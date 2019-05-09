@@ -94,7 +94,6 @@ MODULE m_start_up
                                    regularization, reg_eps, cyl_coord,       & 
                                    anti_diffusion,                     &
                                    rhoref, pref, bubbles, bubble_model,      &
-                                   bubble_switch,                            &
                                    R0ref, nb, Ca, Web, Re_inv,               &
                                    monopole, mono, num_mono, polytropic, thermal,      &
                                    integral, integral_wrt, num_integrals

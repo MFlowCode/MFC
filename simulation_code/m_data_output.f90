@@ -460,7 +460,6 @@ MODULE m_data_output
                      pres = q_prim_vf(E_idx)%sf(j,k,l)
                      
                      ! Compute mixture sound speed
-                     !IF ( (alt_soundspeed .OR. regularization) .and. (bubble_switch .neqv. .TRUE.) .and. (bubbles.neqv. .TRUE.) ) THEN
                      IF ( alt_soundspeed ) THEN
                          DO i = 1, num_fluids
                              alpha(i) = q_prim_vf(E_idx+i)%sf(j,k,l)

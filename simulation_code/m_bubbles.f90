@@ -65,12 +65,12 @@ MODULE m_bubbles
                                         Rtmp, nbub(j,k,l) ) !get n_bub
                       
                     call s_quad( (Rtmp**2.d0)*Vtmp, R2Vav )
-                    bub_adv_src(j,k,l)  = b_coeff(j,k,l)*(4.d0*pi*nbub(j,k,l)*R2Vav)
+                    bub_adv_src(j,k,l)  = 4.d0*pi*nbub(j,k,l)*R2Vav
                 end do; end do; end do
 
                 ! bubble radius and radial velocity source
                 do q=1,nb; do j = 0,m; do k = 0,n; do l = 0,p
-                    bub_r_src(q,j,k,l) = b_coeff(j,k,l)*q_cons_vf(bub_idx%vs(q))%sf(j,k,l)
+                    bub_r_src(q,j,k,l) = q_cons_vf(bub_idx%vs(q))%sf(j,k,l)
                 
                     CALL s_convert_to_mixture_variables( q_cons_vf, myRho, n_tait, B_tait, Re, We, j, k, l )
                     
@@ -121,7 +121,7 @@ MODULE m_bubbles
                         c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
                         rddot       = f_rddot_KM( pbdot, gamma_gas, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_gas, n_tait, B_tait )
                     end if
-                    bub_v_src(q,j,k,l) = b_coeff(j,k,l) * nbub(j,k,l) * rddot
+                    bub_v_src(q,j,k,l) = nbub(j,k,l) * rddot
                     if (isnan(bub_r_src(q,j,k,l))) then
                         stop 'bub_r_src NaN'
                     else if (isnan(bub_v_src(q,j,k,l))) then

@@ -1600,10 +1600,7 @@ MODULE m_riemann_solvers
             ! Generic loop iterator
             INTEGER :: i
 
-            !IF ( (model_eqns.ne.4) .and. (alt_soundspeed .OR. regularization) .and. (bubble_switch .neqv. .TRUE.) ) THEN
             IF ( (alt_soundspeed .or. regularization) ) THEN
-            !IF ( (alt_soundspeed .or. regularization) .and. (bubbles .neqv. .TRUE.) ) THEN
-            !IF ( (model_eqns.ne.4) .and.(alt_soundspeed .OR. regularization) .and. (bubbles .neqv. .TRUE.) ) THEN
                 DO i = 1, num_fluids
                     alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
                     alpha_R(i) = qR_prim_rs_vf(E_idx+i)%sf(j+1,k,l)
@@ -1631,37 +1628,6 @@ MODULE m_riemann_solvers
                 END DO
                 c_L = c_L/rho_L
                 c_R = c_R/rho_R
-            ELSE IF (bubble_switch) THEN
-                DO i = 1, num_fluids
-                    alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
-                    alpha_R(i) = qR_prim_rs_vf(E_idx+i)%sf(j+1,k,l)
-                END DO
-
-                !get Wood part of sound speed
-                blkmod1 = ((fluid_pp(1)%gamma+1d0)*pres_L + &
-                    fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                blkmod2 = ((fluid_pp(2)%gamma+1d0)*pres_L + &
-                    fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                c_L = 1d0/(rho_L*(alpha_L(1)/blkmod1 + alpha_L(2)/blkmod2))
-
-                blkmod1 = ((fluid_pp(1)%gamma+1d0)*pres_R + &
-                    fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                blkmod2 = ((fluid_pp(2)%gamma+1d0)*pres_R + &
-                    fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
-
-                c_L = a_coeff(j,k,l)*c_L
-                c_R = a_coeff(j,k,l)*c_R
-
-                !get linear part of sound speed (for bubbles)
-                c_L =   c_L + b_coeff(j,k,l) *  & 
-                        (1d0/gamma_L + 1d0) *   &
-                        (pres_L + pi_inf_L) /   &
-                        (rho_L*(1d0-alpha_L(num_fluids))) 
-                c_R =   c_R + b_coeff(j,k,l) *  & 
-                        (1d0/gamma_R + 1d0) *   &
-                        (pres_R + pi_inf_R) /   &
-                        (rho_R*(1d0-alpha_R(num_fluids))) 
             ELSEIF ( (model_eqns == 4) .or. (model_eqns == 2 .and. bubbles) ) THEN 
                 !SHB: Sound speed for bubblem ixture to order O(\alpha)
                
@@ -2405,9 +2371,9 @@ MODULE m_riemann_solvers
                 call s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
                 
                 !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} ) 
-                ptilde_L = b_coeff(j,k,l) * alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
+                ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
                     rho_L*R3V2Lbar/R3Lbar )
-                ptilde_R = b_coeff(j,k,l) * alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
+                ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
                     rho_R*R3V2Rbar/R3Rbar )
 
                 !ptilde_L = 0d0; ptilde_R = 0d0

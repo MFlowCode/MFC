@@ -353,9 +353,6 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST( bubbles,1,          &
                         MPI_LOGICAL,0,          &
                         MPI_COMM_WORLD,ierr  )
-            CALL MPI_BCAST( bubble_switch,1,          &
-                        MPI_LOGICAL,0,          &
-                        MPI_COMM_WORLD,ierr  )
             CALL MPI_BCAST( bubble_model,1,            &
                         MPI_INTEGER,0, &
                         MPI_COMM_WORLD,ierr)

@@ -1501,30 +1501,7 @@ MODULE m_rhs
                 END DO
             END DO
 
-            !get the coeffients for splitting gas and bubble terms
-            !if (bubbles .and. (num_fluids > 1)) then
-            if ( bubbles ) then
-                do i = ix%beg,ix%end; do j = iy%beg,iy%end; do k = iz%beg,iz%end
-                    if (num_fluids .le. 2) then
-                        call s_get_coeffs(a_coeff(i,j,k),b_coeff(i,j,k),q_cons_qp(0,0,0)%vf(alf_idx)%sf(i,j,k))
-                    else if (num_fluids == 3) then
-                        call s_get_scoeffs( &
-                            a_coeff(i,j,k), &
-                            b_coeff(i,j,k), &
-                            s_term(i,j,k), &
-                            q_cons_qp(0,0,0)%vf(alf_idx-1)%sf(i,j,k), &
-                            q_cons_qp(0,0,0)%vf(alf_idx)%sf(i,j,k) )
-                    end if
-                end do; end do; end do
-                if (proc_rank == 0 .and. bubble_switch) then
-                    print*, 'a/b coeffs',maxval(abs(q_cons_qp(0,0,0)%vf(alf_idx)%sf)),maxval(abs(a_coeff)), maxval(abs(b_coeff))
-                    do i = adv_idx%beg,adv_idx%end
-                        print*, 'max alfs',maxval(abs(q_cons_qp(0,0,0)%vf(i)%sf))
-                    end do
-                end if
-            end if
-
-            iv%beg = mom_idx%beg; iv%end = E_idx !won't use these SHB
+            iv%beg = mom_idx%beg; iv%end = E_idx 
            
             !won't do anything without flag turned on
             CALL s_average_cell_interior_values(q_prim_qp)
@@ -2071,11 +2048,6 @@ MODULE m_rhs
                         rhs_vf(E_idx)%sf(:,:,:) = rhs_vf(E_idx)%sf(:,:,:) + mono_e_src(:,:,:)
                     end if
 
-                    if (bubbles .and. num_fluids == 3 .and. bubble_switch) then
-                        rhs_vf(alf_idx-1)%sf(:,:,:) = rhs_vf(alf_idx-1)%sf(:,:,:) - s_term(:,:,:)
-                        rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + s_term(:,:,:)
-                    end if
-
                     ! Applying source terms to the RHS of the internal energy equations
                     IF(model_eqns == 3) THEN
                         DO j = 1, num_fluids
@@ -2222,7 +2194,7 @@ MODULE m_rhs
                                               - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,k-1,0:p) )
                                         IF (cyl_coord) THEN
                                             rhs_vf(j)%sf(:,k,:) = &
-                                                rhs_vf(j)%sf(:,k,:) + a_coeff(0:m,k,0:p)*Kterm(:,k,:)/2d0/y_cc(k) * &
+                                                rhs_vf(j)%sf(:,k,:) + Kterm(:,k,:)/2d0/y_cc(k) * &
                                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m, k ,0:p) &
                                                 + flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,k-1,0:p) )
                                         END IF
@@ -2493,13 +2465,13 @@ MODULE m_rhs
                                             IF (adv_alphan .AND. j == adv_idx%end) THEN
                                                 rhs_vf(j)%sf(:,l,k) = &
                                                 rhs_vf(j)%sf(:,l,k) + 1d0/dz(k)/y_cc(l) * &
-                                                (q_cons_qp(0,0,0)%vf(j)%sf(0:m,l,k) - a_coeff(0:m,l,k)*Kterm(:,l,k)) * &
+                                                (q_cons_qp(0,0,0)%vf(j)%sf(0:m,l,k) - Kterm(:,l,k)) * &
                                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,l, k ) &
                                                 - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,l,k-1) )
                                             ELSE
                                                 rhs_vf(j)%sf(:,l,k) = &
                                                 rhs_vf(j)%sf(:,l,k) + 1d0/dz(k)/y_cc(l) * &
-                                                (q_cons_qp(0,0,0)%vf(j)%sf(0:m,l,k) + a_coeff(0:m,l,k)*Kterm(:,l,k)) * &
+                                                (q_cons_qp(0,0,0)%vf(j)%sf(0:m,l,k) + Kterm(:,l,k)) * &
                                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,l, k ) &
                                                 - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,l,k-1) )
                                             END IF

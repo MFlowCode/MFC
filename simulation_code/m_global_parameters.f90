@@ -224,7 +224,6 @@ MODULE m_global_parameters
     REAL(KIND(0d0)) :: Ca, Web, Re_inv
     REAL(KIND(0d0)), dimension(:), allocatable :: weight, R0, V0
     LOGICAL         :: bubbles
-    LOGICAL         :: bubble_switch
     INTEGER         :: bubble_model 
 
 
@@ -244,12 +243,6 @@ MODULE m_global_parameters
     LOGICAL         :: monopole
     TYPE(mono_parameters), dimension(num_probes_max) :: mono
     INTEGER         :: num_mono
-
-    !weights for switches
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: a_coeff, b_coeff
-    
-    !Source for bubble transfer
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: s_term
 
     ! SHB: hold onto p_tilde
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ptil 
@@ -354,7 +347,6 @@ MODULE m_global_parameters
 
             !SHB Bubble modeling
             bubbles     = .FALSE.
-            bubble_switch = .FALSE.
             bubble_model  = 1
             polytropic  = .TRUE.
             thermal     = dflt_int
@@ -752,15 +744,6 @@ MODULE m_global_parameters
                 ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
                 IF(n > 0) iy%beg = -buff_size; IF(p > 0) iz%beg = -buff_size
                 ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-                allocate(   a_coeff(    ix%beg:ix%end,   &
-                                        iy%beg:iy%end,   &
-                                        iz%beg:iz%end ), &
-                            b_coeff(    ix%beg:ix%end,   &
-                                        iy%beg:iy%end,   &
-                                        iz%beg:iz%end ) )
-                allocate(   s_term(     ix%beg:ix%end,   &
-                                        iy%beg:iy%end,   &
-                                        iz%beg:iz%end ) )
                 allocate(   ptil   (    ix%beg:ix%end, &
                                         iy%beg:iy%end, &
                                         iz%beg:iz%end ) )
@@ -1086,68 +1069,6 @@ MODULE m_global_parameters
             weight(1) = tmp*dphi/3.D0
             tmp = DEXP( -0.5D0*(phi(Npt)/sd)**2 )/DSQRT( 2.D0*pi )/sd
             weight(Npt) = tmp*dphi/3.D0
-            !NR0beg = 1
-
-            print*, 'weights = ', weight(:)
-            print*, 'R0s = ', R0(:)
-
         END SUBROUTINE s_simpson
-
-        SUBROUTINE s_get_coeffs(a,b,alf)
-            !eventually this should weight mixture vs bubble terms according to \alf
-            real(kind(0d0)), intent(out)    :: a,b
-            real(kind(0d0)), intent(in)     :: alf
-
-            real(kind(0d0)) :: alf_p, alf_m
-
-            alf_m = 0.025; alf_p = 0.045;
-            !a -> mixture part; b -> bubble part
-            if (bubble_switch) then
-                if (alf > alf_p) then
-                    a = 1d0; b = 0d0 !only mixture terms
-                else if (alf < alf_m) then 
-                    a = 0d0; b = 1d0 !only bubble terms
-                else
-                    !linear relationship between a, b and \alpha
-                    a = (alf - alf_m)/(alf_p - alf_m)
-                    b = (alf_p - alf)/(alf_p - alf_m) 
-                end if
-            else
-                !a = 0d0; b = 1d0 !only bubble terms
-                a = 1d0; b = 1d0 !all terms
-                !a = 1d0; b = 0d0 !no bubble terms
-            end if
-
-        END SUBROUTINE s_get_coeffs
-
-        SUBROUTINE s_get_scoeffs(a,b,s,alfgr,alfgs)
-            !eventually this should weight mixture vs bubble terms according to \alf
-            real(kind(0d0)), intent(out)    :: a,b,s
-            real(kind(0d0)), intent(in)     :: alfgr, alfgs
-
-            real(kind(0d0)) :: alf_p, alf_m, alf_g, amp
-
-            !a -> mixture part; b -> bubble part
-            a = 1d0; b = 1d0 !no weighting on source terms
-            
-            alf_g = alfgr + alfgs
-            alf_m = 1.d-5; alf_p = 1.d-3;
-            
-            !amp = 0.1d0
-            amp = 0.005d0/dt
-
-            if (bubble_switch) then
-                !s = c( H[alf_g - alf_-] alf_gr - 
-                !       H[alf_+ - alf_g] alf_gs )
-                if (alf_g < alf_m) then
-                    s = amp*alfgr
-                else if (alf_g > alf_p) then
-                    s = -1.d0*amp*alfgs
-                end if
-            else
-                s = 0d0
-            end if
-
-        END SUBROUTINE s_get_scoeffs
 
 END MODULE m_global_parameters
