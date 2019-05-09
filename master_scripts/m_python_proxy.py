@@ -1114,7 +1114,6 @@ simulation_dict =                                                              \
                     'pref'                          : None,                     \
                     'rhoref'                        : None,                     \
                     'bubbles'                       : None,                     \
-                    'bubble_switch'                 : None,                     \
                     'bubble_model'                  : None,                     \
                     'polytropic'                    : None,                     \
                     'thermal'                       : None,                     \
