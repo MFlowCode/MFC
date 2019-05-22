@@ -1,32 +1,32 @@
-! MFC v3.0 - Simulation Code: m_cbc.f90
-! Description: The module features a large database of characteristic boundary
-!              conditions (CBC) for the Euler system of equations. This system
-!              is augmented by the appropriate advection equations utilized to
-!              capture the material interfaces. The closure is achieved by the
-!              stiffened equation of state and mixture relations. At this time,
-!              the following CBC are available:
-!                           1) Slip Wall
-!                           2) Nonreflecting Subsonic Buffer
-!                           3) Nonreflecting Subsonic Inflow
-!                           4) Nonreflecting Subsonic Outflow
-!                           5) Force-Free Subsonic Outflow
-!                           6) Constant Pressure Subsonic Outflow
-!                           7) Supersonic Inflow
-!                           8) Supersonic Outflow
-!              Please refer to Thompson (1987, 1990) for detailed descriptions.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!>
+!! @file m_cbc.f90
+!! @brief The module features a large database of characteristic boundary
+!!              conditions (CBC) for the Euler system of equations. This system
+!!              is augmented by the appropriate advection equations utilized to
+!!              capture the material interfaces. The closure is achieved by the
+!!              stiffened equation of state and mixture relations. At this time,
+!!              the following CBC are available:
+!!                           1) Slip Wall
+!!                           2) Nonreflecting Subsonic Buffer
+!!                           3) Nonreflecting Subsonic Inflow
+!!                           4) Nonreflecting Subsonic Outflow
+!!                           5) Force-Free Subsonic Outflow
+!!                           6) Constant Pressure Subsonic Outflow
+!!                           7) Supersonic Inflow
+!!                           8) Supersonic Outflow
+!!              Please refer to Thompson (1987, 1990) for detailed descriptions.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_cbc
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
     ! ==========================================================================
     
     
@@ -37,16 +37,17 @@ MODULE m_cbc
     
     ABSTRACT INTERFACE ! =======================================================
         
-        ! Abstract interface to the procedures that are utilized to calculate
-        ! the L variables. For additional information refer to the following:
-        !            1) s_compute_slip_wall_L
-        !            2) s_compute_nonreflecting_subsonic_buffer_L
-        !            3) s_compute_nonreflecting_subsonic_inflow_L
-        !            4) s_compute_nonreflecting_subsonic_outflow_L
-        !            5) s_compute_force_free_subsonic_outflow_L
-        !            6) s_compute_constant_pressure_subsonic_outflow_L
-        !            7) s_compute_supersonic_inflow_L
-        !            8) s_compute_supersonic_outflow_L
+        !> Abstract interface to the procedures that are utilized to calculate
+        !! the L variables. For additional information refer to the following:
+        !!            1) s_compute_slip_wall_L
+        !!            2) s_compute_nonreflecting_subsonic_buffer_L
+        !!            3) s_compute_nonreflecting_subsonic_inflow_L
+        !!            4) s_compute_nonreflecting_subsonic_outflow_L
+        !!            5) s_compute_force_free_subsonic_outflow_L
+        !!            6) s_compute_constant_pressure_subsonic_outflow_L
+        !!            7) s_compute_supersonic_inflow_L
+        !!            8) s_compute_supersonic_outflow_L
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_abstract_L(dflt_int)
 
         INTEGER, INTENT(IN) :: dflt_int
@@ -56,98 +57,86 @@ MODULE m_cbc
     END INTERFACE ! ============================================================
     
     
-    ! The cell-average primitive variables. They are obtained by reshaping (RS)
-    ! q_prim_vf in the coordinate direction normal to the domain boundary along
-    ! which the CBC is applied.
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_prim_rs_vf
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_prim_rs_vf !<
+    !! The cell-average primitive variables. They are obtained by reshaping (RS)
+    !! q_prim_vf in the coordinate direction normal to the domain boundary along
+    !! which the CBC is applied.
+ 
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: F_rs_vf, F_src_rs_vf !<
+    !! Cell-average fluxes (src - source). These are directly determined from the
+    !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
+    
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: flux_rs_vf, flux_src_rs_vf !<
+    !! The cell-boundary-average of the fluxes. They are initially determined by
+    !! reshaping flux_vf and flux_src_vf in a coordinate direction normal to the
+    !! domain boundary along which CBC is applied. flux_rs_vf and flux_src_rs_vf
+    !! are subsequently modified based on the selected CBC.
+    
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_rho   !< Cell averaged partial densiy
+    REAL(KIND(0d0))                              :: rho         !< Cell averaged density
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: vel         !< Cell averaged velocity
+    REAL(KIND(0d0))                              :: pres        !< Cell averaged pressure
+    REAL(KIND(0d0))                              :: E           !< Cell averaged energy
+    REAL(KIND(0d0))                              :: H           !< Cell averaged enthalpy
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: adv         !< Cell averaged advected variables
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: mf          !< Cell averaged mass fraction
+    REAL(KIND(0d0))                              :: gamma       !< Cell averaged specific heat ratio
+    REAL(KIND(0d0))                              :: pi_inf      !< Cell averaged liquid stiffness
+    REAL(KIND(0d0))                              :: c           !< Cell averaged speed of sound
+    REAL(KIND(0d0)),              DIMENSION(2)   :: Re          !< Cell averaged Reynolds numbers
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) :: We          !< Cell averaged Weber numbers
 
-    ! Cell-average fluxes (src - source). These are directly determined from the
-    ! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: F_rs_vf, F_src_rs_vf
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: dalpha_rho_ds !< Spatial derivatives in s-dir of partial density
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::       dvel_ds !< Spatial derivatives in s-dir of velocity
+    REAL(KIND(0d0))                            ::      dpres_ds !< Spatial derivatives in s-dir of pressure
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::       dadv_ds !< Spatial derivatives in s-dir of advection variables
+    !! Note that these are only obtained in those cells on the domain boundary along which the
+    !! CBC is applied by employing finite differences (FD) on the cell-average primitive variables, q_prim_rs_vf.
+ 
     
-    ! The cell-boundary-average of the fluxes. They are initially determined by
-    ! reshaping flux_vf and flux_src_vf in a coordinate direction normal to the
-    ! domain boundary along which CBC is applied. flux_rs_vf and flux_src_rs_vf
-    ! are subsequently modified based on the selected CBC.
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: flux_rs_vf, flux_src_rs_vf
+    REAL(KIND(0d0)),              DIMENSION(3) :: lambda !< Eigenvalues (see Thompson 1987,1990)
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: L      !< L matrix (see Thompson 1987,1990)
     
-    ! The cell-averaged partial densities, density, velocity, pressure, energy,
-    ! enthalpy, advected variables, mass fractions, the specific heat ratio and
-    ! liquid stiffness functions, speed of sound, the shear and volume Reynolds
-    ! numbers and the Weber numbers. These are calculated from q_prim_rs_vf and
-    ! only in those cells on the domain boundary along which the CBC is applied.
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_rho
-    REAL(KIND(0d0))                              :: rho
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: vel
-    REAL(KIND(0d0))                              :: pres
-    REAL(KIND(0d0))                              :: E
-    REAL(KIND(0d0))                              :: H
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: adv
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: mf
-    REAL(KIND(0d0))                              :: gamma
-    REAL(KIND(0d0))                              :: pi_inf
-    REAL(KIND(0d0))                              :: c
-    REAL(KIND(0d0)),              DIMENSION(2)   :: Re
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) :: We
-    
-    ! The first-order spatial derivatives, in the s-direction, of the partial
-    ! densities, velocity, pressure, and advection variables. Note that these
-    ! are only obtained in those cells on the domain boundary along which the
-    ! CBC is applied by employing finite differences (FD) on the cell-average
-    ! primitive variables, q_prim_rs_vf.
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: dalpha_rho_ds
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::       dvel_ds
-    REAL(KIND(0d0))                            ::      dpres_ds
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::       dadv_ds
-    
-    ! Eigenvalues and L, see Thompson (1987, 1990)
-    REAL(KIND(0d0)),              DIMENSION(3) :: lambda
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: L
-    
-    ! Cell-width distribution in the s-direction
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: ds
+
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: ds !< Cell-width distribution in the s-direction
     
     
     ! CBC Coefficients =========================================================
-    
-    ! FD coefficients in x-, y-, and z-directions. Please notice that the first
-    ! dimension of the array identifies the location of a coefficient in the FD
-    ! formula, while the last dimension denotes the location of the CBC.
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:) :: fd_coef_x
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:) :: fd_coef_y
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:) :: fd_coef_z
-    
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:) :: fd_coef_x !< Finite diff. coefficients x-dir
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:) :: fd_coef_y !< Finite diff. coefficients y-dir
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:) :: fd_coef_z !< Finite diff. coefficients z-dir
+    !! The first dimension identifies the location of a coefficient in the FD
+    !! formula, while the last dimension denotes the location of the CBC.
+
+
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:) :: fd_coef => NULL()
     
-    ! Polynomial interpolants (PI) coefficients in the x-, y-, and z-directions.
-    ! Note that the first dimension of the array identifies the polynomial, the
-    ! second dimension identifies the position of its coefficients and the last
-    ! dimension denotes the location of the CBC.
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:) :: pi_coef_x
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:) :: pi_coef_y
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:) :: pi_coef_z
-    
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:) :: pi_coef_z !< Polynominal interpolant coefficients in z-dir
+    !! The first dimension of the array identifies the polynomial, the
+    !! second dimension identifies the position of its coefficients and the last
+    !! dimension denotes the location of the CBC.
+
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:,:) :: pi_coef => NULL()
     ! ==========================================================================
     
     
-    ! Pointer to procedure used to calculate L variables, based on choice of CBC
-    PROCEDURE(s_compute_abstract_L), POINTER :: s_compute_L => NULL()
+
+    PROCEDURE(s_compute_abstract_L), POINTER :: s_compute_L => NULL() !<
+    !! Pointer to procedure used to calculate L variables, based on choice of CBC
     
-    ! Indical bounds in the s1-, s2- and s3-directions
-    TYPE(bounds_info) :: is1,is2,is3
+
+    TYPE(bounds_info) :: is1,is2,is3 !< Indical bounds in the s1-, s2- and s3-directions
     
     
     CONTAINS
         
-        
-        
-        
-        
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.        
         SUBROUTINE s_initialize_cbc_module() ! ---------------------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
+
             
             
             IF(              ALL((/bc_x%beg,bc_x%end/) > -5)  &
@@ -431,20 +420,18 @@ MODULE m_cbc
         
         
         
-        
-        
+        !!  The goal of the procedure is to associate the FD and PI
+        !!      coefficients, or CBC coefficients, with the appropriate
+        !!      targets, based on the coordinate direction and location
+        !!      of the CBC.
+        !!  @param cbc_dir CBC coordinate direction
+        !!  @param cbc_loc CBC coordinate location
         SUBROUTINE s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc) ! ---
-        ! Description: The goal of the procedure is to associate the FD and PI
-        !              coefficients, or CBC coefficients, with the appropriate
-        !              targets, based on the coordinate direction and location
-        !              of the CBC.
             
             
-            ! CBC coordinate direction and location
             INTEGER, INTENT(IN) :: cbc_dir, cbc_loc
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Associating CBC Coefficients in x-direction ======================
@@ -505,31 +492,33 @@ MODULE m_cbc
         
         
         
-        
+        !>  The following is the implementation of the CBC based on
+        !!      the work of Thompson (1987, 1990) on hyperbolic systems.
+        !!      The CBC is indirectly applied in the computation of the
+        !!      right-hand-side (RHS) near the relevant domain boundary
+        !!      through the modification of the fluxes.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param flux_vf Cell-boundary-average fluxes
+        !!  @param flux_src_vf Cell-boundary-average flux sources
+        !!  @param cbc_dir CBC coordinate direction
+        !!  @param cbc_loc CBC coordinate location
+        !!  @param ix Index bound in the first coordinate direction 
+        !!  @param iy Index bound in the second coordinate direction 
+        !!  @param iz Index bound in the third coordinate direction 
         SUBROUTINE s_cbc( q_prim_vf, flux_vf, flux_src_vf, & ! -----------------
                                          cbc_dir, cbc_loc, &
                                                  ix,iy,iz  )
-        ! Description: The following is the implementation of the CBC based on
-        !              the work of Thompson (1987, 1990) on hyperbolic systems.
-        !              The CBC is indirectly applied in the computation of the
-        !              right-hand-side (RHS) near the relevant domain boundary
-        !              through the modification of the fluxes.
-            
-            
-            ! Cell-average primitive variables
+           
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_prim_vf
             
-            ! Cell-boundary-average fluxes
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf
             
-            ! CBC coordinate direction and location
             INTEGER, INTENT(IN) :: cbc_dir, cbc_loc
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! First-order time derivatives of the partial densities, density,
@@ -543,11 +532,10 @@ MODULE m_cbc
             REAL(KIND(0d0))                            ::     dgamma_dt
             REAL(KIND(0d0))                            ::    dpi_inf_dt
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,r
+            INTEGER :: i,j,k,r !< Generic loop iterators
 
-            ! Fluid bulk modulus for Woods mixture sound speed
-            REAL(KIND(0d0)) :: blkmod1, blkmod2
+
+            REAL(KIND(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
             
             
             ! Reshaping of inputted data and association of the FD and PI
@@ -838,13 +826,13 @@ MODULE m_cbc
         
         
         
-        
-        
+        !>  The L variables for the slip wall CBC, see pg. 451 of
+        !!      Thompson (1990). At the slip wall (frictionless wall),
+        !!      the normal component of velocity is zero at all times,
+        !!      while the transverse velocities may be nonzero.        
+        !!  @param dflt_int Default null integer
         SUBROUTINE s_compute_slip_wall_L(dflt_int) ! -----------------------------------
-        ! Description: The L variables for the slip wall CBC, see pg. 451 of
-        !              Thompson (1990). At the slip wall (frictionless wall),
-        !              the normal component of velocity is zero at all times,
-        !              while the transverse velocities may be nonzero.
+
             
         INTEGER, INTENT(IN) :: dflt_int
             
@@ -860,17 +848,17 @@ MODULE m_cbc
         
         
         
-        
+        !>  The L variables for the nonreflecting subsonic buffer CBC
+        !!      see pg. 13 of Thompson (1987). The nonreflecting subsonic
+        !!      buffer reduces the amplitude of any reflections caused by
+        !!      outgoing waves.
+        !!  @param dflt_int Default null integer
         SUBROUTINE s_compute_nonreflecting_subsonic_buffer_L(dflt_int) ! ---------------
-        ! Description: The L variables for the nonreflecting subsonic buffer CBC
-        !              see pg. 13 of Thompson (1987). The nonreflecting subsonic
-        !              buffer reduces the amplitude of any reflections caused by
-        !              outgoing waves.
+           
+            INTEGER, INTENT(IN) :: dflt_int
             
-        INTEGER, INTENT(IN) :: dflt_int
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             L(1) = (5d-1 - 5d-1*SIGN(1d0,lambda(1)))*lambda(1) &
@@ -899,15 +887,14 @@ MODULE m_cbc
         
         
         
-        
-        
+        !>  The L variables for the nonreflecting subsonic inflow CBC
+        !!      see pg. 455, Thompson (1990). This nonreflecting subsonic
+        !!      CBC assumes an incoming flow and reduces the amplitude of
+        !!      any reflections caused by outgoing waves.
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_nonreflecting_subsonic_inflow_L(dflt_int) ! ---------------
-        ! Description: The L variables for the nonreflecting subsonic inflow CBC
-        !              see pg. 455, Thompson (1990). This nonreflecting subsonic
-        !              CBC assumes an incoming flow and reduces the amplitude of
-        !              any reflections caused by outgoing waves.
-            
-        INTEGER, INTENT(IN) :: dflt_int
+           
+            INTEGER, INTENT(IN) :: dflt_int
             
             L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
             
@@ -919,17 +906,17 @@ MODULE m_cbc
         
         
         
-        
+        !>  The L variables for the nonreflecting subsonic outflow
+        !!      CBC see pg. 454 of Thompson (1990). This nonreflecting
+        !!      subsonic CBC presumes an outgoing flow and reduces the
+        !!      amplitude of any reflections caused by outgoing waves.
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_nonreflecting_subsonic_outflow_L(dflt_int) ! --------------
-        ! Description: The L variables for the nonreflecting subsonic outflow
-        !              CBC see pg. 454 of Thompson (1990). This nonreflecting
-        !              subsonic CBC presumes an outgoing flow and reduces the
-        !              amplitude of any reflections caused by outgoing waves.
+           
+            INTEGER, INTENT(IN) :: dflt_int
             
-        INTEGER, INTENT(IN) :: dflt_int
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !> Generic loop iterator
             
             
             L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
@@ -952,22 +939,20 @@ MODULE m_cbc
         END SUBROUTINE s_compute_nonreflecting_subsonic_outflow_L ! ------------
         
         
-        
-        
-        
+        !>  The L variables for the force-free subsonic outflow CBC,
+        !!      see pg. 454 of Thompson (1990). The force-free subsonic
+        !!      outflow sets to zero the sum of all of the forces which
+        !!      are acting on a fluid element for the normal coordinate
+        !!      direction to the boundary. As a result, a fluid element
+        !!      at the boundary is simply advected outward at the fluid
+        !!      velocity.
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_force_free_subsonic_outflow_L(dflt_int) ! -----------------
-        ! Description: The L variables for the force-free subsonic outflow CBC,
-        !              see pg. 454 of Thompson (1990). The force-free subsonic
-        !              outflow sets to zero the sum of all of the forces which
-        !              are acting on a fluid element for the normal coordinate
-        !              direction to the boundary. As a result, a fluid element
-        !              at the boundary is simply advected outward at the fluid
-        !              velocity.
-            
+           
         INTEGER, INTENT(IN) :: dflt_int
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !> Generic loop iterator
             
             
             L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
@@ -991,18 +976,17 @@ MODULE m_cbc
         
         
         
-        
-        
+        !>  L variables for the constant pressure subsonic outflow
+        !!      CBC see pg. 455 Thompson (1990). The constant pressure
+        !!      subsonic outflow maintains a fixed pressure at the CBC
+        !!      boundary in absence of any transverse effects.
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_constant_pressure_subsonic_outflow_L(dflt_int) ! ----------
-        ! Description: L variables for the constant pressure subsonic outflow
-        !              CBC see pg. 455 Thompson (1990). The constant pressure
-        !              subsonic outflow maintains a fixed pressure at the CBC
-        !              boundary in absence of any transverse effects.
-            
+           
         INTEGER, INTENT(IN) :: dflt_int
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !> Generic loop iterator
             
             
             L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
@@ -1027,14 +1011,14 @@ MODULE m_cbc
         
         
         
-        
+        !>  L variables for the supersonic inflow CBC, see pg. 453
+        !!      Thompson (1990). The supersonic inflow CBC is a steady
+        !!      state, or nearly a steady state, CBC in which only the
+        !!      transverse terms may generate a time dependence at the
+        !!      inflow boundary.
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_supersonic_inflow_L(dflt_int) ! ---------------------------
-        ! Description: L variables for the supersonic inflow CBC, see pg. 453
-        !              Thompson (1990). The supersonic inflow CBC is a steady
-        !              state, or nearly a steady state, CBC in which only the
-        !              transverse terms may generate a time dependence at the
-        !              inflow boundary.
-            
+           
         INTEGER, INTENT(IN) :: dflt_int
             
             L = 0d0
@@ -1044,19 +1028,17 @@ MODULE m_cbc
         
         
         
-        
-        
+        !>  L variables for the supersonic outflow CBC, see pg. 453
+        !!      of Thompson (1990). For the supersonic outflow CBC, the
+        !!      flow evolution at the boundary is determined completely
+        !!      by the interior data.
+        !! @param dflt_int Default null integer
         SUBROUTINE s_compute_supersonic_outflow_L(dflt_int) ! --------------------------
-        ! Description: L variables for the supersonic outflow CBC, see pg. 453
-        !              of Thompson (1990). For the supersonic outflow CBC, the
-        !              flow evolution at the boundary is determined completely
-        !              by the interior data.
-            
+           
         INTEGER, INTENT(IN) :: dflt_int
             
-            ! Generic loop iterator
-            INTEGER :: i
-            
+
+            INTEGER :: i !< Generic loop iterator
             
             L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
             
@@ -1079,38 +1061,38 @@ MODULE m_cbc
         
         
         
-        
-        
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are required for the setup of the
+        !!      selected CBC.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param flux_vf Cell-boundary-average fluxes
+        !!  @param flux_src_vf Cell-boundary-average flux sources
+        !!  @param cbc_dir CBC coordinate direction
+        !!  @param cbc_loc CBC coordinate location
+        !!  @param ix Index bound in the first coordinate direction 
+        !!  @param iy Index bound in the second coordinate direction 
+        !!  @param iz Index bound in the third coordinate direction         
         SUBROUTINE s_initialize_cbc( q_prim_vf, flux_vf, flux_src_vf, & ! ------
                                                     cbc_dir, cbc_loc, &
                                                             ix,iy,iz  )
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are required for the setup of the
-        !              selected CBC.
-            
-            
-            ! Cell-average primitive variables
+           
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_prim_vf
             
-            ! Cell-boundary-average fluxes
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: flux_vf, flux_src_vf
             
-            ! CBC coordinate direction and location
             INTEGER, INTENT(IN) :: cbc_dir, cbc_loc
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Indical shift based on CBC location
-            INTEGER :: dj
+
+            INTEGER :: dj !< Indical shift based on CBC location
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,r
+
+            INTEGER :: i,j,k,r !< Generic loop iterators
             
             
             ! Configuring the coordinate direction indexes and flags
@@ -1512,31 +1494,31 @@ MODULE m_cbc
         
         
         
-        
-        
+        !>  Deallocation and/or the disassociation procedures that
+        !!      are necessary in order to finalize the CBC application
+        !!  @param flux_vf Cell-boundary-average fluxes
+        !!  @param flux_src_vf Cell-boundary-average flux sources
+        !!  @param cbc_dir CBC coordinate direction
+        !!  @param cbc_loc CBC coordinate location
+        !!  @param ix Index bound in the first coordinate direction 
+        !!  @param iy Index bound in the second coordinate direction 
+        !!  @param iz Index bound in the third coordinate direction         
         SUBROUTINE s_finalize_cbc( flux_vf, flux_src_vf, & ! -------------------
                                        cbc_dir, cbc_loc, &
                                                ix,iy,iz  )
-        ! Description: Deallocation and/or the disassociation procedures that
-        !              are necessary in order to finalize the CBC application
-            
-            
-            ! Cell-boundary-average fluxes
+           
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf
             
-            ! CBC coordinate direction and location
             INTEGER, INTENT(IN) :: cbc_dir, cbc_loc
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Indical shift based on CBC location
-            INTEGER :: dj
+
+            INTEGER :: dj !< Indical shift based on CBC location
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,r
+
+            INTEGER :: i,j,k,r !< Generic loop iterators
             
             
             ! Determining the indicial shift based on CBC location
@@ -1772,8 +1754,8 @@ MODULE m_cbc
         
         
         
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_cbc_module() ! -----------------------------------
-        ! Description: Module deallocation and/or disassociation procedures
             
             
             IF(              ALL((/bc_x%beg,bc_x%end/) > -5)  &

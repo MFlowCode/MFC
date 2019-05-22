@@ -1,59 +1,57 @@
-! MFC v3.0 - Simulation Code: p_main.f90
-! Description: Quasi-conservative, shock- and interface- capturing finite-volume
-!              scheme for the multicomponent Navier-Stokes equations. The system
-!              is augmented with the relevant advection equations to capture the
-!              material interfaces and closed by the stiffened equation of state
-!              as well as any required mixture relations. The effects of surface
-!              tension are included and modeled through a volume force that acts
-!              across the diffuse material interface regions. The implementation
-!              specifics of surface tension may be found in the work by Perigaud
-!              and Saurel (2005). Note that both viscous and capillarity effects
-!              are only available in the volume fraction model.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!>
+!! @file p_main.f90
+!! @brief  Quasi-conservative, shock- and interface- capturing finite-volume
+!!              scheme for the multicomponent Navier-Stokes equations. The system
+!!              is augmented with the relevant advection equations to capture the
+!!              material interfaces and closed by the stiffened equation of state
+!!              as well as any required mixture relations. The effects of surface
+!!              tension are included and modeled through a volume force that acts
+!!              across the diffuse material interface regions. The implementation
+!!              specifics of surface tension may be found in the work by Perigaud
+!!              and Saurel (2005). Note that both viscous and capillarity effects
+!!              are only available in the volume fraction model.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 PROGRAM p_main
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
 
-    USE m_fftw                 ! Module for FFTW functions
+    USE m_fftw                 !< Module for FFTW functions
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
-    USE m_start_up             ! Reading and checking procedures for the input
-                               ! and the initial condition and grid data files
+    USE m_start_up             !< Reading and checking procedures for the input
+                               !< and the initial condition and grid data files
     
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
     
-    USE m_weno                 ! Weighted and essentially non-oscillatory (WENO)
-                               ! schemes for spatial reconstruction of variables
+    USE m_weno                 !< Weighted and essentially non-oscillatory (WENO)
+                               !! schemes for spatial reconstruction of variables
     
-    USE m_riemann_solvers      ! Exact and approximate Riemann problem solvers
+    USE m_riemann_solvers      !< Exact and approximate Riemann problem solvers
     
-    USE m_cbc                  ! Characteristic boundary conditions (CBC)
+    USE m_cbc                  !< Characteristic boundary conditions (CBC)
     
-    USE m_rhs                  ! Right-hand-side (RHS) evaluation procedures
+    USE m_rhs                  !< Right-hand-side (RHS) evaluation procedures
     
-    USE m_data_output          ! Run-time info & solution data output procedures
+    USE m_data_output          !< Run-time info & solution data output procedures
 
-    USE m_derived_variables    ! Derived variables evaluation procedures
+    USE m_derived_variables    !< Derived variables evaluation procedures
     
-    USE m_time_steppers        ! Time-stepping algorithms
+    USE m_time_steppers        !< Time-stepping algorithms
 
-    USE m_anti_diffusion       !Anti diffusion step of Shyue
+    USE m_anti_diffusion       !< Anti diffusion step of Shyue
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
-    
-    ! Iterator for the time-stepping loop
-    INTEGER :: t_step
+    INTEGER :: t_step !< Iterator for the time-stepping loop
 
     CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
     

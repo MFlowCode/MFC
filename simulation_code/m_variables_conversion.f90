@@ -1,30 +1,30 @@
-! MFC v3.0 - Simulation Code: m_variables_conversion.f90
-! Description: This module features a database of subroutines that allow for the
-!              conversion of state variables from one type into another. At this
-!              time, the state variables type conversions below are available:
-!                             1) Mixture        => Mixture
-!                             2) Species        => Mixture
-!                             3) Conservative   => Primitive
-!                             4) Conservative   => Characteristic
-!                             5) Conservative   => Flux
-!                             6) Primitive      => Conservative
-!                             7) Primitive      => Characteristic
-!                             8) Primitive      => Flux
-!                             9) Characteristic => Conservative
-!                            10) Characteristic => Primitive
-! Author: Vedran Coralic
-! Date: 07/29/12
-
-
+!>
+!! @file m_variables_conversion.f90
+!! @brief This module features a database of subroutines that allow for the
+!!              conversion of state variables from one type into another. At this
+!!              time, the state variables type conversions below are available:
+!!                             1) Mixture        => Mixture
+!!                             2) Species        => Mixture
+!!                             3) Conservative   => Primitive
+!!                             4) Conservative   => Characteristic
+!!                             5) Conservative   => Flux
+!!                             6) Primitive      => Conservative
+!!                             7) Primitive      => Characteristic
+!!                             8) Primitive      => Flux
+!!                             9) Characteristic => Conservative
+!!                            10) Characteristic => Primitive 
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_variables_conversion
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     ! ==========================================================================
     
     
@@ -50,11 +50,20 @@ MODULE m_variables_conversion
     
     ABSTRACT INTERFACE ! =======================================================
         
-        ! The abstract interface to the procedures that are utilized to convert
-        ! the mixture and the species variables into the mixture variables. For
-        ! more information, refer to:
-        !               1) s_convert_mixture_to_mixture_variables
-        !               2) s_convert_species_to_mixture_variables
+        !> The abstract interface to the procedures that are utilized to convert
+        !! the mixture and the species variables into the mixture variables. For
+        !! more information, refer to:
+        !!               1) s_convert_mixture_to_mixture_variables
+        !!               2) s_convert_species_to_mixture_variables
+        !! @param qK_vf Conservative/primitive variables
+        !! @param rho_K Mixture density
+        !! @param gamma_K Mixture sp. heat ratio
+        !! @param pi_inf_K Mixture stiffness function
+        !! @param Re_K Reynolds number
+        !! @param We_K Weber number
+        !! @param i Cell location first index
+        !! @param j Cell location second index
+        !! @param k Cell location third index
         SUBROUTINE s_convert_abstract_to_mixture_variables( qK_vf, rho_K,      &
                                                             gamma_K, pi_inf_K, &
                                                             Re_K, We_K, i,j,k  )
@@ -74,10 +83,13 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_convert_abstract_to_mixture_variables
         
-        ! The abstract interface to the procedures that are used to compute the
-        ! Roe and the arithmetic average states. For additional information see:
-        !                 1) s_compute_roe_average_state
-        !                 2) s_compute_arithmetic_average_state
+        !> The abstract interface to the procedures that are used to compute the
+        !! Roe and the arithmetic average states. For additional information see:
+        !!                 1) s_compute_roe_average_state
+        !!                 2) s_compute_arithmetic_average_state
+        !! @param i Cell location first index
+        !! @param j Cell location second index
+        !! @param k Cell location third index
         SUBROUTINE s_compute_abstract_average_state(i,j,k)
             
             INTEGER, INTENT(IN) :: i,j,k
@@ -87,73 +99,70 @@ MODULE m_variables_conversion
     END INTERFACE ! ============================================================
     
     
-    ! The left (L) and right (R) cell-average densities, velocities, pressures,
-    ! energies, enthalpies, mass fractions, the specific heat ratio and liquid
-    ! stiffness functions, the shear and volume Reynolds numbers and the Weber
-    ! numbers, respectively. These are defined with respect to cell-boundaries.
-    REAL(KIND(0d0))                              ::    rho_L,    rho_R
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::    vel_L,    vel_R
-    REAL(KIND(0d0))                              ::   pres_L,   pres_R
-    REAL(KIND(0d0))                              ::      E_L,      E_R
-    REAL(KIND(0d0))                              ::      H_L,      H_R
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::     mf_L,     mf_R
-    REAL(KIND(0d0))                              ::  gamma_L,  gamma_R
-    REAL(KIND(0d0))                              :: pi_inf_L, pi_inf_R
-    REAL(KIND(0d0)),              DIMENSION(2)   ::     Re_L,     Re_R
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::     We_L,     We_R
-    ! SHB: alpha_L/R for mixture speed of sound computation    
-    REAL(KIND(0d0))                              ::   alpha_L,   alpha_R
+    REAL(KIND(0d0))                              ::    rho_L,    rho_R      !< left/right states density
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::    vel_L,    vel_R      !< left/right states velocity
+    REAL(KIND(0d0))                              ::   pres_L,   pres_R      !< left/right states pressure
+    REAL(KIND(0d0))                              ::      E_L,      E_R      !< left/right states total energy
+    REAL(KIND(0d0))                              ::      H_L,      H_R      !< left/right states enthalpy
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::     mf_L,     mf_R      !< left/right states mass fraction
+    REAL(KIND(0d0))                              ::  gamma_L,  gamma_R      !< left/right states specific heat ratio
+    REAL(KIND(0d0))                              :: pi_inf_L, pi_inf_R      !< left/right states liquid stiffness
+    REAL(KIND(0d0)),              DIMENSION(2)   ::     Re_L,     Re_R      !< left/right states Reynolds number
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::     We_L,     We_R      !< left/right states Weber number
+
     
-    ! The Roe or arithmetic average density, velocity, enthalpy, mass fractions,
-    ! specific heat ratio function, and the sound speed, at the cell-boundaries,
-    ! computed from the left and right cell-average variables.
-    REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:,:,:) :: rho_avg_sf
-    REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:)     :: vel_avg
-    REAL(KIND(0d0))                                   :: H_avg
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)     :: mf_avg_vf
-    REAL(KIND(0d0))                                   :: gamma_avg
-    REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:,:,:) :: c_avg_sf
-    ! SHB: alpha_avg for mixture SOS computation
-    REAL(KIND(0d0))                                   :: alpha_avg
-    REAL(KIND(0d0))                                   :: pres_avg
+    REAL(KIND(0d0))                              ::   alpha_L,   alpha_R    !< left/right states void fraction
     
-    ! Pointer to the procedure utilized to convert either the mixture or the
-    ! species variables into the mixture variables, based on model equations
+    REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:,:,:) :: rho_avg_sf !< averaged (Roe/arithmetic) density
+    REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:)     :: vel_avg    !< averaged (Roe/arithmetic) velocity
+    REAL(KIND(0d0))                                   :: H_avg      !< averaged (Roe/arithmetic) enthalpy
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)     :: mf_avg_vf  !< averaged (Roe/arithmetic) mass fraction
+    REAL(KIND(0d0))                                   :: gamma_avg  !< averaged (Roe/arithmetic) specific heat ratio
+    REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:,:,:) :: c_avg_sf   !< averaged (Roe/arithmetic) speed of sound
+
+    REAL(KIND(0d0))                                   :: alpha_avg !< averaging for bubbly mixture speed of sound
+    REAL(KIND(0d0))                                   :: pres_avg  !< averaging for bubble mixture speed of sound
+    
     PROCEDURE(s_convert_abstract_to_mixture_variables), &
-    POINTER :: s_convert_to_mixture_variables => NULL()
+    POINTER :: s_convert_to_mixture_variables => NULL() !<
+    !! Pointer to the procedure utilized to convert either the mixture or the
+    !! species variables into the mixture variables, based on model equations
     
-    ! Pointer to the subroutine utilized to calculate either the Roe or the
-    ! arithmetic average state variables, based on the chosen average state
     PROCEDURE(s_compute_abstract_average_state), &
-    POINTER :: s_compute_average_state => NULL()
-    
+    POINTER :: s_compute_average_state => NULL() !<
+    !! Pointer to the subroutine utilized to calculate either the Roe or the
+    !! arithmetic average state variables, based on the chosen average state
+     
     
     CONTAINS
-                
+             
+        !> This procedure is used alongside with the gamma/pi_inf
+        !!      model to transfer the density, the specific heat ratio
+        !!      function and liquid stiffness function from the vector
+        !!      of conservative or primitive variables to their scalar
+        !!      counterparts.
+        !! @param qK_vf conservative or primitive variables
+        !! @param i cell index to transfer mixture variables 
+        !! @param j cell index to transfer mixture variables
+        !! @param k cell index to transfer mixture variables
+        !! @param rho_K density
+        !! @param gamma_K  specific heat ratio function
+        !! @param pi_inf_K liquid stiffness
+        !! @param Re_k Reynolds number
+        !! @param We_K Weber number
         SUBROUTINE s_convert_mixture_to_mixture_variables( qK_vf, rho_K,      &
                                                            gamma_K, pi_inf_K, &
                                                            Re_K, We_K, i,j,k  )
-        ! Description: This procedure is used alongside with the gamma/pi_inf
-        !              model to transfer the density, the specific heat ratio
-        !              function and liquid stiffness function from the vector
-        !              of conservative or primitive variables to their scalar
-        !              counterparts.
-            
-            
-            ! Conservative or primitive variables
+
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
             
-            ! Density and the specific heat ratio and liquid stiffness functions
             REAL(KIND(0d0)), INTENT(OUT) :: rho_K, gamma_K, pi_inf_K
             
-            ! Shear and volume Reynolds numbers
             REAL(KIND(0d0)), DIMENSION(2), INTENT(OUT) :: Re_K
             
-            ! Weber numbers
             REAL(KIND(0d0)), DIMENSION( num_fluids, &
                                         num_fluids  ), INTENT(OUT) :: We_K
             
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: i,j,k
             
             ! Performing the transfer of the density, the specific heat ratio
@@ -164,35 +173,38 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_convert_mixture_to_mixture_variables ! ----------------
        
-        !!! SHB mixture variables if you have one phase plus modeled bubbles
+        !>  This procedure is used alongside with the gamma/pi_inf
+        !!      model to transfer the density, the specific heat ratio
+        !!      function and liquid stiffness function from the vector
+        !!      of conservative or primitive variables to their scalar
+        !!      counterparts. Specifially designed for when subgrid bubbles
+        !!      must be included.
+        !! @param qK_vf primitive variables
+        !! @param rho_K density
+        !! @param gamma_K specific heat ratio
+        !! @param pi_inf_K liquid stiffness
+        !! @param Re_K mixture Reynolds number
+        !! @param We_K mixture Weber number
+        !! @param i Cell index
+        !! @param j Cell index
+        !! @param k Cell index
         SUBROUTINE s_convert_species_to_mixture_variables_bubbles ( qK_vf, rho_K,      &
                                                            gamma_K, pi_inf_K, &
                                                            Re_K, We_K, i,j,k  )
 
-        ! Description: This procedure is used alongside with the gamma/pi_inf
-        !              model to transfer the density, the specific heat ratio
-        !              function and liquid stiffness function from the vector
-        !              of conservative or primitive variables to their scalar
-        !              counterparts.
-            
-            
-            ! Conservative or primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
             
-            ! Density and the specific heat ratio and liquid stiffness functions
             REAL(KIND(0d0)), INTENT(OUT) :: rho_K, gamma_K, pi_inf_K
             
-            ! Shear and volume Reynolds numbers
             REAL(KIND(0d0)), DIMENSION(2), INTENT(OUT) :: Re_K
             
-            ! Weber numbers
             REAL(KIND(0d0)), DIMENSION( num_fluids, &
                                         num_fluids  ), INTENT(OUT) :: We_K
  
-            ! Partial densities and volume fractions
-            REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K
+
+            REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K  !<
+            !! Partial densities and volume fractions
             
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: i,j,k
             INTEGER :: l
 
@@ -242,38 +254,41 @@ MODULE m_variables_conversion
  
         
         
-        
+        !>  This subroutine is designed for the volume fraction model
+        !!              and provided a set of either conservative or primitive
+        !!              variables, computes the density, the specific heat ratio
+        !!              function and the liquid stiffness function from q_vf and
+        !!              stores the results into rho, gamma and pi_inf. 
+        !! @param qK_vf primitive variables
+        !! @param rho_K density
+        !! @param gamma_K specific heat ratio
+        !! @param pi_inf_K liquid stiffness
+        !! @param Re_K mixture Reynolds number
+        !! @param We_K mixture Weber number
+        !! @param k Cell index
+        !! @param l Cell index
+        !! @param r Cell index        
         SUBROUTINE s_convert_species_to_mixture_variables( qK_vf, rho_K,      &
                                                            gamma_K, pi_inf_K, &
                                                            Re_K, We_K, k,l,r  )
-        ! Description: The procedure is used alongside with the volume fraction
-        !              model to enable the conversion of species variables into
-        !              mixture variables. Latter includes density, the specific
-        !              heat ratio and liquid stiffness functions, the shear and
-        !              volume Reynolds numbers and the Weber numbers.
             
-            
-            ! Conservative or primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
 
-            ! Density and the specific heat ratio and liquid stiffness functions
             REAL(KIND(0d0)), INTENT(OUT) :: rho_K, gamma_K, pi_inf_K
             
-            ! Shear and volume Reynolds numbers
             REAL(KIND(0d0)), DIMENSION(2), INTENT(OUT) :: Re_K
             
             ! Weber numbers
             REAL(KIND(0d0)), DIMENSION( num_fluids, &
                                         num_fluids  ), INTENT(OUT) :: We_K
             
-            ! Partial densities and volume fractions
-            REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K
+
+            REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K !<
+            !! Partial densities and volume fractions
             
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: k,l,r
             
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: i,j !< Generic loop iterators
             
             ! Constraining the partial densities and the volume fractions within
             ! their physical bounds to make sure that any mixture variables that
@@ -338,22 +353,18 @@ MODULE m_variables_conversion
         
         
         
-        
-        
+        !> The goal of this subroutine is to calculate the Roe
+        !!      average density, velocity, enthalpy, mass fractions,
+        !!      specific heat ratio function and the speed of sound,
+        !!      at the cell-boundaries, from the left and the right
+        !!      cell-average variables.        
+        !!  @param j Cell index
+        !!  @param k Cell index
+        !!  @param l Cell index
         SUBROUTINE s_compute_roe_average_state(j,k,l) ! ------------------------
-        ! Description: The goal of this subroutine is to calculate the Roe
-        !              average density, velocity, enthalpy, mass fractions,
-        !              specific heat ratio function and the speed of sound,
-        !              at the cell-boundaries, from the left and the right
-        !              cell-average variables.
-            
-            
-            ! Generic loop iterators
+
             INTEGER, INTENT(IN) :: j,k,l
-            
-            ! Generic loop iterator
             INTEGER :: i
-            
             
             rho_avg_sf(j,k,l) = SQRT(rho_L*rho_R)
             
@@ -379,20 +390,16 @@ MODULE m_variables_conversion
         END SUBROUTINE s_compute_roe_average_state ! ---------------------------
         
         
-        
-        
-        
+        !>  The goal of this subroutine is to compute the arithmetic
+        !!      average density, velocity, enthalpy, mass fractions, the
+        !!      specific heat ratio function and the sound speed, at the
+        !!      cell-boundaries, from the left and right cell-averages.        
+        !!  @param j Cell index
+        !!  @param k Cell index
+        !!  @param l Cell index  
         SUBROUTINE s_compute_arithmetic_average_state(j,k,l) ! -----------------
-        ! Description: The goal of this subroutine is to compute the arithmetic
-        !              average density, velocity, enthalpy, mass fractions, the
-        !              specific heat ratio function and the sound speed, at the
-        !              cell-boundaries, from the left and right cell-averages.
-            
-            
-            ! Generic loop iterators
+         
             INTEGER, INTENT(IN) :: j,k,l
-            
-            ! Generic loop iterator
             INTEGER :: i
             
             rho_avg_sf(j,k,l) = 5d-1*(rho_L + rho_R)
@@ -433,19 +440,13 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_compute_arithmetic_average_state ! --------------------
         
-        
-        
-        
-        
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.        
         SUBROUTINE s_initialize_variables_conversion_module() ! ----------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
-            
-            
+
             ! Associating the procedural pointer to the appropriate subroutine
             ! that will be utilized in the conversion to the mixture variables
-            
             IF (model_eqns == 1) THEN        ! gamma/pi_inf model
                 s_convert_to_mixture_variables => &
                              s_convert_mixture_to_mixture_variables
@@ -483,32 +484,31 @@ MODULE m_variables_conversion
         
         
         
-        
-        
+        !> The following procedure handles the conversion between
+        !!      the conservative variables and the primitive variables.       
+        !! @param qK_cons_vf Conservative variables
+        !! @param qK_prim_vf Primitive variables
+        !! @param gm_alphaK_vf Gradient magnitude of the volume fraction
+        !! @param ix Index bounds in first coordinate direction
+        !! @param iy Index bounds in second coordinate direction
+        !! @param iz Index bounds in third coordinate direction
         SUBROUTINE s_convert_conservative_to_primitive_variables(  qK_cons_vf, &
                                                                    qK_prim_vf, &
                                                                  gm_alphaK_vf, &
                                                                      ix,iy,iz  )
-        ! Description: The following procedure handles the conversion between
-        !              the conservative variables and the primitive variables.
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qK_cons_vf
             
-            ! Primitive variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qK_prim_vf
             
-            ! Gradient magnitude of the volume fractions
             TYPE(scalar_field),        &
             ALLOCATABLE, DIMENSION(:), &
             INTENT(IN) :: gm_alphaK_vf
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! Density, dynamic pressure, surface energy, specific heat ratio
@@ -524,10 +524,9 @@ MODULE m_variables_conversion
             REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) ::       We_K
             REAL(KIND(0d0)), dimension(nb) :: nRtmp
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
        
-            !print*, 'cons_to_prim'
             ! Calculating the velocity and pressure from the momentum and energy
             DO l = iz%beg, iz%end
                 DO k = iy%beg, iy%end
@@ -637,30 +636,28 @@ MODULE m_variables_conversion
         
         
         
-        
-        
+        !>  This procedure takes care of the conversion between the
+        !!      conservative variables and the characteristic variables.        
+        !!  @param q_rs_wsK Characteristic or conservative cell-avg. variables
+        !!  @param norm_dir Characteristic decomposition coordinate direction
+        !!  @param is1 Index bound in first coordinate direction
+        !!  @param is2 Index bound in second coordinate direction
+        !!  @param is3 Index bound in third coordinate direction
+        !!  @param dj  Evaluation location of the projection matrices
         SUBROUTINE s_convert_conservative_to_characteristic_variables( & ! -----
                                    q_rs_wsK, norm_dir, is1,is2,is3, dj )
-        ! Description: This procedure takes care of the conversion between the
-        !              conservative variables and the characteristic variables.
+
             
-            
-            ! Conservative or characteristic cell-average variables
             TYPE(vector_field),                &
             DIMENSION(-weno_polyn:weno_polyn), &
             INTENT(INOUT) :: q_rs_wsK
-            
-            ! Characteristic decomposition coordinate direction
+
             INTEGER, INTENT(IN) :: norm_dir
-            
-            ! Indical bounds in the s1-, s2- and s3-directions
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
-            
-            ! Evaluation location of the projection matrices
             INTEGER, INTENT(IN) :: dj
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Initializing projection matrices for characteristic decomposition
@@ -693,31 +690,31 @@ MODULE m_variables_conversion
         
         
         
-        
-        
+        !>  The following subroutine handles the conversion between
+        !!      the conservative variables and the Euler flux variables.        
+        !!  @param qK_cons_vf Conservative variables
+        !!  @param FK_vf Flux variables
+        !!  @param FK_src_vf Flux source variables
+        !!  @param ix Index bounds in the first coordinate direction
+        !!  @param iy Index bounds in the second coordinate direction
+        !!  @param iz Index bounds in the third coordinate direction
         SUBROUTINE s_convert_conservative_to_flux_variables( qK_cons_vf, & ! ---
                                                                   FK_vf, &
                                                               FK_src_vf, &
                                                                ix,iy,iz  )
-        ! Description: The following subroutine handles the conversion between
-        !              the conservative variables and the Euler flux variables.
             
-            
-            ! Conservative variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: qK_cons_vf
             
-            ! Flux variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: FK_vf, FK_src_vf
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: j,k,l
+
+            INTEGER :: j,k,l !< Generic loop iterators
             
             
             ! Calculating the flux variables from the conservative ones, without
@@ -742,36 +739,35 @@ MODULE m_variables_conversion
         
         
         
-        
-
+        !>  The following procedure handles the conversion between
+        !!      the primitive variables and the conservative variables.
+        !!  @param qK_prim_vf Primitive variables
+        !!  @param qK_cons_vf Conservative variables
+        !!  @param gm_alphaK_vf Gradient magnitude of the volume fractions
+        !!  @param ix Index bounds in the first coordinate direction
+        !!  @param iy Index bounds in the second coordinate direction
+        !!  @param iz Index bounds in the third coordinate direction
         SUBROUTINE s_convert_primitive_to_conservative_variables(  qK_prim_vf, &
                                                                    qK_cons_vf, &
                                                                  gm_alphaK_vf, &
                                                                      ix,iy,iz  )
-        ! Description: The following procedure handles the conversion between
-        !              the primitive variables and the conservative variables.
             
-            
-            ! Primitive variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: qK_prim_vf
             
-            ! Conservative variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qK_cons_vf
             
-            ! Gradient magnitude of the volume fractions
             TYPE(scalar_field),        &
             ALLOCATABLE, DIMENSION(:), &
             INTENT(IN) :: gm_alphaK_vf
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: j,k,l
+
+            INTEGER :: j,k,l !< Generic loop iterators
             
             
             ! Calculating the momentum and energy from the velocity and pressure
@@ -794,36 +790,33 @@ MODULE m_variables_conversion
         END SUBROUTINE s_convert_primitive_to_conservative_variables ! ---------
         
         
-        
-        
-        ! use this if char_decomp == .True. and weno_vars == 2 (primitive vars) !only option for char_decomp True?
+        !>  This subroutine takes care of the conversion between the
+        !!      the primitive variables and the characteristic variables.     
+        !!  @param q_rs_wsK Primitive or characteristic cell-average variables
+        !!  @param norm_dir Characteristic decomposition coordinate direction
+        !!  @param is1 Index bound in first coordinate direction
+        !!  @param is2 Index bound in second coordinate direction
+        !!  @param is3 Index bound in third coordinate direction
+        !!  @param dj  Evaluation location of the projection matrices
         SUBROUTINE s_convert_primitive_to_characteristic_variables( & ! --------
                                 q_rs_wsK, norm_dir, is1,is2,is3, dj )
-        ! Description: This subroutine takes care of the conversion between the
-        !              the primitive variables and the characteristic variables.
-            
-            
-            ! Primitive or characteristic cell-average variables
+
             TYPE(vector_field),                &
             DIMENSION(-weno_polyn:weno_polyn), &
             INTENT(INOUT) :: q_rs_wsK
             
-            ! Characteristic decomposition coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the s1-, s2- and s3-directions
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
             
-            ! Evaluation location of the projection matrices
             INTEGER, INTENT(IN) :: dj
             
-            ! Cell-average partial densities, velocity and pressure
-            REAL(KIND(0d0)), DIMENSION(cont_idx%end) :: alpha_rho
-            REAL(KIND(0d0)), DIMENSION(num_dims)     :: vel
-            REAL(KIND(0d0))                          :: pres
+            REAL(KIND(0d0)), DIMENSION(cont_idx%end) :: alpha_rho   !< Cell-average partial density
+            REAL(KIND(0d0)), DIMENSION(num_dims)     :: vel         !< Cell-average velocity
+            REAL(KIND(0d0))                          :: pres        !< Pressure
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
             
             
             ! Initializing projection matrices for characteristic decomposition
@@ -880,29 +873,27 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_convert_primitive_to_characteristic_variables ! -------
         
-        
-        
-        
-        ! this is never used. the fluxes are computed in the riemann solver subroutine 
+        !>  The following subroutine handles the conversion between
+        !!      the primitive variables and the Eulerian flux variables.
+        !!  @param qK_prim_vf Primitive variables
+        !!  @param FK_vf Flux variables
+        !!  @param FK_src_vf Flux source variables
+        !!  @param ix Index bounds in the first coordinate direction
+        !!  @param iy Index bounds in the second coordinate direction
+        !!  @param iz Index bounds in the third coordinate direction
         SUBROUTINE s_convert_primitive_to_flux_variables( qK_prim_vf, & ! ------
                                                                FK_vf, &
                                                            FK_src_vf, &
                                                             ix,iy,iz  )
-        ! Description: The following subroutine handles the conversion between
-        !              the primitive variables and the Eulerian flux variables.
-            
-            
-            ! Primitive variables
+           
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: qK_prim_vf
             
-            ! Flux variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: FK_vf, FK_src_vf
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! Partial densities, density, velocity, pressure, energy, advection
@@ -919,9 +910,8 @@ MODULE m_variables_conversion
             REAL(KIND(0d0)), DIMENSION(2)                     ::        Re_K
             REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) ::        We_K
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
-            
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             ! Computing the flux variables from the primitive variables, without
             ! accounting for the contribution of either viscosity or capillarity
@@ -1011,27 +1001,30 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_convert_primitive_to_flux_variables ! -----------------
         
-        
+        !>  The following subroutine handles the conversion between
+        !!      the primitive variables and the Eulerian flux variables
+        !!      for cases with ensemble bubble modeling.
+        !!  @param qK_prim_vf Primitive variables
+        !!  @param qK_cons_vf Primitive variables
+        !!  @param FK_vf Flux variables
+        !!  @param FK_src_vf Flux source variables
+        !!  @param ix Index bounds in the first coordinate direction
+        !!  @param iy Index bounds in the second coordinate direction
+        !!  @param iz Index bounds in the third coordinate direction
         SUBROUTINE s_convert_primitive_to_flux_variables_bubbles( qK_prim_vf, & ! ------
                                                                 qk_cons_vf, &
                                                                 FK_vf, &
                                                                 FK_src_vf, &
                                                                 ix,iy,iz  )
-        ! Description: The following subroutine handles the conversion between
-        !              the primitive variables and the Eulerian flux variables.
             
-            
-            ! Primitive variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: qK_prim_vf, qK_cons_vf
             
-            ! Flux variables
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: FK_vf, FK_src_vf
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! Partial densities, density, velocity, pressure, energy, advection
@@ -1072,7 +1065,7 @@ MODULE m_variables_conversion
                         CALL s_convert_to_mixture_variables( qK_prim_vf, rho_K, &
                                                              gamma_K, pi_inf_K, &
                                                              Re_K, We_K, j,k,l  )
-                     
+                        
                         ! mass flux, \rho u
                         DO i = 1, cont_idx%end
                             FK_vf(i)%sf(j,k,l) = alpha_rho_K(i)*vel_K(dir_idx(1))
@@ -1093,9 +1086,6 @@ MODULE m_variables_conversion
                         DO i = adv_idx%beg, sys_size
                             FK_vf(i)%sf(j,k,l) = vel_K(dir_idx(1))*qK_cons_vf(i)%sf(j,k,l)
                         END DO
-
-                        
-                        !print*, vel_K(dir_idx(1)), qK_prim_vf(2)%sf(j,k,l), FK_vf(adv_idx%beg)%sf(j,k,l)
                     END DO
                 END DO
             END DO
@@ -1103,26 +1093,24 @@ MODULE m_variables_conversion
             !stop
             
         END SUBROUTINE s_convert_primitive_to_flux_variables_bubbles ! -----------------        
-        
-        
+       
+
+        !>  This subroutine takes care of the conversion between the
+        !!      the conservative variables and the characteristic variables.     
+        !!  @param qK_rs_vf Conservative or characteristic cell-boundary variables
+        !!  @param is1 Index bound in first coordinate direction
+        !!  @param is2 Index bound in second coordinate direction
+        !!  @param is3 Index bound in third coordinate direction
+        !!  @param dj  Evaluation location of the projection matrices
         SUBROUTINE s_convert_characteristic_to_conservative_variables( & ! -----
                                              qK_rs_vf, is1,is2,is3, dj )
-        ! Description: This procedure takes care of the conversion between the
-        !              characteristic variables and the conservative variables.
             
-            
-            ! Characteristic or conservative cell-boundary variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: qK_rs_vf
-            
-            ! Indical bounds in the s1-, s2- and s3-directions
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
-            
-            ! Evaluation location of the projection matrices
             INTEGER, INTENT(IN) :: dj
             
-            ! Generic loop iterators
-            INTEGER :: j,k,l
-            
+
+            INTEGER :: j,k,l !< Generic loop iterators
             
             ! Projecting characteristic variables onto the conservative fields
             DO l = is3%beg, is3%end
@@ -1148,29 +1136,22 @@ MODULE m_variables_conversion
         END SUBROUTINE s_convert_characteristic_to_conservative_variables ! ----
         
         
-        
-        
-        
+        !> This subroutine takes care of the conversion between the
+        !!      the characteristic variables and the primitive variables.
+        !!  @param qK_rs_vf Primitive or characteristic cell-boundary variables
+        !!  @param is1 Index bound in first coordinate direction
+        !!  @param is2 Index bound in second coordinate direction
+        !!  @param is3 Index bound in third coordinate direction
+        !!  @param dj  Evaluation location of the projection matrices       
         SUBROUTINE s_convert_characteristic_to_primitive_variables( & ! --------
                                           qK_rs_vf, is1,is2,is3, dj )
-        ! Description: This subroutine takes care of the conversion between the
-        !              the characteristic variables and the primitive variables.
             
-            
-            ! Characteristic or primitive cell-boundary variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: qK_rs_vf
-            
-            ! Indical bounds in the s1-, s2- and s3-directions
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
-            
-            ! Evaluation location of the projection matrices
             INTEGER, INTENT(IN) :: dj
-            
-            ! Characteristic cell-boundary variables
-            REAL(KIND(0d0)), DIMENSION(E_idx) :: w_K
-            
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            REAL(KIND(0d0)), DIMENSION(E_idx) :: w_K !< Characteristic cell-boundary variables
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Projecting characteristic variables onto the primitive fields
@@ -1216,29 +1197,27 @@ MODULE m_variables_conversion
         
         
         
-        
-        
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures needed to configure the characteristic
+        !!      decomposition.    
+        !!  @param q_rs_wsK Primitive or conservative cell-average variables
+        !!  @param norm_dir Characteristic decomposition coordinate direction
+        !!  @param is1 Index bound in first coordinate direction
+        !!  @param is2 Index bound in second coordinate direction
+        !!  @param is3 Index bound in third coordinate direction
         SUBROUTINE s_initialize_characteristic_decomposition( & ! --------------
                               q_rs_wsK, norm_dir, is1,is2,is3 )
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures needed to configure the characteristic
-        !              decomposition.
-            
-            
-            ! Conservative or primitive cell-average variables
+
             TYPE(vector_field),                &
             DIMENSION(-weno_polyn:weno_polyn), &
             INTENT(IN) :: q_rs_wsK
             
-            ! Characteristic decomposition coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the s1-, s2- and s3-directions
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
             
             
             ! Configuring the coordinate direction indexes and flags
@@ -1332,15 +1311,11 @@ MODULE m_variables_conversion
         
         
         
-        
-        
+        !>  Deallocation and/or disassociation procedures that are
+        !!      necessary to finalize the characteristic decomposition        
         SUBROUTINE s_finalize_characteristic_decomposition() ! -----------------
-        ! Description: Deallocation and/or disassociation procedures that are
-        !              necessary to finalize the characteristic decomposition
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Deallocating the average density, sound speed and mass fractions
@@ -1546,13 +1521,9 @@ MODULE m_variables_conversion
 
         END SUBROUTINE s_solve_linear_system    
         
-        
-        
-        
-        
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_variables_conversion_module() ! ------------------
-        ! Description: Module deallocation and/or disassociation procedures
-            
+
             
             ! Disassociating the pointer to the procedure that was utilized to
             ! to convert mixture or species variables to the mixture variables
@@ -1576,8 +1547,6 @@ MODULE m_variables_conversion
             
             
         END SUBROUTINE s_finalize_variables_conversion_module ! ----------------
-        
-        
         
         
         

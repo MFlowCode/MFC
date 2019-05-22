@@ -1,28 +1,26 @@
-! MFC v3.0 - Simulation Code: m_data_output.f90
-! Description: The primary purpose of this module is to output the grid and the
-!              conservative variables data at the chosen time-step interval. In
-!              addition, this module is also in charge of outputting a run-time
-!              information file which summarizes the time-dependent behavior of
-!              the stability criteria. The latter include the inviscid Courant–
-!              Friedrichs–Lewy (ICFL), viscous CFL (VCFL), capillary CFL (CCFL)
-!              and cell Reynolds (Rc) numbers.
-! Author: Vedran Coralic
-! Date: 06/26/12
-
-
+!>
+!! @file m_data_output.f90
+!! @brief The primary purpose of this module is to output the grid and the
+!!              conservative variables data at the chosen time-step interval. In
+!!              addition, this module is also in charge of outputting a run-time
+!!              information file which summarizes the time-dependent behavior !of
+!!              the stability criteria. The latter include the inviscid Courant–
+!!              Friedrichs–Lewy (ICFL), viscous CFL (VCFL), capillary CFL (CCFL)
+!!              and cell Reynolds (Rc) numbers.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_data_output
     
     
     !  Dependencies ============================================================
-    ! USE f90_unix_proc        ! NAG Compiler Library of UNIX system commands
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
-    
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
 
     USE m_compile_specific
     ! ==========================================================================
@@ -50,36 +48,36 @@ MODULE m_data_output
     
     ABSTRACT INTERFACE ! ===================================================
 
+        !> Write data files
+        !! @param q_cons_vf Conservative variables
+        !! @param t_step Current time step
         SUBROUTINE s_write_abstract_data_files(q_cons_vf, t_step)
 
             IMPORT :: scalar_field, sys_size
 
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
 
-            ! Current time-step
             INTEGER, INTENT(IN) :: t_step
 
         END SUBROUTINE s_write_abstract_data_files ! -------------------
     END INTERFACE ! ========================================================
     
-    ! ICFL, VCFL, CCFL and Rc stability criteria at the current time-step
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: icfl_sf
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: vcfl_sf
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ccfl_sf
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) ::   Rc_sf
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: icfl_sf  !< ICFL stability criterion
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: vcfl_sf  !< VCFL stability criterion
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ccfl_sf  !< CCFL stability criterion
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) ::   Rc_sf  !< Rc stability criterion
     
     ! ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
-    REAL(KIND(0d0)) :: icfl_max
-    REAL(KIND(0d0)) :: vcfl_max
-    REAL(KIND(0d0)) :: ccfl_max
-    REAL(KIND(0d0)) ::   Rc_min
-
+    REAL(KIND(0d0)) :: icfl_max !< ICFL criterion maximum
+    REAL(KIND(0d0)) :: vcfl_max !< VCFL criterion maximum
+    REAL(KIND(0d0)) :: ccfl_max !< CCFL criterion maximum
+    REAL(KIND(0d0)) ::   Rc_min !< Rc criterion maximum
 
     ! Generic storage for flow variable(s) that are to be written to CoM data file
-    REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: accel_mag
+    REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: accel_mag 
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:)    :: q_com
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: moments
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:)    :: cb_mass
@@ -87,41 +85,36 @@ MODULE m_data_output
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:)    :: cntrline
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: x_accel, y_accel, z_accel
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)           :: grad_x_vf,grad_y_vf,grad_z_vf,norm_vf,kappa_vf
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:)  :: energy ! Used to write out correct E and p when We_size > 0
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:)  :: energy !< Energy: Used to write out correct E and p when We_size > 0
 
     PROCEDURE(s_write_abstract_data_files), POINTER :: s_write_data_files => NULL()
 
     
     CONTAINS
         
-        
-        
-        
-        
+
+        !>  The purpose of this subroutine is to open a new or pre-
+        !!          existing run-time information file and append to it the
+        !!      basic header information relevant to current simulation.
+        !!      In general, this requires generating a table header for
+        !!      those stability criteria which will be written at every
+        !!      time-step.        
         SUBROUTINE s_open_run_time_information_file() ! ------------------------
-        ! Description: The purpose of this subroutine is to open a new or pre-
-        !              existing run-time information file and append to it the
-        !              basic header information relevant to current simulation.
-        !              In general, this requires generating a table header for
-        !              those stability criteria which will be written at every
-        !              time-step.
+
+
+            CHARACTER(LEN = name_len) :: dir_name !< Name of the case directory
+
+            CHARACTER(LEN = name_len) :: file_name = 'run_time.inf' !<
+            !! Name of the run-time information file
             
+            CHARACTER(LEN = path_len + name_len) :: file_path !<
+            !! Relative path to a file in the case directory
             
-            ! Name of the case directory
-            CHARACTER(LEN = name_len) :: dir_name
+            CHARACTER(LEN = 8) :: file_date !<
+            !! Creation date of the run-time information file
             
-            ! Name of the run-time information file
-            CHARACTER(LEN = name_len) :: file_name = 'run_time.inf'
-            
-            ! Relative path to a file in the case directory
-            CHARACTER(LEN = path_len + name_len) :: file_path
-            
-            ! Creation date of the run-time information file
-            CHARACTER(LEN = 8) :: file_date
-            
-            ! Logical used to check existence of run-time information file
-            LOGICAL :: file_exist
-            
+            LOGICAL :: file_exist !<
+            !! Logical used to check existence of run-time information file
             
             ! Opening the run-time information file
             file_path = TRIM(case_dir) // '/' // TRIM(file_name)
@@ -196,17 +189,17 @@ MODULE m_data_output
         
         
         
-        
-        
+        !>  This opens a formatted data file where the root processor
+        !!      can write out the CoM information        
         SUBROUTINE s_open_com_files() ! ----------------------------------------
-        ! Description: This opens a formatted data file where the root processor
-        !          can write out the CoM information
 
-            ! Relative path to the CoM file in the case directory 
-            CHARACTER(LEN = path_len  + 3*name_len) :: file_path
+
+
+            CHARACTER(LEN = path_len  + 3*name_len) :: file_path !<
+            !! Relative path to the CoM file in the case directory 
         
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
         
             DO i = 1, num_fluids
                 IF (com_wrt(i)) THEN
@@ -293,17 +286,16 @@ MODULE m_data_output
 
 
 
-
-
+        !>  This opens a formatted data file where the root processor
+        !!      can write out the coherent body (cb) information
         SUBROUTINE s_open_cb_files() ! ----------------------------------------
-        ! Description: This opens a formatted data file where the root processor
-        !          can write out the coherent body (cb) information
 
-            ! Relative path to the cb file in the case directory 
-            CHARACTER(LEN = path_len  + 3*name_len) :: file_path
+
+            CHARACTER(LEN = path_len  + 3*name_len) :: file_path !<
+            !! Relative path to the cb file in the case directory 
         
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i  !< Generic loop iterator
         
             DO i = 1, num_fluids
                 IF (cb_wrt(i)) THEN
@@ -332,16 +324,15 @@ MODULE m_data_output
 
 
 
-
+        !>  This opens a formatted data file where the root processor
+        !!      can write out flow probe information
         SUBROUTINE s_open_probe_files() ! --------------------------------------
-        ! Description: This opens a formatted data file where the root processor
-        !          can write out flow probe information
 
-            ! Relative path to the probe data file in the case directory
-            CHARACTER(LEN = path_len + 3*name_len) :: file_path
+            CHARACTER(LEN = path_len + 3*name_len) :: file_path !<
+            !! Relative path to the probe data file in the case directory
 
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
 
             DO i = 1, num_probes
                 ! Generating the relative path to the data file
@@ -387,56 +378,48 @@ MODULE m_data_output
 
 
 
-
-
+        !>  The goal of the procedure is to output to the run-time
+        !!      information file the stability criteria extrema in the
+        !!      entire computational domain and at the given time-step.
+        !!      Moreover, the subroutine is also in charge of tracking
+        !!      these stability criteria extrema over all time-steps.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param t_step Current time step
         SUBROUTINE s_write_run_time_information(q_prim_vf, t_step) ! -----------
-        ! Description: The goal of the procedure is to output to the run-time
-        !              information file the stability criteria extrema in the
-        !              entire computational domain and at the given time-step.
-        !              Moreover, the subroutine is also in charge of tracking
-        !              these stability criteria extrema over all time-steps.
+           
             
-            
-            ! Cell-average primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-            
-            ! Current time-step
             INTEGER, INTENT(IN) :: t_step
             
-            ! The cell-averaged partial densities, density, velocity, pressure,
-            ! volume fractions, specific heat ratio function, liquid stiffness
-            ! function, sound speed, shear and volume Reynolds numbers and the
-            ! Weber numbers.
-            REAL(KIND(0d0)), DIMENSION(cont_idx%end)          :: alpha_rho
-            REAL(KIND(0d0))                                   :: rho
-            REAL(KIND(0d0)), DIMENSION(num_dims)              :: vel
-            REAL(KIND(0d0))                                   :: pres
-            REAL(KIND(0d0)), DIMENSION(num_fluids)            :: alpha
-            REAL(KIND(0d0))                                   :: gamma
-            REAL(KIND(0d0))                                   :: pi_inf
-            REAL(KIND(0d0))                                   :: c
-            REAL(KIND(0d0)), DIMENSION(2)                     :: Re
-            REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) :: We
-            
+            REAL(KIND(0d0)), DIMENSION(cont_idx%end)          :: alpha_rho  !< Cell-avg. partial density
+            REAL(KIND(0d0))                                   :: rho        !< Cell-avg. density
+            REAL(KIND(0d0)), DIMENSION(num_dims)              :: vel        !< Cell-avg. velocity
+            REAL(KIND(0d0))                                   :: pres       !< Cell-avg. pressure
+            REAL(KIND(0d0)), DIMENSION(num_fluids)            :: alpha      !< Cell-avg. volume fraction
+            REAL(KIND(0d0))                                   :: gamma      !< Cell-avg. sp. heat ratio
+            REAL(KIND(0d0))                                   :: pi_inf     !< Cell-avg. liquid stiffness function
+            REAL(KIND(0d0))                                   :: c          !< Cell-avg. sound speed
+            REAL(KIND(0d0)), DIMENSION(2)                     :: Re         !< Cell-avg. Reynolds numbers
+            REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) :: We         !< Cell-avg. Weber numbers
+
             ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
             ! time-step and located on both the local (loc) and the global (glb)
             ! computational domains
-            REAL(KIND(0d0)) :: icfl_max_loc, icfl_max_glb
-            REAL(KIND(0d0)) :: vcfl_max_loc, vcfl_max_glb
-            REAL(KIND(0d0)) :: ccfl_max_loc, ccfl_max_glb
-            REAL(KIND(0d0)) ::   Rc_min_loc,   Rc_min_glb
+            REAL(KIND(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
+            REAL(KIND(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
+            REAL(KIND(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
+            REAL(KIND(0d0)) ::   Rc_min_loc,   Rc_min_glb !< Rc   stability extrema on local and global grids
 
-            ! Fluid bulk modulus for Woods mixture sound speed
-            REAL(KIND(0d0)) :: blkmod1, blkmod2
+
+            REAL(KIND(0d0)) :: blkmod1, blkmod2 !<
+            !! Fluid bulk modulus for Woods mixture sound speed
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
 
-            ! Modified dtheta accounting for Fourier filtering in azimuthal
-            ! direction. 
+            INTEGER :: i,j,k,l !< Generic loop iterators
+
             INTEGER :: Nfq
-            REAL(KIND(0d0)) :: fltr_dtheta
-            
+            REAL(KIND(0d0)) :: fltr_dtheta   !< 
+            !! Modified dtheta accounting for Fourier filtering in azimuthal direction. 
             
 
             ! Computing Stability Criteria at Current Time-step ================
@@ -697,36 +680,36 @@ MODULE m_data_output
         
         
         
-        
-        
+        !>  The goal of this subroutine is to output the grid and
+        !!      conservative variables data files for given time-step.        
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param t_step Current time-step
         SUBROUTINE s_write_serial_data_files(q_cons_vf, t_step) ! ---------------------
-        ! Description: The goal of this subroutine is to output the grid and
-        !              conservative variables data files for given time-step.
+
             
-            
-            ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_cons_vf
-            
-            ! Current time-step
             INTEGER, INTENT(IN) :: t_step
             
-            ! Relative path to the current time-step directory
-            CHARACTER(LEN = path_len + 2*name_len) :: t_step_dir
+            CHARACTER(LEN = path_len + 2*name_len) :: t_step_dir !<
+            !! Relative path to the current time-step directory
 
-            ! Relative path to the grid and conservative variables data files
-            CHARACTER(LEN = path_len + 3*name_len) :: file_path
-            
-            ! Logical used to check existence of current time-step directory
-            LOGICAL :: file_exist
-            
-            ! Generic loop iterator
-            INTEGER :: i, j, k, l
 
+            CHARACTER(LEN = path_len + 3*name_len) :: file_path !<
+            !! Relative path to the grid and conservative variables data files
             
-            real(kind(0d0)), dimension(nb) :: nRtmp
-            real(kind(0d0)) :: nbub, gamma, lit_gamma, pi_inf, rho
-            REAL(KIND(0d0)), DIMENSION(2)                   :: Re
-            REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:)    :: We
+
+            LOGICAL :: file_exist !<
+            !! Logical used to check existence of current time-step directory
+            
+
+            INTEGER :: i, j, k, l !< Generic loop iterators
+
+            REAL(KIND(0d0)), DIMENSION(nb) :: nRtmp         !< Temporary bubble concentration
+            REAL(KIND(0d0)) :: nbub                         !< Temporary bubble number density
+            REAL(KIND(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
+            REAL(KIND(0d0)) :: rho                          !< Temporary density
+            REAL(KIND(0d0)), DIMENSION(2)                   :: Re !< Temporary Reynolds number
+            REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:)    :: We !< Temporary Weber number
 
             ! Creating or overwriting the current time-step directory
             WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/p', &
@@ -1025,7 +1008,6 @@ MODULE m_data_output
         
         
         
-        
         SUBROUTINE s_remove_capillary_potential_energy(v_vf)
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: v_vf
@@ -1081,16 +1063,16 @@ MODULE m_data_output
         
         
         
-        
-        
+        !>  The goal of this subroutine is to output the grid and
+        !!      conservative variables data files for given time-step.        
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param t_step Current time-step
         SUBROUTINE s_write_parallel_data_files(q_cons_vf, t_step) ! --
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
 
-            ! Current timestep
             INTEGER, INTENT(IN) :: t_step
 
             INTEGER :: ifile, ierr, data_size
@@ -1104,8 +1086,8 @@ MODULE m_data_output
             CHARACTER(LEN=path_len + 2*name_len) :: file_loc 
             LOGICAL :: file_exist
 
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
 
             ! Initialize MPI data I/O
             CALL s_initialize_mpi_data(q_cons_vf)
@@ -1168,23 +1150,20 @@ MODULE m_data_output
 
         END SUBROUTINE s_write_parallel_data_files ! ---------------------------
 
-
+        !>  This writes a formatted data file where the root processor
+        !!      can write out the CoM information    
+        !!  @param t_step Current time-step
+        !!  @param q_com Center of mass information
+        !!  @param moments Higher moment information
         SUBROUTINE s_write_com_files(t_step,q_com,moments) ! -------------------
 
-            ! Time step that is currently being simulated
             INTEGER, INTENT(IN) :: t_step
-
-            ! Center of mass information
             REAL(KIND(0d0)), DIMENSION(num_fluids,10), INTENT(IN) :: q_com
-
-            ! Higher moment information
             REAL(KIND(0d0)), DIMENSION(num_fluids,2,5), INTENT(IN) :: moments
 
-            ! Generic loop iterator
-            INTEGER :: i
 
-            ! Non-dimensional time
-            REAL(KIND(0d0)) :: nondim_time
+            INTEGER :: i !< Generic loop iterator
+            REAL(KIND(0d0)) :: nondim_time !< Non-dimensional time
 
             ! Non-dimensional time calculation
             IF (t_step_old /= dflt_int) THEN
@@ -1441,23 +1420,20 @@ MODULE m_data_output
 
 
 
-
-
+        !>  The goal of this subroutine is to output coherent body information.
+        !!  @param t_step Current time-step
+        !!  @param cb_mass Coherent body mass
+        !!  @param bounds Coherent body boundary
+        !!  @param cntrline Coherent body center line
         SUBROUTINE s_write_cb_files(t_step,cb_mass,bounds,cntrline) ! ----------
 
-            ! Time step that is currently being simulated
             INTEGER, INTENT(IN) :: t_step
-
-            ! Coherent body information
             REAL(KIND(0d0)), DIMENSION(num_fluids,10), INTENT(IN) :: cb_mass
             REAL(KIND(0d0)), DIMENSION(num_fluids,5,6), INTENT(IN) :: bounds
             REAL(KIND(0d0)), DIMENSION(num_fluids,5), INTENT(IN) :: cntrline
 
-            ! Generic loop iterator
-            INTEGER :: i
-
-            ! Non-dimensional time
-            REAL(KIND(0d0)) :: nondim_time
+            INTEGER :: i !< Generic loop iterator
+            REAL(KIND(0d0)) :: nondim_time !< Non-dimensional time
 
             ! Non-dimensional time calculation
             IF (t_step_old /= dflt_int) THEN
@@ -1893,17 +1869,14 @@ MODULE m_data_output
 
 
 
-
-
+        !>  This writes a formatted data file for the flow probe information
+        !!  @param t_step Current time-step
+        !!  @param q_cons_vf Conservative variables
+        !!  @param accel_mag Acceleration magnitude information
         SUBROUTINE s_write_probe_files(t_step,q_cons_vf,accel_mag) ! -----------
 
-            ! Time step that is currently being simulated
             INTEGER, INTENT(IN) :: t_step
-
-            ! Conservative variables at the p
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_cons_vf
-
-            ! Acceleration magnitude information
             REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p), INTENT(IN) :: accel_mag
 
             REAL(KIND(0d0)), DIMENSION(-1:m) :: distx
@@ -1932,21 +1905,19 @@ MODULE m_data_output
             REAL(KIND(0d0)), DIMENSION(2)             :: Re
             REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:)      :: We
             
-            ! Generic loop iterator
-            INTEGER :: i,j,k,l,s
-            INTEGER :: npts
+            INTEGER :: i,j,k,l,s !< Generic loop iterator
 
-            ! Non-dimensional time
-            REAL(KIND(0d0)) :: nondim_time
+            REAL(KIND(0d0)) :: nondim_time !< Non-dimensional time
 
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
-            ! Fluid bulk modulus for Woods mixture sound speed
-            REAL(KIND(0d0)) :: blkmod1, blkmod2
+            REAL(KIND(0d0)) :: tmp !<
+            !! Temporary variable to store quantity for mpi_allreduce
 
-            ! for integral quantities for bubble nets !SHB
-            REAL(KIND(0d0)) :: rad, thickness
-            LOGICAL :: trigger
+            REAL(KIND(0d0)) :: blkmod1, blkmod2 !<
+            !! Fluid bulk modulus for Woods mixture sound speed
+
+            INTEGER :: npts !< Number of included integral points
+            REAL(KIND(0d0)) :: rad, thickness !< For integral quantities 
+            LOGICAL :: trigger !< For integral quantities
 
             ! Non-dimensional time calculation
             IF (t_step_old /= dflt_int) THEN
@@ -2491,18 +2462,15 @@ MODULE m_data_output
 
 
 
-
-
+        !>  The goal of this subroutine is to write to the run-time
+        !!      information file basic footer information applicable to
+        !!      the current computation and to close the file when done.
+        !!      The footer contains the stability criteria extrema over
+        !!      all of the time-steps and the simulation run-time.
         SUBROUTINE s_close_run_time_information_file() ! -----------------------
-        ! Description: The goal of this subroutine is to write to the run-time
-        !              information file basic footer information applicable to
-        !              the current computation and to close the file when done.
-        !              The footer contains the stability criteria extrema over
-        !              all of the time-steps and the simulation run-time.
+           
             
-            
-            ! Run-time of the simulation
-            REAL(KIND(0d0)) :: run_time
+            REAL(KIND(0d0)) :: run_time !< Run-time of the simulation
             
             
             ! Writing the footer of and closing the run-time information file
@@ -2529,11 +2497,10 @@ MODULE m_data_output
         
         
         
-        
+        !> Closes communication files 
         SUBROUTINE s_close_com_files() ! ---------------------------------------
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
 
             DO i = 1, num_fluids
                 IF (com_wrt(i)) THEN
@@ -2546,11 +2513,10 @@ MODULE m_data_output
 
 
 
-
+        !> Closes coherent body files
         SUBROUTINE s_close_cb_files() ! ---------------------------------------
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
 
             DO i = 1, num_fluids
                 IF (cb_wrt(i)) THEN
@@ -2563,11 +2529,11 @@ MODULE m_data_output
 
 
 
-
+        !> Closes probe files
         SUBROUTINE s_close_probe_files() ! -------------------------------------
 
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
 
             DO i = 1, num_probes
                 CLOSE(i+30)
@@ -2578,16 +2544,14 @@ MODULE m_data_output
 
 
 
-
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
         SUBROUTINE s_initialize_data_output_module() ! -------------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
-            
+           
             TYPE(bounds_info) :: ix, iy, iz
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
                                  ALLOCATE(icfl_sf(0:m,0:n,0:p)); icfl_max = 0d0
@@ -2683,11 +2647,10 @@ MODULE m_data_output
         
         
         
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_data_output_module() ! ---------------------------
-        ! Description: Module deallocation and/or disassociation procedures
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
                                  DEALLOCATE(icfl_sf)

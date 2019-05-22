@@ -1,24 +1,28 @@
-! MFC v3.0 - Simulation Code: m_start_up.f90
-! Description: The purpose of the module is primarily to read in the files that
-!              contain the inputs, the initial condition data and the grid data
-!              that are provided by the user. The module is additionally tasked
-!              with verifying the consistency of the user inputs and completing
-!              the grid variables.
-! Author: Vedran Coralic
-! Date: 07/09/12
-
-
+!>
+!! @file m_data_output.f90
+!! @brief The purpose of the module is primarily to read in the files that
+!!              contain the inputs, the initial condition data and the grid data
+!!              that are provided by the user. The module is additionally tasked
+!!              with verifying the consistency of the user inputs and completing
+!!              the grid variablesThe purpose of the module is primarily to read in the files that
+!!              contain the inputs, the initial condition data and the grid data
+!!              that are provided by the user. The module is additionally tasked
+!!              with verifying the consistency of the user inputs and completing
+!!              the grid variables..
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_start_up
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
 
     USE m_compile_specific
     ! ==========================================================================
@@ -39,11 +43,11 @@ MODULE m_start_up
 
     ABSTRACT INTERFACE ! ===================================================
 
+        !! @param q_cons_vf  Conservative variables
         SUBROUTINE s_read_abstract_data_files(q_cons_vf) ! -----------
 
             IMPORT :: scalar_field, sys_size
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_cons_vf
@@ -60,19 +64,18 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  The purpose of this procedure is to first verify that an
+        !!      input file has been made available by the user. Provided
+        !!      that this is so, the input file is then read in.
         SUBROUTINE s_read_input_file() ! ---------------------------------------
-        ! Description: The purpose of this procedure is to first verify that an
-        !              input file has been made available by the user. Provided
-        !              that this is so, the input file is then read in.
             
             
             ! Relative path to the input file provided by the user
             CHARACTER(LEN = name_len) :: file_path = './simulation.inp'
             
-            ! Logical used to check the existence of the input file
-            LOGICAL :: file_exist
+
+            LOGICAL :: file_exist !<
+            !! Logical used to check the existence of the input file
             
             ! Namelist of the global parameters which may be specified by user
             NAMELIST /user_inputs/ case_dir, run_time_info, m, n, p, dt,     &
@@ -131,11 +134,10 @@ MODULE m_start_up
             
         END SUBROUTINE s_read_input_file ! -------------------------------------
         
-        
+        !> The goal of this procedure is to verify that each of the
+        !!      user provided inputs is valid and that their combination
+        !!      consitutes a meaningful configuration for the simulation.
         SUBROUTINE s_check_input_file() ! --------------------------------------
-        ! Description: The goal of this procedure is to verify that each of the
-        !              user provided inputs is valid and that their combination
-        !              consitutes a meaningful configuration for the simulation.
             
             
             ! Relative path to the current directory file in the case directory
@@ -760,31 +762,32 @@ MODULE m_start_up
         
         
         
-        
+        !> The primary purpose of this procedure is to read in the
+        !!              initial condition and grid data files. The cell-average
+        !!              conservative variables constitute the former, while the
+        !!              cell-boundary locations in x-, y- and z-directions make
+        !!              up the latter. This procedure also calculates the cell-
+        !!              width distributions from the cell-boundary locations.
+        !! @param q_cons_vf Cell-averaged conservative variables
         SUBROUTINE s_read_serial_data_files(q_cons_vf) ! ------------------------------
-        ! Description: The primary purpose of this procedure is to read in the
-        !              initial condition and grid data files. The cell-average
-        !              conservative variables constitute the former, while the
-        !              cell-boundary locations in x-, y- and z-directions make
-        !              up the latter. This procedure also calculates the cell-
-        !              width distributions from the cell-boundary locations.
+
             
             
-            ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
             
-            ! Relative path to the starting time-step directory
-            CHARACTER(LEN = path_len + 2*name_len) :: t_step_dir
+
+            CHARACTER(LEN = path_len + 2*name_len) :: t_step_dir !<
+            !! Relative path to the starting time-step directory
             
-            ! Relative path to the grid and conservative variables data files
-            CHARACTER(LEN = path_len + 3*name_len) :: file_path
-            
+            CHARACTER(LEN = path_len + 3*name_len) :: file_path !<
+            !! Relative path to the grid and conservative variables data files
+
+
+            LOGICAL :: file_exist !< 
             ! Logical used to check the existence of the data files
-            LOGICAL :: file_exist
             
-            ! Generic loop iterator
-            INTEGER :: i
-            
+
+            INTEGER :: i !< Generic loop iterator
             
             ! Confirming that the directory from which the initial condition and
             ! the grid data files are to be read in exists and exiting otherwise
@@ -918,10 +921,9 @@ MODULE m_start_up
         
         
         
-        
+        !! @param q_cons_vf Conservative variables
         SUBROUTINE s_read_parallel_data_files(q_cons_vf) ! ---------------------------
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_cons_vf
@@ -1076,17 +1078,16 @@ MODULE m_start_up
 
 
 
-
-
+        !> The purpose of this subroutine is to populate the buffers
+        !!          of the grid variables, which are constituted of the cell-
+        !!          boundary locations and cell-width distributions, based on
+        !!          the boundary conditions.
         SUBROUTINE s_populate_grid_variables_buffers() ! -----------------------
-        ! Description: The purpose of this subroutine is to populate the buffers
-        !              of the grid variables, which are constituted of the cell-
-        !              boundary locations and cell-width distributions, based on
-        !              the boundary conditions.
+
             
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Population of Buffers in x-direction =============================
@@ -1355,12 +1356,13 @@ MODULE m_start_up
         
         
         
-        
+        !> The purpose of this procedure is to initialize the
+        !!      values of the internal-energy equations of each phase
+        !!      from the mass of each phase, the mixture momentum and
+        !!      mixture-total-energy equations.  
+        !! @param v_vf conservative variables
         SUBROUTINE s_initialize_internal_energy_equations(v_vf) !---------------
-        ! Description: The purpose of this procedure is to initialize the
-        !              values of the internal-energy equations of each phase
-        !              from the mass of each phase, the mixture momentum and
-        !              mixture-total-energy equations.
+
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) ::     v_vf
             REAL(KIND(0d0))                                        ::      rho
@@ -1419,8 +1421,8 @@ MODULE m_start_up
 
             TYPE(bounds_info) :: ix, iy, iz
 
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THEN
                 ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -1467,8 +1469,7 @@ MODULE m_start_up
 
         SUBROUTINE s_finalize_start_up_module() ! ------------------------------
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop interator
             
             IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THEN
 

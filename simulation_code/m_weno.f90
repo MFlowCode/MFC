@@ -1,26 +1,26 @@
-! MFC v3.0 - Simulation Code: m_weno.f90
-! Description: Weighted essentially non-oscillatory (WENO) reconstruction scheme
-!              that is supplemented with monotonicity preserving bounds (MPWENO)
-!              and a mapping function that boosts the accuracy of the non-linear
-!              weights (WENOM). MPWENO, see Balsara and Shu (2000), prevents the
-!              reconstructed values to lay outside the range set by the stencil,
-!              while WENOM, see Henrick et al. (2005), recovers the formal order
-!              of accuracy of the reconstruction at critical points. Please note
-!              that the basic WENO approach is implemented according to the work
-!              of Jiang and Shu (1996).
-! Author: Vedran Coralic
-! Date: 07/03/12
-
-
+!>
+!! @file m_weno.f90
+!! @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
+!!              that is supplemented with monotonicity preserving bounds (MPWENO)
+!!              and a mapping function that boosts the accuracy of the non-linear
+!!              weights (WENOM). MPWENO, see Balsara and Shu (2000), prevents the
+!!              reconstructed values to lay outside the range set by the stencil,
+!!              while WENOM, see Henrick et al. (2005), recovers the formal order
+!!              of accuracy of the reconstruction at critical points. Please note
+!!              that the basic WENO approach is implemented according to the work
+!!              of Jiang and Shu (1996).
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_weno
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
     ! ==========================================================================
     
     
@@ -29,21 +29,21 @@ MODULE m_weno
     PRIVATE; PUBLIC :: s_initialize_weno_module, s_weno, s_finalize_weno_module
     
     
-    ! The cell-average variables that will be WENO-reconstructed. Formerly, they
-    ! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
-    ! as to be reshaped (RS) and/or characteristically decomposed. The reshaping
-    ! allows the WENO procedure to be independent of the coordinate direction of
-    ! the reconstruction. Lastly, notice that the left (L) and right (R) results
-    ! of the characteristic decomposition are stored in custom-constructed WENO-
-    ! stencils (WS) that are annexed to each position of a given scalar field.
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: v_rs_wsL, v_rs_wsR
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: v_rs_wsL, v_rs_wsR !<
+    !! The cell-average variables that will be WENO-reconstructed. Formerly, they
+    !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
+    !! as to be reshaped (RS) and/or characteristically decomposed. The reshaping
+    !! allows the WENO procedure to be independent of the coordinate direction of
+    !! the reconstruction. Lastly, notice that the left (L) and right (R) results
+    !! of the characteristic decomposition are stored in custom-constructed WENO-
+    !! stencils (WS) that are annexed to each position of a given scalar field.
     
-    ! Left and right WENO-reconstructed values of the cell-average variables.
-    ! Note that the reshaped property of the variables from which these were
-    ! obtained, v_rs_wsL and v_rs_wsR, is initially kept. Once the reshaping
-    ! is undone, the reconstructed values are moved into vL_vf and vR_vf.
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vL_rs_vf, vR_rs_vf
-    
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vL_rs_vf, vR_rs_vf !<
+    !! Left and right WENO-reconstructed values of the cell-average variables.
+    !! Note that the reshaped property of the variables from which these were
+    !! obtained, v_rs_wsL and v_rs_wsR, is initially kept. Once the reshaping
+    !! is undone, the reconstructed values are moved into vL_vf and vR_vf.
+     
     
     ! WENO Coefficients ========================================================
     
@@ -115,15 +115,12 @@ MODULE m_weno
         
         
         
-        
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.        
         SUBROUTINE s_initialize_weno_module() ! --------------------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
-            
-            
-            ! Indical bounds in the x-, y- and z-directions
-            TYPE(bounds_info) :: ix,iy,iz
+
+            TYPE(bounds_info) :: ix,iy,iz !< Indical bounds in the x-, y- and z-directions
             
             
             IF(weno_order == 1) RETURN
@@ -253,33 +250,30 @@ MODULE m_weno
         
         
         
-        
-        
+        !>  The purpose of this subroutine is to compute the grid
+        !!      dependent coefficients of the WENO polynomials, ideal
+        !!      weights and smoothness indicators, provided the order,
+        !!      the coordinate direction and the location of the WENO
+        !!      reconstruction.
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param weno_loc Location of the WENO reconstruction
+        !! @param is Index bounds in the s-direction
         SUBROUTINE s_compute_weno_coefficients(weno_dir, weno_loc, is) ! -------
-        ! Description: The purpose of this subroutine is to compute the grid
-        !              dependent coefficients of the WENO polynomials, ideal
-        !              weights and smoothness indicators, provided the order,
-        !              the coordinate direction and the location of the WENO
-        !              reconstruction.
             
             
-            ! Coordinate direction and location of the WENO reconstruction
             INTEGER, INTENT(IN) :: weno_dir, weno_loc
-            
-            ! Indical bounds in the s-direction
             TYPE(bounds_info), INTENT(IN) :: is
-            
-            ! Number of cells in the s-direction
             INTEGER :: s
             
-            ! Cell-boundary locations in the s-direction
-            REAL(KIND(0d0)), POINTER, DIMENSION(:) :: s_cb => NULL()
+
+            REAL(KIND(0d0)), POINTER, DIMENSION(:) :: s_cb => NULL() !<
+            !! Cell-boundary locations in the s-direction
             
-            ! Boundary conditions (BC) in the s-direction
-            TYPE(bounds_info) :: bc_s
+
+            TYPE(bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Associating WENO coefficients pointers
@@ -621,15 +615,15 @@ MODULE m_weno
         
         
         
-        
+        !>  The purpose of the procedure is to associate the WENO
+        !!      coefficients' pointers with their appropriate targets,
+        !!      based on the coordinate direction and the location of
+        !!      the WENO reconstruction.      
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param weno_loc Location of the WENO reconstruction
         SUBROUTINE s_associate_weno_coefficients_pointers(weno_dir, weno_loc)
-        ! Description: The purpose of the procedure is to associate the WENO
-        !              coefficients' pointers with their appropriate targets,
-        !              based on the coordinate direction and the location of
-        !              the WENO reconstruction.
+
             
-            
-            ! Coordinate direction and location of the WENO reconstruction
             INTEGER, INTENT(IN) :: weno_dir, weno_loc
             
             
@@ -698,54 +692,50 @@ MODULE m_weno
         
         
         
-        
-        
+        !>  WENO reconstruction that is improved with monotonicity
+        !!      preserving bounds (MPWENO) and a mapping function that
+        !!      boosts the accuracy of the non-linear weights (WENOM).
+        !!      MPWENO, Balsara and Shu (2000), prevents reconstructed
+        !!      values to reside outside the range set by the stencil,
+        !!      while WENOM, Henrick et al. (2005), recovers the order
+        !!      of accuracy of the reconstruction for critical points.
+        !!      Notice that the basic WENO scheme is implemented based
+        !!      on the work of Jiang and Shu (1996).
+        !! @param v_vf Cell-averaged variables
+        !! @param vL_vf Left WENO reconstructed cell-boundary values
+        !! @param vR_vf Right WENO reconstructed cell-boundary values
+        !! @param cd_vars Characteristic decomposition state variables type
+        !! @param norm_dir Characteristic decommposition coordinate direction
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param weno_loc Coordinate location of the WENO reconstruction
+        !! @param ix Index bounds in first coordinate direction
+        !! @param iy Index bounds in second coordinate direction
+        !! @param iz Index bounds in third coordinate direction
         SUBROUTINE s_weno( v_vf, vL_vf, vR_vf, cd_vars,  & ! -------------------
                            norm_dir, weno_dir, weno_loc, &
                            ix,iy,iz                      )
-        ! Description: WENO reconstruction that is improved with monotonicity
-        !              preserving bounds (MPWENO) and a mapping function that
-        !              boosts the accuracy of the non-linear weights (WENOM).
-        !              MPWENO, Balsara and Shu (2000), prevents reconstructed
-        !              values to reside outside the range set by the stencil,
-        !              while WENOM, Henrick et al. (2005), recovers the order
-        !              of accuracy of the reconstruction for critical points.
-        !              Notice that the basic WENO scheme is implemented based
-        !              on the work of Jiang and Shu (1996).
+
             
-            
-            ! Cell-average variables
             TYPE(scalar_field), DIMENSION(:), INTENT(IN) :: v_vf
-            
-            ! Left and right WENO-reconstructed cell-boundary values, or the
-            ! values at the quadrature points, of the cell-average variables
             TYPE(scalar_field), DIMENSION(:), INTENT(INOUT) :: vL_vf, vR_vf
-            
-            ! Characteristic decomposition state variables type
             INTEGER, INTENT(IN) :: cd_vars
-            
-            ! Characteristic decomposition coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
-            
-            ! Coordinate direction and location of the WENO reconstruction
             INTEGER, INTENT(IN) :: weno_dir, weno_loc
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Newton divided differences
-            REAL(KIND(0d0)), DIMENSION(-weno_polyn:weno_polyn-1) :: dvd
+
+            REAL(KIND(0d0)), DIMENSION(-weno_polyn:weno_polyn-1) :: dvd !<
+            !! Newton divided differences
             
-            ! Left and right polynomials and nonlinear weights
-            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) ::  poly_L,  poly_R
-            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: alpha_L, alpha_R
-            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: omega_L, omega_R
+            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) ::  poly_L,  poly_R  !< Left/right polynominals
+            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: alpha_L, alpha_R  !< Left/right nonlinear weights
+            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: omega_L, omega_R  !< Left/right nonlinear weights
             
-            ! Smoothness indicators
-            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: beta
+
+            REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: beta !< Smoothness indicators
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Reshaping and/or projecting onto characteristic fields inputted
@@ -958,36 +948,32 @@ MODULE m_weno
         
         
         
-        
+        !> The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are required for the setup of the
+        !!      WENO reconstruction.      
+        !! @param v_vf Cell-averaged variables
+        !! @param vL_vf Left WENO reconstructed cell-boundary values
+        !! @param vR_vf Right WENO reconstructed cell-boundary values
+        !! @param cd_vars Characteristic decomposition state variables type
+        !! @param norm_dir Characteristic decommposition coordinate direction
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param ix Index bounds in first coordinate direction
+        !! @param iy Index bounds in second coordinate direction
+        !! @param iz Index bounds in third coordinate direction
         SUBROUTINE s_initialize_weno( v_vf, vL_vf, vR_vf, cd_vars, & ! ---------
                                       norm_dir, weno_dir, ix,iy,iz )
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are required for the setup of the
-        !              WENO reconstruction.
+
             
-            
-            ! Cell-average variables
             TYPE(scalar_field), DIMENSION(:), INTENT(IN) :: v_vf
-            
-            ! Left and right WENO-reconstructed cell-boundary values, or the
-            ! values at the quadrature points, of the cell-average variables
             TYPE(scalar_field), DIMENSION(:), INTENT(INOUT) :: vL_vf, vR_vf
-            
-            ! Characteristic decomposition state variables type
             INTEGER, INTENT(IN) :: cd_vars
-            
-            ! Characteristic decomposition coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
-            
-            ! WENO reconstruction coordinate direction
             INTEGER, INTENT(IN) :: weno_dir
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Determining the number of cell-average variables which will be
@@ -1175,13 +1161,15 @@ MODULE m_weno
         
         
         
-        
+        !>  The goal of this procedure is to map the nonlinear WENO
+        !!      weights to the more accurate nonlinear WENOM weights in
+        !!      order to reinstate the optimal order of accuracy of the
+        !!      reconstruction in the proximity of critical points, see
+        !!      Henrick et al. (2005).
+        !!  @param d_K Cell boundary pointer
+        !!  @param alpha_K ideal weights
+        !!  @param omega_K nonlinear weights
         SUBROUTINE s_map_nonlinear_weights(d_K, alpha_K, omega_K) ! ------------
-        ! Description: The goal of this procedure is to map the nonlinear WENO
-        !              weights to the more accurate nonlinear WENOM weights in
-        !              order to reinstate the optimal order of accuracy of the
-        !              reconstruction in the proximity of critical points, see
-        !              Henrick et al. (2005).
             
             
             ! Ideal and nonlinear weights
@@ -1203,26 +1191,28 @@ MODULE m_weno
         
         
         
-        
-        
+        !>  The goal of this subroutine is to ensure that the WENO
+        !!      reconstruction is monotonic. The latter is achieved by
+        !!      enforcing monotonicity preserving bounds of Suresh and
+        !!      Huynh (1997). The resulting MPWENO reconstruction, see
+        !!      Balsara and Shu (2000), ensures that the reconstructed
+        !!      values do not reside outside the range spanned by WENO
+        !!      stencil.
+        !!  @param i Equation number
+        !!  @param j First-coordinate cell index
+        !!  @param k Second-coordinate cell index
+        !!  @param l Third-coordinate cell index
         SUBROUTINE s_preserve_monotonicity(i,j,k,l) ! --------------------------
-        ! Description: The goal of this subroutine is to ensure that the WENO
-        !              reconstruction is monotonic. The latter is achieved by
-        !              enforcing monotonicity preserving bounds of Suresh and
-        !              Huynh (1997). The resulting MPWENO reconstruction, see
-        !              Balsara and Shu (2000), ensures that the reconstructed
-        !              values do not reside outside the range spanned by WENO
-        !              stencil.
+
             
-            
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: i,j,k,l
             
-            ! Curvature measures at the zone centers
-            REAL(KIND(0d0)), DIMENSION(-1:1) :: d
+
+            REAL(KIND(0d0)), DIMENSION(-1:1) :: d !< Curvature measures at the zone centers
             
-            ! Median (md) curvature and large curvature (LC) measures
-            REAL(KIND(0d0)) :: d_MD, d_LC
+
+            REAL(KIND(0d0)) :: d_MD, d_LC !<
+            !! Median (md) curvature and large curvature (LC) measures
             
             ! The left and right upper bounds (UL), medians, large curvatures,
             ! minima, and maxima of the WENO-reconstructed values of the cell-
@@ -1233,15 +1223,17 @@ MODULE m_weno
             REAL(KIND(0d0)) :: vL_min, vR_min
             REAL(KIND(0d0)) :: vL_max, vR_max
             
-            ! Determines the maximum Courant–Friedrichs–Lewy (CFL) number that
-            ! may be utilized with the scheme. In theory, for stability, a CFL
-            ! number less than 1/(1+alpha) is necessary. The default value for
-            ! alpha is 2.
-            REAL(KIND(0d0)), PARAMETER :: alpha = 2d0
+            REAL(KIND(0d0)), PARAMETER :: alpha = 2d0 !>
+            !! Determines the maximum Courant–Friedrichs–Lewy (CFL) number that
+            !! may be utilized with the scheme. In theory, for stability, a CFL
+            !! number less than 1/(1+alpha) is necessary. The default value for
+            !! alpha is 2.
             
-            ! Determines the amount of freedom available from utilizing a large
-            ! value for the local curvature. The default value for beta is 4/3.
-            REAL(KIND(0d0)), PARAMETER :: beta = 4d0/3d0
+
+
+            REAL(KIND(0d0)), PARAMETER :: beta = 4d0/3d0 !<
+            !! Determines the amount of freedom available from utilizing a large
+            !! value for the local curvature. The default value for beta is 4/3.
             
             
             ! Left Monotonicity Preserving Bound ===============================
@@ -1366,29 +1358,25 @@ MODULE m_weno
         
         
         
-        
+        !>  Deallocation and/or disassociation procedures that are
+        !!      necessary in order to finalize the WENO reconstruction
+        !! @param vL_vf Left WENO reconstructed cell-boundary values
+        !! @param vR_vf Right WENO reconstructed cell-boundary values
+        !! @param cd_vars Characteristic decomposition state variables type
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param ix Index bounds in first coordinate direction
+        !! @param iy Index bounds in second coordinate direction
+        !! @param iz Index bounds in third coordinate direction
         SUBROUTINE s_finalize_weno( vL_vf, vR_vf, cd_vars, & ! -----------------
                                     weno_dir, ix,iy,iz     )
-        ! Description: Deallocation and/or disassociation procedures that are
-        !              necessary in order to finalize the WENO reconstruction
             
-            
-            ! Left and right WENO-reconstructed cell-boundary values, or the
-            ! values at the quadrature points, of the cell-average variables
             TYPE(scalar_field), DIMENSION(:), INTENT(INOUT) :: vL_vf, vR_vf
-            
-            ! Characteristic decomposition state variables type
             INTEGER, INTENT(IN) :: cd_vars
-            
-            ! WENO reconstruction coordinate direction
             INTEGER, INTENT(IN) :: weno_dir
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
-            
+
+            INTEGER :: i,j,k !< Generic loop iterators
             
             ! Reshaping/Projecting onto Physical Fields in x-direction =========
             IF(weno_dir == 1) THEN
@@ -1518,11 +1506,9 @@ MODULE m_weno
         END SUBROUTINE s_finalize_weno ! ---------------------------------------
         
         
-        
-        
-        
+        !>  Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_weno_module() ! ----------------------------------
-        ! Description: Module deallocation and/or disassociation procedures
+
             
             
             IF(weno_order == 1) RETURN

@@ -1,26 +1,25 @@
-! MFC v3.0 - Simulation Code: m_derived_variables.f90
-! Description: This module features subroutines that allow for the derivation of
-!              numerous flow variables from the conservative and primitive ones.
-!              Currently, the available derived variables include the unadvected
-!              volume fraction, specific heat ratio, liquid stiffness, speed of
-!              sound, vorticity and the numerical Schlieren function.
-! Author: Vedran Coralic
-! Date: 04/10/11
-
-
+!>
+!! @file m_derived_variables.f90
+!! @brief This module features subroutines that allow for the derivation of
+!!              numerous flow variables from the conservative and primitive ones.
+!!              Currently, the available derived variables include the unadvected
+!!              volume fraction, specific heat ratio, liquid stiffness, speed of
+!!              sound, vorticity and the numerical Schlieren function.
+!! @author spencer
+!! @version 1.1
 MODULE m_derived_variables
     
     
     ! Dependencies =============================================================
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
-    USE m_data_output           ! Data output module
+    USE m_data_output           !< Data output module
 
-    USE m_time_steppers         ! Time-stepping algorithms
+    USE m_time_steppers         !< Time-stepping algorithms
     ! ==========================================================================
     
     
@@ -31,23 +30,25 @@ MODULE m_derived_variables
                        s_compute_derived_variables             , &
                        s_finalize_derived_variables_module
 
-    ! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
-    ! Note that because sufficient boundary information is available for all the
-    ! active coordinate directions, the centered family of the finite-difference
-    ! schemes is used.
+    !> @name Finite-difference coefficients
+    !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
+    !! Note that because sufficient boundary information is available for all the
+    !! active coordinate directions, the centered family of the finite-difference
+    !! schemes is used.
+    !> @{
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:) :: fd_coeff_x
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:) :: fd_coeff_y
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:) :: fd_coeff_z
-
+    !> @}
+    
     CONTAINS
         
         
         
-        
-        
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module        
         SUBROUTINE s_initialize_derived_variables_module() ! ----------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
+
             
             ! Allocating the variables which will store the coefficients of the
             ! centered family of finite-difference schemes. Note that sufficient
@@ -73,7 +74,7 @@ MODULE m_derived_variables
         
 
 
-
+        !> Allocate and open derived variables. Computing FD coefficients.
         SUBROUTINE s_initialize_derived_variables() ! -----------------------------
 
             ! Opening and writing header of CoM and flow probe files
@@ -106,14 +107,14 @@ MODULE m_derived_variables
 
 
 
-        
+        !> Writes coherent body information, communication files, and probes.
+        !!  @param t_step Current time-step
         SUBROUTINE s_compute_derived_variables(t_step) ! -----------------------
 
-            ! Current time-step
             INTEGER, INTENT(IN) :: t_step
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+            INTEGER :: i,j,k !< Generic loop iterators
 
             IF ((ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) .AND. (t_step > t_step_start + 2)) THEN
                 IF (ANY(com_wrt)) THEN
@@ -181,32 +182,30 @@ MODULE m_derived_variables
 
 
 
-
+        !>  The purpose of this subroutine is to compute the finite-
+        !!      difference coefficients for the centered schemes utilized
+        !!      in computations of first order spatial derivatives in the
+        !!      s-coordinate direction. The s-coordinate direction refers
+        !!      to the x-, y- or z-coordinate direction, depending on the
+        !!      subroutine's inputs. Note that coefficients of up to 4th
+        !!      order accuracy are available.
+        !!  @param q Number of cells in the s-coordinate direction
+        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
+        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
         SUBROUTINE s_compute_finite_difference_coefficients(    q,s_cc, fd_coeff_s  )
-        ! Description: The purpose of this subroutine is to compute the finite-
-        !              difference coefficients for the centered schemes utilized
-        !              in computations of first order spatial derivatives in the
-        !              s-coordinate direction. The s-coordinate direction refers
-        !              to the x-, y- or z-coordinate direction, depending on the
-        !              subroutine's inputs. Note that coefficients of up to 4th
-        !              order accuracy are available.
-            
-            
-            ! Number of cells in the s-coordinate direction
+           
             INTEGER, INTENT(IN) :: q
             
-            ! Locations of the cell-centers in the s-coordinate direction
             REAL(KIND(0d0)), &
             DIMENSION(-buff_size:q+buff_size), &
             INTENT(IN) :: s_cc
             
-            ! Finite-difference coefficients in the s-coordinate direction
             REAL(KIND(0d0)), &
             DIMENSION(-fd_number:fd_number,0:q), &
             INTENT(INOUT) :: fd_coeff_s
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Computing the 1st order finite-difference coefficients
@@ -242,33 +241,33 @@ MODULE m_derived_variables
         
         
         
-        
-
+        !> This subroutine receives as inputs the indicator of the
+        !!      component of the acceleration that should be outputted and
+        !!      the primitive variables. From those inputs, it proceeds
+        !!      to calculate values of the desired acceleration component,
+        !!      which are subsequently stored in derived flow quantity
+        !!      storage variable, q_sf.
+        !!  @param i Acceleration component indicator
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_prim_vf1 Primitive variables
+        !!  @param q_prim_vf2 Primitive variables
+        !!  @param q_prim_vf3 Primitive variables
+        !!  @param q_sf Acceleration component
         SUBROUTINE s_derive_acceleration_component(i, q_prim_vf, q_prim_vf1, &
                             q_prim_vf2, q_prim_vf3, q_sf) ! ----------
-        ! Description: This subroutine receives as inputs the indicator of the
-        !              component of the acceleration that should be outputted and
-        !              the primitive variables. From those inputs, it proceeds
-        !              to calculate values of the desired acceleration component,
-        !              which are subsequently stored in derived flow quantity
-        !              storage variable, q_sf.
+           
             
-            
-            ! Acceleration component indicator
             INTEGER, INTENT(IN) :: i
 
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf1
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf2
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf3
 
-            ! Acceleration component
             REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p), INTENT(OUT) :: q_sf
             
-            ! Generic loop iterators
-            INTEGER :: j,k,l,r
-            
+
+            INTEGER :: j,k,l,r !< Generic loop iterators
             
             ! Computing the acceleration component in the x-coordinate direction
             IF(i == 1) THEN
@@ -379,45 +378,47 @@ MODULE m_derived_variables
 
 
 
-
+        !> This subroutine is used together with the volume fraction
+        !!      model and when called upon, it computes the location of
+        !!      of the center of mass for each fluid from the inputted 
+        !!      primitive variables, q_prim_vf. The computed location
+        !!      is then written to a formatted data file by the root
+        !!      process.
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_prim_vf1 Primitive variables
+        !!  @param q_prim_vf2 Primitive variables
+        !!  @param q_prim_vf3 Primitive variables
+        !!  @param q_com Mass,x-location,y-location,z-location,x-velocity,y-velocity,z-velocity,
+        !!  x-acceleration, y-acceleration, z-acceleration, weighted 
         SUBROUTINE s_derive_center_of_mass(q_prim_vf,q_prim_vf1,q_prim_vf2,q_prim_vf3,q_com)
-        ! Description: This subroutine is used together with the volume fraction
-        !              model and when called upon, it computes the location of
-        !              of the center of mass for each fluid from the inputted 
-        !              primitive variables, q_prim_vf. The computed location
-        !              is then written to a formatted data file by the root
-        !              process.
-            
-            
-            ! Primitive variables
+           
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf1
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf2
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf3
-
-            ! Mass,x-location,y-location,z-location,x-velocity,y-velocity,z-velocity,
-            ! x-acceleration, y-acceleration, z-acceleration, weighted 
             REAL(KIND(0d0)), DIMENSION(num_fluids,10), INTENT(INOUT) :: q_com
 
-            ! Maximum and minimum values of cell boundaries in each direction used in check for
-            ! reflective BC in computation of center of mass
-            REAL(KIND(0d0)) :: xbeg,xend,ybeg,yend,zbeg,zend
+            REAL(KIND(0d0)) :: xbeg,xend,ybeg,yend,zbeg,zend !<
+            !! Maximum and minimum values of cell boundaries in each direction used in check for
+            !! reflective BC in computation of center of mass
+ 
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !< Generic loop iterators
 
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
 
-            ! Discrete cell volume
-            REAL(KIND(0d0)) :: dV
+            REAL(KIND(0d0)) :: tmp !< Temporary variable to store quantity for mpi_allreduce
 
-            ! Cartesian velocities
+
+            REAL(KIND(0d0)) :: dV !< Discrete cell volume
+
+
             REAL(KIND(0d0)) :: cart_u_x,  cart_u_y, &
                                cart_u_x1, cart_u_y1,&
                                cart_u_x2, cart_u_y2,&
-                               cart_u_x3, cart_u_y3
-            
+                               cart_u_x3, cart_u_y3 !<
+            !! Cartesian velocities
+
+
             IF (n == 0)  THEN !1D simulation
 
                 DO i = 1,num_fluids !Loop over individual fluids
@@ -725,19 +726,17 @@ MODULE m_derived_variables
 
 
 
-
+        !>  Subroutine to compute the higher moments in an attempt to find
+        !!      the maximal size of the droplet
+        !!  @param q_prim_vf Primitive variables
+        !!  @param moments Higher moments (2 lateral directions, 5 moment orders)
         SUBROUTINE s_derive_higher_moments(q_prim_vf, moments)
-        ! Description: Subroutine to compute the higher moments in an attempt to find
-        !              the maximal size of the droplet
 
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-
-            ! Higher moments (2 lateral directions, 5 moment orders)
             REAL(KIND(0d0)), DIMENSION(num_fluids,2,5), INTENT(INOUT) :: moments
 
-            ! Generic loop iterators
-            INTEGER :: i,r
+
+            INTEGER :: i,r !< Generic loop iterators
 
             ! Using the global boundary conditions, determine method of computing
             ! higher moments for y-direction
@@ -788,38 +787,25 @@ MODULE m_derived_variables
 
 
 
-
+        !> Compute non-symmetric moments
+        !! @param q_prim_vf Primitive variables
+        !! @param moments Higher moments(2 lateral directions, 5 moment orders)
+        !! @param dir Current lateral direction
         SUBROUTINE s_non_symmetric_moments(q_prim_vf, moments, dir) ! ---------------------
 
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-
-            ! Higher moments (2 lateral directions, 5 moment orders)
             REAL(KIND(0d0)), DIMENSION(num_fluids,2,5), INTENT(INOUT) :: moments
-
-            ! Numerator and denominator place holders for computation
-            REAL(KIND(0d0)), DIMENSION(num_fluids,5) :: pos_numer, neg_numer, pos_denom, neg_denom
-
-            ! Numerator weight
-            REAL(KIND(0d0)) :: numer_weight
-
-            ! Constant term in both numerator and denominator
-            REAL(KIND(0d0)) :: main_term
-
-            ! Current lateral direction
             INTEGER, INTENT(IN) :: dir
 
-            ! Discrete cell volume
-            REAL(KIND(0d0)) :: dV
+            REAL(KIND(0d0)), DIMENSION(num_fluids,5) :: pos_numer, neg_numer, pos_denom, neg_denom !<
+            !! Numerator and denominator place holders for computation
 
-            ! Cartesian x- and y-locations
-            REAL(KIND(0d0)) :: cart_x, cart_y
-
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
-
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
+            REAL(KIND(0d0)) :: numer_weight     !< Numerator weight
+            REAL(KIND(0d0)) :: main_term        !< Constant term in both numerator and denominator
+            REAL(KIND(0d0)) :: dV               !< Discrete cell volume
+            REAL(KIND(0d0)) :: cart_x, cart_y   !< Cartesian x- and y-locations
+            INTEGER :: i,j,k,l,r    !< Generic loop iterators
+            REAL(KIND(0d0)) :: tmp  !< Temporary variable to store quantity for mpi_allreduce
 
             DO i = 1, num_fluids
                 IF (com_wrt(i)) THEN
@@ -921,38 +907,28 @@ MODULE m_derived_variables
 
 
 
-
+        !> Compute symmetric moments
+        !! @param q_prim_vf Primitive variables
+        !! @param moments Higher moments(2 lateral directions, 5 moment orders)
+        !! @param dir Current lateral direction
         SUBROUTINE s_symmetric_moments(q_prim_vf, moments, dir) ! ---------------------
 
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-
-            ! Higher moments (2 lateral directions, 5 moment orders)
             REAL(KIND(0d0)), DIMENSION(num_fluids,2,5), INTENT(INOUT) :: moments
-
-            ! Numerator and denominator place holders for computation
-            REAL(KIND(0d0)), DIMENSION(num_fluids,5) :: numer, denom
-
-            ! Numerator weight
-            REAL(KIND(0d0)) :: numer_weight
-
-            ! Constant term in both numerator and denominator
-            REAL(KIND(0d0)) :: main_term
-
-            ! Current lateral direction
             INTEGER, INTENT(IN) :: dir
 
-            ! Discrete cell volume
-            REAL(KIND(0d0)) :: dV
 
-            ! Cartesian x- and y-locations
-            REAL(KIND(0d0)) :: cart_x, cart_y
+            REAL(KIND(0d0)), DIMENSION(num_fluids,5) :: numer, denom !<
+            !! Numerator and denominator place holders for computation
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            REAL(KIND(0d0)) :: numer_weight     !< Numerator weight
+            REAL(KIND(0d0)) :: main_term        !< Constant term in both numerator and denominator
+            REAL(KIND(0d0)) :: dV               !< Discrete cell volume
+            REAL(KIND(0d0)) :: cart_x, cart_y   !< Cartesian x- and y-locations
+            REAL(KIND(0d0)) :: tmp !< Temporary variable to store quantity for mpi_allreduce
 
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
+
 
             DO i = 1, num_fluids
                 IF (com_wrt(i)) THEN
@@ -1027,26 +1003,23 @@ MODULE m_derived_variables
 
 
 
-
+        !>  This subroutine is used together with the volume fraction model
+        !!      and when called upon, it computes the min and max bounds  of the 
+        !!      fluid in each direction in the domain. 
+        !!  @param q_prim_vf Primitive variables
+        !!  @param bounds Variables storing the min and max bounds  of the fluids
         SUBROUTINE s_derive_fluid_bounds(q_prim_vf, bounds) ! -----------------------
-        ! Description: This subroutine is used together with the volume fraction model
-        !       and when called upon, it computes the min and max bounds  of the 
-        !       fluid in each direction in the domain. 
 
-            ! Primitive variables
+
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-
-            ! Variables storing the min and max bounds  of the fluids
             REAL(KIND(0d0)), DIMENSION(num_fluids,5,6), INTENT(INOUT) :: bounds
 
-            ! Cartesian x,y,z-locations
-            REAL(KIND(0d0)) :: cart_x, cart_y, cart_z
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            REAL(KIND(0d0)) :: cart_x, cart_y, cart_z !< Cartesian x,y,z-locations
+            REAL(KIND(0d0)) :: tmp !< Temporary variable to store quantity for mpi_allreduce
 
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
+
 
             IF (n == 0) THEN ! 1D simulation
                 DO i = 1,num_fluids !Loop over individual fluids
@@ -1210,28 +1183,22 @@ MODULE m_derived_variables
 
 
 
-
-
+        !>  This subroutine is used together with the volume fraction model
+        !!      and when called upon, it computes the total mass of a fluid in the 
+        !!      entire domain for which the volume fraction is greater than a
+        !!      threshold value. This gives the mass of the coherent body.
+        !!  @param q_prim_vf Primitive variables
+        !!  @param cb_mass Coherent body mass
         SUBROUTINE s_derive_coherent_body(q_prim_vf, cb_mass) ! --------------------------
-        ! Description: This subroutine is used together with the volume fraction model
-        !       and when called upon, it computes the total mass of a fluid in the 
-        !       entire domain for which the volume fraction is greater than a
-        !       threshold value. This gives the mass of the coherent body.
 
-            ! Primitive variables
+
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-
-            ! Variables storing the coherent body masses of the fluids
             REAL(KIND(0d0)), DIMENSION(num_fluids,10), INTENT(INOUT) :: cb_mass
 
-            ! Discrete cell volume
-            REAL(KIND(0d0)) :: dV
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
-
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
+            REAL(KIND(0d0)) :: dV  !< Discrete cell volume
+            INTEGER :: i,j,k,l,r   !< Generic loop iterators
+            REAL(KIND(0d0)) :: tmp !< Temporary variable to store quantity for mpi_allreduce
 
             DO i = 1,num_fluids !Loop over individual fluids
                 IF (cb_wrt(i)) THEN
@@ -1317,28 +1284,21 @@ MODULE m_derived_variables
 
 
 
-
-
+        !>  This subroutine is used together with the volume fraction model
+        !!      and when called upon, it computes the centerline length of the
+        !!      fluid.
+        !!  @param q_prim_vf Primitive variables
+        !!  @param cntrline Variables storing the centerline length of the fluids
         SUBROUTINE s_derive_centerline(q_prim_vf, cntrline) ! --------------------------
-        ! Description: This subroutine is used together with the volume fraction model
-        !       and when called upon, it computes the centerline length of the
-        !       fluid.
 
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-
-            ! Variables storing the centerline length of the fluids
             REAL(KIND(0d0)), DIMENSION(num_fluids,5), INTENT(INOUT) :: cntrline
 
-            ! Placeholders
-            REAL(KIND(0d0)), DIMENSION(5) :: cntrmin, cntrmax
 
+            REAL(KIND(0d0)), DIMENSION(5) :: cntrmin, cntrmax !< Placeholders
+            REAL(KIND(0d0)) :: tmp !< Temporary variable to store quantity for mpi_allreduce
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
-
-            ! Temporary variable to store quantity for mpi_allreduce
-            REAL(KIND(0d0)) :: tmp
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
 
             IF (n == 0) THEN ! 1D simulation
                 DO i = 1, num_fluids
@@ -1436,9 +1396,9 @@ MODULE m_derived_variables
 
 
 
+        !> Deallocation procedures for the module
         SUBROUTINE s_finalize_derived_variables_module() ! -------------------
-        ! Description: Deallocation procedures for the module
-            
+
             ! Closing CoM and flow probe files
             IF (proc_rank == 0) THEN
                 IF (ANY(com_wrt)) THEN

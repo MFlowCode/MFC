@@ -1,72 +1,75 @@
-! MFC v3.0 - Simulation Code: m_time_steppers.f90
-! Description: The following module features a variety of time-stepping schemes.
-!              Currently, it includes the following Runge-Kutta (RK) algorithms:
-!                                     1) 1st Order TVD RK
-!                                     2) 2nd Order TVD RK
-!                                     3) 3rd Order TVD RK
-!                                     4) 4th Order RK
-!                                     5) 5th Order RK
-!              where TVD designates a total-variation-diminishing time-stepper.
-! Author: Vedran Coralic
-! Date: 06/08/12
-
-
+!>
+!! @file m_time_steppers.f90
+!! @brief The following module features a variety of time-stepping schemes.
+!!              Currently, it includes the following Runge-Kutta (RK) algorithms:
+!!                   1) 1st Order TVD RK
+!!                   2) 2nd Order TVD RK
+!!                   3) 3rd Order TVD RK
+!!                   4) 4th Order RK
+!!                   5) 5th Order RK
+!!              where TVD designates a total-variation-diminishing time-stepper.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_time_steppers
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_fftw                 ! Module for FFTW functions
+    USE m_fftw                 !< Module for FFTW functions
     
-    USE m_rhs                  ! Right-hand-side (RHS) evaluation procedures
+    USE m_rhs                  !< Right-hand-side (RHS) evaluation procedures
     
-    USE m_data_output          ! Run-time info & solution data output procedures
+    USE m_data_output          !< Run-time info & solution data output procedures
 
-    USE m_bubbles               
+    USE m_bubbles              !< Bubble dynamics routines
 
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
     
-    ! Cell-average conservative variables at each time-stage (TS)
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: q_cons_ts
-    
-    ! Cell-average primitive variables at the current time-stage
-    TYPE(scalar_field), PRIVATE, ALLOCATABLE, DIMENSION(:) :: q_prim_vf
-    
-    ! Cell-average RHS variables at the current time-stage
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: rhs_vf
-    
-    ! Cell-average primitive variables at consecutive TIMESTEPS
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: q_prim_ts
 
-    ! Number of time stages in the time-stepping scheme
-    INTEGER, PRIVATE :: num_ts
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: q_cons_ts !<
+    !! Cell-average conservative variables at each time-stage (TS)
+    
+    TYPE(scalar_field), PRIVATE, ALLOCATABLE, DIMENSION(:) :: q_prim_vf !<
+    !! Cell-average primitive variables at the current time-stage
+    
+
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: rhs_vf !<
+    !! Cell-average RHS variables at the current time-stage
+    
+
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: q_prim_ts !<
+    !! Cell-average primitive variables at consecutive TIMESTEPS
+
+
+    INTEGER, PRIVATE :: num_ts !<
+    !! Number of time stages in the time-stepping scheme
     
     
     CONTAINS
         
         
         
-        
-        
+        !> The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
         SUBROUTINE s_initialize_time_steppers_module() ! -----------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
+           
             
+
+            TYPE(bounds_info) :: ix,iy,iz !<
+            !! Indical bounds in the x-, y- and z-directions
             
-            ! Indical bounds in the x-, y- and z-directions
-            TYPE(bounds_info) :: ix,iy,iz
-            
-            ! Generic loop iterators
-            INTEGER :: i,j
+
+            INTEGER :: i,j !< Generic loop iterators
             
             
             ! Setting number of time-stages for selected time-stepping scheme
@@ -183,16 +186,13 @@ MODULE m_time_steppers
         
         
         
+        !> 1st order TVD RK time-stepping algorithm
+        !! @param t_step Current time step
         SUBROUTINE s_1st_order_tvd_rk(t_step) ! --------------------------------
-        ! Description: 1st order TVD RK time-stepping algorithm
-            
-            
-            ! Current time-step
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Generic loop iterator
-            INTEGER :: i
-!            INTEGER :: j
+            INTEGER :: i !< Generic loop iterator
            
             ! Stage 1 of 1 =====================================================
             DO i = 1, cont_idx%end
@@ -277,24 +277,18 @@ MODULE m_time_steppers
             end if
             ! ==================================================================
            
-            !print '(a)', 'SHB: end of time step'
-
-            
         END SUBROUTINE s_1st_order_tvd_rk ! ------------------------------------
         
         
         
         
-        
+        !> 2nd order TVD RK time-stepping algorithm
+        !! @param t_step Current time-step
         SUBROUTINE s_2nd_order_tvd_rk(t_step) ! --------------------------------
-        ! Description: 2nd order TVD RK time-stepping algorithm
-            
-            
-            ! Current time-step
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Stage 1 of 2 =====================================================
@@ -368,15 +362,13 @@ MODULE m_time_steppers
         
         
         
+        !> 3rd order TVD RK time-stepping algorithm
+        !! @param t_step Current time-step
         SUBROUTINE s_3rd_order_tvd_rk(t_step) ! --------------------------------
-        ! Description: 3rd order TVD RK time-stepping algorithm
-            
-            
-            ! Current time-step
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Generic loop iterator
-            INTEGER :: i,j
+            INTEGER :: i,j !< Generic loop iterator
             
             ! Stage 1 of 3 =====================================================
             DO i = 1, cont_idx%end
@@ -469,16 +461,13 @@ MODULE m_time_steppers
         
         
         
-        
+        !> 4th order RK time-stepping algorithm
+        !! @param t_step Current time-step
         SUBROUTINE s_4th_order_rk(t_step) ! ------------------------------------
-        ! Description: 4th order RK time-stepping algorithm
-            
-            
-            ! Current time-step
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Stage 1 of 4 =====================================================
@@ -607,16 +596,13 @@ MODULE m_time_steppers
         
         
         
-        
+        !> 5th order RK time-stepping algorithm
+        !! @param t_step Current time-step
         SUBROUTINE s_5th_order_rk(t_step) ! ------------------------------------
-        ! Description: 5th order RK time-stepping algorithm
-            
-            
-            ! Current time-step
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Stage 1 of 6 =====================================================
@@ -860,17 +846,14 @@ MODULE m_time_steppers
         
         
         
-        
-        
+        !> This subroutine saves the temporary q_prim_vf vector 
+        !!      into the q_prim_ts vector that is then used in p_main        
+        !! @param t_step current time-step
         SUBROUTINE s_time_step_cycling(t_step) ! ----------------------------
-        ! Description: This subroutine saves the temporary q_prim_vf vector 
-        !          into the q_prim_ts vector that is then used in p_main
 
-            ! Current time-step
             INTEGER, INTENT(IN) :: t_step
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
 
             IF (t_step == t_step_start) THEN
                 DO i = 1, sys_size
@@ -903,14 +886,10 @@ MODULE m_time_steppers
 
 
 
-
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_time_steppers_module() ! -------------------------
-        ! Description: Module deallocation and/or disassociation procedures
-            
-            
-            ! Generic loop iterators
-            INTEGER :: i,j
-            
+
+            INTEGER :: i,j !< Generic loop iterators
             
             ! Deallocating the cell-average conservative variables
             DO i = 1, num_ts
