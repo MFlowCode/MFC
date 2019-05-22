@@ -1,27 +1,27 @@
-! MFC v3.0 - Pre-process Code: m_variables_conversion.f90
-! Description: This module consists of subroutines used in the conversion of the
-!              conservative variables into the primitive ones and vice versa. In
-!              addition, the module also contains the subroutines used to obtain
-!              the mixture variables.
-! Author: Vedran Coralic
-! Date: 06/10/12
-
-
+!>
+!! @file m_variables_conversion.f90
+!! @brief This module consists of subroutines used in the conversion of the
+!!              conservative variables into the primitive ones and vice versa. In
+!!              addition, the module also contains the subroutines used to obtain
+!!              the mixture variables.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_variables_conversion
     
     
     ! Dependencies =============================================================
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
     
-    ! Abstract interface to two subroutines designed for the transfer/conversion
-    ! of the mixture/species variables to the mixture variables
+    !> Abstract interface to two subroutines designed for the transfer/conversion
+    !! of the mixture/species variables to the mixture variables
     ABSTRACT INTERFACE
         
         SUBROUTINE s_convert_xxxxx_to_mixture_variables(   q_vf, i,j,k,   &
@@ -54,31 +54,32 @@ MODULE m_variables_conversion
     ! be queried every time the mixture quantities are needed.
     
     
-    ! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
-    ! or s_convert_species_to_mixture_variables, based on model equations choice
+
     PROCEDURE(s_convert_xxxxx_to_mixture_variables), &
-    POINTER :: s_convert_to_mixture_variables => NULL()
-    
+    POINTER :: s_convert_to_mixture_variables => NULL() !<
+    !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
+    !! or s_convert_species_to_mixture_variables, based on model equations choice    
     
     CONTAINS
-        
+    
+        !>  This subroutine is designed for the gamma/pi_inf model
+        !!      and provided a set of either conservative or primitive
+        !!      variables, transfers the density, specific heat ratio
+        !!      function and the liquid stiffness function from q_vf to
+        !!      rho, gamma and pi_inf.
+        !! @param q_vf conservative or primitive variables
+        !! @param i cell index to transfer mixture variables 
+        !! @param j cell index to transfer mixture variables
+        !! @param k cell index to transfer mixture variables
+        !! @param rho density
+        !! @param gamma  specific heat ratio function
+        !! @param pi_inf liquid stiffness
         SUBROUTINE s_convert_mixture_to_mixture_variables(     q_vf, i,j,k,    &
                                                              rho,gamma,pi_inf  )
-        ! Description: This subroutine is designed for the gamma/pi_inf model
-        !              and provided a set of either conservative or primitive
-        !              variables, transfers the density, specific heat ratio
-        !              function and the liquid stiffness function from q_vf to
-        !              rho, gamma and pi_inf.
-            
-            
-            ! Conservative or primitive variables
+
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_vf
-            
-            ! Indexes of the cell for which to transfer the mixture variables
             INTEGER, INTENT(IN) :: i,j,k
             
-            ! Density, the specific heat ratio function and liquid stiffness
-            ! function, respectively
             REAL(KIND(0d0)), INTENT(OUT) :: rho
             REAL(KIND(0d0)), INTENT(OUT) :: gamma
             REAL(KIND(0d0)), INTENT(OUT) :: pi_inf
@@ -92,29 +93,32 @@ MODULE m_variables_conversion
             
             
         END SUBROUTINE s_convert_mixture_to_mixture_variables ! ----------------
-        
+
+        !>  This procedure is used alongside with the gamma/pi_inf
+        !!      model to transfer the density, the specific heat ratio
+        !!      function and liquid stiffness function from the vector
+        !!      of conservative or primitive variables to their scalar
+        !!      counterparts. Specifially designed for when subgrid bubbles
+        !!      must be included.
+        !! @param qK_vf primitive variables
+        !! @param rho_K density
+        !! @param gamma_K specific heat ratio
+        !! @param pi_inf_K liquid stiffness
+        !! @param j Cell index
+        !! @param k Cell index
+        !! @param l Cell index
         SUBROUTINE s_convert_species_to_mixture_variables_bubbles ( qK_vf,  &
                                                             j,k,l,&
                                                             rho_K,gamma_K, pi_inf_K &
                                                              )
 
-        ! Description: This procedure is used alongside with the gamma/pi_inf
-        !              model to transfer the density, the specific heat ratio
-        !              function and liquid stiffness function from the vector
-        !              of conservative or primitive variables to their scalar
-        !              counterparts.
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
             
-            
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf !should be primitive variables
-            
-            ! Density and the specific heat ratio and liquid stiffness functions
             REAL(KIND(0d0)), INTENT(OUT) :: rho_K, gamma_K, pi_inf_K
             
+            REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K !<
+            !! Partial densities and volume fractions
             
-            ! Partial densities and volume fractions
-            REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K
-            
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: j,k,l
             INTEGER :: i
             
@@ -162,30 +166,35 @@ MODULE m_variables_conversion
             end if
 
         END SUBROUTINE s_convert_species_to_mixture_variables_bubbles ! ----------------
-        
+       
+
+        !>  This subroutine is designed for the volume fraction model
+        !!              and provided a set of either conservative or primitive
+        !!              variables, computes the density, the specific heat ratio
+        !!              function and the liquid stiffness function from q_vf and
+        !!              stores the results into rho, gamma and pi_inf. 
+        !! @param q_vf primitive variables
+        !! @param rho density
+        !! @param gamma specific heat ratio
+        !! @param pi_inf liquid stiffness
+        !! @param j Cell index
+        !! @param k Cell index
+        !! @param l Cell index
         SUBROUTINE s_convert_species_to_mixture_variables(     q_vf, j,k,l,    &
                                                              rho,gamma,pi_inf  )
-        ! Description: This subroutine is designed for the volume fraction model
-        !              and provided a set of either conservative or primitive
-        !              variables, computes the density, the specific heat ratio
-        !              function and the liquid stiffness function from q_vf and
-        !              stores the results into rho, gamma and pi_inf.
+           
             
-            
-            ! Conservative or primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_vf
             
+
+            INTEGER, INTENT(IN) :: j,k,l !<
             ! Indexes of the cell for which to compute the mixture variables
-            INTEGER, INTENT(IN) :: j,k,l
             
-            ! Density, the specific heat ratio function and the liquid stiffness
-            ! function, respectively
             REAL(KIND(0d0)), INTENT(OUT) :: rho
             REAL(KIND(0d0)), INTENT(OUT) :: gamma
             REAL(KIND(0d0)), INTENT(OUT) :: pi_inf
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Computing the density, the specific heat ratio function and the
@@ -222,14 +231,10 @@ MODULE m_variables_conversion
         END SUBROUTINE s_convert_species_to_mixture_variables ! ----------------
         
         
-        
-        
-        
+        !> Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module        
         SUBROUTINE s_initialize_variables_conversion_module() ! -------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
-            
+
             ! Depending on the model selection for the equations of motion, the
             ! appropriate procedure for the conversion to the mixture variables
             ! is targeted by the procedure pointer
@@ -254,18 +259,16 @@ MODULE m_variables_conversion
         
         
         
-        
+        !> Converts the conservative variables to the primitive ones
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
         SUBROUTINE s_convert_conservative_to_primitive_variables( q_cons_vf, &
                                                                   q_prim_vf  )
-        ! Description: Converts the conservative variables to the primitive ones
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Primitive variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_prim_vf
@@ -369,17 +372,17 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_convert_conservative_to_primitive_variables ! ---------
         
-        ! Used when initializing patch 
+        !> Converts the primitive variables to the conservative ones.
+        !!  Used when initializing patches.
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
         SUBROUTINE s_convert_primitive_to_conservative_variables( q_prim_vf, &
                                                                   q_cons_vf  )
-        ! Description: Converts the primitive variables to the conservative ones
-            
-            ! Primitive variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_prim_vf
             
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_cons_vf
@@ -394,8 +397,7 @@ MODULE m_variables_conversion
             REAL(KIND(0d0)) :: nbub
             REAL(KIND(0d0)), dimension(nb) :: Rtmp
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             ! Converting the primitive variables to the conservative variables
             DO l = 0, p
@@ -472,10 +474,9 @@ MODULE m_variables_conversion
         END SUBROUTINE s_convert_primitive_to_conservative_variables ! ---------
         
         
+        !> Deallocation procedures for the module
         SUBROUTINE s_finalize_variables_conversion_module() ! ----------------
-        ! Description: Deallocation procedures for the module
-            
-            
+
             ! Nullifying the procedure pointer to the subroutine transfering/
             ! computing the mixture/species variables to the mixture variables
             s_convert_to_mixture_variables => NULL()

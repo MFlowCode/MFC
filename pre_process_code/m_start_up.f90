@@ -1,31 +1,26 @@
-! MFC v3.0 - Pre-process Code: m_start_up.f90
-! Description: This module contains subroutines that read, and check consistency
-!              of, the user provided inputs and data.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!>
+!! @file m_start_up.f90
+!! @brief This module contains subroutines that read, and check consistency
+!!              of, the user provided inputs and data.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_start_up
-    
     
     ! Dependencies =============================================================
     ! USE f90_unix_proc          ! NAG Compiler Library of UNIX system commands
     
-    USE m_derived_types          ! Definitions of the derived types
-    
-    USE m_global_parameters      ! Global parameters for the code
-    
-    USE m_mpi_proxy              ! Message passing interface (MPI) module proxy
-    
-    USE m_data_output           ! Procedures to write the grid data and the
-                                ! conservative variables to files
-    USE mpi                     ! Message passing interface (MPI) module
+    USE m_derived_types          !< Definitions of the derived types
+    USE m_global_parameters      !< Global parameters for the code
+    USE m_mpi_proxy              !< Message passing interface (MPI) module proxy
+    USE m_data_output            !< Procedures to write the grid data and the
+                                 !! conservative variables to files
+    USE mpi                      !< Message passing interface (MPI) module
     use m_compile_specific
     ! ==========================================================================
     
     
     IMPLICIT NONE
-    
     
     PRIVATE; PUBLIC :: s_initialize_start_up_module, &
                        s_read_input_file, &
@@ -60,13 +55,14 @@ MODULE m_start_up
 
     END INTERFACE ! ========================================================
 
-    ! Location of the folder associated with the rank of the local processor
-    CHARACTER(LEN = path_len + name_len) :: proc_rank_dir
+
+    CHARACTER(LEN = path_len + name_len) :: proc_rank_dir !<
+    !! Location of the folder associated with the rank of the local processor
     
-    ! Possible location of time-step folder containing preexisting grid and/or
-    ! conservative variables data to be used as starting point for pre-process
-    CHARACTER(LEN = path_len + 2*name_len), PRIVATE :: t_step_dir
-    
+    CHARACTER(LEN = path_len + 2*name_len), PRIVATE :: t_step_dir !<
+    !! Possible location of time-step folder containing preexisting grid and/or
+    !! conservative variables data to be used as starting point for pre-process    
+
     PROCEDURE(s_read_abstract_grid_data_files), POINTER :: s_read_grid_data_files => NULL()
     PROCEDURE(s_read_abstract_ic_data_files), POINTER :: s_read_ic_data_files => NULL()
     
@@ -74,21 +70,19 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  Reads the configuration file pre_process.inp, in order to
+        !!      populate the parameters in module m_global_parameters.f90
+        !!      with the user provided inputs        
         SUBROUTINE s_read_input_file() ! ---------------------------------------
-        ! Description: Reads the configuration file pre_process.inp, in order to
-        !              populate the parameters in module m_global_parameters.f90
-        !              with the user provided inputs
+
+
+            CHARACTER(LEN = name_len) :: file_loc  !<
+            !! Generic string used to store the address of a particular file
             
-            
-            ! Generic string used to store the address of a particular file
-            CHARACTER(LEN = name_len) :: file_loc
-            
-            ! Generic logical used for the purpose of asserting whether a file
-            ! is or is not present in the designated location
-            LOGICAL :: file_check
-            
+            LOGICAL :: file_check !<
+            !! Generic logical used for the purpose of asserting whether a file
+            !! is or is not present in the designated location
+             
             ! Namelist for all of the parameters to be inputed by the user
             NAMELIST /user_inputs/ case_dir, old_grid, old_ic, t_step_old, m, &
                                    n, p, x_domain, y_domain, z_domain,        &
@@ -101,9 +95,9 @@ MODULE m_start_up
                                    perturb_sph, perturb_sph_fluid, fluid_rho, &
                                    cyl_coord, loops_x, loops_y, loops_z,      &
                                    rhoref, pref, bubbles, R0ref, nb,          &
-                                   polytropic, thermal, Ca, Web, Re_inv                !SHB
+                                   polytropic, thermal, Ca, Web, Re_inv
  
-            
+
             ! Inquiring the status of the pre_process.inp file
             file_loc = 'pre_process.inp'
             INQUIRE(FILE = TRIM(file_loc), EXIST = file_check)
@@ -131,24 +125,26 @@ MODULE m_start_up
         
         
         
-        
+        !>  Checking that the user inputs make sense, i.e. that the
+        !!      individual choices are compatible with the code's options
+        !!      and that the combination of these choices results into a
+        !!      valid configuration for the pre-process       
         SUBROUTINE s_check_input_file() ! --------------------------------------
-        ! Description: Checking that the user inputs make sense, i.e. that the
-        !              individual choices are compatible with the code's options
-        !              and that the combination of these choices results into a
-        !              valid configuration for the pre-process
-            
-            
-            ! Generic string used to store the address of a particular file
-            CHARACTER(LEN = LEN_TRIM(case_dir)) :: file_loc
-            
-            ! Logical variable used to test the existence of folders
-            LOGICAL :: dir_check
-            
-            ! Generic loop iterator
-            INTEGER :: i
+                     
 
-            INTEGER :: bub_fac !for allowing an extra fluid_pp if there are bubbles
+            CHARACTER(LEN = LEN_TRIM(case_dir)) :: file_loc !<
+            !! Generic string used to store the address of a particular file
+            
+
+            LOGICAL :: dir_check !<
+            !! Logical variable used to test the existence of folders
+            
+
+            INTEGER :: i !< 
+            !! Generic loop iterator
+
+            INTEGER :: bub_fac !<
+            !! For allowing an extra fluid_pp if there are subgrid bubbles
 
             bub_fac = 0
             if (bubbles .and. (num_fluids == 1)) bub_fac = 1
@@ -161,7 +157,7 @@ MODULE m_start_up
            
             call my_inquire(file_loc,dir_check)
             
-            ! SHB: Startup checks for bubbles and bubble variables
+            ! Startup checks for bubbles and bubble variables
             IF(bubbles .AND. (model_eqns .NE. 4 .and. model_eqns .ne. 2)) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'bubbles and model_eqns. '           // &
@@ -952,17 +948,13 @@ MODULE m_start_up
         
         
         
-        
-        
+        !> This subroutine verifies that the geometric parameters of
+        !!      the line segment patch have consistently been inputted by
+        !!      the user.      
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_line_segment_patch_geometry(patch_id) ! -------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the line segment patch have consistently been inputted by
-        !              the user.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
-            
             
             ! Constraints on the geometric parameters of the line segment patch
             IF(n > 0 .OR. patch_icpp(patch_id)%length_x <= 0d0 &
@@ -983,17 +975,13 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the circle patch have consistently been inputted by the
+        !!      user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_circle_patch_geometry(patch_id) ! -------------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the circle patch have consistently been inputted by the
-        !              user.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
-            
             
             ! Constraints on the geometric parameters of the circle patch
             IF(n == 0 .OR. p > 0 .OR. patch_icpp(patch_id)%radius <= 0d0 &
@@ -1014,15 +1002,12 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the rectangle patch have consistently been inputted by
+        !!      the user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_rectangle_patch_geometry(patch_id) ! ----------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the rectangle patch have consistently been inputted by
-        !              the user.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1050,16 +1035,13 @@ MODULE m_start_up
         
         
         
-        
+        !> This subroutine verifies that the geometric parameters of
+        !!      the line sweep patch have consistently been inputted by
+        !!      the user.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_line_sweep_patch_geometry(patch_id) ! ---------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the line sweep patch have consistently been inputted by
-        !              the user.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
-            
             
             ! Constraints on the geometric parameters of the line sweep patch
             IF(                     n == 0 .OR. p > 0                     &
@@ -1086,17 +1068,13 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the ellipse patch have consistently been inputted by
+        !!      the user.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_ellipse_patch_geometry(patch_id) ! ------------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the ellipse patch have consistently been inputted by
-        !              the user.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
-            
             
             ! Constraints on the geometric parameters of the ellipse patch
             IF(                     n == 0 .OR. p > 0                     &
@@ -1124,14 +1102,13 @@ MODULE m_start_up
 
 
 
-
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the isentropic vortex patch have been entered by the user
+        !!      consistently.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_isentropic_vortex_patch_geometry(patch_id) ! --------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the isentropic vortex patch have been entered by the user
-        !              consistently.
+
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1154,13 +1131,12 @@ MODULE m_start_up
             
         END SUBROUTINE s_check_isentropic_vortex_patch_geometry ! --------------
         
-        
-          SUBROUTINE s_check_1D_analytical_patch_geometry(patch_id) ! ---------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !       the analytical patch have consistently been inputted by
-        !       the user.
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the analytical patch have consistently been inputted by
+        !!      the user.        
+        !!  @param patch_id Patch identifier
+        SUBROUTINE s_check_1D_analytical_patch_geometry(patch_id) ! ---------------
 
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
 
             ! Constraints on the geometric parameters of the analytical patch
@@ -1179,13 +1155,12 @@ MODULE m_start_up
             END IF
         END SUBROUTINE s_check_1D_analytical_patch_geometry ! ---------------------      
         
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the analytical patch have consistently been inputted by
+        !!      the user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_2D_analytical_patch_geometry(patch_id) ! ---------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !       the analytical patch have consistently been inputted by
-        !       the user.
 
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
 
             ! Constraints on the geometric parameters of the analytical patch
@@ -1208,14 +1183,12 @@ MODULE m_start_up
 
 
 
-
-
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the analytical patch have consistently been inputted by
+        !!      the user.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_3D_analytical_patch_geometry(patch_id) ! ---------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !       the analytical patch have consistently been inputted by
-        !       the user.
 
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
 
             ! Constraints on the geometric parameters of the analytical patch
@@ -1243,16 +1216,13 @@ MODULE m_start_up
 
 
 
-
+        !> This subroutine verifies that the geometric parameters of
+        !!      the sphere patch have consistently been inputted by the
+        !!      user.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_sphere_patch_geometry(patch_id) ! -------------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the sphere patch have consistently been inputted by the
-        !              user.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
-            
             
             ! Constraints on the geometric parameters of the sphere patch
             IF(                           p == 0                          &
@@ -1277,15 +1247,12 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the spherical harmonic  patch have consistently been
+        !!      inputted by the user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_spherical_harmonic_patch_geometry(patch_id) ! -------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the spherical harmonic  patch have consistently been
-        !              inputted by the user.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1319,11 +1286,11 @@ MODULE m_start_up
         
         
         
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the cuboid patch have consistently been inputted by the
+        !!      user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_cuboid_patch_geometry(patch_id) ! -------------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the cuboid patch have consistently been inputted by the
-        !              user.
             
             
             ! Patch identifier
@@ -1358,11 +1325,12 @@ MODULE m_start_up
         
         
         
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the cylinder patch have consistently been inputted by the
+        !!      user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_cylinder_patch_geometry(patch_id) ! -----------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the cylinder patch have consistently been inputted by the
-        !              user.
+
             
             
             ! Patch identifier
@@ -1409,11 +1377,11 @@ MODULE m_start_up
         
         
         
-        
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the plane sweep patch have consistently been inputted by
+        !!      the user.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_plane_sweep_patch_geometry(patch_id) ! --------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the plane sweep patch have consistently been inputted by
-        !              the user.
             
             
             ! Patch identifier
@@ -1447,15 +1415,12 @@ MODULE m_start_up
         
         
         
-        
-        
+        !> This subroutine verifies that the geometric parameters of
+        !!      the ellipsoid patch have consistently been inputted by
+        !!      the user.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_ellipsoid_patch_geometry(patch_id) ! ----------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the ellipsoid patch have consistently been inputted by
-        !              the user.
-            
-            
-            ! Patch identifier
+           
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1486,14 +1451,11 @@ MODULE m_start_up
 
 
 
-
-
+        !>  This subroutine verifies that the geometric parameters of
+        !!      the inactive patch remain unaltered by the user inputs.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_inactive_patch_geometry(patch_id) ! -----------------
-        ! Description: This subroutine verifies that the geometric parameters of
-        !              the inactive patch remain unaltered by the user inputs.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1539,16 +1501,12 @@ MODULE m_start_up
         END SUBROUTINE s_check_inactive_patch_geometry ! -----------------------
         
         
-        
-        
-        
+        !>  This subroutine verifies that any rights granted to the
+        !!      given active patch, to overwrite the preceding active
+        !!      patches, were consistently inputted by the user.       
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_active_patch_alteration_rights(patch_id) ! ----------
-        ! Description: This subroutine verifies that any rights granted to the
-        !              given active patch, to overwrite the preceding active
-        !              patches, were consistently inputted by the user.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1569,12 +1527,12 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  This subroutine verifies that the rights of the given
+        !!      inactive patch, to overwrite the preceding patches,
+        !!      remain unaltered by the user inputs.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_inactive_patch_alteration_rights(patch_id) ! --------
-        ! Description: This subroutine verifies that the rights of the given
-        !              inactive patch, to overwrite the preceding patches,
-        !              remain unaltered by the user inputs.
+
             
             
             ! Patch identifier
@@ -1597,16 +1555,12 @@ MODULE m_start_up
         END SUBROUTINE s_check_inactive_patch_alteration_rights ! --------------
         
         
-        
-        
-        
+        !> This subroutine verifies that the smoothing parameters of
+        !!      the given patch, which supports the smoothing out of its
+        !!      boundaries, have consistently been inputted by the user.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_supported_patch_smoothing(patch_id) ! ---------------
-        ! Description: This subroutine verifies that the smoothing parameters of
-        !              the given patch, which supports the smoothing out of its
-        !              boundaries, have consistently been inputted by the user.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1637,12 +1591,11 @@ MODULE m_start_up
         
         
         
-        
-        
+        !> This subroutine verifies that the smoothing parameters of
+        !!      the given patch, which does not support the smoothing out
+        !!          of its boundaries, remain unaltered by the user inputs.
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_unsupported_patch_smoothing(patch_id) ! -------------
-        ! Description: This subroutine verifies that the smoothing parameters of
-        !              the given patch, which does not support the smoothing out
-        !              of its boundaries, remain unaltered by the user inputs.
             
             
             ! Patch identifier
@@ -1668,15 +1621,12 @@ MODULE m_start_up
         
         
         
-        
-        
+        !>  This subroutine verifies that the primitive variables
+        !!      associated with the given active patch are physically
+        !!      consistent.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_active_patch_primitive_variables(patch_id) ! --------
-        ! Description: This subroutine verifies that the primitive variables
-        !              associated with the given active patch are physically
-        !              consistent.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1751,14 +1701,12 @@ MODULE m_start_up
         
         
         
-        
+        !>  This subroutine verifies that the primitive variables
+        !!      associated with the given inactive patch remain unaltered
+        !!      by the user inputs.        
+        !!  @param patch_id Patch identifier
         SUBROUTINE s_check_inactive_patch_primitive_variables(patch_id) ! ------
-        ! Description: This subroutine verifies that the primitive variables
-        !              associated with the given inactive patch remain unaltered
-        !              by the user inputs.
-            
-            
-            ! Patch identifier
+          
             INTEGER, INTENT(IN) :: patch_id
             
             
@@ -1789,12 +1737,12 @@ MODULE m_start_up
         
         
         
-        
-        
+        !> The goal of this subroutine is to read in any preexisting
+        !!      grid data as well as based on the imported grid, complete
+        !!      the necessary global computational domain parameters.        
+        !! @param dflt_int Default null integer
         SUBROUTINE s_read_serial_grid_data_files(dflt_int) ! ---
-        ! Description: The goal of this subroutine is to read in any preexisting
-        !              grid data as well as based on the imported grid, complete
-        !              the necessary global computational domain parameters.
+
             
         INTEGER, INTENT(IN) :: dflt_int
             
@@ -1952,13 +1900,11 @@ MODULE m_start_up
         
         
         
-        
-        
+        !> Cell-boundary data are checked for consistency by looking
+        !!      at the (non-)uniform cell-width distributions for all the
+        !!      active coordinate directions and making sure that all of
+        !!      the cell-widths are positively valued
         SUBROUTINE s_check_grid_data_files() ! -----------------
-        ! Description: Cell-boundary data are checked for consistency by looking
-        !              at the (non-)uniform cell-width distributions for all the
-        !              active coordinate directions and making sure that all of
-        !              the cell-widths are positively valued
             
             
             ! Cell-boundary Data Consistency Check in x-direction ==============
@@ -2008,38 +1954,35 @@ MODULE m_start_up
         
         
         
-        
-        
+        !> The goal of this subroutine is to read in any preexisting
+        !!      initial condition data files so that they may be used by
+        !!      the pre-process as a starting point in the creation of an
+        !!      all new initial condition.      
+        !! @param q_cons_vf Conservative variables
         SUBROUTINE s_read_serial_ic_data_files(q_cons_vf) ! ---------------------------
-        ! Description: The goal of this subroutine is to read in any preexisting
-        !              initial condition data files so that they may be used by
-        !              the pre-process as a starting point in the creation of an
-        !              all new initial condition.
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_cons_vf
             
+
+            CHARACTER(LEN = LEN_TRIM(case_dir) + 3*name_len) :: file_loc !<
             ! Generic string used to store the address of a particular file
-            CHARACTER(LEN = LEN_TRIM(case_dir) + 3*name_len) :: file_loc
             
-            ! Used to store the variable position, in character form, of the
-            ! currently manipulated conservative variable file
             CHARACTER(LEN = &
-            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num
+            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num !<
+            !! Used to store the variable position, in character form, of the
+            !! currently manipulated conservative variable file
             
-            ! Generic logical used for the purpose of asserting whether a file
-            ! is or is not present in the designated location
-            LOGICAL :: file_check
+            LOGICAL :: file_check !<
+            !! Generic logical used for the purpose of asserting whether a file
+            !! is or is not present in the designated location
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Reading the Conservative Variables Data Files ====================
-            
             DO i = 1, adv_idx%end
                 
                 ! Checking whether data file associated with variable position
@@ -2081,7 +2024,11 @@ MODULE m_start_up
         
         
         
-        
+        !> Cell-boundary data are checked for consistency by looking
+        !!      at the (non-)uniform cell-width distributions for all the
+        !!      active coordinate directions and making sure that all of
+        !!      the cell-widths are positively valued
+        !! @param dflt_int Default null integer
         SUBROUTINE s_read_parallel_grid_data_files(dflt_int)
 
             INTEGER, INTENT(IN) :: dflt_int
@@ -2185,11 +2132,13 @@ MODULE m_start_up
 
 
 
-
-
+        !> The goal of this subroutine is to read in any preexisting
+        !!      initial condition data files so that they may be used by
+        !!      the pre-process as a starting point in the creation of an
+        !!      all new initial condition.      
+        !! @param q_cons_vf Conservative variables
         SUBROUTINE s_read_parallel_ic_data_files(q_cons_vf) ! ------------------
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_cons_vf
@@ -2205,7 +2154,6 @@ MODULE m_start_up
             CHARACTER(LEN=path_len + 2*name_len) :: file_loc
             LOGICAL :: file_exist
 
-            ! Generic loop iterator
             INTEGER :: i
 
             ! Open the file to read

@@ -1,32 +1,32 @@
-! MFC v3.0 - Pre-process Code: p_main.f90
-! Description: This program takes care of setting up the initial condition and
-!              grid data for the multicomponent flow code.
-! Author: Vedran Coralic
-! Date: 06/08/12
-
-
+!>
+!! @file m_start_up.f90
+!! @brief This program takes care of setting up the initial condition and
+!!              grid data for the multicomponent flow code.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1i
 PROGRAM p_main
     
     
     ! Dependencies =============================================================
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
     
-    USE m_variables_conversion  ! Subroutines to change the state variables from
-                                ! one form to another
+    USE m_variables_conversion  !< Subroutines to change the state variables from
+                                !! one form to another
     
-    USE m_start_up              ! Procedures to read in and check consistency of
-                                ! the user provided inputs and data
+    USE m_start_up              !< Procedures to read in and check consistency of
+                                !! the user provided inputs and data
     
-    USE m_grid                  ! Procedures to generate (non-)uniform grids
+    USE m_grid                  !< Procedures to generate (non-)uniform grids
     
-    USE m_initial_condition     ! Procedures to generate initial condition
+    USE m_initial_condition     !< Procedures to generate initial condition
     
-    USE m_data_output           ! Procedures to write the grid data and the
-                                ! conservative variables to files
+    USE m_data_output           !< Procedures to write the grid data and the
+                                !! conservative variables to files
     ! ==========================================================================
     
     

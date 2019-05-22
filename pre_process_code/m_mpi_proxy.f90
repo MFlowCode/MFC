@@ -1,42 +1,35 @@
-! MFC v3.0 - Pre-process Code: m_mpi_proxy.f90
-! Description: This module serves as a proxy to the parameters and subroutines
-!              available in the MPI implementation's MPI module. Specifically,
-!              the role of the proxy is to harness basic MPI commands into more
-!              complex procedures as to achieve the required pre-processing
-!              communication goals.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!>
+!! @file m_mpi_proxy.f90
+!! @brief This module serves as a proxy to the parameters and subroutines
+!!              available in the MPI implementation's MPI module. Specifically,
+!!              the role of the proxy is to harness basic MPI commands into more
+!!              complex procedures as to achieve the required pre-processing
+!!              communication goals.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_mpi_proxy
     
     
     ! Dependencies =============================================================
-    USE mpi                     ! Message passing interface (MPI) module
-    
-    USE m_derived_types         ! Definitions of the derived types
-    
-    USE m_global_parameters     ! Global parameters for the code
+    USE mpi                     !< Message passing interface (MPI) module
+    USE m_derived_types         !< Definitions of the derived types
+    USE m_global_parameters     !< Global parameters for the code
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
-    
-    ! Generic flags used to identify and report MPI errors
-    INTEGER, PRIVATE :: err_code, ierr
+    INTEGER, PRIVATE :: err_code, ierr !< 
+    !! Generic flags used to identify and report MPI errors
     
     
     CONTAINS
-        
-        
-        
-        
-        
+  
+        !>  The subroutine intializes the MPI environment and queries
+        !!      both the number of processors that will be available for
+        !!      the job as well as the local processor rank.
         SUBROUTINE s_mpi_initialize() ! ----------------------------
-        ! Description: The subroutine intializes the MPI environment and queries
-        !              both the number of processors that will be available for
-        !              the job as well as the local processor rank.
             
             
             ! Establishing the MPI environment
@@ -63,24 +56,19 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !> The subroutine terminates the MPI execution environment.
         SUBROUTINE s_mpi_abort() ! ---------------------------------------------
-        ! Description: The subroutine terminates the MPI execution environment.
-            
             
             ! Terminating the MPI environment
             CALL MPI_ABORT(MPI_COMM_WORLD, err_code, ierr)
-            
             
         END SUBROUTINE s_mpi_abort ! -------------------------------------------
         
         
         
-        
-        
+        !! @param q_cons_vf Conservative variables 
         SUBROUTINE s_initialize_mpi_data(q_cons_vf) ! --------------------------
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
@@ -117,8 +105,8 @@ MODULE m_mpi_proxy
 
 
 
+        !> Halts all processes until all have reached barrier.
         SUBROUTINE s_mpi_barrier() ! -------------------------------------------
-        ! Description: Halts all processes until all have reached barrier.
 
             ! Calling MPI_BARRIER
             CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -127,15 +115,13 @@ MODULE m_mpi_proxy
 
 
 
-
-
+        !> Since only processor with rank 0 is in charge of reading
+        !!       and checking the consistency of the user provided inputs,
+        !!       these are not available to the remaining processors. This
+        !!       subroutine is then in charge of broadcasting the required
+        !!       information.
         SUBROUTINE s_mpi_bcast_user_inputs() ! ---------------------------------
-        ! Description: Since only processor with rank 0 is in charge of reading
-        !              and checking the consistency of the user provided inputs,
-        !              these are not available to the remaining processors. This
-        !              subroutine is then in charge of broadcasting the required
-        !              information.
-            
+           
             
             ! Generic loop iterator
             INTEGER :: i
@@ -380,16 +366,13 @@ MODULE m_mpi_proxy
         
         
         
-        
-        
+        !> Description: This subroutine takes care of efficiently distributing
+        !!              the computational domain among the available processors
+        !!             as well as recomputing some of the global parameters so
+        !!              that they reflect the configuration of sub-domain that is
+        !!              overseen by the local processor.        
         SUBROUTINE s_mpi_decompose_computational_domain() ! --------------------
-        ! Description: This subroutine takes care of efficiently distributing
-        !              the computational domain among the available processors
-        !              as well as recomputing some of the global parameters so
-        !              that they reflect the configuration of sub-domain that is
-        !              overseen by the local processor.
-            
-            
+
             ! # of processors in the x-, y- and z-coordinate directions
             INTEGER :: num_procs_x, num_procs_y, num_procs_z
             
@@ -804,18 +787,14 @@ MODULE m_mpi_proxy
         END SUBROUTINE s_mpi_decompose_computational_domain ! ------------------
         
         
-        
-        
-        
+        !>  The following subroutine takes the inputted variable and
+        !!      determines its minimum value on the entire computational
+        !!      domain. The result is stored back into inputted variable.        
+        !!  @param var_loc holds the local value to be reduced among
+        !!      all the processors in communicator. On output, the variable holds
+        !!      the minimum value, reduced amongst all of the local values.
         SUBROUTINE s_mpi_reduce_min(var_loc) ! ---------------------------------
-        ! Description: The following subroutine takes the inputted variable and
-        !              determines its minimum value on the entire computational
-        !              domain. The result is stored back into inputted variable.
-            
-            
-            ! On input, this variable holds the local value to be reduced among
-            ! all the processors in communicator. On output, the variable holds
-            ! the minimum value, reduced amongst all of the local values.
+
             REAL(KIND(0d0)), INTENT(INOUT) :: var_loc
             
             ! Temporary storage variable that holds the reduced minimum value
@@ -838,19 +817,12 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !> Finalization of all MPI related processes
         SUBROUTINE s_mpi_finalize() ! ------------------------------
-        ! Description: Finalization of all MPI related processes
-            
-            
+
             ! Terminating the MPI environment
             CALL MPI_FINALIZE(ierr)
             
-            
         END SUBROUTINE s_mpi_finalize ! ----------------------------
-        
-        
-        
-        
         
 END MODULE m_mpi_proxy

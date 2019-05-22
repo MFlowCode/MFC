@@ -1,26 +1,23 @@
-! MFC v3.0 - Pre-process Code: m_data_output.f90
-! Description: This module takes care of writing the grid and initial condition
-!              data files into the "0" time-step directory located in the folder
-!              associated with the rank of the local processor, which is a sub-
-!              directory of the case folder specified by the user in the input
-!              file pre_process.inp.
-! Author: Vedran Coralic
-! Date: 06/08/12
-
-
+!>
+!! @file m_data_output.f90
+!! @brief This module takes care of writing the grid and initial condition
+!!              data files into the "0" time-step directory located in the folder
+!!              associated with the rank of the local processor, which is a sub-
+!!              directory of the case folder specified by the user in the input
+!!              file pre_process.inp.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_data_output
     
-    
     ! Dependencies =============================================================
-    ! USE f90_unix_proc           ! NAG Compiler Library of UNIX system commands
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_global_parameters     ! Global parameters for the code
-    
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
-    USE mpi                     ! Message passing interface (MPI) module
+    USE mpi                     !< Message passing interface (MPI) module
     USE m_compile_specific
     USE m_variables_conversion
     ! ==========================================================================
@@ -37,6 +34,8 @@ MODULE m_data_output
 
     ABSTRACT INTERFACE ! ===================================================
 
+        !>  Interface for the conservative data
+        !! @param q_cons_vf The conservative variables
         SUBROUTINE s_write_abstract_data_files(q_cons_vf)
 
             IMPORT :: scalar_field, sys_size
@@ -50,41 +49,36 @@ MODULE m_data_output
         END SUBROUTINE s_write_abstract_data_files ! -------------------
     END INTERFACE ! ========================================================
 
-    ! Time-step folder into which grid and initial condition data will be placed
-    CHARACTER(LEN = path_len + 2*name_len), PRIVATE :: t_step_dir
+
+
+    CHARACTER(LEN = path_len + 2*name_len), PRIVATE :: t_step_dir !<
+    !! Time-step folder into which grid and initial condition data will be placed
     
-    CHARACTER(LEN = path_len + 2*name_len), PUBLIC :: restart_dir
+    CHARACTER(LEN = path_len + 2*name_len), PUBLIC :: restart_dir !< 
+    !! Restart data folder
 
     PROCEDURE(s_write_abstract_data_files), POINTER :: s_write_data_files => NULL()
     
     CONTAINS
         
-        
-        
-        
-        
+        !>  Writes grid and initial condition data files to the "0"
+        !!  time-step directory in the local processor rank folder
+        !! @param q_cons_vf The conservative variables
         SUBROUTINE s_write_serial_data_files(q_cons_vf) ! -----------
-        ! Description: Writes grid and initial condition data files to the "0"
-        !              time-step directory in the local processor rank folder
-            
-            
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
 
-            logical :: file_exist
+            logical :: file_exist !< checks if file exists
             
-            ! Used to store the number, in character form, of the currently
-            ! manipulated conservative variable data file
             CHARACTER(LEN = &
-            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num
+            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num !< Used to store the number, in character form, of the currently
+            !! manipulated conservative variable data file
+
+            CHARACTER(LEN = LEN_TRIM(t_step_dir) + name_len) :: file_loc !<
+            !! Generic string used to store the address of a particular file
             
-            ! Generic string used to store the address of a particular file
-            CHARACTER(LEN = LEN_TRIM(t_step_dir) + name_len) :: file_loc
-            
-            ! Generic loop iterator
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !< Generic loop iterator
             REAL(KIND(0d0)), DIMENSION(nb) :: nRtmp
             REAL(KIND(0d0)) :: nbub, lit_gamma, pi_inf, gamma, rho
             
@@ -339,8 +333,10 @@ MODULE m_data_output
 
 
 
-
-
+        !> 
+        !! @brief Writes grid and initial condition data files in parallel to the "0"
+        !!  time-step directory in the local processor rank folder
+        !! @param q_cons_vf The conservative variables
         SUBROUTINE s_write_parallel_data_files(q_cons_vf) ! --
 
             ! Conservative variables
@@ -418,15 +414,10 @@ MODULE m_data_output
 
         END SUBROUTINE s_write_parallel_data_files ! ---------------------------
 
-
-
-
-
+        !> 
+        !! @brief Computation of parameters, allocation procedures, and/or
+        !!              any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_data_output_module() ! ----------------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
-            
             ! Generic string used to store the address of a particular file
             CHARACTER(LEN = LEN_TRIM(case_dir) + 2*name_len) :: file_loc
             
@@ -488,8 +479,8 @@ MODULE m_data_output
         
         
         
-        
-        
+        !> 
+        !! @brief Resets s_write_data_files pointer
         SUBROUTINE s_finalize_data_output_module() ! ---------------------------
 
             s_write_data_files => NULL()

@@ -1,18 +1,18 @@
-! MFC v3.0 - Pre-process Code: m_grid.f90
-! Description: This module takes care of creating the rectilinear grid on which
-!              the data for the initial condition will be laid out and on which
-!              the simulation will eventually be computed. The grid may either
-!              be uniform or non-uniform. Non-uniform grids are generated using
-!              the hyperbolic tangent function, see Johnsen (2007) for details.
-!              Alternatively to synthesizing a new grid, the user may select to
-!              read in a preexisting one. This is carried out through the module
-!              m_start_up.f90. In such a case, the responsibility of this module
-!              becomes only to allocate/deallocate the necessary grid variables
-!              for the cell-centers and cell-boundaries locations.
-! Author: Vedran Coralic
-! Date: 06/08/12
-
-
+!>
+!! @file m_grid.f90
+!! @brief  This module takes care of creating the rectilinear grid on which
+!!              the data for the initial condition will be laid out and on which
+!!              the simulation will eventually be computed. The grid may either
+!!              be uniform or non-uniform. Non-uniform grids are generated using
+!!              the hyperbolic tangent function, see Johnsen (2007) for details.
+!!              Alternatively to synthesizing a new grid, the user may select to
+!!              read in a preexisting one. This is carried out through the module
+!!              m_start_up.f90. In such a case, the responsibility of this module
+!!              becomes only to allocate/deallocate the necessary grid variables
+!!              for the cell-centers and cell-boundaries locations.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_grid
     
     
@@ -51,21 +51,19 @@ MODULE m_grid
     CONTAINS
         
         
-        
-        
-        
+        !> The following subroutine generates either a uniform or
+        !!              non-uniform rectilinear grid in serial, defined by the parameters
+        !!              inputted by the user. The grid information is stored in
+        !!              the grid variables containing coordinates of the cell-
+        !!              centers and cell-boundaries.
+        !! @param dflt_int is the default null integer used for checking initializationss  
         SUBROUTINE s_generate_serial_grid(dflt_int) ! -----------------------------------------
-        ! Description: The following subroutine generates either a uniform or
-        !              non-uniform rectilinear grid, defined by the parameters
-        !              inputted by the user. The grid information is stored in
-        !              the grid variables containing coordinates of the cell-
-        !              centers and cell-boundaries.
             
             INTEGER, INTENT(IN) :: dflt_int
             
             ! Generic loop iterator
-            INTEGER :: i,j
-            real(kind(0d0)) :: length
+            INTEGER :: i,j              !< generic loop operatorss
+            real(kind(0d0)) :: length   !< domain lengths
             
             ! Grid Generation in the x-direction ===============================
             dx = (x_domain%end - x_domain%beg) / REAL(m+1, KIND(0d0))
@@ -191,23 +189,28 @@ MODULE m_grid
         
         
         
-        
-        
+        !> The following subroutine generates either a uniform or
+        !!              non-uniform rectilinear grid in parallel, defined by the parameters
+        !!              inputted by the user. The grid information is stored in
+        !!              the grid variables containing coordinates of the cell-
+        !!              centers and cell-boundaries.
+        !! @param dflt_int is she default null integer used for checking initializationss         
         SUBROUTINE s_generate_parallel_grid(dflt_int) !-------------------------
 
             INTEGER, INTENT(IN) :: dflt_int
 
             ! Locations of cell boundaries
-            REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+            REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: x_cb_glb, y_cb_glb, z_cb_glb !<
+            !! Locations of cell boundaries
 
-            ! Generic string used to store the address of a file
-            CHARACTER(LEN = path_len + name_len) :: file_loc
+
+            CHARACTER(LEN = path_len + name_len) :: file_loc !< 
+            !! Generic string used to store the address of a file
 
             INTEGER :: ifile, ierr, data_size
             INTEGER, DIMENSION(MPI_STATUS_SIZE) :: status
 
-            ! Generic loop iterator
-            INTEGER :: i,j
+            INTEGER :: i,j !< Generic loop integers
 
             ALLOCATE(x_cb_glb(-1:m_glb))
             ALLOCATE(y_cb_glb(-1:n_glb))
@@ -234,8 +237,6 @@ MODULE m_grid
             IF (n_glb > 0) THEN
 
                 IF (grid_geometry == 2.and.y_domain%beg.eq.0.0d0) THEN
-                !IF (grid_geometry == 2) THEN
-                !PRINT *,proc_rank,y_domain%beg
                     dy = (y_domain%end - y_domain%beg) / REAL(2*n_glb+1, KIND(0d0))
                     y_cb_glb(-1) = y_domain%beg
                     DO i = 1, n_glb
@@ -309,13 +310,9 @@ MODULE m_grid
 
         END SUBROUTINE s_generate_parallel_grid ! ------------------------------
 
-
-
-
-
+        !> Computation of parameters, allocation procedures, and/or
+        !!              any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_grid_module() ! -----------------------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
             
             IF (parallel_io .NEQV. .TRUE.) THEN
                 s_generate_grid => s_generate_serial_grid
@@ -325,19 +322,11 @@ MODULE m_grid
             
         END SUBROUTINE s_initialize_grid_module ! ---------------------------------
         
-        
-        
-        
-        
+        !> Deallocation procedures for the module        
         SUBROUTINE s_finalize_grid_module() ! --------------------------------
-        ! Description: Deallocation procedures for the module
             
             s_generate_grid => NULL()   
             
         END SUBROUTINE s_finalize_grid_module ! ------------------------------
-        
-        
-        
-        
         
 END MODULE m_grid

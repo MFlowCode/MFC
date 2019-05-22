@@ -1,20 +1,20 @@
-! MFC v3.0 - Pre-process Code: m_initial_condition.f90
-! Description: This module provides a platform that is analagous to constructive
-!              solid geometry techniques and in this way allows for the creation
-!              of a wide variety of initial conditions. Several 1D, 2D and 3D
-!              fundamental geometries are included that may further be combined
-!              into more complex shapes. This is achieved by carefully setting
-!              up the order in which the patches are laid out in the domain and
-!              specifying the priority that each patch has over the preceeding
-!              ones. The resulting shapes may be identified both by the values
-!              of their primitive variables and the associated patch identities.
-!              Note that the user may choose to read in and modify a preexisting
-!              initial condition. The module m_start_up.f90 is responsible for
-!              reading in the relevant data files.
-! Author: Vedran Coralic
-! Date: 06/11/12
-
-
+!>
+!! @file m_initial_condition.f90
+!! @brief This module provides a platform that is analagous to constructive
+!!              solid geometry techniques and in this way allows for the creation
+!!              of a wide variety of initial conditions. Several 1D, 2D and 3D
+!!              fundamental geometries are included that may further be combined
+!!              into more complex shapes. This is achieved by carefully setting
+!!              up the order in which the patches are laid out in the domain and
+!!              specifying the priority that each patch has over the preceeding
+!!              ones. The resulting shapes may be identified both by the values
+!!              of their primitive variables and the associated patch identities.
+!!              Note that the user may choose to read in and modify a preexisting
+!!              initial condition. The module m_start_up.f90 is responsible for
+!!             reading in the relevant data files.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_initial_condition
     
     
@@ -31,20 +31,20 @@ MODULE m_initial_condition
     IMPLICIT NONE
     
     
-    ! Abstract interface to the two subroutines that assign the patch primitive
-    ! variables, either mixture or species, depending on the subroutine, to a
-    ! particular cell in the computational domain
+    !> Abstract interface to the two subroutines that assign the patch primitive
+    !! variables, either mixture or species, depending on the subroutine, to a
+    !! particular cell in the computational domain
     ABSTRACT INTERFACE
-        
+ 
+        !> Skeleton of s_assign_patch_mixture_primitive_variables
+        !!      and s_assign_patch_species_primitive_variables
+        !! @param patch_id is the patch identifier
+        !! @param j (x) cell index in which the mixture or species primitive variables from the indicated patch areassigned
+        !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch areassigned
+        !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         SUBROUTINE s_assign_patch_xxxxx_primitive_variables( patch_id,j,k,l)
-        ! Description: Skeleton of s_assign_patch_mixture_primitive_variables
-        !              and s_assign_patch_species_primitive_variables
-            
-            ! Patch identifier
+           
             INTEGER, INTENT(IN) :: patch_id
-            
-            ! Cell indexes of the cell in which the mixture or species primitive
-            ! variables from the indicated patch will be assigned
             INTEGER, INTENT(IN) :: j,k,l
             
         END SUBROUTINE s_assign_patch_xxxxx_primitive_variables
@@ -55,91 +55,90 @@ MODULE m_initial_condition
     ! a procedure such that the choice of the model equations does not have to
     ! be queried every time the patch primitive variables are to be assigned in
     ! a cell in the computational domain.
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_prim_vf !< primitive variables
     
-    
-    ! Primitive variables
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_prim_vf
-    
-    ! Conservative variables
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_cons_vf
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_cons_vf !< conservative variables
     
     TYPE(scalar_field) :: alf_sum
     
-    ! These variables are analogous in both meaning and use to the similarly
-    ! named components in the ic_patch_parameters type (see m_derived_types.f90
-    ! for additional details). They are employed as a means to more concisely
-    ! perform the actions necessary to lay out a particular patch on the grid.
-    REAL(KIND(0d0)) :: x_centroid, y_centroid, z_centroid
+    REAL(KIND(0d0)) :: x_centroid, y_centroid, z_centroid 
     REAL(KIND(0d0)) :: length_x, length_y, length_z
     REAL(KIND(0d0)) :: radius
     REAL(KIND(0d0)) :: epsilon, beta
     INTEGER         :: smooth_patch_id
-    REAL(KIND(0d0)) :: smooth_coeff
-    
-    ! These variables combine the centroid and length parameters associated with
-    ! a particular patch to yield the locations of the patch boundaries in the
-    ! x-, y- and z-coordinate directions. They are used as a means to concisely
-    ! perform the actions necessary to lay out a particular patch on the grid.
-    TYPE(bounds_info) :: x_boundary, y_boundary, z_boundary
-    
-    ! When a line or a plane sweep patch geometry is employed, these variables
-    ! represent the coefficients associated with the equation describing the
-    ! said line or plane.
-    REAL(KIND(0d0)) :: a, b, c, d
-    
-    ! In the case that smoothing of patch boundaries is enabled and the boundary
-    ! between two adjacent patches is to be smeared out, this variable's purpose
-    ! is to act as a pseudo volume fraction to indicate the contribution of each
-    ! patch toward the composition of a cell's fluid state.
-    REAL(KIND(0d0)) :: eta
-    
-    ! Bookkepping variable used to track the patch identities (id) associated
-    ! with each of the cells in the computational domain. Note that only one
-    ! patch identity may be associated with any one cell.
-    INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: patch_id_fp
+    REAL(KIND(0d0)) :: smooth_coeff !< 
+    !! These variables are analogous in both meaning and use to the similarly
+    !! named components in the ic_patch_parameters type (see m_derived_types.f90
+    !! for additional details). They are employed as a means to more concisely
+    !! perform the actions necessary to lay out a particular patch on the grid.
 
-    ! Variables to be used to hold cell locations in Cartesian coordinates if
-    ! 3D simulation is using cylindrical coordinates
-    REAL(KIND(0d0)) :: cart_y, cart_z
-    REAL(KIND(0d0)) :: sph_phi
+    TYPE(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
+    !! These variables combine the centroid and length parameters associated with
+    !! a particular patch to yield the locations of the patch boundaries in the
+    !! x-, y- and z-coordinate directions. They are used as a means to concisely
+    !! perform the actions necessary to lay out a particular patch on the grid.
+ 
     
-    ! Depending on the multicomponent flow model, this variable is a pointer to
-    ! either the subroutine s_assign_patch_mixture_primitive_variables, or the
-    ! subroutine s_assign_patch_species_primitive_variables
+    REAL(KIND(0d0)) :: a, b, c, d !<
+    !! When a line or a plane sweep patch geometry is employed, these variables
+    !! represent the coefficients associated with the equation describing the
+    !! said line or plane.
+    
+
+    REAL(KIND(0d0)) :: eta !<
+    !! In the case that smoothing of patch boundaries is enabled and the boundary
+    !! between two adjacent patches is to be smeared out, this variable's purpose
+    !! is to act as a pseudo volume fraction to indicate the contribution of each
+    !! patch toward the composition of a cell's fluid state.
+
+
+    INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: patch_id_fp !<
+    !! Bookkepping variable used to track the patch identities (id) associated
+    !! with each of the cells in the computational domain. Note that only one
+    !! patch identity may be associated with any one cell.
+ 
+    REAL(KIND(0d0)) :: cart_y, cart_z
+    REAL(KIND(0d0)) :: sph_phi !<
+    !! Variables to be used to hold cell locations in Cartesian coordinates if
+    !! 3D simulation is using cylindrical coordinates
+
+    
     PROCEDURE(s_assign_patch_xxxxx_primitive_variables), &
-    POINTER :: s_assign_patch_primitive_variables => NULL()
+    POINTER :: s_assign_patch_primitive_variables => NULL() !<
+    !! Depending on the multicomponent flow model, this variable is a pointer to
+    !! either the subroutine s_assign_patch_mixture_primitive_variables, or the
+    !! subroutine s_assign_patch_species_primitive_variables
+ 
     
     
     CONTAINS
-        
+
+        !>  This subroutine assigns the mixture primitive variables
+        !!              of the patch designated by the patch_id, to the cell that
+        !!              is designated by the indexes (j,k,l). In addition, the
+        !!              variable bookkeeping the patch identities in the entire
+        !!              domain is updated with the new assignment. Note that if
+        !!              the smoothing of the patch's boundaries is employed, the
+        !!              ensuing primitive variables in the cell will be a type of
+        !!              combination of the current patch's primitive variables
+        !!              with those of the smoothing patch. The specific details
+        !!              of the combination may be found in Shyue's work (1998).
+        !! @param patch_id the patch identifier
+        !! @param j  the x-dir node index
+        !! @param k  the y-dir node index
+        !! @param l  the z-dir node index
         SUBROUTINE s_assign_patch_mixture_primitive_variables( patch_id,j,k,l)
-        ! Description: This subroutine assigns the mixture primitive variables
-        !              of the patch designated by the patch_id, to the cell that
-        !              is designated by the indexes (j,k,l). In addition, the
-        !              variable bookkeeping the patch identities in the entire
-        !              domain is updated with the new assignment. Note that if
-        !              the smoothing of the patch's boundaries is employed, the
-        !              ensuing primitive variables in the cell will be a type of
-        !              combination of the current patch's primitive variables
-        !              with those of the smoothing patch. The specific details
-        !              of the combination may be found in Shyue's work (1998).
             
             
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
-            
-            ! Cell indexes of the cell in which the mixture primitive variables
-            ! from the indicated patch are to be assigned
             INTEGER, INTENT(IN) :: j,k,l
             
-            ! Density, velocity, pressure and specific heat ratio function
-            REAL(KIND(0d0))                               :: rho
-            REAL(KIND(0d0)), DIMENSION(E_idx-mom_idx%beg) :: vel
-            REAL(KIND(0d0))                               :: pres
-            REAL(KIND(0d0))                               :: gamma
+            REAL(KIND(0d0))                               :: rho    !< density
+            REAL(KIND(0d0)), DIMENSION(E_idx-mom_idx%beg) :: vel    !< velocity
+            REAL(KIND(0d0))                               :: pres   !< pressure
+            REAL(KIND(0d0))                               :: gamma  !< specific heat ratio function
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< generic loop operator
             
             
             ! Assigning the mixture primitive variables of a uniform state patch
@@ -239,44 +238,34 @@ MODULE m_initial_condition
             
         END SUBROUTINE s_assign_patch_mixture_primitive_variables ! ------------
         
-        
-               
+        !>  This subroutine assigns the species primitive variables. This follows
+        !!  s_assign_patch_species_primitive_variables with adaptation for
+        !!  ensemble-averaged bubble modeling
+        !! @param patch_id the patch identifier
+        !! @param j  the x-dir node index
+        !! @param k  the y-dir node index
+        !! @param l  the z-dir node index
         SUBROUTINE s_assign_patch_species_primitive_variables_bubbles( patch_id,j,k,l)
-        ! Description: This subroutine assigns the species primitive variables
-        !              of the patch designated by the patch_id, to the cell that
-        !              is designated by the indexes (j,k,l). In addition, the
-        !              variable bookkeeping the patch identities in the entire
-        !              domain is updated with the new assignment. Note that if
-        !              the smoothing of the patch's boundaries is employed, the
-        !              ensuing primitive variables in the cell will be a type of
-        !              combination of the current patch's primitive variables
-        !              with those of the smoothing patch. The specific details
-        !              of the combination may be found in Shyue's work (1998).
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
-            
-            ! Cell indexes of the cell in which the species primitive variables
-            ! from the indicated patch are to be assigned
             INTEGER, INTENT(IN) :: j,k,l
             
             ! Density, the specific heat ratio function and the liquid stiffness
             ! function, respectively, obtained from the combination of primitive
             ! variables of the current and smoothing patches
-            REAL(KIND(0d0)) :: rho
-            REAL(KIND(0d0)) :: gamma
-            REAL(KIND(0d0)) :: lit_gamma
-            REAL(KIND(0d0)) :: pi_inf
-            REAL(KIND(0d0)) :: orig_rho
+            REAL(KIND(0d0)) :: rho          !< density
+            REAL(KIND(0d0)) :: gamma        
+            REAL(KIND(0d0)) :: lit_gamma    !< specific heat ratio
+            REAL(KIND(0d0)) :: pi_inf       !< stiffness from SEOS
+            REAL(KIND(0d0)) :: orig_rho     
             REAL(KIND(0d0)) :: orig_gamma
-            REAL(KIND(0d0)) :: orig_pi_inf
+            REAL(KIND(0d0)) :: orig_pi_inf 
 
-            ! Vector to hold original values of cell for smoothing purposes
-            REAL(KIND(0d0)), DIMENSION(sys_size) :: orig_prim_vf
+            REAL(KIND(0d0)), DIMENSION(sys_size) :: orig_prim_vf !<
+            !! Vector to hold original values of cell for smoothing purposes
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i  !< Generic loop iterator
             
             ! Transferring the identity of the smoothing patch
             smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
@@ -492,43 +481,40 @@ MODULE m_initial_condition
             
         END SUBROUTINE s_assign_patch_species_primitive_variables_bubbles ! ------------ 
         
-        
-        
+       
+        !>      This subroutine assigns the species primitive variables
+        !!              of the patch designated by the patch_id, to the cell that
+        !!              is designated by the indexes (j,k,l). In addition, the
+        !!              variable bookkeeping the patch identities in the entire
+        !!              domain is updated with the new assignment. Note that if
+        !!              the smoothing of the patch's boundaries is employed, the
+        !!              ensuing primitive variables in the cell will be a type of
+        !!              combination of the current patch's primitive variables
+        !!              with those of the smoothing patch. The specific details
+        !!              of the combination may be found in Shyue's work (1998).
+        !! @param patch_id the patch identifier
+        !! @param j  the x-dir node index
+        !! @param k  the y-dir node index
+        !! @param l  the z-dir node index
         SUBROUTINE s_assign_patch_species_primitive_variables( patch_id,j,k,l)
-        ! Description: This subroutine assigns the species primitive variables
-        !              of the patch designated by the patch_id, to the cell that
-        !              is designated by the indexes (j,k,l). In addition, the
-        !              variable bookkeeping the patch identities in the entire
-        !              domain is updated with the new assignment. Note that if
-        !              the smoothing of the patch's boundaries is employed, the
-        !              ensuing primitive variables in the cell will be a type of
-        !              combination of the current patch's primitive variables
-        !              with those of the smoothing patch. The specific details
-        !              of the combination may be found in Shyue's work (1998).
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
-            
-            ! Cell indexes of the cell in which the species primitive variables
-            ! from the indicated patch are to be assigned
             INTEGER, INTENT(IN) :: j,k,l
             
-            ! Density, the specific heat ratio function and the liquid stiffness
-            ! function, respectively, obtained from the combination of primitive
-            ! variables of the current and smoothing patches
             REAL(KIND(0d0)) :: rho
             REAL(KIND(0d0)) :: gamma
             REAL(KIND(0d0)) :: pi_inf
             REAL(KIND(0d0)) :: orig_rho
             REAL(KIND(0d0)) :: orig_gamma
-            REAL(KIND(0d0)) :: orig_pi_inf
-
+            REAL(KIND(0d0)) :: orig_pi_inf !<
+            !! Density, the specific heat ratio function and the liquid stiffness
+            !! function, respectively, obtained from the combination of primitive
+            !! variables of the current and smoothing patches
+ 
+            REAL(KIND(0d0)), DIMENSION(sys_size) :: orig_prim_vf !<
             ! Vector to hold original values of cell for smoothing purposes
-            REAL(KIND(0d0)), DIMENSION(sys_size) :: orig_prim_vf
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< generic loop iterator
             
             
             ! Transferring the identity of the smoothing patch
@@ -631,13 +617,11 @@ MODULE m_initial_condition
             
         END SUBROUTINE s_assign_patch_species_primitive_variables ! ------------
         
+        !> Computation of parameters, allocation procedures, and/or
+        !!              any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_initial_condition_module() ! -------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
             
-            
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< generic loop iterator
             
             
             ! Allocating the primitive and conservative variables
@@ -694,19 +678,16 @@ MODULE m_initial_condition
         
         
         
-        
-        
+        !>  This subroutine peruses the patches and depending on the
+        !!              type of geometry associated with a particular patch, it
+        !!              calls the related subroutine to setup the said geometry
+        !!              on the grid using the primitive variables included with
+        !!              the patch parameters. The subroutine is complete once the
+        !!              primitive variables are converted to conservative ones.
         SUBROUTINE s_generate_initial_condition() ! ----------------------------
-        ! Description: This subroutine peruses the patches and depending on the
-        !              type of geometry associated with a particular patch, it
-        !              calls the related subroutine to setup the said geometry
-        !              on the grid using the primitive variables included with
-        !              the patch parameters. The subroutine is complete once the
-        !              primitive variables are converted to conservative ones.
             
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i  !< Generic loop operator
             
             
             ! Converting the conservative variables to the primitive ones given
@@ -840,9 +821,6 @@ MODULE m_initial_condition
         END SUBROUTINE s_generate_initial_condition ! --------------------------
         
         
-        
-        
-        
         SUBROUTINE s_convert_cylindrical_to_cartesian_coord(cyl_y,cyl_z)
 
             REAL(KIND(0d0)), INTENT(IN) :: cyl_y, cyl_z
@@ -851,10 +829,6 @@ MODULE m_initial_condition
             cart_z = cyl_y*COS(cyl_z)
 
         END SUBROUTINE s_convert_cylindrical_to_cartesian_coord ! --------------
-
-
-
-
 
         SUBROUTINE s_convert_cylindrical_to_spherical_coord(cyl_x,cyl_y)
 
@@ -865,13 +839,9 @@ MODULE m_initial_condition
         END SUBROUTINE s_convert_cylindrical_to_spherical_coord ! --------------
 
 
-
-
-
         SUBROUTINE s_perturb_sphere() ! ----------------------------------------
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !< generic loop operators
 
             REAL(KIND(0d0)) :: perturb_alpha
             REAL(KIND(0d0)) :: alpha_unadv
@@ -935,11 +905,9 @@ MODULE m_initial_condition
 
 
 
-
         SUBROUTINE s_perturb_surrounding_flow() ! ------------------------------
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !<  generic loop iterators
 
             REAL(KIND(0d0)) :: perturb_alpha
             REAL(KIND(0d0)) :: rand_real
@@ -977,25 +945,20 @@ MODULE m_initial_condition
         END SUBROUTINE s_perturb_surrounding_flow ! ----------------------------
 
 
-
-
-
+        !>          The line segment patch is a 1D geometry that may be used,
+        !!              for example, in creating a Riemann problem. The geometry
+        !!              of the patch is well-defined when its centroid and length
+        !!              in the x-coordinate direction are provided. Note that the
+        !!              line segment patch DOES NOT allow for the smearing of its
+        !!              boundaries.
+        !! @param patch_id patch identifier
         SUBROUTINE s_line_segment(patch_id) ! ----------------------------------
-        ! Description: The line segment patch is a 1D geometry that may be used,
-        !              for example, in creating a Riemann problem. The geometry
-        !              of the patch is well-defined when its centroid and length
-        !              in the x-coordinate direction are provided. Note that the
-        !              line segment patch DOES NOT allow for the smearing of its
-        !              boundaries.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
             
             REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma
 
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: i,j  !< Generic loop operators
 
             print*, 'Patch type: ', 'line segment'
 
@@ -1045,20 +1008,17 @@ MODULE m_initial_condition
             print*, 'patch type done'
             
         END SUBROUTINE s_line_segment ! ----------------------------------------
-        
+       
+        !>  The spiral patch is a 2D geometry that may be used, The geometry
+        !!              of the patch is well-defined when its centroid and radius
+        !!              are provided. Note that the circular patch DOES allow for
+        !!              the smoothing of its boundary.
+        !!  @param patch_id patch identifier
         SUBROUTINE s_spiral(patch_id) ! ----------------------------------------
-        ! Description: The circular patch is a 2D geometry that may be used, for
-        !              example, in creating a bubble or a droplet. The geometry
-        !              of the patch is well-defined when its centroid and radius
-        !              are provided. Note that the circular patch DOES allow for
-        !              the smoothing of its boundary.
-            
-            
-            ! Patch identifier
+           
             INTEGER, INTENT(IN) :: patch_id
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< Generic loop iterators
             REAL(KIND(0d0)) :: th, thickness, nturns, mya
             REAL(KIND(0d0)) :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
             !integer, allocatable, dimension(:,:,:) :: logic_grid
@@ -1120,21 +1080,18 @@ MODULE m_initial_condition
             f_r = a + b*myth + offset
         end function f_r
         
-        
+        !> The circular patch is a 2D geometry that may be used, for
+        !!              example, in creating a bubble or a droplet. The geometry
+        !!              of the patch is well-defined when its centroid and radius
+        !!              are provided. Note that the circular patch DOES allow for
+        !!              the smoothing of its boundary.   
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_circle(patch_id) ! ----------------------------------------
-        ! Description: The circular patch is a 2D geometry that may be used, for
-        !              example, in creating a bubble or a droplet. The geometry
-        !              of the patch is well-defined when its centroid and radius
-        !              are provided. Note that the circular patch DOES allow for
-        !              the smoothing of its boundary.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
-            ! Generic loop iterators
-            INTEGER :: i,j
-            
+            INTEGER :: i,j !< Generic loop iterators
+             
             ! Transferring the circular patch's radius, centroid, smearing patch
             ! identity and smearing coefficient information
             x_centroid      = patch_icpp(patch_id)%x_centroid
@@ -1185,12 +1142,10 @@ MODULE m_initial_condition
         END SUBROUTINE s_circle ! ----------------------------------------------
         
 
+        !>             The varcircle patch is a 2D geometry that may be used
+        !!             . It  generatres an annulus
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_varcircle(patch_id) ! ----------------------------------------
-        ! Description: The circular patch is a 2D geometry that may be used, for
-        !              example, in creating a bubble or a droplet. The geometry
-        !              of the patch is well-defined when its centroid and radius
-        !              are provided. Note that the circular patch DOES allow for
-        !              the smoothing of its boundary.
             
             
             ! Patch identifier
@@ -1241,7 +1196,8 @@ MODULE m_initial_condition
             
             
         END SUBROUTINE s_varcircle ! ----------------------------------------------
-        
+       
+
         SUBROUTINE s_3dvarcircle(patch_id) ! ----------------------------------------
             
             ! Patch identifier
@@ -1298,19 +1254,16 @@ MODULE m_initial_condition
             
         END SUBROUTINE s_3dvarcircle ! ----------------------------------------------
         
-
-        
+        !>      The elliptical patch is a 2D geometry. The geometry of 
+        !!      the patch is well-defined when its centroid and radii
+        !!      are provided. Note that the elliptical patch DOES allow
+        !!      for the smoothing of its boundary
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_ellipse(patch_id) ! ---------------------------------------
-        ! Description: The elliptical patch is a 2D geometry. The geometry of 
-        !       the patch is well-defined when its centroid and radii
-        !       are provided. Note that the elliptical patch DOES allow
-        !       for the smoothing of its boundary
 
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
 
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: i,j !< Generic loop operators
 
             ! Transferring the elliptical patch's radii, centroid, smearing
             ! patch identity, and smearing coefficient information
@@ -1358,13 +1311,13 @@ MODULE m_initial_condition
 
 
 
-
-
+        !>      The ellipsoidal patch is a 3D geometry. The geometry of 
+        !!       the patch is well-defined when its centroid and radii
+        !!       are provided. Note that the ellipsoidal patch DOES allow
+        !!       for the smoothing of its boundary
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_ellipsoid(patch_id) ! -------------------------------------
-        ! Description: The ellipsoidal patch is a 3D geometry. The geometry of 
-        !       the patch is well-defined when its centroid and radii
-        !       are provided. Note that the ellipsoidal patch DOES allow
-        !       for the smoothing of its boundary
+
 
             ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
@@ -1430,27 +1383,22 @@ MODULE m_initial_condition
         END SUBROUTINE s_ellipsoid ! -------------------------------------------
 
 
-
-
-
+        !>      The rectangular patch is a 2D geometry that may be used,
+        !!              for example, in creating a solid boundary, or pre-/post-
+        !!              shock region, in alignment with the axes of the Cartesian
+        !!              coordinate system. The geometry of such a patch is well-
+        !!              defined when its centroid and lengths in the x- and y-
+        !!              coordinate directions are provided. Please note that the
+        !!              rectangular patch DOES NOT allow for the smoothing of its
+        !!              boundaries.
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_rectangle(patch_id) ! -------------------------------------
-        ! Description: The rectangular patch is a 2D geometry that may be used,
-        !              for example, in creating a solid boundary, or pre-/post-
-        !              shock region, in alignment with the axes of the Cartesian
-        !              coordinate system. The geometry of such a patch is well-
-        !              defined when its centroid and lengths in the x- and y-
-        !              coordinate directions are provided. Please note that the
-        !              rectangular patch DOES NOT allow for the smoothing of its
-        !              boundaries.
-            
-            
-            ! Patch identifier
-            INTEGER, INTENT(IN) :: patch_id
+           
+            INTEGER, INTENT(IN) :: patch_id 
 
-            REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma
+            REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: i,j !< generic loop iterators
 
             print*, 'Patch type: ', 'rectangle'
 
@@ -1512,24 +1460,19 @@ MODULE m_initial_condition
         END SUBROUTINE s_rectangle ! -------------------------------------------
         
         
-        
-        
-        
+        !>  The swept line patch is a 2D geometry that may be used,
+        !!      for example, in creating a solid boundary, or pre-/post-
+        !!      shock region, at an angle with respect to the axes of the
+        !!      Cartesian coordinate system. The geometry of the patch is
+        !!      well-defined when its centroid and normal vector, aimed
+        !!      in the sweep direction, are provided. Note that the sweep
+        !!      line patch DOES allow the smoothing of its boundary.        
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_sweep_line(patch_id) ! ------------------------------------
-        ! Description: The swept line patch is a 2D geometry that may be used,
-        !              for example, in creating a solid boundary, or pre-/post-
-        !              shock region, at an angle with respect to the axes of the
-        !              Cartesian coordinate system. The geometry of the patch is
-        !              well-defined when its centroid and normal vector, aimed
-        !              in the sweep direction, are provided. Note that the sweep
-        !              line patch DOES allow the smoothing of its boundary.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
             
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: i,j !< Generic loop operators
             
             
             ! Transferring the centroid information of the line to be swept
@@ -1580,16 +1523,14 @@ MODULE m_initial_condition
         END SUBROUTINE s_sweep_line ! ------------------------------------------
         
         
-        
-        
-        
+        !> The isentropic vortex is a 2D geometry that may be used,
+        !!              for example, to generate an isentropic flow disturbance.
+        !!              Geometry of the patch is well-defined when its centroid
+        !!              and radius are provided. Notice that the patch DOES NOT
+        !!              allow for the smoothing of its boundary.
+        !! @param patch_id is the patch identifier
         SUBROUTINE s_isentropic_vortex(patch_id) ! ----------------------------
-        ! Description: The isentropic vortex is a 2D geometry that may be used,
-        !              for example, to generate an isentropic flow disturbance.
-        !              Geometry of the patch is well-defined when its centroid
-        !              and radius are provided. Notice that the patch DOES NOT
-        !              allow for the smoothing of its boundary.
-            
+           
             
             ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
@@ -1635,10 +1576,10 @@ MODULE m_initial_condition
             
         END SUBROUTINE s_isentropic_vortex ! -----------------------------------
         
-        
+        !>  This patch assigns the primitive variables as analytical 
+        !!  functions such that the code can be verified.         
+        !!  @param patch_id is the patch identifier
         SUBROUTINE s_1D_analytical(patch_id) ! ---------------------------------
-        ! Description: This patch assigns the primitive variables as analytical 
-        !       functions such that the code can be verified. 
 
             ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
@@ -1712,6 +1653,7 @@ MODULE m_initial_condition
             
         END SUBROUTINE s_1D_analytical ! --------------------------------------- 
         
+
  
         SUBROUTINE s_1d_bubble_pulse(patch_id) ! ---------------------------------
         ! Description: This patch assigns the primitive variables as analytical 
@@ -1789,19 +1731,18 @@ MODULE m_initial_condition
 
             
         END SUBROUTINE s_1D_bubble_pulse ! --------------------------------------- 
-        
-        SUBROUTINE s_2D_analytical(patch_id) ! ---------------------------------
-        ! Description: This patch assigns the primitive variables as analytical 
-        !       functions such that the code can be verified. 
 
-            ! Patch identifier
+        !>  This patch assigns the primitive variables as analytical 
+        !!  functions such that the code can be verified. 
+        !!  @param patch_id is the patch identifier
+        SUBROUTINE s_2D_analytical(patch_id) ! ---------------------------------
+
             INTEGER, INTENT(IN) :: patch_id
 
-            ! Placeholders for the cell boundary values
-            REAL(KIND(0d0)) :: a,b,c,d,pi_inf,gamma,lit_gamma
+            REAL(KIND(0d0)) :: a,b,c,d !< placeholderrs for the cell boundary values
+            REAL(KIND(0d0)) :: pi_inf,gamma,lit_gamma !< equation of state parameters
 
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: i,j !< generic loop iterators
 
             print*, 'Patch type: ', '2d_analytical'
 
@@ -1929,18 +1870,16 @@ MODULE m_initial_condition
 
 
 
-
-
+        !>      This patch assigns the primitive variables as analytical 
+        !!      functions such that the code can be verified. 
+        !!      @param patch_id is the patch identifier
         SUBROUTINE s_3D_analytical(patch_id) ! ---------------------------------
-        ! Description: This patch assigns the primitive variables as analytical 
-        !       functions such that the code can be verified. 
 
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
-            REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma
+            REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< generic loop iterators
             print*, 'Patch type: ', '3d_analytical'
 
             pi_inf = fluid_pp(1)%pi_inf
@@ -2072,17 +2011,14 @@ MODULE m_initial_condition
 
 
 
-
-
+        !>      This patch generates the shape of the spherical harmonics
+        !!      as a perturbation to a perfect sphere
+        !!      @param patch_id is the patch identifier
         SUBROUTINE s_spherical_harmonic(patch_id) ! ----------------------------
-        ! Description: This patch generates the shape of the spherical harmonics
-        !               as a perturbation to a perfect sphere
 
-            ! Patch identifier
-            INTEGER, INTENT(IN) :: patch_id
+            INTEGER, INTENT(IN) :: patch_id 
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< generic loop iterators
 
             COMPLEX(KIND(0d0)) :: cmplx_i = (0d0,1d0)
             COMPLEX(KIND(0d0)) :: H
@@ -2188,25 +2124,22 @@ MODULE m_initial_condition
         END SUBROUTINE s_spherical_harmonic ! ----------------------------------
 
 
-
-
-
+        !>          The spherical patch is a 3D geometry that may be used,
+        !!              for example, in creating a bubble or a droplet. The patch
+        !!              geometry is well-defined when its centroid and radius are
+        !!              provided. Please note that the spherical patch DOES allow
+        !!              for the smoothing of its boundary.
+        !!      @param patch_id is the patch identifier
         SUBROUTINE s_sphere(patch_id) ! ----------------------------------------
-        ! Description: The spherical patch is a 3D geometry that may be used,
-        !              for example, in creating a bubble or a droplet. The patch
-        !              geometry is well-defined when its centroid and radius are
-        !              provided. Please note that the spherical patch DOES allow
-        !              for the smoothing of its boundary.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
             
             ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< generic loop iterators
 
-            ! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
-            REAL(KIND(0d0)) :: radius_pressure, pressure_bubble, pressure_inf
+
+            REAL(KIND(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !< 
+            !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
             
             
             ! Transferring spherical patch's radius, centroid, smoothing patch
@@ -2288,25 +2221,20 @@ MODULE m_initial_condition
         END SUBROUTINE s_sphere ! ----------------------------------------------
         
         
-        
-        
-        
+        !>      The cuboidal patch is a 3D geometry that may be used, for
+        !!              example, in creating a solid boundary, or pre-/post-shock
+        !!              region, which is aligned with the axes of the Cartesian
+        !!              coordinate system. The geometry of such a patch is well-
+        !!              defined when its centroid and lengths in the x-, y- and
+        !!              z-coordinate directions are provided. Please notice that
+        !!              the cuboidal patch DOES NOT allow for the smearing of its
+        !!              boundaries.
+        !!      @param patch_id is the patch identifier
         SUBROUTINE s_cuboid(patch_id) ! ----------------------------------------
-        ! Description: The cuboidal patch is a 3D geometry that may be used, for
-        !              example, in creating a solid boundary, or pre-/post-shock
-        !              region, which is aligned with the axes of the Cartesian
-        !              coordinate system. The geometry of such a patch is well-
-        !              defined when its centroid and lengths in the x-, y- and
-        !              z-coordinate directions are provided. Please notice that
-        !              the cuboidal patch DOES NOT allow for the smearing of its
-        !              boundaries.
             
-            
-            ! Patch identifier
             INTEGER, INTENT(IN) :: patch_id
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Transferring the cuboid's centroid and length information
@@ -2371,25 +2299,20 @@ MODULE m_initial_condition
         END SUBROUTINE s_cuboid ! ----------------------------------------------
         
         
-        
-        
-        
+        !>              The cylindrical patch is a 3D geometry that may be used,
+        !!              for example, in setting up a cylindrical solid boundary
+        !!              confinement, like a blood vessel. The geometry of this
+        !!              patch is well-defined when the centroid, the radius and
+        !!              the length along the cylinder's axis, parallel to the x-,
+        !!              y- or z-coordinate direction, are provided. Please note
+        !!              that the cylindrical patch DOES allow for the smoothing
+        !!              of its lateral boundary.       
+        !!      @param patch_id is the patch identifier
         SUBROUTINE s_cylinder(patch_id) ! --------------------------------------
-        ! Description: The cylindrical patch is a 3D geometry that may be used,
-        !              for example, in setting up a cylindrical solid boundary
-        !              confinement, like a blood vessel. The geometry of this
-        !              patch is well-defined when the centroid, the radius and
-        !              the length along the cylinder's axis, parallel to the x-,
-        !              y- or z-coordinate direction, are provided. Please note
-        !              that the cylindrical patch DOES allow for the smoothing
-        !              of its lateral boundary.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Transferring the cylindrical patch's centroid, length, radius,
@@ -2492,25 +2415,19 @@ MODULE m_initial_condition
         END SUBROUTINE s_cylinder ! --------------------------------------------
         
         
-        
-        
-        
+        !>      The swept plane patch is a 3D geometry that may be used,
+        !!              for example, in creating a solid boundary, or pre-/post-
+        !!              shock region, at an angle with respect to the axes of the
+        !!              Cartesian coordinate system. The geometry of the patch is
+        !!              well-defined when its centroid and normal vector, aimed
+        !!              in the sweep direction, are provided. Note that the sweep
+        !!              plane patch DOES allow the smoothing of its boundary.       
+        !!      @param patch_id is the patch identifier
         SUBROUTINE s_sweep_plane(patch_id) ! -----------------------------------
-        ! Description: The swept plane patch is a 3D geometry that may be used,
-        !              for example, in creating a solid boundary, or pre-/post-
-        !              shock region, at an angle with respect to the axes of the
-        !              Cartesian coordinate system. The geometry of the patch is
-        !              well-defined when its centroid and normal vector, aimed
-        !              in the sweep direction, are provided. Note that the sweep
-        !              plane patch DOES allow the smoothing of its boundary.
-            
-            
-            ! Patch identifier
+
             INTEGER, INTENT(IN) :: patch_id
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
-            
+            INTEGER :: i,j,k !< Generic loop iterators
             
             ! Transferring the centroid information of the plane to be swept
             x_centroid = patch_icpp(patch_id)%x_centroid
@@ -2577,13 +2494,10 @@ MODULE m_initial_condition
         
         
         
-        
+        !>  Deallocation procedures for the module
         SUBROUTINE s_finalize_initial_condition_module() ! ---------------------
-        ! Description: Deallocation procedures for the module
             
-            
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Dellocating the primitive and conservative variables
@@ -2607,9 +2521,6 @@ MODULE m_initial_condition
             
             
         END SUBROUTINE s_finalize_initial_condition_module ! -------------------
-        
-        
-        
         
         
 END MODULE m_initial_condition
