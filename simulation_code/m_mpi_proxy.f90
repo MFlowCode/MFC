@@ -1,54 +1,51 @@
-! MFC v3.0 - Simulation Code: m_mpi_proxy.f90
-! Description: The module serves as a proxy to the parameters and subroutines
-!              available in the MPI implementation's MPI module. Specifically,
-!              the purpose of the proxy is to harness basic MPI commands into
-!              more complicated procedures as to accomplish the communication
-!              goals for the simulation.
-! Author: Vedran Coralic
-! Date: 07/09/12
-
-
+!>
+!! @file m_mpi_proxy.f90
+!! @brief The module serves as a proxy to the parameters and subroutines
+!!          available in the MPI implementation's MPI module. Specifically,
+!!          the purpose of the proxy is to harness basic MPI commands into
+!!          more complicated procedures as to accomplish the communication
+!!          goals for the simulation.
+!! @author spencer
+!! @version 1.1
 MODULE m_mpi_proxy
     
     
     ! Dependencies =============================================================
-    USE mpi                    ! Message passing interface (MPI) module
+    USE mpi                    !< Message passing interface (MPI) module
     
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
     
-    ! This variable is utilized to pack and send the buffer of the cell-average
-    ! conservative variables, for a single computational domain boundary at the
-    ! time, to the relevant neighboring processor.
-    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:) :: q_cons_buff_send
+    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:) :: q_cons_buff_send !<
+    !! This variable is utilized to pack and send the buffer of the cell-average
+    !! conservative variables, for a single computational domain boundary at the
+    !! time, to the relevant neighboring processor.
     
-    ! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
-    ! average conservative variables, for a single computational domain boundary
-    ! at the time, from the relevant neighboring processor.
-    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:) :: q_cons_buff_recv
+    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:) :: q_cons_buff_recv !<
+    !! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
+    !! average conservative variables, for a single computational domain boundary
+    !! at the time, from the relevant neighboring processor.
     
-    ! Generic flag used to identify and report MPI errors
+    !> @name Generic flags used to identify and report MPI errors
+    !> @{
     INTEGER, PRIVATE :: err_code, ierr
-    
+    !> @}
     
     CONTAINS
         
         
         
-        
-        
+        !> The subroutine intializes the MPI execution environment
+        !!      and queries both the number of processors which will be
+        !!      available for the job and the local processor rank.        
         SUBROUTINE s_mpi_initialize() ! ----------------------------------------
-        ! Description: The subroutine intializes the MPI execution environment
-        !              and queries both the number of processors which will be
-        !              available for the job and the local processor rank.
-            
-            
+
             ! Initializing the MPI environment
             CALL MPI_INIT(ierr)
             
@@ -67,30 +64,27 @@ MODULE m_mpi_proxy
             ! Querying the rank of the local processor
             CALL MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
             
-            
         END SUBROUTINE s_mpi_initialize ! --------------------------------------
         
         
         
         
         
+        !> The subroutine terminates the MPI execution environment.
         SUBROUTINE s_mpi_abort() ! ---------------------------------------------
-        ! Description: The subroutine terminates the MPI execution environment.
-            
-            
+
             ! Terminating the MPI environment
             CALL MPI_ABORT(MPI_COMM_WORLD, err_code, ierr)
-            
             
         END SUBROUTINE s_mpi_abort ! -------------------------------------------
         
         
         
         
-        
+        !> The subroutine that initializes MPI data structures
+        !!  @param q_cons_vf Conservative variables
         SUBROUTINE s_initialize_mpi_data(q_cons_vf) ! --------------------------
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
@@ -98,8 +92,7 @@ MODULE m_mpi_proxy
             INTEGER, DIMENSION(num_dims) :: sizes_glb, sizes_loc
             INTEGER :: ierr
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
 
             DO i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m,0:n,0:p)
@@ -127,8 +120,8 @@ MODULE m_mpi_proxy
         
         
         
+        !> Halts all processes until all have reached barrier.
         SUBROUTINE s_mpi_barrier() ! -------------------------------------------
-        ! Description: Halts all processes until all have reached barrier.
 
             ! Calling MPI_BARRIER
             CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -137,14 +130,11 @@ MODULE m_mpi_proxy
 
 
 
-
-
+        !> The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
         SUBROUTINE s_initialize_mpi_proxy_module() ! ---------------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
-            
-            
+           
             ! Allocating q_cons_buff_send and q_cons_buff_recv. Please note that
             ! for the sake of simplicity, both variables are provided sufficient
             ! storage to hold the largest buffer in the computational domain.
@@ -174,19 +164,14 @@ MODULE m_mpi_proxy
         END SUBROUTINE s_initialize_mpi_proxy_module ! -------------------------
         
         
-        
-        
-        
+        !>  Since only the processor with rank 0 reads and verifies
+        !!      the consistency of user inputs, these are initially not
+        !!      available to the other processors. Then, the purpose of
+        !!      this subroutine is to distribute the user inputs to the
+        !!      remaining processors in the communicator.       
         SUBROUTINE s_mpi_bcast_user_inputs() ! ---------------------------------
-        ! Description: Since only the processor with rank 0 reads and verifies
-        !              the consistency of user inputs, these are initially not
-        !              available to the other processors. Then, the purpose of
-        !              this subroutine is to distribute the user inputs to the
-        !              remaining processors in the communicator.
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i,j
+
+            INTEGER :: i,j !< Generic loop iterator
             
             
             ! Logistics
@@ -341,7 +326,7 @@ MODULE m_mpi_proxy
                                 MPI_COMM_WORLD, ierr     )                            
             END DO
 
-            ! SHB: Tait EOS
+            !Tait EOS
             CALL MPI_BCAST( pref,1,             &
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
@@ -349,7 +334,7 @@ MODULE m_mpi_proxy
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
 
-            ! SHB: Bubble modeling
+            !Bubble modeling
             CALL MPI_BCAST( bubbles,1,          &
                         MPI_LOGICAL,0,          &
                         MPI_COMM_WORLD,ierr  )
@@ -378,7 +363,7 @@ MODULE m_mpi_proxy
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
 
-            ! SHB: for acoustic monopole
+            !Acoustic monopole
             CALL MPI_BCAST( monopole,1,          &
                         MPI_LOGICAL,0,          &
                         MPI_COMM_WORLD,ierr  )
@@ -462,35 +447,32 @@ MODULE m_mpi_proxy
         
         
         
-        
-        
+        !>  The purpose of this procedure is to optimally decompose
+        !!      the computational domain among the available processors.
+        !!      This is performed by attempting to award each processor,
+        !!      in each of the coordinate directions, approximately the
+        !!      same number of cells, and then recomputing the affected
+        !!      global parameters.
         SUBROUTINE s_mpi_decompose_computational_domain() ! --------------------
-        ! Description: The purpose of this procedure is to optimally decompose
-        !              the computational domain among the available processors.
-        !              This is performed by attempting to award each processor,
-        !              in each of the coordinate directions, approximately the
-        !              same number of cells, and then recomputing the affected
-        !              global parameters.
             
+            INTEGER :: num_procs_x, num_procs_y, num_procs_z !<
+            !! Optimal number of processors in the x-, y- and z-directions
             
-            ! Optimal number of processors in the x-, y- and z-directions
-            INTEGER :: num_procs_x, num_procs_y, num_procs_z
+            REAL(KIND(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z !<
+            !! Non-optimal number of processors in the x-, y- and z-directions
             
-            ! Non-optimal number of processors in the x-, y- and z-directions
-            REAL(KIND(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
+            REAL(KIND(0d0)) :: fct_min !<
+            !! Processor factorization (fct) minimization parameter
             
-            ! Processor factorization (fct) minimization parameter
-            REAL(KIND(0d0)) :: fct_min
+            INTEGER :: MPI_COMM_CART !<
+            !! Cartesian processor topology communicator
             
-            ! Cartesian processor topology communicator
-            INTEGER :: MPI_COMM_CART
-            
-            ! Remaining number of cells, in a particular coordinate direction,
-            ! after the majority is divided up among the available processors
-            INTEGER :: rem_cells
-            
-            ! Generic loop iterators
-            INTEGER :: i,j
+            INTEGER :: rem_cells !<
+            !! Remaining number of cells, in a particular coordinate direction,
+            !! after the majority is divided up among the available processors
+ 
+
+            INTEGER :: i,j !< Generic loop iterators
             
             IF (num_procs == 1 .AND. parallel_io) THEN
                 DO i = 1, num_dims
@@ -847,21 +829,17 @@ MODULE m_mpi_proxy
         
         
         
-        
-        
+        !>  The goal of this procedure is to populate the buffers of
+        !!      the grid variables by communicating with the neighboring
+        !!      processors. Note that only the buffers of the cell-width
+        !!      distributions are handled in such a way. This is because
+        !!      the buffers of cell-boundary locations may be calculated
+        !!      directly from those of the cell-width distributions.        
+        !!  @param mpi_dir MPI communication coordinate direction
+        !!  @param pbc_loc Processor boundary condition (PBC) location 
         SUBROUTINE s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc) ! ---
-        ! Description: The goal of this procedure is to populate the buffers of
-        !              the grid variables by communicating with the neighboring
-        !              processors. Note that only the buffers of the cell-width
-        !              distributions are handled in such a way. This is because
-        !              the buffers of cell-boundary locations may be calculated
-        !              directly from those of the cell-width distributions.
-            
-            
-            ! MPI communication coordinate direction
+
             INTEGER, INTENT(IN) :: mpi_dir
-            
-            ! Processor boundary condition (PBC) location
             INTEGER, INTENT(IN) :: pbc_loc
             
             
@@ -1036,8 +1014,22 @@ MODULE m_mpi_proxy
         
         
         
-        
-        
+        !>  The goal of this subroutine is to determine the global
+        !!      extrema of the stability criteria in the computational
+        !!      domain. This is performed by sifting through the local
+        !!      extrema of each stability criterion. Note that each of
+        !!      the local extrema is from a single process, within its
+        !!      assigned section of the computational domain. Finally,
+        !!      note that the global extrema values are only bookkeept
+        !!      on the rank 0 processor.
+        !!  @param icfl_max_loc Local maximum ICFL stability criterion
+        !!  @param vcfl_max_loc Local maximum VCFL stability criterion
+        !!  @param ccfl_max_loc Local maximum CCFL stability criterion
+        !!  @param Rc_min_loc Local minimum Rc stability criterion
+        !!  @param icfl_max_glb Global maximum ICFL stability criterion
+        !!  @param vcfl_max_glb Global maximum VCFL stability criterion
+        !!  @param ccfl_max_glb Global maximum CCFL stability criterion
+        !!  @param Rc_min_glb Global minimum Rc stability criterion
         SUBROUTINE s_mpi_reduce_stability_criteria_extrema( icfl_max_loc, & ! --
                                                             vcfl_max_loc, &
                                                             ccfl_max_loc, &
@@ -1046,19 +1038,7 @@ MODULE m_mpi_proxy
                                                             vcfl_max_glb, &
                                                             ccfl_max_glb, &
                                                               Rc_min_glb  )
-        ! Description: The goal of this subroutine is to determine the global
-        !              extrema of the stability criteria in the computational
-        !              domain. This is performed by sifting through the local
-        !              extrema of each stability criterion. Note that each of
-        !              the local extrema is from a single process, within its
-        !              assigned section of the computational domain. Finally,
-        !              note that the global extrema values are only bookkeept
-        !              on the rank 0 processor.
-            
-            
-            ! Local (loc) and global (glb) extrema of the inviscid Courant-
-            ! Friedrichs-Lewy (ICFL) number, the viscous CFL (VCFL) number,
-            ! the capillary CFL (CCFL) number and cell Reynolds (Rc) number
+           
             REAL(KIND(0d0)), INTENT(IN)  :: icfl_max_loc
             REAL(KIND(0d0)), INTENT(IN)  :: vcfl_max_loc
             REAL(KIND(0d0)), INTENT(IN)  :: ccfl_max_loc
@@ -1096,19 +1076,16 @@ MODULE m_mpi_proxy
         
         
         
-        
-        
+        !>  The following subroutine takes the input local variable
+        !!      from all processors and reduces to the sum of all
+        !!      values. The reduced variable is recorded back onto the 
+        !!      original local variable on each processor. 
+        !!  @param var_loc Some variable containing the local value which should be
+        !!  reduced amongst all the processors in the communicator.
+        !!  @param var_glb The globally reduced value
         SUBROUTINE s_mpi_allreduce_sum(var_loc, var_glb) ! ---------------------
-        ! Description: The following subroutine takes the input local variable
-        !          from all processors and reduces to the sum of all
-        !          values. The reduced variable is recorded back onto the 
-        !          original local variable on each processor.
 
-            ! Some variable containing the local value which should be
-            ! reduced amongst all the processors in the communicator.
             REAL(KIND(0d0)), INTENT(IN) :: var_loc
-
-            ! The globally reduced value
             REAL(KIND(0d0)), INTENT(OUT) :: var_glb
 
             ! Performing the reduction procedure
@@ -1119,19 +1096,16 @@ MODULE m_mpi_proxy
 
 
 
-
-
+        !>  The following subroutine takes the input local variable
+        !!      from all processors and reduces to the minimum of all
+        !!      values. The reduced variable is recorded back onto the 
+        !!      original local variable on each processor.
+        !!  @param var_loc Some variable containing the local value which should be
+        !!  reduced amongst all the processors in the communicator.
+        !!  @param var_glb The globally reduced value
         SUBROUTINE s_mpi_allreduce_min(var_loc, var_glb) ! ---------------------
-        ! Description: The following subroutine takes the input local variable
-        !          from all processors and reduces to the minimum of all
-        !          values. The reduced variable is recorded back onto the 
-        !          original local variable on each processor.
 
-            ! Some variable containing the local value which should be
-            ! reduced amongst all the processors in the communicator.
             REAL(KIND(0d0)), INTENT(IN) :: var_loc
-
-            ! The globally reduced value
             REAL(KIND(0d0)), INTENT(OUT) :: var_glb
 
             ! Performing the reduction procedure
@@ -1142,19 +1116,16 @@ MODULE m_mpi_proxy
 
 
 
-
-
+        !>  The following subroutine takes the input local variable
+        !!      from all processors and reduces to the maximum of all
+        !!      values. The reduced variable is recorded back onto the 
+        !!      original local variable on each processor.
+        !!  @param var_loc Some variable containing the local value which should be
+        !!  reduced amongst all the processors in the communicator.
+        !!  @param var_glb The globally reduced value
         SUBROUTINE s_mpi_allreduce_max(var_loc, var_glb) ! ---------------------
-        ! Description: The following subroutine takes the input local variable
-        !          from all processors and reduces to the maximum of all
-        !          values. The reduced variable is recorded back onto the 
-        !          original local variable on each processor.
 
-            ! Some variable containing the local value which should be
-            ! reduced amongst all the processors in the communicator.
             REAL(KIND(0d0)), INTENT(IN) :: var_loc
-
-            ! The globally reduced value
             REAL(KIND(0d0)), INTENT(OUT) :: var_glb
 
             ! Performing the reduction procedure
@@ -1165,27 +1136,23 @@ MODULE m_mpi_proxy
 
 
 
-
-
+        !>  The goal of this procedure is to populate the buffers of
+        !!      the cell-average conservative variables by communicating
+        !!      with the neighboring processors.
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param mpi_dir MPI communication coordinate direction
+        !!  @param pbc_loc Processor boundary condition (PBC) location
         SUBROUTINE s_mpi_sendrecv_conservative_variables_buffers( q_cons_vf, &
                                                                   mpi_dir,   &
                                                                   pbc_loc    )
-        ! Description: The goal of this procedure is to populate the buffers of
-        !              the cell-average conservative variables by communicating
-        !              with the neighboring processors.
+
             
-            
-            ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
-            
-            ! MPI communication coordinate direction
             INTEGER, INTENT(IN) :: mpi_dir
-            
-            ! Processor boundary condition (PBC) location
             INTEGER, INTENT(IN) :: pbc_loc
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
             
             
             ! MPI Communication in x-direction =================================
@@ -1643,13 +1610,11 @@ MODULE m_mpi_proxy
         
         
         
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_mpi_proxy_module() ! -----------------------------
-        ! Description: Module deallocation and/or disassociation procedures
-            
-            
+
             ! Deallocating q_cons_buff_send and q_cons_buff_recv
             DEALLOCATE( q_cons_buff_send, q_cons_buff_recv  )
-            
             
         END SUBROUTINE s_finalize_mpi_proxy_module ! ---------------------------
         
@@ -1657,13 +1622,11 @@ MODULE m_mpi_proxy
         
         
         
+        !> The subroutine finalizes the MPI execution environment.
         SUBROUTINE s_mpi_finalize() ! ------------------------------------------
-        ! Description: The subroutine finalizes the MPI execution environment.
-            
-            
+
             ! Finalizing the MPI environment
             CALL MPI_FINALIZE(ierr)
-            
             
         END SUBROUTINE s_mpi_finalize ! ----------------------------------------
         

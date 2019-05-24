@@ -98,7 +98,9 @@ MODULE m_variables_conversion
         
     END INTERFACE ! ============================================================
     
-    
+   
+    !> @name  Left/right states
+    !> @{
     REAL(KIND(0d0))                              ::    rho_L,    rho_R      !< left/right states density
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::    vel_L,    vel_R      !< left/right states velocity
     REAL(KIND(0d0))                              ::   pres_L,   pres_R      !< left/right states pressure
@@ -109,10 +111,11 @@ MODULE m_variables_conversion
     REAL(KIND(0d0))                              :: pi_inf_L, pi_inf_R      !< left/right states liquid stiffness
     REAL(KIND(0d0)),              DIMENSION(2)   ::     Re_L,     Re_R      !< left/right states Reynolds number
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::     We_L,     We_R      !< left/right states Weber number
-
-    
     REAL(KIND(0d0))                              ::   alpha_L,   alpha_R    !< left/right states void fraction
-    
+    !> @}
+
+    !> @name Averaged states
+    !> @{
     REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:,:,:) :: rho_avg_sf !< averaged (Roe/arithmetic) density
     REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:)     :: vel_avg    !< averaged (Roe/arithmetic) velocity
     REAL(KIND(0d0))                                   :: H_avg      !< averaged (Roe/arithmetic) enthalpy
@@ -122,7 +125,8 @@ MODULE m_variables_conversion
 
     REAL(KIND(0d0))                                   :: alpha_avg !< averaging for bubbly mixture speed of sound
     REAL(KIND(0d0))                                   :: pres_avg  !< averaging for bubble mixture speed of sound
-    
+    !> @}
+
     PROCEDURE(s_convert_abstract_to_mixture_variables), &
     POINTER :: s_convert_to_mixture_variables => NULL() !<
     !! Pointer to the procedure utilized to convert either the mixture or the

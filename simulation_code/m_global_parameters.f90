@@ -1,21 +1,20 @@
-! MFC v3.0 - Simulation Code: m_global_parameters.f90
-! Description: The module contains all of the parameters describing the program
+!>
+!! @file m_global_parameters.f90
+!! @brief The module contains all of the parameters describing the program
 !              logistics, the computational domain and the simulation algorithm.
 !              Additionally, for the volume fraction model, physical parameters
 !              of each of the fluids present in the flow are located here. They
 !              include stiffened gas equation of state parameters, the Reynolds
 !              numbers and the Weber numbers.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!! @author spencer
+!! @version 1.1
 MODULE m_global_parameters
     
     
     ! Dependencies =============================================================
-    USE mpi                    ! Message passing interface (MPI) module
+    USE mpi                    !< Message passing interface (MPI) module
     
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     ! ==========================================================================
     
     
@@ -23,189 +22,219 @@ MODULE m_global_parameters
     
     
     ! Logistics ================================================================
-    INTEGER                    :: num_procs             ! Number of processors
-    INTEGER        , PARAMETER :: num_stcls_min = 5     ! Mininum # of stencils
-    INTEGER        , PARAMETER :: path_len      = 400   ! Maximum path length
-    INTEGER        , PARAMETER :: name_len      = 50    ! Maximum name length
-    CHARACTER      , PARAMETER :: dflt_char     = ' '   ! Default string value
-    REAL(KIND(0d0)), PARAMETER :: dflt_real     = -1d6  ! Default real value
-    INTEGER        , PARAMETER :: dflt_int      = -100  ! Default integer value
-    REAL(KIND(0d0)), PARAMETER :: sgm_eps       = 1d-16 ! Segmentation tolerance
-    INTEGER        , PARAMETER :: fourier_rings = 5     ! Fourier filter ring limit
-    CHARACTER(LEN = path_len)  :: case_dir              ! Case folder location
-    LOGICAL                    :: run_time_info         ! Run-time output flag
-    INTEGER                    :: t_step_old            ! Existing IC/grid folder
+    INTEGER                    :: num_procs             !< Number of processors
+    INTEGER        , PARAMETER :: num_stcls_min = 5     !< Mininum # of stencils
+    INTEGER        , PARAMETER :: path_len      = 400   !< Maximum path length
+    INTEGER        , PARAMETER :: name_len      = 50    !< Maximum name length
+    CHARACTER      , PARAMETER :: dflt_char     = ' '   !< Default string value
+    REAL(KIND(0d0)), PARAMETER :: dflt_real     = -1d6  !< Default real value
+    INTEGER        , PARAMETER :: dflt_int      = -100  !< Default integer value
+    REAL(KIND(0d0)), PARAMETER :: sgm_eps       = 1d-16 !< Segmentation tolerance
+    INTEGER        , PARAMETER :: fourier_rings = 5     !< Fourier filter ring limit
+    CHARACTER(LEN = path_len)  :: case_dir              !< Case folder location
+    LOGICAL                    :: run_time_info         !< Run-time output flag
+    INTEGER                    :: t_step_old            !< Existing IC/grid folder
     ! ==========================================================================
     
     
     ! Computational Domain Parameters ==========================================
     
-    ! Rank of the local processor
-    INTEGER :: proc_rank
-    
-    ! Number of cells in the x-, y- and z-directions, respectively
-    INTEGER :: m, n, p
-    
-    ! Global number of cells in each direction
-    INTEGER :: m_glb, n_glb, p_glb
 
-    ! Cylindrical coordinates (either axisymmetric or full 3D)
+    INTEGER :: proc_rank !< Rank of the local processor
+    
+    !> @name Number of cells in the x-, y- and z-directions, respectively
+    !> @{
+    INTEGER :: m, n, p
+    !> @}
+
+    !> @name Global number of cells in each direction
+    !> @{
+    INTEGER :: m_glb, n_glb, p_glb
+    !> @}
+
+    !> @name Cylindrical coordinates (either axisymmetric or full 3D)
+    !> @{
     LOGICAL :: cyl_coord
     INTEGER :: grid_geometry
+    !> @}
 
-    ! Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
+    !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
+    !> @{
     REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:) :: x_cb, y_cb, z_cb
-    
-    ! Cell-center (CC) locations in the x-, y- and z-directions, respectively
+    !> @}
+
+    !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
+    !> @{
     REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:) :: x_cc, y_cc, z_cc
-    
-    ! Cell-width distributions in the x-, y- and z-directions, respectively
+    !> @}
+
+    !> @name Cell-width distributions in the x-, y- and z-directions, respectively
+    !> @{
     REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:) :: dx, dy, dz
+    !> @}
+
+
+    REAL(KIND(0d0)) :: dt !< Size of the time-step
     
-    ! Size of the time-step
-    REAL(KIND(0d0)) :: dt
-    
-    ! Starting time-step iteration, stopping time-step iteration and the number
-    ! of time-step iterations between successive solution backups, respectively
+    !> @name Starting time-step iteration, stopping time-step iteration and the number
+    !! of time-step iterations between successive solution backups, respectively
+    !> @{
     INTEGER :: t_step_start, t_step_stop, t_step_save
-    
+    !> @}
+
     ! ==========================================================================
     
     
     ! Simulation Algorithm Parameters ==========================================
-    INTEGER         :: model_eqns     ! Multicomponent flow model
-    INTEGER         :: num_dims       ! Number of spatial dimensions
-    INTEGER         :: num_fluids     ! Number of fluids in the flow
-    LOGICAL         :: adv_alphan     ! Advection of the last volume fraction
-    LOGICAL         :: mpp_lim        ! Mixture physical parameters (MPP) limits
-    INTEGER         :: time_stepper   ! Time-stepper algorithm
-    INTEGER         :: weno_vars      ! WENO-reconstructed state variables type
-    INTEGER         :: weno_order     ! Order of the WENO reconstruction
-    INTEGER         :: weno_polyn     ! Degree of the WENO polynomials (polyn)
-    REAL(KIND(0d0)) :: weno_eps       ! Binding for the WENO nonlinear weights
-    LOGICAL         :: char_decomp    ! Characteristic decomposition
-    LOGICAL         :: mapped_weno    ! WENO with mapping of nonlinear weights
-    LOGICAL         :: mp_weno        ! Monotonicity preserving (MP) WENO
-    LOGICAL         :: weno_avg       ! Average left/right cell-boundary states
-    LOGICAL         :: weno_Re_flux   ! WENO reconstruct velocity gradients for viscous stress tensor
-    INTEGER         :: riemann_solver ! Riemann solver algorithm
-    INTEGER         :: wave_speeds    ! Wave speeds estimation method
-    INTEGER         :: avg_state      ! Average state evaluation method
-    LOGICAL         :: commute_err    ! Commutative error correction
-    LOGICAL         :: split_err      ! Dimensional splitting error correction
-    LOGICAL         :: alt_crv        ! Alternate curvature definition
-    LOGICAL         :: alt_soundspeed ! Alternate mixture sound speed
-    LOGICAL         :: regularization ! Regularization terms of Tiwari (2013)
-    REAL(KIND(0d0)) :: reg_eps        ! User-defined interface thickness parameter for regularization terms
-    LOGICAL         :: null_weights   ! Null undesired WENO weights
-    LOGICAL         :: mixture_err    ! Mixture properties correction
-    LOGICAL         :: tvd_riemann_flux ! Apply TVD flux limiter to left and right states inside Riemann solver
-    LOGICAL         :: tvd_rhs_flux   ! Apply TVD flux limiter to to intercell fluxes outside Riemann solver
-    LOGICAL         :: tvd_wave_speeds! Use TVD wavespeeds when computing fluxes inside Riemann solver
-    INTEGER         :: flux_lim       ! Choice of flux limiter
-    LOGICAL         :: We_riemann_flux ! Account for capillary effects in the Riemann solver
-    LOGICAL         :: We_rhs_flux    ! Account for capillary effects using the conservative formulation in RHS
-    LOGICAL         :: We_src         ! Account for capillary effects in non-conservative formulation in RHS
-    LOGICAL         :: We_wave_speeds ! Account for capillary effects when computing the contact wave speed
-    LOGICAL         :: lsq_deriv      ! Use linear least squares to calculate normals and curvatures
+    INTEGER         :: model_eqns     !< Multicomponent flow model
+    INTEGER         :: num_dims       !< Number of spatial dimensions
+    INTEGER         :: num_fluids     !< Number of fluids in the flow
+    LOGICAL         :: adv_alphan     !< Advection of the last volume fraction
+    LOGICAL         :: mpp_lim        !< Mixture physical parameters (MPP) limits
+    INTEGER         :: time_stepper   !< Time-stepper algorithm
+    INTEGER         :: weno_vars      !< WENO-reconstructed state variables type
+    INTEGER         :: weno_order     !< Order of the WENO reconstruction
+    INTEGER         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+    REAL(KIND(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
+    LOGICAL         :: char_decomp    !< Characteristic decomposition
+    LOGICAL         :: mapped_weno    !< WENO with mapping of nonlinear weights
+    LOGICAL         :: mp_weno        !< Monotonicity preserving (MP) WENO
+    LOGICAL         :: weno_avg       !< Average left/right cell-boundary states
+    LOGICAL         :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
+    INTEGER         :: riemann_solver !< Riemann solver algorithm
+    INTEGER         :: wave_speeds    !< Wave speeds estimation method
+    INTEGER         :: avg_state      !< Average state evaluation method
+    LOGICAL         :: commute_err    !< Commutative error correction
+    LOGICAL         :: split_err      !< Dimensional splitting error correction
+    LOGICAL         :: alt_crv        !< Alternate curvature definition
+    LOGICAL         :: alt_soundspeed !< Alternate mixture sound speed
+    LOGICAL         :: regularization !< Regularization terms of Tiwari (2013)
+    REAL(KIND(0d0)) :: reg_eps        !< User-defined interface thickness parameter for regularization terms
+    LOGICAL         :: null_weights   !< Null undesired WENO weights
+    LOGICAL         :: mixture_err    !< Mixture properties correction
+    LOGICAL         :: tvd_riemann_flux !< Apply TVD flux limiter to left and right states inside Riemann solver
+    LOGICAL         :: tvd_rhs_flux   !< Apply TVD flux limiter to to intercell fluxes outside Riemann solver
+    LOGICAL         :: tvd_wave_speeds!< Use TVD wavespeeds when computing fluxes inside Riemann solver
+    INTEGER         :: flux_lim       !< Choice of flux limiter
+    LOGICAL         :: We_riemann_flux !< Account for capillary effects in the Riemann solver
+    LOGICAL         :: We_rhs_flux    !< Account for capillary effects using the conservative formulation in RHS
+    LOGICAL         :: We_src         !< Account for capillary effects in non-conservative formulation in RHS
+    LOGICAL         :: We_wave_speeds !< Account for capillary effects when computing the contact wave speed
+    LOGICAL         :: lsq_deriv      !< Use linear least squares to calculate normals and curvatures
 
-    LOGICAL         :: anti_diffusion ! Use anti-diffusion step of Shyue
+    LOGICAL         :: anti_diffusion !< Use anti-diffusion step of Shyue
     
     INTEGER         :: cpu_start, cpu_end, cpu_rate
     
-    ! Boundary conditions (BC) in the x-, y- and z-directions, respectively
+    !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
+    !> @{
     TYPE(bounds_info) :: bc_x, bc_y, bc_z
-
     TYPE(bounds_info) :: bc_x_glb, bc_y_glb, bc_z_glb
+    !> @}
 
-    ! Format of the data files
-    LOGICAL :: parallel_io
+    LOGICAL :: parallel_io !< Format of the data files
 
-    ! Processor coordinates in MPI_CART_COMM
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: proc_coords
-    ! Starting cell-center index of local processor in global grid
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: start_idx
+
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: proc_coords !<
+    !! Processor coordinates in MPI_CART_COMM
+    
+
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: start_idx !<
+    !! Starting cell-center index of local processor in global grid
 
     TYPE(mpi_io_var), PUBLIC :: MPI_IO_DATA
 
-    ! MPI info for parallel IO with Lustre file systems
+    !> @name MPI info for parallel IO with Lustre file systems
+    !> @{
     CHARACTER(LEN = name_len) :: mpiiofs
     INTEGER :: mpi_info_int
+    !> @}
 
     INTEGER, PRIVATE :: ierr
     
-    ! Annotations of the structure of the state and flux vectors in terms of the
-    ! size and the configuration of the system of equations to which they belong
-    INTEGER           :: sys_size                  ! Number of unknowns in system of eqns.
-    TYPE(bounds_info) :: cont_idx                  ! Indexes of first & last continuity eqns.
-    TYPE(bounds_info) :: mom_idx                   ! Indexes of first & last momentum eqns.
-    INTEGER           :: E_idx                     ! Index of energy equation
-    TYPE(bounds_info) :: adv_idx                   ! Indexes of first & last advection eqns.
-    TYPE(bounds_info) :: internalEnergies_idx      ! Indexes of first & last internal energy eqns.
-    TYPE(bub_bounds_info) :: bub_idx                    ! Indexes of first & last bubble variable eqns.
-    INTEGER               :: alf_idx                    ! Index of void fraction
-    INTEGER           :: gamma_idx                 ! Index of specific heat ratio func. eqn.
-    INTEGER           :: pi_inf_idx                ! Index of liquid stiffness func. eqn.
-    
-    ! The number of fluids, along with their identifying indexes, respectively,
-    ! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
-    ! numbers, will be non-negligible.
+    !> @name Annotations of the structure of the state and flux vectors in terms of the
+    !! size and the configuration of the system of equations to which they belong
+    !> @{
+    INTEGER           :: sys_size                  !< Number of unknowns in system of eqns.
+    TYPE(bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
+    TYPE(bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
+    INTEGER           :: E_idx                     !< Index of energy equation
+    TYPE(bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
+    TYPE(bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
+    TYPE(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
+    INTEGER               :: alf_idx               !< Index of void fraction
+    INTEGER           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
+    INTEGER           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    !> @}
+
+    !> @name The number of fluids, along with their identifying indexes, respectively,
+    !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
+    !! numbers, will be non-negligible.
+    !> @{
     INTEGER,              DIMENSION(2)   :: Re_size
     INTEGER, ALLOCATABLE, DIMENSION(:,:) :: Re_idx
-    
-    ! The number of idiosyncratic material interfaces, along with the indexes of
-    ! the fluids comprising them, respectively, for which the effects of surface
-    ! tension, e.g. the Weber (We) numbers, will be non-negligible.
+    !> @}
+
+    !> @name The number of idiosyncratic material interfaces, along with the indexes of
+    !! the fluids comprising them, respectively, for which the effects of surface
+    !! tension, e.g. the Weber (We) numbers, will be non-negligible.
+    !> @{
     INTEGER                              :: We_size
     INTEGER, ALLOCATABLE, DIMENSION(:,:) :: We_idx
-    
-    ! The number of fluids, along with their identifying indexes, respectively,
-    ! for which the physical and the geometric curvatures (crv) of the material
-    ! interfaces will be calculated.
+    !> @}
+
+    !> @name The number of fluids, along with their identifying indexes, respectively,
+    !! for which the physical and the geometric curvatures (crv) of the material
+    !! interfaces will be calculated.
+    !> @{
     INTEGER                            :: crv_size
     INTEGER, ALLOCATABLE, DIMENSION(:) :: crv_idx
-    
-    ! The coordinate direction indexes and flags (flg), respectively, for which
-    ! the configurations will be determined with respect to a working direction
-    ! and that will be used to isolate the contributions, in that direction, in
-    ! the dimensionally split system of equations.
+    !> @}
+
+    !> @name The coordinate direction indexes and flags (flg), respectively, for which
+    !! the configurations will be determined with respect to a working direction
+    !! and that will be used to isolate the contributions, in that direction, in
+    !! the dimensionally split system of equations.
+    !> @{
     INTEGER        , DIMENSION(3) :: dir_idx
     REAL(KIND(0d0)), DIMENSION(3) :: dir_flg
-    
-    ! The WENO average (WA) flag regulates whether the calculation of any cell-
-    ! average spatial derivatives is carried out in each cell by utilizing the
-    ! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
-    ! values or simply, the unaltered left and right, WENO-reconstructed, cell-
-    ! boundary values.
-    REAL(KIND(0d0)) :: wa_flg
-    
-    ! The number of cells that are necessary to be able to store enough boundary
-    ! conditions data to march the solution in the physical computational domain
-    ! to the next time-step.
-    INTEGER :: buff_size
+    !> @}
+
+    REAL(KIND(0d0)) :: wa_flg !<
+    !! The WENO average (WA) flag regulates whether the calculation of any cell-
+    !! average spatial derivatives is carried out in each cell by utilizing the
+    !! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
+    !! values or simply, the unaltered left and right, WENO-reconstructed, cell-
+    !! boundary values.
+  
+    INTEGER :: buff_size !<
+    !! The number of cells that are necessary to be able to store enough boundary
+    !! conditions data to march the solution in the physical computational domain
+    !! to the next time-step.
+ 
     ! END: Simulation Algorithm Parameters =====================================
     
     
     ! Fluids Physical Parameters ===============================================
     
-    ! Database of the physical parameters of each of the fluids that is present
-    ! in the flow. These include the stiffened gas equation of state parameters,
-    ! the Reynolds numbers and the Weber numbers.
-    TYPE(physical_parameters), DIMENSION(num_fluids_max) :: fluid_pp
-    
+    TYPE(physical_parameters), DIMENSION(num_fluids_max) :: fluid_pp !<
+    !! Database of the physical parameters of each of the fluids that is present
+    !! in the flow. These include the stiffened gas equation of state parameters,
+    !! the Reynolds numbers and the Weber numbers.
+     
     ! ==========================================================================
     
     
-    ! The order of the finite-difference (fd) approximations of the first-order
-    ! derivatives that need to be evaluated when the CoM or flow probe data
-    ! files are to be written at each time step
-    INTEGER :: fd_order
-
-    ! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
-    ! it is a measure of the half-size of the finite-difference stencil for the
-    ! selected order of accuracy.
-    INTEGER :: fd_number
-
+    INTEGER :: fd_order !<
+    !! The order of the finite-difference (fd) approximations of the first-order
+    !! derivatives that need to be evaluated when the CoM or flow probe data
+    !! files are to be written at each time step
+ 
+    INTEGER :: fd_number !<
+    !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
+    !! it is a measure of the half-size of the finite-difference stencil for the
+    !! selected order of accuracy.
+ 
     LOGICAL, DIMENSION(num_fluids_max) :: com_wrt, cb_wrt
     LOGICAL :: probe_wrt
     LOGICAL :: integral_wrt
@@ -216,53 +245,61 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(5) :: threshold_mf
     INTEGER, DIMENSION(5) :: moment_order
 
-    ! SHB: Reference parameters for Tait EOS
+    !> @name Reference density and pressure for Tait EOS
+    !> @{
     REAL(KIND(0d0)) :: rhoref, pref
-    ! SHB: For bubble modeling
-    INTEGER         :: nb
-    REAL(KIND(0d0)) :: R0ref
-    REAL(KIND(0d0)) :: Ca, Web, Re_inv
-    REAL(KIND(0d0)), dimension(:), allocatable :: weight, R0, V0
-    LOGICAL         :: bubbles
-    INTEGER         :: bubble_model 
+    !> @}
 
-
-    ! SHB: For non-polytropic modeling
-    LOGICAL         :: polytropic
-    INTEGER         :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
+    !> @name Bubble modeling
+    !> @{
+    INTEGER         :: nb       !< Number of eq. bubble sizes
+    REAL(KIND(0d0)) :: R0ref    !< Reference bubble size
+    REAL(KIND(0d0)) :: Ca       !< Cavitation number
+    REAL(KIND(0d0)) :: Web      !< Weber number
+    REAL(KIND(0d0)) :: Re_inv   !< Inverse Reynolds number
+    REAL(KIND(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
+    REAL(KIND(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
+    REAL(KIND(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+    LOGICAL         :: bubbles      !< Bubbles on/off
+    LOGICAL         :: polytropic   !< Polytropic  switch
+    INTEGER         :: bubble_model !< Gilmore or Keller--Miksis bubble model
+    INTEGER         :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ptil  !< Pressure modification
+    !> @}
+    
+    !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
+    !> @{
     REAL(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     REAL(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
-    ! liquid physical properties
     REAL(KIND(0.D0)) :: mul0, ss, gamma_v, mu_v
-    ! gas physical properties
     REAL(KIND(0.D0)) :: gamma_m, gamma_n, mu_n
+    !> @}
 
 
-    ! SHB: For acoustic monopole
-    LOGICAL         :: monopole
-    TYPE(mono_parameters), dimension(num_probes_max) :: mono
-    INTEGER         :: num_mono
+    !> @name Acoustic monopole parameters
+    !> @{
+    LOGICAL         :: monopole !< Monopole switch
+    TYPE(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
+    INTEGER         :: num_mono !< Number of monopoles
+    !> @}
 
-    ! SHB: hold onto p_tilde
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ptil 
+
     ! ======================================================================
 
     ! Mathematical and Physical Constants ======================================
-    REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0
+    REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
     ! ==========================================================================
   
     
     CONTAINS
-        
+ 
+        !> Assigns default values to the user inputs before reading
+        !!  them in. This enables for an easier consistency check of
+        !!  these parameters once they are read from the input file.
         SUBROUTINE s_assign_default_values_to_user_inputs() ! ------------------
-        ! Description: Assigns default values to the user inputs before reading
-        !              them in. This enables for an easier consistency check of
-        !              these parameters once they are read from the input file.
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i,j
+           
+            INTEGER :: i,j !< Generic loop iterator
             
             
             ! Logistics
@@ -404,22 +441,15 @@ MODULE m_global_parameters
         END SUBROUTINE s_assign_default_values_to_user_inputs ! ----------------
         
         
-        
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
         SUBROUTINE s_initialize_global_parameters_module() ! -------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
+           
             
-            
-            ! Temporary indexes storage
-            INTEGER :: tmp_idx
-            
-            ! Generic loop iterators
-            INTEGER :: i,j
-            
-            ! Generic counter
-            INTEGER :: k
-
+            INTEGER :: tmp_idx !< Temporary indexes storage
+            INTEGER :: i,j !< Generic loop iterators
+            INTEGER :: k !< Generic counter
             INTEGER :: fac
             
             TYPE(bounds_info) :: ix,iy,iz
@@ -780,6 +810,7 @@ MODULE m_global_parameters
         END SUBROUTINE s_initialize_global_parameters_module ! -----------------
 
 
+        !> Initializes non-polydisperse bubble modeling
         subroutine s_initialize_nonpoly
             INTEGER :: ir
             REAL(KIND(0.D0)) :: rhol0
@@ -793,10 +824,12 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), DIMENSION(Nb) :: k_m0
             REAL(KIND(0.D0)), DIMENSION(Nb) :: rho_m0
             REAL(KIND(0.D0)), DIMENSION(Nb) :: x_vw
-            ! polytropic index used to compute isothermal natural frequency
-            REAL(KIND(0.D0)), PARAMETER :: k_poly = 1.D0
-            ! universal gas constant
-            REAL(KIND(0.D0)), PARAMETER :: Ru = 8314.D0
+
+            REAL(KIND(0.D0)), PARAMETER :: k_poly = 1.D0 !<
+            !! polytropic index used to compute isothermal natural frequency
+
+            REAL(KIND(0.D0)), PARAMETER :: Ru = 8314.D0 !<
+            !! universal gas constant
 
 
             rhol0 = rhoref
@@ -894,6 +927,11 @@ MODULE m_global_parameters
             pref = 1.d0
         end subroutine s_initialize_nonpoly
 
+        !>  Computes transfer coefficient for non-polydisperse bubble modeling (Preston 2007)
+        !!  @param omega Frequency
+        !!  @param peclet Peclet number
+        !!  @param Re_trans Real part of transfer coefficient
+        !!  @param Im_trans Imaginary part of transfer coefficient
         SUBROUTINE s_transcoeff( omega,peclet,Re_trans,Im_trans )
 
             REAL(KIND(0.D0)), INTENT(IN) :: omega
@@ -914,6 +952,7 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_transcoeff
 
+        !> Initializes parallel infrastructure
         SUBROUTINE s_initialize_parallel_io() ! --------------------------------
 
             num_dims = 1 + MIN(1,n) + MIN(1,p)
@@ -940,9 +979,9 @@ MODULE m_global_parameters
         
         
         
-        
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_global_parameters_module() ! ---------------------
-        ! Description: Module deallocation and/or disassociation procedures
+
             
             INTEGER :: i
             
@@ -974,10 +1013,12 @@ MODULE m_global_parameters
         END SUBROUTINE s_finalize_global_parameters_module ! -------------------
         
         
-        !bubble routines
+        !> Computes the bubble number density n from the conservative variables
+        !! @param vftmp is the void fraction
+        !! @param nRtmp is the bubble number  density times the bubble radii
+        !! @param ntmp is the output number bubble density
         SUBROUTINE s_comp_n_from_cons( vftmp,nRtmp,ntmp )
-            ! vftemp is \alpha, nRtemp is nR=n*R, ntmp is n
-            ! compute n from \alpha and nR(:)
+       
             REAL(KIND(0.D0)), INTENT(IN) :: vftmp
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: nRtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
@@ -992,9 +1033,12 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_comp_n_from_cons
 
+        !> Computes the bubble number density n from the primitive variables
+        !! @param vftmp is the void fraction
+        !! @param Rtmp is the  bubble radii
+        !! @param ntmp is the output number bubble density
         SUBROUTINE s_comp_n_from_prim( vftmp,Rtmp,ntmp )
-            ! vftemp is \alpha, Rtemp is R, ntmp is n
-            ! compute n from \alpha and R(:)
+            
             REAL(KIND(0.D0)), INTENT(IN) :: vftmp
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: Rtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
@@ -1012,6 +1056,9 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_comp_n_from_prim
 
+        !> Computes the quadrature for polydisperse bubble populations
+        !! @param func is the bubble dynamic variables for each bin
+        !! @param mom is the computed moment        
         SUBROUTINE s_quad( func,mom )
 
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: func
@@ -1022,6 +1069,8 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_quad
 
+        !> Computes the Simpson weights for quadrature
+        !! @param Npt is the number of bins that represent the polydisperse bubble population
         SUBROUTINE s_simpson( Npt )
 
             INTEGER, INTENT(IN) :: Npt

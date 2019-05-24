@@ -28,30 +28,35 @@ MODULE m_weno
     
     PRIVATE; PUBLIC :: s_initialize_weno_module, s_weno, s_finalize_weno_module
     
-    
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: v_rs_wsL, v_rs_wsR !<
-    !! The cell-average variables that will be WENO-reconstructed. Formerly, they
+    !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
     !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
     !! as to be reshaped (RS) and/or characteristically decomposed. The reshaping
     !! allows the WENO procedure to be independent of the coordinate direction of
     !! the reconstruction. Lastly, notice that the left (L) and right (R) results
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
-    
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vL_rs_vf, vR_rs_vf !<
-    !! Left and right WENO-reconstructed values of the cell-average variables.
+    !> @{
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:) :: v_rs_wsL, v_rs_wsR
+    !> @}
+  
+    !> @name Left and right WENO-reconstructed values of the cell-average variables.
     !! Note that the reshaped property of the variables from which these were
     !! obtained, v_rs_wsL and v_rs_wsR, is initially kept. Once the reshaping
     !! is undone, the reconstructed values are moved into vL_vf and vR_vf.
+    !> @{
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vL_rs_vf, vR_rs_vf 
+    !> @}
      
     
     ! WENO Coefficients ========================================================
-    
-    ! Polynomial coefficients at the left and right cell-boundaries (CB) and at
-    ! the left and right quadrature points (QP), in the x-, y- and z-directions.
-    ! Note that the first dimension of the array identifies the polynomial, the
-    ! second dimension identifies the position of its coefficients and the last
-    ! dimension denotes the cell-location in the relevant coordinate direction.
+   
+
+    !> @name Polynomial coefficients at the left and right cell-boundaries (CB) and at
+    !! the left and right quadrature points (QP), in the x-, y- and z-directions.
+    !! Note that the first dimension of the array identifies the polynomial, the
+    !! second dimension identifies the position of its coefficients and the last
+    !! dimension denotes the cell-location in the relevant coordinate direction.
+    !> @{
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:,:) :: poly_coef_cbL_x
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:,:) :: poly_coef_cbL_y
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:,:) :: poly_coef_cbL_z
@@ -68,11 +73,13 @@ MODULE m_weno
     
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:,:) :: poly_coef_L => NULL()
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:,:) :: poly_coef_R => NULL()
-    
-    ! The ideal weights at the left and the right cell-boundaries and at the
-    ! left and the right quadrature points, in x-, y- and z-directions. Note
-    ! that the first dimension of the array identifies the weight, while the
-    ! last denotes the cell-location in the relevant coordinate direction.
+    !> @}
+
+    !> @name The ideal weights at the left and the right cell-boundaries and at the
+    !! left and the right quadrature points, in x-, y- and z-directions. Note
+    !! that the first dimension of the array identifies the weight, while the
+    !! last denotes the cell-location in the relevant coordinate direction.
+    !> @{
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:) :: d_cbL_x
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:) :: d_cbL_y
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:) :: d_cbL_z
@@ -89,26 +96,30 @@ MODULE m_weno
     
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:) :: d_L => NULL()
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:) :: d_R => NULL()
-    
-    ! Smoothness indicator coefficients in the x-, y-, and z-directions. Note
-    ! that the first array dimension identifies the smoothness indicator, the
-    ! second identifies the position of its coefficients and the last denotes
-    ! the cell-location in the relevant coordinate direction.
+    !> @}
+
+    !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
+    !! that the first array dimension identifies the smoothness indicator, the
+    !! second identifies the position of its coefficients and the last denotes
+    !! the cell-location in the relevant coordinate direction.
+    !> @{
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:,:) :: beta_coef_x
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:,:) :: beta_coef_y
     REAL(KIND(0d0)), TARGET , ALLOCATABLE, DIMENSION(:,:,:) :: beta_coef_z
     
     REAL(KIND(0d0)), POINTER, DIMENSION(:,:,:) :: beta_coef => NULL()
-    
+    !> @}
+
     ! END: WENO Coefficients ===================================================
     
     
-    ! Number of WENO-reconstructed cell-average variables
-    INTEGER :: v_size
+
+    INTEGER :: v_size !< Number of WENO-reconstructed cell-average variables
     
-    ! Indical bounds in the s1-, s2- and s3-directions
+    !> @name Indical bounds in the s1-, s2- and s3-directions
+    !> @{
     TYPE(bounds_info) :: is1,is2,is3
-    
+    !> @}
     
     CONTAINS
         

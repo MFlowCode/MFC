@@ -1,70 +1,82 @@
-!Module to compute anti-duffusion equation----------
-!**** WARNING ::: Currently only for 2 species *****
-!------------Aswin, Oct 2015------------------------
-!---------------------------------------------------
-
+!>
+!! @file m_anti_diffusion.f90
+!! @brief This module is used to compute the anti-diffusion equation
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_anti_diffusion
 
 
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
 
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
 
-    USE m_rhs                  ! Right-hand-side (RHS) evaluation procedures
+    USE m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
-    USE m_data_output          ! Run-time info & solution data output procedures
+    USE m_data_output          !< Run-time info & solution data output procedures
 
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-    USE m_time_steppers        ! Time-stepping algorithms
+    USE m_time_steppers        !< Time-stepping algorithms
 
-    USE m_variables_conversion ! Variable conversion
+    USE m_variables_conversion !< Variable conversion
     ! ==========================================================================
 
     IMPLICIT NONE
 
-    ! Cell-average RHS variables at the current time-stage
-    TYPE(scalar_field), PRIVATE, ALLOCATABLE, DIMENSION(:) :: ad_rhs_vf
 
-    ! Cell-average RHS variables at the current time-stage
-    TYPE(scalar_field), PRIVATE, ALLOCATABLE, DIMENSION(:) :: ad_prim_vf
+    TYPE(scalar_field), PRIVATE, ALLOCATABLE, DIMENSION(:) :: ad_rhs_vf !<
+    !! Cell-average RHS variables at the current time-stage
 
-    !Variable to compute grad alpha
+
+    TYPE(scalar_field), PRIVATE, ALLOCATABLE, DIMENSION(:) :: ad_prim_vf !<
+    !! Cell-average RHS variables at the current time-stage
+
+
+    !> @name Variables to compute grad alpha
+    !> @{
     REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:) :: grad_alpha
     REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:) :: grad_alpharho1
     REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:) :: grad_alpharho2
     REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:) :: grad_rho
+    !> @}
 
-    !Temp array variables
+
+    !> @name Temporary array variables
+    !> @{
     REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:) :: ad_a, ad_b, ad_c
+    !> @}
 
-    !Face flux
-    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:,:) :: face_flux
 
-    !Diffusion coefficient
+    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:,:) :: face_flux !< Face flux
+
+    !> @name Diffusion coefficients
+    !> @{
     REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:) :: diff_coeff_x,diff_coeff_y,diff_coeff_z
+    !> @}
 
-    !Temp variables to store primitives
-    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:,:) :: temp
 
-    !gamma_alpha_qp -- variable in convert from conservative to primitive -- just dummy here
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: gm_alpha
+    REAL(KIND(0d0)), PRIVATE, ALLOCATABLE, DIMENSION(:,:,:,:) :: temp !<
+    !!Temp variables to store primitives
 
-    ! Indical bounds in the x-, y- and z-directions
+
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: gm_alpha !<
+    !!gamma_alpha_qp -- Dummy variable in convert from conservative to primitive
+
+    !> @name Indical bounds in the x-, y- and z-directions
+    !> @{
     TYPE(bounds_info) :: ad_ix, ad_iy, ad_iz
-
+    !> @}
 
     CONTAINS
 
 
 
-
-
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
         SUBROUTINE s_initialize_anti_diffusion_module()
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
  
             INTEGER :: i,j
 
@@ -129,8 +141,7 @@ MODULE m_anti_diffusion
 
 
 
-
-
+        !> Subroutine to compute anti-diffusion equation
         SUBROUTINE s_compute_anti_diffusion()
 
             INTEGER :: i, j, k, r, no_of_itr
@@ -139,9 +150,7 @@ MODULE m_anti_diffusion
             REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p) :: Lheaviside, U0, velmag
             REAL(KIND(0d0)) :: U0_loc, U0_glb
 
-            !******Things to be moved*******
-            no_of_itr = 1   !Needs to be user input or decided based on interface sharpness
-            !*******************************
+            no_of_itr = 1
 
             IF(num_fluids /= 2) THEN 
                 PRINT '(A)', 'Error in number of species for anti-diffusion...exiting'
@@ -174,19 +183,13 @@ MODULE m_anti_diffusion
                 maxD_glb = maxD_loc
             END IF
 
-            ! CAUTION: This expression for dtau is not general. Needs to be
-            ! modified for general case according to Eq. 3.24 in Meng's thesis.
-            ! dtau = MIN(1d-2*1d-2/(4d0*maxD_glb),1d-11)
             IF(n.eq.0) THEN
                 dtau = MIN(MINVAL(dx)**2d0/(2d0*maxD_glb),dt)
             ELSE IF(p.eq.0) THEN
                 IF(cyl_coord.NEQV..TRUE.) THEN
-                    ! Fixme (cyl_coord must be treated in a good manner Kazuki)
                     dtau = MIN((MIN((minval(dx))**2d0,(minval(dy))**2d0))/(4d0*maxd_glb),dt)
                 ELSE
-                    !dtau = MIN(MINVAL(dx)*MINVAL(dy)/(6d0*maxD_glb),dt)
                     dtau = 1.0d1*MIN((MIN((minval(dx))**2d0,(minval(dy))**2d0))/(6d0*maxd_glb),dt)
-                    !dtau = MIN((MIN((minval(dx))**2d0,(minval(dy))**2d0))/(6d0*maxd_glb),dt)
                 END IF
             ELSE
                 dtau = MIN((minval(dx))**2d0,(minval(dy))**2d0)
@@ -225,7 +228,6 @@ MODULE m_anti_diffusion
             END IF
 
             DO j = 1, no_of_itr
-
                 !convert conservative to primitive
                 CALL s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, ad_prim_vf, gm_alpha,ad_ix,ad_iy,ad_iz)
 
@@ -237,7 +239,6 @@ MODULE m_anti_diffusion
                                     q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
                                     + dtau*Lheaviside(0:m,0:n,0:p)*U0_glb*ad_rhs_vf(i)%sf(0:m,0:n,0:p)
                 END DO
-
             END DO
 
             DO i = 1, cont_idx%end
@@ -253,25 +254,26 @@ MODULE m_anti_diffusion
 
 
 
-
+        !> Compute anti-diffusive rhs terms of Shyue
+        !!      Details follow the imcompressible anit-diffusion method of So and Adams
         SUBROUTINE s_compute_anti_diffusive_rhs(ad_cons_vf, ad_prim_vf, ad_rhs_vf)
-        !Description : Compute anti-diffusive rhs terms of Shyue
-        !              Details follow the imcompressible anit-diffusion method of So and Adams
+            
 
-            ! Cell-average conservative variables
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: ad_cons_vf
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: ad_cons_vf !<
+            !! Cell-average conservative variables
 
-            ! Cell-average conservative variables
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: ad_prim_vf
 
-            ! Cell-average RHS variables
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: ad_rhs_vf
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: ad_prim_vf !<
+            !! Cell-average conservative variables
 
-            !Generic loop variables
-            INTEGER :: h,i,j,k,l
 
-            !Error variable
-            INTEGER :: ALLOC_ERR
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: ad_rhs_vf !<
+            !! Cell-average RHS variables
+
+
+            INTEGER :: h,i,j,k,l !< Generic loop variables
+
+            INTEGER :: ALLOC_ERR !< Error variable
 
             !Call buffer subroutine to update bcs and interprocess bcs
             CALL s_populate_variables_buffers(ad_cons_vf)
@@ -288,8 +290,8 @@ MODULE m_anti_diffusion
                 temp(4,0:m,0:n,0:p) = 0d0
                 temp(5,0:m,0:n,0:p) = 0d0
             END IF
-            temp(6,0:m,0:n,0:p) = ad_prim_vf(E_idx)%sf(0:m,0:n,0:p)*fluid_pp(1)%gamma + fluid_pp(1)%pi_inf        !rho1 e1
-            temp(7,0:m,0:n,0:p) = ad_prim_vf(E_idx)%sf(0:m,0:n,0:p)*fluid_pp(2)%gamma + fluid_pp(2)%pi_inf        !rho2 e2
+            temp(6,0:m,0:n,0:p) = ad_prim_vf(E_idx)%sf(0:m,0:n,0:p)*fluid_pp(1)%gamma + fluid_pp(1)%pi_inf !rho1 e1
+            temp(7,0:m,0:n,0:p) = ad_prim_vf(E_idx)%sf(0:m,0:n,0:p)*fluid_pp(2)%gamma + fluid_pp(2)%pi_inf !rho2 e2
 
             DO i = 1, num_dims
                 IF (i == 1) THEN
@@ -299,25 +301,35 @@ MODULE m_anti_diffusion
                     ALLOCATE(ad_c(ad_iy%beg:ad_iy%end,ad_iz%beg:ad_iz%end))
 
                     DO j = 0, m
-                        ad_a(:,:) = (ad_cons_vf(cont_idx%beg)%sf(j+1,:,:) - ad_cons_vf(cont_idx%beg)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
-                        ad_b(:,:) = (ad_cons_vf(cont_idx%beg)%sf( j ,:,:) - ad_cons_vf(cont_idx%beg)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
+                        ad_a(:,:) = (ad_cons_vf(cont_idx%beg)%sf(j+1,:,:) - &
+                            ad_cons_vf(cont_idx%beg)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
+                        ad_b(:,:) = (ad_cons_vf(cont_idx%beg)%sf( j ,:,:) - &
+                            ad_cons_vf(cont_idx%beg)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
                         CALL s_minmod(ad_a,ad_b,ad_c)
                         grad_alpharho1(j,:,:) = ad_c(:,:) 
 
-                        ad_a(:,:) = (ad_cons_vf(cont_idx%end)%sf(j+1,:,:) - ad_cons_vf(cont_idx%end)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
-                        ad_b(:,:) = (ad_cons_vf(cont_idx%end)%sf( j ,:,:) - ad_cons_vf(cont_idx%end)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
+                        ad_a(:,:) = (ad_cons_vf(cont_idx%end)%sf(j+1,:,:) - &
+                            ad_cons_vf(cont_idx%end)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
+                        ad_b(:,:) = (ad_cons_vf(cont_idx%end)%sf( j ,:,:) - &
+                            ad_cons_vf(cont_idx%end)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
                         CALL s_minmod(ad_a,ad_b,ad_c)
                         grad_alpharho2(j,:,:) = ad_c(:,:)
 
-                        ad_a(:,:) = (ad_cons_vf(cont_idx%beg)%sf(j+1,:,:) + ad_cons_vf(cont_idx%end)%sf(j+1,:,:) &
-                                    -ad_cons_vf(cont_idx%beg)%sf( j ,:,:) - ad_cons_vf(cont_idx%end)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
-                        ad_b(:,:) = (ad_cons_vf(cont_idx%beg)%sf( j ,:,:) + ad_cons_vf(cont_idx%end)%sf( j ,:,:) &
-                                    -ad_cons_vf(cont_idx%beg)%sf(j-1,:,:) - ad_cons_vf(cont_idx%end)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
+                        ad_a(:,:) = (ad_cons_vf(cont_idx%beg)%sf(j+1,:,:) + &
+                                    ad_cons_vf(cont_idx%end)%sf(j+1,:,:) &
+                                    -ad_cons_vf(cont_idx%beg)%sf( j ,:,:) - &
+                                    ad_cons_vf(cont_idx%end)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
+                        ad_b(:,:) = (ad_cons_vf(cont_idx%beg)%sf( j ,:,:) + &
+                                    ad_cons_vf(cont_idx%end)%sf( j ,:,:) &
+                                    -ad_cons_vf(cont_idx%beg)%sf(j-1,:,:) - &
+                                    ad_cons_vf(cont_idx%end)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
                         CALL s_minmod(ad_a,ad_b,ad_c)
                         grad_rho(j,:,:) = ad_c(:,:)
 
-                        ad_a(:,:) = (ad_cons_vf(adv_idx%beg)%sf(j+1,:,:) - ad_cons_vf(adv_idx%beg)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
-                        ad_b(:,:) = (ad_cons_vf(adv_idx%beg)%sf( j ,:,:) - ad_cons_vf(adv_idx%beg)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
+                        ad_a(:,:) = (ad_cons_vf(adv_idx%beg)%sf(j+1,:,:) - &
+                                ad_cons_vf(adv_idx%beg)%sf( j ,:,:))/(x_cc(j+1) - x_cc( j ))
+                        ad_b(:,:) = (ad_cons_vf(adv_idx%beg)%sf( j ,:,:) - &
+                                ad_cons_vf(adv_idx%beg)%sf(j-1,:,:))/(x_cc( j ) - x_cc(j-1))
                         CALL s_minmod(ad_a,ad_b,ad_c)
                         grad_alpha(j,:,:) = ad_c(:,:) 
                     END DO
@@ -366,13 +378,18 @@ MODULE m_anti_diffusion
                     DO l = 0, p
                         DO k = 0, n
                             DO j = 0, m
-                                ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*(face_flux(1,j,k,l) - face_flux(1,j-1,k,l))
-                                ad_rhs_vf(cont_idx%end)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*(face_flux(2,j,k,l) - face_flux(2,j-1,k,l))
+                                ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*(face_flux(1,j,k,l) &
+                                    - face_flux(1,j-1,k,l))
+                                ad_rhs_vf(cont_idx%end)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*(face_flux(2,j,k,l) &
+                                    - face_flux(2,j-1,k,l))
                                 DO h = 1, num_dims
-                                    ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l)*(face_flux(3,j,k,l) - face_flux(3,j-1,k,l))
+                                    ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = &
+                                        -1d0/dx(j)*diff_coeff_x(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l) * &
+                                        (face_flux(3,j,k,l) - face_flux(3,j-1,k,l))
                                 END DO
                                 ad_rhs_vf(E_idx)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*( &
-                                                            (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * (face_flux(3,j,k,l) - face_flux(3,j-1,k,l)) + &
+                                                            (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * &
+                                                            (face_flux(3,j,k,l) - face_flux(3,j-1,k,l)) + &
                                                             (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)-face_flux(4,j-1,k,l)))
                                 ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = -1d0/dx(j)*diff_coeff_x(j,k,l)*(face_flux(4,j,k,l)-face_flux(4,j-1,k,l))
                             END DO
@@ -455,26 +472,45 @@ MODULE m_anti_diffusion
                     DO l = 0, p
                         DO k = 0, n
                             DO j = 0, m
-                                ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = ad_rhs_vf(cont_idx%beg)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l)*(face_flux(1,j,k,l) - face_flux(1,j,k-1,l))
-                                ad_rhs_vf(cont_idx%end)%sf(j,k,l) = ad_rhs_vf(cont_idx%end)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l)*(face_flux(2,j,k,l) - face_flux(2,j,k-1,l))
+                                ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = &
+                                    ad_rhs_vf(cont_idx%beg)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l) * &
+                                    (face_flux(1,j,k,l) - face_flux(1,j,k-1,l))
+                                ad_rhs_vf(cont_idx%end)%sf(j,k,l) = &
+                                    ad_rhs_vf(cont_idx%end)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l) * &
+                                    (face_flux(2,j,k,l) - face_flux(2,j,k-1,l))
                                 DO h = 1, num_dims
-                                    ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = ad_rhs_vf(cont_idx%end+h)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l)*(face_flux(3,j,k,l) - face_flux(3,j,k-1,l))
+                                    ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) - &
+                                        1d0/dy(k)*diff_coeff_y(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l) * &
+                                        (face_flux(3,j,k,l) - face_flux(3,j,k-1,l))
                                 END DO
-                                ad_rhs_vf(E_idx)%sf(j,k,l) = ad_rhs_vf(E_idx)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l)*( &
-                                                             (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * (face_flux(3,j,k,l) - face_flux(3,j,k-1,l)) + &
-                                                             (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)-face_flux(4,j,k-1,l)))
-                                ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = ad_rhs_vf(adv_idx%beg)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l)*(face_flux(4,j,k,l)-face_flux(4,j,k-1,l))
+                                ad_rhs_vf(E_idx)%sf(j,k,l) = &
+                                    ad_rhs_vf(E_idx)%sf(j,k,l)-1d0/dy(k)*diff_coeff_y(j,k,l)*( &
+                                    (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * &
+                                    (face_flux(3,j,k,l) - face_flux(3,j,k-1,l)) + &
+                                    (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)-face_flux(4,j,k-1,l)))
+                                ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = &
+                                    ad_rhs_vf(adv_idx%beg)%sf(j,k,l) - &
+                                    1d0/dy(k)*diff_coeff_y(j,k,l)*(face_flux(4,j,k,l)-face_flux(4,j,k-1,l))
   
                                 IF(cyl_coord.AND.p.eq.0) THEN
-                                    ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = ad_rhs_vf(cont_idx%beg)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l)*(face_flux(1,j,k,l) + face_flux(1,j,k-1,l))
-                                    ad_rhs_vf(cont_idx%end)%sf(j,k,l) = ad_rhs_vf(cont_idx%end)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l)*(face_flux(2,j,k,l) + face_flux(2,j,k-1,l))
+                                    ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = &
+                                        ad_rhs_vf(cont_idx%beg)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l) * &
+                                        (face_flux(1,j,k,l) + face_flux(1,j,k-1,l))
+                                    ad_rhs_vf(cont_idx%end)%sf(j,k,l) = &
+                                        ad_rhs_vf(cont_idx%end)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l) * &
+                                        (face_flux(2,j,k,l) + face_flux(2,j,k-1,l))
                                     DO h = 1, num_dims
-                                        ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = ad_rhs_vf(cont_idx%end+h)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l)*(face_flux(3,j,k,l) + face_flux(3,j,k-1,l))
+                                        ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = &
+                                            ad_rhs_vf(cont_idx%end+h)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l) * &
+                                            ad_prim_vf(cont_idx%end+h)%sf(j,k,l)*(face_flux(3,j,k,l) + face_flux(3,j,k-1,l))
                                     END DO
-                                    ad_rhs_vf(E_idx)%sf(j,k,l) = ad_rhs_vf(E_idx)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l)*( &
-                                                                 (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * (face_flux(3,j,k,l) + face_flux(3,j,k-1,l)) + &
-                                                                 (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)+face_flux(4,j,k-1,l)))
-                                    ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = ad_rhs_vf(adv_idx%beg)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l)*(face_flux(4,j,k,l)+face_flux(4,j,k-1,l))
+                                    ad_rhs_vf(E_idx)%sf(j,k,l) = &
+                                        ad_rhs_vf(E_idx)%sf(j,k,l)-5d-1/y_cc(k)*diff_coeff_y(j,k,l)*( &
+                                        (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * &
+                                        (face_flux(3,j,k,l) + face_flux(3,j,k-1,l)) + &
+                                        (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)+face_flux(4,j,k-1,l)))
+                                    ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = ad_rhs_vf(adv_idx%beg)%sf(j,k,l) - &
+                                        5d-1/y_cc(k)*diff_coeff_y(j,k,l)*(face_flux(4,j,k,l)+face_flux(4,j,k-1,l))
                                 END IF
                             END DO
                         END DO
@@ -556,15 +592,22 @@ MODULE m_anti_diffusion
                     DO l = 0, p
                         DO k = 0, n
                             DO j = 0, m
-                                ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = ad_rhs_vf(cont_idx%beg)%sf(j,k,l)-1d0/dz(l)*diff_coeff_z(j,k,l)*(face_flux(1,j,k,l) - face_flux(1,j,k,l-1))
-                                ad_rhs_vf(cont_idx%end)%sf(j,k,l) = ad_rhs_vf(cont_idx%end)%sf(j,k,l)-1d0/dz(l)*diff_coeff_z(j,k,l)*(face_flux(2,j,k,l) - face_flux(2,j,k,l-1))
+                                ad_rhs_vf(cont_idx%beg)%sf(j,k,l) = ad_rhs_vf(cont_idx%beg)%sf(j,k,l) - &
+                                    1d0/dz(l)*diff_coeff_z(j,k,l)*(face_flux(1,j,k,l) - face_flux(1,j,k,l-1))
+                                ad_rhs_vf(cont_idx%end)%sf(j,k,l) = ad_rhs_vf(cont_idx%end)%sf(j,k,l) - &
+                                    1d0/dz(l)*diff_coeff_z(j,k,l)*(face_flux(2,j,k,l) - face_flux(2,j,k,l-1))
                                 DO h = 1, num_dims
-                                    ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = ad_rhs_vf(cont_idx%end+h)%sf(j,k,l)-1d0/dz(l)*diff_coeff_z(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l)*(face_flux(3,j,k,l) - face_flux(3,j,k,l-1))
+                                    ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) = ad_rhs_vf(cont_idx%end+h)%sf(j,k,l) - &
+                                        1d0/dz(l)*diff_coeff_z(j,k,l)*ad_prim_vf(cont_idx%end+h)%sf(j,k,l) * &
+                                        (face_flux(3,j,k,l) - face_flux(3,j,k,l-1))
                                 END DO
-                                ad_rhs_vf(E_idx)%sf(j,k,l) = ad_rhs_vf(E_idx)%sf(j,k,l)-1d0/dz(l)*diff_coeff_z(j,k,l)*( &
-                                                            (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * (face_flux(3,j,k,l) - face_flux(3,j,k,l-1)) + &
-                                                            (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)-face_flux(4,j,k,l-1)))
-                                ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = ad_rhs_vf(adv_idx%beg)%sf(j,k,l)-1d0/dz(l)*diff_coeff_z(j,k,l)*(face_flux(4,j,k,l)-face_flux(4,j,k,l-1))
+                                ad_rhs_vf(E_idx)%sf(j,k,l) = ad_rhs_vf(E_idx)%sf(j,k,l) - &
+                                    1d0/dz(l)*diff_coeff_z(j,k,l)*( &
+                                    (5d-1*(temp(3,j,k,l)**2d0 + temp(4,j,k,l)**2d0 + temp(5,j,k,l)**2d0)) * &
+                                    (face_flux(3,j,k,l) - face_flux(3,j,k,l-1)) + &
+                                    (temp(6,j,k,l) - temp(7,j,k,l))*(face_flux(4,j,k,l)-face_flux(4,j,k,l-1)))
+                                ad_rhs_vf(adv_idx%beg)%sf(j,k,l) = ad_rhs_vf(adv_idx%beg)%sf(j,k,l) - &
+                                    1d0/dz(l)*diff_coeff_z(j,k,l)*(face_flux(4,j,k,l)-face_flux(4,j,k,l-1))
                             END DO
                         END DO
                     END DO
@@ -579,9 +622,12 @@ MODULE m_anti_diffusion
 
 
 
-
+        !> Computes minmod of two variables
+        !> @param ad_a Variable 1
+        !> @param ad_b Variable 2
+        !> @param ad_c Minmod result
         SUBROUTINE s_minmod(ad_a,ad_b,ad_c)
-        !Description : compute minmod of two variables as given in So and Adams
+
 
             REAL(KIND(0d0)), INTENT(IN) :: ad_a(:,:), ad_b(:,:)
             REAL(KIND(0d0)), INTENT(INOUT) :: ad_c(:,:)
@@ -608,7 +654,7 @@ MODULE m_anti_diffusion
 
 
 
-
+        !> Finalizes the anti diffusion module via deallocation
         SUBROUTINE s_finalize_anti_diffusion_module()
 
             INTEGER :: i

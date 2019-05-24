@@ -1,40 +1,39 @@
-! MFC v3.0 - Simulation Code: m_rhs.f90
-! Description: The module contains the subroutines used to calculate the right-
-!              hand-side (RHS) in the quasi-conservative, shock- and interface-
-!              capturing finite-volume framework for the multicomponent Navier-
-!              Stokes equations supplemented by appropriate advection equations
-!              used to capture the material interfaces. The system of equations
-!              is closed by the stiffened gas equation of state, as well as any
-!              required mixture relationships. Capillarity effects are included
-!              and are modeled by the means of a volume force acting across the
-!              diffuse material interface region. The implementation details of
-!              surface tension may be found in Perigaud and Saurel (2005). Note
-!              that both viscous and surface tension effects are only available
-!              in the volume fraction model.
-! Author: Vedran Coralic
-! Date: 07/12/12
-
-
+!>
+!! @file m_rhs.f90
+!! @brief The module contains the subroutines used to calculate the right-
+!!              hand-side (RHS) in the quasi-conservative, shock- and interface-
+!!              capturing finite-volume framework for the multicomponent Navier-
+!!              Stokes equations supplemented by appropriate advection equations
+!!              used to capture the material interfaces. The system of equations
+!!              is closed by the stiffened gas equation of state, as well as any
+!!              required mixture relationships. Capillarity effects are included
+!!              and are modeled by the means of a volume force acting across the
+!!              diffuse material interface region. The implementation details of
+!!              surface tension may be found in Perigaud and Saurel (2005). Note
+!!              that both viscous and surface tension effects are only available
+!!              in the volume fraction model.
+!! @author spencer
+!! @version 1.1
 MODULE m_rhs
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
     
-    USE m_weno                 ! Weighted and essentially non-oscillatory (WENO)
-                               ! schemes for spatial reconstruction of variables
+    USE m_weno                 !< Weighted and essentially non-oscillatory (WENO)
+                               !! schemes for spatial reconstruction of variables
     
-    USE m_riemann_solvers      ! Exact and approximate Riemann problem solvers
+    USE m_riemann_solvers      !< Exact and approximate Riemann problem solvers
     
-    USE m_cbc                  ! Characteristic boundary conditions (CBC)
+    USE m_cbc                  !< Characteristic boundary conditions (CBC)
 
-    use m_bubbles
+    use m_bubbles              !< Bubble dynamic routines
     ! ==========================================================================
     
     
@@ -49,93 +48,110 @@ MODULE m_rhs
                        s_get_viscous
     
     
-    ! This variable contains the WENO-reconstructed values of the cell-average
-    ! conservative variables, which are located in q_cons_vf, at cell-interior
-    ! Gaussian quadrature points (QP).
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: q_cons_qp
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: q_cons_qp !<
+    !! This variable contains the WENO-reconstructed values of the cell-average
+    !! conservative variables, which are located in q_cons_vf, at cell-interior
+    !! Gaussian quadrature points (QP).
     
-    ! The primitive variables at cell-interior Gaussian quadrature points. These
-    ! are calculated from the conservative variables and gradient magnitude (GM)
-    ! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: q_prim_qp
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: q_prim_qp !<
+    !! The primitive variables at cell-interior Gaussian quadrature points. These
+    !! are calculated from the conservative variables and gradient magnitude (GM)
+    !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
     
-    ! The left (L) and the right (R) WENO-reconstructed cell-boundary values,
-    ! including cell-boundary Gaussian quadrature points, of the cell-average
-    ! conservative variables. The latter are stored in the variable q_cons_qp
-    ! (NDQP - normal direction quadrature points).
+    !> @name The left (L) and the right (R) WENO-reconstructed cell-boundary values,
+    !! including cell-boundary Gaussian quadrature points, of the cell-average
+    !! conservative variables. The latter are stored in the variable q_cons_qp
+    !! (NDQP - normal direction quadrature points).
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: qL_cons_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: qR_cons_ndqp
-    
-    ! The left and right WENO-reconstructed cell-boundary values, that include
-    ! cell-boundary Gaussian quadrature points, of the cell-averaged primitive
-    ! variables. The latter are stored in the variable q_prim_qp.
+    !> @}
+
+    !> @name The left and right WENO-reconstructed cell-boundary values, that include
+    !! cell-boundary Gaussian quadrature points, of the cell-averaged primitive
+    !! variables. The latter are stored in the variable q_prim_qp.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: qL_prim_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: qR_prim_ndqp
-    
-    ! The first-order spatial derivatives of the primitive variables at cell-
-    ! interior Guassian quadrature points. These are WENO-reconstructed from
-    ! their respective cell-average values, obtained through the application
-    ! of the divergence theorem on the integral-average cell-boundary values
-    ! of the primitive variables, located in qK_prim_ndqp, where K = L or R.
+    !> @}
+
+    !> @name The first-order spatial derivatives of the primitive variables at cell-
+    !! interior Guassian quadrature points. These are WENO-reconstructed from
+    !! their respective cell-average values, obtained through the application
+    !! of the divergence theorem on the integral-average cell-boundary values
+    !! of the primitive variables, located in qK_prim_ndqp, where K = L or R.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dq_prim_dx_qp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dq_prim_dy_qp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dq_prim_dz_qp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: gm_vel_qp
-    
-    ! The left and right WENO-reconstructed cell-boundary values of the cell-
-    ! average first-order spatial derivatives of the primitive variables. The
-    ! cell-average of the first-order spatial derivatives may be found in the
-    ! variables dq_prim_ds_qp, where s = x, y or z.
+    !> @}
+
+    !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
+    !! average first-order spatial derivatives of the primitive variables. The
+    !! cell-average of the first-order spatial derivatives may be found in the
+    !! variables dq_prim_ds_qp, where s = x, y or z.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dqL_prim_dx_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dqL_prim_dy_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dqL_prim_dz_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dqR_prim_dx_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dqR_prim_dy_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dqR_prim_dz_ndqp
+    !> @}
+
+    TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: gm_alpha_qp  !<
+    !! The gradient magnitude of the volume fractions at cell-interior Gaussian
+    !! quadrature points. gm_alpha_qp is calculated from individual first-order
+    !! spatial derivatives located in dq_prim_ds_qp.
     
-    ! The gradient magnitude of the volume fractions at cell-interior Gaussian
-    ! quadrature points. gm_alpha_qp is calculated from individual first-order
-    ! spatial derivatives located in dq_prim_ds_qp.
-    TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: gm_alpha_qp
-    
-    ! The left and right WENO-reconstructed cell-boundary values of the cell-
-    ! average gradient magnitude of volume fractions, located in gm_alpha_qp.
+    !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
+    !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: gm_alphaL_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: gm_alphaR_ndqp
-    
-    ! The left and right cell-boundary values of the vector components of the
-    ! unit normal (UN) of the volume fractions. These are directly calculated
-    ! from the first-order spatial derivatives, stored in dqK_prim_ds_ndqp.
+    !> @}
+
+    !> @name The left and right cell-boundary values of the vector components of the
+    !! unit normal (UN) of the volume fractions. These are directly calculated
+    !! from the first-order spatial derivatives, stored in dqK_prim_ds_ndqp.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alphaL_x_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alphaL_y_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alphaL_z_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alphaR_x_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alphaR_y_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alphaR_z_ndqp
+    !> @}
+
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: kappa_vf !<
+    !! The cell-average curvature of volume fractions. kappa_vf is calculated by
+    !! the divergence theorem using the integral-average cell-boundary values of
+    !! of the components of the unit normals, which are located in the variables
+    !! un_alphaK_s_ndqp.
     
-    ! The cell-average curvature of volume fractions. kappa_vf is calculated by
-    ! the divergence theorem using the integral-average cell-boundary values of
-    ! of the components of the unit normals, which are located in the variables
-    ! un_alphaK_s_ndqp.
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: kappa_vf
-    
-    ! The left and right WENO-reconstructed cell-boundary values of the cell-
-    ! average curvature of the volume fractions. The cell-average quantities
-    ! are located in the variable kappa_vf.
+    !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
+    !! average curvature of the volume fractions. The cell-average quantities
+    !! are located in the variable kappa_vf.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: kappaL_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: kappaR_ndqp
-    
-    ! The cell-boundary values of the fluxes (src - source, gsrc - geometrical
-    ! source). These are computed by applying the chosen Riemann problem solver
-    ! on the left and right cell-boundary values of the primitive variables, 
-    ! qK_prim_ndqp, the first-order spatial derivatives, dqK_prim_ds_ndqp, as
-    ! well as the curvature of volume fractions, kappaK_ndqp.
+    !> @}
+
+    !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
+    !! source). These are computed by applying the chosen Riemann problem solver
+    !! on the left and right cell-boundary values of the primitive variables, 
+    !! qK_prim_ndqp, the first-order spatial derivatives, dqK_prim_ds_ndqp, as
+    !! well as the curvature of volume fractions, kappaK_ndqp.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: flux_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: flux_src_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: flux_gsrc_ndqp
+    !> @}
 
-    ! Additional vector and scalar fields needed in alternate computation
-    ! of the cell-average curvature of volume fractions.
+    !> @name Additional vector and scalar fields needed in alternate computation
+    !! of the cell-average curvature of volume fractions.
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dgm_alpha_dx_qp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dgm_alpha_dy_qp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: dgm_alpha_dz_qp
@@ -143,20 +159,25 @@ MODULE m_rhs
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alpha_y_qp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: un_alpha_z_qp
 
+
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: laplacian_vf
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: alt_kappa_vf
+    !> @}
 
-    ! Additional field for regularization terms
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: reg_src_vf
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: reg_src_vf !<
+    !! Additional field for regularization terms
 
-    ! Additional field for capillary source terms
+
+    !> @name Additional field for capillary source terms
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: We_mtm_src
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: We_nrg_src
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: tau_We_vf
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: tau_Re_vf
+    !> @}
 
-    ! Additional variables for applying a flux limiter to the advection
-    ! equation
+    !> @name Additional variables for applying a flux limiter to the advection equation
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: flux_lim_func
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: lo_flux_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: lo_flux_src_ndqp
@@ -164,51 +185,60 @@ MODULE m_rhs
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: hi_flux_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: hi_flux_src_ndqp
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: hi_flux_gsrc_ndqp
-    
-    ! The indical bounds in the coordinate directions of the Gaussian numerical
-    ! integration that identify the locations of the quadrature points that are
-    ! necessary to evaluate cell-interior integral-averages.
+    !> @}
+
+    !> @name The indical bounds in the coordinate directions of the Gaussian numerical
+    !! integration that identify the locations of the quadrature points that are
+    !! necessary to evaluate cell-interior integral-averages.
+    !> @{
     TYPE(bounds_info) :: ieta,iksi,itau
-    
-    ! The indical bounds in the coordinate directions of the Gaussian numerical
-    ! integration that identify the locations of the quadrature points that are
-    ! necessary to evaluate cell-boundary integral-averages.
+    !> @}
+
+    !> @name The indical bounds in the coordinate directions of the Gaussian numerical
+    !! integration that identify the locations of the quadrature points that are
+    !! necessary to evaluate cell-boundary integral-averages.
+    !> @{
     TYPE(bounds_info) :: ichi,ipsi
+    !> @}
+
+    TYPE(bounds_info) :: iv !< Vector field indical bounds
     
-    ! Vector field indical bounds
-    TYPE(bounds_info) :: iv
-    
-    ! Indical bounds in the x-, y- and z-directions
+    !> @name Indical bounds in the x-, y- and z-directions
+    !> @{
     TYPE(bounds_info) :: ix,iy,iz
-   
-    ! source terms for bubbles
+    !> @}
+
+    !> @name Bubble dynamic source terms
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: bub_adv_src
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
-    ! matrix for \div(u)
-    TYPE(scalar_field) :: divu
-    !REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: divu
+    TYPE(scalar_field) :: divu !< matrix for div(u)
+    !> @}
+
+
  
-    ! source terms for monopole
+    !> @name Monopole source terms
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: mono_mass_src, mono_e_src
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: mono_mom_src
+    !> @}
     
+    !> @name Saved fluxes for testing
+    !> @{
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: myflux_vf, myflux_src_vf
     TYPE(scalar_field) :: alf_sum
+    !> @}
 
-
-    character(50) :: file_path
+    character(50) :: file_path !< Local file path for saving debug files
     
     CONTAINS
         
-        
+        !> The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.        
         SUBROUTINE s_initialize_rhs_module() ! ---------------------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
-            
-            
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Configuring Cell-Interior Quadrature Points ======================
@@ -1335,34 +1365,28 @@ MODULE m_rhs
         
         
         
-        
-        
+        !> The purpose of this procedure is to employ the inputted
+        !!      cell-average conservative variables in order to compute
+        !!      the cell-average RHS variables of the semidiscrete form
+        !!      of the governing equations by utilizing the appropriate
+        !!      Riemann solver.        
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param rhs_vf Cell-average RHS variables
+        !!  @param t_step Current time-step
         SUBROUTINE s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, t_step) ! -------
-        ! Description: The purpose of this procedure is to employ the inputted
-        !              cell-average conservative variables in order to compute
-        !              the cell-average RHS variables of the semidiscrete form
-        !              of the governing equations by utilizing the appropriate
-        !              Riemann solver.
-            
-            
-            ! Cell-average conservative variables
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
-            
-            ! Cell-average primitive variables
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_prim_vf
-            
-            ! Cell-average RHS variables
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
 
-            ! Numerator and denominator when evaluating flux limiter function
-            REAL(KIND(0d0)) :: top, bottom
-            REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
-            
-            ! Current time-step
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_prim_vf
+            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
             INTEGER, INTENT(IN) :: t_step
+
+            REAL(KIND(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm !<
+            !! terms  for K div(u)
+            
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
             
             
             ! Configuring Coordinate Direction Indexes =========================
@@ -2690,12 +2714,14 @@ MODULE m_rhs
         
         
         
-        
-        
+        !>  This subroutine takes the consecutive changes in volume fraction
+        !!  at a cell boundary and computes the desired slope and flux limiter
+        !!  function value at the cell boundary        
+        !!  @param top The top flux limiter
+        !!  @param bottom The bottom flux limiter
+        !!  @param flux_lim_func The flux limiter
         SUBROUTINE s_compute_flux_lim(top,bottom,flux_lim_func) ! ---------------
-        ! Description: This subroutine takes the consecutive changes in volume fraction
-        !   at a cell boundary and computes the desired slope and flux limiter
-        !   function value at the cell boundary
+
 
             REAL(KIND(0d0)), INTENT(INOUT) :: top, bottom
             REAL(KIND(0d0)) :: slope
@@ -2735,32 +2761,33 @@ MODULE m_rhs
 
 
 
-
-
+        !> The purpose of this subroutine is to compute the viscous 
+        !!      stress tensor for the cells directly next to the axis in
+        !!      cylindrical coordinates. This is necessary to avoid the
+        !!      1/r singularity that arises at the cell boundary coinciding
+        !!      with the axis, i.e., y_cb(-1) = 0.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param grad_x_vf Cell-average primitive variable derivatives, x-dir
+        !!  @param grad_y_vf Cell-average primitive variable derivatives, y-dir
+        !!  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
         SUBROUTINE s_compute_viscous_stress_tensor(q_prim_vf,grad_x_vf,grad_y_vf,grad_z_vf) ! ---
-        ! Description: The purpose of this subroutine is to compute the viscous 
-        !              stress tensor for the cells directly next to the axis in
-        !              cylindrical coordinates. This is necessary to avoid the
-        !              1/r singularity that arises at the cell boundary coinciding
-        !              with the axis, i.e., y_cb(-1) = 0.
 
-            ! Cell-average primitive variables and derivatives
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
             TYPE(scalar_field), DIMENSION(num_dims), INTENT(IN) :: grad_x_vf, grad_y_vf, grad_z_vf
 
-            ! Mixture variables
-            REAL(KIND(0d0)) :: rho_visc, gamma_visc, pi_inf_visc
+
+            REAL(KIND(0d0)) :: rho_visc, gamma_visc, pi_inf_visc  !< Mixture variables
             REAL(KIND(0d0)), DIMENSION(2) :: Re_visc
             REAL(KIND(0d0)), DIMENSION(1:num_fluids,1:num_fluids) :: We_visc
 
-            ! Capillary stress tensor components
-            REAL(KIND(0d0)), DIMENSION(num_dims,num_dims) :: tau_Re
+
+            REAL(KIND(0d0)), DIMENSION(num_dims,num_dims) :: tau_Re !< Capillary stress tensor components
 
             TYPE(bounds_info) :: ix,iy,iz
 
-            ! Generic loop iterator
-            INTEGER :: i,j,k,l
 
+            INTEGER :: i,j,k,l !< Generic loop iterator
+            
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             IF(n > 0) iy%beg = -buff_size; IF(p > 0) iz%beg = -buff_size
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
@@ -2780,7 +2807,7 @@ MODULE m_rhs
 
                             tau_Re(2,1) = (grad_y_vf(1)%sf(j,k,l) + &
                                            grad_x_vf(2)%sf(j,k,l))/ &
-                                           Re_visc(1)
+                                               Re_visc(1)
 
                             tau_Re(2,2) = ( 4d0*grad_y_vf(2)%sf(j,k,l) &
                                           - 2d0*grad_x_vf(1)%sf(j,k,l) &
@@ -2889,31 +2916,33 @@ MODULE m_rhs
 
 
 
-
+        !>  The purpose of this procedure is to calculate the capillary
+        !!      stress tensor at the cell centers in the non-conservative 
+        !!      formulation of the equations.
+        !!  @param norm_dir Dimensional split index
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param grad_x_vf Cell-average primitive variable derivatives, x-dir
+        !!  @param grad_y_vf Cell-average primitive variable derivatives, y-dir
+        !!  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
+        !!  @param norm_vf Normal-dir derivative
         SUBROUTINE s_compute_capillary_stress_tensor(norm_dir,q_prim_vf,grad_x_vf,grad_y_vf,grad_z_vf,norm_vf) ! -------
-        ! Description: The purpose of this procedure is to calculate the capillary
-        !              stress tensor at the cell centers in the non-conservative 
-        !              formulation of the equations.
-
-            ! Dimensional split index
+            
             INTEGER, INTENT(IN) :: norm_dir
-
-            ! Cell-average primitive variables and derivatives
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
             TYPE(scalar_field), DIMENSION(num_fluids), INTENT(IN) :: norm_vf, grad_x_vf, grad_y_vf, grad_z_vf
 
-            ! Mixture variables
-            REAL(KIND(0d0)) :: rho_cap, gamma_cap, pi_inf_cap
+
+            REAL(KIND(0d0)) :: rho_cap, gamma_cap, pi_inf_cap  !< Mixture variables
             REAL(KIND(0d0)), DIMENSION(2) :: Re_cap
             REAL(KIND(0d0)), DIMENSION(1:num_fluids,1:num_fluids) :: We_cap
 
-            ! Capillary stress tensor components
-            REAL(KIND(0d0)), DIMENSION(num_dims,num_dims) :: tau_We
+
+            REAL(KIND(0d0)), DIMENSION(num_dims,num_dims) :: tau_We !< Capillary stress tensor components
 
             TYPE(bounds_info) :: ix,iy,iz
 
-            ! Generic loop iterator
-            INTEGER :: i,j,k,l,r
+
+            INTEGER :: i,j,k,l,r !< Generic loop iterator
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             IF(n > 0) iy%beg = -buff_size; IF(p > 0) iz%beg = -buff_size
@@ -3126,28 +3155,26 @@ MODULE m_rhs
 
 
 
-
+        !>  The purpose of this procedure is to compute the source term
+        !!      that accounts for capillary effects in the momentum equations
+        !!  @param i Dimensional split index
+        !!  @param q_prim_vf Cell-average primitive variables
         SUBROUTINE s_compute_capillary_source(i,q_prim_vf) ! ------------------------------
-        ! Description: The purpose of this procedure is to compute the source term
-        !              that accounts for capillary effects in the momentum equations
 
-            ! Dimensional split index
             INTEGER, INTENT(IN) :: i
-
-            ! Cell-average primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
 
-            ! Mixture variables
-            REAL(KIND(0d0)) :: rho_cap, gamma_cap, pi_inf_cap
+
+            REAL(KIND(0d0)) :: rho_cap, gamma_cap, pi_inf_cap !< Mixture variables
             REAL(KIND(0d0)), DIMENSION(2) :: Re_cap
             REAL(KIND(0d0)), DIMENSION(1:num_fluids,1:num_fluids) :: We_cap
             REAL(KIND(0d0)), DIMENSION(1:num_fluids) :: kappa_cap
 
             REAL(KIND(0d0)) :: F_sv
 
-            ! Generic loop iterators
-            INTEGER :: j,k,l,r
 
+            INTEGER :: j,k,l,r !< Generic loop iterators
+            
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
@@ -3188,11 +3215,17 @@ MODULE m_rhs
             END DO
         END SUBROUTINE s_compute_capillary_source ! ----------------------------------
 
+
+        !> Gets the divergence term for k div(U)
+        !> @param idir Coordinate direction
+        !> @param q_prim_vf Primitive variables
+        !> @param mydivu Output divergence term div(U)
         SUBROUTINE s_get_divergence(idir,q_prim_vf,mydivu)
+
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
-            TYPE(scalar_field), intent(inout) :: mydivu
+            TYPE(scalar_field), INTENT(inout) :: mydivu
             INTEGER, INTENT(IN) :: idir
-            INTEGER :: j,k,l
+            INTEGER :: j,k,l !< Generic loop iterators
             
             !contribute to divergence computation \div(u)
             if (idir == 1) mydivu%sf(:,:,:) = 0d0
@@ -3216,17 +3249,23 @@ MODULE m_rhs
 
         END SUBROUTINE s_get_divergence
 
-
+        !> The purpose of this procedure is to compute the source term
+        !! that are needed for generating one-way acoustic waves
+        !! @param idir Coordinate direction
+        !! @param q_prim_vf Primitive variables
+        !! @param t_step Current time-step
+        !! @param mymono Monopole parameters
         SUBROUTINE s_get_monopole(idir, q_prim_vf,t_step,mymono) ! ------------------------------
-        ! Description: The purpose of this procedure is to compute the source term
-        ! that are needed for generating one-way acoustic waves
+
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
             TYPE(mono_parameters), INTENT(IN) :: mymono
             INTEGER, INTENT(IN) :: idir, t_step
+            
             INTEGER :: ndirs,j,k,l
-            real(kind(0d0)) :: mytime, sound, n_tait, B_tait
-            real(kind(0d0)) :: s2, myRho, const_sos
+            
+            REAL(KIND(0d0)) :: mytime, sound, n_tait, B_tait
+            REAL(KIND(0d0)) :: s2, myRho, const_sos
             
             REAL(KIND(0d0)), DIMENSION(2) :: Re
             REAL(KIND(0d0)), DIMENSION( num_fluids, &
@@ -3291,11 +3330,17 @@ MODULE m_rhs
         END SUBROUTINE s_get_monopole
        
 
+        !> This function gives the temporally varying amplitude of the pulse
+        !! @param mytime Simulation time
+        !! @param sos Sound speed
+        !! @param mysos Alternative speed of sound for testing
+        !! @param mymono Monopole parameterrs
         function f_g(mytime,sos,mysos,mymono)
-            real(kind(0d0)), intent(in) :: mytime, sos, mysos
-            type(mono_parameters), intent(in) :: mymono
-            real(kind(0d0)) :: period, t0, sigt, pa
-            real(kind(0d0)) :: f_g
+
+            REAL(KIND(0d0)), INTENT(IN) :: mytime, sos, mysos
+            TYPE(mono_parameters), INTENT(IN) :: mymono
+            REAL(KIND(0d0)) :: period, t0, sigt, pa
+            REAL(KIND(0d0)) :: f_g
 
             if (mymono%pulse == 1) then
                 !sine wave
@@ -3327,18 +3372,25 @@ MODULE m_rhs
 
         end function f_g
 
+        !> This function give the spatial support of the acoustic source 
+        !! @param j First coordinate-direction location index
+        !! @param k Second coordinate-direction location index
+        !! @param l Third coordinate-direction location index
+        !! @param mono_loc Nominal source term location
+        !! @param mono_leng Length of source term in space
+        !! @param mymono Monopole parameters
         function f_delta(j,k,l,mono_loc,mono_leng,mymono)
-            !spatial delta function
-            real(kind(0d0)), dimension(3), intent(in) :: mono_loc
-            type(mono_parameters), intent(in) :: mymono
-            real(kind(0d0)), intent(in) :: mono_leng
-            integer, intent(in) :: j,k,l
+            
+            REAL(KIND(0d0)), DIMENSION(3), INTENT(IN) :: mono_loc
+            type(mono_parameters), INTENT(IN) :: mymono
+            REAL(KIND(0d0)), INTENT(IN) :: mono_leng
+            integer, INTENT(in) :: j,k,l
 
             integer :: q
-            real(kind(0d0)) :: h,hx,hy,hz
-            real(kind(0d0)) :: hxnew,hynew
-            real(kind(0d0)) :: sig
-            real(kind(0d0)) :: f_delta
+            REAL(KIND(0d0)) :: h,hx,hy,hz
+            REAL(KIND(0d0)) :: hxnew,hynew
+            REAL(KIND(0d0)) :: sig
+            REAL(KIND(0d0)) :: f_delta
 
             if (n==0) then
                 sig = dx(j)
@@ -3426,16 +3478,14 @@ MODULE m_rhs
  
         end function f_delta
 
-   
+        !>  The purpose of this procedure is to compute the interface
+        !!      sharpening regularization source terms. Only applicable
+        !!      for 2-fluid system!
+        !!  @param i Dimensional split index
+        !!  @param q_prim_vf Cell-averaged primitive variables
         SUBROUTINE s_compute_regularization_source(i,q_prim_vf) ! -----------------
-        ! Description: The purpose of this procedure is to compute the interface
-        !               sharpening regularization source terms. Only applicable
-        !               for 2-fluid system!
 
-            ! Dimensional split index
             INTEGER, INTENT(IN) :: i
-
-            ! Cell-average primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
 
             TYPE(scalar_field), ALLOCATABLE :: var
@@ -3450,8 +3500,8 @@ MODULE m_rhs
             REAL(KIND(0d0)), DIMENSION(num_dims) :: vel
 
             TYPE(bounds_info) :: ix,iy,iz
-            ! Generic loop iterators
-            INTEGER :: j,k,l,r
+            
+            INTEGER :: j,k,l,r !< Generic loop iterators
 
             ix%beg = -buff_size; iy%beg = -buff_size
             ix%end = m + buff_size; iy%end = n + buff_size
@@ -3599,8 +3649,12 @@ MODULE m_rhs
 
 
 
-
-
+        !>  Computes the scalar gradient fields via finite differences
+        !!  @param var Variable to compute derivative of
+        !!  @param grad_x First coordinate direction component of the derivative
+        !!  @param grad_y Second coordinate direction component of the derivative
+        !!  @param grad_z Third coordinate direction component of the derivative
+        !!  @param norm Norm of the gradient vector
         SUBROUTINE s_compute_fd_gradient(var,grad_x,grad_y,grad_z,norm)
 
             TYPE(scalar_field), INTENT(IN) :: var
@@ -3610,8 +3664,8 @@ MODULE m_rhs
             TYPE(scalar_field), INTENT(INOUT) :: norm
 
             TYPE(bounds_info) :: ix,iy,iz
-            ! Generic loop iterators
-            INTEGER :: j,k,l
+
+            INTEGER :: j,k,l !< Generic loop iterators
 
             ix%beg = -buff_size; ix%end = m + buff_size;
             IF (n > 0) THEN
@@ -3711,23 +3765,23 @@ MODULE m_rhs
 
 
 
-
+        !>  The purpose of this procedure is to infinitely relax
+        !!      the pressures from the internal-energy equations to a
+        !!      unique pressure, from which the corresponding volume
+        !!      fraction of each phase are recomputed. For conservation
+        !!      purpose, this pressure is finally corrected using the
+        !!      mixture-total-energy equation.
+        !!  @param q_cons_vf Cell-average conservative variables
         SUBROUTINE s_pressure_relaxation_procedure(q_cons_vf) ! ----------------
-        ! Description: The purpose of this procedure is to infinitely relax
-        !              the pressures from the internal-energy equations to a
-        !              unique pressure, from which the corresponding volume
-        !              fraction of each phase are recomputed. For conservation
-        !              purpose, this pressure is finally corrected using the
-        !              mixture-total-energy equation.
-            
-            ! Cell-average conservative variables
+           
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
             
-            ! Relaxed pressure, initial partial pressures, function f(p) and its partial
-            ! derivative df(p), isentropic partial density, sum of volume fractions,
-            ! mixture density, dynamic pressure, surface energy, specific heat ratio
-            ! function, liquid stiffness function (two variations of the last two
-            ! ones), shear and volume Reynolds numbers and the Weber numbers
+            !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
+            !! derivative df(p), isentropic partial density, sum of volume fractions,
+            !! mixture density, dynamic pressure, surface energy, specific heat ratio
+            !! function, liquid stiffness function (two variations of the last two
+            !! ones), shear and volume Reynolds numbers and the Weber numbers
+            !> @{
             REAL(KIND(0d0))                                   ::  pres_relax
             REAL(KIND(0d0)), DIMENSION(num_fluids)            :: pres_K_init
             REAL(KIND(0d0))                                   ::      f_pres
@@ -3743,12 +3797,10 @@ MODULE m_rhs
             REAL(KIND(0d0)), DIMENSION(num_fluids)            ::    pres_inf
             REAL(KIND(0d0)), DIMENSION(2)                     ::          Re
             REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) ::          We
+            !> @}
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,iter
-
-            ! Relaxation procedure determination variable
-            INTEGER :: relax
+            INTEGER :: i,j,k,l,iter !< Generic loop iterators
+            INTEGER :: relax !< Relaxation procedure determination variable
             
             DO i = 1, num_fluids
                 gamma_min(i) = 1d0/fluid_pp(i)%gamma + 1d0
@@ -3894,22 +3946,21 @@ MODULE m_rhs
         END SUBROUTINE s_pressure_relaxation_procedure ! -----------------------
 
 
+        !>  This subroutine compute the TVD flux function
+        !!  @param q_cons_vf Cell-averaged conservative variables
+        !!  @param q_prim_vf Cell-averaged primitive variables
+        !!  @param rhs_vf Cell-averaged RHS variables
+        !!  @param i Dimensional splitting index
         SUBROUTINE s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i) ! -------
             
-            ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
-            
-            ! Cell-average primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_prim_vf
-            
-            ! Cell-average RHS variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
-
             INTEGER, INTENT(in) :: i
-            ! Generic loop iterators
-            INTEGER :: j,k,l,r
 
-            REAL(kind(0d0)) :: top, bottom
+            INTEGER :: j,k,l,r !< Generic loop iterators
+
+            REAL(KIND(0d0)) :: top, bottom
             
             DO l = iz%beg, iz%end
                 DO k = iy%beg, iy%end
@@ -3989,19 +4040,18 @@ MODULE m_rhs
             CALL s_average_cell_boundary_values(flux_gsrc_ndqp(i,:,:))
         END SUBROUTINE s_get_tvd_flux
 
+
+        !>  Computes viscous terms
+        !!  @param q_cons_vf Cell-averaged conservative variables
+        !!  @param q_prim_vf Cell-averaged primitive variables
+        !!  @param rhs_vf Cell-averaged RHS variables
         SUBROUTINE s_get_viscous(q_cons_vf, q_prim_vf, rhs_vf) ! -------
             
-            ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
-            
-            ! Cell-average primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_prim_vf
-            
-            ! Cell-average RHS variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
 
                 DO i = 1, num_dims
                     ! WENO reconstruct variables to cell boundaries
@@ -4275,19 +4325,17 @@ MODULE m_rhs
         END SUBROUTINE s_get_viscous
 
 
+        !>  Computes curvatures for surface tension terms
+        !!  @param q_cons_vf Cell-averaged conservative variables
+        !!  @param q_prim_vf Cell-averaged primitive variables
+        !!  @param rhs_vf Cell-averaged RHS variables
         SUBROUTINE s_get_crv(q_cons_vf, q_prim_vf, rhs_vf) ! -------
             
-            ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
-            
-            ! Cell-average primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_prim_vf
-            
-            ! Cell-average RHS variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
 
             DO l = 1, crv_size
                
@@ -4555,20 +4603,18 @@ MODULE m_rhs
         END SUBROUTINE s_get_crv
 
 
-
+        !>  The purpose of this procedure is to populate the buffers
+        !!      of the conservative variables, depending on the selected
+        !!      boundary conditions.
+        !!  @param v_vf Scalar field for which buffers are populated
         SUBROUTINE s_populate_variables_buffers(v_vf) ! ---------------
-        ! Description: The purpose of this procedure is to populate the buffers
-        !              of the conservative variables, depending on the selected
-        !              boundary conditions.
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: v_vf
-            
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Population of Buffers in x-direction =============================
-            
             IF(bc_x%beg <= -3) THEN         ! Ghost-cell extrap. BC at beginning
                 
                 DO i = 1, sys_size
@@ -4899,16 +4945,12 @@ MODULE m_rhs
 
 
 
-
+        !>  The purpose of this procedure is to populate the buffers
+        !!      of the conservative variables, depending on the selected
+        !!      boundary conditions.
         SUBROUTINE s_populate_conservative_variables_buffers() ! ---------------
-        ! Description: The purpose of this procedure is to populate the buffers
-        !              of the conservative variables, depending on the selected
-        !              boundary conditions.
-            
-            
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
-            
+           
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
             
             ! Population of Buffers in x-direction =============================
             
@@ -5292,25 +5334,21 @@ MODULE m_rhs
         
         
         
-        
-        
+        !>  The goal of this procedure is to WENO-reconstruct the
+        !!      inputted cell-averaged variables at the cell-interior
+        !!      Gaussian quadrature points.
+        !!  @param v_qp Inputted cell-averaged variables and their WENO-reconstructed
+        !!          values at the chosen cell-interior Gaussian quadrature points
         SUBROUTINE s_reconstruct_cell_interior_values(v_qp) ! ------------------
-        ! Description: The goal of this procedure is to WENO-reconstruct the
-        !              inputted cell-averaged variables at the cell-interior
-        !              Gaussian quadrature points.
+           
             
-            
-            ! Inputted cell-averaged variables and their WENO-reconstructed
-            ! values at the chosen cell-interior Gaussian quadrature points
             TYPE(vector_field),             &
             DIMENSION( ieta%beg:ieta%end,   &
                        iksi%beg:iksi%end,   &
                        itau%beg:itau%end ), &
             INTENT(INOUT) :: v_qp
             
-            ! Indical bounds in the s1-, s2- and s3-directions
-            TYPE(bounds_info) :: is1,is2,is3
-            
+            TYPE(bounds_info) :: is1,is2,is3 !< Indical bounds in the s1-, s2- and s3-directions
             
             ! Reconstruction in x-direction ====================================
             IF(commute_err .NEQV. .TRUE.) RETURN
@@ -5370,26 +5408,22 @@ MODULE m_rhs
         
         
         
-        
-        
+        !>  The goal of this subroutine is to numerically approximate
+        !!      the cell-interior integral-average of the given variables
+        !!      by taking the arithmetic mean of their WENO-reconstructed
+        !!      values at the cell-interior Gaussian quadrature points.       
+        !!  @param v_qp The inputted WENO-reconstructed values of cell-averaged variables
+        !!      at cell-interior Gaussian quadrature points and their numerically
+        !!      approximated cell-interior integral-average.
         SUBROUTINE s_average_cell_interior_values(v_qp) ! ----------------------
-        ! Description: The goal of this subroutine is to numerically approximate
-        !              the cell-interior integral-average of the given variables
-        !              by taking the arithmetic mean of their WENO-reconstructed
-        !              values at the cell-interior Gaussian quadrature points.
-            
-            
-            ! The inputted WENO-reconstructed values of cell-averaged variables
-            ! at cell-interior Gaussian quadrature points and their numerically
-            ! approximated cell-interior integral-average.
+
             TYPE(vector_field),             &
             DIMENSION( ieta%beg:ieta%end,   &
                        iksi%beg:iksi%end,   &
                        itau%beg:itau%end ), &
             INTENT(INOUT) :: v_qp
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             IF(commute_err .NEQV. .TRUE.) RETURN
@@ -5417,37 +5451,33 @@ MODULE m_rhs
         
         
         
-        
+        !>  The purpose of this subroutine is to WENO-reconstruct the
+        !!      left and the right cell-boundary values, including values
+        !!      at the Gaussian quadrature points, from the cell-averaged
+        !!      variables.
+        !!  @param v_vf Cell-average variables
+        !!  @param vL_qp Left WENO-reconstructed, cell-boundary values including
+        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
+        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param cd_vars Characteristic decomposition state variables type
+        !!  @param norm_dir Splitting coordinate direction
         SUBROUTINE s_reconstruct_cell_boundary_values( v_vf, vL_qp, vR_qp, & ! -
                                                         cd_vars, norm_dir  )
-        ! Description: The purpose of this subroutine is to WENO-reconstruct the
-        !              left and the right cell-boundary values, including values
-        !              at the Gaussian quadrature points, from the cell-averaged
-        !              variables.
-            
-            
-            ! Cell-average variables
+           
             TYPE(scalar_field), DIMENSION(iv%beg:iv%end), INTENT(IN) :: v_vf
             
-            ! Left and right, WENO-reconstructed, cell-boundary values including
-            ! the values at the quadrature points, of the cell-average variables
             TYPE(vector_field),             &
             DIMENSION( ichi%beg:ichi%end,   &
                        ipsi%beg:ipsi%end ), &
             INTENT(INOUT) :: vL_qp, vR_qp
             
-            ! Characteristic decomposition state variables type
             INTEGER, INTENT(IN) :: cd_vars
-            
-            ! Splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Coordinate direction of the WENO reconstruction
-            INTEGER :: weno_dir
-            
-            ! Indical bounds in the s1-, s2- and s3-directions
-            TYPE(bounds_info) :: is1,is2,is3
-            
+            INTEGER :: weno_dir !< Coordinate direction of the WENO reconstruction
+
+            TYPE(bounds_info) :: is1,is2,is3 !< Indical bounds in the s1-, s2- and s3-directions
             
             ! Reconstruction in s1-direction ===================================
             is1 = ix; is2 = iy; is3 = iz
@@ -5533,27 +5563,22 @@ MODULE m_rhs
         
         
         
-        
-        
+        !>  The goal of the procedure is to numerically approximate
+        !!      the left or right cell-boundary integral-average of the
+        !!      given variables by getting the arithmetic mean of their
+        !!      WENO-reconstructed values at the cell-boundary Gaussian
+        !!      quadrature points.
+        !!  @param vK_qp The inputted WENO-reconstructed values of cell-averaged variables
+        !!      at the left or right cell-boundary Gaussian quadrature points and
+        !!      their numerically approximated cell-boundary integral-average.
         SUBROUTINE s_average_cell_boundary_values(vK_qp) ! ---------------------
-        ! Description: The goal of the procedure is to numerically approximate
-        !              the left or right cell-boundary integral-average of the
-        !              given variables by getting the arithmetic mean of their
-        !              WENO-reconstructed values at the cell-boundary Gaussian
-        !              quadrature points.
             
-            
-            ! The inputted WENO-reconstructed values of cell-averaged variables
-            ! at the left or right cell-boundary Gaussian quadrature points and
-            ! their numerically approximated cell-boundary integral-average.
             TYPE(vector_field),             &
             DIMENSION( ichi%beg:ichi%end,   &
                        ipsi%beg:ipsi%end ), &
             INTENT(INOUT) :: vK_qp
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
-            
+            INTEGER :: i,j,k !< Generic loop iterators
             
             IF(split_err .NEQV. .TRUE.) RETURN
             
@@ -5578,33 +5603,30 @@ MODULE m_rhs
         
         
         
-        
+        !>  The purpose of this subroutine is to employ the inputted
+        !!      left and right cell-boundary integral-averaged variables
+        !!      to compute the relevant cell-average first-order spatial
+        !!      derivatives in the x-, y- or z-direction by means of the
+        !!      scalar divergence theorem.
+        !!  @param vL_vf Left cell-boundary integral averages
+        !!  @param vR_vf Right cell-boundary integral averages
+        !!  @param dv_ds_vf Cell-average first-order spatial derivatives
+        !!  @param norm_dir Splitting coordinate direction
         SUBROUTINE s_apply_scalar_divergence_theorem( vL_vf, vR_vf, & ! --------
                                                           dv_ds_vf, &
                                                           norm_dir  )
-        ! Description: The purpose of this subroutine is to employ the inputted
-        !              left and right cell-boundary integral-averaged variables
-        !              to compute the relevant cell-average first-order spatial
-        !              derivatives in the x-, y- or z-direction by means of the
-        !              scalar divergence theorem.
-            
-            
-            ! Left and right cell-boundary integral-averages
+
             TYPE(scalar_field),       &
             DIMENSION(iv%beg:iv%end), &
             INTENT(IN) :: vL_vf, vR_vf
             
-            ! Cell-average first-order spatial derivatives
             TYPE(scalar_field),       &
             DIMENSION(iv%beg:iv%end), &
             INTENT(INOUT) :: dv_ds_vf
             
-            ! Splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
-            
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             ! First-Order Spatial Derivatives in x-direction ===================
             IF(norm_dir == 1) THEN
@@ -5780,20 +5802,22 @@ MODULE m_rhs
         
         
         
-        
-        
+        !>  The goal of this procedure is to utilize the inputted
+        !!      left and right cell-boundary integral-averaged vector
+        !!      components in the x-, y-, and z-directions to compute
+        !!      the vector divergence by using the divergence theorem.
+        !!  @param vL_x_ndqp Left cell-boundary integral-average x-dir component
+        !!  @param vL_y_ndqp Left cell-boundary integral-average y-dir component
+        !!  @param vL_z_ndqp Left cell-boundary integral-average z-dir component
+        !!  @param vR_x_ndqp Right cell-boundary integral-average x-dir component
+        !!  @param vR_y_ndqp Right cell-boundary integral-average y-dir component
+        !!  @param vR_z_ndqp Right cell-boundary integral-average z-dir component
+        !!  @param div_v_vf Cell-average divergence
         SUBROUTINE s_apply_vector_divergence_theorem(       & ! ----------------
                            vL_x_ndqp, vL_y_ndqp, vL_z_ndqp, &
                            vR_x_ndqp, vR_y_ndqp, vR_z_ndqp, &
                                                   div_v_vf  )
-        ! Description: The goal of this procedure is to utilize the inputted
-        !              left and right cell-boundary integral-averaged vector
-        !              components in the x-, y-, and z-directions to compute
-        !              the vector divergence by using the divergence theorem.
             
-            
-            ! The left and right cell-boundary integral-average vector
-            ! components in the x-, y- and z-directions, respectively.
             TYPE(vector_field),             &
             DIMENSION(     1   :num_dims,   &
                        ichi%beg:ichi%end,   &
@@ -5802,13 +5826,12 @@ MODULE m_rhs
                           vL_y_ndqp, vR_y_ndqp, &
                           vL_z_ndqp, vR_z_ndqp
             
-            ! Cell-average divergence
             TYPE(scalar_field),       &
             DIMENSION(iv%beg:iv%end), &
             INTENT(INOUT) :: div_v_vf
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! First-Order Spatial Derivatives in x-direction ===================
@@ -6010,31 +6033,29 @@ MODULE m_rhs
         
         
         
-        
-        
+        !>  The purpose of the procedure is to utilize the inputted
+        !!      cell-averaged first-order spatial derivatives in the x-,
+        !!      y- and z-directions to calculate the gradient magnitude.        
+        !!  @param dv_dx_vf Cell-average first-order spatial derivatives in the x-dir
+        !!  @param dv_dy_vf Cell-average first-order spatial derivatives in the y-dir
+        !!  @param dv_dz_vf Cell-average first-order spatial derivatives in the z-dir
+        !!  @param gm_v_vf  Gradient magnitude
         SUBROUTINE s_compute_gradient_magnitude( dv_dx_vf, & ! -----------------
                                                  dv_dy_vf, &
                                                  dv_dz_vf, &
                                                   gm_v_vf  )
-        ! Description: The purpose of the procedure is to utilize the inputted
-        !              cell-averaged first-order spatial derivatives in the x-,
-        !              y- and z-directions to calculate the gradient magnitude.
-            
-            
-            ! Cell-average first-order spatial derivatives in x-,y-,z-directions
+
             TYPE(scalar_field),       &
             DIMENSION(iv%beg:iv%end), &
             INTENT(IN) :: dv_dx_vf, &
                           dv_dy_vf, &
                           dv_dz_vf
             
-            ! Gradient magnitude
             TYPE(scalar_field),       &
             DIMENSION(iv%beg:iv%end), &
             INTENT(INOUT) :: gm_v_vf
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             ! Scalar Product Contribution in x-direction =======================
             DO i = iv%beg, iv%end
@@ -6105,12 +6126,11 @@ MODULE m_rhs
         
         
         
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_rhs_module() ! -----------------------------------
-        ! Description: Module deallocation and/or disassociation procedures
-            
-            
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Deallocation/Disassociation of q_cons_qp and q_prim_qp ===========

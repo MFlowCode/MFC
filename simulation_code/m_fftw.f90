@@ -1,12 +1,17 @@
+!>
+!! @file m_fftw.f90
+!! @brief The module contains the subroutines for the FFT routines
+!! @author spencer
+!! @version 1.1
 MODULE m_fftw
 
     ! Dependencies =============================================================
     USE, INTRINSIC :: ISO_C_BINDING
 
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_global_parameters    !< Definitions of the global parameters
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     ! ==========================================================================
 
     IMPLICIT NONE
@@ -14,31 +19,33 @@ MODULE m_fftw
     PRIVATE; PUBLIC :: s_initialize_fftw_module,   &
                        s_apply_fourier_filter,     &
                        s_finalize_fftw_module
-    ! (Hooke)
-    ! INCLUDE 'fftw3.f90'
-    ! (Comet/Stampede)
+    
     INCLUDE 'fftw3.f03'
 
     TYPE(C_PTR) :: fwd_plan, bwd_plan
     TYPE(C_PTR) :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
     INTEGER :: real_size, cmplx_size
-    ! Real data
-    REAL(C_DOUBLE), POINTER :: data_real(:)
-    ! Complex data in Fourier space
-    COMPLEX(C_DOUBLE_COMPLEX), POINTER :: data_cmplx(:)
-    ! Filtered complex data in Fourier space
-    COMPLEX(C_DOUBLE_COMPLEX), POINTER :: data_fltr_cmplx(:)
+
+    REAL(C_DOUBLE), POINTER :: data_real(:) !< Real data
+
+    COMPLEX(C_DOUBLE_COMPLEX), POINTER :: data_cmplx(:) !< 
+    !! Complex data in Fourier space
+    
+    
+
+    COMPLEX(C_DOUBLE_COMPLEX), POINTER :: data_fltr_cmplx(:) !< 
+    !! Filtered complex data in Fourier space
 
     CONTAINS
 
 
 
 
-
+        !>  The purpose of this subroutine is to create the fftw plan
+        !!      that will be used in the forward and backward DFTs when
+        !!      applying the Fourier filter in the azimuthal direction.
         SUBROUTINE s_initialize_fftw_module() ! ----------------------------------
-        ! Description: The purpose of this subroutine is to create the fftw plan
-        !              that will be used in the forward and backward DFTs when
-        !              applying the Fourier filter in the azimuthal direction.
+
 
 
             ! Size of input array going into DFT
@@ -64,20 +71,17 @@ MODULE m_fftw
 
 
 
-
+        !>  The purpose of this subroutine is to apply a Fourier low-
+        !!      pass filter to the flow variables in the azimuthal direction
+        !!      to remove the high-frequency content. This alleviates the 
+        !!      restrictive CFL condition arising from cells near the axis.
         SUBROUTINE s_apply_fourier_filter(q_cons_vf) ! --------------------------
-        ! Description: The purpose of this subroutine is to apply a Fourier low-
-        !              pass filter to the flow variables in the azimuthal direction
-        !              to remove the high-frequency content. This alleviates the 
-        !              restrictive CFL condition arising from cells near the axis.
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
 
-            ! Number of kept modes
-            INTEGER :: Nfq
+            INTEGER :: Nfq !< Number of kept modes
 
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< Generic loop iterators
 
             ! Restrict filter to processors that have cells adjacent to axis
             IF (bc_y%beg >= 0) RETURN
@@ -117,12 +121,10 @@ MODULE m_fftw
 
 
 
-
+        !>  The purpose of this subroutine is to destroy the fftw plan
+        !!      that will be used in the forward and backward DFTs when
+        !!      applying the Fourier filter in the azimuthal direction.
         SUBROUTINE s_finalize_fftw_module() ! ------------------------------------
-        ! Description: The purpose of this subroutine is to destroy the fftw plan
-        !              that will be used in the forward and backward DFTs when
-        !              applying the Fourier filter in the azimuthal direction.
-
             CALL fftw_free(fftw_real_data)
             CALL fftw_free(fftw_cmplx_data)
             CALL fftw_free(fftw_fltr_cmplx_data)
@@ -131,8 +133,6 @@ MODULE m_fftw
             CALL fftw_destroy_plan(bwd_plan)
 
         END SUBROUTINE s_finalize_fftw_module ! --------------------------------
-
-
 
 
 

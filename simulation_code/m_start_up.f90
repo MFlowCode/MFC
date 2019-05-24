@@ -56,7 +56,7 @@ MODULE m_start_up
 
     END INTERFACE ! ========================================================
 
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)           :: grad_x_vf,grad_y_vf,grad_z_vf,norm_vf,kappa_vf
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)  :: grad_x_vf,grad_y_vf,grad_z_vf,norm_vf,kappa_vf
 
     PROCEDURE(s_read_abstract_data_files), POINTER :: s_read_data_files => NULL()
     

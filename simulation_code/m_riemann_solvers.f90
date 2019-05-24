@@ -1,36 +1,34 @@
-! MFC v3.0 - Simulation Code: m_riemann_solvers.f90
-! Description: This module features a database of approximate and exact Riemann
-!              problem solvers for the Navier-Stokes system of equations, which
-!              is supplemented by appropriate advection equations that are used
-!              to capture the material interfaces. The closure of the system is
-!              achieved by the stiffened gas equation of state and any required
-!              mixture relations. Surface tension effects are accounted for and
-!              are modeled by means of a volume force acting across the diffuse
-!              material interface region. The implementation details of viscous
-!              and capillary effects, into the Riemann solvers, may be found in
-!              Perigaud and Saurel (2005). Note that both effects are available
-!              only in the volume fraction model. At this time, the approximate
-!              and exact Riemann solvers that are listed below are available:
-!                            1) Harten-Lax-van Leer (HLL)
-!                            2) Harten-Lax-van Leer-Contact (HLLC)
-!                            3) Exact
-! Author: Vedran Coralic
-! Date: 07/09/12
-
-
+!>
+!! @file m_riemann_solvers.f90
+!! @brief This module features a database of approximate and exact Riemann
+!!              problem solvers for the Navier-Stokes system of equations, which
+!!              is supplemented by appropriate advection equations that are used
+!!              to capture the material interfaces. The closure of the system is
+!!              achieved by the stiffened gas equation of state and any required
+!!              mixture relations. Surface tension effects are accounted for and
+!!              are modeled by means of a volume force acting across the diffuse
+!!              material interface region. The implementation details of viscous
+!!              and capillary effects, into the Riemann solvers, may be found in
+!!              Perigaud and Saurel (2005). Note that both effects are available
+!!              only in the volume fraction model. At this time, the approximate
+!!              and exact Riemann solvers that are listed below are available:
+!!                  1) Harten-Lax-van Leer (HLL)
+!!                  2) Harten-Lax-van Leer-Contact (HLLC)
+!!                  3) Exact
+!! @author spencer
+!! @version 1.1
 MODULE m_riemann_solvers
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
-    USE m_variables_conversion ! State variables type conversion procedures
+    USE m_variables_conversion !< State variables type conversion procedures
     ! ==========================================================================
-    
     
     IMPLICIT NONE
     
@@ -44,11 +42,39 @@ MODULE m_riemann_solvers
     
     ABSTRACT INTERFACE ! =======================================================
         
-        ! Abstract interface to the subroutines that are utilized to compute the
-        ! Riemann problem solution. For additional information please reference:
-        !                        1) s_hll_riemann_solver
-        !                        2) s_hllc_riemann_solver
-        !                        3) s_exact_riemann_solver
+        !> Abstract interface to the subroutines that are utilized to compute the
+        !! Riemann problem solution. For additional information please reference:
+        !!                        1) s_hll_riemann_solver
+        !!                        2) s_hllc_riemann_solver
+        !!                        3) s_exact_riemann_solver
+        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param gm_alphaL_vf  Left averaged gradient magnitude
+        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
+        !!  @param kappaR_vf Right averaged vol. frac. curvatures
+        !!  @param flux_vf Intra-cell fluxes
+        !!  @param flux_src_vf Intra-cell fluxes sources
+        !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
+        !!  @param norm_dir Dir. splitting direction
+        !!  @param ix Index bounds in the x-dir
+        !!  @param iy Index bounds in the y-dir
+        !!  @param iz Index bounds in the z-dir
+        !!  @param q_prim_vf Cell-averaged primitive variables
         SUBROUTINE s_abstract_riemann_solver( qL_prim_vf, dqL_prim_dx_vf, &
                                                           dqL_prim_dy_vf, &
                                                           dqL_prim_dz_vf, &
@@ -90,32 +116,38 @@ MODULE m_riemann_solvers
             
         END SUBROUTINE s_abstract_riemann_solver
         
-        ! The abstract interface to the subroutines that are used to calculate
-        ! the Roe and arithmetic average states. For more information refer to:
-        !                 1) s_compute_roe_average_state
-        !                 2) s_compute_arithmetic_average_state
+        !>  The abstract interface to the subroutines that are used to calculate
+        !!  the Roe and arithmetic average states. For more information refer to:
+        !!      1) s_compute_roe_average_state
+        !!      2) s_compute_arithmetic_average_state
+        !!  @param i First coordinate location index
+        !!  @param j Second coordinate location index
+        !!  @param k Third coordinate location index
         SUBROUTINE s_compute_abstract_average_state(i,j,k)
             
             INTEGER, INTENT(IN) :: i,j,k
             
         END SUBROUTINE s_compute_abstract_average_state
         
-        ! The abstract interface to the subroutines that are utilized to compute
-        ! the wave speeds of the Riemann problem either directly or by the means
-        ! of pressure-velocity estimates. For more information please refer to:
-        !               1) s_compute_direct_wave_speeds
-        !               2) s_compute_pressure_velocity_wave_speeds
+        !> The abstract interface to the subroutines that are utilized to compute
+        !! the wave speeds of the Riemann problem either directly or by the means
+        !! of pressure-velocity estimates. For more information please refer to:
+        !!      1) s_compute_direct_wave_speeds
+        !!      2) s_compute_pressure_velocity_wave_speeds
+        !!  @param i First coordinate location index
+        !!  @param j Second coordinate location index
+        !!  @param k Third coordinate location index
         SUBROUTINE s_compute_abstract_wave_speeds(i,j,k)
             
             INTEGER, INTENT(IN) :: i,j,k
             
         END SUBROUTINE s_compute_abstract_wave_speeds
         
-        ! The abstract interface to the subroutines that are utilized to compute
-        ! the viscous source fluxes for either Cartesian or cylindrical geometries.
-        ! For more information please refer to:
-        !               1) s_compute_cartesian_viscous_source_flux
-        !               2) s_compute_cylindrical_viscous_source_flux
+        !> The abstract interface to the subroutines that are utilized to compute
+        !! the viscous source fluxes for either Cartesian or cylindrical geometries.
+        !! For more information please refer to:
+        !!      1) s_compute_cartesian_viscous_source_flux
+        !!      2) s_compute_cylindrical_viscous_source_flux
         SUBROUTINE s_compute_abstract_viscous_source_flux(     velL_vf, & ! -------------
                                                            dvelL_dx_vf, & 
                                                            dvelL_dy_vf, &
@@ -150,43 +182,51 @@ MODULE m_riemann_solvers
     END INTERFACE ! ============================================================
     
     
-    ! The left (L) and right (R) WENO-reconstructed cell-boundary values of the
-    ! cell-average primitive variables that define the left and right states of
-    ! the Riemann problem. Variables qK_prim_rs_vf, K = L or R, are obtained by
-    ! reshaping (RS) qK_prim_vf in a coordinate direction that is normal to the
-    ! cell-boundaries along which the fluxes are to be determined.
+    !> The left (L) and right (R) WENO-reconstructed cell-boundary values of the
+    !! cell-average primitive variables that define the left and right states of
+    !! the Riemann problem. Variables qK_prim_rs_vf, K = L or R, are obtained by
+    !! reshaping (RS) qK_prim_vf in a coordinate direction that is normal to the
+    !! cell-boundaries along which the fluxes are to be determined.
+    !> @{
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: qL_prim_rs_vf
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: qR_prim_rs_vf
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: q_prim_rs_vf
-    
-    ! The left and right, WENO-reconstructed, cell-boundary values of the cell-
-    ! average curvatures of the volume fractions that define the left and right
-    ! states of the Riemann problem. The variables kappaK_rs_vf are obtained by
-    ! reshaping kappaK_vf in a coordinate direction that is normal to the cell-
-    ! boundaries on which the fluxes are to be determined.
+    !> @}
+
+    !> The left and right, WENO-reconstructed, cell-boundary values of the cell-
+    !! average curvatures of the volume fractions that define the left and right
+    !! states of the Riemann problem. The variables kappaK_rs_vf are obtained by
+    !! reshaping kappaK_vf in a coordinate direction that is normal to the cell-
+    !! boundaries on which the fluxes are to be determined.
+    !> @{
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: kappaL_rs_vf, kappaR_rs_vf
-    
-    ! The cell-boundary values of the fluxes (src - source) that are computed
-    ! through the chosen Riemann problem solver, and the direct evaluation of
-    ! source terms, by using the left and right states given in qK_prim_rs_vf,
-    ! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
+    !> @}
+
+    !> The cell-boundary values of the fluxes (src - source) that are computed
+    !! through the chosen Riemann problem solver, and the direct evaluation of
+    !! source terms, by using the left and right states given in qK_prim_rs_vf,
+    !! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
+    !> @{
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: flux_rs_vf, flux_src_rs_vf
-    
-    ! The cell-boundary values of the geometrical source flux that are computed
-    ! through the chosen Riemann problem solver by using the left and right
-    ! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: flux_gsrc_rs_vf
+    !> @}
+
+   
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: flux_gsrc_rs_vf !<
+    !! The cell-boundary values of the geometrical source flux that are computed
+    !! through the chosen Riemann problem solver by using the left and right
+    !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
     
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vel_src_rs_vf
     
-    ! Left and right, WENO-reconstructed, cell-boundary values of cell-average
-    ! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
-    ! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
-    ! of sound, shear and volume Reynolds numbers and the Weber numbers. These
-    ! variables are left and right states of the Riemann problem obtained from
-    ! qK_prim_rs_vf and kappaK_rs_vf.
+    !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
+    !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
+    !! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
+    !! of sound, shear and volume Reynolds numbers and the Weber numbers. These
+    !! variables are left and right states of the Riemann problem obtained from
+    !! qK_prim_rs_vf and kappaK_rs_vf.
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_rho_L, alpha_rho_R
     REAL(KIND(0d0))                              ::       rho_L,       rho_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::       vel_L,       vel_R
@@ -200,16 +240,28 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              ::         c_L,         c_R
     REAL(KIND(0d0)),              DIMENSION(2)   ::        Re_L,        Re_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::        We_L,        We_R
+    !> @}
 
-    !SHB: for bubble number density and bubble variables
+    !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
+    !! bubble density, radius, radial velocity, pressure, wall pressure, and modified
+    !! pressure. These variables are left and right states of the Riemann problem obtained from
+    !! qK_prim_rs_vf and kappaK_rs_vf.
+    !> @{
     REAL(KIND(0d0))                              ::       nbub_L,     nbub_R
     REAL(KIND(0d0)), allocatable, dimension(:)   ::         R0_L,       R0_R
     REAL(KIND(0d0)), allocatable, dimension(:)   ::         V0_L,       V0_R
     REAL(KIND(0d0)), allocatable, dimension(:)   ::         P0_L,       P0_R
     REAL(KIND(0d0)), allocatable, dimension(:)   ::        pbw_L,      pbw_R
     REAL(KIND(0d0))                              ::     ptilde_L,   ptilde_R
+    !> @}
 
-    
+    !> @name Left and right, WENO-reconstructed, cell-boundary, low-order values of cell-average
+    !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
+    !! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
+    !! of sound, shear and volume Reynolds numbers and the Weber numbers. These
+    !! variables are left and right states of the Riemann problem obtained from
+    !! qK_prim_rs_vf and kappaK_rs_vf.
+    !> @{   
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: lo_alpha_rho_L, lo_alpha_rho_R
     REAL(KIND(0d0))                              ::       lo_rho_L,       lo_rho_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::       lo_vel_L,       lo_vel_R
@@ -222,9 +274,10 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              ::         lo_c_L,         lo_c_R
     REAL(KIND(0d0)),              DIMENSION(2)   ::        lo_Re_L,        lo_Re_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::        lo_We_L,        lo_We_R
+    !> @}
 
-    ! Gamma-related constants for use in exact Riemann solver 
-    ! (following Toro (1999) pp.153)
+    !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
+    !> @{
     REAL(KIND(0d0)) :: G1_L, G1_R
     REAL(KIND(0d0)) :: G2_L, G2_R
     REAL(KIND(0d0)) :: G3_L, G3_R
@@ -233,27 +286,35 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0)) :: G6_L, G6_R
     REAL(KIND(0d0)) :: G7_L, G7_R
     REAL(KIND(0d0)) :: G8_L, G8_R
+    !> @}
 
-    ! Star region pressure and velocity
+    !> @name Star region pressure and velocity
+    !> @{
     REAL(KIND(0d0)) :: pres_S
     REAL(KIND(0d0)) :: vel_S
+    !> @}
 
-    ! Intercell solution used to calculated intercell flux
+    !> @name Intercell solution used to calculated intercell flux
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_rho_IC
     REAL(KIND(0d0))                              :: rho_IC
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: vel_IC
     REAL(KIND(0d0))                              :: pres_IC
     REAL(KIND(0d0))                              :: E_IC
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_IC
+    !> @}
 
-    ! Surface tension pressure contribution
+    !> @name Surface tension pressure contribution
+    !> @{
     REAL(KIND(0d0)) :: dpres_We
     REAL(KIND(0d0)) :: dpres_L, dpres_R
-    
-    ! Roe or arithmetic average density, velocity, enthalpy, volume fractions,
-    ! specific heat ratio function, speed of sound, shear and volume Reynolds
-    ! numbers, Weber numbers and curvatures, at the cell-boundaries, computed
-    ! from the left and the right states of the Riemann problem
+    !> @}
+
+    !> @name Roe or arithmetic average density, velocity, enthalpy, volume fractions,
+    !! specific heat ratio function, speed of sound, shear and volume Reynolds
+    !! numbers, Weber numbers and curvatures, at the cell-boundaries, computed
+    !! from the left and the right states of the Riemann problem
+    !> @{
     REAL(KIND(0d0))                                 :: rho_avg
     REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:)   :: vel_avg
     REAL(KIND(0d0))                                 :: H_avg
@@ -263,58 +324,100 @@ MODULE m_riemann_solvers
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)   :: Re_avg_rs_vf
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:,:) :: We_avg_rs_vf
     REAL(KIND(0d0))   , ALLOCATABLE, DIMENSION(:)   :: kappa_avg
-    
-    ! Left, right and star (S) region wave speeds
+    !> @}
+
+    !> @name Left, right and star (S) region wave speeds
+    !> @{
     REAL(KIND(0d0)) :: s_L, s_R, s_S
+    !> @}
 
-    ! Star region variables (HLLC)
+    !> @name Star region variables (HLLC)
+    !> @{
     REAL(KIND(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
-    
-    ! Minus (M) and plus (P) wave speeds
-    REAL(KIND(0d0)) :: s_M, s_P
-    
-    ! Minus and plus wave speeds functions
-    REAL(KIND(0d0)) :: xi_M, xi_P
+    !> @}
 
-    ! Additional variables for applying a flux limiter
+    !> Minus (M) and plus (P) wave speeds
+    !> @{
+    REAL(KIND(0d0)) :: s_M, s_P
+    !> @}
+
+    !> Minus and plus wave speeds functions
+    !> @{
+    REAL(KIND(0d0)) :: xi_M, xi_P
+    !> @}
+
+    !> @name Additional variables for applying a flux limiter
+    !> @{
     REAL(KIND(0d0)) :: flux_lim_func
     REAL(KIND(0d0)) :: lo_s_L, lo_s_R, lo_s_S
     REAL(KIND(0d0)) :: lo_s_M, lo_s_P
     REAL(KIND(0d0)) :: tvd_s_M, tvd_s_P
     REAL(KIND(0d0)) :: lo_xi_M, lo_xi_P
     REAL(KIND(0d0)) :: tvd_xi_M, tvd_xi_P
-    
-    ! Pointer to the procedure that is utilized to calculate either the HLL,
-    ! HLLC or exact intercell fluxes, based on the choice of Riemann solver
-    PROCEDURE(s_abstract_riemann_solver), &
-    POINTER :: s_riemann_solver => NULL()
-    
-    ! Pointer to the subroutine utilized to calculate either the Roe or the
-    ! arithmetic average state variables, based on the chosen average state
-    PROCEDURE(s_compute_abstract_average_state), &
-    POINTER :: s_compute_average_state => NULL()
-    
-    ! Pointer to the subroutine that is utilized to compute the wave speeds of
-    ! the Riemann problem either directly or by the means of pressure-velocity
-    ! estimates, based on the selected method of estimation of the wave speeds
-    PROCEDURE(s_compute_abstract_wave_speeds), &
-    POINTER :: s_compute_wave_speeds => NULL()
-    
-    ! Pointer to the subroutine that is utilized to compute the viscous source
-    ! flux for either Cartesian or cylindrical geometries.
-    PROCEDURE(s_compute_abstract_viscous_source_flux), &
-    POINTER :: s_compute_viscous_source_flux => NULL()
+    !> @}
 
-    ! Indical bounds in the s1-, s2- and s3-directions
-    TYPE(bounds_info) :: is1,is2,is3
+    PROCEDURE(s_abstract_riemann_solver), &
+    POINTER :: s_riemann_solver => NULL() !<
+    !! Pointer to the procedure that is utilized to calculate either the HLL,
+    !! HLLC or exact intercell fluxes, based on the choice of Riemann solver
     
+    PROCEDURE(s_compute_abstract_average_state), &
+    POINTER :: s_compute_average_state => NULL() !<
+    !! Pointer to the subroutine utilized to calculate either the Roe or the
+    !! arithmetic average state variables, based on the chosen average state
+    
+    PROCEDURE(s_compute_abstract_wave_speeds), &
+    POINTER :: s_compute_wave_speeds => NULL() !<
+    !! Pointer to the subroutine that is utilized to compute the wave speeds of
+    !! the Riemann problem either directly or by the means of pressure-velocity
+    !! estimates, based on the selected method of estimation of the wave speeds
+    
+    PROCEDURE(s_compute_abstract_viscous_source_flux), &
+    POINTER :: s_compute_viscous_source_flux => NULL() !<
+    !! Pointer to the subroutine that is utilized to compute the viscous source
+    !! flux for either Cartesian or cylindrical geometries.
+ 
+    !> @name Indical bounds in the s1-, s2- and s3-directions
+    !> @{
+    TYPE(bounds_info) :: is1,is2,is3
+    !> @}
     
     CONTAINS
         
         
-        
-        
-        
+        !>  The procedure features the Harten, Lax and van Leer (HLL)
+        !!      approximate Riemann solver algorithm, see Toro (1999) as
+        !!      well as Saurel and Abgrall (1999). Viscous and capillary
+        !!      effects have been included by adapting the exact Riemann
+        !!      solver of Perigaud and Saurel (2005).
+        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param gm_alphaL_vf  Left averaged gradient magnitude
+        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
+        !!  @param kappaR_vf Right averaged vol. frac. curvatures
+        !!  @param flux_vf Intra-cell fluxes
+        !!  @param flux_src_vf  Intra-cell fluxes sources
+        !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
+        !!  @param norm_dir Dir. splitting direction
+        !!  @param ix Index bounds in the x-dir
+        !!  @param iy Index bounds in the y-dir
+        !!  @param iz Index bounds in the z-dir
+        !!  @param q_prim_vf Cell-averaged primitive variables
         SUBROUTINE s_hll_riemann_solver( qL_prim_vf, dqL_prim_dx_vf, & ! -------
                                                      dqL_prim_dy_vf, &
                                                      dqL_prim_dz_vf, &
@@ -329,17 +432,8 @@ MODULE m_riemann_solvers
                                                flux_vf, flux_src_vf, &
                                                        flux_gsrc_vf, &
                                                  norm_dir, ix,iy,iz  )
-        ! Description: The procedure features the Harten, Lax and van Leer (HLL)
-        !              approximate Riemann solver algorithm, see Toro (1999) as
-        !              well as Saurel and Abgrall (1999). Viscous and capillary
-        !              effects have been included by adapting the exact Riemann
-        !              solver of Perigaud and Saurel (2005).
             
             
-            ! The left and right WENO-reconstructed cell-boundary values of the
-            ! cell-average primitive variables, first-order spatial derivatives
-            ! of the primitive variables and lastly, the gradient magnitude and
-            ! the curvature of the volume fractions.
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -358,14 +452,12 @@ MODULE m_riemann_solvers
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
             
-            ! Dimensional splitting coordinate direction
+
             INTEGER, INTENT(IN) :: norm_dir
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
            
             ! Placeholders for high- and low-order fluxes
             REAL(KIND(0d0)) :: hi_cons, hi_cons_L, hi_cons_R
@@ -669,9 +761,39 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_hll_riemann_solver ! ----------------------------------
         
         
-        
-        
-        
+        !> This procedure is the implementation of the Harten, Lax,
+        !!      van Leer, and contact (HLLC) approximate Riemann solver,
+        !!      see Toro (1999) and Johnsen (2007). The viscous and the
+        !!      surface tension effects have been included by modifying
+        !!      the exact Riemann solver of Perigaud and Saurel (2005).       
+        !!  @param qL_prim_vf The left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param dqL_prim_dx_vf The left WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqL_prim_dy_vf The left WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqL_prim_dz_vf The left WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param gm_alphaL_vf Left averaged gradient magnitude
+        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param kappaL_vf Left averaged vol. frac. curvatures
+        !!  @param kappaR_vf Right averaged vol. rac. curvatures
+        !!  @param flux_vf Intra-cell fluxes
+        !!  @param flux_src_vf Intra-cell fluxes sources
+        !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
+        !!  @param norm_dir Dir. splitting direction
+        !!  @param ix Index bounds in the x-dir
+        !!  @param iy Index bounds in the y-dir
+        !!  @param iz Index bounds in the z-dir
+        !!  @param q_prim_vf Cell-averaged primitive variables 
         SUBROUTINE s_hllc_riemann_solver( qL_prim_vf, dqL_prim_dx_vf, & ! ------
                                                       dqL_prim_dy_vf, &
                                                       dqL_prim_dz_vf, &
@@ -686,17 +808,8 @@ MODULE m_riemann_solvers
                                                 flux_vf, flux_src_vf, &
                                                         flux_gsrc_vf, &
                                                   norm_dir, ix,iy,iz  )
-        ! Description: This procedure is the implementation of the Harten, Lax,
-        !              van Leer, and contact (HLLC) approximate Riemann solver,
-        !              see Toro (1999) and Johnsen (2007). The viscous and the
-        !              surface tension effects have been included by modifying
-        !              the exact Riemann solver of Perigaud and Saurel (2005).
+
             
-            
-            ! The left and right WENO-reconstructed cell-boundary values of the
-            ! cell-average primitive variables, first-order spatial derivatives
-            ! of the primitive variables and lastly, the gradient magnitude and
-            ! the curvature of the volume fractions.
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -715,24 +828,20 @@ MODULE m_riemann_solvers
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Left and right wave speeds functions
-            REAL(KIND(0d0)) :: xi_L, xi_R
+
+            REAL(KIND(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
-            REAL(KIND(0d0)) :: lo_xi_L, lo_xi_R
             ! Placeholders for high- and low-order fluxes
+            REAL(KIND(0d0)) :: lo_xi_L, lo_xi_R
             REAL(KIND(0d0)) :: hi_flux_L, hi_flux_R, lo_flux_L, lo_flux_R
             REAL(KIND(0d0)) :: tvd_flux_L, tvd_flux_R
             
-            !print '(a)', 'SHB: beg riemann solve'
             ! Populating the buffers of the left and right Riemann problem
             ! states variables, based on the choice of boundary conditions
             CALL s_populate_riemann_states_variables_buffers( &
@@ -748,50 +857,22 @@ MODULE m_riemann_solvers
                                                    kappaR_vf, &
                                           norm_dir, ix,iy,iz  )
             
-            !print '(a)', 'SHB: within riemann solve loop. beforew initialization'
             ! Reshaping inputted data based on dimensional splitting direction
-            ! SEG FAULT in here! !
-            !takes in qL/R_prim_vf, out qL_prim_rs_vf and others
             CALL s_initialize_riemann_solver( qL_prim_vf, kappaL_vf, &
                                               qR_prim_vf, kappaR_vf, &
                                                           q_prim_vf, &
                                                flux_vf, flux_src_vf, &
                                                        flux_gsrc_vf, &
                                                  norm_dir, ix,iy,iz  )
-            !print '(a)', 'SHB: within riemann solve loop. after initialization'
-            !call s_mpi_abort()
-
-            !print*, 'within riemann solver, q_prim_vf'
-            !DO i = 1,sys_size
-            !print*, 'i=', i
-            !print*, q_prim_vf(i)%sf(:,0,0) 
-            !END DO
-
-            !print*, 'within riemann solver, ql_prim_vf'
-            !DO i = 1,sys_size
-            !print*, 'i=', i
-            !print*, qL_prim_vf(i)%sf(:,0,0) 
-            !END DO
-            
-            !print*, 'within riemann solver, qL/R_prim_rs_vf'
-            !DO i = sys_size-1,sys_size
-            !    print*, 'i=', i
-            !    DO j = is1%beg, is1%end
-            !        print*, qL_prim_rs_vf(i)%sf(j,0,0), qR_prim_rs_vf(i)%sf(j,0,0) 
-            !    END DO
-            !END DO
 
             ! Computing HLLC flux and source flux for Euler system of equations
             DO l = is3%beg, is3%end
                 DO k = is2%beg, is2%end
                     DO j = is1%beg, is1%end
-                        !print '(a)', 'SHB: within riemann solve loop. beforew aves peeds'
-                        !this thing takes mostly zeros? alpha_rho, rho, vel, etc.
+
                         CALL s_compute_average_state(j,k,l)
-           
+
                         CALL s_compute_wave_speeds(j,k,l)
-
-
 
                         IF(model_eqns == 3) THEN
 
@@ -888,8 +969,6 @@ MODULE m_riemann_solvers
                                 CALL s_compute_flux_limiter(j,k,l,flux_lim_func,norm_dir)
                             END IF
 
-                            ! do this stuff
-
                             ! follows Einfeldt et al.
                             ! s_M/P = min/max(0.,s_L/R)
                             s_M = MIN(0d0,s_L); s_P = MAX(0d0,s_R)
@@ -905,7 +984,6 @@ MODULE m_riemann_solvers
                             xi_P = (5d-1 - SIGN(5d-1,s_S))
 
 
-                            !!! we don't use this !!!                            
                             IF (tvd_wave_speeds) THEN
                                 lo_s_M = MIN(0d0,lo_s_L); lo_s_P = MAX(0d0,lo_s_R)
 
@@ -919,7 +997,6 @@ MODULE m_riemann_solvers
                                 tvd_xi_P = lo_xi_P + flux_lim_func*(xi_P - lo_xi_P)
                             END IF
 
-                            !!! we don't use this !!!
                             IF (tvd_riemann_flux) THEN
                                 ! Mass
                                 DO i = 1, cont_idx%end
@@ -1059,14 +1136,7 @@ MODULE m_riemann_solvers
                                     END IF
                                 END DO
                             ELSE
-                                ! no TVD riemann flux (what we do)
 
-                                ! numerical fluxes, from:
-                                !       flux = xi_m(f_L + s_m(q_s_L - q_L)) + xi_p(f_R + s_p(q_s_R - q_R))
-                                !       f = flux variables, q = conserved variables
-                                !       q_s = q_star = xi_L/R q_L/R [approximately, see appendix D coralic 2014]
-
-                                ! mass flux. f = \alpha_i \rho_i u, q = \alpha_i \rho_i
                                 DO i = 1, cont_idx%end
                                     flux_rs_vf(i)%sf(j,k,l) = &
                                            xi_M*alpha_rho_L(i)                    &
@@ -1076,7 +1146,7 @@ MODULE m_riemann_solvers
                                 END DO
 
                                 IF (bubbles .and. (model_eqns == 2) .and. (num_fluids > 1) ) THEN
-                                    !Kill mass transport @ gas density
+                                    ! Kill mass transport @ gas density
                                     flux_rs_vf(cont_idx%end)%sf(j,k,l) = 0.d0
                                 END IF
 
@@ -1091,7 +1161,7 @@ MODULE m_riemann_solvers
                                 IF (isnan(vel_L(dir_idx(1)))) STOP '"ve_L" is a NaN'
                                 IF (isnan(vel_R(dir_idx(1)))) STOP '"ve_R" is a NaN'
 
-                                ! momentum flux. 
+                                ! Momentum flux. 
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 IF (bubbles .neqv. .TRUE.) THEN
                                     DO i = 1, num_dims
@@ -1110,7 +1180,7 @@ MODULE m_riemann_solvers
                                             dir_flg(dir_idx(i))*(pres_R))
                                     END DO
                                 ELSE
-                                    !include p_tilde
+                                    ! Include p_tilde
                                     DO i = 1, num_dims
                                         flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
                                             xi_M*(rho_L*(vel_L(dir_idx(1)) *            &
@@ -1128,7 +1198,7 @@ MODULE m_riemann_solvers
                                     END DO
                                 END IF
 
-                                ! energy flux.
+                                ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
                                 IF ( (model_eqns .ne. 4) .and. bubbles ) THEN
                                     flux_rs_vf(E_idx)%sf(j,k,l) = &
@@ -1153,13 +1223,12 @@ MODULE m_riemann_solvers
                                         (s_R - vel_R(dir_idx(1))))) - E_R))
  
                                 ELSE
-                                    ! SHB: Tait EOS, no energy equation
+                                    ! Tait EOS, no energy equation
                                     flux_rs_vf(E_idx)%sf(j,k,l) = 0.d0
                                 END IF
 
 
-                                ! volume fraction flux
-                                !DO i = adv_idx%beg, adv_idx%end
+                                ! Volume fraction flux
                                 if (model_eqns == 4) then
                                     DO i = alf_idx, alf_idx !only advect the void fraction
                                         flux_rs_vf(i)%sf(j,k,l) =  &
@@ -1178,7 +1247,7 @@ MODULE m_riemann_solvers
                                     END DO
                                 end if
 
-                                !source for volume fraction advection equation
+                                ! Source for volume fraction advection equation
                                 DO i = 1, num_dims
                                     vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = &
                                         xi_M*(   vel_L(dir_idx(i)) + &
@@ -1193,7 +1262,7 @@ MODULE m_riemann_solvers
                                 END DO
 
 
-                                !add advection flux for bubble variables
+                                ! Add advection flux for bubble variables
                                 IF (bubbles) THEN
                                     DO i = bub_idx%beg,sys_size
                                         flux_rs_vf(i)%sf(j,k,l) =   &
@@ -1313,8 +1382,38 @@ MODULE m_riemann_solvers
         
         
         
-        
-        
+        !>  This procedure is the implementation of the exact Riemann
+        !!      solver, see Toro (1999). The effects of viscosity and the
+        !!      surface tension have been incorporated following the work
+        !!      of Perigaud and Saurel (2005).        
+        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param gm_alphaL_vf  Left averaged gradient magnitude
+        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
+        !!  @param kappaR_vf Right averaged vol. frac. curvatures
+        !!  @param q_prim_vf Cell-averaged primitive variables
+        !!  @param flux_vf Intra-cell fluxes
+        !!  @param flux_src_vf  Intra-cell fluxes sources
+        !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
+        !!  @param norm_dir Dir. splitting direction
+        !!  @param ix Index bounds in the x-dir
+        !!  @param iy Index bounds in the y-dir
+        !!  @param iz Index bounds in the z-dir 
         SUBROUTINE s_exact_riemann_solver( qL_prim_vf, dqL_prim_dx_vf, & ! -----
                                                        dqL_prim_dy_vf, &
                                                        dqL_prim_dz_vf, &
@@ -1329,16 +1428,7 @@ MODULE m_riemann_solvers
                                                  flux_vf, flux_src_vf, &
                                                          flux_gsrc_vf, &
                                                    norm_dir, ix,iy,iz  )
-        ! Description: This procedure is the implementation of the exact Riemann
-        !              solver, see Toro (1999). The effects of viscosity and the
-        !              surface tension have been incorporated following the work
-        !              of Perigaud and Saurel (2005).
             
-            
-            ! The left and right WENO-reconstructed cell-boundary values of the
-            ! cell-average primitive variables, first-order spatial derivatives
-            ! of the primitive variables and lastly, the gradient magnitude and
-            ! the curvature of the volume fractions.
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -1352,19 +1442,15 @@ MODULE m_riemann_solvers
                                gm_alphaL_vf,   gm_alphaR_vf, &
                                   kappaL_vf,      kappaR_vf
             
-            ! Intercell fluxes
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
-            
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Populating the buffers of the left and right Riemann problem
@@ -1483,18 +1569,16 @@ MODULE m_riemann_solvers
         
         
         
-        
-
+        !>  The procedure assigns and computes the left and right
+        !!      states of the Riemann problem
+        !! @param j  First coordinate index
+        !! @param k Second coordinate index
+        !! @param l  Third coordinate index
         SUBROUTINE s_compute_constant_states(j,k,l) ! --------------------------
-        ! Description: The procedure assigns and computes the left and right
-        !       states of the Riemann problem
-        ! only used for exact riemann solver
 
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: j,k,l
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
 
             ! Left and Right Riemann States
             DO i = 1, cont_idx%end
@@ -1588,17 +1672,17 @@ MODULE m_riemann_solvers
         
         END SUBROUTINE s_compute_constant_states ! -----------------------------
 
+        !> Compute mixture sound speed
+        !! @param j  First coordinate index
+        !! @param k Second coordinate index
+        !! @param l  Third coordinate index
         SUBROUTINE s_compute_mixture_sound_speeds(j,k,l) ! ---------------------
-        ! Description: Compute mixture sound speed
 
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: j,k,l
 
-            ! Fluid bulk modulus for alternate sound speed
-            REAL(KIND(0d0)) :: blkmod1, blkmod2
+            REAL(KIND(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for alternate sound speed
 
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
 
             IF ( (alt_soundspeed .or. regularization) ) THEN
                 DO i = 1, num_fluids
@@ -1716,11 +1800,10 @@ MODULE m_riemann_solvers
 
 
 
-
+        !>  The purpose of this subroutine is to compute the solution
+        !!      for pressure and velocity in the star region when using
+        !!      the exact Riemann solver
         SUBROUTINE s_compute_star_region() ! -----------------------------------
-        ! Description: The purpose of this subroutine is to compute the solution
-        !       for pressure and velocity in the star region when using
-        !       the exact Riemann solver
 
             REAL(KIND(0d0)) :: change, f_L, dfdp_L, f_R, dfdp_R, pres_old, & 
                         pres_start, pres_tol, vel_diff
@@ -1757,10 +1840,14 @@ MODULE m_riemann_solvers
 
         END SUBROUTINE s_compute_star_region ! ----------------------------------
 
-
+        !>  The purpose of this subroutine is to evaluate the pressure
+        !!      functions f_K in the exact Riemann solver
+        !!  @param f_K    Pressure function
+        !!  @param dfdp_K Mixture pressure derivative
+        !!  @param pres   Pressure
+        !!  @param side   Wave side
         SUBROUTINE s_pressure_function(f_K, dfdp_K, pres, side) ! -
-        ! Description: The purpose of this subroutine is to evaluate the pressure
-        !       functions f_K in the exact Riemann solver
+
 
             REAL(KIND(0d0)), INTENT(IN) :: pres
             INTEGER, INTENT(IN) :: side
@@ -1814,12 +1901,13 @@ MODULE m_riemann_solvers
 
 
 
-
+        !>  The purpose of this subroutine is to provide a guess value
+        !!      for pressure in the star region. The choice is made
+        !!      according to adaptive Riemann solver using the PVRS, TRRS.
+        !!      and TSRS approximate Riemann solvers.
+        !!  @param pres_start Initial and output pressure
         SUBROUTINE s_guess_pressure(pres_start) ! -------------------------------
-        ! Description: The purpose of this subroutine is to provide a guess value
-        !       for pressure in the star region. The choice is made
-        !       according to adaptive Riemann solver using the PVRS, TRRS.
-        !       and TSRS approximate Riemann solvers.
+
 
             REAL(KIND(0d0)), INTENT(INOUT) :: pres_start
 
@@ -1884,9 +1972,7 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_guess_pressure ! --------------------------------------
 
 
-
-
-
+        !> Computes the averaged intrercell variables for the Riemann solver
         SUBROUTINE s_compute_intercell_solution() ! --------------------
 
             INTEGER :: i
@@ -2131,22 +2217,19 @@ MODULE m_riemann_solvers
 
 
 
-
-
+        !>  The procedure computes the Roe average density, velocity,
+        !!      enthalpy, volume fractions, specific heat ratio function,
+        !!      speed of sound, shear and volume Reynolds numbers, Weber
+        !!      numbers and curvatures, at the cell-boundaries, from the
+        !!      left and right states of the Riemann problem.
+        !! @param j  First coordinate index
+        !! @param k Second coordinate index
+        !! @param l  Third coordinate index
         SUBROUTINE s_compute_roe_average_state(j,k,l) ! ---------------
-        ! Description: The procedure computes the Roe average density, velocity,
-        !              enthalpy, volume fractions, specific heat ratio function,
-        !              speed of sound, shear and volume Reynolds numbers, Weber
-        !              numbers and curvatures, at the cell-boundaries, from the
-        !              left and right states of the Riemann problem.
-            
-            
-            ! Generic loop iterators
+
             INTEGER, INTENT(IN) :: j,k,l
 
-            ! Generic loop iterator
             INTEGER :: i
-            
             
             ! Left and Right Riemann Problem States ============================
             DO i = 1, cont_idx%end
@@ -2262,21 +2345,19 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_compute_roe_average_state ! ---------------------------
         
         
-        
-        
-        
+        !>  This procedure calculates the arithmetic average density,
+        !!      velocity, enthalpy, volume fractions, specIFic heat ratio
+        !!      function, sound speed, shear and volume Reynolds numbers,
+        !!      Weber numbers and the curvatures, at the cell-boundaries,
+        !!      from the left and right states of the Riemann problem.
+        !!  @param j  First coordinate index
+        !!  @param k Second coordinate index
+        !!  @param l  Third coordinate index
         SUBROUTINE s_compute_arithmetic_average_state(j,k,l) ! --------
-        ! Description: This procedure calculates the arithmetic average density,
-        !              velocity, enthalpy, volume fractions, specIFic heat ratio
-        !              function, sound speed, shear and volume Reynolds numbers,
-        !              Weber numbers and the curvatures, at the cell-boundaries,
-        !              from the left and right states of the Riemann problem.
-            
-            ! Generic loop iterators
+           
             INTEGER, INTENT(IN) :: j,k,l
             
-            ! Generic loop iterator
-            INTEGER :: i           
+            INTEGER :: i !< Generic loop iterator
 
             REAL(KIND(0d0)) :: gamma_gas
 
@@ -2484,23 +2565,21 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_compute_arithmetic_average_state ! --------------------
         
         
-        
-        
-        
+        !>  The direct estimation of the left, right and middle wave
+        !!      speeds, proposed by Batten et al. (1997) that results in
+        !!      the exact resolution of isolated shock and contact waves.
+        !!  @param j  First coordinate index
+        !!  @param k Second coordinate index
+        !!  @param l  Third coordinate index       
         SUBROUTINE s_compute_direct_wave_speeds(j,k,l) ! -----------------------
-        ! Description: The direct estimation of the left, right and middle wave
-        !              speeds, proposed by Batten et al. (1997) that results in
-        !              the exact resolution of isolated shock and contact waves.
-            
-            
-            ! Generic loop iterators
+           
             INTEGER, INTENT(IN) :: j,k,l
             
-            ! Capillary pressure
-            REAL(KIND(0d0)) :: denom, dpres_We
+
+            REAL(KIND(0d0)) :: denom, dpres_We !< Capillary pressure
             
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             dpres_We = 0d0
@@ -2551,34 +2630,31 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_compute_direct_wave_speeds ! --------------------------
         
         
-        
-        
-        
+        !>  Estimation of the left, right and star region wave speeds
+        !!      by the approximation of the pressures and velocity in the
+        !!      star regions, see Toro (1999). The pressures and velocity
+        !!      are approximated by using the primitive variables Riemann
+        !!      solver (PVRS) and the wave speeds are then estimated from
+        !!      those approximations using the exact wave relations.
+        !!  @param j  First coordinate index
+        !!  @param k Second coordinate index
+        !!  @param l  Third coordinate index          
         SUBROUTINE s_compute_pressure_velocity_wave_speeds(j,k,l) ! ------------
-        ! Description: Estimation of the left, right and star region wave speeds
-        !              by the approximation of the pressures and velocity in the
-        !              star regions, see Toro (1999). The pressures and velocity
-        !              are approximated by using the primitive variables Riemann
-        !              solver (PVRS) and the wave speeds are then estimated from
-        !              those approximations using the exact wave relations.
             
-            
-            ! Generic loop iterators
             INTEGER, INTENT(IN) :: j,k,l
             
             ! Left and right pressures in the star region
             REAL(KIND(0d0)) :: pres_SL, pres_SR
             REAL(KIND(0d0)) :: lo_pres_SL, lo_pres_SR
             
-            ! Capillary pressure
-            REAL(KIND(0d0)) :: dpres_We
+
+            REAL(KIND(0d0)) :: dpres_We !< Capillary pressure
             
             ! Left and right shock Mach numbers
             REAL(KIND(0d0)) :: Ms_L, Ms_R
             REAL(KIND(0d0)) :: lo_Ms_L, lo_Ms_R
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             dpres_We = 0d0
@@ -2639,10 +2715,15 @@ MODULE m_riemann_solvers
         
         
         
-        
+        !>  This subroutine computes the flux limiter function value
+        !!      at the cell boundary
+        !!  @param j  First coordinate index
+        !!  @param k Second coordinate index
+        !!  @param l  Third coordinate index     
+        !!  @param flux_lim_func The flux limiter
+        !!  @param norm_dir Directional splitting index
         SUBROUTINE s_compute_flux_limiter(j,k,l,flux_lim_func,norm_dir) ! ------
-        ! Description: This subroutine computes the flux limiter function value
-        !       at the cell boundary
+
 
             INTEGER, INTENT(IN) :: j,k,l,norm_dir
             REAL(KIND(0d0)), INTENT(OUT) :: flux_lim_func
@@ -2699,11 +2780,10 @@ MODULE m_riemann_solvers
 
 
 
-
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
         SUBROUTINE s_initialize_riemann_solvers_module() ! ---------------------
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures that are necessary to setup the module.
             
             
             ! Allocating the variables that will be utilized to formulate the
@@ -2824,8 +2904,33 @@ MODULE m_riemann_solvers
         
         
         
-        
-        
+        !>  The purpose of this subroutine is to populate the buffers
+        !!      of the left and right Riemann states variables, depending
+        !!      on the boundary conditions.        
+        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order x-dir spatial derivatives 
+        !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order y-dir spatial derivatives 
+        !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
+        !!      first-order z-dir spatial derivatives 
+        !!  @param gm_alphaL_vf  Left averaged gradient magnitude
+        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
+        !!  @param kappaR_vf Right averaged vol. frac. curvatures
+        !!  @param norm_dir Dir. splitting direction
+        !!  @param ix Index bounds in the x-dir
+        !!  @param iy Index bounds in the y-dir
+        !!  @param iz Index bounds in the z-dir
         SUBROUTINE s_populate_riemann_states_variables_buffers( & ! ------------
                                     qL_prim_vf, dqL_prim_dx_vf, &
                                                 dqL_prim_dy_vf, &
@@ -2838,15 +2943,7 @@ MODULE m_riemann_solvers
                                                   gm_alphaR_vf, &
                                                      kappaR_vf, &
                                             norm_dir, ix,iy,iz  )
-        ! Description: The purpose of this subroutine is to populate the buffers
-        !              of the left and right Riemann states variables, depending
-        !              on the boundary conditions.
-            
-            
-            ! The left and right WENO-reconstructed cell-boundary values of the
-            ! cell-average primitive variables, first-order spatial derivatives
-            ! of the primitive variables and lastly, the gradient magnitude and
-            ! the curvature of the volume fractions.
+
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -2859,14 +2956,11 @@ MODULE m_riemann_solvers
                                gm_alphaL_vf,   gm_alphaR_vf, &
                                   kappaL_vf,      kappaR_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Population of Buffers in x-direction =============================
@@ -3352,22 +3446,33 @@ MODULE m_riemann_solvers
             
         END SUBROUTINE s_populate_riemann_states_variables_buffers ! -----------
         
-        
+ 
+
+        !>  The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures needed to configure the chosen Riemann
+        !!      solver algorithm.
+        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables 
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables
+        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
+        !!  @param kappaR_vf Right averaged vol. frac. curvatures
+        !!  @param flux_vf Intra-cell fluxes
+        !!  @param flux_src_vf Intra-cell fluxes sources
+        !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
+        !!  @param norm_dir Dir. splitting direction
+        !!  @param ix Index bounds in the x-dir
+        !!  @param iy Index bounds in the y-dir
+        !!  @param iz Index bounds in the z-dir
+        !!  @param q_prim_vf Cell-averaged primitive variables
         SUBROUTINE s_initialize_riemann_solver( qL_prim_vf, kappaL_vf, & ! -----
                                                 qR_prim_vf, kappaR_vf, &
                                                             q_prim_vf, &
                                                  flux_vf, flux_src_vf, &
                                                          flux_gsrc_vf, &
                                                    norm_dir, ix,iy,iz  )
-        ! Description: The computation of parameters, the allocation of memory,
-        !              the association of pointers and/or the execution of any
-        !              other procedures needed to configure the chosen Riemann
-        !              solver algorithm.
-            
-            
-            ! The left and the right, WENO-reconstructed, cell-boundary values
-            ! of the cell-average primitive variables and the curvature of the
-            ! volume fractions.
+
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(IN) :: qL_prim_vf, qR_prim_vf
@@ -3377,19 +3482,16 @@ MODULE m_riemann_solvers
             ALLOCATABLE, DIMENSION(:), &
             INTENT(IN) :: kappaL_vf, kappaR_vf
             
-            ! Intercell fluxes
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+            INTEGER :: i,j,k ! Generic loop iterators
            
             INTEGER :: xbeg,xend,ybeg,yend,zbeg,zend
             INTEGER :: s1beg,s1end,s2beg,s2end,s3beg,s3end
@@ -3526,8 +3628,6 @@ MODULE m_riemann_solvers
             ! END: Allocating Intercell Fluxes and Velocity ====================
            
                         
-            !print '(a)', 'from initialize riemann subroutine'
-            ! seg fault happens in here 
             ! Reshaping Inputted Data in x-direction ===========================
             IF(norm_dir == 1) THEN
                
@@ -3544,8 +3644,6 @@ MODULE m_riemann_solvers
                                                                 zbeg : zend  )
                     END IF
                 END DO
-            !print '(a)', 'from initialize riemann subroutine, after reshape data'
-            !call s_mpi_abort()  
                 DO i = 1, crv_size
                     kappaL_rs_vf(crv_idx(i))%sf = kappaL_vf(crv_idx(i))%sf( &
                                                        ix%beg   : ix%end  , &
@@ -3636,7 +3734,22 @@ MODULE m_riemann_solvers
         
         
         
-        
+        !>  The goal of this subroutine is to evaluate and account
+        !!      for the contribution of viscous stresses in the source
+        !!      flux for the momentum and energy.
+        !!  @param velL_vf  Left, WENO reconstructed, cell-boundary values of the velocity
+        !!  @param velR_vf Right, WENO reconstructed, cell-boundary values of the velocity
+        !!  @param dvelL_dx_vf  Left, WENO reconstructed cell-avg. x-dir derivative of the velocity
+        !!  @param dvelL_dy_vf  Left, WENO reconstructed cell-avg. y-dir derivative of the velocity
+        !!  @param dvelL_dz_vf  Left, WENO reconstructed cell-avg. z-dir derivative of the velocity
+        !!  @param dvelR_dx_vf Right, WENO reconstructed cell-avg. x-dir derivative of the velocity
+        !!  @param dvelR_dy_vf Right, WENO reconstructed cell-avg. y-dir derivative of the velocity
+        !!  @param dvelR_dz_vf Right, WENO reconstructed cell-avg. z-dir derivative of the velocity
+        !!  @param flux_src_vf Intercell flux
+        !!  @param norm_dir Dimensional splitting coordinate direction
+        !!  @param ix Index bounds in  first coordinate direction
+        !!  @param iy Index bounds in second coordinate direction
+        !!  @param iz Index bounds in  third coordinate direction
         SUBROUTINE s_compute_cylindrical_viscous_source_flux(     velL_vf, & ! -------------
                                                               dvelL_dx_vf, &
                                                               dvelL_dy_vf, &
@@ -3648,13 +3761,7 @@ MODULE m_riemann_solvers
                                                               flux_src_vf, &
                                                                  norm_dir, &
                                                                  ix,iy,iz  )
-        ! Description: The goal of this subroutine is to evaluate and account
-        !              for the contribution of viscous stresses in the source
-        !              flux for the momentum and energy.
-            
-            
-            ! The left and the right, WENO-reconstructed, cell-boundary values
-            ! of the cell-average first-order spatial derivatives of velocity.
+
             TYPE(scalar_field),  &
             DIMENSION(num_dims), &
             INTENT(IN) ::         velL_vf, velR_vf, &
@@ -3662,15 +3769,12 @@ MODULE m_riemann_solvers
                           dvelL_dy_vf, dvelR_dy_vf, &
                           dvelL_dz_vf, dvelR_dz_vf
             
-            ! Intercell flux
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_src_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
@@ -4143,9 +4247,22 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_compute_cylindrical_viscous_source_flux ! -------------------------
         
        
-
-
-
+        !>  The goal of this subroutine is to evaluate and account
+        !!      for the contribution of viscous stresses in the source
+        !!      flux for the momentum and energy.
+        !!  @param velL_vf  Left, WENO reconstructed, cell-boundary values of the velocity
+        !!  @param velR_vf Right, WENO reconstructed, cell-boundary values of the velocity
+        !!  @param dvelL_dx_vf  Left, WENO reconstructed cell-avg. x-dir derivative of the velocity
+        !!  @param dvelL_dy_vf  Left, WENO reconstructed cell-avg. y-dir derivative of the velocity
+        !!  @param dvelL_dz_vf  Left, WENO reconstructed cell-avg. z-dir derivative of the velocity
+        !!  @param dvelR_dx_vf Right, WENO reconstructed cell-avg. x-dir derivative of the velocity
+        !!  @param dvelR_dy_vf Right, WENO reconstructed cell-avg. y-dir derivative of the velocity
+        !!  @param dvelR_dz_vf Right, WENO reconstructed cell-avg. z-dir derivative of the velocity
+        !!  @param flux_src_vf Intercell flux
+        !!  @param norm_dir Dimensional splitting coordinate direction
+        !!  @param ix Index bounds in  first coordinate direction
+        !!  @param iy Index bounds in second coordinate direction
+        !!  @param iz Index bounds in  third coordinate direction
         SUBROUTINE s_compute_cartesian_viscous_source_flux(     velL_vf, & ! -------------
                                                             dvelL_dx_vf, &
                                                             dvelL_dy_vf, &
@@ -4157,13 +4274,7 @@ MODULE m_riemann_solvers
                                                             flux_src_vf, &
                                                                norm_dir, &
                                                                ix,iy,iz  )
-        ! Description: The goal of this subroutine is to evaluate and account
-        !              for the contribution of viscous stresses in the source
-        !              flux for the momentum and energy.
-            
-            
-            ! The left and the right, WENO-reconstructed, cell-boundary values
-            ! of the cell-average first-order spatial derivatives of velocity.
+
             TYPE(scalar_field),  &
             DIMENSION(num_dims), &
             INTENT(IN) ::         velL_vf, velR_vf, &
@@ -4171,15 +4282,12 @@ MODULE m_riemann_solvers
                           dvelL_dy_vf, dvelR_dy_vf, &
                           dvelL_dz_vf, dvelR_dz_vf
             
-            ! Intercell flux
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_src_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
@@ -4189,11 +4297,11 @@ MODULE m_riemann_solvers
             REAL(KIND(0d0)), DIMENSION(num_dims) :: dvel_avg_dy
             REAL(KIND(0d0)), DIMENSION(num_dims) :: dvel_avg_dz
             
-            ! Viscous stress tensor
-            REAL(KIND(0d0)), DIMENSION(num_dims,num_dims) :: tau_Re
+
+            REAL(KIND(0d0)), DIMENSION(num_dims,num_dims) :: tau_Re !< Viscous stress tensor
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Viscous Stresses in x-direction ==================================
@@ -4616,9 +4724,22 @@ MODULE m_riemann_solvers
         END SUBROUTINE s_compute_cartesian_viscous_source_flux ! -------------------------
         
         
-        
-        
-        
+        !>  The purpose of the subroutine is to evaluate and account
+        !!      for the contribution of capillary stresses in the source
+        !!      flux for the momentum and energy.
+        !! @param dalphaL_dx_vf  Left WENO-reconstructed cell-bndry value of cell-avg x-dir derivative of vol. frac.       
+        !! @param dalphaL_dy_vf  Left WENO-reconstructed cell-bndry value of cell-avg y-dir derivative of vol. frac.       
+        !! @param dalphaL_dz_vf  Left WENO-reconstructed cell-bndry value of cell-avg z-dir derivative of vol. frac.       
+        !! @param dalphaR_dx_vf Right WENO-reconstructed cell-bndry value of cell-avg x-dir derivative of vol. frac.       
+        !! @param dalphaR_dy_vf Right WENO-reconstructed cell-bndry value of cell-avg y-dir derivative of vol. frac.       
+        !! @param dalphaR_dz_vf Right WENO-reconstructed cell-bndry value of cell-avg z-dir derivative of vol. frac.       
+        !! @param gm_alphaL_vf   Left WENO-reconstructed cell-bndry value of the gradient magnitude
+        !! @param gm_alphaR_vf  Right WENO-reconstructed cell-bndry value of the gradient magnitude
+        !!  @param flux_src_vf Intercell flux
+        !!  @param norm_dir Dimensional splitting coordinate direction
+        !!  @param ix Index bounds in  first coordinate direction
+        !!  @param iy Index bounds in second coordinate direction
+        !!  @param iz Index bounds in  third coordinate direction
         SUBROUTINE s_compute_capillary_source_flux( dalphaL_dx_vf, & ! ---------
                                                     dalphaL_dy_vf, &
                                                     dalphaL_dz_vf, &
@@ -4630,14 +4751,7 @@ MODULE m_riemann_solvers
                                                       flux_src_vf, &
                                                          norm_dir, &
                                                          ix,iy,iz  )
-        ! Description: The purpose of the subroutine is to evaluate and account
-        !              for the contribution of capillary stresses in the source
-        !              flux for the momentum and energy.
-            
-            
-            ! The left and right WENO-reconstructed cell-boundary values of
-            ! the cell-average first-order spatial derivative of the volume
-            ! fractions and gradient magnitude of the volume fractions.
+           
             TYPE(scalar_field),    &
             DIMENSION(num_fluids), &
             INTENT(IN) :: dalphaL_dx_vf, dalphaR_dx_vf, &
@@ -4645,15 +4759,12 @@ MODULE m_riemann_solvers
                           dalphaL_dz_vf, dalphaR_dz_vf, &
                            gm_alphaL_vf,  gm_alphaR_vf
             
-            ! Intercell flux
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_src_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
             ! Arithmetic average of the left and right, WENO-reconstructed,
@@ -5062,28 +5173,28 @@ MODULE m_riemann_solvers
         
         
         
-        
-        
+        !>  Deallocation and/or disassociation procedures that are
+        !!      needed to finalize the selected Riemann problem solver
+        !!  @param flux_vf       Intercell fluxes 
+        !!  @param flux_src_vf   Intercell source fluxes 
+        !!  @param flux_gsrc_vf  Intercell geometric source fluxes 
+        !!  @param norm_dir Dimensional splitting coordinate direction
+        !!  @param ix   Index bounds in  first coordinate direction
+        !!  @param iy   Index bounds in second coordinate direction
+        !!  @param iz   Index bounds in  third coordinate direction
         SUBROUTINE s_finalize_riemann_solver( flux_vf, flux_src_vf, & ! --------
                                                       flux_gsrc_vf, &
                                                 norm_dir, ix,iy,iz  )
-        ! Description: Deallocation and/or disassociation procedures that are
-        !              needed to finalize the selected Riemann problem solver
-            
-            
-            ! Intercell fluxes
+           
             TYPE(scalar_field),  &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
             
-            ! Dimensional splitting coordinate direction
             INTEGER, INTENT(IN) :: norm_dir
             
-            ! Indical bounds in the x-, y- and z-directions
             TYPE(bounds_info), INTENT(IN) :: ix,iy,iz
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Reshaping Outputted Data in y-direction ==========================
@@ -5228,8 +5339,9 @@ MODULE m_riemann_solvers
         
         
         
+        !> Module deallocation and/or disassociation procedures
         SUBROUTINE s_finalize_riemann_solvers_module() ! -----------------------
-        ! Description: Module deallocation and/or disassociation procedures
+
             
             
             ! Deallocating the variables that were utilized to formulate the
