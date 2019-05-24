@@ -756,8 +756,6 @@ MODULE m_global_parameters
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
         SUBROUTINE s_comp_n_from_prim( vftmp,Rtmp,ntmp )
-            ! vftemp is \alpha, Rtemp is R, ntmp is n
-            ! compute n from \alpha and R(:)
             REAL(KIND(0.D0)), INTENT(IN) :: vftmp
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: Rtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp

@@ -89,7 +89,7 @@ MODULE m_variables_conversion
             ! liquid stiffness function, respectively
             rho    = q_vf(1)%sf(i,j,k)
             gamma  = q_vf(gamma_idx)%sf(i,j,k)
-            pi_inf = q_vf(pi_inf_idx)%sf(i,j,k)
+            pi_inf = q_vf(pi_nf_idx)%sf(i,j,k)
             
             
         END SUBROUTINE s_convert_mixture_to_mixture_variables ! ----------------
