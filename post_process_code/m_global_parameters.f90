@@ -1,77 +1,84 @@
-! MFC v3.0 - Post-process Code: m_global_parameters.f90
-! Description: This module contains all of the parameters characterizing the
-!              computational domain, simulation algorithm, stiffened equation of
-!              state and finally, the formatted database file(s) structure.
-! Author: Vedran Coralic
-! Date: 06/09/12
-
-
+!>
+!! @file m_global_parameters.f90
+!! @brief This module contains all of the parameters characterizing the
+!!      computational domain, simulation algorithm, stiffened equation of
+!!      state and finally, the formatted database file(s) structure.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_global_parameters
     
     
     ! Dependencies =============================================================
-    USE mpi                     ! Message passing interface (MPI) module
+    USE mpi                     !< Message passing interface (MPI) module
     
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
     
-    ! Logistics ================================================================
-    INTEGER                    :: num_procs            ! Number of processors
-    INTEGER        , PARAMETER :: num_stcls_min = 5    ! Mininum # of stencils
-    INTEGER        , PARAMETER :: path_len      = 400  ! Maximum path length
-    INTEGER        , PARAMETER :: name_len      = 50   ! Maximum name length
-    REAL(KIND(0d0)), PARAMETER :: dflt_real     = -1d6 ! Default real value
-    INTEGER        , PARAMETER :: dflt_int      = -100 ! Default integer value
-    REAL(KIND(0d0)), PARAMETER :: sgm_eps       = 1d-16 ! Segmentation tolerance
-    CHARACTER(LEN = path_len)  :: case_dir             ! Case folder location
-    ! ==========================================================================
-    
+    !> @name Logistics
+    !> @{ 
+    INTEGER                    :: num_procs            !< Number of processors
+    INTEGER        , PARAMETER :: num_stcls_min = 5    !< Mininum # of stencils
+    INTEGER        , PARAMETER :: path_len      = 400  !< Maximum path length
+    INTEGER        , PARAMETER :: name_len      = 50   !< Maximum name length
+    REAL(KIND(0d0)), PARAMETER :: dflt_real     = -1d6 !< Default real value
+    INTEGER        , PARAMETER :: dflt_int      = -100 !< Default integer value
+    REAL(KIND(0d0)), PARAMETER :: sgm_eps       = 1d-16 !< Segmentation tolerance
+    CHARACTER(LEN = path_len)  :: case_dir             !< Case folder location
+    !> @} 
     
     ! Computational Domain Parameters ==========================================
     
-    ! Rank of the local processor
-    INTEGER :: proc_rank
+    INTEGER :: proc_rank !< Rank of the local processor
     
-    ! Number of cells in the x-, y- and z-coordinate directions
+    !> @name Number of cells in the x-, y- and z-coordinate directions
+    !> @{
     INTEGER :: m, m_root
     INTEGER :: n
     INTEGER :: p
-    
-    ! Cylindrical coordinates (either axisymmetric or full 3D)
+    !> @}
+
+    !> @name Cylindrical coordinates (either axisymmetric or full 3D)
+    !> @{
     LOGICAL :: cyl_coord
     INTEGER :: grid_geometry
+    !> @}
 
-    ! Global number of cells in each direction
+    !> @name Global number of cells in each direction
+    !> @{
     INTEGER :: m_glb, n_glb, p_glb
+    !> @}
 
-    ! Number of spatial dimensions
-    INTEGER :: num_dims
+    INTEGER :: num_dims !< Number of spatial dimensions
 
-    ! Cell-boundary locations in the x-, y- and z-coordinate directions
+    !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: x_cb, x_root_cb, y_cb, z_cb
-
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: coarse_x_cb, coarse_y_cb, coarse_z_cb
-    
-    ! Cell-center locations in the x-, y- and z-coordinate directions
+    !> @}
+
+    !> @name Cell-center locations in the x-, y- and z-coordinate directions
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: x_cc, x_root_cc, y_cc, z_cc
-    
-    ! Cell-width distributions in the x-, y- and z-coordinate directions
+    !> @}
+
+    !> Cell-width distributions in the x-, y- and z-coordinate directions
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: dx, dy, dz
+    !> @}
+
+    INTEGER :: buff_size !<
+    !! Number of cells in buffer region. For the variables which feature a buffer
+    !! region, this region is used to store information outside the computational
+    !! domain based on the boundary conditions.
     
-    ! Number of cells in buffer region. For the variables which feature a buffer
-    ! region, this region is used to store information outside the computational
-    ! domain based on the boundary conditions.
-    INTEGER :: buff_size
-    
-    ! In order, the first time-step directory, last time-step directory and the
-    ! interval between consecutive time-step directories, to be post-processed.
-    INTEGER :: t_step_start
-    INTEGER :: t_step_stop
-    INTEGER :: t_step_save
+    INTEGER :: t_step_start  !< First time-step directory
+    INTEGER :: t_step_stop   !< Last time-step directory
+    INTEGER :: t_step_save   !< Interval between consecutive time-step directory
     
     ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data
     ! of the defragmented computational domain. They are only used in 1D. For
@@ -80,17 +87,20 @@ MODULE m_global_parameters
     ! ==========================================================================
     
     
-    ! Simulation Algorithm Parameters ==========================================
-    INTEGER :: model_eqns      ! Multicomponent flow model
-    INTEGER :: num_fluids      ! Number of different fluids present in the flow
-    LOGICAL :: adv_alphan      ! Advection of the last volume fraction
-    LOGICAL :: mpp_lim
-    INTEGER :: sys_size     ! Number of unknowns in the system of equations
-    INTEGER :: weno_order      ! Order of accuracy for the WENO reconstruction
-    LOGICAL :: mixture_err
-    LOGICAL :: alt_soundspeed ! Alternate sound speed
-    
-    ! Annotations of the structure, i.e. the organization, of the state vectors
+    !> @name Simulation Algorithm Parameters
+    !> @{
+    INTEGER :: model_eqns      !< Multicomponent flow model
+    INTEGER :: num_fluids      !< Number of different fluids present in the flow
+    LOGICAL :: adv_alphan      !< Advection of the last volume fraction
+    LOGICAL :: mpp_lim         !< Maximum volume fraction limiter
+    INTEGER :: sys_size        !< Number of unknowns in the system of equations
+    INTEGER :: weno_order      !< Order of accuracy for the WENO reconstruction
+    LOGICAL :: mixture_err     !< Mixture error limiter
+    LOGICAL :: alt_soundspeed  !< Alternate sound speed
+    !> @}
+
+    !> @name Annotations of the structure, i.e. the organization, of the state vectors
+    !> @{
     TYPE(bounds_info) :: cont_idx                  ! Indexes of first & last continuity eqns.
     TYPE(bounds_info) :: mom_idx                   ! Indexes of first & last momentum eqns.
     INTEGER           :: E_idx                     ! Index of energy equation
@@ -100,66 +110,73 @@ MODULE m_global_parameters
     INTEGER           :: gamma_idx                 ! Index of specific heat ratio func. eqn.
     INTEGER           :: alf_idx                 ! Index of specific heat ratio func. eqn.
     INTEGER           :: pi_inf_idx                ! Index of liquid stiffness func. eqn.
-    
-    ! Boundary conditions in the x-, y- and z-coordinate directions
-     TYPE(bounds_info) :: bc_x, bc_y, bc_z
+    !> @}
 
-    ! Format of the data files
-    LOGICAL :: parallel_io
+    !> @name Boundary conditions in the x-, y- and z-coordinate directions
+    !> @{
+    TYPE(bounds_info) :: bc_x, bc_y, bc_z
+    !> @}
 
-    ! Processor coordinates in MPI_CART_COMM
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: proc_coords
-    ! Starting cell-center index of local processor in global grid
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: start_idx
+    LOGICAL :: parallel_io    !< Format of the data files
+
+
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: proc_coords !< 
+    !! Processor coordinates in MPI_CART_COMM
+
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: start_idx !< 
+    !! Starting cell-center index of local processor in global grid
 
     TYPE(mpi_io_var), PUBLIC :: MPI_IO_DATA
 
-    ! MPI info for parallel IO with Lustre file systems
+    !> @name MPI info for parallel IO with Lustre file systems
+    !> @{
     CHARACTER(LEN = name_len) :: mpiiofs
     INTEGER :: mpi_info_int
+    !> @}
 
     INTEGER, PRIVATE :: ierr
     ! ==========================================================================
     
     
-    ! Fluids Physical Parameters ===============================================
-    
-    ! Database of the physical parameters of each of the fluids that is present
-    ! in the flow. These include the stiffened gas equation of state parameters,
-    ! the Reynolds numbers and the Weber numbers.
-    TYPE(physical_parameters), DIMENSION(num_fluids_max) :: fluid_pp
+    TYPE(physical_parameters), DIMENSION(num_fluids_max) :: fluid_pp !<
+    !! Database of the physical parameters of each of the fluids that is present
+    !! in the flow. These include the stiffened gas equation of state parameters,
+    !! the Reynolds numbers and the Weber numbers.
     
     ! ==========================================================================
     
     
     ! Formatted Database File(s) Structure Parameters ==========================
     
-    ! Format of the database file(s)
-    INTEGER :: format
+
+    INTEGER :: format !< Format of the database file(s)
 
     LOGICAL :: coarsen_silo
     
-    ! Floating point precision of the database file(s)
-    INTEGER :: precision
+
+    INTEGER :: precision !< Floating point precision of the database file(s)
     
-    ! Size of the ghost zone layer in the x-, y- and z-coordinate directions.
-    ! The definition of the ghost zone layers is only necessary when using the
-    ! Silo database file format in multidimensions. These zones provide VisIt
-    ! with the subdomain connectivity information that it requires in order to
-    ! produce smooth plots.
+    !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
+    !! The definition of the ghost zone layers is only necessary when using the
+    !! Silo database file format in multidimensions. These zones provide VisIt
+    !! with the subdomain connectivity information that it requires in order to
+    !! produce smooth plots.
+    !> @{
     TYPE(bounds_info) :: offset_x, offset_y, offset_z
-    
-    ! The list of all possible flow variables that may be written to a database
-    ! file. It includes partial densities, density, momentum, velocity, energy,
-    ! pressure, volume fraction(s), specific heat ratio function, specific heat
-    ! ratio, liquid stiffness function, liquid stiffness, primitive variables,
-    ! conservative variables, speed of sound, the vorticity and the numerical
-    ! Schlieren function.
+    !> @}
+
+    !> @name The list of all possible flow variables that may be written to a database
+    !! file. It includes partial densities, density, momentum, velocity, energy,
+    !! pressure, volume fraction(s), specific heat ratio function, specific heat
+    !! ratio, liquid stiffness function, liquid stiffness, primitive variables,
+    !! conservative variables, speed of sound, the vorticity, 
+    !! and the numerical Schlieren function.
+    !> @{
     LOGICAL, DIMENSION(num_fluids_max) :: alpha_rho_wrt
     LOGICAL                            :: rho_wrt
     LOGICAL, DIMENSION(3)              :: mom_wrt
     LOGICAL, DIMENSION(3)              :: vel_wrt
-    INTEGER                            :: flux_lim       ! Choice of flux limiter
+    INTEGER                            :: flux_lim
     LOGICAL, DIMENSION(3)              :: flux_wrt
     LOGICAL, DIMENSION(num_fluids_max) :: kappa_wrt
     LOGICAL                            :: E_wrt
@@ -174,43 +191,51 @@ MODULE m_global_parameters
     LOGICAL                            :: c_wrt
     LOGICAL, DIMENSION(3)              :: omega_wrt
     LOGICAL                            :: schlieren_wrt
-   
-    ! Options for Fourier decomposition in the azimuthal direction if 3D
-    ! cylindrical coordinates are used
+    !> @}
+
+    !> @name Options for Fourier decomposition in the azimuthal direction if 3D
+    !! cylindrical coordinates are used
+    !> @{
     LOGICAL                            :: fourier_decomp
     TYPE(bounds_info)                  :: fourier_modes
+    !> @}
 
-    ! Amplitude coefficients of the numerical Schlieren function that are used
-    ! to adjust the intensity of numerical Schlieren renderings for individual
-    ! fluids. This enables waves and interfaces of varying strenghts and in all
-    ! of the fluids to be made simulatenously visible on a single plot.
-    REAL(KIND(0d0)), DIMENSION(num_fluids_max) :: schlieren_alpha
+    REAL(KIND(0d0)), DIMENSION(num_fluids_max) :: schlieren_alpha    !<
+    !! Amplitude coefficients of the numerical Schlieren function that are used
+    !! to adjust the intensity of numerical Schlieren renderings for individual
+    !! fluids. This enables waves and interfaces of varying strenghts and in all
+    !! of the fluids to be made simulatenously visible on a single plot.
     
-    ! The order of the finite-difference (fd) approximations of the first-order
-    ! derivatives that need to be evaluated when vorticity and/or the numerical
-    ! Schlieren function are to be outputted to the formatted database file(s).
-    INTEGER :: fd_order
+    INTEGER :: fd_order !<
+    !! The order of the finite-difference (fd) approximations of the first-order
+    !! derivatives that need to be evaluated when vorticity and/or the numerical
+    !! Schlieren function are to be outputted to the formatted database file(s).
     
-    ! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
-    ! it is a measure of the half-size of the finite-difference stencil for the
-    ! selected order of accuracy.
-    INTEGER :: fd_number
+    INTEGER :: fd_number !<
+    !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
+    !! it is a measure of the half-size of the finite-difference stencil for the
+    !! selected order of accuracy.
     
     ! ==========================================================================
     
-    ! SHB: Reference parameters for Tait EOS
+    !> @name Reference parameters for Tait EOS
+    !> @{
     REAL(KIND(0d0)) :: rhoref, pref
-    ! SHB: For bubble modeling
+    !> @}
+
+    !> @name Bubble modeling variables and parameters
+    !> @{
     INTEGER         :: nb
     REAL(KIND(0d0)) :: R0ref
     REAL(KIND(0d0)) :: Ca, Web, Re_inv
-    REAL(KIND(0d0)), dimension(:), allocatable :: weight, R0, V0
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight, R0, V0
     LOGICAL         :: bubbles
     LOGICAL         :: polytropic
     INTEGER         :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
-    REAL(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
-    REAL(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
-    REAL(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
+    REAL(KIND(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
+    !> @}
 
     ! Mathematical and Physical Constants ======================================
     REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0
@@ -222,15 +247,12 @@ MODULE m_global_parameters
         
         
         
-        
+        !> Assigns default values to user inputs prior to reading
+        !!      them in. This allows for an easier consistency check of
+        !!      these parameters once they are read from the input file.        
         SUBROUTINE s_assign_default_values_to_user_inputs() ! ------------------
-        ! Description: Assigns default values to user inputs prior to reading
-        !              them in. This allows for an easier consistency check of
-        !              these parameters once they are read from the input file.
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Logistics
@@ -323,12 +345,10 @@ MODULE m_global_parameters
         
         
         
-        
-        
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module        
         SUBROUTINE s_initialize_global_parameters_module() ! ----------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
+
             INTEGER :: i, fac
             
             ! Setting m_root equal to m in the case of a 1D serial simulation
@@ -391,9 +411,9 @@ MODULE m_global_parameters
                     end if
                     sys_size = bub_idx%end
 
-                    allocate( bub_idx%rs(nb), bub_idx%vs(nb) )
-                    allocate( bub_idx%ps(nb), bub_idx%ms(nb) )
-                    allocate( weight(nb),R0(nb),V0(nb) )
+                    ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+                    ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                     do i = 1, nb
                         if (polytropic .neqv. .TRUE.) then
@@ -472,9 +492,9 @@ MODULE m_global_parameters
                     sys_size = bub_idx%end
                     print*, 'sys_size', sys_size
 
-                    allocate( bub_idx%rs(nb), bub_idx%vs(nb) )
-                    allocate( bub_idx%ps(nb), bub_idx%ms(nb) )
-                    allocate( weight(nb),R0(nb),V0(nb) )
+                    ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+                    ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                     do i = 1, nb
                         if (polytropic .neqv. .TRUE.) then
@@ -605,8 +625,9 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_initialize_global_parameters_module ! --------------------
 
+        !> Subroutine to initialize variable for non-polytropic gas modeling processes
+        SUBROUTINE s_initialize_nonpoly
 
-        subroutine s_initialize_nonpoly
             INTEGER :: ir
             REAL(KIND(0.D0)) :: rhol0
             REAL(KIND(0.D0)) :: pl0
@@ -634,9 +655,9 @@ MODULE m_global_parameters
             rhol0 = rhoref
             pl0   = pref
             
-            allocate( pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb) )
-            allocate( k_n(nb), k_v(nb), omegaN(nb) )
-            allocate( Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb) ) 
+            ALLOCATE( pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb) )
+            ALLOCATE( k_n(nb), k_v(nb), omegaN(nb) )
+            ALLOCATE( Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb) ) 
             
             pb0(:)      = dflt_real
             mass_n0(:)  = dflt_real
@@ -723,8 +744,9 @@ MODULE m_global_parameters
 
             rhoref = 1.d0
             pref = 1.d0
-        end subroutine s_initialize_nonpoly
-        
+        END SUBROUTINE s_initialize_nonpoly
+       
+        !> Subroutine to compute the transfer coefficient for non-polytropic gas modeling
         SUBROUTINE s_transcoeff( omega,peclet,Re_trans,Im_trans )
 
             REAL(KIND(0.D0)), INTENT(IN) :: omega
@@ -745,7 +767,8 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_transcoeff
 
-
+        
+        !> Subroutine to initialize parallel infrastructure
         SUBROUTINE s_initialize_parallel_io() ! --------------------------------
 
             num_dims = 1 + MIN(1,n) + MIN(1,p)
@@ -771,10 +794,8 @@ MODULE m_global_parameters
         
         
         
-        
-        
+        !> Deallocation procedures for the module
         SUBROUTINE s_finalize_global_parameters_module() ! -------------------
-        ! Description: Deallocation procedures for the module
             
             INTEGER :: i
             
@@ -819,10 +840,11 @@ MODULE m_global_parameters
         END SUBROUTINE s_finalize_global_parameters_module ! -----------------
         
         
-        !bubble routines
+        !> Computes the bubble number density n from the conservative variables
+        !! @param vftmp is the void fraction
+        !! @param nRtmp is the bubble number  density times the bubble radii
+        !! @param ntmp is the output number bubble density
         SUBROUTINE s_comp_n_from_cons( vftmp,nRtmp,ntmp )
-            ! vftemp is \alpha, nRtemp is nR=n*R, ntmp is n
-            ! compute n from \alpha and nR(:)
             REAL(KIND(0.D0)), INTENT(IN) :: vftmp
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: nRtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
@@ -833,9 +855,13 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_comp_n_from_cons
 
+
+        !> Computes the bubble number density n from the primitive variables
+        !! @param vftmp is the void fraction
+        !! @param Rtmp is the  bubble radii
+        !! @param ntmp is the output number bubble density
         SUBROUTINE s_comp_n_from_prim( vftmp,Rtmp,ntmp )
-            ! vftemp is \alpha, Rtemp is R, ntmp is n
-            ! compute n from \alpha and R(:)
+            
             REAL(KIND(0.D0)), INTENT(IN) :: vftmp
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: Rtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
@@ -846,6 +872,10 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_comp_n_from_prim
 
+
+        !> Computes the quadrature for polydisperse bubble populations
+        !! @param func is the bubble dynamic variables for each bin
+        !! @param mom is the computed moment
         SUBROUTINE s_quad( func,mom )
 
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: func
@@ -856,6 +886,9 @@ MODULE m_global_parameters
 
         END SUBROUTINE s_quad
 
+
+        !> Computes the Simpson weights for quadrature
+        !! @param Npt is the number of bins that represent the polydisperse bubble population
         SUBROUTINE s_simpson( Npt )
 
             INTEGER, INTENT(IN) :: Npt

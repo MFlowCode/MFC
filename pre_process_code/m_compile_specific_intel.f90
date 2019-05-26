@@ -20,4 +20,4 @@ MODULE m_compile_specific
             INQUIRE(DIRECTORY=TRIM(fileloc),EXIST=dircheck)   !Intel
         END SUBROUTINE my_inquire
 
-MODULE m_compile_specific
+END MODULE m_compile_specific

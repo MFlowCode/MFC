@@ -23,24 +23,28 @@ MODULE m_variables_conversion
     !> Abstract interface to two subroutines designed for the transfer/conversion
     !! of the mixture/species variables to the mixture variables
     ABSTRACT INTERFACE
-        
+      
+        !> Structure of the s_convert_mixture_to_mixture_variables
+        !!      and s_convert_species_to_mixture_variables subroutines
+        !!  @param q_vf Conservative or primitive variables
+        !!  @param i First-coordinate cell index
+        !!  @param j First-coordinate cell index
+        !!  @param k First-coordinate cell index
+        !!  @param rho Density
+        !!  @param gamma Specific heat ratio function
+        !!  @param pi_inf Liquid stiffness function
         SUBROUTINE s_convert_xxxxx_to_mixture_variables(   q_vf, i,j,k,   &
                                                          rho,gamma,pi_inf )
-        ! Description: Structure of the s_convert_mixture_to_mixture_variables
-        !              and s_convert_species_to_mixture_variables subroutines
-            
+
             ! Importing the derived type scalar_field from m_derived_types.f90
             ! and global variable sys_size, from m_global_variables.f90, as
             ! the abstract interface does not inherently have access to them
             IMPORT :: scalar_field, sys_size
             
-            ! Conservative or primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_vf
             
-            ! Cell indexes for which to transfer/compute mixture variables
             INTEGER, INTENT(IN) :: i,j,k
             
-            ! Density and the specific heat ratio and liquid stiffness functions
             REAL(KIND(0d0)), INTENT(OUT) :: rho
             REAL(KIND(0d0)), INTENT(OUT) :: gamma
             REAL(KIND(0d0)), INTENT(OUT) :: pi_inf
@@ -89,7 +93,7 @@ MODULE m_variables_conversion
             ! liquid stiffness function, respectively
             rho    = q_vf(1)%sf(i,j,k)
             gamma  = q_vf(gamma_idx)%sf(i,j,k)
-            pi_inf = q_vf(pi_nf_idx)%sf(i,j,k)
+            pi_inf = q_vf(pi_inf_idx)%sf(i,j,k)
             
             
         END SUBROUTINE s_convert_mixture_to_mixture_variables ! ----------------

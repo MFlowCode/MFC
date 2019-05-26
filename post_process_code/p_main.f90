@@ -1,68 +1,70 @@
-! MFC v3.0 - Post-process Code: p_main.f90
-! Description: The post-process restructures raw unformatted data, outputted by
-!              the simulation, into a formatted database, Silo-HDF5 or Binary,
-!              chosen by the user. The user may also specify which variables to
-!              include in the database. The choices range from any one of the
-!              primitive and conservative variables, as well as quantities that
-!              can be derived from those such as the unadvected volume fraction,
-!              specific heat ratio, liquid stiffness, speed of sound, vorticity
-!              and the numerical Schlieren function.
-! Author: Vedran Coralic
-! Date: 06/10/12
-
-
+!>
+!! @file p_main.f90
+!! @brief The post-process restructures raw unformatted data, outputted by
+!!              the simulation, into a formatted database, Silo-HDF5 or Binary,
+!!              chosen by the user. The user may also specify which variables to
+!!              include in the database. The choices range from any one of the
+!!              primitive and conservative variables, as well as quantities that
+!!              can be derived from those such as the unadvected volume fraction,
+!!              specific heat ratio, liquid stiffness, speed of sound, vorticity
+!!              and the numerical Schlieren function.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 PROGRAM p_main
     
     
     ! Dependencies =============================================================
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_fftw                 ! Module for FFTW functions
+    USE m_fftw                  !< Module for FFTW functions
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
     
-    USE m_variables_conversion  ! Subroutines to change the state variables from
-                                ! one form to another
+    USE m_variables_conversion  !< Subroutines to change the state variables from
+                                !! one form to another
     
-    USE m_start_up              ! Subroutines that read in and check consistency
-                                ! of the user provided inputs and data
+    USE m_start_up              !< Subroutines that read in and check consistency
+                                !! of the user provided inputs and data
     
-    USE m_data_input            ! Procedures reading raw simulation data to fill
-                                ! the conservative, primitive and grid variables
+    USE m_data_input            !< Procedures reading raw simulation data to fill
+                                !! the conservative, primitive and grid variables
     
-    USE m_data_output           ! Procedures that write the grid and chosen flow
-                                ! variable(s) to the formatted database file(s)
+    USE m_data_output           !< Procedures that write the grid and chosen flow
+                                !! variable(s) to the formatted database file(s)
     
-    USE m_derived_variables     ! Procedures used to compute quantites derived
-                                ! from the conservative and primitive variables
+    USE m_derived_variables     !< Procedures used to compute quantites derived
+                                !! from the conservative and primitive variables
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
     
-    ! Iterator for the main time-stepping loop
-    INTEGER :: t_step
-    
-    ! Generic storage for the name(s) of the flow variable(s) that will be added
-    ! to the formatted database file(s)
-    CHARACTER(LEN = name_len) :: varname
-    
-    ! Generic loop iterator
-    INTEGER :: i,j,k
 
-    ! Variable for the total volume of the second volume fraction to later on track the evolution of the radius of a bubble over time
-    REAL(KIND(0d0)) :: total_volume
+    INTEGER :: t_step !< Iterator for the main time-stepping loop
+    
+    CHARACTER(LEN = name_len) :: varname !< 
+    !! Generic storage for the name(s) of the flow variable(s) that will be added
+    !! to the formatted database file(s)
+    
+    !> @name Generic loop iterator
+    !> @{
+    INTEGER :: i,j,k
+    !> @}
+
+    REAL(KIND(0d0)) :: total_volume !<
+    !! Variable for the total volume of the second volume fraction 
+    !! to later on track the evolution of the radius of a bubble over time
+ 
     OPEN(11,file='result_totalVolumeAlphaEnd.dat', STATUS='UNKNOWN')
     300 FORMAT(20E16.7)
     
     ! Initialization of the MPI environment
     CALL s_mpi_initialize()
-    
 
-        print*, 'done initializing'    
     ! Processor with rank 0 assigns default user input values prior to reading
     ! those in from the input file. Next, the user inputs are read in and their
     ! consistency is checked. The detection of any inconsistencies automatically
@@ -81,7 +83,6 @@ PROGRAM p_main
     CALL s_initialize_parallel_io()
     CALL s_mpi_decompose_computational_domain()
     
-        print*, 'done decomposing'
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     CALL s_initialize_global_parameters_module()

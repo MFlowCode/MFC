@@ -1,22 +1,22 @@
-! MFC v3.0 - Post-process Code: m_derived_variables.f90
-! Description: This module features subroutines that allow for the derivation of
-!              numerous flow variables from the conservative and primitive ones.
-!              Currently, the available derived variables include the unadvected
-!              volume fraction, specific heat ratio, liquid stiffness, speed of
-!              sound, vorticity and the numerical Schlieren function.
-! Author: Vedran Coralic
-! Date: 06/09/12
-
-
+!>
+!! @file m_derived_variables.f90
+!! @brief This module features subroutines that allow for the derivation of
+!!      numerous flow variables from the conservative and primitive ones.
+!!      Currently, the available derived variables include the unadvected
+!!      volume fraction, specific heat ratio, liquid stiffness, speed of
+!!      sound, vorticity and the numerical Schlieren function.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_derived_variables
     
     
     ! Dependencies =============================================================
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
     ! ==========================================================================
     
     
@@ -34,27 +34,29 @@ MODULE m_derived_variables
                        s_derive_curvature, &
                        s_finalize_derived_variables_module
     
-    ! Gradient magnitude (gm) of the density for each cell of the computational
-    ! sub-domain. This variable is employed in the calculation of the numerical
-    ! Schlieren function.
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: gm_rho_sf
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: gm_rho_sf !<
+    !! Gradient magnitude (gm) of the density for each cell of the computational
+    !! sub-domain. This variable is employed in the calculation of the numerical
+    !! Schlieren function.
     
-    ! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
-    ! Note that because sufficient boundary information is available for all the
-    ! active coordinate directions, the centered family of the finite-difference
-    ! schemes is used.
+    !> @name Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
+    !! Note that because sufficient boundary information is available for all the
+    !! active coordinate directions, the centered family of the finite-difference
+    !! schemes is used.
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:), PUBLIC :: fd_coeff_x
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:), PUBLIC :: fd_coeff_y
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:), PUBLIC :: fd_coeff_z
-    
-    ! Flagging (flg) variable used to annotate the dimensionality of the dataset
-    ! that is undergoing the post-process. A flag value of 1 indicates that the
-    ! dataset is 3D, while a flag value of 0 indicates that it is not. This flg
-    ! variable is necessary to avoid cycling through the third dimension of the
-    ! flow variable(s) when the simulation is not 3D and the size of the buffer
-    ! is non-zero. Note that a similar procedure does not have to be applied to
-    ! the second dimension since in 1D, the buffer size is always zero.
-    INTEGER, PRIVATE :: flg
+    !> @}
+
+    INTEGER, PRIVATE :: flg  !<
+    !! Flagging (flg) variable used to annotate the dimensionality of the dataset
+    !! that is undergoing the post-process. A flag value of 1 indicates that the
+    !! dataset is 3D, while a flag value of 0 indicates that it is not. This flg
+    !! variable is necessary to avoid cycling through the third dimension of the
+    !! flow variable(s) when the simulation is not 3D and the size of the buffer
+    !! is non-zero. Note that a similar procedure does not have to be applied to
+    !! the second dimension since in 1D, the buffer size is always zero.
     
     
     CONTAINS
@@ -62,11 +64,9 @@ MODULE m_derived_variables
         
         
         
-        
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module        
         SUBROUTINE s_initialize_derived_variables_module() ! ----------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
             
             ! Allocating the gradient magnitude of the density variable provided
             ! that numerical Schlieren function is outputted during post-process
@@ -122,38 +122,33 @@ MODULE m_derived_variables
         
         
         
-        
-        
+        !> @name The purpose of this subroutine is to compute the finite-
+        !!      difference coefficients for the centered schemes utilized
+        !!      in computations of first order spatial derivatives in the
+        !!      s-coordinate direction. The s-coordinate direction refers
+        !!      to the x-, y- or z-coordinate direction, depending on the
+        !!      subroutine's inputs. Note that coefficients of up to 4th
+        !!      order accuracy are available.
+        !!  @param q Number of cells in the s-coordinate direction
+        !!  @param offset_s  Size of the ghost zone layer in the s-coordinate direction
+        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
+        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction 
         SUBROUTINE s_compute_finite_difference_coefficients(    q, offset_s,   &
                                                              s_cc, fd_coeff_s  )
-        ! Description: The purpose of this subroutine is to compute the finite-
-        !              difference coefficients for the centered schemes utilized
-        !              in computations of first order spatial derivatives in the
-        !              s-coordinate direction. The s-coordinate direction refers
-        !              to the x-, y- or z-coordinate direction, depending on the
-        !              subroutine's inputs. Note that coefficients of up to 4th
-        !              order accuracy are available.
-            
-            
-            ! Number of cells in the s-coordinate direction
+           
             INTEGER, INTENT(IN) :: q
-            
-            ! Size of the ghost zone layer in the s-coordinate direction
             TYPE(bounds_info), INTENT(IN) :: offset_s
             
-            ! Locations of the cell-centers in the s-coordinate direction
             REAL(KIND(0d0)), &
             DIMENSION(-buff_size:q+buff_size), &
             INTENT(IN) :: s_cc
             
-            ! Finite-difference coefficients in the s-coordinate direction
             REAL(KIND(0d0)), &
             DIMENSION(-fd_number:fd_number, -offset_s%beg:q+offset_s%end), &
             INTENT(INOUT) :: fd_coeff_s
             
-            ! Generic loop iterator
-            INTEGER :: i
-            
+
+            INTEGER :: i !< Generic loop iterator
             
             ! Computing the 1st order finite-difference coefficients
             IF(fd_order == 1) THEN
@@ -189,31 +184,27 @@ MODULE m_derived_variables
         
         
         
-        
-        
+        !>  This subroutine is used together with the volume fraction
+        !!      model and when called upon, it computes the values of the
+        !!      unadvected volume fraction from the inputted conservative
+        !!      variables, q_cons_vf. The calculated values are stored in
+        !!      the derived flow quantity storage variable, q_sf.        
+        !!  @param q_cons_vf Conservative variables
+        !!  @param q_sf Unadvected volume fraction
         SUBROUTINE s_derive_unadvected_volume_fraction(q_cons_vf, q_sf) ! ------
-        ! Description: This subroutine is used together with the volume fraction
-        !              model and when called upon, it computes the values of the
-        !              unadvected volume fraction from the inputted conservative
-        !              variables, q_cons_vf. The calculated values are stored in
-        !              the derived flow quantity storage variable, q_sf.
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Unadvected volume fraction
             REAL(KIND(0d0)), &
             DIMENSION( -offset_x%beg : m+offset_x%end  , &
                        -offset_y%beg : n+offset_y%end  , &
                        -offset_z%beg : p+offset_z%end ), &
             INTENT(INOUT) :: q_sf
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
-            
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             ! Computing unadvected volume fraction from conservative variables
             DO l = -offset_z%beg, p + offset_z%end
@@ -236,30 +227,28 @@ MODULE m_derived_variables
         
         
         
-        
+        !>  This subroutine receives as input the specific heat ratio
+        !!      function, gamma_sf, and derives from it the specific heat
+        !!      ratio. The latter is stored in the derived flow quantity
+        !!      storage variable, q_sf.
+        !!  @param gamma_sf Specific heat ratio function
+        !!  @param q_sf Specific heat ratio
         SUBROUTINE s_derive_specific_heat_ratio(gamma_sf, q_sf) ! --------------
-        ! Description: This subroutine receives as input the specific heat ratio
-        !              function, gamma_sf, and derives from it the specific heat
-        !              ratio. The latter is stored in the derived flow quantity
-        !              storage variable, q_sf.
             
-            
-            ! Specific heat ratio function
             REAL(KIND(0d0)), &
             DIMENSION( -buff_size     :  m+buff_size       , &
                        -buff_size     :  n+buff_size       , &
                        -buff_size*flg : (p+buff_size)*flg ), &
             INTENT(IN) :: gamma_sf
             
-            ! Specific heat ratio
             REAL(KIND(0d0)), &
             DIMENSION( -offset_x%beg : m+offset_x%end  , &
                        -offset_y%beg : n+offset_y%end  , &
                        -offset_z%beg : p+offset_z%end ), &
             INTENT(INOUT) :: q_sf
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Computing specific heat ratio from specific heat ratio function
@@ -276,32 +265,30 @@ MODULE m_derived_variables
         
         
         
-        
-        
+        !>  This subroutine admits as inputs the specific heat ratio
+        !!      function and the liquid stiffness function, gamma_sf and
+        !!      pi_inf_sf, respectively. These are used to calculate the
+        !!      values of the liquid stiffness, which are stored in the
+        !!      derived flow quantity storage variable, q_sf.        
+        !!  @param gamma_sf Specific heat ratio
+        !!  @param pi_inf_sf Liquid stiffness function
+        !!  @param q_sf Liquid stiffness
         SUBROUTINE s_derive_liquid_stiffness(gamma_sf, pi_inf_sf, q_sf) ! ------
-        ! Description: This subroutine admits as inputs the specific heat ratio
-        !              function and the liquid stiffness function, gamma_sf and
-        !              pi_inf_sf, respectively. These are used to calculate the
-        !              values of the liquid stiffness, which are stored in the
-        !              derived flow quantity storage variable, q_sf.
-            
-            
-            ! Specific heat ratio and liquid stiffness functions
+
             REAL(KIND(0d0)), &
             DIMENSION( -buff_size     :  m+buff_size       , &
                        -buff_size     :  n+buff_size       , &
                        -buff_size*flg : (p+buff_size)*flg ), &
             INTENT(IN) :: gamma_sf, pi_inf_sf
             
-            ! Liquid stiffness
             REAL(KIND(0d0)), &
             DIMENSION( -offset_x%beg : m+offset_x%end  , &
                        -offset_y%beg : n+offset_y%end  , &
                        -offset_z%beg : p+offset_z%end ), &
             INTENT(INOUT) :: q_sf
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Calculating the values of the liquid stiffness from those of the
@@ -319,38 +306,37 @@ MODULE m_derived_variables
         
         
         
-        
-        
+        !> This subroutine admits as inputs the primitive variables,
+        !!      the density, the specific heat ratio function and liquid
+        !!      stiffness function. It then computes from those variables
+        !!      the values of the speed of sound, which are stored in the
+        !!      derived flow quantity storage variable, q_sf.        
+        !! @param q_prim_vf Primitive variables
+        !! @param rho_sf Density
+        !! @param gamma_sf Specific heat ratio function
+        !! @param pi_inf_sf Liquid stiffness function
+        !! @param q_sf Speed of sound
         SUBROUTINE s_derive_sound_speed( q_prim_vf, rho_sf, gamma_sf, & ! ------
                                                 pi_inf_sf, q_sf       )
-        ! Description: This subroutine admits as inputs the primitive variables,
-        !              the density, the specific heat ratio function and liquid
-        !              stiffness function. It then computes from those variables
-        !              the values of the speed of sound, which are stored in the
-        !              derived flow quantity storage variable, q_sf.
-            
-            
-            ! Primitive variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_prim_vf
             
-            ! Density and the specific heat ratio and liquid stiffness functions
             REAL(KIND(0d0)), &
             DIMENSION( -buff_size     :  m+buff_size       , &
                        -buff_size     :  n+buff_size       , &
                        -buff_size*flg : (p+buff_size)*flg ), &
             INTENT(IN) :: rho_sf, gamma_sf, pi_inf_sf
             
-            ! Speed of sound
             REAL(KIND(0d0)), &
             DIMENSION( -offset_x%beg : m+offset_x%end  , &
                        -offset_y%beg : n+offset_y%end  , &
                        -offset_z%beg : p+offset_z%end ), &
             INTENT(INOUT) :: q_sf
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+            INTEGER :: i,j,k !< Generic loop iterators
 
             ! Fluid bulk modulus for alternate sound speed
             REAL(KIND(0d0)) :: blkmod1, blkmod2
@@ -391,31 +377,27 @@ MODULE m_derived_variables
         
         
         
-        
+        !>  This subroutine derives the flux_limiter at cell boundary
+        !!      i+1/2. This is an approximation because the velocity used
+        !!      to determine the upwind direction is the velocity at the
+        !!      cell center i instead of the contact velocity at the cell
+        !!      boundary from the Riemann solver.        
+        !!  @param i Component indicator
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_sf Flux limiter
         SUBROUTINE s_derive_flux_limiter(i, q_prim_vf, q_sf) ! -----------------
-        ! Description: This subroutine derives the flux_limiter at cell boundary
-        !       i+1/2. This is an approximation because the velocity used
-        !       to determine the upwind direction is the velocity at the
-        !       cell center i instead of the contact velocity at the cell
-        !       boundary from the Riemann solver.
-    
-            ! Component indicator
+
             INTEGER, INTENT(IN) :: i
     
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
     
-            ! Flux limiter
             REAL(KIND(0d0)), DIMENSION (    -offset_x%beg : m+offset_x%end , &
                                             -offset_y%beg : n+offset_y%end , &
                                             -offset_z%beg : p+offset_z%end), &
             INTENT(INOUT) :: q_sf
-    
-            ! Flux limiter calcs
-            REAL(KIND(0d0)) :: top, bottom, slope
-    
-            ! Generic loop iterators
-            INTEGER :: j,k,l
+
+            REAL(KIND(0d0)) :: top, bottom, slope !< Flux limiter calcs
+            INTEGER :: j,k,l !< Generic loop iterators
     
             DO l = -offset_z%beg, p + offset_z%end
                 DO k = -offset_y%beg, n + offset_y%end
@@ -495,16 +477,16 @@ MODULE m_derived_variables
     
     
     
-    
+        !> Computes the local curvatures
+        !!  @param i Fluid indicator
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_sf Curvature
         SUBROUTINE s_derive_curvature(i, q_prim_vf, q_sf) ! --------------------
     
-            ! Fluid indicator
             INTEGER, INTENT(IN) :: i
     
-            ! Primitive variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
     
-            ! Curvature
             REAL(KIND(0d0)), DIMENSION (-offset_x%beg : m+offset_x%end , &
                                         -offset_y%beg : n+offset_y%end , &
                                         -offset_z%beg : p+offset_z%end), &
@@ -637,7 +619,11 @@ MODULE m_derived_variables
     
     
     
-    
+        !>  Computes the solution to the linear system Ax=b w/ sol = x
+        !!  @param A Input matrix
+        !!  @param b right-hand-side
+        !!  @param sol Solution
+        !!  @param ndim Problem size
         SUBROUTINE s_solve_linear_system(A,b,sol,ndim)
 
             INTEGER, INTENT(IN) :: ndim
@@ -699,35 +685,31 @@ MODULE m_derived_variables
         END SUBROUTINE s_solve_linear_system ! -------------------------------------
 
 
-
-
-
+        !>  This subroutine receives as inputs the indicator of the
+        !!      component of the vorticity that should be outputted and
+        !!      the primitive variables. From those inputs, it proceeds
+        !!      to calculate values of the desired vorticity component,
+        !!      which are subsequently stored in derived flow quantity
+        !!      storage variable, q_sf.
+        !!  @param i Vorticity component indicator
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_sf Vorticity component
         SUBROUTINE s_derive_vorticity_component(i, q_prim_vf, q_sf) ! ----------
-        ! Description: This subroutine receives as inputs the indicator of the
-        !              component of the vorticity that should be outputted and
-        !              the primitive variables. From those inputs, it proceeds
-        !              to calculate values of the desired vorticity component,
-        !              which are subsequently stored in derived flow quantity
-        !              storage variable, q_sf.
-            
-            
-            ! Vorticity component indicator
+
             INTEGER, INTENT(IN) :: i
             
-            ! Primitive variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_prim_vf
             
-            ! Vorticity component
             REAL(KIND(0d0)), &
             DIMENSION( -offset_x%beg : m+offset_x%end  , &
                        -offset_y%beg : n+offset_y%end  , &
                        -offset_z%beg : p+offset_z%end ), &
             INTENT(INOUT) :: q_sf
             
-            ! Generic loop iterators
-            INTEGER :: j,k,l,r
+
+            INTEGER :: j,k,l,r !< Generic loop iterators
             
             
             ! Computing the vorticity component in the x-coordinate direction
@@ -816,48 +798,46 @@ MODULE m_derived_variables
         
         
         
-        
+        !>  This subroutine gets as inputs the conservative variables
+        !!      and density. From those inputs, it proceeds to calculate
+        !!      the values of the numerical Schlieren function, which are
+        !!      subsequently stored in the derived flow quantity storage
+        !!      variable, q_sf. 
+        !!  @param q_cons_vf Conservative variables
+        !!  @param rho_sf Density
+        !!  @param q_sf Numerical Schlieren function
         SUBROUTINE s_derive_numerical_schlieren_function(q_cons_vf,rho_sf, q_sf)
-        ! Description: This subroutine gets as inputs the conservative variables
-        !              and density. From those inputs, it proceeds to calculate
-        !              the values of the numerical Schlieren function, which are
-        !              subsequently stored in the derived flow quantity storage
-        !              variable, q_sf.
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Density
             REAL(KIND(0d0)), &
             DIMENSION( -buff_size     :  m+buff_size       , &
                        -buff_size     :  n+buff_size       , &
                        -buff_size*flg : (p+buff_size)*flg ), &
             INTENT(IN) :: rho_sf
             
-            ! Numerical Schlieren function
             REAL(KIND(0d0)), &
             DIMENSION( -offset_x%beg : m+offset_x%end  , &
                        -offset_y%beg : n+offset_y%end  , &
                        -offset_z%beg : p+offset_z%end ), &
             INTENT(INOUT) :: q_sf
             
-            ! Spatial derivatives of the density in the x-, y- and z-directions
-            REAL(KIND(0d0)) :: drho_dx, drho_dy, drho_dz
+
+            REAL(KIND(0d0)) :: drho_dx, drho_dy, drho_dz !<
+            !! Spatial derivatives of the density in the x-, y- and z-directions
             
-            ! Maximum value of the gradient magnitude (gm) of the density field
-            ! in entire computational domain and not just the local sub-domain.
-            ! The first position in the variable contains the maximum value and
-            ! the second contains the rank of the processor on which it occured.
-            REAL(KIND(0d0)), DIMENSION(2) :: gm_rho_max
+            REAL(KIND(0d0)), DIMENSION(2) :: gm_rho_max !<
+            !! Maximum value of the gradient magnitude (gm) of the density field
+            !! in entire computational domain and not just the local sub-domain.
+            !! The first position in the variable contains the maximum value and
+            !! the second contains the rank of the processor on which it occured.
             
-            ! Unadvected volume fraction
-            REAL(KIND(0d0)) :: alpha_unadv
+            REAL(KIND(0d0)) :: alpha_unadv !< Unadvected volume fraction
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             
             ! Computing Gradient Magnitude of Density ==========================
@@ -988,10 +968,9 @@ MODULE m_derived_variables
         
         
         
-        
-        
+        !>  Deallocation procedures for the module        
         SUBROUTINE s_finalize_derived_variables_module() ! -------------------
-        ! Description: Deallocation procedures for the module
+
             
             
             ! Deallocating the variable containing the gradient magnitude of the

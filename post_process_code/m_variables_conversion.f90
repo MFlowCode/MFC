@@ -1,22 +1,22 @@
-! MFC v3.0 - Post-process Code: m_variables_conversion.f90
-! Description: This module consists of subroutines used in the conversion of the
-!              conservative variables into the primitive variables. In addition,
-!              the module also contains subroutines used to compute the mixture
-!              variables. For a specific time-step undergoing the post-process,
-!              the mixture variables are stored everywhere on the grid so that
-!              they may possibly be outputted or used to compute other derived
-!              flow quantities.
-! Author: Vedran Coralic
-! Date: 06/10/12
-
-
+!>
+!! @file m_variables_conversion.f90
+!! @brief This module consists of subroutines used in the conversion of the
+!!              conservative variables into the primitive variables. In addition,
+!!              the module also contains subroutines used to compute the mixture
+!!              variables. For a specific time-step undergoing the post-process,
+!!              the mixture variables are stored everywhere on the grid so that
+!!              they may possibly be outputted or used to compute other derived
+!!              flow quantities.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_variables_conversion
     
     
     ! Dependencies =============================================================
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     ! ==========================================================================
     
     
@@ -30,13 +30,14 @@ MODULE m_variables_conversion
                        s_convert_conservative_to_primitive_variables, &
                        s_finalize_variables_conversion_module
     
-    ! Abstract interface to two subroutines designed for the transfer/conversion
-    ! of the mixture/species variables to the mixture variables
+    !> Abstract interface to two subroutines designed for the transfer/conversion
+    !! of the mixture/species variables to the mixture variables
     ABSTRACT INTERFACE
         
+        !>  Structure of the s_convert_mixture_to_mixture_variables
+        !!      and s_convert_species_to_mixture_variables subroutines
+
         SUBROUTINE s_convert_xxxxx_to_mixture_variables(q_cons_vf, i,j,k)
-        ! Description: Structure of the s_convert_mixture_to_mixture_variables
-        !              and s_convert_species_to_mixture_variables subroutines
             
             ! Importing the derived type scalar_field from m_derived_types.f90
             ! and global variable sys_size, from m_global_variables.f90, as
@@ -59,25 +60,23 @@ MODULE m_variables_conversion
     ! a procedure such that the choice of the model equations does not have to
     ! be queried every time the mixture quantities are needed.
     
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: rho_sf !< Scalar density function
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: gamma_sf !< Scalar sp. heat ratio function
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: pi_inf_sf !< Scalar liquid stiffness function
     
-    ! Density, specific heat ratio function and liquid stiffness function
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: rho_sf
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: gamma_sf
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: pi_inf_sf
-    
-    ! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
-    ! or s_convert_species_to_mixture_variables, based on model equations choice
     PROCEDURE(s_convert_xxxxx_to_mixture_variables), &
-    POINTER :: s_convert_to_mixture_variables => NULL()
+    POINTER :: s_convert_to_mixture_variables => NULL() !<
+    !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
+    !! or s_convert_species_to_mixture_variables, based on model equations choice
     
-    ! Flagging (flg) variable used to annotate the dimensionality of the dataset
-    ! that is undergoing the post-process. A flag value of 1 indicates that the
-    ! dataset is 3D, while a flag value of 0 indicates that it is not. This flg
-    ! variable is necessary to avoid cycling through the third dimension of the
-    ! flow variable(s) when the simulation is not 3D and the size of the buffer
-    ! is non-zero. Note that a similar procedure does not have to be applied to
-    ! the second dimension since in 1D, the buffer size is always zero.
-    INTEGER, PRIVATE :: flg
+    INTEGER, PRIVATE :: flg !<
+    !! Flagging (flg) variable used to annotate the dimensionality of the dataset
+    !! that is undergoing the post-process. A flag value of 1 indicates that the
+    !! dataset is 3D, while a flag value of 0 indicates that it is not. This flg
+    !! variable is necessary to avoid cycling through the third dimension of the
+    !! flow variable(s) when the simulation is not 3D and the size of the buffer
+    !! is non-zero. Note that a similar procedure does not have to be applied to
+    !! the second dimension since in 1D, the buffer size is always zero.
     
     
     CONTAINS
@@ -85,23 +84,22 @@ MODULE m_variables_conversion
         
         
         
-        
+        !>  This subroutine is constructed for the gamma/pi_inf model
+        !!      and provided a set of conservative variables, transfers
+        !!      the density, specific heat ratio function and the liquid
+        !!      stiffness function from q_cons_vf to rho_sf, gamma_sf and
+        !!      pi_inf_sf.
+        !! @param q_cons_vf Conservative variables
+        !! @param i cell index to transfer mixture variables 
+        !! @param j cell index to transfer mixture variables
+        !! @param k cell index to transfer mixture variables
         SUBROUTINE s_convert_mixture_to_mixture_variables(q_cons_vf, i,j,k) ! --
-        ! Description: This subroutine is constructed for the gamma/pi_inf model
-        !              and provided a set of conservative variables, transfers
-        !              the density, specific heat ratio function and the liquid
-        !              stiffness function from q_cons_vf to rho_sf, gamma_sf and
-        !              pi_inf_sf.
             
-            
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Indexes of the cell for which to transfer the mixture variables
             INTEGER, INTENT(IN) :: i,j,k
-            
             
             ! Transfering the density, the specific heat ratio function and the
             ! liquid stiffness function, respectively
@@ -109,15 +107,25 @@ MODULE m_variables_conversion
             gamma_sf(i,j,k)  = q_cons_vf(gamma_idx)%sf(i,j,k)
             pi_inf_sf(i,j,k) = q_cons_vf(pi_inf_idx)%sf(i,j,k)
             
-            
         END SUBROUTINE s_convert_mixture_to_mixture_variables ! ----------------
         
         
+        !>  This subroutine is designed for the volume fraction model
+        !!      with sub-grid ensemble averaged bubbles (Bryngelson 2019)
+        !!      and provided a set of conservative variables, calculates
+        !!      the density, the specific heat ratio function and liquid
+        !!      stiffness function from q_cons_vf and stores the results
+        !!      into rho_sf, gamma_sf and pi_inf_sf.
+        !!  @param qK_vf Conservative variables
+        !!  @param j cell index to transfer mixture variables 
+        !!  @param k cell index to transfer mixture variables
+        !!  @param l cell index to transfer mixture variables
         SUBROUTINE s_convert_species_to_mixture_variables_bubbles (qK_vf,j,k,l)
                                                             
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf 
             INTEGER, INTENT(IN) :: j,k,l
-            INTEGER :: i
+            
+            INTEGER :: i !< Generic loop iterator
 
             if (model_eqns == 4) then
                 rho_sf    = qK_vf(1)%sf(j,k,l)
@@ -147,25 +155,25 @@ MODULE m_variables_conversion
 
         END SUBROUTINE s_convert_species_to_mixture_variables_bubbles ! ----------------        
         
-        
+
+        !>  This subroutine is designed for the volume fraction model
+        !!      and provided a set of conservative variables, calculates
+        !!      the density, the specific heat ratio function and liquid
+        !!      stiffness function from q_cons_vf and stores the results
+        !!      into rho_sf, gamma_sf and pi_inf_sf.
+        !!  @param q_cons_vf Conservative variables
+        !!  @param j cell index to transfer mixture variables 
+        !!  @param k cell index to transfer mixture variables
+        !!  @param l cell index to transfer mixture variables
         SUBROUTINE s_convert_species_to_mixture_variables(q_cons_vf, j,k,l) ! --
-        ! Description: This subroutine is designed for the volume fraction model
-        !              and provided a set of conservative variables, calculates
-        !              the density, the specific heat ratio function and liquid
-        !              stiffness function from q_cons_vf and stores the results
-        !              into rho_sf, gamma_sf and pi_inf_sf.
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Indexes of the cell for which to compute the mixture variables
             INTEGER, INTENT(IN) :: j,k,l
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Computing the density, the specific heat ratio function and the
@@ -215,11 +223,12 @@ MODULE m_variables_conversion
             
         END SUBROUTINE s_convert_species_to_mixture_variables ! ----------------
         
-        
+ 
+
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_variables_conversion_module() ! -------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
+
             
             ! Allocating the density, the specific heat ratio function and the
             ! liquid stiffness function, respectively
@@ -302,28 +311,28 @@ MODULE m_variables_conversion
         
         
         
-        
+        !> Converts the conservative variables to the primitive ones      
+        !!  @param q_cons_vf Conservative variabels
+        !!  @param q_prim_vf Primitive variables
         SUBROUTINE s_convert_conservative_to_primitive_variables( q_cons_vf, &
                                                                   q_prim_vf  )
-        ! Description: Converts the conservative variables to the primitive ones
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Primitive variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_prim_vf
             
             ! Dynamic pressure, as defined in the incompressible flow sense
             REAL(KIND(0d0)) :: dyn_pres
+
+            ! Bubble parameters
             REAL(KIND(0d0)) :: nbub 
             REAL(KIND(0d0)), dimension(:), allocatable :: nRtmp 
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l
+           
+            INTEGER :: i,j,k,l !< Generic loop iterators
             
             allocate( nRtmp(nb) )
             
@@ -415,8 +424,8 @@ MODULE m_variables_conversion
  
         END SUBROUTINE s_convert_conservative_to_primitive_variables ! ---------
         
+        !> Deallocation procedures for the module
         SUBROUTINE s_finalize_variables_conversion_module() ! ----------------
-        ! Description: Deallocation procedures for the module
             
             
             ! Deallocating the density, the specific heat ratio function and the

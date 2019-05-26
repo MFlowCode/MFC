@@ -1,54 +1,59 @@
-! MFC v3.0 - Post-process Code: m_mpi_proxy.f90
-! Description: This module serves as a proxy to the parameters and subroutines
-!              available in the MPI implementation's MPI module. Specifically,
-!              the role of the proxy is to harness basic MPI commands into more
-!              complex procedures as to achieve the required communication goals
-!              for the post-process.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
+!>
+!! @file m_mpi_proxy.f90
+!! @brief  This module serves as a proxy to the parameters and subroutines
+!!              available in the MPI implementation's MPI module. Specifically,
+!!              the role of the proxy is to harness basic MPI commands into more
+!!              complex procedures as to achieve the required communication goals
+!!              for the post-process.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 
 MODULE m_mpi_proxy
     
     
     ! Dependencies =============================================================
-    USE mpi                     ! Message passing interface (MPI) module
+    USE mpi                     !< Message passing interface (MPI) module
     
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     ! ==========================================================================
     
     
     IMPLICIT NONE
     
     
-    ! Buffers of the conservative variables recieved/sent from/to neighbooring
-    ! processors. Note that these variables are structured as vectors rather
-    ! than arrays.
+    !> @name Buffers of the conservative variables recieved/sent from/to neighbooring
+    !! processors. Note that these variables are structured as vectors rather
+    !! than arrays.
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: q_cons_buffer_in
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: q_cons_buffer_out
-    
-    ! Recieve counts and displacement vector variables, respectively, used in
-    ! enabling MPI to gather varying amounts of data from all processes to the
-    ! root process
+    !> @}
+
+    !> @name Recieve counts and displacement vector variables, respectively, used in
+    !! enabling MPI to gather varying amounts of data from all processes to the
+    !! root process
+    !> @{
     INTEGER, ALLOCATABLE, DIMENSION(:) :: recvcounts
     INTEGER, ALLOCATABLE, DIMENSION(:) :: displs
-    
-    ! Generic flags used to identify and report MPI errors
+    !> @}
+
+    !> @name Generic flags used to identify and report MPI errors
+    !> @{
     INTEGER, PRIVATE :: err_code, ierr
-    
+    !> @}
     
     CONTAINS
         
         
         
         
-        
+        !>  The subroutine intializes the MPI environment and queries
+        !!      both the number of processors that will be available for
+        !!      the job as well as the local processor rank.        
         SUBROUTINE s_mpi_initialize() ! ----------------------------
-        ! Description: The subroutine intializes the MPI environment and queries
-        !              both the number of processors that will be available for
-        !              the job as well as the local processor rank.
             
             
             ! Establishing the MPI environment
@@ -76,23 +81,21 @@ MODULE m_mpi_proxy
         
         
         
+        !> The subroutine terminates the MPI execution environment.
         SUBROUTINE s_mpi_abort() ! ---------------------------------------------
-        ! Description: The subroutine terminates the MPI execution environment.
-            
             
             ! Terminating the MPI environment
             CALL MPI_ABORT(MPI_COMM_WORLD, err_code, ierr)
-            
             
         END SUBROUTINE s_mpi_abort ! -------------------------------------------
         
         
         
         
-        
+        !> This subroutine defines local and global sizes for the data
+        !> @name q_cons_vf Conservative variables
         SUBROUTINE s_initialize_mpi_data(q_cons_vf) ! --------------------------
 
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
@@ -100,8 +103,8 @@ MODULE m_mpi_proxy
             INTEGER, DIMENSION(num_dims) :: sizes_glb, sizes_loc
             INTEGER :: ierr
 
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
 
             DO i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m,0:n,0:p)
@@ -129,8 +132,8 @@ MODULE m_mpi_proxy
 
 
 
+        !>Halts all processes until all have reached barrier.
         SUBROUTINE s_mpi_barrier() ! -------------------------------------------
-        ! Description: Halts all processes until all have reached barrier.
 
             ! Calling MPI_BARRIER
             CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -139,15 +142,11 @@ MODULE m_mpi_proxy
 
 
 
-
-
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_mpi_proxy_module() ! ------------------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
+           
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Allocating vectorized buffer regions of conservative variables.
@@ -238,17 +237,15 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !>  Since only processor with rank 0 is in charge of reading
+        !!      and checking the consistency of the user provided inputs,
+        !!      these are not available to the remaining processors. This
+        !!      subroutine is then in charge of broadcasting the required
+        !!      information.        
         SUBROUTINE s_mpi_bcast_user_inputs() ! ---------------------------------
-        ! Description: Since only processor with rank 0 is in charge of reading
-        !              and checking the consistency of the user provided inputs,
-        !              these are not available to the remaining processors. This
-        !              subroutine is then in charge of broadcasting the required
-        !              information.
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Logistics
@@ -400,14 +397,13 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !>  This subroutine takes care of efficiently distributing
+        !!      the computational domain among the available processors
+        !!      as well as recomputing some of the global parameters so
+        !!      that they reflect the configuration of sub-domain that
+        !!      is overseen by the local processor.        
         SUBROUTINE s_mpi_decompose_computational_domain() ! --------------------
-        ! Description: This subroutine takes care of efficiently distributing
-        !              the computational domain among the available processors
-        !              as well as recomputing some of the global parameters so
-        !              that they reflect the configuration of sub-domain that
-        !              is overseen by the local processor.
-            
+
             
             ! # of processors in the x-, y- and z-coordinate directions
             INTEGER :: num_procs_x, num_procs_y, num_procs_z
@@ -851,21 +847,17 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !>  Communicates the buffer regions associated with the grid
+        !!      variables with processors in charge of the neighbooring
+        !!      sub-domains. Note that only cell-width spacings feature
+        !!      buffer regions so that no information relating to the
+        !!      cell-boundary locations is communicated.
+        !!  @param pbc_loc Processor boundary condition (PBC) location
+        !!  @param sweep_coord Coordinate direction normal to the processor boundary
         SUBROUTINE s_mpi_sendrecv_grid_vars_buffer_regions(pbc_loc, sweep_coord)
-        ! Description: Communicates the buffer regions associated with the grid
-        !              variables with processors in charge of the neighbooring
-        !              sub-domains. Note that only cell-width spacings feature
-        !              buffer regions so that no information relating to the
-        !              cell-boundary locations is communicated.
-            
-            
-            ! Processor boundary condition (PBC) location
+
             CHARACTER(LEN = 3), INTENT(IN) :: pbc_loc
-            
-            ! Coordinate direction normal to the processor boundary
             CHARACTER, INTENT(IN) :: sweep_coord
-            
             
             ! Communications in the x-direction ================================
             
@@ -1057,27 +1049,24 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !>  Communicates buffer regions associated with conservative
+        !!      variables with processors in charge of the neighbooring
+        !!      sub-domains
+        !!  @param q_cons_vf Conservative variables
+        !!  @param pbc_loc Processor boundary condition (PBC) location
+        !!  @param sweep_coord Coordinate direction normal to the processor boundary
         SUBROUTINE s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, pbc_loc, &
                                                                sweep_coord     )
-        ! Description: Communicates buffer regions associated with conservative
-        !              variables with processors in charge of the neighbooring
-        !              sub-domains
-            
-            
-            ! Conservative variables
+
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(INOUT) :: q_cons_vf
             
-            ! Processor boundary condition (PBC) location
             CHARACTER(LEN = 3), INTENT(IN) :: pbc_loc
             
-            ! Coordinate direction normal to the processor boundary
             CHARACTER, INTENT(IN) :: sweep_coord
             
-            ! Generic loop iterators
-            INTEGER :: i,j,k,l,r
+            INTEGER :: i,j,k,l,r !< Generic loop iterators
             
             
             ! Communications in the x-direction ================================
@@ -1592,28 +1581,26 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !>  The following subroutine takes the first element of the
+        !!      2-element inputted variable and determines its maximum
+        !!      value on the entire computational domain. The result is
+        !!      stored back into the first element of the variable while
+        !!      the rank of the processor that is in charge of the sub-
+        !!      domain containing the maximum is stored into the second
+        !!      element of the variable.
+        !!  @param var_loc On input, this variable holds the local value and processor rank,
+        !!  which are to be reduced among all the processors in communicator.
+        !!  On output, this variable holds the maximum value, reduced amongst
+        !!  all of the local values, and the process rank to which the value
+        !!  belongs.
         SUBROUTINE s_mpi_reduce_maxloc(var_loc) ! ------------------------------
-        ! Description: The following subroutine takes the first element of the
-        !              2-element inputted variable and determines its maximum
-        !              value on the entire computational domain. The result is
-        !              stored back into the first element of the variable while
-        !              the rank of the processor that is in charge of the sub-
-        !              domain containing the maximum is stored into the second
-        !              element of the variable.
-            
-            
-            ! On input, this variable holds the local value and processor rank,
-            ! which are to be reduced among all the processors in communicator.
-            ! On output, this variable holds the maximum value, reduced amongst
-            ! all of the local values, and the process rank to which the value
-            ! belongs.
+
             REAL(KIND(0d0)), DIMENSION(2), INTENT(INOUT) :: var_loc
             
-            ! Temporary storage variable that holds the reduced maximum value
-            ! and the rank of the processor with which the value is associated
-            REAL(KIND(0d0)), DIMENSION(2) :: var_glb
-            
+
+            REAL(KIND(0d0)), DIMENSION(2) :: var_glb  !<
+            !! Temporary storage variable that holds the reduced maximum value
+            !! and the rank of the processor with which the value is associated            
             
             ! Performing reduction procedure and eventually storing its result
             ! into the variable that was initially inputted into the subroutine
@@ -1625,22 +1612,19 @@ MODULE m_mpi_proxy
             
             var_loc = var_glb
             
-            
         END SUBROUTINE s_mpi_reduce_maxloc ! -----------------------------------
         
         
         
         
-        
+        !>  This subroutine gathers the Silo database metadata for
+        !!      the spatial extents in order to boost the performance of
+        !!      the multidimensional visualization.  
+        !!  @param spatial_extents Spatial extents for each processor's sub-domain. First dimension
+        !!  corresponds to the minimum and maximum values, respectively, while
+        !!  the second dimension corresponds to the processor rank.
         SUBROUTINE s_mpi_gather_spatial_extents(spatial_extents) ! -------------
-        ! Description: This subroutine gathers the Silo database metadata for
-        !              the spatial extents in order to boost the performance of
-        !              the multidimensional visualization.
-            
-            
-            ! Spatial extents for each processor's sub-domain. First dimension
-            ! corresponds to the minimum and maximum values, respectively, while
-            ! the second dimension corresponds to the processor rank.
+
             REAL(KIND(0d0)), DIMENSION(1:,0:), INTENT(INOUT) :: spatial_extents
             
             
@@ -1754,15 +1738,13 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !>  This subroutine collects the sub-domain cell-boundary or
+        !!      cell-center locations data from all of the processors and
+        !!      puts back together the grid of the entire computational
+        !!      domain on the rank 0 processor. This is only done for 1D
+        !!      simulations.        
         SUBROUTINE s_mpi_defragment_1d_grid_variable() ! -----------------------
-        ! Description: This subroutine collects the sub-domain cell-boundary or
-        !              cell-center locations data from all of the processors and
-        !              puts back together the grid of the entire computational
-        !              domain on the rank 0 processor. This is only done for 1D
-        !              simulations.
-            
-            
+
             ! Silo-HDF5 database format
             IF(format == 1) THEN
                 
@@ -1783,26 +1765,24 @@ MODULE m_mpi_proxy
                 
             END IF
             
-            
         END SUBROUTINE s_mpi_defragment_1d_grid_variable ! ---------------------
         
         
         
         
-        
+        !>  This subroutine gathers the Silo database metadata for
+        !!      the flow variable's extents as to boost performance of
+        !!      the multidimensional visualization.    
+        !!  @param q_sf Flow variable defined on a single computational sub-domain
+        !!  @param data_extents The flow variable extents on each of the processor's sub-domain.
+        !!   First dimension of array corresponds to the former's minimum and
+        !!  maximum values, respectively, while second dimension corresponds
+        !!  to each processor's rank.
         SUBROUTINE s_mpi_gather_data_extents(q_sf, data_extents) ! -------------
-        ! Description: This subroutine gathers the Silo database metadata for
-        !              the flow variable's extents as to boost performance of
-        !              the multidimensional visualization.
+
             
-            
-            ! Flow variable defined on a single computational sub-domain
             REAL(KIND(0d0)), DIMENSION(:,:,:), INTENT(IN) :: q_sf
             
-            ! The flow variable extents on each of the processor's sub-domain.
-            ! First dimension of array corresponds to the former's minimum and
-            ! maximum values, respectively, while second dimension corresponds
-            ! to each processor's rank.
             REAL(KIND(0d0)), &
             DIMENSION(1:2,0:num_procs-1), &
             INTENT(INOUT) :: data_extents
@@ -1823,25 +1803,21 @@ MODULE m_mpi_proxy
         
         
         
-        
-        
+        !>  This subroutine gathers the sub-domain flow variable data
+        !!      from all of the processors and puts it back together for
+        !!      the entire computational domain on the rank 0 processor.
+        !!      This is only done for 1D simulations.       
+        !!  @param q_sf Flow variable defined on a single computational sub-domain
+        !!  @param q_root_sf Flow variable defined on the entire computational domain
         SUBROUTINE s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf) ! --------
-        ! Description: This subroutine gathers the sub-domain flow variable data
-        !              from all of the processors and puts it back together for
-        !              the entire computational domain on the rank 0 processor.
-        !              This is only done for 1D simulations.
-            
-            
-            ! Flow variable defined on a single computational sub-domain
+
             REAL(KIND(0d0)), &
             DIMENSION(0:m,0:0,0:0), &
             INTENT(IN) :: q_sf
             
-            ! Flow variable defined on the entire computational domain
             REAL(KIND(0d0)), &
             DIMENSION(0:m_root,0:0,0:0), &
             INTENT(INOUT) :: q_root_sf
-            
             
             ! Gathering the sub-domain flow variable data from all the processes
             ! and putting it back together for the entire computational domain
@@ -1856,10 +1832,8 @@ MODULE m_mpi_proxy
         
         
         
-        
+        !> Deallocation procedures for the module 
         SUBROUTINE s_finalize_mpi_proxy_module() ! ---------------------------
-        ! Description: Deallocation procedures for the module
-            
             
             ! Deallocating the conservative variables buffer vectors
             IF(buff_size > 0) THEN
@@ -1881,14 +1855,11 @@ MODULE m_mpi_proxy
         
         
         
-        
+       !> Finalization of all MPI related processes 
         SUBROUTINE s_mpi_finalize() ! ------------------------------
-        ! Description: Finalization of all MPI related processes
-            
             
             ! Terminating the MPI environment
             CALL MPI_FINALIZE(ierr)
-            
             
         END SUBROUTINE s_mpi_finalize ! ----------------------------
         

@@ -1,10 +1,11 @@
 !>
-!! @file m_data_output.f90
+!! @file m_start_up.f90
 !! @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data
 !!              that are provided by the user. The module is additionally tasked
 !!              with verifying the consistency of the user inputs and completing
-!!              the grid variablesThe purpose of the module is primarily to read in the files that
+!!              the grid variablesThe purpose of the module is primarily to read 
+!!              in the files that
 !!              contain the inputs, the initial condition data and the grid data
 !!              that are provided by the user. The module is additionally tasked
 !!              with verifying the consistency of the user inputs and completing

@@ -70,13 +70,16 @@ MODULE m_data_output
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ccfl_sf  !< CCFL stability criterion
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) ::   Rc_sf  !< Rc stability criterion
     
-    ! ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
+    !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
+    !> @{
     REAL(KIND(0d0)) :: icfl_max !< ICFL criterion maximum
     REAL(KIND(0d0)) :: vcfl_max !< VCFL criterion maximum
     REAL(KIND(0d0)) :: ccfl_max !< CCFL criterion maximum
     REAL(KIND(0d0)) ::   Rc_min !< Rc criterion maximum
+    !> @}
 
-    ! Generic storage for flow variable(s) that are to be written to CoM data file
+    ! @name Generic storage for flow variable(s) that are to be written to CoM data file
+    !> @{
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: accel_mag 
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:)    :: q_com
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: moments
@@ -86,6 +89,7 @@ MODULE m_data_output
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: x_accel, y_accel, z_accel
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)           :: grad_x_vf,grad_y_vf,grad_z_vf,norm_vf,kappa_vf
     REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:)  :: energy !< Energy: Used to write out correct E and p when We_size > 0
+    !> @}
 
     PROCEDURE(s_write_abstract_data_files), POINTER :: s_write_data_files => NULL()
 

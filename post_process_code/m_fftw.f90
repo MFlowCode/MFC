@@ -1,13 +1,18 @@
+!>
+!! @file m_fftw.f90
+!! @brief The module contains the subroutines for the FFT routines
+!! @author spencer
+!! @version 1.1
 MODULE m_fftw
 
     ! Dependencies =============================================================
     USE, INTRINSIC :: ISO_C_BINDING
 
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
 
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     ! ==========================================================================
 
     IMPLICIT NONE
@@ -15,9 +20,7 @@ MODULE m_fftw
     PRIVATE; PUBLIC :: s_initialize_fftw_module,      &
                        s_apply_fourier_decomposition, &
                        s_finalize_fftw_module
-    ! (Hooke)
-    ! INCLUDE 'fftw3.f90'
-    ! (Comet/Stampede)
+
     INCLUDE 'fftw3.f03'
 
     TYPE(C_PTR) :: fwd_plan, bwd_plan
@@ -33,14 +36,10 @@ MODULE m_fftw
     CONTAINS
 
 
-
-
-
+        !>  The purpose of this subroutine is to create the fftw plan
+        !!      that will be used in the forward and backward DFTs when
+        !!      applying the Fourier filter in the azimuthal direction.
         SUBROUTINE s_initialize_fftw_module() ! ----------------------------------
-        ! Description: The purpose of this subroutine is to create the fftw plan
-        !              that will be used in the forward and backward DFTs when
-        !              applying the Fourier filter in the azimuthal direction.
-
 
             ! Size of input array going into DFT
             real_size = p+1
@@ -64,13 +63,13 @@ MODULE m_fftw
 
 
 
-
-
+        !>  The purpose of this subroutine is to Fourier decompose
+        !!      the flow field. Not done in most efficient manner since 
+        !!      subroutine is called for every mode, but can deal with 
+        !!      efficiency later.
+        !!  @param q_sf Scalar field to transform
+        !!  @param i Fourier component 
         SUBROUTINE s_apply_fourier_decomposition(q_sf,i) ! -----------------------
-        ! Description: The purpose of this subroutine is to Fourier decompose
-        !              the flow field. Not done in most efficient manner since 
-        !              subroutine is called for every mode, but can deal with 
-        !              efficiency later.
 
             ! Variable to be Fourier decomposed
             REAL(KIND(0d0)), &
@@ -108,11 +107,10 @@ MODULE m_fftw
 
 
 
-
+        !>  The purpose of this subroutine is to destroy the fftw plan
+        !!      that will be used in the forward and backward DFTs when
+        !!      applying the Fourier filter in the azimuthal direction.
         SUBROUTINE s_finalize_fftw_module() ! ------------------------------------
-        ! Description: The purpose of this subroutine is to destroy the fftw plan
-        !              that will be used in the forward and backward DFTs when
-        !              applying the Fourier filter in the azimuthal direction.
 
             CALL fftw_free(fftw_real_data)
             CALL fftw_free(fftw_cmplx_data)
@@ -122,8 +120,6 @@ MODULE m_fftw
             CALL fftw_destroy_plan(bwd_plan)
 
         END SUBROUTINE s_finalize_fftw_module ! --------------------------------
-
-
 
 
 

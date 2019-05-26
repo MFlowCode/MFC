@@ -1,10 +1,10 @@
 !>
-!! @file m_start_up.f90
+!! @file p_main.f90
 !! @brief This program takes care of setting up the initial condition and
 !!              grid data for the multicomponent flow code.
 !! @author spencer
 !! @version 1.1
-!! @date 1/1/1i
+!! @date 1/1/1
 PROGRAM p_main
     
     

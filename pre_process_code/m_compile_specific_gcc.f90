@@ -20,4 +20,4 @@ MODULE m_compile_specific
             INQUIRE(FILE=TRIM(fileloc),EXIST=dircheck)        !GCC
         END SUBROUTINE my_inquire
 
-MODULE m_compile_specific
+END MODULE m_compile_specific

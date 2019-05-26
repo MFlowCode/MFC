@@ -1,19 +1,19 @@
-! MFC v3.0 - Post-process Code: m_start_up.f90
-! Description: This module contains the subroutines that read in and check the
+!>
+!! @file m_start_up.f90
+!! @brief This module contains the subroutines that read in and check the
 !              consistency of the user provided inputs.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_start_up
     
     
     ! Dependencies =============================================================
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types        !< Definitions of the derived types
     
-    USE m_global_parameters    ! Definitions of the global parameters
+    USE m_global_parameters    !< Definitions of the global parameters
     
-    USE m_mpi_proxy            ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     USE m_compile_specific
     ! ==========================================================================
@@ -24,27 +24,25 @@ MODULE m_start_up
     
     CONTAINS
         
-        
-        
-        
-        
+
+        !>  Reads the configuration file post_process.inp, in order
+        !!      to populate parameters in module m_global_parameters.f90
+        !!      with the user provided inputs
         SUBROUTINE s_read_input_file() ! ---------------------------------------
-        ! Description: Reads the configuration file post_process.inp, in order
-        !              to populate parameters in module m_global_parameters.f90
-        !              with the user provided inputs
+
+
+            CHARACTER(LEN = name_len) :: file_loc !<
+            !! Generic string used to store the address of a particular file
             
-            
-            ! Generic string used to store the address of a particular file
-            CHARACTER(LEN = name_len) :: file_loc
-            
-            ! Generic logical used for the purpose of asserting whether a file
-            ! is or is not present in the designated location
-            LOGICAL :: file_check
+            LOGICAL :: file_check !<
+            !! Generic logical used for the purpose of asserting whether a file
+            !! is or is not present in the designated location
             
             ! Namelist for all of the parameters to be inputed by the user
             NAMELIST /user_inputs/ case_dir, m, n, p, t_step_start,           &
                                    t_step_stop, t_step_save, model_eqns,      &
-                                   num_fluids, mpp_lim, adv_alphan, weno_order, bc_x,  &
+                                   num_fluids, mpp_lim, adv_alphan,           &
+                                   weno_order, bc_x,                          &
                                    bc_y, bc_z, fluid_pp, format, precision,   &
                                    alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt,  &
                                    E_wrt, pres_wrt, alpha_wrt, gamma_wrt,     &
@@ -54,9 +52,9 @@ MODULE m_start_up
                                    fd_order, mixture_err, alt_soundspeed,     &
                                    kappa_wrt, flux_lim, flux_wrt, cyl_coord,  &
                                    parallel_io, coarsen_silo, fourier_decomp, &
-                                   fourier_modes, &
-                                   rhoref, pref, bubbles, R0ref, nb, &
-                                   polytropic, thermal, Ca, Web, Re_inv !SHB
+                                   fourier_modes,                             &
+                                   rhoref, pref, bubbles, R0ref, nb,          &
+                                   polytropic, thermal, Ca, Web, Re_inv 
             
             ! Inquiring the status of the post_process.inp file
             file_loc = 'post_process.inp'
@@ -85,22 +83,23 @@ MODULE m_start_up
         
         
         
-        
+        !>  Checking that the user inputs make sense, i.e. that the
+        !!      individual choices are compatible with the code's options
+        !!      and that the combination of these choices results into a
+        !!      valid configuration for the post-process        
         SUBROUTINE s_check_input_file() ! --------------------------------------
-        ! Description: Checking that the user inputs make sense, i.e. that the
-        !              individual choices are compatible with the code's options
-        !              and that the combination of these choices results into a
-        !              valid configuration for the post-process
+
             
             
-            ! Generic string used to store the address of a particular file
-            CHARACTER(LEN = LEN_TRIM(case_dir)) :: file_loc
+
+            CHARACTER(LEN = LEN_TRIM(case_dir)) :: file_loc !<
+            !! Generic string used to store the address of a particular file
             
-            ! Logical variable used to test the existence of folders
-            LOGICAL :: dir_check
+
+            LOGICAL :: dir_check !<
+            !! Logical variable used to test the existence of folders
             
-            ! Generic loop iterator
-            INTEGER :: i
+            INTEGER :: i  !< Generic loop iterator
             INTEGER :: bub_fac
 
             bub_fac = 0; 

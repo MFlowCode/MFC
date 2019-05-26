@@ -1,24 +1,22 @@
-! MFC v3.0 - Post-process Code: m_data_output.f90
-! Description: This module enables the restructuring of the raw simulation data
+!>
+!! @file m_data_output.f90
+!! @brief This module enables the restructuring of the raw simulation data
 !              file(s) into formatted database file(s). The formats that may be
 !              chosen from include Silo-HDF5 and Binary. Each of these database
 !              structures contains information about the grid as well as each of
 !              the flow variable(s) that were chosen by the user to be included.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_data_output
     
     
     ! Dependencies =============================================================
-    ! USE f90_unix_proc         ! NAG Compiler Library of UNIX system commands
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_global_parameters     ! Global parameters for the code
-    
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
     USE m_compile_specific
     ! ==========================================================================
@@ -39,10 +37,11 @@ MODULE m_data_output
     INCLUDE 'silo_f9x.inc'
     
     
-    ! Generic storage for flow variable(s) that are to be written to formatted
-    ! database file(s). Note that for 1D simulations, q_root_sf is employed to
-    ! gather the flow variable(s) from all sub-domains on to the root process.
-    ! If the run is not parallel, but serial, then q_root_sf is equal to q_sf.
+    !> @name Generic storage for flow variable(s) that are to be written to formatted
+    !! database file(s). Note that for 1D simulations, q_root_sf is employed to
+    !! gather the flow variable(s) from all sub-domains on to the root process.
+    !! If the run is not parallel, but serial, then q_root_sf is equal to q_sf.
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: q_sf
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:), PUBLIC :: dft_q_sf
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: coarse_x_q_sf
@@ -51,79 +50,82 @@ MODULE m_data_output
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: q_root_sf
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: cyl_q_sf
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: cyl_coarse_q_sf
-    
-    ! The spatial and data extents array variables contain information about the
-    ! minimum and maximum values of the grid and flow variable(s), respectively.
-    ! The purpose of bookkeeping this information is to boost the visualization
-    ! of the Silo-HDF5 database file(s) in VisIt.
+    !> @}
+
+    !> @name The spatial and data extents array variables contain information about the
+    !! minimum and maximum values of the grid and flow variable(s), respectively.
+    !! The purpose of bookkeeping this information is to boost the visualization
+    !! of the Silo-HDF5 database file(s) in VisIt.
+    !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) :: spatial_extents
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) :: data_extents
+    !> @}
     
-    ! The size of the ghost zone layer at beginning of each coordinate direction
-    ! (lo) and at end of each coordinate direction (hi). Adding this information
-    ! to Silo-HDF5 database file(s) is recommended since it supplies VisIt with
-    ! connectivity information between the sub-domains of a parallel data set.
+    !> @name The size of the ghost zone layer at beginning of each coordinate direction
+    !! (lo) and at end of each coordinate direction (hi). Adding this information
+    !! to Silo-HDF5 database file(s) is recommended since it supplies VisIt with
+    !! connectivity information between the sub-domains of a parallel data set.
+    !> @{
     INTEGER, ALLOCATABLE, DIMENSION(:) :: lo_offset
     INTEGER, ALLOCATABLE, DIMENSION(:) :: hi_offset
+    !> @}
+
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: dims !<
+    !! For Silo-HDF5 database format, this variable is used to keep track of the
+    !! number of cell-boundaries, for the grid associated with the local process,
+    !! in each of the active coordinate directions.
     
-    ! For Silo-HDF5 database format, this variable is used to keep track of the
-    ! number of cell-boundaries, for the grid associated with the local process,
-    ! in each of the active coordinate directions.
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: dims
-    
-    ! Locations of various folders in the case's directory tree, associated with
-    ! the choice of the formatted database format. These include, in order, the
-    ! location of the folder named after the selected formatted database format,
-    ! and the locations of two sub-directories of the latter, the first of which
-    ! is named after the local processor rank, while the second is named 'root'.
-    ! The folder associated with the local processor rank contains only the data
-    ! pertaining to the part of the domain taken care of by the local processor.
-    ! The root directory, on the other hand, will contain either the information
-    ! about the connectivity required to put the entire domain back together, or
-    ! the actual data associated with the entire computational domain. This all
-    ! depends on dimensionality and the choice of the formatted database format.
+    !> @name Locations of various folders in the case's directory tree, associated with
+    !! the choice of the formatted database format. These include, in order, the
+    !! location of the folder named after the selected formatted database format,
+    !! and the locations of two sub-directories of the latter, the first of which
+    !! is named after the local processor rank, while the second is named 'root'.
+    !! The folder associated with the local processor rank contains only the data
+    !! pertaining to the part of the domain taken care of by the local processor.
+    !! The root directory, on the other hand, will contain either the information
+    !! about the connectivity required to put the entire domain back together, or
+    !! the actual data associated with the entire computational domain. This all
+    !! depends on dimensionality and the choice of the formatted database format.
+    !> @{
     CHARACTER(LEN = path_len +   name_len) :: dbdir
     CHARACTER(LEN = path_len + 2*name_len) :: proc_rank_dir
     CHARACTER(LEN = path_len + 2*name_len) :: rootdir
-    
-    ! Handles of the formatted database master/root file, slave/local processor
-    ! file and options list. The list of options is explicitly used in the Silo-
-    ! HDF5 database format to provide additional details about the contents of a
-    ! formatted database file, such as the previously described spatial and data
-    ! extents.
+    !> @}
+
+    !> @name Handles of the formatted database master/root file, slave/local processor
+    !! file and options list. The list of options is explicitly used in the Silo-
+    !! HDF5 database format to provide additional details about the contents of a
+    !! formatted database file, such as the previously described spatial and data
+    !! extents.
+    !> @{
     INTEGER :: dbroot
     INTEGER :: dbfile
     INTEGER :: optlist
+    !> @}
+
+    INTEGER :: dbvars !<
+    !! The total number of flow variable(s) to be stored in a formatted database
+    !! file. Note that this is only needed when using the Binary format.
     
-    ! The total number of flow variable(s) to be stored in a formatted database
-    ! file. Note that this is only needed when using the Binary format.
-    INTEGER :: dbvars
-    
-    ! Generic error flags utilized in the handling, checking and the reporting
-    ! of the input and output operations errors with a formatted database file
+    !> @name Generic error flags utilized in the handling, checking and the reporting
+    !! of the input and output operations errors with a formatted database file
+    !> @{
     INTEGER, PRIVATE :: err, ierr
-    
+    !> @}
     
     CONTAINS
         
-        
-        
-        
-        
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module        
         SUBROUTINE s_initialize_data_output_module() ! ----------------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
+
+            CHARACTER(LEN = LEN_TRIM(case_dir) + 2*name_len) :: file_loc !<
+            !! Generic string used to store the location of a particular file
             
+            LOGICAL :: dir_check !<
+            !! Generic logical used to test the existence of a particular folder
             
-            ! Generic string used to store the location of a particular file
-            CHARACTER(LEN = LEN_TRIM(case_dir) + 2*name_len) :: file_loc
-            
-            ! Generic logical used to test the existence of a particular folder
-            LOGICAL :: dir_check
-            
-            ! Generic loop iterator
-            INTEGER :: i
-            
+            INTEGER :: i !< Generic loop iterator
             
             ! Allocating the generic storage for the flow variable(s) that are
             ! going to be written to the formatted database file(s). Note once
@@ -486,25 +488,23 @@ MODULE m_data_output
         
         
         
-        
+        !>  This subroutine opens a new formatted database file, or
+        !!      replaces an old one, and readies it for the data storage
+        !!      of the grid and the flow variable(s) associated with the
+        !!      current time-step, t_step. This is performed by all the
+        !!      local process(es). The root processor, in addition, must
+        !!      also generate a master formatted database file whose job
+        !!      will be to link, and thus combine, the data from all of
+        !!      the local process(es). Note that for the Binary format,
+        !!      this extra task that is assigned to the root process is
+        !!      not performed in multidimensions.    
+        !!  @param t_step Time-step that is currently being post-processed
         SUBROUTINE s_open_formatted_database_file(t_step) ! --------------------
-        ! Description: This subroutine opens a new formatted database file, or
-        !              replaces an old one, and readies it for the data storage
-        !              of the grid and the flow variable(s) associated with the
-        !              current time-step, t_step. This is performed by all the
-        !              local process(es). The root processor, in addition, must
-        !              also generate a master formatted database file whose job
-        !              will be to link, and thus combine, the data from all of
-        !              the local process(es). Note that for the Binary format,
-        !              this extra task that is assigned to the root process is
-        !              not performed in multidimensions.
-            
-            
-            ! Time-step that is currently being post-processed
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Generic string used to store the location of a particular file
-            CHARACTER(LEN = LEN_TRIM(case_dir) + 3*name_len) :: file_loc
+            CHARACTER(LEN = LEN_TRIM(case_dir) + 3*name_len) :: file_loc !<
+            !! Generic string used to store the location of a particular file
             
             
             ! Silo-HDF5 Database Format ========================================
@@ -617,40 +617,39 @@ MODULE m_data_output
         
         
         
-        
+        !>  The general objective of this subroutine is to write the
+        !!      necessary grid data to the formatted database file, for
+        !!      the current time-step, t_step. The local processor will
+        !!      write the grid data of the domain segment that it is in
+        !!      charge of to the formatted database slave file. The root
+        !!      process will additionally take care of linking that grid
+        !!      data in the formatted database master file. In the Silo-
+        !!      HDF5 database format, the spatial extents of each local
+        !!      process grid are also written to the master file. In the
+        !!      Binary format, note that no master file is maintained in
+        !!      multidimensions. Finally, in 1D, no grid data is written
+        !!      within this subroutine for the Silo-HDF5 format because
+        !!      curve objects rather than quadrilateral meshes are used.
+        !!      For curve objects, in contrast to the quadrilateral mesh
+        !!      objects, the grid data is included side by side with the
+        !!      flow variable data. Then, in this case, we take care of
+        !!      writing both the grid and the flow variable data in the
+        !!      subroutine s_write_variable_to_formatted_database_file. 
+        !!  @param t_step Time-step that is currently being post-processed
         SUBROUTINE s_write_grid_to_formatted_database_file(t_step) ! -----------
-        ! Description: The general objective of this subroutine is to write the
-        !              necessary grid data to the formatted database file, for
-        !              the current time-step, t_step. The local processor will
-        !              write the grid data of the domain segment that it is in
-        !              charge of to the formatted database slave file. The root
-        !              process will additionally take care of linking that grid
-        !              data in the formatted database master file. In the Silo-
-        !              HDF5 database format, the spatial extents of each local
-        !              process grid are also written to the master file. In the
-        !              Binary format, note that no master file is maintained in
-        !              multidimensions. Finally, in 1D, no grid data is written
-        !              within this subroutine for the Silo-HDF5 format because
-        !              curve objects rather than quadrilateral meshes are used.
-        !              For curve objects, in contrast to the quadrilateral mesh
-        !              objects, the grid data is included side by side with the
-        !              flow variable data. Then, in this case, we take care of
-        !              writing both the grid and the flow variable data in the
-        !              subroutine s_write_variable_to_formatted_database_file.
-            
-            
-            ! Time-step that is currently being post-processed
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Bookkeeping variables storing the name and type of mesh that is
-            ! handled by the local processor(s). Note that due to an internal
-            ! NAG Fortran compiler problem, these two variables could not be
-            ! allocated dynamically.
+            !> @name Bookkeeping variables storing the name and type of mesh that is
+            !! handled by the local processor(s). Note that due to an internal
+            !! NAG Fortran compiler problem, these two variables could not be
+            !! allocated dynamically.
+            !> @{
             CHARACTER(LEN = 4*name_len), DIMENSION(num_procs) :: meshnames
             INTEGER                    , DIMENSION(num_procs) :: meshtypes
-            
-            ! Generic loop iterator
-            INTEGER :: i
+            !> @}
+
+            INTEGER :: i !< Time-step that is currently being post-processed
             
             
             ! Silo-HDF5 Database Format ========================================
@@ -854,42 +853,39 @@ MODULE m_data_output
         
         
         
-        
-        
+        !> The goal of this subroutine is to write to the formatted
+        !!      database file the flow variable at the current time-step,
+        !!      t_step. The local process(es) write the part of the flow
+        !!      variable that they handle to the formatted database slave
+        !!      file. The root process, on the other hand, will also take
+        !!      care of connecting all of the flow variable data in the
+        !!      formatted database master file. In the Silo-HDF5 database
+        !!      format, the extents of each local process flow variable
+        !!      are also written to the master file. Note that in Binary
+        !!      format, no master file is maintained in multidimensions.
+        !!      Finally note that in 1D, grid data is also written within
+        !!      this subroutine for Silo-HDF5 database format since curve
+        !!      and not the quadrilateral variable objects are used, see
+        !!      description of s_write_grid_to_formatted_database_file
+        !!      for more details on this topic.        
+        !!  @param varname Name of the flow variable, which will be written to the formatted
+        !!      database file at the current time-step, t_step
+        !!  @param t_step Time-step that is currently being post-processed
         SUBROUTINE s_write_variable_to_formatted_database_file(varname, t_step)
-        ! Description: The goal of this subroutine is to write to the formatted
-        !              database file the flow variable at the current time-step,
-        !              t_step. The local process(es) write the part of the flow
-        !              variable that they handle to the formatted database slave
-        !              file. The root process, on the other hand, will also take
-        !              care of connecting all of the flow variable data in the
-        !              formatted database master file. In the Silo-HDF5 database
-        !              format, the extents of each local process flow variable
-        !              are also written to the master file. Note that in Binary
-        !              format, no master file is maintained in multidimensions.
-        !              Finally note that in 1D, grid data is also written within
-        !              this subroutine for Silo-HDF5 database format since curve
-        !              and not the quadrilateral variable objects are used, see
-        !              description of s_write_grid_to_formatted_database_file
-        !              for more details on this topic.
-            
-            
-            ! Name of the flow variable, which will be written to the formatted
-            ! database file at the current time-step, t_step
+
             CHARACTER(LEN = *), INTENT(IN) :: varname
-            
-            ! Time-step that is currently being post-processed
             INTEGER, INTENT(IN) :: t_step
             
-            ! Bookkeeping variables storing the name and type of flow variable
-            ! that is about to be handled by the local processor(s). Note that
-            ! due to an internal NAG Fortran compiler problem, these variables
-            ! could not be allocated dynamically.
+            !> @name Bookkeeping variables storing the name and type of flow variable
+            !! that is about to be handled by the local processor(s). Note that
+            !! due to an internal NAG Fortran compiler problem, these variables
+            !! could not be allocated dynamically.
+            !> @{
             CHARACTER(LEN = 4*name_len), DIMENSION(num_procs) :: varnames
             INTEGER                    , DIMENSION(num_procs) :: vartypes
-            
-            ! Generic loop iterator
-            INTEGER :: i,j,k
+            !> @}
+
+            INTEGER :: i,j,k 
             
             
             ! Silo-HDF5 Database Format ========================================
@@ -1096,15 +1092,13 @@ MODULE m_data_output
         
         
         
-        
+        !>  The purpose of this subroutine is to coarsen any variable
+        !!      that is to be written to the formatted database file by averaging every
+        !!      two cells together into a single value. This averaging is done separately
+        !!      in each dimension.        
         SUBROUTINE s_coarsen_variable() ! --------------------------------------
-        ! Description: The purpose of this subroutine is to coarsen any variable
-        ! that is to be written to the formatted database file by averaging every
-        ! two cells together into a single value. This averaging is done separately
-        ! in each dimension.
 
-            ! Generic loop iterator
-            INTEGER :: i,j,k
+            INTEGER :: i,j,k !< Generic loop iterator
 
             ! Average q_sf onto coarser grid
             coarse_x_q_sf(-offset_x%beg : -1,:,:) = q_sf(-offset_x%beg : -1,:,:)
@@ -1143,21 +1137,19 @@ MODULE m_data_output
 
 
 
-
+        !>  The purpose of this subroutine is to close any formatted
+        !!      database file(s) that may be opened at the time-step that
+        !!      is currently being post-processed. The root process must
+        !!      typically close two files, one associated with the local
+        !!      sub-domain and the other with the entire domain. The non-
+        !!      root process(es) must close one file, which is associated
+        !!      with the local sub-domain. Note that for the Binary data-
+        !!      base format and multidimensional data, the root process
+        !!      only has to close the file associated with the local sub-
+        !!      domain, because one associated with the entire domain is
+        !!      not generated.
         SUBROUTINE s_close_formatted_database_file() ! -------------------------
-        ! Description: The purpose of this subroutine is to close any formatted
-        !              database file(s) that may be opened at the time-step that
-        !              is currently being post-processed. The root process must
-        !              typically close two files, one associated with the local
-        !              sub-domain and the other with the entire domain. The non-
-        !              root process(es) must close one file, which is associated
-        !              with the local sub-domain. Note that for the Binary data-
-        !              base format and multidimensional data, the root process
-        !              only has to close the file associated with the local sub-
-        !              domain, because one associated with the entire domain is
-        !              not generated.
-            
-            
+
             ! Silo-HDF5 database format
             IF(format == 1) THEN
                 ierr = DBCLOSE(dbfile)
@@ -1170,16 +1162,13 @@ MODULE m_data_output
                 
             END IF
             
-            
         END SUBROUTINE s_close_formatted_database_file ! -----------------------
         
         
         
         
-        
+        !>  Deallocation procedures for the module        
         SUBROUTINE s_finalize_data_output_module() ! -------------------------
-        ! Description: Deallocation procedures for the module
-            
             
             ! Deallocating the generic storage employed for the flow variable(s)
             ! that were written to the formatted database file(s). Note that the

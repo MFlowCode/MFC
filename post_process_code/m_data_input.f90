@@ -1,22 +1,22 @@
-! MFC v3.0 - Post-process Code: m_data_input.f90
-! Description: This module features procedures, which for a specific time-step,
-!              read in the raw simulation data for the grid and the conservative
-!              variables and fill out their buffer regions.
-! Author: Vedran Coralic
-! Date: 06/27/12
-
-
+!>
+!! @file m_data_input.f90
+!! @brief This module features procedures, which for a specific time-step,
+!!             read in the raw simulation data for the grid and the conservative
+!!             variables and fill out their buffer regions.
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
 MODULE m_data_input
     
     
     ! Dependencies =============================================================
-    USE mpi                     ! Message passing interface (MPI) module
+    USE mpi                     !< Message passing interface (MPI) module
     
-    USE m_derived_types         ! Definitions of the derived types
+    USE m_derived_types         !< Definitions of the derived types
     
-    USE m_global_parameters     ! Global parameters for the code
+    USE m_global_parameters     !< Global parameters for the code
     
-    USE m_mpi_proxy             ! Message passing interface (MPI) module proxy
+    USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
     ! ==========================================================================
     
     
@@ -32,6 +32,8 @@ MODULE m_data_input
 
     ABSTRACT INTERFACE ! ===================================================
 
+        !> Subroutine for reading data files
+        !!  @param t_step Current time-step to input
         SUBROUTINE s_read_abstract_data_files(t_step) ! ------------
 
             INTEGER, INTENT(IN) :: t_step
@@ -40,11 +42,12 @@ MODULE m_data_input
 
     END INTERFACE ! ========================================================
 
-    ! Conservative variables
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:), PUBLIC :: q_cons_vf
+
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:), PUBLIC :: q_cons_vf !<
+    !! Conservative variables
     
-    ! Primitive variables
-    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:), PUBLIC :: q_prim_vf
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:), PUBLIC :: q_prim_vf !<
+    !! Primitive variables
     
     PROCEDURE(s_read_abstract_data_files), POINTER :: s_read_data_files => NULL()
     
@@ -53,36 +56,33 @@ MODULE m_data_input
         
         
         
-        
+        !>  This subroutine is called at each time-step that has to
+        !!      be post-processed in order to read the raw data files
+        !!      present in the corresponding time-step directory and to
+        !!      populate the associated grid and conservative variables.        
+        !!  @param t_step Current time-step
         SUBROUTINE s_read_serial_data_files(t_step) ! -----------------------------
-        ! Description: This subroutine is called at each time-step that has to
-        !              be post-processed in order to read the raw data files
-        !              present in the corresponding time-step directory and to
-        !              populate the associated grid and conservative variables.
-            
-            
-            ! Current time-step
+
             INTEGER, INTENT(IN) :: t_step
             
-            ! Location of the time-step directory associated with t_step
-            CHARACTER(LEN = LEN_TRIM(case_dir) + 2*name_len) :: t_step_dir
+            CHARACTER(LEN = LEN_TRIM(case_dir) + 2*name_len) :: t_step_dir !<
+            !! Location of the time-step directory associated with t_step
             
-            ! Generic string used to store the location of a particular file
-            CHARACTER(LEN = LEN_TRIM(case_dir) + 3*name_len) :: file_loc
+            CHARACTER(LEN = LEN_TRIM(case_dir) + 3*name_len) :: file_loc !<
+            !! Generic string used to store the location of a particular file
             
-            ! Used to store the variable position, in character form, of the
-            ! currently manipulated conservative variable file
             CHARACTER(LEN = &
-            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num
+            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num !<
+            !! Used to store the variable position, in character form, of the
+            !! currently manipulated conservative variable file
             
-            ! Generic logical used to test the existence of a particular folder
-            LOGICAL :: dir_check
+            LOGICAL :: dir_check !<
+            !! Generic logical used to test the existence of a particular folder
             
-            ! Generic logical used to test the existence of a particular file
-            LOGICAL :: file_check
-            
-            ! Generic loop iterator
-            INTEGER :: i
+            LOGICAL :: file_check  !<
+            !! Generic logical used to test the existence of a particular file
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Setting location of time-step folder based on current time-step
@@ -229,8 +229,11 @@ MODULE m_data_input
         
         
         
-        
-        
+        !>  This subroutine is called at each time-step that has to
+        !!      be post-processed in order to parallel-read the raw data files
+        !!      present in the corresponding time-step directory and to
+        !!      populate the associated grid and conservative variables.        
+        !!  @param t_step Current time-step        
         SUBROUTINE s_read_parallel_data_files(t_step) ! ---------------------------
 
             INTEGER, INTENT(IN) :: t_step
@@ -385,21 +388,17 @@ MODULE m_data_input
 
 
 
-
+        !>  The following subroutine populates the buffer regions of
+        !!      the cell-width spacings, the cell-boundary locations and
+        !!      the cell-center locations. Note that the buffer regions
+        !!      of the last two variables should be interpreted slightly
+        !!      differently than usual. They are really ghost zones that
+        !!      are used in aiding the multidimensional visualization of
+        !!      Silo database files, in VisIt, when processor boundary
+        !!      conditions are present.
         SUBROUTINE s_populate_grid_variables_buffer_regions() ! ----------------
-        ! Description: The following subroutine populates the buffer regions of
-        !              the cell-width spacings, the cell-boundary locations and
-        !              the cell-center locations. Note that the buffer regions
-        !              of the last two variables should be interpreted slightly
-        !              differently than usual. They are really ghost zones that
-        !              are used in aiding the multidimensional visualization of
-        !              Silo database files, in VisIt, when processor boundary
-        !              conditions are present.
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
-            
+
+            INTEGER :: i !< Generic loop iterator
             
             ! Populating Buffer Regions in the x-direction =====================
             
@@ -645,15 +644,13 @@ MODULE m_data_input
         
         
         
-        
+        !>  The purpose of this procedure is to populate the buffers
+        !!      of the cell-average conservative variables, depending on
+        !!      the boundary conditions.        
         SUBROUTINE s_populate_conservative_variables_buffer_regions() ! --------
-        ! Description: The purpose of this procedure is to populate the buffers
-        !              of the cell-average conservative variables, depending on
-        !              the boundary conditions.
-            
-            
-            ! Generic loop iterators
-            INTEGER :: i,j,k
+
+
+            INTEGER :: i,j,k !< Generic loop iterators
             
             
             ! Populating Buffer Regions in the x-direction =====================
@@ -1034,14 +1031,11 @@ MODULE m_data_input
         
         
         
-        
+        !>  Computation of parameters, allocation procedures, and/or
+        !!      any other tasks needed to properly setup the module       
         SUBROUTINE s_initialize_data_input_module() ! -----------------------------
-        ! Description: Computation of parameters, allocation procedures, and/or
-        !              any other tasks needed to properly setup the module
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Allocating the parts of the conservative and primitive variables
@@ -1110,12 +1104,11 @@ MODULE m_data_input
         
         
         
+        !> Deallocation procedures for the module
         SUBROUTINE s_finalize_data_input_module() ! --------------------------
-        ! Description: Deallocation procedures for the module
-            
-            
-            ! Generic loop iterator
-            INTEGER :: i
+
+
+            INTEGER :: i !< Generic loop iterator
             
             
             ! Deallocating the conservative and primitive variables
