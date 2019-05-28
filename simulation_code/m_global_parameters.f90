@@ -257,9 +257,9 @@ MODULE m_global_parameters
     REAL(KIND(0d0)) :: Ca       !< Cavitation number
     REAL(KIND(0d0)) :: Web      !< Weber number
     REAL(KIND(0d0)) :: Re_inv   !< Inverse Reynolds number
-    REAL(KIND(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
-    REAL(KIND(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
-    REAL(KIND(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight !< Simpson quadrature weights
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: R0     !< Bubble sizes
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: V0     !< Bubble velocities
     LOGICAL         :: bubbles      !< Bubbles on/off
     LOGICAL         :: polytropic   !< Polytropic  switch
     INTEGER         :: bubble_model !< Gilmore or Keller--Miksis bubble model
@@ -269,9 +269,9 @@ MODULE m_global_parameters
     
     !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
     !> @{
-    REAL(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    REAL(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
-    REAL(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
+    REAL(KIND(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     REAL(KIND(0.D0)) :: mul0, ss, gamma_v, mu_v
     REAL(KIND(0.D0)) :: gamma_m, gamma_n, mu_n
     !> @}
@@ -280,7 +280,7 @@ MODULE m_global_parameters
     !> @name Acoustic monopole parameters
     !> @{
     LOGICAL         :: monopole !< Monopole switch
-    TYPE(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
+    TYPE(mono_parameters), DIMENSION(num_probes_max) :: mono !< Monopole parameters
     INTEGER         :: num_mono !< Number of monopoles
     !> @}
 
@@ -378,11 +378,11 @@ MODULE m_global_parameters
                 fluid_pp(i)%k_v     = dflt_real
             END DO
 
-            !SHB Tait EOS
+            ! Tait EOS
             rhoref  = dflt_real
             pref    = dflt_real
 
-            !SHB Bubble modeling
+            ! Bubble modeling
             bubbles     = .FALSE.
             bubble_model  = 1
             polytropic  = .TRUE.
@@ -394,21 +394,21 @@ MODULE m_global_parameters
             Re_inv  = dflt_real
             Web     = dflt_real
             
-            !SHB monopole source
+            ! Monopole source
             monopole = .FALSE.
             num_mono = 1
 
-            do j = 1,num_probes_max
-                do i = 1,3
+            DO j = 1,num_probes_max
+                DO i = 1,3
                     mono(j)%loc(i) = dflt_real
-                end do
+                END DO
                 mono(j)%mag    = dflt_real
                 mono(j)%length = dflt_real
                 mono(j)%dir    = dflt_real
                 mono(j)%npulse = 1.d0
                 mono(j)%pulse = 1
                 mono(j)%support = 1
-            end do
+            END DO
 
             fd_order = dflt_int
             com_wrt = .FALSE.
@@ -505,7 +505,7 @@ MODULE m_global_parameters
                     adv_idx%beg  = E_idx + 1
                     adv_idx%end  = E_idx + num_fluids                    
                     
-                    IF( (adv_alphan .NEQV. .TRUE.) .and. &
+                    IF( (adv_alphan .NEQV. .TRUE.) .AND. &
                         (num_fluids > 1)) adv_idx%end = adv_idx%end - 1
  
                     sys_size = adv_idx%end
@@ -516,52 +516,52 @@ MODULE m_global_parameters
                         alf_idx = 0
                     END IF
                     
-                    if (bubbles) then
+                    IF (bubbles) THEN
                         bub_idx%beg = sys_size+1
                         bub_idx%end = sys_size+2*nb
-                        if (polytropic .neqv. .TRUE.) then
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             bub_idx%end = sys_size+4*nb
-                        end if
+                        END IF
                         sys_size = bub_idx%end
 
-                        allocate( bub_idx%rs(nb), bub_idx%vs(nb) )
-                        allocate( bub_idx%ps(nb), bub_idx%ms(nb) )
-                        allocate( weight(nb),R0(nb),V0(nb) )
+                        ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                        ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+                        ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                        do i = 1, nb
-                            if (polytropic .neqv. .TRUE.) then
+                        DO i = 1, nb
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 fac = 4
-                            else
+                            ELSE
                                 fac = 2
-                            end if
+                            END IF
 
                             bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                             bub_idx%vs(i) = bub_idx%rs(i)+1
                             
-                            if (polytropic .neqv. .TRUE.) then
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 bub_idx%ps(i) = bub_idx%vs(i)+1
                                 bub_idx%ms(i) = bub_idx%ps(i)+1
-                            end if
-                        end do
+                            END IF
+                        END DO
 
-                        if (nb == 1) then
+                        IF (nb == 1) THEN
                             weight(:)   = 1d0
                             R0(:)       = 1d0
                             V0(:)       = 0d0
-                        else if (nb > 1) then
-                            call s_simpson(nb)
+                        ELSE IF (nb > 1) THEN
+                            CALL s_simpson(nb)
                             V0(:)       = 0d0
-                        else
-                            stop 'Invalid value of nb'
-                        end if
+                        ELSE
+                            STOP 'Invalid value of nb'
+                        END IF
 
-                        if (polytropic .neqv. .TRUE.) then
-                            call s_initialize_nonpoly
-                        else
+                        IF (polytropic .NEQV. .TRUE.) THEN
+                            CALL s_initialize_nonpoly
+                        ELSE
                             rhoref  = 1.d0
                             pref    = 1.d0
-                        end if
-                    end if
+                        END IF
+                    END IF
                 ELSE IF(model_eqns == 3) THEN
                     cont_idx%beg = 1
                     cont_idx%end = num_fluids
@@ -574,8 +574,6 @@ MODULE m_global_parameters
                     internalEnergies_idx%end  = adv_idx%end + num_fluids
                     sys_size     = internalEnergies_idx%end
                 ELSE IF(model_eqns == 4) THEN
-                    !SHB: 4 equation model with subgrid bubbles
-                    !only works with one fluid
                     cont_idx%beg = 1 ! one continuity equation
                     cont_idx%end = 1 !num_fluids
                     mom_idx%beg  = cont_idx%end + 1 ! one momentum equation in each direction
@@ -586,53 +584,53 @@ MODULE m_global_parameters
                     alf_idx      = adv_idx%end
                     sys_size     = alf_idx !adv_idx%end
                     
-                    if (bubbles) then
+                    IF (bubbles) THEN
                         bub_idx%beg = sys_size+1
                         bub_idx%end = sys_size+2*nb
-                        if (polytropic .neqv. .TRUE.) then
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             bub_idx%end = sys_size+4*nb
-                        end if
+                        END IF
                         sys_size = bub_idx%end
 
 
-                        allocate( bub_idx%rs(nb), bub_idx%vs(nb) )
-                        allocate( bub_idx%ps(nb), bub_idx%ms(nb) )
-                        allocate( weight(nb),R0(nb),V0(nb) )
+                        ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                        ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+                        ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                        do i = 1, nb
-                            if (polytropic .neqv. .TRUE.) then
+                        DO i = 1, nb
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 fac = 4
-                            else
+                            ELSE
                                 fac = 2
-                            end if
+                            END IF
 
                             bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                             bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                            if (polytropic .neqv. .TRUE.) then
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 bub_idx%ps(i) = bub_idx%vs(i)+1
                                 bub_idx%ms(i) = bub_idx%ps(i)+1
-                            end if
-                        end do
+                            END IF
+                        END DO
 
-                        if (nb == 1) then
+                        IF (nb == 1) THEN
                             weight(:)   = 1d0
                             R0(:)       = 1d0
                             V0(:)       = 0d0
-                        else if (nb > 1) then
-                            call s_simpson(nb)
+                        ELSE IF (nb > 1) THEN
+                            CALL s_simpson(nb)
                             V0(:)       = 0d0
-                        else
-                            stop 'Invalid value of nb'
-                        end if
+                        ELSE
+                            STOP 'Invalid value of nb'
+                        END IF
 
-                        if (polytropic .neqv. .TRUE.) then
-                            call s_initialize_nonpoly
-                        else
+                        IF (polytropic .NEQV. .TRUE.) THEN
+                            CALL s_initialize_nonpoly
+                        ELSE
                             rhoref  = 1.d0
                             pref    = 1.d0
-                        end if
-                    end if 
+                        END IF
+                    END IF 
                 END IF
             
                 ! Determining the number of fluids for which the shear and the
@@ -770,14 +768,14 @@ MODULE m_global_parameters
             END IF
             
              ! Configuring Coordinate Direction Indexes =========================
-            if (bubbles) then
+            IF (bubbles) THEN
                 ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
                 IF(n > 0) iy%beg = -buff_size; IF(p > 0) iz%beg = -buff_size
                 ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-                allocate(   ptil   (    ix%beg:ix%end, &
+                ALLOCATE(   ptil   (    ix%beg:ix%end, &
                                         iy%beg:iy%end, &
                                         iz%beg:iz%end ) )
-            end if           
+            END IF           
  
             IF (probe_wrt) THEN
                 fd_number = MAX(1, fd_order/2)
@@ -811,7 +809,7 @@ MODULE m_global_parameters
 
 
         !> Initializes non-polydisperse bubble modeling
-        subroutine s_initialize_nonpoly
+        SUBROUTINE s_initialize_nonpoly
             INTEGER :: ir
             REAL(KIND(0.D0)) :: rhol0
             REAL(KIND(0.D0)) :: pl0
@@ -835,9 +833,9 @@ MODULE m_global_parameters
             rhol0 = rhoref
             pl0   = pref
             
-            allocate( pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb) )
-            allocate( k_n(nb), k_v(nb), omegaN(nb) )
-            allocate( Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb) ) 
+            ALLOCATE( pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb) )
+            ALLOCATE( k_n(nb), k_v(nb), omegaN(nb) )
+            ALLOCATE( Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb) ) 
             
             pb0(:)      = dflt_real
             mass_n0(:)  = dflt_real
@@ -859,7 +857,7 @@ MODULE m_global_parameters
             k_n(:)  = fluid_pp(2)%k_v
 
             gamma_m = gamma_n
-            if (thermal==2) gamma_m = 1.d0
+            IF (thermal==2) gamma_m = 1.d0
             
             temp = 293.15D0
             D_m  = 0.242D-4
@@ -925,7 +923,7 @@ MODULE m_global_parameters
 
             rhoref = 1.d0
             pref = 1.d0
-        end subroutine s_initialize_nonpoly
+        END SUBROUTINE s_initialize_nonpoly
 
         !>  Computes transfer coefficient for non-polydisperse bubble modeling (Preston 2007)
         !!  @param omega Frequency

@@ -331,15 +331,14 @@ MODULE m_global_parameters
             
             fd_order = dflt_int
  
-            !SHB Tait EOS
+            ! Tait EOS
             rhoref  = dflt_real
             pref    = dflt_real
 
-            !SHB Bubble modeling
+            ! Bubble modeling
             bubbles = .FALSE.
             R0ref   = dflt_real 
             nb      = dflt_int
-
              
         END SUBROUTINE s_assign_default_values_to_user_inputs ! ----------------
         
@@ -392,7 +391,7 @@ MODULE m_global_parameters
                 adv_idx%beg  = E_idx + 1
                 adv_idx%end  = E_idx + num_fluids
                 
-                IF( (adv_alphan .NEQV. .TRUE.) .and. &
+                IF( (adv_alphan .NEQV. .TRUE.) .AND. &
                     (num_fluids > 1)) adv_idx%end = adv_idx%end - 1
                 
                 sys_size     = adv_idx%end
@@ -403,52 +402,52 @@ MODULE m_global_parameters
                     alf_idx = 0
                 END IF
                 
-                if (bubbles) then
+                IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    if (polytropic .neqv. .TRUE.) then
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         bub_idx%end = sys_size+4*nb
-                    end if
+                    END IF
                     sys_size = bub_idx%end
 
                     ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
                     ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                    do i = 1, nb
-                        if (polytropic .neqv. .TRUE.) then
+                    DO i = 1, nb
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             fac = 4
-                        else
+                        ELSE
                             fac = 2
-                        end if
+                        END IF
                         
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        if (polytropic .neqv. .TRUE.) then
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
-                        end if
-                    end do
+                        END IF
+                    END DO
 
-                    if (nb == 1) then
+                    IF (nb == 1) THEN
                         weight(:)   = 1d0
                         R0(:)       = 1d0
                         V0(:)       = 0d0
-                    else if (nb > 1) then
-                        call s_simpson(nb)
+                    ELSE IF (nb > 1) THEN
+                        CALL s_simpson(nb)
                         V0(:)       = 0d0
-                    else
-                        stop 'Invalid value of nb'
-                    end if
+                    ELSE
+                        STOP 'Invalid value of nb'
+                    END IF
 
-                    if (polytropic .neqv. .TRUE.) then
-                        call s_initialize_nonpoly
-                    else
+                    IF (polytropic .NEQV. .TRUE.) THEN
+                        CALL s_initialize_nonpoly
+                    ELSE
                         rhoref  = 1.d0
                         pref    = 1.d0
-                    end if
-                end if          
+                    END IF
+                END IF          
                 
             ! ==================================================================
 
@@ -471,8 +470,6 @@ MODULE m_global_parameters
                 sys_size     = internalEnergies_idx%end
 
             ELSE IF(model_eqns == 4) THEN
-                !SHB: 4 equation model with subgrid bubbles
-                !only works with one fluid
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids
                 mom_idx%beg  = cont_idx%end + 1 ! one momentum equation in each
@@ -483,53 +480,52 @@ MODULE m_global_parameters
                 alf_idx      = adv_idx%end
                 sys_size     = alf_idx !adv_idx%end
                 
-                if (bubbles) then
+                IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    if (polytropic .neqv. .TRUE.) then
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         bub_idx%end = sys_size+4*nb
-                    end if
+                    END IF
                     sys_size = bub_idx%end
-                    print*, 'sys_size', sys_size
 
                     ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
                     ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                    do i = 1, nb
-                        if (polytropic .neqv. .TRUE.) then
+                    DO i = 1, nb
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             fac = 4
-                        else
+                        ELSE
                             fac = 2
-                        end if
+                        END IF
                         
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        if (polytropic .neqv. .TRUE.) then
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
-                        end if
-                    end do
+                        END IF
+                    END DO
 
-                    if (nb == 1) then
+                    IF (nb == 1) THEN
                         weight(:)   = 1d0
                         R0(:)       = 1d0
                         V0(:)       = 0d0
-                    else if (nb > 1) then
-                        call s_simpson(nb)
+                    ELSE IF (nb > 1) THEN
+                        CALL s_simpson(nb)
                         V0(:)       = 0d0
-                    else
-                        stop 'Invalid value of nb'
-                    end if
+                    ELSE
+                        STOP 'Invalid value of nb'
+                    END IF
 
-                    if (polytropic .neqv. .TRUE.) then
-                        call s_initialize_nonpoly
-                    else
+                    IF (polytropic .NEQV. .TRUE.) THEN
+                        CALL s_initialize_nonpoly
+                    ELSE
                         rhoref  = 1.d0
                         pref    = 1.d0
-                    end if
-                end if
+                    END IF
+                END IF
              END IF
             ! ==================================================================
             
@@ -679,7 +675,7 @@ MODULE m_global_parameters
             k_n(:)  = fluid_pp(2)%k_v
 
             gamma_m = gamma_n
-            if (thermal==2 ) gamma_m = 1.d0 !isothermal
+            IF (thermal==2 ) gamma_m = 1.d0 !isothermal
 
             temp = 293.15D0
             D_m  = 0.242D-4
@@ -845,6 +841,7 @@ MODULE m_global_parameters
         !! @param nRtmp is the bubble number  density times the bubble radii
         !! @param ntmp is the output number bubble density
         SUBROUTINE s_comp_n_from_cons( vftmp,nRtmp,ntmp )
+
             REAL(KIND(0.D0)), INTENT(IN) :: vftmp
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: nRtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
@@ -881,7 +878,6 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: func
             REAL(KIND(0.D0)), INTENT(OUT) :: mom
 
-            
             mom = DOT_PRODUCT( weight,func )
 
         END SUBROUTINE s_quad
@@ -928,10 +924,6 @@ MODULE m_global_parameters
             weight(1) = tmp*dphi/3.D0
             tmp = DEXP( -0.5D0*(phi(Npt)/sd)**2 )/DSQRT( 2.D0*pi )/sd
             weight(Npt) = tmp*dphi/3.D0
-            !NR0beg = 1
-
-            print*, 'weights = ', weight(:)
-            print*, 'R0s = ', R0(:)
 
         END SUBROUTINE s_simpson
         

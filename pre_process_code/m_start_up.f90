@@ -8,15 +8,13 @@
 MODULE m_start_up
     
     ! Dependencies =============================================================
-    ! USE f90_unix_proc          ! NAG Compiler Library of UNIX system commands
-    
     USE m_derived_types          !< Definitions of the derived types
     USE m_global_parameters      !< Global parameters for the code
     USE m_mpi_proxy              !< Message passing interface (MPI) module proxy
     USE m_data_output            !< Procedures to write the grid data and the
                                  !! conservative variables to files
     USE mpi                      !< Message passing interface (MPI) module
-    use m_compile_specific
+    USE m_compile_specific
     ! ==========================================================================
     
     
@@ -147,7 +145,7 @@ MODULE m_start_up
             !! For allowing an extra fluid_pp if there are subgrid bubbles
 
             bub_fac = 0
-            if (bubbles .and. (num_fluids == 1)) bub_fac = 1
+            IF (bubbles .AND. (num_fluids == 1)) bub_fac = 1
             
             
             ! Checking the existence of the case folder
@@ -155,10 +153,10 @@ MODULE m_start_up
             
             file_loc = TRIM(case_dir) // '/.'
            
-            call my_inquire(file_loc,dir_check)
+            CALL my_inquire(file_loc,dir_check)
             
             ! Startup checks for bubbles and bubble variables
-            IF(bubbles .AND. (model_eqns .NE. 4 .and. model_eqns .ne. 2)) THEN
+            IF(bubbles .AND. (model_eqns .NE. 4 .AND. model_eqns .NE. 2)) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'bubbles and model_eqns. '           // &
                              'Exiting ...'
@@ -172,32 +170,27 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'bubbles and pref. '           // &
                              'Exiting ...'
+                CALL s_mpi_abort()  
+            ELSEIF(model_eqns == 4 .AND. (num_fluids > 1)) THEN
+                PRINT '(A)', 'Unsupported combination of values of ' // &
+                             'model_eqns and num_fluids. '           // &
+                             'Exiting ...'
                 CALL s_mpi_abort()   
             ELSEIF(bubbles .AND. (R0ref == dflt_real)) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'bubbles and R0ref. '           // &
                              'Exiting ...'
                 CALL s_mpi_abort()   
-            elseif(bubbles .and. (nb == dflt_int)) then
+            ELSEIF(bubbles .AND. (nb == dflt_int)) THEN
                 print '(a)', 'unsupported combination of values of ' // &
                              'bubbles and nb. '           // &
                              'exiting ...'
-                call s_mpi_abort()  
-            !ELSEIF( (bubbles .neqv. .TRUE.) .and. (polytropic .neqv. .TRUE.) ) THEN
-            !    PRINT '(A)', 'Unsupported combination of values of ' // &
-            !                 'bubbles and polytropic. '           // &
-            !                 'Exiting ...'
-            !    CALL s_mpi_abort()  
-            elseif(bubbles .and. (thermal > 3)) then
+                CALL s_mpi_abort()  
+            ELSEIF(bubbles .AND. (thermal > 3)) THEN
                 print '(a)', 'unsupported combination of values of ' // &
                              'bubbles and thermal. '           // &
                              'exiting ...'
-                call s_mpi_abort() 
-            !ELSEIF( (polytropic .neqv. .TRUE.) .and. (num_fluids > 1) ) THEN
-            !    print '(a)', 'unsupported combination of values of ' // &
-            !                 'polytropic and num_fluids. '           // &
-            !                 'exiting ...'
-            !    call s_mpi_abort() 
+                CALL s_mpi_abort() 
             END IF
 
 
@@ -1142,8 +1135,8 @@ MODULE m_start_up
             ! Constraints on the geometric parameters of the analytical patch
             IF(                     n > 0 .OR. p > 0                    &
                                            .OR.                         &
-                        (model_eqns .ne. 4 .and. model_eqns .ne. 2)     &
-                                           .or.                         &
+                        (model_eqns .ne. 4 .AND. model_eqns .ne. 2)     &
+                                           .OR.                         &
                       patch_icpp(patch_id)%x_centroid == dflt_real      &
                                            .OR.                         &
                            patch_icpp(patch_id)%length_x <= 0d0           ) THEN
@@ -1766,11 +1759,7 @@ MODULE m_start_up
             
             ! Inquiring as to the existence of the time-step directory
             file_loc = TRIM(t_step_dir) // '/.'
-            !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-            !        EXIST     = dir_check       )
-            !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-            !           EXIST     = dir_check       )
-            call my_inquire(file_loc,dir_check)
+            CALL my_inquire(file_loc,dir_check)
             
             ! If the time-step directory is missing, the pre-process exits
             IF(dir_check .NEQV. .TRUE.) THEN

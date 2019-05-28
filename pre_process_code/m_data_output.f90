@@ -180,7 +180,7 @@ MODULE m_data_output
                                         (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
                                         ) ** lit_gamma )                        &
                                         - pi_inf
-                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j), &
                                         (                                       & 
@@ -250,7 +250,7 @@ MODULE m_data_output
                                         q_cons_vf(1)%sf(j,k,0)/                          &
                                         (rhoref*(1.-q_cons_vf(4)%sf(j,k,0)))             & 
                                         ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
-                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j),y_cb(k), &
                                         (                                       & 
@@ -422,11 +422,7 @@ MODULE m_data_output
                     
                     file_loc = TRIM(t_step_dir) // '/'
                     
-                    !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                    !        EXIST     = dir_check       )
-                    !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                    !           EXIST     = dir_check       )
-                    call my_inquire(file_loc,dir_check)
+                    CALL my_inquire(file_loc,dir_check)
         
                     IF(dir_check) CALL SYSTEM('rm -rf ' // TRIM(t_step_dir))
                     CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))

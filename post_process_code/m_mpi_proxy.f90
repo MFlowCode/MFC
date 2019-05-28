@@ -358,7 +358,7 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST(fourier_modes%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(fourier_modes%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-            ! SHB: Tait EOS
+            ! Tait EOS
             CALL MPI_BCAST( pref,1,             &
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
@@ -366,7 +366,7 @@ MODULE m_mpi_proxy
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
 
-            ! SHB: Bubble modeling
+            ! Bubble modeling
             CALL MPI_BCAST( bubbles,1,          &
                         MPI_LOGICAL,0,          &
                         MPI_COMM_WORLD,ierr  )

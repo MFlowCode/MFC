@@ -172,7 +172,6 @@ MODULE m_derived_variables
                         END DO
                     END DO
         
-                    print*, 'write probe'
                     CALL s_write_probe_files(t_step,q_cons_ts(1)%vf,accel_mag)
                 END IF
             END IF

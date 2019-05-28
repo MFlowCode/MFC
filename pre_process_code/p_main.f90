@@ -41,12 +41,11 @@ PROGRAM p_main
     ! those in from the input file. Next, the user inputs are read in and their
     ! consistency is checked. The detection of any inconsistencies automatically
     ! leads to the termination of the pre-process.
-    IF(proc_rank == 0) THEN
+    IF (proc_rank == 0) THEN
         CALL s_assign_default_values_to_user_inputs()
         CALL s_read_input_file()
         CALL s_check_input_file()
     END IF
-    print*, 'got defult values and input file'
    
 
     ! Broadcasting the user inputs to all of the processors and performing the
@@ -55,21 +54,15 @@ PROGRAM p_main
     CALL s_mpi_bcast_user_inputs()
     CALL s_initialize_parallel_io()
     CALL s_mpi_decompose_computational_domain()
-    print*, 'broadcast'
-    if (bubbles) print*, 'nb = ', nb
     
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     CALL s_initialize_global_parameters_module()
-    print*, 'global parameters'
     CALL s_initialize_data_output_module()
     CALL s_initialize_variables_conversion_module()
-    print*, 'variable conversion'
     CALL s_initialize_start_up_module()
-    print*, 'start up'
     CALL s_initialize_grid_module()
     CALL s_initialize_initial_condition_module()
-    print*, 'initialize'
 
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
@@ -111,21 +104,17 @@ PROGRAM p_main
     END IF
         
     IF(old_ic) CALL s_read_ic_data_files(q_cons_vf)
-    print*, 'pre initial condition'
  
     CALL s_generate_initial_condition()
     
-    print*, 'got initial condition'
     CALL s_write_data_files(q_cons_vf)
 
-    print*, 'wrote data files'
     ! Disassociate pointers for serial and parallel I/O
     s_generate_grid => NULL()
     s_read_grid_data_files => NULL()
     s_read_ic_data_files => NULL()
     s_write_data_files => NULL()
     
-    print*, 'nullified'
     ! Deallocation procedures for the modules
     CALL s_finalize_initial_condition_module()
     CALL s_finalize_grid_module()
@@ -133,11 +122,9 @@ PROGRAM p_main
     CALL s_finalize_variables_conversion_module()
     CALL s_finalize_data_output_module()
     CALL s_finalize_global_parameters_module()    
-    print*, 'finalized'
 
     ! Finalization of the MPI environment
     CALL s_mpi_finalize()
-    print*, 'quit'
-    stop
+    STOP 
     
 END PROGRAM p_main

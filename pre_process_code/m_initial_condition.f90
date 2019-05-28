@@ -468,7 +468,7 @@ MODULE m_initial_condition
                 END DO
             END IF
 
-            IF (bubbles .AND. (polytropic .neqv. .TRUE.) ) THEN
+            IF (bubbles .AND. (polytropic .NEQV. .TRUE.) ) THEN
                 DO i = 1,nb
                     q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
                     q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
@@ -632,7 +632,7 @@ MODULE m_initial_condition
                 ALLOCATE(q_prim_vf(i)%sf(0:m,0:n,0:p))
                 ALLOCATE(q_cons_vf(i)%sf(0:m,0:n,0:p))
             END DO
-            allocate( alf_sum%sf(0:m,0:n,0:p) )
+            ALLOCATE( alf_sum%sf(0:m,0:n,0:p) )
             
             
             ! Allocating the patch identities bookkeeping variable

@@ -148,14 +148,13 @@ MODULE m_time_steppers
                                           iz%beg:iz%end ))
             END DO
 
-            ! SHB: added for bubble variables
-            if (bubbles) then
+            IF (bubbles) THEN
                 DO i = bub_idx%beg,sys_size
                     ALLOCATE(q_prim_vf(i)%sf( ix%beg:ix%end, &
                                           iy%beg:iy%end, &
                                           iz%beg:iz%end ))
                 END DO
-            end if
+            END IF
 
             IF (model_eqns == 3) THEN
                 DO i = internalEnergies_idx%beg, internalEnergies_idx%end
@@ -199,7 +198,6 @@ MODULE m_time_steppers
                 q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
             END DO
 
-            !SHB edits
             IF (adv_alphan) THEN
                 DO i = adv_idx%beg, adv_idx%end
                         q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
@@ -210,17 +208,11 @@ MODULE m_time_steppers
                 END DO
             END IF
 
-            print*, 'before rhs'
-            
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
            
-
-            print '(a)', 'SHB: end of rhs in time steppers'
-
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
             END IF
-            print '(a)', 'SHB: end of run_time info'
 
             IF (ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) THEN
                 CALL s_time_step_cycling(t_step)
@@ -235,46 +227,24 @@ MODULE m_time_steppers
                              + dt*rhs_vf(i)%sf
             END DO
 
-            !print '(a)', 'SHB: end of time advancing'
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
 
             IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        ! Chunk of code to output RHS of advection equation when checking changes
-        ! using the analytical initial condition
-
-        ! PRINT '(A,I0)','This is m: ',m
-        ! PRINT '(A)','This is alt_soundspeed: ',alt_soundspeed
-        ! i = 2d0/5d0*(m+1) + (m+1)/25d0/2d0 - 5d-1
-        ! j = i
-        ! PRINT '(A,E15.10,A,E15.10)', 'The location of the cell center is ',x_cc(i),' , ',y_cc(j)
-        ! PRINT '(A,E20.10)','This is rhs for adv: ',rhs_vf(adv_idx%end)%sf(i,j,0)
-
-        ! i = m/2
-        ! j = n/2
-        ! PRINT '(A,E15.10,A,E15.10)', 'The location of the cell center is ',x_cc(i),' , ',y_cc(j)
-        ! PRINT '(A,E20.10)','This is rhs for adv: ',rhs_vf(adv_idx%end)%sf(i,j,0)
-
-        ! i = 4d0/5d0*(m+1) + (m+1)/25d0/2d0 - 5d-1
-        ! j = i
-        ! PRINT '(A,E15.10,A,E15.10)', 'The location of the cell center is ',x_cc(i),' , ',y_cc(j)
-        ! PRINT '(A,E20.10)','This is rhs for adv: ',rhs_vf(adv_idx%end)%sf(i,j,0)
-        ! CALL s_mpi_abort()
             
             DO i = 1, cont_idx%end
                 q_prim_vf(i)%sf => NULL()
             END DO
            
-            !SHB edits
-            if (adv_alphan) then
+            IF (adv_alphan) THEN
                 DO i = adv_idx%beg, adv_idx%end
                     q_prim_vf(i)%sf => NULL()
                 END DO
-            else
+            ELSE
                 DO i = adv_idx%beg, sys_size ! adv_idx%end
                     q_prim_vf(i)%sf => NULL()
                 END DO 
-            end if
+            END IF
             ! ==================================================================
            
         END SUBROUTINE s_1st_order_tvd_rk ! ------------------------------------
@@ -443,9 +413,6 @@ MODULE m_time_steppers
 
             IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
       
-            !IF ((model_eqns == 2) .and. bubbles .and. (num_fluids > 2)) &
-            !    CALL s_phase_transfer(q_cons_ts(1)%vf)
-            
             DO i = 1, cont_idx%end
                 q_prim_vf(i)%sf => NULL()
             END DO
@@ -457,7 +424,6 @@ MODULE m_time_steppers
             
             
         END SUBROUTINE s_3rd_order_tvd_rk ! ------------------------------------
-        
         
         
         

@@ -221,38 +221,38 @@ MODULE m_variables_conversion
  
             ! Performing the transfer of the density, the specific heat ratio
             ! function as well as the liquid stiffness function, respectively       
-            if (model_eqns == 4) then
+            IF (model_eqns == 4) THEN
                 rho_K    = qK_vf(1)%sf(i,j,k)
                 gamma_K  = fluid_pp(1)%gamma !qK_vf(gamma_idx)%sf(i,j,k)
                 pi_inf_K = fluid_pp(1)%pi_inf !qK_vf(pi_inf_idx)%sf(i,j,k)
-            else if ((model_eqns == 2) .and. bubbles .and. adv_alphan) then
+            ELSE IF ((model_eqns == 2) .AND. bubbles .AND. adv_alphan) THEN
                 rho_k = 0d0; gamma_k = 0d0; pi_inf_k = 0d0
 
-                if (mpp_lim .and. (num_fluids > 2)) then
-                    do l = 1, num_fluids
+                IF (mpp_lim .AND. (num_fluids > 2)) THEN
+                    DO l = 1, num_fluids
                         rho_k    = rho_k    + qK_vf(l)%sf(i,j,k) 
                         gamma_k  = gamma_k  + qK_vf(l+E_idx)%sf(i,j,k)*fluid_pp(l)%gamma
                         pi_inf_k = pi_inf_k + qK_vf(l+E_idx)%sf(i,j,k)*fluid_pp(l)%pi_inf
-                    end do
-                else if (num_fluids == 2) then
+                    END DO
+                ELSE IF (num_fluids == 2) THEN
                     rho_K    = qK_vf(1)%sf(i,j,k)
                     gamma_K  = fluid_pp(1)%gamma
                     pi_inf_K = fluid_pp(1)%pi_inf
-                else if (num_fluids > 2) then
-                    do l = 1, num_fluids-1 !leave out bubble part of mixture
+                ELSE IF (num_fluids > 2) THEN
+                    DO l = 1, num_fluids-1 !leave out bubble part of mixture
                         rho_k    = rho_k    + qK_vf(l)%sf(i,j,k) 
                         gamma_k  = gamma_k  + qK_vf(l+E_idx)%sf(i,j,k)*fluid_pp(l)%gamma
                         pi_inf_k = pi_inf_k + qK_vf(l+E_idx)%sf(i,j,k)*fluid_pp(l)%pi_inf
-                    end do
+                    END DO
                     !rho_K    = qK_vf(1)%sf(i,j,k)
                     !gamma_K  = fluid_pp(1)%gamma
                     !pi_inf_K = fluid_pp(1)%pi_inf
-                else
+                ELSE
                     rho_K    = qK_vf(1)%sf(i,j,k)
                     gamma_K  = fluid_pp(1)%gamma
                     pi_inf_K = fluid_pp(1)%pi_inf
-                end if
-            end if
+                END IF
+            END IF
             
         END SUBROUTINE s_convert_species_to_mixture_variables_bubbles ! ----------------
  
@@ -417,33 +417,23 @@ MODULE m_variables_conversion
             
             gamma_avg = 5d-1*(gamma_L + gamma_R)
          
-            !SHB: for Tait EOS
             alpha_avg = 5d-1*(alpha_L + alpha_R)
             pres_avg = 5d-1*(pres_L + pres_R)
 
-            if (model_eqns .ne. 4 ) then
+            IF (model_eqns .NE. 4 ) THEN
                 c_avg_sf(j,k,l) = SQRT((H_avg - 5d-1*SUM(vel_avg**2d0))/gamma_avg)
-            else !SHB: For Tait EOS
-                    !fix for (1-\alpha) into sqrt
+            ELSE 
+                ! For Tait EOS
                 c_avg_sf(j,k,l) = sqrt(                         &
                             (1d0/fluid_pp(1)%gamma+1d0) *       &
                             (pres_avg + fluid_pp(1)%pi_inf) /   &
                             (rho_avg_sf(j,k,l)*(1d0-alpha_avg))   &
                             )
-                !from riemann solver modification
-                ! c = 1/(1-alf) * sqrt( gam(p_l + \pi_inf)/\rho_l))
-                ! c_L = (1/(1-alpha_L(1)))*sqrt(      &
-                !            (1d0/fluid_pp(1)%gamma+1d0) *   &
-                !            (pres_L + fluid_pp(1)%pi_inf)/rho_L &
-                !        )
-                ! c_R = (1/(1-alpha_R(1)))*sqrt(      &
-                !            (1d0/fluid_pp(1)%gamma+1d0) *   &
-                !            (pres_R + fluid_pp(1)%pi_inf)/rho_R &
-                !        )
-            end if
+            END IF
             
         END SUBROUTINE s_compute_arithmetic_average_state ! --------------------
         
+
         !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.        
@@ -454,7 +444,7 @@ MODULE m_variables_conversion
             IF (model_eqns == 1) THEN        ! gamma/pi_inf model
                 s_convert_to_mixture_variables => &
                              s_convert_mixture_to_mixture_variables
-            ELSEIF (bubbles) THEN        !SHB volume fraction for bubbles
+            ELSEIF (bubbles) THEN           ! Volume fraction for bubbles
                 s_convert_to_mixture_variables => &
                              s_convert_species_to_mixture_variables_bubbles
             ELSE                            ! Volume fraction model
@@ -526,7 +516,7 @@ MODULE m_variables_conversion
             REAL(KIND(0d0))                                   ::       nbub
             REAL(KIND(0d0)), DIMENSION(2)                     ::       Re_K
             REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) ::       We_K
-            REAL(KIND(0d0)), dimension(nb) :: nRtmp
+            REAL(KIND(0d0)), DIMENSION(nb) :: nRtmp
             
 
             INTEGER :: i,j,k,l !< Generic loop iterators
@@ -538,27 +528,27 @@ MODULE m_variables_conversion
                     
                         dyn_pres_K = 0d0; E_We_K = 0d0
                      
-                        if (model_eqns .ne. 4 ) then
+                        IF (model_eqns .NE. 4 ) THEN
                             CALL s_convert_to_mixture_variables( qK_cons_vf, rho_K, &
                                                                  gamma_K, pi_inf_K, &
                                                                  Re_K, We_K, j,k,l  )
                             !no mixture variables if single bubble mixture
-                        end if
+                        END IF
 
                         DO i = mom_idx%beg, mom_idx%end
                             !compute velocity
-                            if (model_eqns .ne. 4 ) then
+                            IF (model_eqns .NE. 4 ) THEN
                                 ! u = \rho_k u / \rho_k <--- Mixture densities
                                 qK_prim_vf(i)%sf(j,k,l) = qK_cons_vf(i)%sf(j,k,l) &
                                                        / MAX(rho_K,sgm_eps)
                                 dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j,k,l) &
                                                           *qK_prim_vf(i)%sf(j,k,l)
-                            else !model_eqns == 4. 
+                            ELSE !model_eqns == 4. 
                                 !u = \rho u / \rho
                                 !don't need mixture density here since it's the same
                                 qK_prim_vf(i)%sf(j,k,l) = qK_cons_vf(i)%sf(j,k,l) &
                                                        / qK_cons_vf(1)%sf(j,k,l)
-                            end if
+                            END IF
                         END DO
 
                         IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THEN
@@ -574,29 +564,28 @@ MODULE m_variables_conversion
                         END IF
                     
                         ! compute pressure
-                        if ( (model_eqns .ne. 4) .and. (bubbles .neqv. .TRUE.) ) then
-                            ! No bubbles
+                        IF ( (model_eqns .NE. 4) .AND. (bubbles .NEQV. .TRUE.) ) THEN
                             ! p = ( E - 0.5 rho u u - pi_inf_k )/gamma_k
                             qK_prim_vf(E_idx)%sf(j,k,l) = &
                                 ( qK_cons_vf(E_idx)%sf(j,k,l) &
                                                 - dyn_pres_K &
                                                 - pi_inf_K &
                                                 - E_We_K ) / gamma_K
-                        else if ( (model_eqns .ne. 4) .and. (num_fluids == 1) ) then
+                        ELSE IF ( (model_eqns .NE. 4) .AND. (num_fluids == 1) ) THEN
                             ! p_l = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                             qK_prim_vf(E_idx)%sf(j,k,l) = &
                                 ( (qK_cons_vf(E_idx)%sf(j,k,l) &
                                                 - dyn_pres_K) / (1.d0 - qK_cons_vf(alf_idx)%sf(j,k,l)) &
                                                 - pi_inf_K &
                                                 - E_We_K ) / gamma_K
-                        else if (model_eqns .ne. 4) then
+                        ELSE IF (model_eqns .NE. 4) THEN
                             ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                             qK_prim_vf(E_idx)%sf(j,k,l) = &
                                 ( (qK_cons_vf(E_idx)%sf(j,k,l) &
                                                 - dyn_pres_K) / (1.d0 - qK_cons_vf(alf_idx)%sf(j,k,l)) &
                                                 - pi_inf_K &
                                                 - E_We_K ) / gamma_K
-                        else
+                        ELSE
                             ! Tait EOS
                             ! p_l = (pl0 + pi_infty)(rho/(rho_l0(1-alf)))^gamma - pi_infty  
                             qK_prim_vf(E_idx)%sf(j,k,l) =                       & 
@@ -605,29 +594,23 @@ MODULE m_variables_conversion
                                    qK_cons_vf(1)%sf(j,k,l)/                     &
                                    (rhoref*(1.d0-qK_cons_vf(E_idx+1)%sf(j,k,l)))   & 
                                    ) ** (1.d0/fluid_pp(1)%gamma + 1.d0)) - fluid_pp(1)%pi_inf
-                        end if
+                        END IF
 
-                        !if (qK_prim_vf(alf_idx)%sf(j,k,l) < 0d0) qK_prim_vf(alf_idx)%sf(j,k,l) = 1.d-13
                         ! \phi = (n\phi)/n  (n = nbub)
-                        if (bubbles) then
+                        IF (bubbles) THEN
                             ! n = sqrt( 4pi/(3 alpha) * (nR)**3 )
-                            do i = 1,nb
+                            DO i = 1,nb
                                 nRtmp(i) = qK_cons_vf(bub_idx%rs(i))%sf(j,k,l)
-                                !if (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
-                            end do
-                            call s_comp_n_from_cons( qK_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)                            
+                                !IF (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
+                            END DO
+                            CALL s_comp_n_from_cons( qK_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)                            
                            
-                            if ( isnan(nbub) .or. (nbub < 0.d0) ) stop 'nbub is nan or negative'
-                            do i = bub_idx%beg, sys_size
+                            IF ( isnan(nbub) .OR. (nbub < 0.d0) ) STOP 'nbub is nan or negative'
+                            DO i = bub_idx%beg, sys_size
                                 qk_prim_vf(i)%sf(j,k,l) = qk_cons_vf(i)%sf(j,k,l)/nbub
-                            end do
+                            END DO
 
-                            !do i = 1,nb
-                            !    if ( qk_prim_vf(bub_idx%rs(i))%sf(j,k,l) < 0d0 ) then
-                            !        qk_prim_vf(bub_idx%rs(i))%sf(j,k,l) = 1d-12
-                            !    end if
-                            !end do
-                        end if
+                        END IF
                         
                     END DO
                 END DO
@@ -938,32 +921,18 @@ MODULE m_variables_conversion
                                                              Re_K, We_K, j,k,l  )
 
                         ! Computing the energy from the pressure
-                        !if ( (model_eqns .ne. 4) .and. bubbles .neqv. .TRUE. ) then
-                            ! E = Gamma*P + \rho u u /2 + \pi_inf
-                            E_K = gamma_K*pres_K + pi_inf_K &
+                        E_K = gamma_K*pres_K + pi_inf_K &
                                  + 5d-1*rho_K*SUM(vel_K**2d0)
-                        !else if ( model_eqns .ne. 4 .and. bubbles ) then
-                        !    ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
-                        !    E_K = (1.d0 - qK_prim_vf(alf_idx)%sf(j,k,l)) * (gamma_K*pres_K + pi_inf_K) &
-                        !        + 5d-1*rho_K*SUM(vel_K**2d0)
-                        !else
-                        !    !Tait EOS, no conserved energy variable
-                        !    E_K = 0.d0
-                        !end if
-
                    
-                         ! this is just \alpha_1 (for one fluid)
                         DO i = 1, adv_idx%end-E_idx
                             adv_K(i) = qK_prim_vf(E_idx+i)%sf(j,k,l)
                         END DO
                      
                         ! mass flux, this should be \alpha_i \rho_i u_i 
-                        ! only x-dir? vel_k(dir_idx(1))
                         DO i = 1, cont_idx%end
                             FK_vf(i)%sf(j,k,l) = alpha_rho_K(i)*vel_K(dir_idx(1))
                         END DO
                      
-                        ! momentum flux in num_dims directions, this is \rho u u + p I
                         DO i = 1, num_dims
                             FK_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
                                                rho_K*vel_K(dir_idx(1)) &
@@ -983,21 +952,12 @@ MODULE m_variables_conversion
                             END DO
                         
                         ELSE
-                            ! u*\alpha_1
                             DO i = adv_idx%beg, adv_idx%end
                                 FK_vf(i)%sf(j,k,l) = vel_K(dir_idx(1))*adv_K(i-E_idx)
                             END DO
                         
-                            ! for \alpha_1 \div u
                             FK_src_vf(adv_idx%beg)%sf(j,k,l) = vel_K(dir_idx(1))
                         END IF
-                    
-                        !if (bubbles) then
-                        !    do i = 1,Nb
-                        !        FK_vf(bub_idx%rs(i))%sf(j,k,l) = vel_K(dir_idx(1))*qK_prim_vf(bub_idx%rs(i))%sf(j,k,l)
-                        !        FK_vf(bub_idx%vs(i))%sf(j,k,l) = vel_K(dir_idx(1))*qK_prim_vf(bub_idx%vs(i))%sf(j,k,l)
-                        !    end do
-                        !end if
                     END DO
                 END DO
             END DO
@@ -1269,7 +1229,7 @@ MODULE m_variables_conversion
                                 vel_R(i) = q_rs_wsK(r+1)%vf(cont_idx%end+i)%sf(j,k,l)
                             END DO
 
-                            !SHB alpha_L/R for mixture SOS computation
+                            ! alpha_L/R for mixture SOS computation
                             alpha_L = q_rs_wsK(r)%vf(E_idx+1)%sf(j,k,l)
                             alpha_R = q_rs_wsK(r+1)%vf(E_idx+1)%sf(j,k,l)
 

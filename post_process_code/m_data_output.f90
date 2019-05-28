@@ -263,14 +263,11 @@ MODULE m_data_output
                 
                 file_loc = TRIM(proc_rank_dir) // '/.'
                 
-               !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-               !EXIST     = dir_check       )
-               ! INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-               !           EXIST     = dir_check       )
-                call my_inquire(file_loc,dir_check)
-               IF(dir_check .NEQV. .TRUE.) THEN
-                   CALL SYSTEM('mkdir -p ' // TRIM(proc_rank_dir))
-               END IF
+
+                CALL my_inquire(file_loc,dir_check)
+                IF(dir_check .NEQV. .TRUE.) THEN
+                    CALL SYSTEM('mkdir -p ' // TRIM(proc_rank_dir))
+                END IF
                 
                 ! Creating the directory associated with the root process
                 IF(proc_rank == 0) THEN
@@ -279,14 +276,11 @@ MODULE m_data_output
                     
                     file_loc = TRIM(rootdir) // '/.'
                     
-                   !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                   !        EXIST     = dir_check       )
-                   !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                   !           EXIST     = dir_check       )
-                    call my_inquire(file_loc,dir_check)
-                   IF(dir_check .NEQV. .TRUE.) THEN
+
+                    CALL my_inquire(file_loc,dir_check)
+                    IF(dir_check .NEQV. .TRUE.) THEN
                        CALL SYSTEM('mkdir ' // TRIM(rootdir))
-                   END IF
+                    END IF
                     
                 END IF
                 
@@ -306,11 +300,7 @@ MODULE m_data_output
                 
                 file_loc = TRIM(proc_rank_dir) // '/.'
                 
-                !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                !       EXIST     = dir_check       )
-                !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                !           EXIST     = dir_check       )
-                call my_inquire(file_loc,dir_check)
+                CALL my_inquire(file_loc,dir_check)
 
                 IF(dir_check .NEQV. .TRUE.) THEN
                     CALL SYSTEM('mkdir -p ' // TRIM(proc_rank_dir))
@@ -323,11 +313,7 @@ MODULE m_data_output
                     
                     file_loc = TRIM(rootdir) // '/.'
                     
-                   !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                   !        EXIST     = dir_check       )
-                   !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                   !        EXIST     = dir_check       )
-                   call my_inquire(file_loc,dir_check)
+                   CALL my_inquire(file_loc,dir_check)
 
                    IF(dir_check .NEQV. .TRUE.) THEN
                        CALL SYSTEM('mkdir ' // TRIM(rootdir))

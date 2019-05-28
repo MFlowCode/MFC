@@ -69,16 +69,12 @@ PROGRAM p_main
         CALL s_check_input_file()
     END IF
    
-    print*, 'done with inputs'
-    
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
     CALL s_mpi_bcast_user_inputs()
     CALL s_initialize_parallel_io()
     CALL s_mpi_decompose_computational_domain()
-    
-    print*, 'mpi stuff done'
     
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -95,8 +91,6 @@ PROGRAM p_main
     CALL s_initialize_time_steppers_module()    
     IF (anti_diffusion) CALL s_initialize_anti_diffusion_module()
 
-    print*, 'initialization done'
-
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
         s_read_data_files => s_read_serial_data_files
@@ -109,7 +103,6 @@ PROGRAM p_main
     ! Reading in the user provided initial condition and grid data
     CALL s_read_data_files(q_cons_ts(1)%vf)
     IF (model_eqns == 3) CALL s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
-    print*, 'read input files'
 
     ! Populating the buffers of the grid variables using the boundary conditions
     CALL s_populate_grid_variables_buffers()
@@ -117,7 +110,6 @@ PROGRAM p_main
     CALL s_populate_variables_buffers(q_cons_ts(1)%vf)
     IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
    
-    print*, 'done with grid buffers'
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure
     ! the modules. The preparations below DO DEPEND on the grid being complete.
@@ -129,21 +121,15 @@ PROGRAM p_main
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
 
-    !IF (monopole) THEN
-    !    mono%loc(1) = x_cc( minloc(abs( mono%loc(1) - x_cc(1:m) ), DIM=1) )
-    !    if (n > 0) mono%loc(2) = y_cc( minloc(abs( mono%loc(2) - y_cc(1:n)), DIM=1) )
-    !    if (p > 0) mono%loc(3) = z_cc( minloc(abs( mono%loc(3) - z_cc(1:p)), DIM=1) )
-    !    print*, 'Updated mono_loc: ', mono%loc(:)
-    !END IF
-    print*, 'done with initialization'
-          OPEN(unit=2,file='times.dat')
-          CLOSE(2)
+
+    OPEN(unit=2,file='times.dat')
+    CLOSE(2)
+    
     ! Time-stepping Loop =======================================================
     DO
-        if (proc_rank ==0) print*, 'Time step = ', t_step, ' of ', t_step_stop
+        IF (proc_rank ==0) PRINT*, 'Time step = ', t_step, ' of ', t_step_stop
         !IF(t_step == t_step_stop) stop 
         
-        print*, 'call time stepper'
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         IF(time_stepper == 1) THEN
             CALL s_1st_order_tvd_rk(t_step)
@@ -157,24 +143,17 @@ PROGRAM p_main
             CALL s_5th_order_rk(t_step)
         END IF
 
-
-        
-        print*, 'compute derived vars'
         CALL s_compute_derived_variables(t_step)
 
-
-        print*, 'compute anti diffusion'
-        !Anti-diffusion step - Added by Aswin 
         IF (anti_diffusion) CALL s_compute_anti_diffusion()
 
         ! Time-stepping loop controls
         IF(t_step == t_step_stop) THEN
-            exit
+            EXIT 
         ELSE
             t_step = t_step + 1
         END IF
        
-        print*, 'write data'
         ! Backing up the grid and conservative variables data
         IF(MOD(t_step-t_step_start, t_step_save) == 0) THEN
             CALL s_write_data_files(q_cons_ts(1)%vf, t_step)
@@ -187,17 +166,12 @@ PROGRAM p_main
             CLOSE(2)
         END IF
         
-        if (proc_rank == 0) then
-            !print '(a)', 'SHB: done with time step'
-            print '(a)', ' ------------------------------------------------------ '
-        end if
-        !call s_mpi_abort()     
+        IF (proc_rank == 0) THEN
+            PRINT '(a)', ' ------------------------------------------------------ '
+        END IF
     END DO
     ! ==========================================================================
     
-    print*, 'wrapping up'
-    !call s_mpi_abort()
-
     ! Disassociate pointers for serial and parallel I/O
     s_read_data_files => NULL()
     s_write_data_files => NULL()

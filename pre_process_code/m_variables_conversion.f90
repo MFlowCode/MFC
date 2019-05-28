@@ -323,7 +323,7 @@ MODULE m_variables_conversion
                             END IF
                         END DO
 
-                        IF ( (model_eqns .ne. 4) .AND. (bubbles .neqv. .TRUE.) ) THEN
+                        IF ( (model_eqns .ne. 4) .AND. (bubbles .NEQV. .TRUE.) ) THEN
                             ! Computing the pressure from the energy
                             q_prim_vf(E_idx)%sf(j,k,l) = &
                                 (q_cons_vf(E_idx)%sf(j,k,l)-dyn_pres-pi_inf)/gamma
@@ -426,7 +426,7 @@ MODULE m_variables_conversion
                         END DO
                         
                         ! Computing the energy from the pressure
-                        IF ( (model_eqns .ne. 4) .AND. (bubbles .neqv. .TRUE.) ) THEN
+                        IF ( (model_eqns .ne. 4) .AND. (bubbles .NEQV. .TRUE.) ) THEN
                             ! E = Gamma*P + \rho u u /2 + \pi_inf
                             q_cons_vf(E_idx)%sf(j,k,l) = &
                                 gamma*q_prim_vf(E_idx)%sf(j,k,l)+dyn_pres+pi_inf

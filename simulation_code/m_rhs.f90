@@ -554,8 +554,6 @@ MODULE m_rhs
                             !    qR_cons_ndqp(i,j,k)%vf(l)%sf
                             !END DO
 
-
-                            !SHB changes
                             IF (adv_alphan ) THEN
                                 DO l = adv_idx%beg, adv_idx%end
                                     qL_prim_ndqp(i,j,k)%vf(l)%sf => &
@@ -1194,15 +1192,6 @@ MODULE m_rhs
                                     END DO
                                 END IF
                             
-                                !SHB: Edit for 2 fluids w/ bubbles
-                                !IF (bubbles .AND. riemann_solver .NE. 1) THEN
-                                !    DO l = adv_idx%beg,adv_idx%end
-                                !        ALLOCATE(flux_src_ndqp(i,j,k)%vf(l)%sf(       &
-                                !                                   ix%beg:ix%end,   &
-                                !                                   iy%beg:iy%end,   &
-                                !                                   iz%beg:iz%end ))
-                                !    END DO
-                                !END IF
                                 ALLOCATE(flux_src_ndqp(i,j,k)%vf(adv_idx%beg)%sf(       &
                                                                    ix%beg:ix%end,   &
                                                                    iy%beg:iy%end,   &
@@ -1353,7 +1342,7 @@ MODULE m_rhs
             IF (model_eqns == 1) THEN        ! Gamma/pi_inf model
                 s_convert_to_mixture_variables => &
                              s_convert_mixture_to_mixture_variables
-            ELSE IF (bubbles) THEN        !SHB volume fraction for bubbles
+            ELSE IF (bubbles) THEN          ! Volume fraction for bubbles
                 s_convert_to_mixture_variables => &
                              s_convert_species_to_mixture_variables_bubbles 
             ELSE                            ! Volume fraction model
@@ -1451,7 +1440,7 @@ MODULE m_rhs
                 END IF
             END IF
   
-            IF (crv_size > 0) call s_get_crv(q_cons_vf,q_prim_vf,rhs_vf)
+            IF (crv_size > 0) CALL s_get_crv(q_cons_vf,q_prim_vf,rhs_vf)
 
             ! Converting Conservative to Primitive Variables ===================
             iv%beg = 1; iv%end = adv_idx%end
@@ -1503,7 +1492,7 @@ MODULE m_rhs
             ! ==================================================================
             
             ! Computing Velocity Gradients =====================================
-            IF (any(Re_size > 0)) call s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
+            IF (any(Re_size > 0)) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
 
             
             ! Dimensional Splitting Loop =======================================
@@ -1853,13 +1842,6 @@ MODULE m_rhs
                             END DO
                         END DO
                     END DO
-                    IF (bubbles) THEN
-                        print*, 'max Kterm = ', maxval(abs(alpha1(:,:,:))), maxval(abs(alpha2(:,:,:))), &
-                                            1.d0 - maxval(abs( q_cons_qp(0,0,0)%vf(alf_idx-2)%sf(:,:,:) + &
-                                                               q_cons_qp(0,0,0)%vf(alf_idx-1)%sf(:,:,:) + &
-                                                               q_cons_qp(0,0,0)%vf(alf_idx-0)%sf(:,:,:) ) ), &
-                                            maxval(abs(Kterm(:,:,:)))
-                    END IF
                 END IF
 
                 ! RHS Contribution in x-direction ===============================
@@ -1867,7 +1849,7 @@ MODULE m_rhs
                   
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
-                    IF (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
+                    IF (tvd_rhs_flux) CALL s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
 
                     ! Applying characteristic boundary conditions
                     IF(bc_x%beg <= -5) THEN
@@ -1963,8 +1945,8 @@ MODULE m_rhs
                     END IF
 
                     IF (bubbles) THEN
-                        call s_get_divergence(i,q_prim_vf,divu)
-                        call s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
+                        CALL s_get_divergence(i,q_prim_vf,divu)
+                        CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
                                 bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
                         
                                               rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
@@ -1983,7 +1965,7 @@ MODULE m_rhs
                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
                         DO j = 1,num_mono
-                            call s_get_monopole(i,q_prim_vf,t_step,mono(j))
+                            CALL s_get_monopole(i,q_prim_vf,t_step,mono(j))
                         END DO
                         DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
@@ -2056,12 +2038,10 @@ MODULE m_rhs
                
                ! RHS Contribution in y-direction ===============================
                 ELSEIF(i == 2) THEN
-                    !print '(a)', 'SHB: before y component rhs'
-                  
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
                     
-                    IF (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
+                    IF (tvd_rhs_flux) CALL s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
 
                     ! Applying characteristic boundary conditions
                     IF(bc_y%beg <= -5 .AND. bc_y%beg /= -13) THEN
@@ -2157,8 +2137,8 @@ MODULE m_rhs
                     END IF
 
                     IF (bubbles) THEN
-                        call s_get_divergence(i,q_prim_vf,divu)
-                        call s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
+                        CALL s_get_divergence(i,q_prim_vf,divu)
+                        CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
                                 bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
                                               rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
@@ -2177,7 +2157,7 @@ MODULE m_rhs
                     IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
                         DO j = 1,num_mono
-                            call s_get_monopole(i,q_prim_vf,t_step,mono(j))
+                            CALL s_get_monopole(i,q_prim_vf,t_step,mono(j))
                         END DO
                         DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
@@ -2341,11 +2321,9 @@ MODULE m_rhs
                
                ! RHS Contribution in z-direction ===============================
                 ELSE
-                    !print '(a)', 'SHB: before z component rhs'
-
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
-                    IF (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
+                    IF (tvd_rhs_flux) CALL s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
 
                     ! Applying characteristic boundary conditions
                     IF(bc_z%beg <= -5) THEN
@@ -2481,8 +2459,8 @@ MODULE m_rhs
                     END IF
                     
                     IF (bubbles) THEN
-                        call s_get_divergence(i,q_prim_vf,divu)
-                        call s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
+                        CALL s_get_divergence(i,q_prim_vf,divu)
+                        CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
                                 bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
                                               rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
@@ -2501,7 +2479,7 @@ MODULE m_rhs
                     IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
                         DO j = 1,num_mono
-                            call s_get_monopole(i,q_prim_vf,t_step,mono(j))
+                            CALL s_get_monopole(i,q_prim_vf,t_step,mono(j))
                         END DO
                         DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
@@ -3209,14 +3187,12 @@ MODULE m_rhs
 
                     const_sos = dsqrt( n_tait )
 
-                    !c_ac=SQRT((1d0/gamma_ac+1d0)*((q_prim_vf(E_idx)%sf(j,k,l)+1d0/(gamma_ac+1d0)*pi_inf_ac))/rho_ac)
-
                     s2 = f_g(mytime,sound,const_sos,mymono) * f_delta(j,k,l,mymono%loc,mymono%length,mymono) !g(t)*\delta(x-x0)
                    
                     mono_mass_src(j,k,l)    = mono_mass_src(j,k,l) + s2/sound
                     IF (n ==0) THEN
                         
-                        !1d
+                        ! 1D
                         IF (mymono%dir < -0.1d0) THEN
                             !left-going wave
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) - s2
@@ -3225,18 +3201,18 @@ MODULE m_rhs
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) + s2
                         END IF
                     ELSE IF (p==0) THEN
-                        IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
-                            print*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mymono) 
+                        ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
+                        !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mymono) 
  
                         IF (mymono%dir .NE. dflt_real) THEN
-                            !2d
+                            ! 2d
                             !mono_mom_src(1,j,k,l) = s2
                             !mono_mom_src(2,j,k,l) = s2
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) + s2*cos( mymono%dir )
                             mono_mom_src(2,j,k,l) = mono_mom_src(2,j,k,l) + s2*sin( mymono%dir )
                         END IF
                     ELSE    
-                        !3Di
+                        ! 3D
                         IF (mymono%dir .NE. dflt_real) THEN
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) + s2*cos( mymono%dir )
                             mono_mom_src(2,j,k,l) = mono_mom_src(2,j,k,l) + s2*sin( mymono%dir )
@@ -3257,7 +3233,7 @@ MODULE m_rhs
         !! @param sos Sound speed
         !! @param mysos Alternative speed of sound for testing
         !! @param mymono Monopole parameterrs
-        function f_g(mytime,sos,mysos,mymono)
+        FUNCTION f_g(mytime,sos,mysos,mymono)
 
             REAL(KIND(0d0)), INTENT(IN) :: mytime, sos, mysos
             TYPE(mono_parameters), INTENT(IN) :: mymono
@@ -3265,7 +3241,7 @@ MODULE m_rhs
             REAL(KIND(0d0)) :: f_g
 
             IF (mymono%pulse == 1) THEN
-                !sine wave
+                ! Sine wave
                 period = mymono%length/sos
                 IF (mytime .le. mymono%npulse*period) THEN
                     f_g = mymono%mag*sin(mytime*2.d0*pi/period)
@@ -3273,13 +3249,13 @@ MODULE m_rhs
                     f_g = 0d0
                 END IF
             ELSE IF (mymono%pulse == 2) THEN
-                !Gaussian pulse
+                ! Gaussian pulse
                 sigt = mymono%length/sos/7.d0
                 t0 = 3.5d0*sigt 
                 f_g = mymono%mag/(dsqrt(2.d0*pi) * sigt) * &
                     dexp( -0.5d0 * ((mytime-t0)**2.d0)/(sigt**2.d0) )
             ELSE IF (mymono%pulse == 3) THEN
-                !square wave
+                ! Square wave
                 sigt = mymono%length/sos
                 t0 = 0d0
                 IF (mytime > t0 .AND. mytime < sigt) THEN
@@ -3292,7 +3268,7 @@ MODULE m_rhs
                 CALL s_mpi_abort()
             END IF
 
-        end function f_g
+        END FUNCTION f_g
 
         !> This function give the spatial support of the acoustic source 
         !! @param j First coordinate-direction location index
@@ -3301,14 +3277,14 @@ MODULE m_rhs
         !! @param mono_loc Nominal source term location
         !! @param mono_leng Length of source term in space
         !! @param mymono Monopole parameters
-        function f_delta(j,k,l,mono_loc,mono_leng,mymono)
+        FUNCTION f_delta(j,k,l,mono_loc,mono_leng,mymono)
             
             REAL(KIND(0d0)), DIMENSION(3), INTENT(IN) :: mono_loc
-            type(mono_parameters), INTENT(IN) :: mymono
+            TYPE(mono_parameters), INTENT(IN) :: mymono
             REAL(KIND(0d0)), INTENT(IN) :: mono_leng
-            integer, INTENT(in) :: j,k,l
+            INTEGER, INTENT(in) :: j,k,l
 
-            integer :: q
+            INTEGER :: q
             REAL(KIND(0d0)) :: h,hx,hy,hz
             REAL(KIND(0d0)) :: hxnew,hynew
             REAL(KIND(0d0)) :: sig
@@ -3327,20 +3303,20 @@ MODULE m_rhs
 
             IF (n==0) THEN      !1D
                 IF (mymono%support == 1) THEN
-                    !1d delta function
+                    ! 1D delta function
                     hx = abs(mono_loc(1) - x_cc(j))
 
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                         dexp( -0.5d0 * (hx/(sig/2.d0))**2.d0 )
                 ELSE IF (mymono%support == 0) THEN
-                    !support for all x
+                    ! Support for all x
                     f_delta = 1.d0
                 END IF
             ELSE IF (p==0) THEN !2D
                 hx = mono_loc(1) - x_cc(j)
                 hy = mono_loc(2) - y_cc(k)
                 IF (mymono%support == 1) THEN
-                    !2d delta function
+                    ! 2D delta function
                     sig = mono_leng/20.d0
                     h = dsqrt(hx**2.d0 + hy**2.d0)
 
@@ -3355,14 +3331,13 @@ MODULE m_rhs
                         f_delta = 0d0
                     END IF
                 ELSE IF (mymono%support == 3) THEN
-                    !only support along some line
-
+                    ! Only support along some line
                     hx = x_cc(j) - mono_loc(1) 
                     hy = y_cc(k) - mono_loc(2)
-                    !rotate actual point by -theta
+                    
+                    ! Rotate actual point by -theta
                     hxnew = cos(      mymono%dir)*hx + sin(     mymono%dir)*hy
                     hynew = -1.d0*sin(mymono%dir)*hx + cos(     mymono%dir)*hy
-                    !IF ( abs(hynew) < mymono%length*2 ) THEN
                     IF ( abs(hynew) < mymono%loc(3)/2.d0 ) THEN
                         f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                             dexp( -0.5d0 * (hxnew/(sig/2.d0))**2.d0 )
@@ -3370,21 +3345,22 @@ MODULE m_rhs
                         f_delta = 0d0
                     END IF
                 ELSE IF (mymono%support == 4) THEN
-                    !support for all y
+                    ! Support for all y
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig) * &
                         dexp( -0.5d0 * (hx/sig)**2.d0 ) 
                 END IF
             ELSE !3D
                 IF (mymono%support == 3) THEN
-                    !only support along some line
+                    ! Only support along some patch
 
                     hx = x_cc(j) - mono_loc(1) 
                     hy = y_cc(k) - mono_loc(2)
                     hz = z_cc(l) - mono_loc(3)
-                    !rotate actual point by -theta
+
+                    ! Rotate actual point by -theta
                     hxnew = cos(      mymono%dir)*hx + sin(     mymono%dir)*hy
                     hynew = -1.d0*sin(mymono%dir)*hx + cos(     mymono%dir)*hy
-                    !IF ( abs(hynew) < mymono%length*2 ) THEN
+                   
                     IF ( abs(hynew) < mymono%length/2. .AND. &
                          abs(hz) < mymono%length/2. ) THEN
                         f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
@@ -3393,12 +3369,13 @@ MODULE m_rhs
                         f_delta = 0d0
                     END IF
                 ELSE
-                    print '(a)', 'monopole support not properly defined'
-                    call s_mpi_abort()
+                    PRINT '(a)', 'Monopole support not properly defined'
+                    CALL s_mpi_abort()
                 END IF
             END IF
  
-        end function f_delta
+        END FUNCTION f_delta
+
 
         !>  The purpose of this procedure is to compute the interface
         !!      sharpening regularization source terms. Only applicable
@@ -3766,14 +3743,14 @@ MODULE m_rhs
                                 IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. sgm_eps) THEN
                                     pres_K_init(i) = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
                                                      - fluid_pp(i)%pi_inf) / fluid_pp(i)%gamma
-                                    ! Physical pressure?
+                           
                                     IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
                                 ELSE
                                     pres_K_init(i) = 0d0
                                 END IF
                                 pres_relax = pres_relax + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_K_init(i)
                             END DO
-! IF (j == 499 .OR. j == 500) print*, j, pres_relax, q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l), q_cons_vf(2+adv_idx%beg-1)%sf(j,k,l), pres_K_init(1), pres_K_init(2), q_cons_vf(1+cont_idx%beg-1)%sf(j,k,l), q_cons_vf(2+cont_idx%beg-1)%sf(j,k,l) ! //KS//
+                            
                             ! Iterative process for relaxed pressure determination
                             iter    = 0
                             f_pres  = 1d-9
@@ -3785,14 +3762,14 @@ MODULE m_rhs
                             DO WHILE (DABS(f_pres) .GT. 1d-10)
                                 pres_relax = pres_relax - f_pres / df_pres
 
-                                ! Convergence?
+                                ! Convergence
                                 iter = iter + 1
                                 IF (iter == 50) THEN
                                     PRINT '(A)', 'Pressure relaxation procedure failed to converge to a solution. Exiting ...'
                                     CALL s_mpi_abort()
                                 END IF
 
-                                ! Physical pressure?
+                                ! Physical pressure
                                 DO i = 1, num_fluids
                                     IF (pres_relax .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
                                 END DO
@@ -3810,13 +3787,11 @@ MODULE m_rhs
                                 END DO
 
                             END DO
-! IF (j == 827) print*, j, pres_relax, q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l), q_cons_vf(2+adv_idx%beg-1)%sf(j,k,l), rho_K_s(1), rho_K_s(2) ! //KS//
+
                             ! Cell update of the volume fraction
                             DO i = 1, num_fluids
                                 IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. sgm_eps) q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                             END DO
-! IF (j == 499 .OR. j == 500) print*, j, pres_relax, q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l), q_cons_vf(2+adv_idx%beg-1)%sf(j,k,l), rho_K_s(1), rho_K_s(2) ! //KS//
-                            ! Numerical correction of the volume fractions
                         END IF
 
                         ! ==================================================================
@@ -3841,18 +3816,6 @@ MODULE m_rhs
                         END DO
 
                         E_We = 0d0
-                        ! //KS// To do later on when capillary effects will be undertaken
-                        ! IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THEN
-                        !      DO i = 1, We_size
-                        !         E_We = E_We &
-                        !                + q_cons_vf(E_idx+We_idx(i,1))%sf(j,k,l) * &
-                        !                      gm_alpha_vf(We_idx(i,2))%sf(j,k,l) / &
-                        !                            We(We_idx(i,1),We_idx(i,2))   &
-                        !                + q_cons_vf(E_idx+We_idx(i,2))%sf(j,k,l) * &
-                        !                      gm_alpha_vf(We_idx(i,1))%sf(j,k,l) / &
-                        !                            We(We_idx(i,1),We_idx(i,2))
-                        !      END DO
-                        ! END IF
                      
                         pres_relax = (q_cons_vf(E_idx)%sf(j,k,l) - dyn_pres - pi_inf - E_We) / gamma
 
@@ -3860,7 +3823,6 @@ MODULE m_rhs
                             q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) * (fluid_pp(i)%gamma*pres_relax + fluid_pp(i)%pi_inf)
                         END DO
                         ! ==================================================================
-! IF (j == 499 .OR. j == 500) print*, j, pres_relax ! //KS//
                     END DO
                 END DO
             END DO
@@ -5421,7 +5383,6 @@ MODULE m_rhs
                          cd_vars, norm_dir, weno_dir, 1, &
                          is1,is2,is3                     )
             ! ==================================================================
-            !print '(a)', 'SHB: finished weno' 
             
             ! Reconstruction in s2-direction ===================================
             IF(split_err .NEQV. .TRUE.) RETURN

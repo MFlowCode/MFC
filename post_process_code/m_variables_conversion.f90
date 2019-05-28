@@ -36,7 +36,10 @@ MODULE m_variables_conversion
         
         !>  Structure of the s_convert_mixture_to_mixture_variables
         !!      and s_convert_species_to_mixture_variables subroutines
-
+        !! @param q_cons_vf Conservative variables
+        !! @param i cell index to transfer mixture variables 
+        !! @param j cell index to transfer mixture variables
+        !! @param k cell index to transfer mixture variables
         SUBROUTINE s_convert_xxxxx_to_mixture_variables(q_cons_vf, i,j,k)
             
             ! Importing the derived type scalar_field from m_derived_types.f90
@@ -44,12 +47,10 @@ MODULE m_variables_conversion
             ! the abstract interface does not inherently have access to them
             IMPORT :: scalar_field, sys_size
             
-            ! Conservative variables
             TYPE(scalar_field), &
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
             
-            ! Cell indexes for which to transfer/compute mixture variables
             INTEGER, INTENT(IN) :: i,j,k
             
         END SUBROUTINE s_convert_xxxxx_to_mixture_variables
@@ -127,31 +128,31 @@ MODULE m_variables_conversion
             
             INTEGER :: i !< Generic loop iterator
 
-            if (model_eqns == 4) then
+            IF (model_eqns == 4) THEN
                 rho_sf    = qK_vf(1)%sf(j,k,l)
                 gamma_sf  = fluid_pp(1)%gamma   
                 pi_inf_sf = fluid_pp(1)%pi_inf      
-            else if (model_eqns == 2 .and. bubbles .and. adv_alphan) then
+            ELSE IF (model_eqns == 2 .AND. bubbles .AND. adv_alphan) THEN
                 rho_sf = 0d0; gamma_sf = 0d0; pi_inf_sf = 0d0
 
-                if (mpp_lim .and. num_fluids > 1) then
-                    do i = 1, num_fluids
+                IF (mpp_lim .AND. num_fluids > 1) THEN
+                    DO i = 1, num_fluids
                         rho_sf    = rho_sf    + qK_vf(i+E_idx)%sf(j,k,l)*qK_vf(i)%sf(j,k,l) 
                         gamma_sf  = gamma_sf  + qK_vf(i+E_idx)%sf(j,k,l)*fluid_pp(i)%gamma
                         pi_inf_sf = pi_inf_sf + qK_vf(i+E_idx)%sf(j,k,l)*fluid_pp(i)%pi_inf
-                    end do
-                else if (num_fluids > 1) then
-                    do i = 1, num_fluids-1 !leave out bubble part of mixture
+                    END DO
+                ELSE IF (num_fluids > 1) THEN
+                    DO i = 1, num_fluids-1 !leave out bubble part of mixture
                         rho_sf    = rho_sf    + qK_vf(i+E_idx)%sf(j,k,l)*qK_vf(i)%sf(j,k,l) 
                         gamma_sf  = gamma_sf  + qK_vf(i+E_idx)%sf(j,k,l)*fluid_pp(i)%gamma
                         pi_inf_sf = pi_inf_sf + qK_vf(i+E_idx)%sf(j,k,l)*fluid_pp(i)%pi_inf
-                    end do
-                else
+                    END DO
+                ELSE
                     rho_sf    = qK_vf(1)%sf(j,k,l)
                     gamma_sf  = fluid_pp(1)%gamma
                     pi_inf_sf = fluid_pp(1)%pi_inf   
-                end if
-            end if
+                END IF
+            END IF
 
         END SUBROUTINE s_convert_species_to_mixture_variables_bubbles ! ----------------        
         
@@ -179,7 +180,7 @@ MODULE m_variables_conversion
             ! Computing the density, the specific heat ratio function and the
             ! liquid stiffness function, respectively
             IF(adv_alphan) THEN
-                if (bubbles .neqv. .True.) then
+                IF (bubbles .NEQV. .True.) THEN
                         rho_sf(j,k,l)    = 0d0
                         gamma_sf(j,k,l)  = 0d0
                         pi_inf_sf(j,k,l) = 0d0
@@ -194,13 +195,12 @@ MODULE m_variables_conversion
                                      + q_cons_vf(i+E_idx)%sf(j,k,l) &
                                      * fluid_pp(i)%pi_inf
                         END DO
-                else
+                ELSE
                         rho_sf(j,k,l)    = q_cons_vf(1)%sf(j,k,l)
                         gamma_sf(j,k,l)  = fluid_pp(1)%gamma
                         pi_inf_sf(j,k,l) = fluid_pp(1)%pi_inf
-                end if
+                END IF
             ELSE
-                
                 rho_sf(j,k,l)    = q_cons_vf(num_fluids)%sf(j,k,l)
                 gamma_sf(j,k,l)  = fluid_pp(num_fluids)%gamma
                 pi_inf_sf(j,k,l) = fluid_pp(num_fluids)%pi_inf
@@ -287,7 +287,7 @@ MODULE m_variables_conversion
             IF(model_eqns == 1) THEN        ! Gamma/pi_inf model
                 s_convert_to_mixture_variables => &
                             s_convert_mixture_to_mixture_variables
-            ELSEIF (bubbles) THEN                           ! Volume fraction model
+            ELSEIF (bubbles) THEN           ! Volume fraction model
                 s_convert_to_mixture_variables => &
                             s_convert_species_to_mixture_variables_bubbles
             ELSE                            ! Volume fraction model
@@ -356,19 +356,19 @@ MODULE m_variables_conversion
                         
                         ! Computing velocity and dynamic pressure from momenta
                         DO i = mom_idx%beg, mom_idx%end
-                            if (model_eqns==4) then
+                            IF (model_eqns==4) THEN
                                 !u = \rho u/ \rho
                                 q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l) / &
                                                      q_cons_vf(1)%sf(j,k,l)
-                            else
+                            ELSE
                                 q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l) / &
                                                      rho_sf(j,k,l)
                                 dyn_pres = dyn_pres + q_cons_vf(i)%sf(j,k,l) * &
                                                   q_prim_vf(i)%sf(j,k,l) / 2d0
-                            end if 
+                            END IF 
                         END DO
                         
-                        if (model_eqns == 4) then
+                        IF (model_eqns == 4) THEN
                             ! Computing the pressure from the energy
                             ! Tait EOS
                             ! p_l = (pl0 + pi_infty)(rho/(rho_l0(1-alf)))^gamma
@@ -379,19 +379,19 @@ MODULE m_variables_conversion
                                    q_cons_vf(1)%sf(j,k,l)/ &
                                    (rhoref*(1.d0-q_cons_vf(alf_idx)%sf(j,k,l))) & 
                                    ) ** (1.d0/fluid_pp(1)%gamma + 1.d0)) - fluid_pp(1)%pi_inf
-                        else if ( (model_eqns .ne. 4) .and. bubbles .neqv. .TRUE. ) then
+                        ELSE IF ( (model_eqns .NE. 4) .AND. bubbles .NEQV. .TRUE. ) THEN
                             ! Computing the pressure from the energy
                             q_prim_vf(E_idx)%sf(j,k,l) = &
                                 ( q_cons_vf(E_idx)%sf(j,k,l) &
                                 - dyn_pres -pi_inf_sf(j,k,l) ) / gamma_sf(j,k,l)
-                        else
+                        ELSE
                             ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                             q_prim_vf(E_idx)%sf(j,k,l) = &
                                 ( (q_cons_vf(E_idx)%sf(j,k,l) &
                                                 - dyn_pres) / (1.d0 - q_cons_vf(alf_idx)%sf(j,k,l)) &
                                                 - pi_inf_sf(j,k,l) &
                                                 ) / gamma_sf(j,k,l)
-                        end if
+                        END IF
                         
                         ! Set partial pressures to mixture pressure
                         IF(model_eqns == 3) THEN
@@ -406,27 +406,26 @@ MODULE m_variables_conversion
                         END DO
                         
                         ! \phi = (n\phi)/n  (n = nbub)
-                        if (bubbles) then
+                        IF (bubbles) THEN
                             ! n = sqrt( 4pi/(3 alpha) * (nR)**3 )
-                            do i = 1,nb
+                            DO i = 1,nb
                                 nRtmp(i) = q_cons_vf(bub_idx%rs(i))%sf(j,k,l)
-                            end do
-                            call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)
-                            do i = bub_idx%beg, sys_size
+                            END DO
+                            CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)
+                            DO i = bub_idx%beg, sys_size
                                 q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l)/nbub
-                            end do
-                        end if
+                            END DO
+                        END IF
                     END DO
                 END DO
             END DO
             
-           deallocate( nRtmp )
+           DEALLOCATE( nRtmp )
  
         END SUBROUTINE s_convert_conservative_to_primitive_variables ! ---------
         
         !> Deallocation procedures for the module
         SUBROUTINE s_finalize_variables_conversion_module() ! ----------------
-            
             
             ! Deallocating the density, the specific heat ratio function and the
             ! liquid stiffness function
@@ -438,7 +437,6 @@ MODULE m_variables_conversion
             ! Nullifying the procedure pointer to the subroutine transfering/
             ! computing the mixture/species variables to the mixture variables
             s_convert_to_mixture_variables => NULL()
-            
             
         END SUBROUTINE s_finalize_variables_conversion_module ! --------------
         

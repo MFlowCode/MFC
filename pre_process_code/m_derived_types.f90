@@ -12,7 +12,7 @@ MODULE m_derived_types
     INTEGER, PARAMETER :: num_patches_max   = 10 !<
     !! Maximum number of patches allowed
     
-    integer, parameter :: num_fluids_max    = 10 !<
+    INTEGER, parameter :: num_fluids_max    = 10 !<
     !! Maximum number of fluids allowed
      
     !> Derived type annexing a scalar field (SF)
@@ -25,7 +25,7 @@ MODULE m_derived_types
         TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: var
     END TYPE  mpi_io_var
 
-    !> integer boounds for variables
+    !> INTEGER boounds for variables
     TYPE int_bounds_info
         INTEGER :: beg
         INTEGER :: end
@@ -39,12 +39,12 @@ MODULE m_derived_types
   
     !> bounds for the bubble dynamic variables
     TYPE bub_bounds_info
-        integer :: beg
-        integer :: end
-        integer, dimension(:), allocatable :: rs
-        integer, dimension(:), allocatable :: vs
-        integer, dimension(:), allocatable :: ps
-        integer, dimension(:), allocatable :: ms
+        INTEGER :: beg
+        INTEGER :: end
+        INTEGER, DIMENSION(:), ALLOCATABLE :: rs
+        INTEGER, DIMENSION(:), ALLOCATABLE :: vs
+        INTEGER, DIMENSION(:), ALLOCATABLE :: ps
+        INTEGER, DIMENSION(:), ALLOCATABLE :: ms
     END TYPE bub_bounds_info
     
     !> Derived type adding initial condition (ic) patch parameters as attributes

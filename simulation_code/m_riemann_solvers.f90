@@ -248,10 +248,10 @@ MODULE m_riemann_solvers
     !! qK_prim_rs_vf and kappaK_rs_vf.
     !> @{
     REAL(KIND(0d0))                              ::       nbub_L,     nbub_R
-    REAL(KIND(0d0)), allocatable, dimension(:)   ::         R0_L,       R0_R
-    REAL(KIND(0d0)), allocatable, dimension(:)   ::         V0_L,       V0_R
-    REAL(KIND(0d0)), allocatable, dimension(:)   ::         P0_L,       P0_R
-    REAL(KIND(0d0)), allocatable, dimension(:)   ::        pbw_L,      pbw_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         R0_L,       R0_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         V0_L,       V0_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         P0_L,       P0_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::        pbw_L,      pbw_R
     REAL(KIND(0d0))                              ::     ptilde_L,   ptilde_R
     !> @}
 
@@ -1145,7 +1145,7 @@ MODULE m_riemann_solvers
                                          * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 END DO
 
-                                IF (bubbles .and. (model_eqns == 2) .and. (num_fluids > 1) ) THEN
+                                IF (bubbles .AND. (model_eqns == 2) .AND. (num_fluids > 1) ) THEN
                                     ! Kill mass transport @ gas density
                                     flux_rs_vf(cont_idx%end)%sf(j,k,l) = 0.d0
                                 END IF
@@ -1163,7 +1163,7 @@ MODULE m_riemann_solvers
 
                                 ! Momentum flux. 
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                IF (bubbles .neqv. .TRUE.) THEN
+                                IF (bubbles .NEQV. .TRUE.) THEN
                                     DO i = 1, num_dims
                                         flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
                                             xi_M*(rho_L*(vel_L(dir_idx(1)) *            &
@@ -1200,7 +1200,7 @@ MODULE m_riemann_solvers
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-                                IF ( (model_eqns .ne. 4) .and. bubbles ) THEN
+                                IF ( (model_eqns .ne. 4) .AND. bubbles ) THEN
                                     flux_rs_vf(E_idx)%sf(j,k,l) = &
                                      xi_M*(vel_L(dir_idx(1))*(E_L + pres_L-ptilde_L) +     &
                                         s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1))) * &
@@ -1211,7 +1211,7 @@ MODULE m_riemann_solvers
                                         (rho_R*s_S + (pres_R - ptilde_R) /                        &
                                         (s_R - vel_R(dir_idx(1))))) - E_R))
                                 ELSE IF ( model_eqns .ne. 4 ) THEN
-                                !IF (model_eqns .ne. 4) then
+                                !IF (model_eqns .ne. 4) THEN
                                     flux_rs_vf(E_idx)%sf(j,k,l) = &
                                      xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) +     &
                                         s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1))) * &
@@ -1229,7 +1229,7 @@ MODULE m_riemann_solvers
 
 
                                 ! Volume fraction flux
-                                if (model_eqns == 4) then
+                                IF (model_eqns == 4) THEN
                                     DO i = alf_idx, alf_idx !only advect the void fraction
                                         flux_rs_vf(i)%sf(j,k,l) =  &
                                                   xi_M*qL_prim_rs_vf(i)%sf(j,k,l)      &
@@ -1237,7 +1237,7 @@ MODULE m_riemann_solvers
                                                 + xi_P*qR_prim_rs_vf(i)%sf(j+1,k,l)      &
                                                 * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                     END DO
-                                else
+                                ELSE
                                     DO i = adv_idx%beg, adv_idx%end 
                                         flux_rs_vf(i)%sf(j,k,l) =  &
                                                   xi_M*qL_prim_rs_vf(i)%sf(j,k,l)      &
@@ -1245,7 +1245,7 @@ MODULE m_riemann_solvers
                                                 + xi_P*qR_prim_rs_vf(i)%sf(j+1,k,l)      &
                                                 * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                     END DO
-                                end if
+                                END IF
 
                                 ! Source for volume fraction advection equation
                                 DO i = 1, num_dims
@@ -1257,8 +1257,8 @@ MODULE m_riemann_solvers
                                             dir_flg(dir_idx(i)) * &
                                             s_P*(xi_R - 1d0) ) 
                                     
-                                    if ( model_eqns == 4 ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
-                                    !if ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    IF ( model_eqns == 4 ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 END DO
 
 
@@ -1272,13 +1272,6 @@ MODULE m_riemann_solvers
                                                 * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                     END DO
                                 END IF
-
-                                DO i = 1,sys_size
-                                    IF (isnan(flux_rs_vf(i)%sf(j,k,l)) ) THEN
-                                        print*, i,j,k,l
-                                        STOP '"flux_rs_vf" is a NaN'
-                                    END IF
-                                END DO
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 IF(norm_dir == 2 .AND. cyl_coord) THEN
@@ -1702,32 +1695,30 @@ MODULE m_riemann_solvers
                     fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
                 c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
 
-                !print*, 'c_l, c_r', c_L, alpha_L(1), alpha_L(2), pres_L
             ELSEIF(model_eqns == 3) THEN
                 c_L = 0d0
                 c_R = 0d0
                 DO i = 1, num_fluids
-                    c_L = c_L + qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * (qL_prim_rs_vf(E_idx)%sf( j ,k,l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
-                    c_R = c_R + qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * (qR_prim_rs_vf(E_idx)%sf(j+1,k,l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
+                    c_L = c_L + qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
+                        (qL_prim_rs_vf(E_idx)%sf( j ,k,l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
+                    c_R = c_R + qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
+                        (qR_prim_rs_vf(E_idx)%sf(j+1,k,l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
                 END DO
                 c_L = c_L/rho_L
                 c_R = c_R/rho_R
-            ELSEIF ( (model_eqns == 4) .or. (model_eqns == 2 .and. bubbles) ) THEN 
-                !SHB: Sound speed for bubblem ixture to order O(\alpha)
-               
-                do i = 1,num_fluids
+            ELSEIF ( (model_eqns == 4) .or. (model_eqns == 2 .AND. bubbles) ) THEN 
+                ! Sound speed for bubble mmixture to order O(\alpha)
+                DO i = 1,num_fluids
                     alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
                     alpha_R(i) = qR_prim_rs_vf(E_idx+i)%sf(j+1,k,l)
-                end do
+                END DO
                 
-                if (mpp_lim .and. (num_fluids > 1)) then
-                    ! \rho should already be mixture sound speed (but it isn't)
+                IF (mpp_lim .AND. (num_fluids > 1)) THEN
                     c_L =   (1d0/gamma_L + 1d0) *   &
                             (pres_L + pi_inf_L) / rho_L  
                     c_R =   (1d0/gamma_R + 1d0) *   &
                             (pres_R + pi_inf_R) / rho_R  
-                else
-                    ! c = sqrt( gam(p_l + \pi_inf)/\rho_l(1-\alf)))
+                ELSE
                     c_L =   & 
                             (1d0/gamma_L + 1d0) *   &
                             (pres_L + pi_inf_L) /   &
@@ -1736,7 +1727,7 @@ MODULE m_riemann_solvers
                             (1d0/gamma_R + 1d0) *   &
                             (pres_R + pi_inf_R) /   &
                             (rho_R*(1d0-alpha_R(num_fluids))) 
-                end if
+                END IF
             ELSE
                 DO i = 1, num_fluids 
                     alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
@@ -1795,8 +1786,8 @@ MODULE m_riemann_solvers
                     lo_c_R = SQRT(lo_c_R)
                 END IF
             END IF
-        END SUBROUTINE s_compute_mixture_sound_speeds ! ------------------------
 
+        END SUBROUTINE s_compute_mixture_sound_speeds ! ------------------------
 
 
 
@@ -2366,11 +2357,11 @@ MODULE m_riemann_solvers
             REAL(KIND(0d0)) :: R3Lbar, R3Rbar
             REAL(KIND(0d0)) :: R3V2Lbar, R3V2Rbar
 
-            if (bubbles .and. num_fluids == 1) then
+            IF (bubbles .AND. num_fluids == 1) THEN
                 gamma_gas = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
-            else if (bubbles .and. num_fluids > 1) then
+            ELSE IF (bubbles .AND. num_fluids > 1) THEN
                 gamma_gas = 1.d0/fluid_pp(num_fluids  )%gamma + 1.d0
-            end if
+            END IF
             
             ! Left and Right Riemann Problem States ============================
             DO i = 1, cont_idx%end
@@ -2401,55 +2392,55 @@ MODULE m_riemann_solvers
             H_L = (E_L + pres_L)/rho_L
             H_R = (E_R + pres_R)/rho_R
 
-            !comptue left/right states for bubble number density
+            ! Compute left/right states for bubble number density
             IF (bubbles) THEN
-                do i = 1,num_fluids
+                DO i = 1,num_fluids
                     alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
                     alpha_R(i) = qR_prim_rs_vf(E_idx+i)%sf(j+1,k,l)
-                end do
+                END DO
 
-                do i = 1,nb
+                DO i = 1,nb
                     R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j,k,l)
                     R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j+1,k,l)
                 
                     V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
                     V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
-                    if (polytropic .neqv. .TRUE.) then
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
                         P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
-                    end if
-                end do
+                    END IF
+                END DO
                 
                 !nbub_L = (3.d0/(4.d0*pi)) * alpha_L(1)/(R0_L**3.d0)
                 !nbub_R = (3.d0/(4.d0*pi)) * alpha_R(1)/(R0_R**3.d0)
-                call s_comp_n_from_prim(alpha_L(num_fluids),R0_L,nbub_L)
-                call s_comp_n_from_prim(alpha_R(num_fluids),R0_R,nbub_R)
+                CALL s_comp_n_from_prim(alpha_L(num_fluids),R0_L,nbub_L)
+                CALL s_comp_n_from_prim(alpha_R(num_fluids),R0_R,nbub_R)
                 
                 !pbw = p_g0*(R0/R)^(3\gamma_gas)
-                do i = 1,nb
+                DO i = 1,nb
                     !pbw_L(i) = (R0(i)/R0_L(i))**(3d0*gamma_gas)
                     !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
 
-                    if (polytropic) then
+                    IF (polytropic) THEN
                         pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
                             - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
 
                         pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
                             - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
-                    else
+                    ELSE
                         pbw_L(i) = P0_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
                         pbw_R(i) = P0_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
-                    end if
-                end do
+                    END IF
+                END DO
 
-                call s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
-                call s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
+                CALL s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
+                CALL s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
                 
-                call s_quad(R0_L**3.d0, R3Lbar)
-                call s_quad(R0_R**3.d0, R3Rbar)
+                CALL s_quad(R0_L**3.d0, R3Lbar)
+                CALL s_quad(R0_R**3.d0, R3Rbar)
                 
-                call s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
-                call s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
+                CALL s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
+                CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
                 
                 !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} ) 
                 ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
@@ -2457,28 +2448,7 @@ MODULE m_riemann_solvers
                 ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
                     rho_R*R3V2Rbar/R3Rbar )
 
-                !ptilde_L = 0d0; ptilde_R = 0d0
-
                 ptil(j,k,l) = 0.5d0*(ptilde_L+ptilde_R)
-
-                if (isnan(ptilde_L)) then
-                    print*, nbub_L, R0_L, V0_L, pres_L, pbw_L, PbwR3Lbar, R3Lbar, rho_L, R3V2Lbar, alpha_L(:)
-                    STOP 'ptilde_L is a NaN'
-                end if
-
-                if (isnan(ptilde_R)) then 
-                    print*, qR_prim_rs_vf(1)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(2)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(3)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(4)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(5)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(6)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(7)%sf(j+1,k,l)
-                    print*, qR_prim_rs_vf(8)%sf(j+1,k,l)
-                    print*, nbub_R, R0_R, V0_R, pres_R, pbw_R, PbwR3Rbar, R3Rbar, rho_R, R3V2Rbar, alpha_R(:)
-                    STOP 'ptilde_R is a NaN'
-                end if
-                !ptilde_L = 0d0; ptilde_R = 0d0
             END IF
 
             IF (tvd_riemann_flux) THEN
@@ -2595,8 +2565,8 @@ MODULE m_riemann_solvers
                 END DO
             END IF
             
-            s_L = MIN(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R) ! MIN(vel_L(dir_idx(1)) - c_L, vel_avg(dir_idx(1)) - c_avg)
-            s_R = MAX(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L) ! MAX(vel_R(dir_idx(1)) + c_R, vel_avg(dir_idx(1)) + c_avg)
+            s_L = MIN(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R) 
+            s_R = MAX(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L) 
             
             s_S = ( pres_R - pres_L - dpres_We + rho_L*vel_L(dir_idx(1))  * &
                                                 (s_L - vel_L(dir_idx(1))) - &
@@ -2605,10 +2575,6 @@ MODULE m_riemann_solvers
                 / ( rho_L*(s_L - vel_L(dir_idx(1))) - &
                     rho_R*(s_R - vel_R(dir_idx(1))) )
             denom = rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))) 
-            !print*, 'rho_L = ', rho_L
-            !print*, 'rho_R = ', rho_R
-            !print*, 'denom = ', rho_L, rho_R, denom
-
 
             IF (tvd_wave_speeds) THEN
                 lo_s_L = MIN(lo_vel_L(dir_idx(1)) - lo_c_L, vel_avg(dir_idx(1)) - c_avg)
@@ -2625,7 +2591,6 @@ MODULE m_riemann_solvers
             IF (isnan(s_L)) STOP 's_l is NaN'
             IF (isnan(s_R)) STOP 's_r is NaN'
             IF (isnan(s_s)) STOP 's_s is NaN'
-            
             
         END SUBROUTINE s_compute_direct_wave_speeds ! --------------------------
         
@@ -2849,13 +2814,13 @@ MODULE m_riemann_solvers
                 s_riemann_solver => s_exact_riemann_solver
             END IF
            
-            if (bubbles) then
+            IF (bubbles) THEN
                 allocate( R0_L(nb), V0_L(nb), pbw_L(nb) )
                 allocate( R0_R(nb), V0_R(nb), pbw_R(nb) )
-                if (polytropic .neqv. .TRUE.) then
+                IF (polytropic .NEQV. .TRUE.) THEN
                     allocate( P0_L(nb), P0_R(nb) )
-                end if 
-            end if
+                END IF 
+            END IF
             
             ! Associating the procedural pointers to the procedures that will be
             ! utilized to compute the average state and estimate the wave speeds
@@ -2891,7 +2856,7 @@ MODULE m_riemann_solvers
             IF (model_eqns == 1) THEN        ! Gamma/pi_inf model
                 s_convert_to_mixture_variables => &
                              s_convert_mixture_to_mixture_variables
-            ELSEIF (bubbles) THEN        !SHB volume fraction for bubbles
+            ELSEIF (bubbles) THEN           ! Volume fraction for bubbles
                 s_convert_to_mixture_variables => &
                              s_convert_species_to_mixture_variables_bubbles 
             ELSE                            ! Volume fraction model
@@ -5385,9 +5350,9 @@ MODULE m_riemann_solvers
                 DEALLOCATE(alpha_IC)
             END IF
             
-            if (bubbles) then
+            IF (bubbles) THEN
                 deallocate(R0_L, V0_L, pbw_L, R0_R, V0_R, pbw_R)
-            end if
+            END IF
 
             ! Disassociating procedural pointer to the subroutine which was
             ! utilized to calculate the solution of a given Riemann problem

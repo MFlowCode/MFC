@@ -90,8 +90,6 @@ MODULE m_start_up
         SUBROUTINE s_check_input_file() ! --------------------------------------
 
             
-            
-
             CHARACTER(LEN = LEN_TRIM(case_dir)) :: file_loc !<
             !! Generic string used to store the address of a particular file
             
@@ -103,14 +101,14 @@ MODULE m_start_up
             INTEGER :: bub_fac
 
             bub_fac = 0; 
-            if (bubbles .and. (num_fluids == 1)) bub_fac = 1
+            IF (bubbles .AND. (num_fluids == 1)) bub_fac = 1
             
             ! Checking the existence of the case folder
             case_dir = ADJUSTL(case_dir)
             
             file_loc = TRIM(case_dir) // '/.'
             
-            call my_inquire(file_loc,dir_check)
+            CALL my_inquire(file_loc,dir_check)
             
             ! Constraint on the location of the case directory
             IF(dir_check .NEQV. .TRUE.) THEN

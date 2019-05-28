@@ -668,7 +668,7 @@ MODULE m_data_output
                           t_step, t_step*dt, icfl_max_glb
                 END IF
 
-                print*, 'icflmaxglb', icfl_max_glb
+                PRINT*, 'icflmaxglb', icfl_max_glb
                 IF (icfl_max_glb /= icfl_max_glb) THEN
                     PRINT '(A)', 'ICFL is NaN. Exiting ...'
                     CALL s_mpi_abort()
@@ -720,7 +720,7 @@ MODULE m_data_output
                                             proc_rank, '/', t_step
             
             file_path = TRIM(t_step_dir) // '/.'
-            call my_inquire(file_path,file_exist)
+            CALL my_inquire(file_path,file_exist)
             IF(file_exist) CALL SYSTEM('rm -rf ' // TRIM(t_step_dir))
             CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
             
@@ -810,7 +810,7 @@ MODULE m_data_output
                                         (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
                                         ) ** lit_gamma )                        &
                                         - pi_inf
-                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j), &
                                         (                                       & 
@@ -832,7 +832,7 @@ MODULE m_data_output
                                 DO k = 1,nb
                                     nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
                                 END DO
-                                call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
+                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
                                 
                                 WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
                             END IF
@@ -880,7 +880,7 @@ MODULE m_data_output
                                         q_cons_vf(1)%sf(j,k,0)/                          &
                                         (rhoref*(1.-q_cons_vf(4)%sf(j,k,0)))             & 
                                         ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
-                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j),y_cb(k), &
                                         (                                       & 
@@ -903,7 +903,7 @@ MODULE m_data_output
                                 DO l = 1,nb
                                     nRtmp(l) = q_cons_vf(bub_idx%rs(l))%sf(j,k,0)
                                 END DO
-                                call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)                                
+                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)                                
                                 
                                 WRITE(2,*) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
                            END IF
@@ -1907,7 +1907,7 @@ MODULE m_data_output
                                 (rhoref*(1.d0-q_cons_vf(4)%sf(j-2,k,l)))  & 
                                 ) ** lit_gamma )                        &
                                 - pi_inf
-                        ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
+                        ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                             !Stiffened gas pressure from energy
                             pres = (                                       & 
                                 q_cons_vf(E_idx)%sf(j-2,k,l)  -            &
@@ -1934,7 +1934,7 @@ MODULE m_data_output
                                 nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
                                 nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
                             END DO
-                            call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
+                            CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
                                 
                             R(:) = nR(:)/nbub                        
                             Rdot(:) = nRdot(:)/nbub                        
@@ -1990,8 +1990,6 @@ MODULE m_data_output
                                 vel(s) = q_cons_vf(cont_idx%end+s)%sf(j-2,k-2,l)/rho
                             END DO
 
-
-                            print*, 'probe 1'
                             IF (model_eqns == 4) THEN
                                 lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
                             
@@ -2001,7 +1999,7 @@ MODULE m_data_output
                                     (rhoref*(1.d0-q_cons_vf(4)%sf(j-2,k-2,l)))  & 
                                     ) ** lit_gamma )                        &
                                     - pi_inf
-                            ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
+                            ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                 !Stiffened gas pressure from energy
                                 pres = (                                       & 
                                     q_cons_vf(E_idx)%sf(j-2,k-2,l)  -            &
@@ -2017,19 +2015,15 @@ MODULE m_data_output
                                     (1.d0 - q_cons_vf(alf_idx)%sf(j-2,k-2,l)) - &
                                     pi_inf &
                                     ) / gamma
-                                print*, q_cons_vf(1)%sf(j-2,k-2,l), q_cons_vf(2)%sf(j-2,k-2,l), &
-                                    q_cons_vf(E_idx)%sf(j-2,k-2,l), q_cons_vf(alf_idx)%sf(j-2,k-2,l), &
-                                    pi_inf, gamma, pres
                             end IF
 
-                            print*, 'probe 2'
                             IF (bubbles) THEN
                                 alf = q_cons_vf(alf_idx)%sf(j-2,k-2,0)
                                 DO s = 1,nb
                                     nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k-2,l)
                                     nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k-2,l)
                                 END DO
-                                call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k-2,l), nR, nbub)
+                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k-2,l), nR, nbub)
                                 
                                 R(:) = nR(:)/nbub                        
                                 Rdot(:) = nRdot(:)/nbub                        
@@ -2311,8 +2305,8 @@ MODULE m_data_output
                 END DO
             ELSEIF (p == 0) THEN
                 IF (num_integrals .ne. 3) THEN
-                    print '(A)', 'Incorrect number of integrals'
-                    call s_mpi_abort()
+                    PRINT '(A)', 'Incorrect number of integrals'
+                    CALL s_mpi_abort()
                 END IF
 
                 rad = integral(1)%xmax
@@ -2505,7 +2499,7 @@ MODULE m_data_output
             IF (model_eqns == 1) THEN        ! Gamma/pi_inf model
                 s_convert_to_mixture_variables => &
                              s_convert_mixture_to_mixture_variables
-            ELSEIF (bubbles) THEN        !SHB volume fraction for bubbles
+            ELSEIF (bubbles) THEN           ! Volume fraction for bubbles
                 s_convert_to_mixture_variables => &
                              s_convert_species_to_mixture_variables_bubbles
             ELSE                            ! Volume fraction model

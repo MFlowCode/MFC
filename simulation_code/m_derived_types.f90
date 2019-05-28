@@ -40,12 +40,12 @@ MODULE m_derived_types
     
     !> Variables for bubble dynamic variables
     TYPE bub_bounds_info
-        integer :: beg !< Beginning of bub. variables
-        integer :: end !< End of bub. variables
-        integer, dimension(:), allocatable :: rs !< Bubble radii
-        integer, dimension(:), allocatable :: vs !< Bubble radial velocities
-        integer, dimension(:), allocatable :: ps !< Bubble pressures
-        integer, dimension(:), allocatable :: ms !< Bubble mass fluxes
+        INTEGER :: beg !< Beginning of bub. variables
+        INTEGER :: end !< End of bub. variables
+        INTEGER, DIMENSION(:), ALLOCATABLE :: rs !< Bubble radii
+        INTEGER, DIMENSION(:), ALLOCATABLE :: vs !< Bubble radial velocities
+        INTEGER, DIMENSION(:), ALLOCATABLE :: ps !< Bubble pressures
+        INTEGER, DIMENSION(:), ALLOCATABLE :: ms !< Bubble mass fluxes
     END TYPE bub_bounds_info    
     
     !> Derived type annexing the physical parameters (PP) of fluids. 
@@ -84,13 +84,13 @@ MODULE m_derived_types
 
     !> Monopole acoustic source parameters
     TYPE mono_parameters
-        REAL(KIND(0d0)),dimension(3) :: loc !< Physical location of acoustic source
+        REAL(KIND(0d0)), DIMENSION(3) :: loc !< Physical location of acoustic source
         REAL(KIND(0d0)) :: mag !< Magnitude
         REAL(KIND(0d0)) :: length !< Length of line source
         REAL(KIND(0d0)) :: npulse !< Number of cycles of pulse
         REAL(KIND(0d0)) :: dir !< Direction of pulse
-        integer :: pulse 
-        integer :: support
+        INTEGER :: pulse 
+        INTEGER :: support
     END TYPE mono_parameters
 
 END MODULE m_derived_types

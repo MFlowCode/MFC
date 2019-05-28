@@ -89,10 +89,10 @@ MODULE m_bubbles
                     END DO
 
                     ! Computes n_bub number bubble density
-                    call s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(j,k,l), &
+                    CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(j,k,l), &
                                         Rtmp, nbub(j,k,l) )
                       
-                    call s_quad( (Rtmp**2.d0)*Vtmp, R2Vav )
+                    CALL s_quad( (Rtmp**2.d0)*Vtmp, R2Vav )
                     bub_adv_src(j,k,l)  = 4.d0*pi*nbub(j,k,l)*R2Vav
                 END DO; END DO; END DO
 
@@ -119,7 +119,7 @@ MODULE m_bubbles
                     IF (polytropic .NEQV. .TRUE.) THEN
                         pb = q_prim_vf(bub_idx%ps(q))%sf(j,k,l)
                         mv = q_prim_vf(bub_idx%ms(q))%sf(j,k,l)
-                        call s_bwproperty( pb, q )
+                        CALL s_bwproperty( pb, q )
                         vflux = f_vflux( myR, myV, mv, q )
                         pbdot = f_bpres_dot( vflux, myR, myV, pb, mv, q )
 
@@ -171,8 +171,6 @@ MODULE m_bubbles
                 PRINT*, 'max adv src', maxval(abs(bub_adv_src(:,:,:)))
                 PRINT*, 'max r src', maxval(abs(bub_r_src(:,:,:,:)))
                 PRINT*, 'max v src', maxval(abs(bub_v_src(:,:,:,:)))
-                PRINT*, 'max p src', maxval(abs(bub_p_src(:,:,:,:)))
-                PRINT*, 'max m src', maxval(abs(bub_m_src(:,:,:,:)))
             END IF
 
         END SUBROUTINE s_compute_bubble_source
@@ -481,50 +479,6 @@ MODULE m_bubbles
             END IF
             
     END FUNCTION f_bpres_dot
-
-
-    !>  Function to compute a phase transfer from mixture gas to bubble void fraction
-    !!  @param q_cons_vf Conservative variables
-    SUBROUTINE s_phase_transfer(q_cons_vf) ! ----------------
-        
-        TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
-        
-        REAL(KIND(0d0)), DIMENSION(Nb)  ::       nRtmp
-        REAL(KIND(0d0))                 ::       nbub
-        REAL(KIND(0d0))                 ::       alf
-
-        INTEGER :: i,j,k,l !< Loop iterators
-
-        RETURN 
-
-        DO j = 0,m; DO k = 0,n; DO l = 0,p
-            IF (q_cons_vf(alf_idx)%sf(j,k,l) > 0.1d0) THEN 
-
-                alf = q_cons_vf(alf_idx)%sf(j,k,l)
-                ! n = sqrt( 4pi/(3 alpha) * (nR)**3 )
-                DO i = 1,nb
-                    nRtmp(i) = q_cons_vf(bub_idx%rs(i))%sf(j,k,l)
-                END DO
-                call s_comp_n_from_cons( alf, nRtmp, nbub)   
-
-
-                !transfer bubble void fraction to another component
-                q_cons_vf(alf_idx-1)%sf(j,k,l) = alf
-
-
-                alf  = 1d-8; 
-                nbub = (3.d0/(4.d0*pi)) * alf/1.d0
-                q_cons_vf(alf_idx)%sf(j,k,l) = alf   !get rid of bubble void fraction
-
-                DO i = 1,nb
-                    q_cons_vf(bub_idx%rs(i))%sf(j,k,l) = nbub * 1.d0 !&
-                        !* ((3.d0/(4.d0*pi) * alf/nbub)**(1.d0/3.d0))
-                    q_cons_vf(bub_idx%vs(i))%sf(j,k,l) = 0d0
-                END DO
-            END IF
-        END DO; END DO; END DO
-
-    END SUBROUTINE s_phase_transfer
 
 
 END MODULE m_bubbles

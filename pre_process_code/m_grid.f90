@@ -63,7 +63,7 @@ MODULE m_grid
             
             ! Generic loop iterator
             INTEGER :: i,j              !< generic loop operatorss
-            real(kind(0d0)) :: length   !< domain lengths
+            REAL(KIND(0d0)) :: length   !< domain lengths
             
             ! Grid Generation in the x-direction ===============================
             dx = (x_domain%end - x_domain%beg) / REAL(m+1, KIND(0d0))
@@ -105,7 +105,7 @@ MODULE m_grid
             ! Grid Generation in the y-direction ===============================
             IF(n == 0) RETURN
             
-            IF (grid_geometry == 2.and.y_domain%beg.eq.0.0d0) THEN
+            IF (grid_geometry == 2.AND.y_domain%beg.eq.0.0d0) THEN
             !IF (grid_geometry == 2) THEN
 
                dy = (y_domain%end - y_domain%beg) / REAL(2*n+1, KIND(0d0))
@@ -236,7 +236,7 @@ MODULE m_grid
             ! Grid generation in the y-direction
             IF (n_glb > 0) THEN
 
-                IF (grid_geometry == 2.and.y_domain%beg.eq.0.0d0) THEN
+                IF (grid_geometry == 2.AND.y_domain%beg.eq.0.0d0) THEN
                     dy = (y_domain%end - y_domain%beg) / REAL(2*n_glb+1, KIND(0d0))
                     y_cb_glb(-1) = y_domain%beg
                     DO i = 1, n_glb

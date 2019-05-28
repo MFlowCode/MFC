@@ -197,8 +197,7 @@ MODULE m_data_input
             
             
             ! Reading the Conservative Variables Data Files ====================
-            
-            DO i = 1, sys_size ! adv_idx%end !SHB edit
+            DO i = 1, sys_size 
                 
                 ! Checking whether the data file associated with the variable
                 ! position of currently manipulated conservative variable exists
@@ -348,31 +347,31 @@ MODULE m_data_input
                 NVARS_MOK = INT(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles) then
-                DO i = 1,sys_size
-                    var_MOK = INT(i, MPI_OFFSET_KIND)
+                IF (bubbles) THEN
+                    DO i = 1,sys_size
+                        var_MOK = INT(i, MPI_OFFSET_KIND)
 
-                    ! Initial displacement to skip at beginning of file
-                    disp = m_MOK*MAX(MOK,n_MOK)*MAX(MOK,p_MOK)*WP_MOK*(var_MOK-1)
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*MAX(MOK,n_MOK)*MAX(MOK,p_MOK)*WP_MOK*(var_MOK-1)
 
-                    CALL MPI_FILE_SET_VIEW(ifile,disp,MPI_DOUBLE_PRECISION,MPI_IO_DATA%view(i), &
-                                'native',mpi_info_int,ierr)
-                    CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
-                                MPI_DOUBLE_PRECISION,status,ierr)
-                END DO
-                else
-                DO i = 1, adv_idx%end
-                    var_MOK = INT(i, MPI_OFFSET_KIND)
+                        CALL MPI_FILE_SET_VIEW(ifile,disp,MPI_DOUBLE_PRECISION,MPI_IO_DATA%view(i), &
+                                    'native',mpi_info_int,ierr)
+                        CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
+                                    MPI_DOUBLE_PRECISION,status,ierr)
+                    END DO
+                ELSE
+                    DO i = 1, adv_idx%end
+                        var_MOK = INT(i, MPI_OFFSET_KIND)
 
-                    ! Initial displacement to skip at beginning of file
-                    disp = m_MOK*MAX(MOK,n_MOK)*MAX(MOK,p_MOK)*WP_MOK*(var_MOK-1)
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*MAX(MOK,n_MOK)*MAX(MOK,p_MOK)*WP_MOK*(var_MOK-1)
 
-                    CALL MPI_FILE_SET_VIEW(ifile,disp,MPI_DOUBLE_PRECISION,MPI_IO_DATA%view(i), &
-                                'native',mpi_info_int,ierr)
-                    CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
-                                MPI_DOUBLE_PRECISION,status,ierr)
-                END DO
-                end if
+                        CALL MPI_FILE_SET_VIEW(ifile,disp,MPI_DOUBLE_PRECISION,MPI_IO_DATA%view(i), &
+                                    'native',mpi_info_int,ierr)
+                        CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
+                                    MPI_DOUBLE_PRECISION,status,ierr)
+                    END DO
+                END IF
 
                 CALL s_mpi_barrier()
 

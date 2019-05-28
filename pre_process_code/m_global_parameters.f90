@@ -281,11 +281,11 @@ MODULE m_global_parameters
                 patch_icpp(i)%v0              = dflt_real
             END DO
            
-            !SHB Tait EOS
+            ! Tait EOS
             rhoref  = dflt_real
             pref    = dflt_real
 
-            !SHB Bubble modeling
+            ! Bubble modeling
             bubbles     = .FALSE.
             polytropic  = .TRUE.
             thermal     = dflt_int
@@ -380,7 +380,7 @@ MODULE m_global_parameters
                 IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    IF (polytropic .neqv. .TRUE.) THEN
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         bub_idx%end = sys_size+4*nb
                     END IF
                     sys_size = bub_idx%end
@@ -390,7 +390,7 @@ MODULE m_global_parameters
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                     DO i = 1, nb
-                        IF (polytropic .neqv. .TRUE.) THEN
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             fac = 4
                         ELSE
                             fac = 2
@@ -399,7 +399,7 @@ MODULE m_global_parameters
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        IF (polytropic .neqv. .TRUE.) THEN
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
                         END IF
@@ -416,7 +416,7 @@ MODULE m_global_parameters
                         STOP 'Invalid value of nb'
                     END IF
 
-                    IF (polytropic .neqv. .TRUE.) THEN
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         CALL s_initialize_nonpoly
                     ELSE
                         rhoref  = 1.d0
@@ -445,8 +445,7 @@ MODULE m_global_parameters
                 sys_size     = internalEnergies_idx%end
             !========================
             ELSE IF(model_eqns == 4) THEN
-                !SHB: 4 equation model with subgrid bubbles
-                !only works with one fluid
+                ! 4 equation model with subgrid bubbles
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 ! num_fluids
                 mom_idx%beg  = cont_idx%end + 1 ! one momentum equation in each direction
@@ -460,7 +459,7 @@ MODULE m_global_parameters
                 IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    IF (polytropic .neqv. .TRUE.) THEN
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         bub_idx%end = sys_size+4*nb
                     END IF
                     sys_size = bub_idx%end
@@ -470,7 +469,7 @@ MODULE m_global_parameters
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                     DO i = 1, nb
-                        IF (polytropic .neqv. .TRUE.) THEN
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             fac = 4
                         ELSE
                             fac = 2
@@ -479,7 +478,7 @@ MODULE m_global_parameters
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        IF (polytropic .neqv. .TRUE.) THEN
+                        IF (polytropic .NEQV. .TRUE.) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
                         END IF
@@ -496,7 +495,7 @@ MODULE m_global_parameters
                         STOP 'Invalid value of nb'
                     END IF
 
-                    IF (polytropic .neqv. .TRUE.) THEN
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         CALL s_initialize_nonpoly
                     ELSE
                         rhoref  = 1.d0
@@ -540,7 +539,7 @@ MODULE m_global_parameters
 
         !> Initializes and computes bubble properties
         !! for non-polytropic processes
-        subroutine s_initialize_nonpoly
+        SUBROUTINE s_initialize_nonpoly
             INTEGER :: ir
             REAL(KIND(0.D0)) :: rhol0
             REAL(KIND(0.D0)) :: pl0
@@ -657,7 +656,7 @@ MODULE m_global_parameters
 
             rhoref = 1.d0
             pref = 1.d0
-        end subroutine s_initialize_nonpoly
+        END SUBROUTINE s_initialize_nonpoly
        
         !> Computes the transfer coefficient for the non-polytropic bubble compression process
         !! @param omega natural frqeuencies

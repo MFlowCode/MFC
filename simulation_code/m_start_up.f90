@@ -153,12 +153,12 @@ MODULE m_start_up
             INTEGER :: bub_fac !for allowing an extra fluid_pp if there are bubbles
 
             bub_fac = 0
-            if ( bubbles .and. (num_fluids == 1) ) bub_fac = 1
+            IF ( bubbles .AND. (num_fluids == 1) ) bub_fac = 1
             
             ! Logistics ========================================================
             file_path = TRIM(case_dir) // '/.'
             
-            call my_inquire(file_path,file_exist)
+            CALL my_inquire(file_path,file_exist)
 
             IF(file_exist .NEQV. .TRUE.) THEN
                 PRINT '(A)', TRIM(file_path) // ' is missing. Exiting ...'
@@ -208,7 +208,7 @@ MODULE m_start_up
             IF(ALL(model_eqns /= (/1,2,3,4/))) THEN
                 PRINT '(A)', 'Unsupported value of model_eqns. Exiting ...'
                 CALL s_mpi_abort()
-            elseif( model_eqns == 4 .AND. num_fluids /= 1 ) then
+            ELSEIF( model_eqns == 4 .AND. num_fluids /= 1 ) THEN
                 PRINT '(A)', 'this model eqns requires numfluids=1'
                 CALL s_mpi_abort()
             ELSEIF(model_eqns == 3 .AND. riemann_solver /= 2) THEN
@@ -314,7 +314,7 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'weno_order and mp_weno. Exiting ...'
                 CALL s_mpi_abort()
-            ELSEIF( (model_eqns == 1 .AND. weno_avg) .or. (model_eqns == 4 .and. weno_avg) ) THEN
+            ELSEIF( (model_eqns == 1 .AND. weno_avg) .OR. (model_eqns == 4 .AND. weno_avg) ) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'model_eqns and weno_avg. Exiting ...'
                 CALL s_mpi_abort()
@@ -453,8 +453,7 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported combination of model_eqns ' // &
                         'and alt_soundspeed. Exiting ...'
                 CALL s_mpi_abort()
-            !ELSEIF( ( (num_fluids /= 2) .and. ( (num_fluids /= 3) .and. (bubbles.neqv. .TRUE.))) .AND. alt_soundspeed) THEN
-            ELSEIF(  (num_fluids /= 2 .and. num_fluids /= 3) .and. alt_soundspeed) THEN
+            ELSEIF(  (num_fluids /= 2 .AND. num_fluids /= 3) .AND. alt_soundspeed) THEN
                 PRINT '(A)', 'Unsupported combination of num_fluids ' // &
                         'and alt_soundspeed. Exiting ...'
                 CALL s_mpi_abort()
@@ -556,7 +555,7 @@ MODULE m_start_up
                              'values for probe_wrt, and fd_order. '         // &
                              'Exiting ...'
                 CALL s_mpi_abort()
-            ELSEIF (integral_wrt .AND. (bubbles .neqv. .TRUE.)) THEN
+            ELSEIF (integral_wrt .AND. (bubbles .NEQV. .TRUE.)) THEN
                 PRINT '(A)', 'Unsupported choice of the combination of '    // &
                              'values for integral_wrt, and bubbles. '         // &
                              'Exiting ...'
@@ -796,12 +795,7 @@ MODULE m_start_up
                     TRIM(case_dir) // '/p', proc_rank, '/', t_step_start
             
             file_path = TRIM(t_step_dir) // '/.'
-            
-            !INQUIRE( DIRECTORY = TRIM(file_path), & ! Intel compiler
-            !        EXIST     = file_exist       )
-            !  INQUIRE( FILE      = TRIM(file_path), & ! NAG/PGI/GCC compiler
-            !           EXIST     = file_exist       )
-            call my_inquire(file_path,file_exist)
+            CALL my_inquire(file_path,file_exist)
 
             IF(file_exist .NEQV. .TRUE.) THEN
                 PRINT '(A)', TRIM(file_path) // ' is missing. Exiting ...'
@@ -881,7 +875,7 @@ MODULE m_start_up
             
             
             ! Cell-average Conservative Variables ==============================
-            if (bubbles .neqv. .True. ) then
+            IF (bubbles .NEQV. .True. ) THEN
                 DO i = 1, adv_idx%end
                     WRITE(file_path, '(A,I0,A)') &
                            TRIM(t_step_dir) // '/q_cons_vf', i, '.dat'
@@ -897,7 +891,7 @@ MODULE m_start_up
                         CALL s_mpi_abort()
                     END IF
                 END DO
-            else 
+            ELSE 
                 !make sure to read bubble variables
                 DO i = 1, sys_size
                     WRITE(file_path, '(A,I0,A)') &
@@ -914,7 +908,7 @@ MODULE m_start_up
                         CALL s_mpi_abort()
                     END IF
                 END DO
-            end if
+            END IF
             ! ==================================================================
             
         END SUBROUTINE s_read_serial_data_files ! -------------------------------------
@@ -1040,7 +1034,7 @@ MODULE m_start_up
                 NVARS_MOK = INT(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles) then
+                IF (bubbles) THEN
                     DO i = 1, sys_size!adv_idx%end
                         var_MOK = INT(i, MPI_OFFSET_KIND)
 
@@ -1052,7 +1046,7 @@ MODULE m_start_up
                         CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
                                     MPI_DOUBLE_PRECISION,status,ierr)
                     END DO
-                else
+                ELSE
                     DO i = 1, adv_idx%end
                         var_MOK = INT(i, MPI_OFFSET_KIND)
 
@@ -1064,7 +1058,7 @@ MODULE m_start_up
                         CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
                                     MPI_DOUBLE_PRECISION,status,ierr)
                     END DO
-                end if
+                END IF
 
                 CALL s_mpi_barrier()
 

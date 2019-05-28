@@ -282,7 +282,7 @@ MODULE m_mpi_proxy
                                 num_fluids_max-1, MPI_DOUBLE_PRECISION, 0, &
                                 MPI_COMM_WORLD, ierr                       )
 
-                ! SHB: For bubbles
+                ! Bubbles
                 CALL MPI_BCAST( patch_icpp(i)%r0         , 1, &
                                 MPI_DOUBLE_PRECISION         , 0, &
                                 MPI_COMM_WORLD, ierr              )
@@ -325,7 +325,7 @@ MODULE m_mpi_proxy
                                 MPI_COMM_WORLD, ierr     )
             END DO
             
-            ! SHB: Tait EOS
+            ! Tait EOS
             CALL MPI_BCAST( pref,1,             &
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
@@ -333,7 +333,7 @@ MODULE m_mpi_proxy
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
 
-            ! SHB: Bubble modeling
+            ! Bubble modeling
             CALL MPI_BCAST( bubbles,1,          &
                         MPI_LOGICAL,0,          &
                         MPI_COMM_WORLD,ierr  )

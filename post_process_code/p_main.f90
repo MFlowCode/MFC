@@ -149,7 +149,7 @@ PROGRAM p_main
         ! Adding the partial densities to the formatted database file ----------
         IF((model_eqns == 2) .OR. (model_eqns == 3) .or. (model_eqns == 4)) THEN
             DO i = 1, num_fluids
-                IF(alpha_rho_wrt(i) .OR. (cons_vars_wrt .OR. prim_vars_wrt))THEN
+                IF (alpha_rho_wrt(i) .OR. (cons_vars_wrt .OR. prim_vars_wrt)) THEN
                     
                     q_sf = q_cons_vf(i)%sf( -offset_x%beg : m + offset_x%end, &
                                             -offset_y%beg : n + offset_y%end, &
@@ -164,11 +164,11 @@ PROGRAM p_main
                             CALL s_write_variable_to_formatted_database_file(varname,t_step)
                         END DO
                     ELSE
-                        if (model_eqns .ne. 4) then
-                                WRITE(varname, '(A,I0)') 'alpha_rho', i
-                        else
-                                WRITE(varname, '(A,I0)') 'rho', i
-                        end if
+                        IF (model_eqns .NE. 4) THEN
+                            WRITE(varname, '(A,I0)') 'alpha_rho', i
+                        ELSE
+                            WRITE(varname, '(A,I0)') 'rho', i
+                        END IF
                         CALL s_write_variable_to_formatted_database_file(varname,t_step)
                     END IF
                     
@@ -367,7 +367,7 @@ PROGRAM p_main
         ! ----------------------------------------------------------------------
         
         ! Adding the volume fraction(s) to the formatted database file ---------
-        IF( ( (model_eqns == 2) .and. (bubbles .neqv. .TRUE.)) &
+        IF( ( (model_eqns == 2) .AND. (bubbles .NEQV. .TRUE.)) &
                 .OR. (model_eqns == 3) &
                 ) THEN
             
@@ -631,8 +631,10 @@ PROGRAM p_main
         END IF
         ! ----------------------------------------------------------------------
         
-        ! Adding the total volume of the second volume fraction to a supplementary file to later on track the evolution of the radius of a bubble over time ----------
-        IF((model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) .OR. (model_eqns == 3)) THEN
+        ! Adding the total volume of the second 
+        ! volume fraction to a supplementary file to 
+        ! track the evolution of the radius of a bubble 
+        IF((model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) .OR. (model_eqns == 3)) THEN
             IF(adv_alphan) THEN
 
                 total_volume = 0d0
@@ -659,14 +661,13 @@ PROGRAM p_main
                 END IF
 
                 WRITE(11,300) real(t_step), total_volume
-
             END IF
         END IF
         ! ----------------------------------------------------------------------
         
         ! Adding the volume fraction(s) to the formatted database file ---------
         IF (bubbles) THEN
-            do i = adv_idx%beg,adv_idx%end
+            DO i = adv_idx%beg,adv_idx%end
                 q_sf = q_cons_vf(i)%sf(                 &
                                 -offset_x%beg : m + offset_x%end, &
                                 -offset_y%beg : n + offset_y%end, &
@@ -685,11 +686,11 @@ PROGRAM p_main
                     CALL s_write_variable_to_formatted_database_file(varname,t_step)
                 END IF
                 varname(:) = ' '
-            end do
+            END DO  
         END IF
  
         ! Adding the bubble variables  to the formatted database file ---------
-        IF(bubbles) THEN
+        IF (bubbles) THEN
                 !nR
                 DO i = 1,nb
                         q_sf = q_cons_vf(bub_idx%rs(i))%sf(       &
@@ -711,7 +712,7 @@ PROGRAM p_main
                         CALL s_write_variable_to_formatted_database_file(varname,t_step)
                         varname(:) = ' '
                 END DO
-                if (polytropic .neqv. .TRUE.) then
+                IF (polytropic .NEQV. .TRUE.) THEN
                     !nP
                     DO i = 1,nb
                             q_sf = q_cons_vf(bub_idx%ps(i))%sf(       &
@@ -733,7 +734,7 @@ PROGRAM p_main
                             CALL s_write_variable_to_formatted_database_file(varname,t_step)
                             varname(:) = ' '
                     END DO
-                end if
+                END IF
         END IF
         
         ! Closing the formatted database file
