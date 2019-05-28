@@ -56,7 +56,8 @@ MODULE m_bubbles
                                 c_gas, c2_liquid, &
                                 Cpbw, Cpinf,Cpinf_dot, &
                                 myH, myHdot, rddot, alf_gas
-
+            
+            REAL(KIND(0d0))   :: pb, mv, vflux, pldot, pbdot
             
             REAL(KIND(0d0)) :: n_tait, B_tait, gamma_gas !< EOS parameters
             
@@ -71,7 +72,7 @@ MODULE m_bubbles
             INTEGER :: j,k,l,q,s !< Loop variables
             INTEGER :: ndirs  !< Number of coordinate directions
             
-            REAL(KIND(0d0))   :: pb, mv, vflux, pldot, pbdot
+
             
             ndirs = 1; IF (n > 0) ndirs = 2; IF (p > 0) ndirs = 3
 
@@ -115,7 +116,7 @@ MODULE m_bubbles
                     myR  = q_prim_vf(bub_idx%rs(q))%sf(j,k,l)
                     myV  = q_prim_vf(bub_idx%vs(q))%sf(j,k,l)
 
-                    IF (polytropic .neqv. .TRUE.) THEN
+                    IF (polytropic .NEQV. .TRUE.) THEN
                         pb = q_prim_vf(bub_idx%ps(q))%sf(j,k,l)
                         mv = q_prim_vf(bub_idx%ms(q))%sf(j,k,l)
                         call s_bwproperty( pb, q )
@@ -129,7 +130,7 @@ MODULE m_bubbles
                     END IF
 
                    IF (bubble_model == 1) THEN
-                        !Gilmore bubbles
+                        ! Gilmore bubbles
                         Cpinf       = myP - pref
                         Cpbw        = f_cpbw( R0(q), myR, myV, gamma_gas, pb )
                         myH         = f_H       ( Cpbw, Cpinf, n_tait, B_tait )
@@ -138,7 +139,7 @@ MODULE m_bubbles
                         myHdot      = f_Hdot    ( Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, gamma_gas, myR, myV, R0(q), pbdot )
                         rddot       = f_rddot   ( Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait )
                     ELSE IF (bubble_model == 2) THEN
-                        !Keller-Miksis bubbles
+                        ! Keller-Miksis bubbles
                         Cpinf       = myP
                         Cpbw        = f_cpbw_KM( R0(q), myR, myV, gamma_gas, pb )
                         c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
@@ -148,42 +149,30 @@ MODULE m_bubbles
                     bub_v_src(q,j,k,l) = nbub(j,k,l) * rddot
                     
                     IF (isnan(bub_r_src(q,j,k,l))) THEN
-                        stop 'bub_r_src NaN'
+                        STOP 'bub_r_src NaN'
                     ELSE IF (isnan(bub_v_src(q,j,k,l))) THEN
-                        print*,  q_prim_vf(adv_idx%beg)%sf(j,k,l) 
-                        print*,  q_prim_vf(adv_idx%beg+1)%sf(j,k,l) 
-                        print*,  q_prim_vf(adv_idx%beg+2)%sf(j,k,l) 
-                        print*, n_tait, B_tait, myRho
-                        print*, cpinf, cpbw, myh, c_gas, cpinf_dot, myHdot, rddot, nbub(j,k,l)
-                        stop 'bub_v_src NaN'
+                        STOP 'bub_v_src NaN'
                     END IF
 
-                    IF  ( (alf         < 1.d-10 ) & !.or. &
-                        !.and. ( rddot < 0d0 )    & 
-                        !  (nbub(j,k,l) < 1.d-10) .or. &
-                        !  (myR         < 1.d-10)      &
-                        ) THEN
+                    IF (alf < 1.d-10) THEN
                         bub_adv_src(j,k,l) = 0d0
                         bub_r_src(q,j,k,l) = 0d0
                         bub_v_src(q,j,k,l) = 0d0
-                        IF (polytropic .neqv. .TRUE.) THEN
+                        IF (polytropic .NEQV. .TRUE.) THEN
                            bub_p_src(q,j,k,l) = 0d0
                            bub_m_src(q,j,k,l) = 0d0
                         END IF
                     END IF
                 END DO; END DO; END DO; END DO
             END IF
-           
-            !bub_adv_src = 0d0; bub_r_src = 0d0; bub_v_src = 0d0
-            !bub_p_src = 0d0; bub_m_src = 0d0
             
             IF (proc_rank == 0) THEN
-                print*, 'Source terms:'
-                print*, 'max adv src', maxval(abs(bub_adv_src(:,:,:)))
-                print*, 'max r src', maxval(abs(bub_r_src(:,:,:,:)))
-                print*, 'max v src', maxval(abs(bub_v_src(:,:,:,:)))
-                print*, 'max p src', maxval(abs(bub_p_src(:,:,:,:)))
-                print*, 'max m src', maxval(abs(bub_m_src(:,:,:,:)))
+                PRINT*, 'Source terms:'
+                PRINT*, 'max adv src', maxval(abs(bub_adv_src(:,:,:)))
+                PRINT*, 'max r src', maxval(abs(bub_r_src(:,:,:,:)))
+                PRINT*, 'max v src', maxval(abs(bub_v_src(:,:,:,:)))
+                PRINT*, 'max p src', maxval(abs(bub_p_src(:,:,:,:)))
+                PRINT*, 'max m src', maxval(abs(bub_m_src(:,:,:,:)))
             END IF
 
         END SUBROUTINE s_compute_bubble_source
@@ -362,8 +351,8 @@ MODULE m_bubbles
             REAL(KIND(0d0))             :: f_cpbw_KM
             
             IF (polytropic) THEN
-                !f_cpbw = (fR0/fR)**(3.d0*fgamma_gas) - 1.d0
-                f_cpbw_KM = (Ca + 2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas)) - Ca - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
+                f_cpbw_KM = (Ca + 2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas)) - &
+                    Ca - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
             ELSE
                 f_cpbw_KM = fpb - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
             END IF

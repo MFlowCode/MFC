@@ -158,22 +158,22 @@ MODULE m_global_parameters
 
     REAL(KIND(0d0)) :: rhoref, pref !< Reference parameters for Tait EOS
 
-    ! SHB: For bubble modeling
+    ! Bubble modeling
     INTEGER         :: nb
     REAL(KIND(0d0)) :: R0ref
     REAL(KIND(0d0)) :: Ca, Web, Re_inv
-    REAL(KIND(0d0)), dimension(:), allocatable :: weight, R0, V0
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight, R0, V0
     LOGICAL         :: bubbles
 
 
-    ! SHB: For non-polytropic modeling
+    ! Non-polytropic bubble gas compression
     LOGICAL         :: polytropic
     INTEGER         :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
     REAL(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
-    REAL(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
-    REAL(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
+    REAL(kind(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
+    REAL(kind(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     
-    integer, allocatable, dimension(:,:,:) :: logic_grid
+    INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: logic_grid
             
     ! Mathematical and Physical Constants ======================================
     REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0
@@ -377,52 +377,52 @@ MODULE m_global_parameters
                     alf_idx = 0
                 END IF
                 
-                if (bubbles) then
+                IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    if (polytropic .neqv. .TRUE.) then
+                    IF (polytropic .neqv. .TRUE.) THEN
                         bub_idx%end = sys_size+4*nb
-                    end if
+                    END IF
                     sys_size = bub_idx%end
 
-                    allocate( bub_idx%rs(nb), bub_idx%vs(nb) )
-                    allocate( bub_idx%ps(nb), bub_idx%ms(nb) )
-                    allocate( weight(nb),R0(nb),V0(nb) )
+                    ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+                    ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                    do i = 1, nb
-                        if (polytropic .neqv. .TRUE.) then
+                    DO i = 1, nb
+                        IF (polytropic .neqv. .TRUE.) THEN
                             fac = 4
-                        else
+                        ELSE
                             fac = 2
-                        end if
+                        END IF
                         
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        if (polytropic .neqv. .TRUE.) then
+                        IF (polytropic .neqv. .TRUE.) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
-                        end if
-                    end do
+                        END IF
+                    END DO
 
-                    if (nb == 1) then
+                    IF (nb == 1) THEN
                         weight(:)   = 1d0
                         R0(:)       = 1d0
                         V0(:)       = 0d0
-                    else if (nb > 1) then
-                        call s_simpson(nb)
+                    ELSE IF (nb > 1) THEN
+                        CALL s_simpson(nb)
                         V0(:)       = 0d0
-                    else
-                        stop 'Invalid value of nb'
-                    end if
+                    ELSE
+                        STOP 'Invalid value of nb'
+                    END IF
 
-                    if (polytropic .neqv. .TRUE.) then
-                        call s_initialize_nonpoly
-                    else
+                    IF (polytropic .neqv. .TRUE.) THEN
+                        CALL s_initialize_nonpoly
+                    ELSE
                         rhoref  = 1.d0
                         pref    = 1.d0
-                    end if
-                end if                    
+                    END IF
+                END IF                    
             ! ==================================================================
 
 
@@ -457,53 +457,52 @@ MODULE m_global_parameters
                 alf_idx      = adv_idx%end
                 sys_size     = alf_idx !adv_idx%end
 
-                if (bubbles) then
+                IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    if (polytropic .neqv. .TRUE.) then
+                    IF (polytropic .neqv. .TRUE.) THEN
                         bub_idx%end = sys_size+4*nb
-                    end if
+                    END IF
                     sys_size = bub_idx%end
-                    print*, 'sys_size', sys_size
 
-                    allocate( bub_idx%rs(nb), bub_idx%vs(nb) )
-                    allocate( bub_idx%ps(nb), bub_idx%ms(nb) )
-                    allocate( weight(nb),R0(nb),V0(nb) )
+                    ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+                    ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                    do i = 1, nb
-                        if (polytropic .neqv. .TRUE.) then
+                    DO i = 1, nb
+                        IF (polytropic .neqv. .TRUE.) THEN
                             fac = 4
-                        else
+                        ELSE
                             fac = 2
-                        end if
+                        END IF
                         
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        if (polytropic .neqv. .TRUE.) then
+                        IF (polytropic .neqv. .TRUE.) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
-                        end if
-                    end do
+                        END IF
+                    END DO
 
-                    if (nb == 1) then
+                    IF (nb == 1) THEN
                         weight(:)   = 1d0
                         R0(:)       = 1d0
                         V0(:)       = 0d0
-                    else if (nb > 1) then
-                        call s_simpson(nb)
+                    ELSE IF (nb > 1) THEN
+                        CALL s_simpson(nb)
                         V0(:)       = 0d0
-                    else
-                        stop 'Invalid value of nb'
-                    end if
+                    ELSE
+                        STOP 'Invalid value of nb'
+                    END IF
 
-                    if (polytropic .neqv. .TRUE.) then
-                        call s_initialize_nonpoly
-                    else
+                    IF (polytropic .neqv. .TRUE.) THEN
+                        CALL s_initialize_nonpoly
+                    ELSE
                         rhoref  = 1.d0
                         pref    = 1.d0
-                    end if
-                end if
+                    END IF
+                END IF
             END IF
             ! ==================================================================
 
@@ -534,10 +533,11 @@ MODULE m_global_parameters
             END IF
 
             
-            allocate( logic_grid(0:m,0:n,0:p) )
+            ALLOCATE( logic_grid(0:m,0:n,0:p) )
             
         END SUBROUTINE s_initialize_global_parameters_module ! --------------------
-        
+       
+
         !> Initializes and computes bubble properties
         !! for non-polytropic processes
         subroutine s_initialize_nonpoly
@@ -568,9 +568,9 @@ MODULE m_global_parameters
             rhol0 = rhoref
             pl0   = pref
             
-            allocate( pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb) )
-            allocate( k_n(nb), k_v(nb), omegaN(nb) )
-            allocate( Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb) ) 
+            ALLOCATE( pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb) )
+            ALLOCATE( k_n(nb), k_v(nb), omegaN(nb) )
+            ALLOCATE( Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb) ) 
             
             pb0(:)      = dflt_real
             mass_n0(:)  = dflt_real
@@ -592,7 +592,7 @@ MODULE m_global_parameters
             k_n(:)  = fluid_pp(2)%k_v
 
             gamma_m = gamma_n
-            if (thermal==2 ) gamma_m = 1.d0 !isothermal
+            IF (thermal==2 ) gamma_m = 1.d0 !isothermal
 
             temp = 293.15D0
             D_m  = 0.242D-4
@@ -827,10 +827,6 @@ MODULE m_global_parameters
             weight(1) = tmp*dphi/3.D0
             tmp = DEXP( -0.5D0*(phi(Npt)/sd)**2 )/DSQRT( 2.D0*pi )/sd
             weight(Npt) = tmp*dphi/3.D0
-            !NR0beg = 1
-
-            print*, 'weights = ', weight(:)
-            print*, 'R0s = ', R0(:)
 
         END SUBROUTINE s_simpson
 

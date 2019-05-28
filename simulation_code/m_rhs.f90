@@ -33,7 +33,7 @@ MODULE m_rhs
     
     USE m_cbc                  !< Characteristic boundary conditions (CBC)
 
-    use m_bubbles              !< Bubble dynamic routines
+    USE m_bubbles              !< Bubble dynamic routines
     ! ==========================================================================
     
     
@@ -333,13 +333,13 @@ MODULE m_rhs
                                 END DO
                             END IF
        
-                            if (bubbles) then
+                            IF (bubbles) THEN
                                 DO l = bub_idx%beg,sys_size
                                     ALLOCATE(q_prim_qp(i,j,k)%vf(l)%sf( ix%beg:ix%end, &
                                                                         iy%beg:iy%end, &
                                                                         iz%beg:iz%end ))
                                 END DO
-                            end if
+                            END IF
                         END IF
                      
                     END DO
@@ -369,7 +369,7 @@ MODULE m_rhs
                                    ichi%beg:ichi%end, &
                                    ipsi%beg:ipsi%end ))
 
-            allocate( alf_sum%sf( &
+            ALLOCATE( alf_sum%sf( &
                                     ix%beg:ix%end, &
                                     iy%beg:iy%end, &
                                     iz%beg:iz%end ))
@@ -388,7 +388,7 @@ MODULE m_rhs
 
 
                         IF(ABS(j) >= ABS(k)) THEN
-                            do l = 1,sys_size
+                            DO l = 1,sys_size
                                 ALLOCATE(myflux_vf(i,j,k)%vf(l)%sf( &
                                                             ix%beg:ix%end, &
                                                             iy%beg:iy%end, &
@@ -397,7 +397,7 @@ MODULE m_rhs
                                                             ix%beg:ix%end, &
                                                             iy%beg:iy%end, &
                                                             iz%beg:iz%end ))
-                            end do
+                            END DO
  
                             IF(i == 1) THEN
                               
@@ -459,7 +459,7 @@ MODULE m_rhs
                                                         iz%beg:iz%end ))
                                 END DO
 
-                                if (bubbles) then
+                                IF (bubbles) THEN
                                     DO l = bub_idx%beg, sys_size
                                         ALLOCATE(qL_prim_ndqp(i,j,k)%vf(l)%sf( &
                                                             ix%beg:ix%end, &
@@ -470,7 +470,7 @@ MODULE m_rhs
                                                             iy%beg:iy%end, &
                                                             iz%beg:iz%end ))
                                     END DO
-                                end if
+                                END IF
                               
                             ELSE
                               
@@ -556,21 +556,21 @@ MODULE m_rhs
 
 
                             !SHB changes
-                            if (adv_alphan ) then
+                            IF (adv_alphan ) THEN
                                 DO l = adv_idx%beg, adv_idx%end
                                     qL_prim_ndqp(i,j,k)%vf(l)%sf => &
                                     qL_cons_ndqp(i,j,k)%vf(l)%sf
                                     qR_prim_ndqp(i,j,k)%vf(l)%sf => &
                                     qR_cons_ndqp(i,j,k)%vf(l)%sf
                                 END DO
-                            else
+                            ELSE
                                 DO l = adv_idx%beg, adv_idx%end+1    
                                     qL_prim_ndqp(i,j,k)%vf(l)%sf => &
                                     qL_cons_ndqp(i,j,k)%vf(l)%sf
                                     qR_prim_ndqp(i,j,k)%vf(l)%sf => &
                                     qR_cons_ndqp(i,j,k)%vf(l)%sf
                                 END DO
-                            end if
+                            END IF
                            
                         END IF
                      
@@ -1103,21 +1103,21 @@ MODULE m_rhs
                 END DO
             END IF
 
-            if (bubbles) then
-                allocate( bub_adv_src(0:m,0:n,0:p) )
-                allocate( bub_r_src(1:nb,0:m,0:n,0:p) )
-                allocate( bub_v_src(1:nb,0:m,0:n,0:p) )
-                allocate( bub_p_src(1:nb,0:m,0:n,0:p) )
-                allocate( bub_m_src(1:nb,0:m,0:n,0:p) )
-            end if
+            IF (bubbles) THEN
+                ALLOCATE( bub_adv_src(0:m,0:n,0:p) )
+                ALLOCATE( bub_r_src(1:nb,0:m,0:n,0:p) )
+                ALLOCATE( bub_v_src(1:nb,0:m,0:n,0:p) )
+                ALLOCATE( bub_p_src(1:nb,0:m,0:n,0:p) )
+                ALLOCATE( bub_m_src(1:nb,0:m,0:n,0:p) )
+            END IF
 
-            if (monopole) then
-                allocate( mono_mass_src(0:m,0:n,0:p) )
-                allocate( mono_mom_src(1:num_dims,0:m,0:n,0:p) )
-                allocate( mono_E_src(0:m,0:n,0:p) )
-            end if
+            IF (monopole) THEN
+                ALLOCATE( mono_mass_src(0:m,0:n,0:p) )
+                ALLOCATE( mono_mom_src(1:num_dims,0:m,0:n,0:p) )
+                ALLOCATE( mono_E_src(0:m,0:n,0:p) )
+            END IF
 
-            allocate( divu%sf( &
+            ALLOCATE( divu%sf( &
                                                         ix%beg:ix%end, &
                                                         iy%beg:iy%end, &
                                                         iz%beg:iz%end ))
@@ -1195,7 +1195,7 @@ MODULE m_rhs
                                 END IF
                             
                                 !SHB: Edit for 2 fluids w/ bubbles
-                                !IF (bubbles .and. riemann_solver .ne. 1) then
+                                !IF (bubbles .AND. riemann_solver .NE. 1) THEN
                                 !    DO l = adv_idx%beg,adv_idx%end
                                 !        ALLOCATE(flux_src_ndqp(i,j,k)%vf(l)%sf(       &
                                 !                                   ix%beg:ix%end,   &
@@ -1215,12 +1215,12 @@ MODULE m_rhs
                                                                  iz%beg:iz%end ))
                                     END DO
                                 ELSE
-                                    !if ( (num_fluids > 1) .and. (bubbles .neqv. .TRUE.)) then
+                                    !IF ( (num_fluids > 1) .AND. (bubbles .NEQV. .TRUE.)) THEN
                                         DO l = adv_idx%beg+1, adv_idx%end
                                             flux_src_ndqp(i,j,k)%vf(l)%sf => &
                                             flux_src_ndqp(i,j,k)%vf(adv_idx%beg)%sf
                                         END DO
-                                    !end if
+                                    !END IF
                                 END IF
                               
                             ELSE
@@ -1406,18 +1406,7 @@ MODULE m_rhs
             
             CALL s_populate_conservative_variables_buffers()
            
-            ! does this, same loop problem as below?
             IF((model_eqns == 2 .OR. model_eqns == 3) .AND. (adv_alphan .NEQV. .TRUE.)) THEN
-                !was a modified line; sys_size -> adv_idx%end
-                !q_cons_qp(0,0,0)%vf(adv_idx%end)%sf = 1d0
-                
-                !DO i = adv_idx%beg, adv_idx%end
-                !    q_cons_qp(0,0,0)%vf(adv_idx%end)%sf = &
-                !    q_cons_qp(0,0,0)%vf(adv_idx%end)%sf - &
-                !    q_cons_qp(0,0,0)%vf(i)%sf
-                !END DO
- 
-                !from old code
                 q_cons_qp(0,0,0)%vf(sys_size)%sf = 1d0
                 
                 DO i = adv_idx%beg, adv_idx%end
@@ -1427,7 +1416,7 @@ MODULE m_rhs
                 END DO
             END IF
 
-            IF (mpp_lim .and. bubbles) THEN
+            IF (mpp_lim .AND. bubbles) THEN
                 !adjust volume fractions, according to modeled gas void fraction
                 alf_sum%sf = 0d0
                 DO i = adv_idx%beg, adv_idx%end - 1
@@ -1440,22 +1429,6 @@ MODULE m_rhs
                 END DO
             END IF
 
-            !! Correct void fraction if negative
-            !if (bubbles) then
-            !    do r = 1,nb; do i = 0,m; do j = 0,n; do k = 0,p
-            !        if( (q_cons_vf(alf_idx)%sf(i,j,k) < 0d0)        .or. &
-            !            (q_cons_vf(bub_idx%rs(r))%sf(i,j,k)) < 0d0       &
-            !            ) then
-            !            q_cons_vf(alf_idx)%sf(i,j,k) = 1.d-12
-            !            q_cons_vf(bub_idx%rs(r))%sf(i,j,k) = 1.d-12
-            !            q_cons_vf(bub_idx%vs(r))%sf(i,j,k) = 1.d-12
-            !        end if
-            !    end do; end do; end do; end do
-            !end if
-
-            do j = 1,sys_size
-                print*, sum( q_cons_vf(j)%sf(0:m,0:n,0:p))
-            end do
             ! ==================================================================
 
 
@@ -1478,15 +1451,13 @@ MODULE m_rhs
                 END IF
             END IF
   
-            if (crv_size > 0) call s_get_crv(q_cons_vf,q_prim_vf,rhs_vf)
+            IF (crv_size > 0) call s_get_crv(q_cons_vf,q_prim_vf,rhs_vf)
 
             ! Converting Conservative to Primitive Variables ===================
             iv%beg = 1; iv%end = adv_idx%end
             
-            !won't do anything without flag turned on
             CALL s_reconstruct_cell_interior_values(q_cons_qp)
            
-            !won't do anything without commute_err
             IF( (model_eqns == 2 .OR. model_eqns == 3)  &
                            .AND.           &
                 (adv_alphan .NEQV. .TRUE.) &
@@ -1496,7 +1467,6 @@ MODULE m_rhs
                     DO j = iksi%beg, iksi%end, 2
                         DO i = ieta%beg, ieta%end, 2
                             
-                            !was a modified line, don't use anyway
                             q_cons_qp(i,j,k)%vf(adv_idx%end)%sf = 1d0
                         
                             DO l = adv_idx%beg, adv_idx%end
@@ -1527,18 +1497,15 @@ MODULE m_rhs
 
             iv%beg = mom_idx%beg; iv%end = E_idx 
            
-            !won't do anything without flag turned on
             CALL s_average_cell_interior_values(q_prim_qp)
            
             IF(t_step == t_step_stop) RETURN
             ! ==================================================================
             
             ! Computing Velocity Gradients =====================================
-            if (any(Re_size > 0)) call s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
+            IF (any(Re_size > 0)) call s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
 
-            PRINT '(A)', 'SHB: Before dim splitting'
             
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Dimensional Splitting Loop =======================================
             DO i = 1, num_dims
                
@@ -1550,23 +1517,16 @@ MODULE m_rhs
                 ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
                 ! ===============================================================
                 
-                ! we do all this stuff
                 ! Reconstructing Primitive/Conservative Variables ===============
                 IF(char_decomp .OR. (ALL(Re_size == 0) .AND. We_size == 0)) THEN
                    
-                    !IF(char_decomp) THEN
-                    !    iv%beg = 1; iv%end = sys_size
-                    !ELSE
-                    !    iv%beg = 1; iv%end = adv_idx%end
-                    !END IF
-                    !iv%beg = 1; iv%end = adv_idx%end
                     iv%beg = 1;
-                    if (adv_alphan) then
-                        iv%end = adv_idx%end !old  
-                        if (bubbles) iv%end = sys_size  !SHB: modified line to look out for
-                    else
+                    IF (adv_alphan) THEN
+                        iv%end = adv_idx%end
+                        IF (bubbles) iv%end = sys_size  
+                    ELSE
                         iv%end = adv_idx%end+1
-                    end if
+                    END IF
                         
                     !reconstruct either primative or conservative vars 
                     IF(weno_vars == 1) THEN
@@ -1584,7 +1544,6 @@ MODULE m_rhs
                     END IF
 
                 ELSE
-                !don't do this stuff, just reconstruct all primative variables at once
                 ! ===============================================================
                
                 ! Reconstructing Continuity Variables ===========================
@@ -1673,28 +1632,10 @@ MODULE m_rhs
 
                 END IF
 
-                !should set \alpha_2 = 1 - \alpha_1
                 IF((model_eqns == 2 .OR. model_eqns == 3) .AND. (adv_alphan .NEQV. .TRUE.)) THEN
                     DO k = ipsi%beg, ipsi%end, 2
                         DO j = ichi%beg, ichi%end, 2
                         
-                            !from kevin
-                            !qL_cons_ndqp(i,j,k)%vf(adv_idx%end)%sf = 1d0
-                            !qR_cons_ndqp(i,j,k)%vf(adv_idx%end)%sf = 1d0
-                            
-                            !DO l = adv_idx%beg, adv_idx%end
-                               
-                            !    qL_cons_ndqp(i,j,k)%vf(adv_idx%end)%sf = &
-                            !    qL_cons_ndqp(i,j,k)%vf(adv_idx%end)%sf - &
-                            !    qL_cons_ndqp(i,j,k)%vf(l)%sf !SHB: mistake?
-                                
-                            !    qR_cons_ndqp(i,j,k)%vf(adv_idx%end)%sf = &
-                            !    qR_cons_ndqp(i,j,k)%vf(adv_idx%end)%sf - &
-                            !    qR_cons_ndqp(i,j,k)%vf(l)%sf
-                               
-                            !END DO
-
-                            !from old code
                             qL_cons_ndqp(i,j,k)%vf(sys_size)%sf = 1d0
                             qR_cons_ndqp(i,j,k)%vf(sys_size)%sf = 1d0
                             
@@ -1702,7 +1643,7 @@ MODULE m_rhs
                                
                                 qL_cons_ndqp(i,j,k)%vf(sys_size)%sf = &
                                 qL_cons_ndqp(i,j,k)%vf(sys_size)%sf - &
-                                qL_cons_ndqp(i,j,k)%vf(l)%sf !SHB: mistake?
+                                qL_cons_ndqp(i,j,k)%vf(l)%sf 
                                 
                                 qR_cons_ndqp(i,j,k)%vf(sys_size)%sf = &
                                 qR_cons_ndqp(i,j,k)%vf(sys_size)%sf - &
@@ -1714,7 +1655,6 @@ MODULE m_rhs
                 END IF
                ! END: Reconstructing Volume Fraction Variables =================
                
-               ! don't do, weno_vars == 2
                ! Converting Conservative to Primitive Variables ================
                 IF(weno_vars == 1) THEN
                     DO k = ipsi%beg, ipsi%end, 2
@@ -1802,10 +1742,7 @@ MODULE m_rhs
                 
                 ix%end = m; iy%end = n; iz%end = p
                ! ===============================================================
-                print '(a)', 'SHB: before riemann solver flux and sources.'
 
-
-                ! don't use
                 IF (tvd_rhs_flux) THEN
                     ! Compute Riemann solver flux and source flux 
                     DO k = ipsi%beg, ipsi%end, 2
@@ -1854,7 +1791,6 @@ MODULE m_rhs
                         END DO
                     END DO
                 ELSE
-                    ! we do this (SHB)
                     ! Computing Riemann Solver Flux and Source Flux =================
                     DO k = ipsi%beg, ipsi%end, 2
                         DO j = ichi%beg, ichi%end, 2
@@ -1877,14 +1813,9 @@ MODULE m_rhs
                                                                   i, ix,iy,iz  )
                         END DO
                     END DO
-                    print '(a)', 'SHB: after riemann solver flux and sources.'
                   
-                    !print*, rhs_vf(1)%sf(:,0,0)
-                    !print*, 'after riemann solver'
-
                     iv%beg = 1; iv%end = adv_idx%end
        
-                    !won't do anything without flag
                     CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
                    
                     IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
@@ -1895,7 +1826,6 @@ MODULE m_rhs
                    
                     IF(riemann_solver /= 1) iv%end = adv_idx%beg
                    
-                    !won't do anything without flag
                     CALL s_average_cell_boundary_values(flux_src_ndqp(i,:,:))
                     CALL s_average_cell_boundary_values(flux_gsrc_ndqp(i,:,:))
                    ! ===============================================================
@@ -1912,36 +1842,32 @@ MODULE m_rhs
                                                    fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
                                 alpha1(j,k,l) = q_cons_qp(0,0,0)%vf(adv_idx%beg)%sf(j,k,l)
                                 
-                                if (bubbles) then
+                                IF (bubbles) THEN
                                     alpha2(j,k,l) = q_cons_qp(0,0,0)%vf(alf_idx-1)%sf(j,k,l)
-                                else
+                                ELSE
                                     alpha2(j,k,l) = q_cons_qp(0,0,0)%vf(adv_idx%end)%sf(j,k,l)
-                                end if
+                                END IF
                                 
                                 Kterm(j,k,l) = alpha1(j,k,l)*alpha2(j,k,l)*(blkmod2(j,k,l)-blkmod1(j,k,l)) / &
                                                 (alpha1(j,k,l)*blkmod2(j,k,l) + alpha2(j,k,l)*blkmod1(j,k,l))
                             END DO
                         END DO
                     END DO
-                    if (bubbles) then
+                    IF (bubbles) THEN
                         print*, 'max Kterm = ', maxval(abs(alpha1(:,:,:))), maxval(abs(alpha2(:,:,:))), &
                                             1.d0 - maxval(abs( q_cons_qp(0,0,0)%vf(alf_idx-2)%sf(:,:,:) + &
                                                                q_cons_qp(0,0,0)%vf(alf_idx-1)%sf(:,:,:) + &
                                                                q_cons_qp(0,0,0)%vf(alf_idx-0)%sf(:,:,:) ) ), &
                                             maxval(abs(Kterm(:,:,:)))
-                    end if
+                    END IF
                 END IF
 
-
-
-                ! adding the components to the RHS, starting with x-direction !
                 ! RHS Contribution in x-direction ===============================
                 IF(i == 1) THEN
-                    !print '(a)', 'SHB: before x component rhs'
                   
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
-                    if (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
+                    IF (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
 
                     ! Applying characteristic boundary conditions
                     IF(bc_x%beg <= -5) THEN
@@ -1954,9 +1880,7 @@ MODULE m_rhs
                                     flux_src_ndqp(i,0,0)%vf, i,  1, ix,iy,iz  )
                     END IF
             
-                    ! We do this
                     ! Applying the Riemann fluxes
-                    !print*, 'apply riemann fluxes'
                     DO j = 1, sys_size
                         DO k = 0, m
                             rhs_vf(j)%sf(k,:,:) = 1d0/dx(k) * &
@@ -1965,7 +1889,6 @@ MODULE m_rhs
                         END DO
                     END DO
     
-                    !print*, 'apply riemann fluxes 2'
                     ! Applying source terms to the RHS of the advection equations
                     IF(riemann_solver == 1) THEN
                         DO j = adv_idx%beg, adv_idx%end
@@ -1980,7 +1903,7 @@ MODULE m_rhs
                     ELSE
                         DO j = adv_idx%beg, adv_idx%end
                             IF (alt_soundspeed .OR. regularization) THEN
-                                IF ( adv_alphan .AND. (j == adv_idx%end) .and. (bubbles .neqv. .TRUE.)) THEN
+                                IF ( adv_alphan .AND. (j == adv_idx%end) .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !adv_idx%end, -k div(u)
                                     DO k = 0, m
                                         rhs_vf(j)%sf(k,:,:) = &
@@ -1989,7 +1912,7 @@ MODULE m_rhs
                                         ( flux_src_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) &
                                         - flux_src_ndqp(i,0,0)%vf(j)%sf(k-1,0:n,0:p) )
                                     END DO
-                                ELSE IF ( adv_alphan .AND. (j == adv_idx%beg) .and. (bubbles .neqv. .TRUE.)) THEN
+                                ELSE IF ( adv_alphan .AND. (j == adv_idx%beg) .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !adv_idx%beg, +k div(u)
                                     DO k = 0, m
                                         rhs_vf(j)%sf(k,:,:) = &
@@ -1998,7 +1921,7 @@ MODULE m_rhs
                                         ( flux_src_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) &
                                         - flux_src_ndqp(i,0,0)%vf(j)%sf(k-1,0:n,0:p) )
                                     END DO
-                                ELSE IF ( adv_alphan .AND. (j == adv_idx%beg) .and. bubbles) THEN
+                                ELSE IF ( adv_alphan .AND. (j == adv_idx%beg) .AND. bubbles) THEN
                                     !liquid part, +k div(u)
                                     DO k = 0, m
                                         rhs_vf(j)%sf(k,:,:) = &
@@ -2007,7 +1930,7 @@ MODULE m_rhs
                                         ( flux_src_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) &
                                         - flux_src_ndqp(i,0,0)%vf(j)%sf(k-1,0:n,0:p) )
                                     END DO
-                                ELSE IF ( adv_alphan .AND. (j == alf_idx-1) .and. bubbles) THEN
+                                ELSE IF ( adv_alphan .AND. (j == alf_idx-1) .AND. bubbles) THEN
                                     !resolved gas, -k div(u)
                                     DO k = 0, m
                                         rhs_vf(j)%sf(k,:,:) = &
@@ -2016,7 +1939,7 @@ MODULE m_rhs
                                         ( flux_src_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) &
                                         - flux_src_ndqp(i,0,0)%vf(j)%sf(k-1,0:n,0:p) )
                                     END DO
-                                ELSE IF ( adv_alphan .AND. (j == alf_idx) .and. bubbles) THEN
+                                ELSE IF ( adv_alphan .AND. (j == alf_idx) .AND. bubbles) THEN
                                     !bubble part, no k div(u)
                                     DO k = 0, m
                                         rhs_vf(j)%sf(k,:,:) = &
@@ -2039,38 +1962,37 @@ MODULE m_rhs
                         END DO
                     END IF
 
-                    If (bubbles) then
+                    IF (bubbles) THEN
                         call s_get_divergence(i,q_prim_vf,divu)
                         call s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
                                 bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
                         
                                               rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
-                        if ( num_fluids >1 )  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
+                        IF ( num_fluids >1 )  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
 
-                        do k = 1,nb
+                        DO k = 1,nb
                             rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
                             rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
-                            if (polytropic .neqv. .TRUE.) then
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
                                 rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
-                            end if
-                        end do
-                   end if
+                            END IF
+                        END DO
+                   END IF
 
-                   !print*, 'before monopole calls'
-                   If (monopole) then
+                   IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
-                        do j = 1,num_mono
+                        DO j = 1,num_mono
                             call s_get_monopole(i,q_prim_vf,t_step,mono(j))
-                        end do
-                        do k = cont_idx%beg,cont_idx%end
+                        END DO
+                        DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
-                        end do
-                        do k = mom_idx%beg,mom_idx%end
+                        END DO
+                        DO k = mom_idx%beg,mom_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mom_src(k-cont_idx%end,:,:,:)
-                        end do
+                        END DO
                         rhs_vf(E_idx)%sf(:,:,:) = rhs_vf(E_idx)%sf(:,:,:) + mono_e_src(:,:,:)
-                    end if
+                    END IF
 
                     ! Applying source terms to the RHS of the internal energy equations
                     IF(model_eqns == 3) THEN
@@ -2139,7 +2061,7 @@ MODULE m_rhs
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
                     
-                    if (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
+                    IF (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
 
                     ! Applying characteristic boundary conditions
                     IF(bc_y%beg <= -5 .AND. bc_y%beg /= -13) THEN
@@ -2177,21 +2099,21 @@ MODULE m_rhs
                         DO j = adv_idx%beg, adv_idx%end
                             DO k = 0, n
                                 IF (alt_soundspeed .OR. regularization) THEN
-                                    IF ( adv_alphan .AND. (j == adv_idx%beg) .and. bubbles) THEN
+                                    IF ( adv_alphan .AND. (j == adv_idx%beg) .AND. bubbles) THEN
                                         !liquid part, +k div(u)
                                         rhs_vf(j)%sf(:,k,:) = &
                                             rhs_vf(j)%sf(:,k,:) + 1d0/dy(k) * &
                                             (q_cons_qp(0,0,0)%vf(j)%sf(0:m,k,0:p) + Kterm(:,k,:)) * &
                                             ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m, k ,0:p) &
                                             - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,k-1,0:p) )
-                                    ELSE IF ( adv_alphan .AND. (j == alf_idx-1) .and. bubbles) THEN
+                                    ELSE IF ( adv_alphan .AND. (j == alf_idx-1) .AND. bubbles) THEN
                                         !resolved gas, -k div(u)
                                         rhs_vf(j)%sf(:,k,:) = &
                                             rhs_vf(j)%sf(:,k,:) + 1d0/dy(k) * &
                                             (q_cons_qp(0,0,0)%vf(j)%sf(0:m,k,0:p) - Kterm(:,k,:)) * &
                                             ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m, k ,0:p) &
                                             - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,k-1,0:p) )
-                                    ELSE IF ( adv_alphan .AND. (j == alf_idx) .and. bubbles) THEN
+                                    ELSE IF ( adv_alphan .AND. (j == alf_idx) .AND. bubbles) THEN
                                         !bubble part, no k div(u)
                                         rhs_vf(j)%sf(:,k,:) = &
                                             rhs_vf(j)%sf(:,k,:) + 1d0/dy(k) * &
@@ -2234,37 +2156,37 @@ MODULE m_rhs
                         END DO
                     END IF
 
-                    If (bubbles) then
+                    IF (bubbles) THEN
                         call s_get_divergence(i,q_prim_vf,divu)
                         call s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
                                 bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
                                               rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
-                        if ( num_fluids > 1)  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
+                        IF ( num_fluids > 1)  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
 
-                        do k = 1,nb
+                        DO k = 1,nb
                             rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
                             rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
-                            if (polytropic .neqv. .TRUE.) then
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
                                 rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
-                            end if
-                        end do
-                    end if
+                            END IF
+                        END DO
+                    END IF
 
-                    If (monopole) then
+                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
-                        do j = 1,num_mono
+                        DO j = 1,num_mono
                             call s_get_monopole(i,q_prim_vf,t_step,mono(j))
-                        end do
-                        do k = cont_idx%beg,cont_idx%end
+                        END DO
+                        DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
-                        end do
-                        do k = mom_idx%beg,mom_idx%end
+                        END DO
+                        DO k = mom_idx%beg,mom_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mom_src(k-cont_idx%end,:,:,:)
-                        end do
+                        END DO
                         rhs_vf(E_idx)%sf(:,:,:) = rhs_vf(E_idx)%sf(:,:,:) + mono_e_src(:,:,:)
-                    end if
+                    END IF
 
                     ! Applying source terms to the RHS of the internal energy equations
                     IF(model_eqns == 3) THEN
@@ -2423,7 +2345,7 @@ MODULE m_rhs
 
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
-                    if (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
+                    IF (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)
 
                     ! Applying characteristic boundary conditions
                     IF(bc_z%beg <= -5) THEN
@@ -2511,7 +2433,7 @@ MODULE m_rhs
                             ELSE
                                 DO k = 0, p
                                     IF (alt_soundspeed .OR. regularization) THEN
-                                        IF ( adv_alphan .AND. (j == adv_idx%beg) .and. bubbles) THEN
+                                        IF ( adv_alphan .AND. (j == adv_idx%beg) .AND. bubbles) THEN
                                             !liquid part, +k div(u)
                                             rhs_vf(j)%sf(:,:,k) = &
                                                rhs_vf(j)%sf(:,:,k) + 1d0/dz(k) * &
@@ -2519,14 +2441,14 @@ MODULE m_rhs
                                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n, k ) &
                                                 - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n,k-1) )
 
-                                        ELSE IF ( adv_alphan .AND. (j == alf_idx-1) .and. bubbles) THEN
+                                        ELSE IF ( adv_alphan .AND. (j == alf_idx-1) .AND. bubbles) THEN
                                             !resolved gas, -k div(u)
                                             rhs_vf(j)%sf(:,:,k) = &
                                                 rhs_vf(j)%sf(:,:,k) + 1d0/dz(k) * &
                                                 (q_cons_qp(0,0,0)%vf(j)%sf(0:m,0:n,k) - Kterm(:,:,k)) * &
                                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n, k ) &
                                                 - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n,k-1) )
-                                        ELSE IF ( adv_alphan .AND. (j == alf_idx) .and. bubbles) THEN
+                                        ELSE IF ( adv_alphan .AND. (j == alf_idx) .AND. bubbles) THEN
                                             !bubble part, no k div(u)
                                             rhs_vf(j)%sf(:,:,k) = &
                                                 rhs_vf(j)%sf(:,:,k) + 1d0/dz(k) * &
@@ -2558,47 +2480,47 @@ MODULE m_rhs
                         END DO
                     END IF
                     
-                    If (bubbles) then
+                    IF (bubbles) THEN
                         call s_get_divergence(i,q_prim_vf,divu)
                         call s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
                                 bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
                                               rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
-                        if ( num_fluids > 1)  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
+                        IF ( num_fluids > 1)  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
 
-                        do k = 1,nb
+                        DO k = 1,nb
                             rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
                             rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
-                            if (polytropic .neqv. .TRUE.) then
+                            IF (polytropic .NEQV. .TRUE.) THEN
                                 rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
                                 rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
-                            end if
-                        end do
-                    end if 
+                            END IF
+                        END DO
+                    END IF 
 
-                    If (monopole) then
+                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
-                        do j = 1,num_mono
+                        DO j = 1,num_mono
                             call s_get_monopole(i,q_prim_vf,t_step,mono(j))
-                        end do
-                        do k = cont_idx%beg,cont_idx%end
+                        END DO
+                        DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
-                        end do
-                        do k = mom_idx%beg,mom_idx%end
+                        END DO
+                        DO k = mom_idx%beg,mom_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mom_src(k-cont_idx%end,:,:,:)
-                        end do
+                        END DO
                         rhs_vf(E_idx)%sf(:,:,:) = rhs_vf(E_idx)%sf(:,:,:) + mono_e_src(:,:,:)
-                    end if
+                    END IF
 
                     ! Applying source terms to the RHS of the internal energy equations
                     IF(model_eqns == 3) THEN
                         DO j = 1, num_fluids
                             DO k = 0, p
-                                rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,:,k) = rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,:,k) - 1d0/dz(k) * &
-                                                        q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,0:n,k)*q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,0:n,k) * &
-                                                        (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,0:n, k ) - flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,0:n,k-1))
-                                                        ! (flux_src_ndqp(i,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,0:n, k ) - flux_src_ndqp(i,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,0:n,k-1)) 
-                                                        ! //KS// see remark above
+                                rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,:,k) = &
+                                    rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,:,k) - 1d0/dz(k) * &
+                                    q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,0:n,k)*q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,0:n,k) * &
+                                    (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,0:n, k ) - &
+                                    flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,0:n,k-1))
                             END DO
                         END DO
                     END IF
@@ -3228,24 +3150,24 @@ MODULE m_rhs
             INTEGER :: j,k,l !< Generic loop iterators
             
             !contribute to divergence computation \div(u)
-            if (idir == 1) mydivu%sf(:,:,:) = 0d0
+            IF (idir == 1) mydivu%sf(:,:,:) = 0d0
             
-            do j = 0,m
-                do k = 0,n
-                    do l = 0,p
-                        if (idir == 1) then
+            DO j = 0,m
+                DO k = 0,n
+                    DO l = 0,p
+                        IF (idir == 1) THEN
                             mydivu%sf(j,k,l) =                      0.5d0/dx(j)*(q_prim_vf(cont_idx%end+idir)%sf(j+1,k,l) - &
                                                                                  q_prim_vf(cont_idx%end+idir)%sf(j-1, k , l )) 
-                        else if (idir == 2) then
+                        ELSE IF (idir == 2) THEN
                             mydivu%sf(j,k,l) = mydivu%sf(j,k,l) +   0.5d0/dy(k)*(q_prim_vf(cont_idx%end+idir)%sf(j,k+1,l) - &
                                                                                  q_prim_vf(cont_idx%end+idir)%sf( j ,k-1, l ))
-                        else if (idir == 3) then
+                        ELSE IF (idir == 3) THEN
                             mydivu%sf(j,k,l) = mydivu%sf(j,k,l) +   0.5d0/dz(l)*(q_prim_vf(cont_idx%end+idir)%sf(j,k,l+1) - &
                                                                                  q_prim_vf(cont_idx%end+idir)%sf( j , k ,l-1))
-                        end if
-                    end do
-                end do
-            end do
+                        END IF
+                    END DO
+                END DO
+            END DO
 
         END SUBROUTINE s_get_divergence
 
@@ -3271,14 +3193,14 @@ MODULE m_rhs
             REAL(KIND(0d0)), DIMENSION( num_fluids, &
                                         num_fluids  ) :: We
            
-            ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+            ndirs = 1; IF (n > 0) ndirs = 2; IF (p > 0) ndirs = 3
 
 
 
-            if (idir == ndirs) then
+            IF (idir == ndirs) THEN
                 mytime = t_step*dt
 
-                do j = 0,m; do k = 0,n; do l=0,p
+                DO j = 0,m; DO k = 0,n; DO l=0,p
                     CALL s_convert_to_mixture_variables( q_prim_vf, myRho, n_tait, B_tait, Re, We, j, k, l )
                     n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
@@ -3292,40 +3214,40 @@ MODULE m_rhs
                     s2 = f_g(mytime,sound,const_sos,mymono) * f_delta(j,k,l,mymono%loc,mymono%length,mymono) !g(t)*\delta(x-x0)
                    
                     mono_mass_src(j,k,l)    = mono_mass_src(j,k,l) + s2/sound
-                    if (n ==0) then
+                    IF (n ==0) THEN
                         
                         !1d
-                        if (mymono%dir < -0.1d0) then
+                        IF (mymono%dir < -0.1d0) THEN
                             !left-going wave
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) - s2
-                        else
+                        ELSE
                             !right-going wave
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) + s2
-                        end if
-                    else if (p==0) then
-                        if ( (j==1) .and. (k==1) .and. proc_rank == 0) &
+                        END IF
+                    ELSE IF (p==0) THEN
+                        IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                             print*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mymono) 
  
-                        if (mymono%dir .ne. dflt_real) then
+                        IF (mymono%dir .NE. dflt_real) THEN
                             !2d
                             !mono_mom_src(1,j,k,l) = s2
                             !mono_mom_src(2,j,k,l) = s2
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) + s2*cos( mymono%dir )
                             mono_mom_src(2,j,k,l) = mono_mom_src(2,j,k,l) + s2*sin( mymono%dir )
-                        end if
-                    else    
+                        END IF
+                    ELSE    
                         !3Di
-                        if (mymono%dir .ne. dflt_real) then
+                        IF (mymono%dir .NE. dflt_real) THEN
                             mono_mom_src(1,j,k,l) = mono_mom_src(1,j,k,l) + s2*cos( mymono%dir )
                             mono_mom_src(2,j,k,l) = mono_mom_src(2,j,k,l) + s2*sin( mymono%dir )
-                        end if
-                    end if
+                        END IF
+                    END IF
 
-                    if (model_eqns .ne. 4) then
+                    IF (model_eqns .NE. 4) THEN
                         mono_E_src(j,k,l)   = mono_E_src(j,k,l) + s2*sound/(n_tait - 1.d0)
-                    end if
-                end do; end do; end do
-            end if
+                    END IF
+                END DO; END DO; END DO
+            END IF
 
         END SUBROUTINE s_get_monopole
        
@@ -3342,33 +3264,33 @@ MODULE m_rhs
             REAL(KIND(0d0)) :: period, t0, sigt, pa
             REAL(KIND(0d0)) :: f_g
 
-            if (mymono%pulse == 1) then
+            IF (mymono%pulse == 1) THEN
                 !sine wave
                 period = mymono%length/sos
-                if (mytime .le. mymono%npulse*period) then
+                IF (mytime .le. mymono%npulse*period) THEN
                     f_g = mymono%mag*sin(mytime*2.d0*pi/period)
-                else
+                ELSE
                     f_g = 0d0
-                end if
-            else if (mymono%pulse == 2) then
+                END IF
+            ELSE IF (mymono%pulse == 2) THEN
                 !Gaussian pulse
                 sigt = mymono%length/sos/7.d0
                 t0 = 3.5d0*sigt 
                 f_g = mymono%mag/(dsqrt(2.d0*pi) * sigt) * &
                     dexp( -0.5d0 * ((mytime-t0)**2.d0)/(sigt**2.d0) )
-            else if (mymono%pulse == 3) then
+            ELSE IF (mymono%pulse == 3) THEN
                 !square wave
                 sigt = mymono%length/sos
                 t0 = 0d0
-                if (mytime > t0 .and. mytime < sigt) then
+                IF (mytime > t0 .AND. mytime < sigt) THEN
                     f_g = mymono%mag
-                else 
+                ELSE 
                     f_g = 0d0
-                end if
-            else
+                END IF
+            ELSE
                 PRINT '(A)', 'No pulse type detected. Exiting ...'
                 CALL s_mpi_abort()
-            end if
+            END IF
 
         end function f_g
 
@@ -3392,47 +3314,47 @@ MODULE m_rhs
             REAL(KIND(0d0)) :: sig
             REAL(KIND(0d0)) :: f_delta
 
-            if (n==0) then
+            IF (n==0) THEN
                 sig = dx(j)
                 sig = sig*2.5d0
-            else if (p==0) then
+            ELSE IF (p==0) THEN
                 sig = maxval( (/ dx(j), dy(k) /) )
                 sig = sig*2.5d0
-            else 
+            ELSE 
                 sig = maxval( (/ dx(j), dy(k), dz(l) /) )
                 sig = sig*2.5d0
-            end if            
+            END IF            
 
-            if (n==0) then      !1D
-                if (mymono%support == 1) then
+            IF (n==0) THEN      !1D
+                IF (mymono%support == 1) THEN
                     !1d delta function
                     hx = abs(mono_loc(1) - x_cc(j))
 
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                         dexp( -0.5d0 * (hx/(sig/2.d0))**2.d0 )
-                else if (mymono%support == 0) then
+                ELSE IF (mymono%support == 0) THEN
                     !support for all x
                     f_delta = 1.d0
-                end if
-            else if (p==0) then !2D
+                END IF
+            ELSE IF (p==0) THEN !2D
                 hx = mono_loc(1) - x_cc(j)
                 hy = mono_loc(2) - y_cc(k)
-                if (mymono%support == 1) then
+                IF (mymono%support == 1) THEN
                     !2d delta function
                     sig = mono_leng/20.d0
                     h = dsqrt(hx**2.d0 + hy**2.d0)
 
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                         dexp( -0.5d0 * ((h/(sig/2.d0))**2.d0) )
-                else if (mymono%support == 2) then
+                ELSE IF (mymono%support == 2) THEN
                     !only support for y \pm some value
-                    if ( abs(hy) < mymono%length ) then
+                    IF ( abs(hy) < mymono%length ) THEN
                         f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                             dexp( -0.5d0 * (hx/(sig/2.d0))**2.d0 )
-                    else
+                    ELSE
                         f_delta = 0d0
-                    end if
-                else if (mymono%support == 3) then
+                    END IF
+                ELSE IF (mymono%support == 3) THEN
                     !only support along some line
 
                     hx = x_cc(j) - mono_loc(1) 
@@ -3440,20 +3362,20 @@ MODULE m_rhs
                     !rotate actual point by -theta
                     hxnew = cos(      mymono%dir)*hx + sin(     mymono%dir)*hy
                     hynew = -1.d0*sin(mymono%dir)*hx + cos(     mymono%dir)*hy
-                    !if ( abs(hynew) < mymono%length*2 ) then
-                    if ( abs(hynew) < mymono%loc(3)/2.d0 ) then
+                    !IF ( abs(hynew) < mymono%length*2 ) THEN
+                    IF ( abs(hynew) < mymono%loc(3)/2.d0 ) THEN
                         f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                             dexp( -0.5d0 * (hxnew/(sig/2.d0))**2.d0 )
-                    else
+                    ELSE
                         f_delta = 0d0
-                    end if
-                else if (mymono%support == 4) then
+                    END IF
+                ELSE IF (mymono%support == 4) THEN
                     !support for all y
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig) * &
                         dexp( -0.5d0 * (hx/sig)**2.d0 ) 
-                end if
-            else !3D
-                if (mymono%support == 3) then
+                END IF
+            ELSE !3D
+                IF (mymono%support == 3) THEN
                     !only support along some line
 
                     hx = x_cc(j) - mono_loc(1) 
@@ -3462,19 +3384,19 @@ MODULE m_rhs
                     !rotate actual point by -theta
                     hxnew = cos(      mymono%dir)*hx + sin(     mymono%dir)*hy
                     hynew = -1.d0*sin(mymono%dir)*hx + cos(     mymono%dir)*hy
-                    !if ( abs(hynew) < mymono%length*2 ) then
-                    if ( abs(hynew) < mymono%length/2. .and. &
-                         abs(hz) < mymono%length/2. ) then
+                    !IF ( abs(hynew) < mymono%length*2 ) THEN
+                    IF ( abs(hynew) < mymono%length/2. .AND. &
+                         abs(hz) < mymono%length/2. ) THEN
                         f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0) * &
                             dexp( -0.5d0 * (hxnew/(sig/2.d0))**2.d0 )
-                    else
+                    ELSE
                         f_delta = 0d0
-                    end if
-                else
+                    END IF
+                ELSE
                     print '(a)', 'monopole support not properly defined'
                     call s_mpi_abort()
-                end if
-            end if
+                END IF
+            END IF
  
         end function f_delta
 

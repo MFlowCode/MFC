@@ -1013,7 +1013,8 @@ MODULE m_global_parameters
         END SUBROUTINE s_finalize_global_parameters_module ! -------------------
         
         
-        !> Computes the bubble number density n from the conservative variables
+        !>  Computes the bubble number density n from the conservative variables
+        !!  \f$ n = \sqrt{ \frac{4 \pi}{3} } \frac{ nR^3}{\alpha} \f$
         !! @param vftmp is the void fraction
         !! @param nRtmp is the bubble number  density times the bubble radii
         !! @param ntmp is the output number bubble density
@@ -1024,16 +1025,17 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: nR3
 
-            !if (nRtmp(1) < 0d0) nRtmp = 1.d-12
-            CALL s_quad( nRtmp**3,nR3 )  !returns itself if NR0 = 1
-            if ( nR3 < 0.d0 ) stop 'nR3 is negative'
+            CALL s_quad( nRtmp**3,nR3 )
+            
+            IF ( nR3 < 0.d0 ) STOP 'nR3 is negative'
+            IF (vftmp < 0.d0) STOP 'vf negative'
 
-            if (vftmp < 0.d0) stop 'vf negative'
             ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
 
         END SUBROUTINE s_comp_n_from_cons
 
         !> Computes the bubble number density n from the primitive variables
+        !!  \f$ n = \sqrt{ \frac{3}{4 \pi} } \frac{ \alpha }{ R^3} \f$
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
@@ -1043,15 +1045,8 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: Rtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: R3
-            integer :: i
 
-            CALL s_quad( Rtmp**3,R3 )  !returns itself if NR0 = 1
-            do i = 1,nb
-                if (Rtmp(i) < 0d0) then
-                    print*, Rtmp(i)
-                    stop 'R neg'
-                end if
-            end do
+            CALL s_quad( Rtmp**3,R3 ) 
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
 
         END SUBROUTINE s_comp_n_from_prim
@@ -1063,7 +1058,6 @@ MODULE m_global_parameters
 
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: func
             REAL(KIND(0.D0)), INTENT(OUT) :: mom
-
             
             mom = DOT_PRODUCT( weight,func )
 

@@ -275,7 +275,7 @@ MODULE m_initial_condition
                 orig_prim_vf(i) = q_prim_vf(i)%sf(j,k,l)
             END DO
 
-            IF (mpp_lim .and. bubbles) THEN
+            IF (mpp_lim .AND. bubbles) THEN
                 !adjust volume fractions, according to modeled gas void fraction
                 alf_sum%sf = 0d0
                 DO i = adv_idx%beg, adv_idx%end - 1
@@ -302,7 +302,7 @@ MODULE m_initial_condition
                 q_prim_vf(i)%sf(j,k,l) = patch_icpp(patch_id)%alpha(i-E_idx)
             END DO
 
-            IF (mpp_lim .and. bubbles) THEN
+            IF (mpp_lim .AND. bubbles) THEN
                 !adjust volume fractions, according to modeled gas void fraction
                 alf_sum%sf = 0d0
                 DO i = adv_idx%beg, adv_idx%end - 1
@@ -316,19 +316,19 @@ MODULE m_initial_condition
             END IF
             
             ! Partial densities
-            if (model_eqns .ne. 4) then
+            IF (model_eqns .ne. 4) THEN
                 DO i = 1, cont_idx%end
                     q_prim_vf(i)%sf(j,k,l) = patch_icpp(patch_id)%alpha_rho(i)
                 END DO
-            end if
+            END IF
 
             ! Bubbles variables
-            if (bubbles) then
-                do i = 1,nb
+            IF (bubbles) THEN
+                DO i = 1,nb
                     q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = R0(i)*patch_icpp(patch_id)%r0
                     q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = V0(i)*patch_icpp(patch_id)%v0
-                end do
-            end if
+                END DO
+            END IF
 
             ! Density and the specific heat ratio and liquid stiffness functions
             CALL s_convert_species_to_mixture_variables(    &
@@ -341,19 +341,19 @@ MODULE m_initial_condition
             
             ! Computing Mixture Variables of Smoothing Patch ===================
             
-            if (model_eqns .ne. 4) then
+            IF (model_eqns .ne. 4) THEN
                 ! Partial densities
                 DO i = 1, cont_idx%end
                     q_prim_vf(i)%sf(j,k,l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
                 END DO
-            end if
+            END IF
            
             ! Volume fraction(s)
             DO i = adv_idx%beg, adv_idx%end
                 q_prim_vf(i)%sf(j,k,l) = patch_icpp(smooth_patch_id)%alpha(i-E_idx)
             END DO
 
-            IF (mpp_lim .and. bubbles) THEN
+            IF (mpp_lim .AND. bubbles) THEN
                 !adjust volume fractions, according to modeled gas void fraction
                 alf_sum%sf = 0d0
                 DO i = adv_idx%beg, adv_idx%end - 1
@@ -367,12 +367,12 @@ MODULE m_initial_condition
             END IF
 
             ! Bubbles variables
-            if (bubbles) then
-                do i = 1,nb
+            IF (bubbles) THEN
+                DO i = 1,nb
                     q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = R0(i)*patch_icpp(smooth_patch_id)%r0
                     q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = V0(i)*patch_icpp(smooth_patch_id)%v0
-                end do
-            end if
+                END DO
+            END IF
            
             ! Density and the specific heat ratio and liquid stiffness functions
             CALL s_convert_species_to_mixture_variables(       &
@@ -395,7 +395,7 @@ MODULE m_initial_condition
                     + (1d0 - eta)   *orig_prim_vf(i)
             END DO
 
-            IF (mpp_lim .and. bubbles) THEN
+            IF (mpp_lim .AND. bubbles) THEN
                 !adjust volume fractions, according to modeled gas void fraction
                 alf_sum%sf = 0d0
                 DO i = adv_idx%beg, adv_idx%end - 1
@@ -410,14 +410,14 @@ MODULE m_initial_condition
 
 
             ! Partial densities \alpha \rho
-            if (model_eqns .ne. 4) then
+            IF (model_eqns .ne. 4) THEN
                 !mixture density is an input
                 DO i = 1, cont_idx%end
                     q_prim_vf(i)%sf(j,k,l) = &
                         eta *patch_icpp(patch_id)%alpha_rho(i) &
                         + (1d0 - eta) * orig_prim_vf(i)
                 END DO
-            else
+            ELSE
                 !get mixture density from pressure via Tait EOS
                 pi_inf = fluid_pp(1)%pi_inf
                 gamma = fluid_pp(1)%gamma
@@ -427,7 +427,7 @@ MODULE m_initial_condition
                 q_prim_vf(1)%sf(j,k,l) = &
                     (((q_prim_vf(E_idx)%sf(j,k,l) + pi_inf)/(pref + pi_inf))**(1/lit_gamma)) * &
                     rhoref*(1-q_prim_vf(alf_idx)%sf(j,k,l))
-            end if
+            END IF
 
             ! Density and the specific heat ratio and liquid stiffness functions
             CALL s_convert_species_to_mixture_variables( q_prim_vf , j,k,l, &
@@ -441,8 +441,8 @@ MODULE m_initial_condition
             END DO
 
             ! Smoothed bubble variables
-            if (bubbles) then
-                do i = 1,nb
+            IF (bubbles) THEN
+                DO i = 1,nb
                     q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
                         (eta * R0(i)*patch_icpp(patch_id)%r0 & 
                         + (1d0-eta)*orig_prim_vf(bub_idx%rs(i)))
@@ -452,10 +452,10 @@ MODULE m_initial_condition
 
                     q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = R0(i)*patch_icpp(patch_id)%r0
                     q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = V0(i)*patch_icpp(patch_id)%v0
-                end do
-            end if
+                END DO
+            END IF
 
-            IF (mpp_lim .and. bubbles) THEN
+            IF (mpp_lim .AND. bubbles) THEN
                 !adjust volume fractions, according to modeled gas void fraction
                 alf_sum%sf = 0d0
                 DO i = adv_idx%beg, adv_idx%end - 1
@@ -468,12 +468,12 @@ MODULE m_initial_condition
                 END DO
             END IF
 
-            if (bubbles .and. (polytropic .neqv. .TRUE.) ) then
-                do i = 1,nb
+            IF (bubbles .AND. (polytropic .neqv. .TRUE.) ) THEN
+                DO i = 1,nb
                     q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
                     q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
-                end do
-            end if
+                END DO
+            END IF
             
 
             ! Updating the patch identities bookkeeping variable
@@ -664,11 +664,11 @@ MODULE m_initial_condition
             IF(model_eqns == 1) THEN        ! Gamma/pi_inf model
                 s_assign_patch_primitive_variables => &
                             s_assign_patch_mixture_primitive_variables
-            ELSE if ( bubbles ) then
+            ELSE IF ( bubbles ) THEN
                 s_assign_patch_primitive_variables => &
                             s_assign_patch_species_primitive_variables_bubbles
-            else ! Volume fraction model
-                print*, 'assigning primative variables without bubbles'
+            ELSE ! Volume fraction model
+                PRINT*, 'assigning primative variables without bubbles'
                 s_assign_patch_primitive_variables => &
                             s_assign_patch_species_primitive_variables
             END IF
@@ -926,7 +926,7 @@ MODULE m_initial_condition
                             perturb_alpha = q_prim_vf(E_idx+perturb_flow_fluid)%sf(i,j,k)
                         END IF
                         IF (perturb_alpha == 1d0) THEN
-                            print*, 'perturbing flow field'
+                            PRINT*, 'perturbing flow field'
                             ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
 !                            rand_real = rand_real / 1d2 / 1d3
@@ -960,7 +960,7 @@ MODULE m_initial_condition
 
             INTEGER :: i,j  !< Generic loop operators
 
-            print*, 'Patch type: ', 'line segment'
+            PRINT*, 'Patch type: ', 'line segment'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -995,17 +995,17 @@ MODULE m_initial_condition
                     
                     CALL s_assign_patch_primitive_variables(patch_id, i,0,0)
                    
-                    !if ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .and. (model_eqns .ne. 4)) then
-                    !    print*, 'Reassigning zero density for 1st fluid'
+                    !IF ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .AND. (model_eqns .ne. 4)) THEN
+                    !    PRINT*, 'Reassigning zero density for 1st fluid'
                     !    !zero density, reassign according to Tait EOS
                     !    q_prim_vf(1)%sf(i,0,0) = &
                     !        (((q_prim_vf(E_idx)%sf(i,0,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
                     !        rhoref*(1d0-q_prim_vf(alf_idx)%sf(i,0,0))
-                    !end if
+                    !END IF
                 END IF
             END DO
            
-            print*, 'patch type done'
+            PRINT*, 'patch type done'
             
         END SUBROUTINE s_line_segment ! ----------------------------------------
        
@@ -1021,10 +1021,7 @@ MODULE m_initial_condition
             INTEGER :: i,j,k !< Generic loop iterators
             REAL(KIND(0d0)) :: th, thickness, nturns, mya
             REAL(KIND(0d0)) :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
-            !integer, allocatable, dimension(:,:,:) :: logic_grid
             
-            !allocate( logic_grid(0:m,0:n,0:p) )
-
             ! Transferring the circular patch's radius, centroid, smearing patch
             ! identity and smearing coefficient information
             x_centroid      = patch_icpp(patch_id)%x_centroid
@@ -1035,8 +1032,8 @@ MODULE m_initial_condition
 
 !
             logic_grid = 0
-            do k = 0,int(m*91*nturns)
-                th = k/real(int(m*91d0*nturns)) * nturns*2.d0*pi
+            DO k = 0,int(m*91*nturns)
+                th = k/REAL(int(m*91d0*nturns)) * nturns*2.d0*pi
                 
                 spiral_x_min = minval( (/ f_r(th,0.0d0,    mya)*cos(th), &
                                           f_r(th,thickness,mya)*cos(th) /) )
@@ -1048,37 +1045,39 @@ MODULE m_initial_condition
                 spiral_y_max = maxval( (/ f_r(th,0.0d0,    mya)*sin(th), &
                                           f_r(th,thickness,mya)*sin(th) /) )
 
-                do j = 0,n; do i = 0,m;
-                    if( (x_cc(i) > spiral_x_min) .and. (x_cc(i) < spiral_x_max) .and. &
-                        (y_cc(j) > spiral_y_min) .and. (y_cc(j) < spiral_y_max)) then  
+                DO j = 0,n; DO i = 0,m;
+                    if( (x_cc(i) > spiral_x_min) .AND. (x_cc(i) < spiral_x_max) .AND. &
+                        (y_cc(j) > spiral_y_min) .AND. (y_cc(j) < spiral_y_max)) THEN  
                         logic_grid(i,j,0) = 1
-                    end if
-                end do; end do
-            end do
+                    END IF
+                END DO; END DO
+            END DO
 
             DO j = 0, n
                 DO i = 0, m
-                    IF ( (logic_grid(i,j,0) == 1) ) then
+                    IF ( (logic_grid(i,j,0) == 1) ) THEN
                         CALL s_assign_patch_primitive_variables(patch_id, i,j,0)
                     END IF
                 END DO
             END DO
 
-            !deallocate(logic_grid)
         END SUBROUTINE s_spiral ! ---------------------------------------------- 
-        
-        function f_r(myth,offset,a)
-            real(kind(0d0)), intent(in) :: myth, offset,a
-            real(kind(0d0)) :: b
-            real(kind(0d0)) :: f_r
 
-            !archimedes spiral 
+
+        !> Archimedes spiral function
+        !! @param myth Angle
+        !! @param offset Thickness
+        !! @param a Starting position
+        FUNCTION f_r(myth,offset,a)
+            REAL(KIND(0d0)), INTENT(IN) :: myth, offset,a
+            REAL(KIND(0d0)) :: b
+            REAL(KIND(0d0)) :: f_r
+
             !r(th) = a + b*th
-            !offset allows for a finite thickness
 
             b = 2.d0*a/(2.d0*pi) 
             f_r = a + b*myth + offset
-        end function f_r
+        END FUNCTION f_r
         
         !> The circular patch is a 2D geometry that may be used, for
         !!              example, in creating a bubble or a droplet. The geometry
@@ -1154,7 +1153,7 @@ MODULE m_initial_condition
             ! Generic loop iterators
             INTEGER :: i,j
            
-            real(kind(0d0)) :: myr, thickness
+            REAL(KIND(0d0)) :: myr, thickness
 
             ! Transferring the circular patch's radius, centroid, smearing patch
             ! identity and smearing coefficient information
@@ -1181,8 +1180,8 @@ MODULE m_initial_condition
                     myr = dsqrt(  (x_cc(i) - x_centroid)**2d0 &
                                 + (y_cc(j) - y_centroid)**2d0                   )
 
-                    IF( myr <= radius+thickness/2.d0 .and. &       
-                        myr >= radius-thickness/2.d0 .and. &
+                    IF( myr <= radius+thickness/2.d0 .AND. &       
+                        myr >= radius-thickness/2.d0 .AND. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i,j,0)) ) THEN
                         
                         CALL s_assign_patch_primitive_variables(patch_id, i,j,0)
@@ -1206,7 +1205,7 @@ MODULE m_initial_condition
             ! Generic loop iterators
             INTEGER :: i,j,k
            
-            real(kind(0d0)) :: myr, thickness
+            REAL(KIND(0d0)) :: myr, thickness
 
             ! Transferring the circular patch's radius, centroid, smearing patch
             ! identity and smearing coefficient information
@@ -1231,14 +1230,14 @@ MODULE m_initial_condition
             ! and verifying whether the current patch has permission to write to
             ! that cell. If both queries check out, the primitive variables of
             ! the current patch are assigned to this cell.
-            do k =0,p
+            DO k =0,p
             DO j = 0, n
                 DO i = 0, m
                     myr = dsqrt(  (x_cc(i) - x_centroid)**2d0 &
                                 + (y_cc(j) - y_centroid)**2d0                   )
 
-                    IF( myr <= radius+thickness/2.d0 .and. &       
-                        myr >= radius-thickness/2.d0 .and. &
+                    IF( myr <= radius+thickness/2.d0 .AND. &       
+                        myr >= radius-thickness/2.d0 .AND. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i,j,k)) ) THEN
                         
                         CALL s_assign_patch_primitive_variables(patch_id, i,j,k)
@@ -1249,7 +1248,7 @@ MODULE m_initial_condition
                     
                 END DO
             END DO
-            end do
+            END DO
             
             
         END SUBROUTINE s_3dvarcircle ! ----------------------------------------------
@@ -1400,7 +1399,7 @@ MODULE m_initial_condition
 
             INTEGER :: i,j !< generic loop iterators
 
-            print*, 'Patch type: ', 'rectangle'
+            PRINT*, 'Patch type: ', 'rectangle'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -1446,12 +1445,12 @@ MODULE m_initial_condition
                         
                         CALL s_assign_patch_primitive_variables(patch_id, i,j,0)
 
-                        if ( (q_prim_vf(1)%sf(i,j,0) < 1.e-10) .and. (model_eqns .ne. 4)) then
+                        IF ( (q_prim_vf(1)%sf(i,j,0) < 1.e-10) .AND. (model_eqns .ne. 4)) THEN
                             !zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i,j,0) = &
                                 (((q_prim_vf(E_idx)%sf(i,j,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
                                 rhoref*(1d0-q_prim_vf(alf_idx)%sf(i,j,0))
-                        end if                        
+                        END IF                        
                     END IF
                 END DO
             END DO
@@ -1590,7 +1589,7 @@ MODULE m_initial_condition
             ! Generic loop iterators
             INTEGER :: i,j
 
-            print*, 'Patch type: ', '1d_analytical'
+            PRINT*, 'Patch type: ', '1d_analytical'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -1637,13 +1636,13 @@ MODULE m_initial_condition
 
                     !IF (model_eqns == 4) THEN
                         !reassign density
-                    !if (num_fluids == 1) then
+                    !IF (num_fluids == 1) THEN
                         q_prim_vf(1)%sf(i,0,0) = &
                             (((q_prim_vf(E_idx)%sf(i,0,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
                             rhoref*(1d0-q_prim_vf(alf_idx)%sf(i,0,0))
-                    !end if
+                    !END IF
                     !ELSE IF (model_eqns == 2) THEN
-                        !can manually adjust density here if wanted
+                        !can manually adjust density here
                         !q_prim_vf(1)%sf(i,0,0) = q_prim_vf(1)%sf(i,0,0) * &
                         !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
                     !END IF
@@ -1668,7 +1667,7 @@ MODULE m_initial_condition
             ! Generic loop iterators
             INTEGER :: i,j
 
-            print*, 'Patch type: ', '1d_bubble pulse'
+            PRINT*, 'Patch type: ', '1d_bubble pulse'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -1716,13 +1715,13 @@ MODULE m_initial_condition
 
                     !IF (model_eqns == 4) THEN
                         !reassign density
-                    !if (num_fluids == 1) then
+                    !IF (num_fluids == 1) THEN
                         q_prim_vf(1)%sf(i,0,0) = &
                             (((q_prim_vf(E_idx)%sf(i,0,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
                             rhoref*(1d0-q_prim_vf(alf_idx)%sf(i,0,0))
-                    !end if
+                    !END IF
                     !ELSE IF (model_eqns == 2) THEN
-                        !can manually adjust density here if wanted
+                        !can manually adjust density here
                         !q_prim_vf(1)%sf(i,0,0) = q_prim_vf(1)%sf(i,0,0) * &
                         !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
                     !END IF
@@ -1744,7 +1743,7 @@ MODULE m_initial_condition
 
             INTEGER :: i,j !< generic loop iterators
 
-            print*, 'Patch type: ', '2d_analytical'
+            PRINT*, 'Patch type: ', '2d_analytical'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -1880,7 +1879,7 @@ MODULE m_initial_condition
             REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
             
             INTEGER :: i,j,k !< generic loop iterators
-            print*, 'Patch type: ', '3d_analytical'
+            PRINT*, 'Patch type: ', '3d_analytical'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma

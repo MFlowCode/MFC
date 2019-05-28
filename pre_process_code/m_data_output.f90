@@ -79,9 +79,15 @@ MODULE m_data_output
             !! Generic string used to store the address of a particular file
             
             INTEGER :: i,j,k,l !< Generic loop iterator
-            REAL(KIND(0d0)), DIMENSION(nb) :: nRtmp
-            REAL(KIND(0d0)) :: nbub, lit_gamma, pi_inf, gamma, rho
-            
+            INTEGER :: t_step
+           
+            REAL(KIND(0d0)), DIMENSION(nb) :: nRtmp         !< Temporary bubble concentration
+            REAL(KIND(0d0)) :: nbub                         !< Temporary bubble number density
+            REAL(KIND(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
+            REAL(KIND(0d0)) :: rho                          !< Temporary density
+
+            t_step = 0
+
             ! Outputting the Locations of the Cell-boundaries ==================
             
             ! x-coordinate direction
@@ -112,7 +118,7 @@ MODULE m_data_output
             
             
             ! Outputting Conservative Variables ================================
-            if ( bubbles .eqv. .False. ) then
+            IF ( bubbles .eqv. .False. ) THEN
                 DO i = 1, adv_idx%end
                     WRITE(file_num, '(I0)') i
                     file_loc = TRIM(t_step_dir) // '/q_cons_vf' // TRIM(file_num) &
@@ -122,8 +128,7 @@ MODULE m_data_output
                     WRITE(1) q_cons_vf(i)%sf
                     CLOSE(1)
                 END DO
-            else
-                !make sure to write bubble variables as well
+            ELSE
                 DO i = 1, sys_size
                     WRITE(file_num, '(I0)') i
                     file_loc = TRIM(t_step_dir) // '/q_cons_vf' // TRIM(file_num) &
@@ -133,42 +138,41 @@ MODULE m_data_output
                     WRITE(1) q_cons_vf(i)%sf
                     CLOSE(1)
                 END DO
-            end if
+            END IF
             ! ==================================================================
     
             gamma = fluid_pp(1)%gamma
             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
             pi_inf = fluid_pp(1)%pi_inf
 
-            !1d only
-            if (n ==0 .and. p ==0) then
+            !1D
+            IF (n ==0 .AND. p ==0) THEN
                 ! writting an output directory
                 WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
                 file_loc = TRIM(t_step_dir) // '/.'
             
-                call my_inquire(file_loc,file_exist)
-                if(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+                INQUIRE( FILE = TRIM(file_loc), EXIST = file_exist )
+            
+                IF(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
-                ! Writing the conservative variables data files
                 DO i = 1, sys_size
-                    WRITE(file_loc,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', 0,'.dat'
+                    WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
 
-                    OPEN(2,FILE= TRIM(file_loc) )!,STATUS = 'new')
-                        do j=0,m
+                    OPEN(2,FILE= TRIM(file_loc) )
+                        DO j=0,m
                             CALL s_convert_to_mixture_variables( q_cons_vf, j, 0, 0, rho, gamma, pi_inf)
-                            lit_gamma = 1d0/gamma + 1d0
 
-                            !if (i==1 .or. i==4) then !\rho, \alpha
-                            if ( ((i.ge.cont_idx%beg) .and. (i.le.cont_idx%end))    &
-                                                      .or.                          &
-                                 ((i.ge.adv_idx%beg)  .and. (i.le.adv_idx%end))     &
-                                                     ) then 
+                            lit_gamma = 1d0/gamma + 1d0
+                            
+                            IF ( ((i.ge.cont_idx%beg) .AND. (i.le.cont_idx%end))    &
+                                                      .OR.                          &
+                                 ((i.ge.adv_idx%beg)  .AND. (i.le.adv_idx%end))     &
+                                                     ) THEN 
                                 WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)
-                            else if (i.eq.mom_idx%beg) then !u
-                                !WRITE(2,*) x_cb(j),q_cons_vf(2)%sf(j,0,0)/q_cons_vf(1)%sf(j,0,0)
+                            ELSE IF (i.eq.mom_idx%beg) THEN !u
                                 WRITE(2,*) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
-                            else if (i.eq.E_idx) then !p
-                                if (model_eqns == 4) then
+                            ELSE IF (i.eq.E_idx) THEN !p
+                                IF (model_eqns == 4) THEN
                                     !Tait pressure from density
                                     WRITE(2,*) x_cb(j), &
                                         (pref + pi_inf) * (                     &
@@ -176,7 +180,7 @@ MODULE m_data_output
                                         (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
                                         ) ** lit_gamma )                        &
                                         - pi_inf
-                                else if (model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) then
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j), &
                                         (                                       & 
@@ -184,7 +188,7 @@ MODULE m_data_output
                                         0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho - &
                                         pi_inf &
                                         ) / gamma
-                                else
+                                ELSE
                                     !Stiffened gas pressure from energy with bubbles
                                     WRITE(2,*) x_cb(j), &
                                         (                                       & 
@@ -193,71 +197,60 @@ MODULE m_data_output
                                         (1.d0 - q_cons_vf(alf_idx)%sf(j,0,0)) - &
                                         pi_inf &
                                         ) / gamma
-                                end if
-                            else if (bubbles .and. (i .gt. alf_idx)) then
-                                do k = 1,nb
+                                END IF
+                            ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
+                                DO k = 1,nb
                                     nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
-                                end do
-                                call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)
+                                END DO
+                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
                                 
                                 WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
-                           end if
-                        end do
+                            END IF
+                        END DO
                     CLOSE(2)
                 END DO
-
-                WRITE(file_loc,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/dx.dat'
-                OPEN(2,FILE= TRIM(file_loc) )!,STATUS = 'new')
-                    do j = 1,m
-                        WRITE(2,*), x_cb(j), abs(x_cb(j) - x_cb(j-1))
-                    end do
-                CLOSE(2)
 
                 DO i = 1, sys_size    
-                    WRITE(file_loc,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', 0,'.dat'
-                    OPEN(2,FILE= TRIM(file_loc) )!,STATUS = 'new')
-                        do j=0,m
+                    WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+
+                    OPEN(2,FILE= TRIM(file_loc) )
+                        DO j=0,m
                             WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)
-                        end do
+                        END DO
                     CLOSE(2)
                 END DO
-            end if
+            END IF
 
-            !2d only
-            if (n > 0 .and. p ==0) then
-                ! writting an output directory
+
+            !2D
+            IF (n > 0 .AND. p ==0) THEN
                 WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
                 file_loc = TRIM(t_step_dir) // '/.'
             
-                !INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                !EXIST     = file_exist       )
-                call my_inquire(file_loc,file_exist)
+                INQUIRE( FILE      = TRIM(file_loc), EXIST     = file_exist       )
+            
+                IF(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
-                if(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
-
-                ! Writing the conservative variables data files
                 DO i = 1, sys_size
-                    WRITE(file_loc,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', 0,'.dat'
-                    OPEN(2,FILE= TRIM(file_loc) )!,STATUS = 'new')
-                        do j=0,m
-                        do k=0,n
+                    WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+                    OPEN(2,FILE=TRIM(file_loc) )
+                        DO j=0,m; DO k=0,n
                             CALL s_convert_to_mixture_variables( q_cons_vf, j, k, 0, rho, gamma, pi_inf)
                             lit_gamma = 1d0/gamma + 1d0
                             
-                            if (i==1 .or. i==5) then 
+                            IF (i==1 .OR. i==5) THEN 
                                 WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
-                            else if (i==2 .or. i==3) then !u = \rho u /\rho
+                            ELSE IF (i==2 .OR. i==3) THEN !u
                                 WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)/rho
-                            else if (i.eq.4) then !p
-                                if (model_eqns == 4) then
-                                    !Tait pressure from density
+                            ELSE IF (i==4) THEN !p
+                                IF (model_eqns == 4) THEN
                                     WRITE(2,*) x_cb(j),y_cb(k), &
-                                        (pref + pi_inf) * (                     &
-                                        ( q_cons_vf(1)%sf(j,k,0)/               &
-                                        (rhoref*(1.d0-q_cons_vf(alf_idx)%sf(j,k,0)))  & 
-                                        ) ** lit_gamma )                        &
-                                        - pi_inf
-                                else if (model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) then
+                                        (pref+fluid_pp(1)%pi_inf) *                     &
+                                        ((                                               & 
+                                        q_cons_vf(1)%sf(j,k,0)/                          &
+                                        (rhoref*(1.-q_cons_vf(4)%sf(j,k,0)))             & 
+                                        ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j),y_cb(k), &
                                         (                                       & 
@@ -265,76 +258,65 @@ MODULE m_data_output
                                         0.5d0*(q_cons_vf(2)%sf(j,k,0)**2.d0)/rho - &
                                         pi_inf &
                                         ) / gamma
-                                else
+                                ELSE
                                     !Stiffened gas pressure from energy with bubbles
                                     WRITE(2,*) x_cb(j),y_cb(k), &
-                                        (                                           & 
-                                        (q_cons_vf(E_idx)%sf(j,k,0)  -              &
-                                        0.5d0*(q_cons_vf(2)%sf(j,k,0)**2.d0  +      &
-                                               q_cons_vf(3)%sf(j,k,0)**2.d0) /      &
-                                               rho ) /           &
-                                        (1.d0 - q_cons_vf(alf_idx)%sf(j,k,0)) -     &
+                                        (                                       & 
+                                        (q_cons_vf(E_idx)%sf(j,k,0)  -            &
+                                        0.5d0*( q_cons_vf(2)%sf(j,k,0)**2.d0 + q_cons_vf(3)%sf(j,k,0)**2.d0 ) &
+                                        / rho) / &
+                                        (1.d0 - q_cons_vf(alf_idx)%sf(j,k,0)) - &
                                         pi_inf &
                                         ) / gamma
-                                end if
-                            else if (bubbles .and. (i > alf_idx)) then
-                                do l = 1,nb
+                                END IF
+                            ELSE IF ( (i .GT. alf_idx) .AND. bubbles) THEN
+                                DO l = 1,nb
                                     nRtmp(l) = q_cons_vf(bub_idx%rs(l))%sf(j,k,0)
-                                end do
-                                call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)
-
-                                WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)/nbub
-                           end if
-                        end do
-                        write(2,*)
-                        end do
+                                END DO
+                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)                                
+                                
+                                WRITE(2,*) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
+                           END IF
+                        END DO
+                        WRITE(2,*)
+                        END DO
                     CLOSE(2)
 
-                    WRITE(file_loc,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/x_slice.prim.', i, '.', 0,'.dat'
-                    OPEN(2,FILE= TRIM(file_loc) ) !,STATUS = 'new')
-                        do j=0,m
-                            k = (n-1)/2
-                            if (i==1 .or. i==5) then 
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,k,0)
-                            else if (i==2 .or. i==3) then !u = \rho u /\rho
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,k,0)/q_cons_vf(1)%sf(j,k,0)
-                            else if (i==4) then !p
-                                WRITE(2,*) x_cb(j), &
-                                    (pref+fluid_pp(1)%pi_inf) *                     &
-                                   ((                                               & 
-                                   q_cons_vf(1)%sf(j,k,0)/                          &
-                                   (rhoref*(1.-q_cons_vf(alf_idx)%sf(j,k,0)))             & 
-                                   ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
-                            else if (bubbles .and. (i > alf_idx)) then
-                                do l = 1,nb
-                                    nRtmp(l) = q_cons_vf(bub_idx%rs(l))%sf(j,k,0)
-                                end do
-                                call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)
-
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,k,0)/nbub
-                           end if
-                        end do
-                    CLOSE(2)
-
-                    WRITE(file_loc,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', 0,'.dat'
+                    WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_loc) )
-                        do j=0,m
-                        do k=0,n
+                        DO j=0,m
+                        DO k=0,n
                             WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
-                        end do
-                        write(2,*)
-                        end do
+                        END DO
+                        WRITE(2,*)
+                        END DO
                     CLOSE(2)
-
                 END DO
-            end if
+            END IF
+
+            ! 3D
+            IF ( p > 0) THEN
+                DO i = 1,sys_size
+                    WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+                    OPEN(2,FILE= TRIM(file_loc) )
+                        DO j=0,m
+                        DO k=0,n
+                        DO l=0,p
+                            WRITE(2,*) x_cb(j),y_cb(k),z_cb(l), q_cons_vf(i)%sf(j,k,l)
+                        END DO
+                        WRITE(2,*)
+                        END DO
+                        WRITE(2,*)
+                        END DO
+                    CLOSE(2)
+                END DO
+            END IF
 
         END SUBROUTINE s_write_serial_data_files ! ------------------------------------
 
 
 
-        !> 
-        !! @brief Writes grid and initial condition data files in parallel to the "0"
+        !> Writes grid and initial condition data files in parallel to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf The conservative variables
         SUBROUTINE s_write_parallel_data_files(q_cons_vf) ! --
@@ -384,7 +366,7 @@ MODULE m_data_output
             NVARS_MOK = INT(sys_size, MPI_OFFSET_KIND)
             
             ! Write the data for each variable
-            if (bubbles) then
+            IF (bubbles) THEN
                 DO i = 1, sys_size! adv_idx%end
                 var_MOK = INT(i, MPI_OFFSET_KIND)
 
@@ -396,7 +378,7 @@ MODULE m_data_output
                 CALL MPI_FILE_WRITE_ALL(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
                             MPI_DOUBLE_PRECISION,status,ierr)
                 END DO
-            else
+            ELSE
                 DO i = 1, adv_idx%end
                 var_MOK = INT(i, MPI_OFFSET_KIND)
 
@@ -408,14 +390,14 @@ MODULE m_data_output
                 CALL MPI_FILE_WRITE_ALL(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
                             MPI_DOUBLE_PRECISION,status,ierr)
                 END DO
-            end if
+            END IF
 
             CALL MPI_FILE_CLOSE(ifile,ierr)
 
         END SUBROUTINE s_write_parallel_data_files ! ---------------------------
 
-        !> 
-        !! @brief Computation of parameters, allocation procedures, and/or
+        
+        !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_data_output_module() ! ----------------------------
             ! Generic string used to store the address of a particular file
@@ -459,11 +441,7 @@ MODULE m_data_output
                 IF ((old_grid .NEQV. .TRUE.) .AND. (proc_rank == 0)) THEN
 
                     file_loc = TRIM(restart_dir) // '/'
-                    !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                    !       EXIST     = dir_check       )
-                    !INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                    !       EXIST     = dir_check       )
-                    call my_inquire(file_loc,dir_check)
+                    CALL my_inquire(file_loc,dir_check)
 
                     IF (dir_check) CALL SYSTEM('rm -rf ' // TRIM(restart_dir))
                     CALL SYSTEM('mkdir -p ' // TRIM(restart_dir))
@@ -479,8 +457,7 @@ MODULE m_data_output
         
         
         
-        !> 
-        !! @brief Resets s_write_data_files pointer
+        !> Resets s_write_data_files pointer
         SUBROUTINE s_finalize_data_output_module() ! ---------------------------
 
             s_write_data_files => NULL()

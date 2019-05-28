@@ -365,7 +365,7 @@ MODULE m_data_output
             END DO
 
 
-            if (integral_wrt) then
+            IF (integral_wrt) THEN
             DO i = 1, num_integrals
                 WRITE(file_path,'(A,I0,A)') '/D/integral',i,'_prim.dat'
                 file_path = TRIM(case_dir) // TRIM(file_path)
@@ -375,7 +375,7 @@ MODULE m_data_output
                     POSITION = 'append', &
                     STATUS   = 'unknown')
             END DO
-            end if
+            end IF
 
 
         END SUBROUTINE s_open_probe_files ! ------------------------------------
@@ -706,7 +706,7 @@ MODULE m_data_output
             !! Logical used to check existence of current time-step directory
             
 
-            INTEGER :: i, j, k, l !< Generic loop iterators
+            INTEGER :: i, j, k, l, ii !< Generic loop iterators
 
             REAL(KIND(0d0)), DIMENSION(nb) :: nRtmp         !< Temporary bubble concentration
             REAL(KIND(0d0)) :: nbub                         !< Temporary bubble number density
@@ -755,9 +755,8 @@ MODULE m_data_output
                 
             END IF
             
-            
             ! Writing the conservative variables data files
-            DO i = 1, sys_size !adv_idx%end     !SHB edit
+            DO i = 1, sys_size
                 WRITE(file_path,'(A,I0,A)') TRIM(t_step_dir) // '/q_cons_vf', &
                                             i, '.dat'
 
@@ -777,38 +776,33 @@ MODULE m_data_output
             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
             pi_inf = fluid_pp(1)%pi_inf
 
-            !1d only
-            print*, 'sys_size = ', sys_size
-            if (n ==0 .and. p ==0) then
+            !1D
+            IF (n ==0 .AND. p ==0) THEN
                 ! writting an output directory
                 WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
                 file_path = TRIM(t_step_dir) // '/.'
             
-                INQUIRE( FILE      = TRIM(file_path), & ! NAG/PGI/GCC compiler
-                EXIST     = file_exist       )
+                INQUIRE( FILE = TRIM(file_path), EXIST = file_exist       )
             
-                if(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+                IF(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
-                ! Writing the conservative variables data files
                 DO i = 1, sys_size
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', t_step,'.dat'
+                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
 
                     OPEN(2,FILE= TRIM(file_path) )
-                        do j=0,m
+                        DO j=0,m
                             CALL s_convert_to_mixture_variables( q_cons_vf, rho, gamma, pi_inf, Re, We, j,0,0)
                             lit_gamma = 1d0/gamma + 1d0
                             
-                            !if (i==1 .or. i==4) then 
-                            if ( ((i.ge.cont_idx%beg) .and. (i.le.cont_idx%end))    &
-                                                      .or.                          &
-                                 ((i.ge.adv_idx%beg)  .and. (i.le.adv_idx%end))     &
-                                                     ) then 
+                            IF ( ((i.ge.cont_idx%beg) .AND. (i.le.cont_idx%end))    &
+                                                      .OR.                          &
+                                 ((i.ge.adv_idx%beg)  .AND. (i.le.adv_idx%end))     &
+                                                     ) THEN 
                                 WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)
-                            else if (i.eq.mom_idx%beg) then !u
-                                !WRITE(2,*) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/q_cons_vf(1)%sf(j,0,0)
+                            ELSE IF (i.eq.mom_idx%beg) THEN !u
                                 WRITE(2,*) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
-                            else if (i.eq.E_idx) then !p
-                                if (model_eqns == 4) then
+                            ELSE IF (i.eq.E_idx) THEN !p
+                                IF (model_eqns == 4) THEN
                                     !Tait pressure from density
                                     WRITE(2,*) x_cb(j), &
                                         (pref + pi_inf) * (                     &
@@ -816,7 +810,7 @@ MODULE m_data_output
                                         (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
                                         ) ** lit_gamma )                        &
                                         - pi_inf
-                                else if (model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) then
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j), &
                                         (                                       & 
@@ -824,7 +818,7 @@ MODULE m_data_output
                                         0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho - &
                                         pi_inf &
                                         ) / gamma
-                                else
+                                ELSE
                                     !Stiffened gas pressure from energy with bubbles
                                     WRITE(2,*) x_cb(j), &
                                         (                                       & 
@@ -833,95 +827,60 @@ MODULE m_data_output
                                         (1.d0 - q_cons_vf(alf_idx)%sf(j,0,0)) - &
                                         pi_inf &
                                         ) / gamma
-                                end if
-                            else if ((i .gt. alf_idx) .and. bubbles) then
-                                do k = 1,nb
+                                END IF
+                            ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
+                                DO k = 1,nb
                                     nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
-                                end do
+                                END DO
                                 call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
                                 
                                 WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
-                            end if
-                        end do
-                    CLOSE(2)
-                END DO
-
-                if (bubbles) then
-                do i = sys_size+1,sys_size+2
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', t_step,'.dat'
-                    OPEN(2,FILE= TRIM(file_path) )
-                        DO j = 0,m
-                            CALL s_convert_to_mixture_variables( q_cons_vf, rho, gamma, pi_inf, Re, We, j,0,0)
-                            lit_gamma = 1d0/gamma + 1d0
-
-                            IF (i == sys_size + 1) THEN
-                                WRITE(2,*) x_cb(j), ptil(j,0,0)
-                        
-                            ELSE IF (i == sys_size + 2) THEN 
-                                IF  ( model_eqns == 2 .and. bubbles ) THEN
-                                    WRITE(2,*) x_cb(j), &
-                                        (                                       & 
-                                        (q_cons_vf(E_idx)%sf(j,0,0)  -            &
-                                        0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho) / &
-                                        (1.d0 - q_cons_vf(alf_idx)%sf(j,0,0)) - &
-                                        pi_inf &
-                                        ) / gamma &
-                                        - ptil(j,0,0)
-                                END IF
                             END IF
                         END DO
                     CLOSE(2)
-                end do
-                end if
+                END DO
 
                 DO i = 1, sys_size    
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', t_step,'.dat'
+                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
 
-                    OPEN(2,FILE= TRIM(file_path) )!,STATUS = 'new')
-                        do j=0,m
+                    OPEN(2,FILE= TRIM(file_path) )
+                        DO j=0,m
                             WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)
-                        end do
+                        END DO
                     CLOSE(2)
                 END DO
-            end if
+            END IF
 
 
-            !2d only
-            if (n > 0 .and. p ==0) then
-                ! writting an output directory
+            !2D
+            IF (n > 0 .AND. p ==0) THEN
                 WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
                 file_path = TRIM(t_step_dir) // '/.'
             
-                INQUIRE( FILE      = TRIM(file_path), & ! NAG/PGI/GCC compiler
-                EXIST     = file_exist       )
+                INQUIRE( FILE      = TRIM(file_path), EXIST     = file_exist       )
             
-                if(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+                IF(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
-                ! Writing the conservative variables data files
                 DO i = 1, sys_size
-                    print*, 'i = ', i
-                    print*, 'write'
-                    !write full 2d data
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', t_step,'.dat'
-                    OPEN(2,FILE=TRIM(file_path) ) !,STATUS ='new')
-                        do j=0,m
-                        do k=0,n
+                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+                    OPEN(2,FILE=TRIM(file_path) )
+                        DO j=0,m; DO k=0,n
                             CALL s_convert_to_mixture_variables( q_cons_vf, rho, gamma, pi_inf, Re, We, j,k,0)
                             lit_gamma = 1d0/gamma + 1d0
                             
-                            if (i==1 .or. i==5) then 
+                            IF (i==1 .OR. i==5) THEN 
                                 WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
-                            else if (i==2 .or. i==3) then !u
+                            ELSE IF (i==2 .OR. i==3) THEN !u
                                 WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)/rho
-                            else if (i==4) then !p
-                                if (model_eqns == 4) then
+                            ELSE IF (i==4) THEN !p
+                                IF (model_eqns == 4) THEN
                                     WRITE(2,*) x_cb(j),y_cb(k), &
                                         (pref+fluid_pp(1)%pi_inf) *                     &
                                         ((                                               & 
                                         q_cons_vf(1)%sf(j,k,0)/                          &
                                         (rhoref*(1.-q_cons_vf(4)%sf(j,k,0)))             & 
                                         ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
-                                else if (model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) then
+                                ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
                                     WRITE(2,*) x_cb(j),y_cb(k), &
                                         (                                       & 
@@ -929,7 +888,7 @@ MODULE m_data_output
                                         0.5d0*(q_cons_vf(2)%sf(j,k,0)**2.d0)/rho - &
                                         pi_inf &
                                         ) / gamma
-                                else
+                                ELSE
                                     !Stiffened gas pressure from energy with bubbles
                                     WRITE(2,*) x_cb(j),y_cb(k), &
                                         (                                       & 
@@ -939,73 +898,49 @@ MODULE m_data_output
                                         (1.d0 - q_cons_vf(alf_idx)%sf(j,k,0)) - &
                                         pi_inf &
                                         ) / gamma
-                                end if
-                            else if (i .gt. alf_idx .and. bubbles) then
-                                do l = 1,nb
+                                END IF
+                            ELSE IF ( (i .GT. alf_idx) .AND. bubbles) THEN
+                                DO l = 1,nb
                                     nRtmp(l) = q_cons_vf(bub_idx%rs(l))%sf(j,k,0)
-                                end do
+                                END DO
                                 call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)                                
                                 
                                 WRITE(2,*) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
-                           end if
-                        end do
-                        write(2,*)
-                        end do
+                           END IF
+                        END DO
+                        WRITE(2,*)
+                        END DO
                     CLOSE(2)
 
-                    print*, 'cons'
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', t_step,'.dat'
-                    OPEN(2,FILE= TRIM(file_path) )!,STATUS = 'new')
-                        do j=0,m
-                        do k=0,n
-                            WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
-                        end do
-                        write(2,*)
-                        end do
-                    CLOSE(2)
-
-                    print*, '1d slice'
-                    !write a 1d slice
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/x_slice.prim.', i, '.', t_step,'.dat'
-                    OPEN(2,FILE=TRIM(file_path) )!,STATUS ='new')
-                        do j=0,m
-                            k = (n-1)/2
-                            if (i==1 .or. i==5) then 
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,k,0)
-                            else if (i==2 .or. i==3) then !u
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,k,0)/q_cons_vf(1)%sf(j,k,0)
-                            else if (i==4) then !p
-                                WRITE(2,*) x_cb(j), &
-                                    (pref+fluid_pp(1)%pi_inf) *                     &
-                                   ((                                               & 
-                                   q_cons_vf(1)%sf(j,k,0)/                          &
-                                   (rhoref*(1.-q_cons_vf(4)%sf(j,k,0)))             & 
-                                   ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
-                            else if (i==6 .or. i==7) then
-                                !nbub = ((4.d0*pi)/(3.d0*q_cons_vf(adv_idx%beg)%sf(j,k,0))) * &
-                                !    q_cons_vf(adv_idx%end+1)%sf(j,k,0)**3.d0 
-                                !nbub = dsqrt(nbub)
-                                !WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,k,0)/nbub
-                           end if
-                        end do
-                    CLOSE(2)
-
-
-                    WRITE(file_path,'(A,I0,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', 0,'.dat'
+                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
-                        do j=0,m
-                        do k=0,n
+                        DO j=0,m
+                        DO k=0,n
                             WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
-                        end do
-                        write(2,*)
-                        end do
+                        END DO
+                        WRITE(2,*)
+                        END DO
                     CLOSE(2)
                 END DO
+            END IF
 
-
-            end if
-
-          
+            ! 3D
+            IF ( p > 0) THEN
+                DO i = 1,sys_size
+                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+                    OPEN(2,FILE= TRIM(file_path) )
+                        DO j=0,m
+                        DO k=0,n
+                        DO l=0,p
+                            WRITE(2,*) x_cb(j),y_cb(k),z_cb(l), q_cons_vf(i)%sf(j,k,l)
+                        END DO
+                        WRITE(2,*)
+                        END DO
+                        WRITE(2,*)
+                        END DO
+                    CLOSE(2)
+                END DO
+            END IF
 
         END SUBROUTINE s_write_serial_data_files ! ------------------------------------
         
@@ -1123,7 +1058,7 @@ MODULE m_data_output
             str_MOK   = INT(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = INT(sys_size, MPI_OFFSET_KIND)
             
-            if (bubbles) then
+            IF (bubbles) THEN
                 ! Write the data for each variable
                 DO i = 1, sys_size
                     var_MOK = INT(i, MPI_OFFSET_KIND)
@@ -1136,7 +1071,7 @@ MODULE m_data_output
                     CALL MPI_FILE_WRITE_ALL(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
                                 MPI_DOUBLE_PRECISION,status,ierr)
                 END DO
-            else
+            ELSE
                 DO i = 1, adv_idx%end
                     var_MOK = INT(i, MPI_OFFSET_KIND)
 
@@ -1148,7 +1083,7 @@ MODULE m_data_output
                     CALL MPI_FILE_WRITE_ALL(ifile,MPI_IO_DATA%var(i)%sf,data_size, &
                                 MPI_DOUBLE_PRECISION,status,ierr)
                 END DO
-            end if
+            END IF
 
             CALL MPI_FILE_CLOSE(ifile,ierr)
 
@@ -1963,7 +1898,7 @@ MODULE m_data_output
                             vel(s) = q_cons_vf(cont_idx%end+s)%sf(j-2,k,l)/rho
                         END DO
 
-                        if (model_eqns == 4) then
+                        IF (model_eqns == 4) THEN
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
                             
                             !Tait pressure from density
@@ -1972,14 +1907,14 @@ MODULE m_data_output
                                 (rhoref*(1.d0-q_cons_vf(4)%sf(j-2,k,l)))  & 
                                 ) ** lit_gamma )                        &
                                 - pi_inf
-                        else if (model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) then
+                        ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
                             !Stiffened gas pressure from energy
                             pres = (                                       & 
                                 q_cons_vf(E_idx)%sf(j-2,k,l)  -            &
                                 0.5d0*(q_cons_vf(2)%sf(j-2,k,l)**2.d0)/q_cons_vf(1)%sf(j-2,k,l) - &
                                 pi_inf &
                                 ) / gamma
-                        else
+                        ELSE
                             !Stiffened gas pressure from energy with bubbles
 
                             pres = (                                       & 
@@ -1988,17 +1923,17 @@ MODULE m_data_output
                                 (1.d0 - q_cons_vf(alf_idx)%sf(j-2,k,l)) - &
                                 pi_inf &
                                 ) / gamma
-                        end if
+                        end IF
 
-                        if (bubbles) then
+                        IF (bubbles) THEN
                             alf = q_cons_vf(alf_idx)%sf(j-2,k,l)
-                            if (num_fluids == 3) then
+                            IF (num_fluids == 3) THEN
                                 alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
-                            end if
-                            do s = 1,nb
+                            end IF
+                            DO s = 1,nb
                                 nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
                                 nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
-                            end do
+                            END DO
                             call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
                                 
                             R(:) = nR(:)/nbub                        
@@ -2006,7 +1941,7 @@ MODULE m_data_output
                         
                             ptilde = ptil(j-2,k,l)
                             ptot = pres - ptilde
-                        end if
+                        end IF
 
                         ! Compute mixture sound speed
                         IF (alt_soundspeed .OR. regularization) THEN
@@ -2057,7 +1992,7 @@ MODULE m_data_output
 
 
                             print*, 'probe 1'
-                            if (model_eqns == 4) then
+                            IF (model_eqns == 4) THEN
                                 lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
                             
                                 !Tait pressure from density
@@ -2066,14 +2001,14 @@ MODULE m_data_output
                                     (rhoref*(1.d0-q_cons_vf(4)%sf(j-2,k-2,l)))  & 
                                     ) ** lit_gamma )                        &
                                     - pi_inf
-                            else if (model_eqns == 2 .and. (bubbles .neqv. .TRUE.)) then
+                            ELSE IF (model_eqns == 2 .AND. (bubbles .neqv. .TRUE.)) THEN
                                 !Stiffened gas pressure from energy
                                 pres = (                                       & 
                                     q_cons_vf(E_idx)%sf(j-2,k-2,l)  -            &
                                     0.5d0*( (q_cons_vf(2)%sf(j-2,k-2,l)**2.d0 + q_cons_vf(3)%sf(j-2,k-2,l)**2.d0)/q_cons_vf(1)%sf(j-2,k-2,l)) - &
                                     pi_inf &
                                     ) / gamma
-                            else
+                            ELSE
                                 !Stiffened gas pressure from energy with bubbles
                                 pres = (                                       & 
                                     (q_cons_vf(E_idx)%sf(j-2,k-2,l)  -            &
@@ -2085,20 +2020,20 @@ MODULE m_data_output
                                 print*, q_cons_vf(1)%sf(j-2,k-2,l), q_cons_vf(2)%sf(j-2,k-2,l), &
                                     q_cons_vf(E_idx)%sf(j-2,k-2,l), q_cons_vf(alf_idx)%sf(j-2,k-2,l), &
                                     pi_inf, gamma, pres
-                            end if
+                            end IF
 
                             print*, 'probe 2'
-                            if (bubbles) then
+                            IF (bubbles) THEN
                                 alf = q_cons_vf(alf_idx)%sf(j-2,k-2,0)
-                                do s = 1,nb
+                                DO s = 1,nb
                                     nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k-2,l)
                                     nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k-2,l)
-                                end do
+                                END DO
                                 call s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k-2,l), nR, nbub)
                                 
                                 R(:) = nR(:)/nbub                        
                                 Rdot(:) = nRdot(:)/nbub                        
-                            end if
+                            end IF
 
                             ! Compute mixture sound speed
                             IF (alt_soundspeed .OR. regularization) THEN
@@ -2213,18 +2148,18 @@ MODULE m_data_output
                     tmp = Rdot(1)
                     CALL s_mpi_allreduce_sum(tmp,Rdot(1))
 
-                    if (bubbles) then
+                    IF (bubbles) THEN
                         tmp = ptilde
                         CALL s_mpi_allreduce_sum(tmp,ptilde)
                         tmp = ptot
                         CALL s_mpi_allreduce_sum(tmp,ptot)
-                    end if
+                    end IF
                 END IF
 
                 IF (proc_rank == 0) THEN
                     IF (n == 0) THEN
-                        if (bubbles .and. (num_fluids <= 2)) then
-                            write(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // &
+                        IF (bubbles .AND. (num_fluids <= 2)) THEN
+                            WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // &
                                            'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
                                 nondim_time, &
                                 rho, &
@@ -2237,8 +2172,8 @@ MODULE m_data_output
                                 Rdot(1), &
                                 ptilde, &
                                 ptot
-                        elseif (bubbles .and. (num_fluids ==3)) then
-                            write(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // &
+                        ELSE IF (bubbles .AND. (num_fluids ==3)) THEN
+                            WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // &
                                            'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
                                 nondim_time, &
                                 rho, &
@@ -2252,8 +2187,8 @@ MODULE m_data_output
                                 Rdot(1), &
                                 ptilde, &
                                 ptot
-                        else if (bubbles .and. num_fluids ==4) then
-                             write(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // &
+                        ELSE IF (bubbles .AND. num_fluids ==4) THEN
+                             WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // &
                                            'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
                                 nondim_time, &
                                 q_cons_vf(1)%sf(j-2,0,0), &
@@ -2269,13 +2204,13 @@ MODULE m_data_output
                                 nbub,&
                                 R(1),&
                                 Rdot(1)
-                        else
+                        ELSE
                             WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
                                 pres
-                        end if
+                        end IF
                         !WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
                         !                   'F24.8,F24.8,F24.8)') &
                         !    nondim_time, &
@@ -2287,7 +2222,7 @@ MODULE m_data_output
                         !    c, &
                         !    accel
                     ELSEIF (p == 0) THEN
-                        if (bubbles) then
+                        IF (bubbles) THEN
                             WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
                                            'F24.8,F24.8,F24.8,F24.8)') &
                                 nondim_time, &
@@ -2300,13 +2235,13 @@ MODULE m_data_output
                                 nRdot(1), &
                                 R(1), &
                                 Rdot(1)
-                        else
+                        ELSE
                             WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
                                 pres
-                        end if
+                        end IF
                     ELSE
                         WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
                                            'F24.8,F24.8,F24.8,F24.8,' // &
@@ -2325,7 +2260,7 @@ MODULE m_data_output
                 END IF
             END DO
 
-        IF (integral_wrt .and. bubbles) THEN
+        IF (integral_wrt .AND. bubbles) THEN
             IF (n == 0) THEN ! 1D simulation
                 DO i = 1, num_integrals
                     int_pres = 0d0
@@ -2368,10 +2303,10 @@ MODULE m_data_output
                     END IF
 
                     IF (proc_rank == 0) THEN
-                        if (bubbles .and. (num_fluids <= 2)) then
-                            write(i+70,'(6x,f12.6,f24.8)') &
+                        IF (bubbles .AND. (num_fluids <= 2)) THEN
+                            WRITE(i+70,'(6x,f12.6,f24.8)') &
                                 nondim_time, int_pres
-                        end if
+                        end IF
                     END IF
                 END DO
             ELSEIF (p == 0) THEN
@@ -2397,7 +2332,7 @@ MODULE m_data_output
                                     trigger = .TRUE.
                             ELSEIF (i==2) THEN
                                 !net region
-                                IF ( dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad - 0.5d0*thickness) .and. &
+                                IF ( dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad - 0.5d0*thickness) .AND. &
                                      dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad + 0.5d0*thickness) ) &
                                     trigger = .TRUE.
                             ELSEIF (i==3) THEN
@@ -2437,11 +2372,11 @@ MODULE m_data_output
                        END DO
                     END DO
 
-                    if (npts > 0) then
+                    IF (npts > 0) THEN
                         int_pres = int_pres/(1.d0*npts)
-                    else
+                    ELSE
                         int_pres = 0.d0
-                    end if
+                    end IF
                     
                     IF (num_procs > 1) THEN
                         tmp = int_pres
@@ -2452,10 +2387,10 @@ MODULE m_data_output
                     END IF
 
                     IF (proc_rank == 0) THEN
-                        if (bubbles .and. (num_fluids <= 2)) then
-                            write(i+70,'(6x,f12.6,f24.8,f24.8)') &
+                        IF (bubbles .AND. (num_fluids <= 2)) THEN
+                            WRITE(i+70,'(6x,f12.6,f24.8,f24.8)') &
                                 nondim_time, int_pres, max_pres
-                        end if
+                        end IF
                     END IF
                 END DO
             END IF
