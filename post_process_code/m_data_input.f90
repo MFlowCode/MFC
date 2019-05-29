@@ -17,6 +17,8 @@ MODULE m_data_input
     USE m_global_parameters     !< Global parameters for the code
     
     USE m_mpi_proxy             !< Message passing interface (MPI) module proxy
+
+    USE m_compile_specific
     ! ==========================================================================
     
     
@@ -93,11 +95,7 @@ MODULE m_data_input
             ! Inquiring as to the existence of the time-step directory
             file_loc = TRIM(t_step_dir) // '/.'
             
-           !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-           !        EXIST     = dir_check       )
-             INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                      EXIST     = dir_check       )
-            
+            CALL my_inquire(file_loc,dir_check) 
             
             ! If the time-step directory is missing, the post-process exits.
             IF(dir_check .NEQV. .TRUE.) THEN
