@@ -1,4 +1,7 @@
 */*.mod
 */*.o
+pre_process_code/pre_process
+simulation_code/simulation
+post_process_code/post_process
 cases/
 .DS_Store
