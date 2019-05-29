@@ -786,7 +786,6 @@ simulation_dict =                                                              \
                     'case_dir'                      : None,                    \
                     'run_time_info'                 : None,                    \
                     't_step_old'                    : None,                    \
-                    'anti_diffusion'                : None,                    \
                     'm'                             : None,                    \
                     'n'                             : None,                    \
                     'p'                             : None,                    \
