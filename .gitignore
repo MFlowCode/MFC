@@ -8,6 +8,6 @@ cases/
 tests/*/D/*
 tests/*/p*
 tests/*/D_*
-tests/*.inf
-tests/*.inp
-tests/*.dat
+tests/*/*.inf
+tests/*/*.inp
+tests/*/*.dat
