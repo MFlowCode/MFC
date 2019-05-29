@@ -122,8 +122,6 @@ MODULE m_global_parameters
     LOGICAL         :: We_wave_speeds !< Account for capillary effects when computing the contact wave speed
     LOGICAL         :: lsq_deriv      !< Use linear least squares to calculate normals and curvatures
 
-    LOGICAL         :: anti_diffusion !< Use anti-diffusion step of Shyue
-    
     INTEGER         :: cpu_start, cpu_end, cpu_rate
     
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
@@ -355,7 +353,6 @@ MODULE m_global_parameters
             We_wave_speeds   = .FALSE.
             lsq_deriv        = .FALSE.
             parallel_io      = .FALSE.
-            anti_diffusion   = .FALSE.
             
             bc_x%beg = dflt_int; bc_x%end = dflt_int
             bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -404,7 +401,7 @@ MODULE m_global_parameters
                 END DO
                 mono(j)%mag    = dflt_real
                 mono(j)%length = dflt_real
-                mono(j)%dir    = dflt_real
+                mono(j)%dir    = 1.d0
                 mono(j)%npulse = 1.d0
                 mono(j)%pulse = 1
                 mono(j)%support = 1

@@ -19,7 +19,7 @@ endif
 # MKLROOT = /opt/intel/mkl/10.3
 
 # MKLROOT (Heaviside)
-MKLROOT = /opt/intel/mkl
+#MKLROOT = /opt/intel/mkl
 
 # Linker flags for FFTW library (Comet)
 #ld_flags = -L/usr/lib64 -lfftw3 -lm
@@ -32,7 +32,7 @@ ld_flags = -L/usr/local/lib -lfftw3 -lm
 
 # Header flags for FFTW library (Richardson)
 #hd_flags = -I/usr/local/include
-hd_flags = -I/usr/local/Cellar/fftw/3.3.8/include/fftw3.f03
+#hd_flags = -I/usr/local/Cellar/fftw/3.3.8/include/fftw3.f03
 
 # Linker flags (Hooke)
 #ld_flags = -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_core.a $(MKLROOT)/lib/intel64/libmkl_sequential.a -Wl,--end-group -lpthread -lm
@@ -87,7 +87,6 @@ object_files = m_derived_types.o \
 			   m_data_output.o \
 			   m_time_steppers.o \
 			   m_derived_variables.o \
-			   m_anti_diffusion.o \
 			   p_main.o
 
 # Compiler choice (Hooke/Intel compiler)

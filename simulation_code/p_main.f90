@@ -44,8 +44,6 @@ PROGRAM p_main
     USE m_derived_variables    !< Derived variables evaluation procedures
     
     USE m_time_steppers        !< Time-stepping algorithms
-
-    USE m_anti_diffusion       !< Anti diffusion step of Shyue
     ! ==========================================================================
     
     
@@ -89,7 +87,6 @@ PROGRAM p_main
     CALL s_initialize_data_output_module()
     CALL s_initialize_derived_variables_module()
     CALL s_initialize_time_steppers_module()    
-    IF (anti_diffusion) CALL s_initialize_anti_diffusion_module()
 
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
@@ -145,8 +142,6 @@ PROGRAM p_main
 
         CALL s_compute_derived_variables(t_step)
 
-        IF (anti_diffusion) CALL s_compute_anti_diffusion()
-
         ! Time-stepping loop controls
         IF(t_step == t_step_stop) THEN
             EXIT 
@@ -177,7 +172,6 @@ PROGRAM p_main
     s_write_data_files => NULL()
     
     ! Deallocation and/or disassociation procedures for the modules
-    IF (anti_diffusion) CALL s_finalize_anti_diffusion_module()
     CALL s_finalize_time_steppers_module()
     CALL s_finalize_derived_variables_module()
     CALL s_finalize_data_output_module()

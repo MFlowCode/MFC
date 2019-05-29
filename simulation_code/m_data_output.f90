@@ -146,7 +146,7 @@ MODULE m_data_output
                 
                 CALL SYSTEM('rm -f dir_name')
                 
-                WRITE(1,'(A)') 'MFC v3.0 - Cases - ' // TRIM( dir_name) // &
+                WRITE(1,'(A)') 'MFC - Case - ' // TRIM( dir_name) // &
                                                 ': ' // TRIM(file_name)
                 WRITE(1,'(A)')     'Description: Stability information at ' // &
                                    'each time-step of the simulation. This'
@@ -159,7 +159,6 @@ MODULE m_data_output
                 WRITE(1,'(13X,A)') 'those stability conditions pertinent '  // &
                                    'to the physics included in'
                 WRITE(1,'(13X,A)') 'the current computation are displayed.'
-                WRITE(1,'(A)') 'Author: Vedran Coralic'
                 
                 CALL DATE_AND_TIME(DATE = file_date)
                 

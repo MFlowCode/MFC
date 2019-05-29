@@ -244,8 +244,6 @@ MODULE m_mpi_proxy
                                            0, MPI_COMM_WORLD, ierr  )
             CALL MPI_BCAST(regularization, 1, MPI_LOGICAL         , &
                                            0, MPI_COMM_WORLD, ierr  )
-            CALL MPI_BCAST(anti_diffusion, 1, MPI_LOGICAL         , &
-                                           0, MPI_COMM_WORLD, ierr  )
             CALL MPI_BCAST(reg_eps       , 1, MPI_DOUBLE_PRECISION, &
                                            0, MPI_COMM_WORLD, ierr  )
             CALL MPI_BCAST(null_weights  , 1, MPI_LOGICAL         , &

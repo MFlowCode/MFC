@@ -96,7 +96,6 @@ MODULE m_start_up
                                    We_riemann_flux, We_src, null_weights,    &
                                    We_wave_speeds, lsq_deriv, parallel_io,   &
                                    regularization, reg_eps, cyl_coord,       & 
-                                   anti_diffusion,                     &
                                    rhoref, pref, bubbles, bubble_model,      &
                                    R0ref, nb, Ca, Web, Re_inv,               &
                                    monopole, mono, num_mono, polytropic, thermal,      &
@@ -208,8 +207,38 @@ MODULE m_start_up
             IF(ALL(model_eqns /= (/1,2,3,4/))) THEN
                 PRINT '(A)', 'Unsupported value of model_eqns. Exiting ...'
                 CALL s_mpi_abort()
+            ELSEIF( model_eqns == 2 .AND. bubbles .AND. bubble_model == 1  ) THEN
+                PRINT '(A)', 'The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)'
+                CALL s_mpi_abort()
+            ELSEIF( cyl_coord .AND. bubbles ) THEN
+                PRINT '(A)', 'Bubble models untested in cylindrical coordinates'
+                CALL s_mpi_abort()
+            ELSEIF( model_eqns == 3 .AND. bubbles ) THEN
+                PRINT '(A)', 'Bubble models untested with 6-equation model'
+                CALL s_mpi_abort()
+            ELSEIF( model_eqns == 1 .AND. bubbles ) THEN
+                PRINT '(A)', 'Bubble models untested with pi-gamma model'
+                CALL s_mpi_abort()
             ELSEIF( model_eqns == 4 .AND. num_fluids /= 1 ) THEN
-                PRINT '(A)', 'this model eqns requires numfluids=1'
+                PRINT '(A)', 'The 4-equation model implementation is not a multi-component and requires num_fluids = 1'
+                CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. weno_vars /= 2 ) THEN
+                PRINT '(A)', 'Bubble modeling requires weno_vars = 2'
+                CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. riemann_solver /= 2 ) THEN
+                PRINT '(A)', 'Bubble modeling requires riemann_solver = 2'
+                CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. commute_err ) THEN
+                PRINT '(A)', 'Bubble modeling is not compatible with commute_err'
+                CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. split_err ) THEN
+                PRINT '(A)', 'Bubble modeling is not compatible with split_err'
+                CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. regularization ) THEN
+                PRINT '(A)', 'Bubble modeling is not compatible with regularization'
+                CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. (adv_alphan .NEQV. .TRUE.) ) THEN
+                PRINT '(A)', 'Bubble modeling requires adv_alphan'
                 CALL s_mpi_abort()
             ELSEIF(model_eqns == 3 .AND. riemann_solver /= 2) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
@@ -473,10 +502,6 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported combination of num_fluids ' // &
                         'and regularization. Exiting ...'
                 CALL s_mpi_abort()
-              ELSEIF(num_fluids /= 2 .AND. anti_diffusion) THEN
-                PRINT '(A)', 'Unsupported combination of num_fluids ' // &
-                        'and anti_diffusion. Exiting ...'
-                CALL s_mpi_abort() 
             ELSEIF(riemann_solver /= 2 .AND. regularization) THEN
                 PRINT '(A)', 'Unsupported combination of riemann_solver ' // &
                         'and regularization. Exiting ...'

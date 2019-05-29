@@ -1,0 +1,130 @@
+# Definitions ==================================================================
+#For compiler-specific modules, options (gcc,intel)
+mycompiler="gcc"
+
+ifeq ($(mycompiler),"gcc")
+myfile = m_compile_specific_gcc.f90
+else
+myfile = m_compile_specific_intel.f90
+endif
+
+# Intel compiler flags (development)
+# f90_flags = -c -C -fpe-all=1 -O0 -traceback -warn
+
+# Intel compiler flags (production)
+#f90_flags = -c -ip -O3 -w
+
+# NAG compiler flags (development)
+# f90_flags = -c -C=all -colour -f2003 -gline -mismatch -mtrace=all -O0 -v
+
+# NAG compiler flags (production)
+# f90_flags = -c -colour -f2003 -mismatch -O4 -w
+
+# PGI compiler flags (development)
+# f90_flags = -c -C -Mchkptr -Minform=inform -O0 -traceback -v
+
+# PGI compiler flags (production)
+# f90_flags = -c -Minform=severe -O4 -w
+
+# GCC compiler flags (development)
+# f90_flags = -c -C -O0 -Wall -g3 -fbacktrace -v
+
+# GCC compiler flags (production)
+f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
+
+# Compiler choice (Hooke/Intel compiler)
+# compiler = /opt/mvapich2/ch3_mrail_gen2-intel12/bin/mpif90
+
+# Compiler choice (Darter/Intel compiler)
+# export XTPE_INFO_MESSAGE_OFF = yes
+# compiler = ftn
+
+# Compiler choice (Stampede/Intel compiler)
+# compiler = /opt/apps/intel13/mvapich2/1.9/bin/mpif90
+
+# Compiler choice (Thomson/NAG compiler)
+# compiler = /share/apps/openmpi-1.4.3/nag_fort/bin/mpif90
+
+# Compiler choice (Laptop compiler)
+# compiler = /opt/local/bin/openmpif90
+compiler = mpif90
+
+# Compiler choice (Comet)
+# compiler = mpif90
+
+# Compiler choice (Heaviside)
+# compiler = mpiifort
+
+# Compiler choice (Richardson)
+#compiler = mpiifort
+
+############ FFTW Flags ##############
+
+# Linker flags for FFTW library (Comet)
+#ld_sim_flags = -L/usr/lib64 -lfftw3 -lm
+
+# Linker flags for FFTW library (Richardson)
+ld_sim_flags = -L/usr/local/lib -lfftw3 -lm
+
+# Header flags for FFTW library (Comet)
+#hd_flags = -I/usr/include
+
+# Header flags for FFTW library (Richardson)
+#hd_flags = -I/usr/local/include
+
+# Header flags (Hooke/Heaviside)
+#hd_flags =  -I$(MKLROOT)/include
+
+
+######## Post-process Flags ###########
+
+# Location of the Silo directory (Richardson)
+#silo_dir = /home/kevinsch/software/silo-4.10.2
+silo_dir = /home/spencer/packages/silo-4.10.2
+#silo_dir = /home/spencer/packages/visit2.13.2/2.13.2/linux-x86_64/lib
+
+# Linker flags
+ld_post_flags = -L$(silo_dir)/lib -lsiloh5 -lm -L/usr/lib64 -lfftw3 -lm
+# ld_post_flags = -L$(silo_dir)/lib -lsiloh5 -lm -L/usr/local/lib64 -lfftw3 -lm
+# ld_post_flags = -L$(silo_dir)/lib -lsiloh5 -lz -lm -L/usr/local/lib64 -lfftw3 -lm
+
+ld_post_flags = $(ld_post_flags) $(ld_sim_flags)
+
+# Header flags (Hooke)
+# hd_post_flags = -I$(silo_dir)/include -I$(MKLROOT)/include -I/usr/include
+
+# Header flags (Richardson)
+hd_post_flags = -I$(silo_dir)/include -I$(MKLROOT)/include -I/usr/include
+
+# Header flags (Laptop)
+# hd_post_flags = -I$(silo_dir)/include -I/usr/include
+
+# Header flags (Thomson/Darter/Stampede)
+# hd_post_flags = -I$(silo_dir)/include
+
+# Intel compiler flags (development)
+# f90_post_flags = -c -C -fpe-all=0 -O0 -traceback -warn $(hd_post_flags)
+# f90_post_flags = -O0 -g -CA -CB -CS -CV -c -C -traceback -debug all -ftrapuv -check all,noarg_temp_created -WB -warn all -nogen-interfaces $(hd_post_flags)
+# f90_post_flags = -c -C -fpe-all=0 -O0 -traceback $(hd_post_flags)
+
+# Intel compiler flags (production)
+f90_post_flags = -c -ip -O3 -w $(hd_post_flags)
+
+# NAG compiler flags (development)
+# f90_post_flags = -c -C=all -colour -f2003 -gline -mismatch -mtrace=all -O0 -v \
+#             $(hd_post_flags)
+
+# NAG compiler flags (production)
+# f90_post_flags = -c -colour -f2003 -mismatch -O4 -w $(hd_post_flags)
+
+# PGI compiler flags (development)
+# f90_post_flags = -c -C -Mchkptr -Minform=inform -O0 -traceback -v $(hd_post_flags)
+
+# PGI compiler flags (production)
+# f90_post_flags = -c -Minform=severe -O4 -w $(hd_post_flags)
+
+# GCC compiler flags (development)
+# f90_post_flags = -c -C -O0 -Wall -g3 -fbacktrace -v
+
+# GCC compiler flags (production)
+# f90_post_flags = -ffree-line-length-none -c -O3 -w $(hd_post_flags)
