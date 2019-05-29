@@ -5,3 +5,9 @@ simulation_code/simulation
 post_process_code/post_process
 cases/
 .DS_Store
+tests/*/D/*
+tests/*/p*
+tests/*/D_*
+tests/*.inf
+tests/*.inp
+tests/*.dat
