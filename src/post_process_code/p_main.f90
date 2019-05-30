@@ -59,9 +59,6 @@ PROGRAM p_main
     !! Variable for the total volume of the second volume fraction 
     !! to later on track the evolution of the radius of a bubble over time
  
-    OPEN(11,file='result_totalVolumeAlphaEnd.dat', STATUS='UNKNOWN')
-    300 FORMAT(20E16.7)
-    
     ! Initialization of the MPI environment
     CALL s_mpi_initialize()
 
@@ -628,40 +625,6 @@ PROGRAM p_main
             
             varname(:) = ' '
             
-        END IF
-        ! ----------------------------------------------------------------------
-        
-        ! Adding the total volume of the second 
-        ! volume fraction to a supplementary file to 
-        ! track the evolution of the radius of a bubble 
-        IF((model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) .OR. (model_eqns == 3)) THEN
-            IF(adv_alphan) THEN
-
-                total_volume = 0d0
-                IF(n > 0) THEN
-                    IF(p > 0) THEN
-                        DO k = 0, p
-                            DO j = 0, n
-                                DO i = 0, m
-                                    total_volume = total_volume + q_cons_vf(adv_idx%end)%sf(i,j,k)*(x_cb(i)-x_cb(i-1))*(y_cb(i)-y_cb(i-1))*(z_cb(i)-z_cb(i-1))
-                                END DO
-                            END DO
-                        END DO
-                    ELSE
-                        DO j = 0, n
-                            DO i = 0, m
-                                total_volume = total_volume + q_cons_vf(adv_idx%end)%sf(i,j,k)*(x_cb(i)-x_cb(i-1))*(y_cb(i)-y_cb(i-1))
-                            END DO
-                        END DO
-                    END IF
-                ELSE
-                    DO i = 0, m
-                        total_volume = total_volume + q_cons_vf(adv_idx%end)%sf(i,j,k)*(x_cb(i)-x_cb(i-1))
-                    END DO
-                END IF
-
-                WRITE(11,300) real(t_step), total_volume
-            END IF
         END IF
         ! ----------------------------------------------------------------------
         

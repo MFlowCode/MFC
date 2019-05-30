@@ -118,14 +118,9 @@ PROGRAM p_main
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
 
-
-    OPEN(unit=2,file='times.dat')
-    CLOSE(2)
-    
     ! Time-stepping Loop =======================================================
     DO
         IF (proc_rank ==0) PRINT*, 'Time step = ', t_step, ' of ', t_step_stop
-        !IF(t_step == t_step_stop) stop 
         
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         IF(time_stepper == 1) THEN
@@ -155,11 +150,6 @@ PROGRAM p_main
         END IF
 
         CALL system_clock(cpu_end)
-        IF(proc_rank == 0) THEN
-            OPEN(unit=2, file='times.dat', position = "append", status = "old")
-                WRITE(2,*) t_step, REAL(cpu_end-cpu_start)/cpu_rate
-            CLOSE(2)
-        END IF
         
         IF (proc_rank == 0) THEN
             PRINT '(a)', ' ------------------------------------------------------ '
