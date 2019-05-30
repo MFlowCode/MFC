@@ -1,26 +1,12 @@
+include ../../Makefile.user
+
 ########################### Definitions #########################
 # For compiler-specific modules, options [gcc,intel]
-mycompiler="intel"
-
 ifeq ($(mycompiler),"intel")
    myfile = m_compile_specific_intel.f90
 else
    myfile = m_compile_specific_gcc.f90
 endif
-
-# FFTW library location
-fftw_dir = /usr/local/lib
-
-# FFTW include location
-#fftw_include_dir = /usr/include
-fftw_include_dir = /usr/local/include
-
-# Silo location
-silo_dir = /home/spencer/packages/silo-4.10.2
-
-# Compiler command
-compiler = mpif90
-#compiler = mpiifort
 
 ########################## FFTW Flags ###########################
 # Linker flags 
