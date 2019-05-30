@@ -12,3 +12,4 @@ tests/*/*.inf
 tests/*/*.inp
 tests/*/*.dat
 tests/*/silo*
+tests/*/restart*
