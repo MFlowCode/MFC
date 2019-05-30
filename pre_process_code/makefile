@@ -3,78 +3,19 @@
 # Author: Vedran Coralic
 # Date: 06/14/12
 
-
-# Definitions ==================================================================
-#For compiler-specific modules, options (gcc,intel)
-mycompiler="gcc"
-
-ifeq ($(mycompiler),"gcc")
-myfile = m_compile_specific_gcc.f90
-else
-myfile = m_compile_specific_intel.f90
-endif
-
-# Intel compiler flags (development)
-# f90_flags = -c -C -fpe-all=1 -O0 -traceback -warn
-
-# Intel compiler flags (production)
-#f90_flags = -c -ip -O3 -w
-
-# NAG compiler flags (development)
-# f90_flags = -c -C=all -colour -f2003 -gline -mismatch -mtrace=all -O0 -v
-
-# NAG compiler flags (production)
-# f90_flags = -c -colour -f2003 -mismatch -O4 -w
-
-# PGI compiler flags (development)
-# f90_flags = -c -C -Mchkptr -Minform=inform -O0 -traceback -v
-
-# PGI compiler flags (production)
-# f90_flags = -c -Minform=severe -O4 -w
-
-# GCC compiler flags (development)
-# f90_flags = -c -C -O0 -Wall -g3 -fbacktrace -v
-
-# GCC compiler flags (production)
-f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
+include ../Makefile.in
 
 # List of the object files that are members of the pre-process code
 object_files = m_derived_types.o \
-	       		   m_compile_specific.o \
-			   m_global_parameters.o \
-			   m_mpi_proxy.o \
-			   m_variables_conversion.o \
-			   m_data_output.o \
-			   m_start_up.o \
-			   m_grid.o \
-			   m_initial_condition.o \
-			   p_main.o
-
-# Compiler choice (Hooke/Intel compiler)
-# compiler = /opt/mvapich2/ch3_mrail_gen2-intel12/bin/mpif90
-
-# Compiler choice (Darter/Intel compiler)
-# export XTPE_INFO_MESSAGE_OFF = yes
-# compiler = ftn
-
-# Compiler choice (Stampede/Intel compiler)
-# compiler = /opt/apps/intel13/mvapich2/1.9/bin/mpif90
-
-# Compiler choice (Thomson/NAG compiler)
-# compiler = /share/apps/openmpi-1.4.3/nag_fort/bin/mpif90
-
-# Compiler choice (Laptop compiler)
-# compiler = /opt/local/bin/openmpif90
-compiler = mpif90
-
-# Compiler choice (Comet)
-# compiler = mpif90
-
-# Compiler choice (Heaviside)
-# compiler = mpiifort
-
-# Compiler choice (Richardson)
-#compiler = mpiifort
+                           m_compile_specific.o \
+                           m_global_parameters.o \
+                           m_mpi_proxy.o \
+                           m_variables_conversion.o \
+                           m_data_output.o \
+                           m_start_up.o \
+                           m_grid.o \
+                           m_initial_condition.o \
+                           p_main.o
 
 # ==============================================================================
 
