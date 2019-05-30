@@ -20,10 +20,8 @@ endif
 # GCC compiler flags (production)
 f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
 
-# Compiler choice (Laptop compiler)
+# Compiler
 compiler = mpif90
-
-# Compiler choice (Richardson)
 #compiler = mpiifort
 
 ############ FFTW Flags ##############

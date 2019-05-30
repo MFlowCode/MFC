@@ -1805,8 +1805,8 @@ def f_create_input_file(comp_name, case_dict): # -------------------------------
             file_id.write(parameter + ' = ' + str(comp_dict[parameter]) + '\n')
     
     # OTS: end statement for namelist [gfortran compatibility]
-    if sys.platform == 'darwin':
-	file_id.write('&end\n')
+    #if sys.platform == 'darwin':
+    file_id.write('&end\n')
     
     # Populating the file's footer information
     file_id.write('/')
