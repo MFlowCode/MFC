@@ -78,21 +78,11 @@ case_dict =                                                                    \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'F',                      \
-                    'weno_avg'                     : 'F',                      \
-                    'weno_Re_flux'                 : 'F',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
                     'commute_err'                  : 'F',                      \
                     'split_err'                    : 'F',                      \
-                    'regularization'               : 'F',                      \
-                    'reg_eps'                      : 1.E+00,                   \
-                    'We_riemann_flux'              : 'F',                      \
-                    'We_rhs_flux'                  : 'F',                      \
-                    'We_src'                       : 'F',                      \
-                    'We_wave_speeds'               : 'F',                      \
-                    'lsq_deriv'                    : 'F',                      \
-                    'alt_crv'                      : 'F',                      \
                     'bc_x%beg'                     : -3,                       \
                     'bc_x%end'                     : -3,                       \
                     # ==========================================================
