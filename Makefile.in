@@ -1,54 +1,52 @@
-# Definitions ==================================================================
-#For compiler-specific modules, options (gcc,intel)
-mycompiler="intel"
+########################### Definitions #########################
+# For compiler-specific modules, options [gcc,intel]
+mycompiler="gcc"  #[gcc,intel]
 
-ifeq ($(mycompiler),"gcc")
-myfile = m_compile_specific_gcc.f90
+ifeq ($(mycompiler),"intel")
+   myfile = m_compile_specific_intel.f90
 else
-myfile = m_compile_specific_intel.f90
+   myfile = m_compile_specific_gcc.f90
 endif
 
-# Intel compiler flags (development)
-# f90_flags = -c -C -fpe-all=1 -O0 -traceback -warn
+# FFTW library location
+fftw_dir = /usr/local/lib
 
-# Intel compiler flags (production)
- f90_flags = -c -ip -O3 -w
+# FFTW include location
+#fftw_include_dir = /usr/include
+fftw_include_dir = /usr/local/include
 
-# GCC compiler flags (development)
-# f90_flags = -c -C -O0 -Wall -g3 -fbacktrace -v
+# Silo location
+silo_dir = /home/spencer/packages/silo-4.10.2
 
-# GCC compiler flags (production)
-# f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
-
-# Compiler
+# Compiler command
 compiler = mpif90
 #compiler = mpiifort
 
-############ FFTW Flags ##############
+########################## FFTW Flags ###########################
+# Linker flags 
+ld_sim_flags = -L$(fftw_dir) -lfftw3 -lm
 
-# Linker flags for FFTW library (Richardson)
-ld_sim_flags = -L/usr/local/lib -lfftw3 -lm
+# Header flags
+hd_flags = -I$(fftw_include_dir)
 
-# Header flags for FFTW library (Comet)
-#hd_flags = -I/usr/include
+######################## Compiler Flags #########################
+ifeq ($(mycompiler),"intel")
+  # Intel
+  f90_flags = -c -ip -O3 -w $(hd_flags)
+else
+  # GCC
+  f90_flags = -ffree-line-length-none -c -O3 -w $(hd_flags) #-fdefault-real-8
+endif
 
-# Header flags for FFTW library (Richardson)
-#hd_flags = -I/usr/local/include
-
-# Header flags (Hooke/Heaviside)
-#hd_flags =  -I$(MKLROOT)/include
-
-######## Post-process Flags ###########
-
-# Location of the Silo directory (Richardson)
-silo_dir = /home/spencer/packages/silo-4.10.2
+#################### Post-process Silo Flags #####################
+# Silo flags
+silo_flags = -L$(silo_dir)/lib -lsiloh5 -lm #-lz
 
 # Linker flags
-silo_flags = -L$(silo_dir)/lib -lsiloh5 -lm #-lz# #-L/usr/lib64 -lfftw3 -lm
 ld_post_flags = $(ld_sim_flags) $(silo_flags)
 
 # Header flags (Richardson)
-hd_post_flags = -I$(silo_dir)/include -I$(MKLROOT)/include -I/usr/include
+hd_post_flags = -I$(silo_dir)/include -I$(MKLROOT)/include
 
-# Intel compiler flags (production)
+# Compiler flags
 f90_post_flags = $(f90_flags) $(hd_post_flags)
