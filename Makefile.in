@@ -1,6 +1,6 @@
 # Definitions ==================================================================
 #For compiler-specific modules, options (gcc,intel)
-mycompiler="gcc"
+mycompiler="intel"
 
 ifeq ($(mycompiler),"gcc")
 myfile = m_compile_specific_gcc.f90
@@ -47,7 +47,7 @@ f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
 
 # Compiler choice (Laptop compiler)
 # compiler = /opt/local/bin/openmpif90
-compiler = mpif90
+#compiler = mpif90
 
 # Compiler choice (Comet)
 # compiler = mpif90
@@ -56,7 +56,7 @@ compiler = mpif90
 # compiler = mpiifort
 
 # Compiler choice (Richardson)
-#compiler = mpiifort
+compiler = mpiifort
 
 ############ FFTW Flags ##############
 
@@ -84,11 +84,8 @@ silo_dir = /home/spencer/packages/silo-4.10.2
 #silo_dir = /home/spencer/packages/visit2.13.2/2.13.2/linux-x86_64/lib
 
 # Linker flags
-ld_post_flags = -L$(silo_dir)/lib -lsiloh5 -lm -L/usr/lib64 -lfftw3 -lm
-# ld_post_flags = -L$(silo_dir)/lib -lsiloh5 -lm -L/usr/local/lib64 -lfftw3 -lm
-# ld_post_flags = -L$(silo_dir)/lib -lsiloh5 -lz -lm -L/usr/local/lib64 -lfftw3 -lm
-
-ld_post_flags = $(ld_post_flags) $(ld_sim_flags)
+silo_flags = -L$(silo_dir)/lib -lsiloh5 -lm #-lz# #-L/usr/lib64 -lfftw3 -lm
+ld_post_flags = $(ld_sim_flags) $(silo_flags)
 
 # Header flags (Hooke)
 # hd_post_flags = -I$(silo_dir)/include -I$(MKLROOT)/include -I/usr/include
