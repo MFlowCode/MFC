@@ -1401,92 +1401,6 @@ post_process_dict =                                                            \
     }
 # ==============================================================================
 
-
-# Analysis Dictionary ==========================================================
-analysis_dict =                                                                \
-    {                                                                          \
-                    'case_dir'                      : None,                    \
-                    'cyl_coord'                     : None,                    \
-                    'm'                             : None,                    \
-                    'n'                             : None,                    \
-                    'p'                             : None,                    \
-                    'x_domain%beg'                  : None,                    \
-                    'x_domain%end'                  : None,                    \
-                    'y_domain%beg'                  : None,                    \
-                    'y_domain%end'                  : None,                    \
-                    'z_domain%beg'                  : None,                    \
-                    'z_domain%end'                  : None,                    \
-                    'stretch_x'                     : None,                    \
-                    'stretch_y'                     : None,                    \
-                    'stretch_z'                     : None,                    \
-                    'a_x'                           : None,                    \
-                    'a_y'                           : None,                    \
-                    'a_z'                           : None,                    \
-                    'x_a'                           : None,                    \
-                    'y_a'                           : None,                    \
-                    'z_a'                           : None,                    \
-                    'x_b'                           : None,                    \
-                    'y_b'                           : None,                    \
-                    'z_b'                           : None,                    \
-                    'dt'                            : None,                    \
-                    't_step_start'                  : None,                    \
-                    't_step_stop'                   : None,                    \
-                    't_step_save'                   : None,                    \
-                    'model_eqns'                    : None,                    \
-                    'num_fluids'                    : None,                    \
-                    'adv_alphan'                    : None,                    \
-                    'weno_order'                    : None,                    \
-                    'parallel_io'                   : None,                    \
-                    'bc_x%beg'                      : None,                    \
-                    'bc_x%end'                      : None,                    \
-                    'bc_y%beg'                      : None,                    \
-                    'bc_y%end'                      : None,                    \
-                    'bc_z%beg'                      : None,                    \
-                    'bc_z%end'                      : None,                    \
-                    'fluid_pp(1)%gamma'             : None,                    \
-                    'fluid_pp(1)%pi_inf'            : None,                    \
-                    'fluid_pp(2)%gamma'             : None,                    \
-                    'fluid_pp(2)%pi_inf'            : None,                    \
-                    'fluid_pp(3)%gamma'             : None,                    \
-                    'fluid_pp(3)%pi_inf'            : None,                    \
-                    'fluid_pp(4)%gamma'             : None,                    \
-                    'fluid_pp(4)%pi_inf'            : None,                    \
-                    'fluid_pp(5)%gamma'             : None,                    \
-                    'fluid_pp(5)%pi_inf'            : None,                    \
-                    'fluid_pp(6)%gamma'             : None,                    \
-                    'fluid_pp(6)%pi_inf'            : None,                    \
-                    'fluid_pp(7)%gamma'             : None,                    \
-                    'fluid_pp(7)%pi_inf'            : None,                    \
-                    'fluid_pp(8)%gamma'             : None,                    \
-                    'fluid_pp(8)%pi_inf'            : None,                    \
-                    'fluid_pp(9)%gamma'             : None,                    \
-                    'fluid_pp(9)%pi_inf'            : None,                    \
-                    'fluid_pp(10)%gamma'            : None,                    \
-                    'fluid_pp(10)%pi_inf'           : None,                    \
-                    'analysis'                      : None,                    \
-                    'dft_modes'                     : None,                    \
-                    'proj_area'                     : None,                    \
-                    'surf_area'                     : None,                    \
-                    'isovalue'                      : None,                    \
-                    'plic_wrt'                      : None,                    \
-                    'plic_wrt(1)'                   : None,                    \
-                    'plic_wrt(2)'                   : None,                    \
-                    'plic_wrt(3)'                   : None,                    \
-                    'plic_wrt(4)'                   : None,                    \
-                    'plic_wrt(5)'                   : None,                    \
-                    'plic_wrt(6)'                   : None,                    \
-                    'plic_wrt(7)'                   : None,                    \
-                    'plic_wrt(8)'                   : None,                    \
-                    'plic_wrt(9)'                   : None,                    \
-                    'plic_wrt(10)'                  : None,                    \
-                    'proj_plane_un'                 : None,                    \
-                    'proj_plane_un(1)'              : None,                    \
-                    'proj_plane_un(2)'              : None,                    \
-                    'proj_plane_un(3)'              : None,                    \
-    }
-# ==============================================================================
-
-
 # PBS Dictionary ===============================================================
 pbs_dict =                                                                     \
     {                                                                          \
@@ -1500,135 +1414,7 @@ pbs_dict =                                                                     \
 
 
 
-
-
 # CONTAINS =====================================================================
-
-def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name): # ----------
-    # Description: The following function receives the name of the MFC component
-    #              the user wishes to execute, the case dictionary, the location
-    #              of the MFC folder and lastly, the configuration of the engine
-    #              with which the component will be executed. Then, given this
-    #              information, the function compiles the code for the selected
-    #              component and then writes the component's input file. A batch
-    #              file may also be generated, given the engine is configured in
-    #              parallel. If this is the case, the function then runs the
-    #              component's executable by submitting the batch file to PBS,
-    #              otherwise, it runs the executable serially, directly from the
-    #              command-line.
-
-
-    # Enabling access to the MFC component and PBS dictionaries
-    global pre_process_dict, simulation_dict, post_process_dict, analysis_dict, pbs_dict
-
-
-    # Checking the validity of the configuration of the engine
-    if (engine != 'parallel') and (engine != 'serial'):
-        print '\n' + comp_name + '>> Unsupported engine configuration. ' \
-                                 'Exiting ...' + '\n'
-        exit(0)
-
-
-    # Checking whether the MFC component selected by the user exists
-    if (comp_name != 'pre_process' ) and \
-       (comp_name != 'simulation'  ) and \
-       (comp_name != 'analysis'    ) and \
-       (comp_name != 'post_process'):
-        print '\n' + 'Unsupported choice of MFC component to execute. ' \
-                   + 'Exiting ...' + '\n'
-        exit(0)
-
-
-    # Checking the consistency of the case dictionary with respect to the MFC
-    # component and PBS dictionaries
-    for parameter in case_dict:
-        if ( pre_process_dict.has_key(parameter) == False) and \
-           (  simulation_dict.has_key(parameter) == False) and \
-           (    analysis_dict.has_key(parameter) == False) and \
-           (post_process_dict.has_key(parameter) == False) and \
-           (         pbs_dict.has_key(parameter) == False):
-               print '\n' + comp_name + '>> Unsupported parameter choice ' \
-                          + parameter + '. Exiting ...' + '\n'
-               exit(0)
-
-
-    # Updating the values in the PBS dictionary using the values provided by the
-    # user in the case dictionary
-    for parameter in case_dict:
-        if pbs_dict.has_key(parameter) == True:
-            pbs_dict[parameter] = case_dict[parameter]
-
-
-    # Checking whether the engine configuration is compatible with the values of
-    # the parameters located in the PBS dictionary
-    #if engine == 'serial':
-    #   for parameter in pbs_dict:
-    #       if pbs_dict[parameter] is not None:
-    #           print '\n' + comp_name + '>> Serial engine configuration '  \
-    #                                  + 'incompatible with value(s) of '   \
-    #                                  + 'parameter(s) in PBS dictionary. ' \
-    #                                  + 'Exiting ...' + '\n'
-    #           exit(0)
-    #else:
-    #   for parameter in pbs_dict:
-    #       if pbs_dict[parameter] is None:
-    #           print '\n' + comp_name + '>> Parallel engine configuration ' \
-    #                                  + 'incompatible with value(s) of '    \
-    #                                  + 'parameter(s) in PBS dictionary. '  \
-    #                                  + 'Exiting ...' + '\n'
-    #           exit(0)
-
-
-    # Outputting the component's start-up message
-    print '\n' + comp_name + '>> Preparing ' + engine + ' job ...' + '\n'
-
-
-    # Setting the directory location for the MFC component
-    comp_dir = mfc_dir + '/' + comp_name + '_code'
-
-    makefile = 'makefile_richardson'
-    if sys.platform == 'darwin':
-        makefile = 'makefile'
-
-    # Compiling the MFC component's code if necessary
-    cmd_status = Popen('make -C ' + comp_dir + ' all', shell=True, stdout=PIPE)
-    output, errors = cmd_status.communicate()
-
-
-    # Generating input file to be read in by the MFC component's executable
-    f_create_input_file(comp_name, case_dict)
-
-
-     # If the engine is configured serially, the job, i.e. the executable of the
-    # component, is run in the command-line, else, for a parallel configuration,
-    # a bash script is generated and the job is submitted to a queue via PBS.
-    if engine == 'serial':
-        print '\n' + comp_name + '>> Serial job in progress ...' + '\n'
-        #cmd_status = Popen('mpirun -n '+str(pbs_dict[ 'ppn' ])+' ./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
-        cmd_status = Popen('mpirun -n '+str(pbs_dict[ 'ppn' ])+ ' '+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
-        output, errors = cmd_status.communicate()
-        print '\n' + output
-        print comp_name + '>> Serial job completed!' + '\n'
-        cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE)
-        output, errors = cmd_status.communicate()
-    #else if engine == 'interactive':
-    #    print '\n' + comp_name + '>> Interactive job in progress ...' + '\n'
-    #    cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
-    #    output, errors = cmd_status.communicate()
-    #    print '\n' + output
-    #    print comp_name + '>> Serial job completed!' + '\n'
-    #    cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE)
-    #    output, errors = cmd_status.communicate()
-    else:
-        f_create_batch_file_SHB(comp_name, case_dict, mfc_dir, sub_name)
-        # Submit job to queue (Hooke/Thomson/Darter)
-        #cmd_status = Popen('qsub ' + comp_name + '.sh', shell=True, stdout=PIPE)
-        # submit job to queue (Stampede)
-        cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE)
-        output, errors = cmd_status.communicate()
-        print '\n' + output
-        print comp_name + '>> Parallel job submitted to queue!' + '\n'
-# END: def f_execute_mfc_component ---------------------------------------------
 
 def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     # Description: The following function receives the name of the MFC component
@@ -1645,7 +1431,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     
     
     # Enabling access to the MFC component and PBS dictionaries
-    global pre_process_dict, simulation_dict, post_process_dict, analysis_dict, pbs_dict
+    global pre_process_dict, simulation_dict, post_process_dict, pbs_dict
     
     
     # Checking the validity of the configuration of the engine
@@ -1658,7 +1444,6 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     # Checking whether the MFC component selected by the user exists
     if (comp_name != 'pre_process' ) and \
        (comp_name != 'simulation'  ) and \
-       (comp_name != 'analysis'    ) and \
        (comp_name != 'post_process'):
         print '\n' + 'Unsupported choice of MFC component to execute. ' \
                    + 'Exiting ...' + '\n'
@@ -1670,7 +1455,6 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     for parameter in case_dict:
         if ( pre_process_dict.has_key(parameter) == False) and \
            (  simulation_dict.has_key(parameter) == False) and \
-           (    analysis_dict.has_key(parameter) == False) and \
            (post_process_dict.has_key(parameter) == False) and \
            (         pbs_dict.has_key(parameter) == False):
                print '\n' + comp_name + '>> Unsupported parameter choice ' \
@@ -1712,10 +1496,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     # Setting the directory location for the MFC component
     comp_dir = mfc_dir + '/' + comp_name + '_code'
 
-    makefile = 'makefile_richardson'
-    if sys.platform == 'darwin':
-        makefile = 'makefile'
-   
+    makefile = 'makefile'
 
     # Compiling the MFC component's code if necessary
     cmd_status = Popen('make -C ' + comp_dir + ' all', shell=True, stdout=PIPE)
@@ -1760,7 +1541,7 @@ def f_create_input_file(comp_name, case_dict): # -------------------------------
     
     
     # Enabling access to the MFC component dictionaries
-    global pre_process_dict, simulation_dict, post_process_dict, analysis_dict
+    global pre_process_dict, simulation_dict, post_process_dict
     
     
     # Updating the values in the relevant MFC component dictionary using the
@@ -1775,11 +1556,6 @@ def f_create_input_file(comp_name, case_dict): # -------------------------------
             if simulation_dict.has_key(parameter) == True:
                 simulation_dict[parameter] = case_dict[parameter]
         comp_dict = simulation_dict
-    elif comp_name == 'analysis':
-        for parameter in case_dict:
-            if analysis_dict.has_key(parameter) == True:
-                analysis_dict[parameter] = case_dict[parameter]
-        comp_dict = analysis_dict
     else:
         for parameter in case_dict:
             if post_process_dict.has_key(parameter) == True:
@@ -1815,207 +1591,6 @@ def f_create_input_file(comp_name, case_dict): # -------------------------------
     file_id.close()
 # END: def f_create_input_file -------------------------------------------------
 
-def f_create_batch_file_SHB(comp_name, case_dict, mfc_dir,sub_name): # ----------------------
-    # Description: The following function generates a batch file given the name
-    #              of the MFC component for which the file is to be created, the
-    #              case dictionary from which the parameters will be used to
-    #              populate the file, and the location of the MFC folder.
-
-
-    # Enabling access to the PBS dictionary
-    global pbs_dict
-
-
-    # Setting the location of the batch file
-    file_loc = comp_name + '.sh'
-
-
-    # Opening and obtaining a handle for it
-    file_id = open(file_loc, 'w')
-
-
-    # Populating Batch File  ===================================================
-    file_id.write(                                                             \
-                                                                               \
-        # Script interpreter
-        '#!/bin/sh'                                                     + '\n' \
-                                                                               \
-        # Account to be charged for the job:
-        # (Darter/Gordon)
-        # '#PBS -A TG-CTS120005'                                          + '\n' \
-        # (Stampede)
-        #'#SBATCH -A TG-CTS120005'                                       + '\n' \
-                                                                               \
-        # Name of the queue to which the job should be submitted:
-        # (Hooke/Thomson/Darter/Gordon)
-        # '#PBS -q ' + str(pbs_dict['queue'])                             + '\n' \
-        # (Stampede)
-        # '#SBATCH -p ' + str(pbs_dict['queue'])                          + '\n' \
-        # (Comet)
-        '#SBATCH --partition=' + str(pbs_dict['queue'])                 + '\n' \
-                                                                               \
-        # Name of the job to be submitted to the scheduler:
-        # (Hooke/Thomson/Darter/Gordon)
-        # '#PBS -N ' + comp_name                                          + '\n' \
-        # (Stampede)
-        # '#SBATCH -J ' + comp_name                                       + '\n' \
-        # (Comet/Richardson)
-        '#SBATCH --job-name=' + sub_name                               + '\n' \
-                                                                               \
-        # Node(s) and processor(s) per node (ppn) for job:
-        # (Thomson)
-        # '#PBS -l nodes=' + str(pbs_dict['nodes'])                              \
-        #        + ':ppn=' + str(pbs_dict[ 'ppn' ])                       + '\n' \
-        # (Hooke)
-        # '#PBS -l nodes=0' + str(pbs_dict['nodes'])                             \
-        #        + ':ppn=' + str(pbs_dict[ 'ppn' ])                       + '\n' \
-        # (Darter)
-        # '#PBS -l size=' + str( pbs_dict['nodes']*pbs_dict['ppn']               \
-        #                      + min(1,( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16)                 \
-        #                      * (16 - ( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16) )        + '\n' \
-        # (Stampede)
-        # '#SBATCH -n ' + str( pbs_dict['nodes']*pbs_dict['ppn']                 \
-        #                      + min(1,( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16)                 \
-        #                      * (16 - ( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16) )        + '\n' \
-        # (Gordon)
-        # '#PBS -l nodes=' + str(pbs_dict['nodes'])                              \
-        #        + ':ppn=' + str(pbs_dict[ 'ppn' ]) + ':native'           + '\n' \
-        # (Comet)
-        #'#SBATCH --nodes=' + str(pbs_dict['nodes'])                      + '\n' \
-        #'#SBATCH --ntasks-per-node=' + str(pbs_dict['ppn'])              + '\n' \
-        #'#SBATCH --switches=' + '1'                                      + '\n' \
-        #                                                                       \
-        # (Richardson)
-        #'#SBATCH -n ' + str( pbs_dict['nodes']*pbs_dict['ppn'])                \
-                #              + ' --ntasks-per-node=' + str(pbs_dict['ppn'])    + '\n' \
-        '#SBATCH -n ' + str( pbs_dict['nodes']*pbs_dict['ppn'])         + '\n' \
-                                                                               \
-        # (Richardson)
-        #'#SBATCH --mem-per-cpu ' + str(5) + 'G'                         + '\n' \
-                                                                               \
-        # Maximum amount of time to commit to the execution of the job:
-        # (Hooke/Thomson/Gordon)
-        # '#PBS -l walltime=' + str(pbs_dict['walltime'])                 + '\n' \
-        # (Stampede/Comet)
-        '#SBATCH -t ' + str(pbs_dict['walltime'])                       + '\n' \
-                                                                               \
-        # Declare the job rerunable (y) or non-rerunable (n)
-        # (Hooke/Thomson)
-        # '#PBS -r n'                                                     + '\n' \
-                                                                               \
-        # Output standard output and error in a single file
-        # (Hooke/Thomson/Darter/Gordon?)
-        # '#PBS -j oe'                                                    + '\n' \
-        # (Stampede/Comet/Richardson)
-        '#SBATCH -o ' + comp_name + '.o%j'                              + '\n' \
-        '#SBATCH -e ' + comp_name + '.o%j'                              + '\n' \
-                                                                               \
-        # Notify by email when job begins (b), aborts (a), and/or ends (e):
-        # (Hooke/Thomson/Darter/Gordon)
-        # '#PBS -m bae'                                                   + '\n' \
-        # '#PBS -M ' + str(pbs_dict['mail_list'])                         + '\n' \
-        # (Stampede/Comet/Richardson)
-        '#SBATCH --mail-type=all'                                       + '\n' \
-        '#SBATCH --mail-user=' + str(pbs_dict['mail_list'])             + '\n' \
-                                                                               \
-        # Total number of processor(s) allocated for job execution
-        # (Hooke/Thomson/Darter/Gordon?)
-        # 'num_procs=$(cat $PBS_NODEFILE | wc -l)'                        + '\n' \
-
-        # Moving to the case directory
-        # (Hooke/Thomson/Darter/Gordon?)
-        # 'cd $PBS_O_WORKDIR'                                             + '\n' \
-                                                                               \
-        # Setting up environment variables for MPI I/O on Cray systems (Darter)
-        # 'export MPICH_PTL_UNEX_EVENTS=400000'                           + '\n' \
-                                                                               \
-        # 'export MPICH_PTL_OTHER_EVENTS=100000'                          + '\n' \
-                                                                               \
-        # 'export MPICH_UNEX_BUFFER_SIZE=536870912'                       + '\n' \
-                                                                               \
-        # 'export MPICH_MPIIO_HINTS=*:romio_ds_write=disable'             + '\n' \
-                                                                               \
-        # Setting up the output file's header information:
-        # (Hooke/Thomson/Darter/Gordon?)
-        # 'echo MFC v3.0 - Cases - ' + basename(getcwd())                        \
-        #                           + ': $PBS_JOBNAME.o${PBS_JOBID:0:7}' + '\n' \
-        # 'echo Description: $PBS_JOBID executed on $num_procs '                 \
-        # (Stampede/Comet/Richardson)
-        'echo MFC v3.0 - Cases - ' + basename(getcwd())                        \
-                               + ': $SLURM_JOB_NAME.o%j'                 + '\n' \
-        'echo Description: %j executed on $num_procs '                         \
-
-                         + 'processor\'(s)\'. The' + '\n' + 'echo '            \
-                         + '\'            \' command-line output '             \
-                         + 'information may be found below.'            + '\n' \
-        'echo Author: Vedran Coralic'                                   + '\n' \
-        'echo Start-date: `date +%D`'                                   + '\n' \
-        'echo Start-time: `date +%T`'                                   + '\n' \
-        'echo' + '\n' + 'echo'                                          + '\n' \
-        'echo \'================================ Terminal Output '             \
-             + '===============================\'' + '\n' + 'echo'      + '\n' \
-                                                                               \
-        # Starting the timer for the job execution
-        't_start=$(date +%s)'                                           + '\n' \
-        #'t_start=$(date +"%T.%3N")'                                           + '\n' \
-        # Executing job:
-        # (Hooke)
-        # '/opt/mvapich2/ch3_mrail_gen2-intel12/bin/mpirun '                     \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        # (Darter)
-        # 'aprun -n ' + str(pbs_dict['nodes']*pbs_dict['ppn']) + ' '             \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        # (Thomson)
-        # '/share/apps/openmpi-1.4.3/nag_fort/bin/mpirun '                       \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        # (Stampede/Comet)
-        #'ibrun '                                                               \
-        #                               + mfc_dir + '/' + comp_name             \
-        #                               + '_code' + '/' + comp_name      + '\n' \
-        # (Gordon)
-        # 'mpirun_rsh -np ' + str(pbs_dict['nodes']*pbs_dict['ppn']) + ' '       \
-        #                               + '-hostfile $PBS_NODEFILE '            \
-        #                               + mfc_dir + '/' + comp_name             \
-        #                               + '_code' + '/' + comp_name      + '\n' \
-        # (Richardson)
-        'mpirun '                                                               \
-                                       + mfc_dir + '/' + comp_name             \
-                                       + '_code' + '/' + comp_name      + '\n' \
-        # Stopping the timer for the job
-        't_stop=$(date +%s)' + '\n' + 'echo'                            + '\n' \
-        #'t_stop=$(date +"%T.%3N")' + '\n' + 'echo'                            + '\n' \
-                                                                               \
-        # Setting up the PBS output file's footer information
-        'echo \'================================================='             \
-             + '===============================\''                      + '\n' \
-        'echo' + '\n' + 'echo'                                          + '\n' \
-        'echo End-date: `date +%D`'                                     + '\n' \
-        'echo End-time: `date +%T`' + '\n' + 'echo'                     + '\n' \
-        'echo Total-time: $(expr $t_stop - $t_start)s'                  + '\n' \
-                                                                               \
-        # Removing the input file
-        'rm -f ' + comp_name + '.inp'                                   + '\n' \
-                                                                               \
-        # Removing the batch file
-        'rm -f ' + comp_name + '.sh'                                           )
-    # END: Populating Batch File ===============================================
-
-
-    # Closing the batch file
-    file_id.close()
-
-
-    # Giving the batch file the permission to be executed
-    cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE)
-    output, errors = cmd_status.communicate()
-# END: def f_create_batch_file -------------------------------------------------
 
 def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
     # Description: The following function generates a batch file given the name

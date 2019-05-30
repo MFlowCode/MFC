@@ -34,7 +34,6 @@ R0ref   = 10.E-06
 
 pa      = 0.1 * 1.E+06 / 101325.
 
-#Dimensionless groups
 #Characteristic velocity
 uu = math.sqrt( p0/rho0 )
 #Cavitation number
@@ -84,10 +83,9 @@ if len(dirname(argv[0])) != 0: chdir(dirname(argv[0]))
 # Adding master_scripts directory to module search path
 mfc_dir = '../../src'; path[:0] = [mfc_dir + '/master_scripts']
 
-
 # Command to execute the MFC components
-from m_python_proxy import f_execute_mfc_component_SHB
-sub_name = 'bubscreen-ensavg-500Nx'
+from m_python_proxy import f_execute_mfc_component
+
 # ==============================================================================
 
 # Case Analysis Configuration ==================================================
@@ -243,6 +241,6 @@ case_dict =                                                                     
     }
 
 # Executing MFC component
-f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
+f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine)
 
 # ==============================================================================
