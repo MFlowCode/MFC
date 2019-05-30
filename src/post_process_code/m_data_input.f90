@@ -88,7 +88,7 @@ MODULE m_data_input
             
             
             ! Setting location of time-step folder based on current time-step
-            WRITE(t_step_dir, '(A,I0,A,I0)') '/p', proc_rank, '/', t_step
+            WRITE(t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
             t_step_dir = TRIM(case_dir) // TRIM(t_step_dir)
             
             

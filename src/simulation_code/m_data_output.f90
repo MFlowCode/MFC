@@ -714,8 +714,11 @@ MODULE m_data_output
             REAL(KIND(0d0)), DIMENSION(2)                   :: Re !< Temporary Reynolds number
             REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:)    :: We !< Temporary Weber number
 
+            ! Creating or overwriting the time-step root directory
+            WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/p_all'
+ 
             ! Creating or overwriting the current time-step directory
-            WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/p', &
+            WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/p_all/p', &
                                             proc_rank, '/', t_step
             
             file_path = TRIM(t_step_dir) // '/.'

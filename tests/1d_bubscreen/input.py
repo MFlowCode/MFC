@@ -94,7 +94,7 @@ from m_python_proxy import f_execute_mfc_component
 comp_name = argv[1].strip()
 
 
-np = 1
+np = 2
 
 # Serial or parallel computational engine
 engine = 'serial'
@@ -153,7 +153,7 @@ case_dict =                                                                     
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
-                    'format'                       : 1,                        \
+                    'format'                       : 2,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
 		    'parallel_io'                  :'F',                       \

@@ -257,7 +257,7 @@ MODULE m_data_output
                     END IF
                 END IF
                 
-                WRITE(proc_rank_dir, '(A,I0)') '/p', proc_rank
+                WRITE(proc_rank_dir, '(A,I0)') '/p_all/p', proc_rank
                 
                 proc_rank_dir = TRIM(dbdir) // TRIM(proc_rank_dir)
                 

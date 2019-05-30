@@ -817,7 +817,7 @@ MODULE m_start_up
             ! Confirming that the directory from which the initial condition and
             ! the grid data files are to be read in exists and exiting otherwise
             WRITE(t_step_dir, '(A,I0,A,I0)') &
-                    TRIM(case_dir) // '/p', proc_rank, '/', t_step_start
+                    TRIM(case_dir) // '/p_all/p', proc_rank, '/', t_step_start
             
             file_path = TRIM(t_step_dir) // '/.'
             CALL my_inquire(file_path,file_exist)

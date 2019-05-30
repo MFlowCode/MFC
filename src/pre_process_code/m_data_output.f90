@@ -409,7 +409,7 @@ MODULE m_data_output
             
             IF (parallel_io .NEQV. .TRUE.) THEN
                 ! Setting the address of the time-step directory
-                WRITE(t_step_dir, '(A,I0,A)') '/p', proc_rank, '/0'
+                WRITE(t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
                 t_step_dir = TRIM(case_dir) // TRIM(t_step_dir)
                 
                 
