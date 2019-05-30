@@ -1,6 +1,6 @@
 # Definitions ==================================================================
 #For compiler-specific modules, options (gcc,intel)
-mycompiler="gcc"
+mycompiler="intel"
 
 ifeq ($(mycompiler),"gcc")
 myfile = m_compile_specific_gcc.f90
@@ -12,13 +12,13 @@ endif
 # f90_flags = -c -C -fpe-all=1 -O0 -traceback -warn
 
 # Intel compiler flags (production)
-#f90_flags = -c -ip -O3 -w
+ f90_flags = -c -ip -O3 -w
 
 # GCC compiler flags (development)
 # f90_flags = -c -C -O0 -Wall -g3 -fbacktrace -v
 
 # GCC compiler flags (production)
-f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
+# f90_flags = -ffree-line-length-none -c -O3 -w #-fdefault-real-8
 
 # Compiler
 compiler = mpif90
