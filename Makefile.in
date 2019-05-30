@@ -46,7 +46,7 @@ silo_flags = -L$(silo_dir)/lib -lsiloh5 -lm #-lz
 ld_post_flags = $(ld_sim_flags) $(silo_flags)
 
 # Header flags (Richardson)
-hd_post_flags = -I$(silo_dir)/include -I$(MKLROOT)/include
+hd_post_flags = -I$(silo_dir)/include #-I$(MKLROOT)/include
 
 # Compiler flags
 f90_post_flags = $(f90_flags) $(hd_post_flags)
