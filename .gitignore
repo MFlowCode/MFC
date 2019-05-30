@@ -1,8 +1,8 @@
-*/*.mod
-*/*.o
-pre_process_code/pre_process
-simulation_code/simulation
-post_process_code/post_process
+src/*/*.mod
+src/*/*.o
+src/pre_process_code/pre_process
+src/simulation_code/simulation
+src/post_process_code/post_process
 cases/
 .DS_Store
 tests/*/D/*
