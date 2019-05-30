@@ -197,7 +197,8 @@ MODULE m_start_up
             ! Constraint on the location of the case directory
             IF(dir_check .NEQV. .TRUE.) THEN
                 PRINT '(A)', 'Unsupported choice for the value of '         // &
-                             'case_dir. Exiting ...'
+                             'case_dir.'
+                PRINT '(A)', 'WARNING: Ensure that compiler choice in Makefile.in (gcc/intel) matches your compiler! '
                 CALL s_mpi_abort()
                 
             ! Constraints on the use of a preexisting grid and initial condition
