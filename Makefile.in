@@ -1,6 +1,6 @@
 ########################### Definitions #########################
 # For compiler-specific modules, options [gcc,intel]
-mycompiler="intel"
+mycompiler="gcc"
 
 ifeq ($(mycompiler),"intel")
    myfile = m_compile_specific_intel.f90
