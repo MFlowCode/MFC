@@ -67,7 +67,7 @@ Nt      = int(Tfinal/dt)
 
 Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
-Nt = Nout*Nfiles
+Nt = int(Nout*Nfiles)
 
 # Command to navigate between directories
 from os import chdir
