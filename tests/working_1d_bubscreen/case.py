@@ -82,7 +82,7 @@ from sys import argv, path
 if len(dirname(argv[0])) != 0: chdir(dirname(argv[0]))
 
 # Adding master_scripts directory to module search path
-mfc_dir = '../..'; path[:0] = [mfc_dir + '/master_scripts']
+mfc_dir = '../../src'; path[:0] = [mfc_dir + '/master_scripts']
 
 
 # Command to execute the MFC components

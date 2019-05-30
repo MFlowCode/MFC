@@ -1,6 +1,6 @@
 ########################### Definitions #########################
 # For compiler-specific modules, options [gcc,intel]
-mycompiler="gcc"  #[gcc,intel]
+mycompiler="intel"
 
 ifeq ($(mycompiler),"intel")
    myfile = m_compile_specific_intel.f90
@@ -31,11 +31,11 @@ hd_flags = -I$(fftw_include_dir)
 
 ######################## Compiler Flags #########################
 ifeq ($(mycompiler),"intel")
-  # Intel
-  f90_flags = -c -ip -O3 -w $(hd_flags)
+   # Intel
+   f90_flags = -c -ip -O3 -w $(hd_flags)
 else
-  # GCC
-  f90_flags = -ffree-line-length-none -c -O3 -w $(hd_flags) #-fdefault-real-8
+   # GCC
+   f90_flags = -ffree-line-length-none -c -O3 -w $(hd_flags)
 endif
 
 #################### Post-process Silo Flags #####################
