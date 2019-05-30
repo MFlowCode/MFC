@@ -65,6 +65,10 @@ Tpulse  = Lpulse/cact
 Tfinal  = 0.25*10.*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
+Nfiles = 20.
+Nout = int(math.ceil(Nt/Nfiles))
+Nt = Nout*Nfiles
+
 # Command to navigate between directories
 from os import chdir
 
@@ -80,6 +84,7 @@ if len(dirname(argv[0])) != 0: chdir(dirname(argv[0]))
 # Adding master_scripts directory to module search path
 mfc_dir = '../..'; path[:0] = [mfc_dir + '/master_scripts']
 
+
 # Command to execute the MFC components
 from m_python_proxy import f_execute_mfc_component_SHB
 sub_name = 'bubscreen-ensavg-500Nx'
@@ -90,8 +95,8 @@ sub_name = 'bubscreen-ensavg-500Nx'
 # Selecting MFC component
 comp_name = argv[1].strip()
 
-np = 2
-if (comp_name=='post_process'): np = 1
+
+np = 1
 
 # Serial or parallel computational engine
 engine = 'serial'
@@ -121,7 +126,7 @@ case_dict =                                                                     
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
                     't_step_stop'                  : Nt,                        \
-                    't_step_save'                  : int(math.ceil(Nt/20.)),   \
+                    't_step_save'                  : Nout,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -154,11 +159,11 @@ case_dict =                                                                     
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
 		    'parallel_io'                  :'F',                       \
-	            'fd_order'                     : 1,                       \
+	            #'fd_order'                     : 1,                       \
                     #'schlieren_wrt'                :'T',                      \
-		    'probe_wrt'                    :'T',                   \
-		    'num_probes'                   : 1,                    \
-		    'probe(1)%x'                   : 0.,             \
+		    #'probe_wrt'                    :'T',                   \
+		    #'num_probes'                   : 1,                    \
+		    #'probe(1)%x'                   : 0.,             \
 		    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
@@ -167,7 +172,7 @@ case_dict =                                                                     
                     'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
                     'patch_icpp(1)%vel(1)'         : 0.0,                       \
                     'patch_icpp(1)%pres'           : patm,                      \
-                    'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)1.E+03/rho0, \
+                    'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0, \
                     'patch_icpp(1)%alpha(1)'       : 1.E-12,                    \
                     'patch_icpp(1)%r0'             : 1.,                        \
                     'patch_icpp(1)%v0'             : 0.0E+00,                   \
