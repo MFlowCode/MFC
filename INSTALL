@@ -15,6 +15,10 @@ on OSX:
     $$ brew install open-mpi
 or compiled via another package manager on Unix systems.
 
+## NOTE! ##
+In Makefile.user (lines 1-2) you need to indicate if you 
+are using gcc or Intel compilers! 
+
 ## FFTW ##
 If you already have FFTW compiled:
     - Specify the location of your FFTW library and 
