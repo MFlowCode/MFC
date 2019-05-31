@@ -42,7 +42,7 @@ case_dict =                                                                    \
     {                                                                          \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                  \
-                    'run_time_info'                : 'T',                      \
+                    'run_time_info'                : 'F',                      \
                     'nodes'                        : 1,                        \
                     'ppn'                          : 1,                        \
                     'queue'                        : 'normal',                 \
@@ -53,13 +53,13 @@ case_dict =                                                                    \
                     # Computational Domain Parameters ==========================
                     'x_domain%beg'                 : 0.E+00,                   \
                     'x_domain%end'                 : 1.E+00,                   \
-                    'm'                            : 999,                      \
+                    'm'                            : 299,                      \
                     'n'                            : 0,                        \
                     'p'                            : 0,                        \
                     'dt'                           : 4.E-08,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 6025,                     \
-                    't_step_save'                  : 100,                     \
+                    't_step_stop'                  : 500,                     \
+                    't_step_save'                  : 500,                     \
 		            # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
@@ -89,7 +89,7 @@ case_dict =                                                                    \
                                                                                \
                     # Formatted Database Files Structure Parameters ============
                     'format'                       : 1,                        \
-                    'precision'                    : 2,                        \
+                    'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
 		    'parallel_io'                  :'F',                       \
                     # ==========================================================

@@ -13,3 +13,4 @@ tests/*/*.inp
 tests/*/*.dat
 tests/*/silo*
 tests/*/restart*
+lib/fftw-3.3.8

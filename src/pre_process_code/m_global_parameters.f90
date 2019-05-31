@@ -110,7 +110,8 @@ MODULE m_global_parameters
 
 
     LOGICAL :: parallel_io !< Format of the data files
-   
+    INTEGER :: precision !< Precision of output files
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     LOGICAL :: perturb_flow
     INTEGER :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -241,6 +242,7 @@ MODULE m_global_parameters
             bc_z%end = dflt_real
             
             parallel_io = .FALSE.
+            precision = 2
             perturb_flow = .FALSE.
             perturb_flow_fluid = dflt_int
             perturb_sph = .FALSE.

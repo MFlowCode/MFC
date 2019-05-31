@@ -94,7 +94,8 @@ MODULE m_start_up
                                    tvd_riemann_flux, tvd_rhs_flux,           &
                                    tvd_wave_speeds, flux_lim, We_rhs_flux,   &
                                    We_riemann_flux, We_src, null_weights,    &
-                                   We_wave_speeds, lsq_deriv, parallel_io,   &
+                                   We_wave_speeds, lsq_deriv, precision,     & 
+                                   parallel_io,                              &
                                    regularization, reg_eps, cyl_coord,       & 
                                    rhoref, pref, bubbles, bubble_model,      &
                                    R0ref, nb, Ca, Web, Re_inv,               &

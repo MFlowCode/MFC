@@ -1,15 +1,25 @@
 # For compiler-specific modules, options [gcc,intel]
-mycompiler="intel"
+mycompiler="gcc"
 
 # FFTW library location
-fftw_dir = /usr/local/lib
+#fftw_lib_dir = /usr/local/lib
+
+#(for pre-packaged FFTW)
+fftw_lib_dir = ../../lib/fftw-3.3.8/lib
 
 # FFTW include location
 #fftw_include_dir = /usr/include
-fftw_include_dir = /usr/local/include
+#fftw_include_dir = /usr/local/include
+
+#(for pre-packaged FFTW)
+fftw_include_dir = ../../lib/fftw-3.3.8/include
 
 # Silo location
-silo_dir = /home/spencer/packages/silo-4.10.2
+#silo_dir = /home/spencer/packages/silo-4.10.2
+#silo_dir = /Users/spencerbryngelson/Downloads/post_process_lib/silo-4.10.2
+#silo_dir = /Users/spencerbryngelson/Documents/packages/silo-4.10.2
+silo_lib_dir = /usr/local/lib
+silo_include_dir = /usr/local/include
 
 # Compiler command
 compiler = mpif90

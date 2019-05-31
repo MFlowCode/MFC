@@ -131,7 +131,7 @@ MODULE m_global_parameters
     !> @}
 
     LOGICAL :: parallel_io !< Format of the data files
-
+    INTEGER :: precision !< Precision of output files
 
     INTEGER, ALLOCATABLE, DIMENSION(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -353,6 +353,7 @@ MODULE m_global_parameters
             We_wave_speeds   = .FALSE.
             lsq_deriv        = .FALSE.
             parallel_io      = .FALSE.
+            precision        = 2
             
             bc_x%beg = dflt_int; bc_x%end = dflt_int
             bc_y%beg = dflt_int; bc_y%end = dflt_int

@@ -200,6 +200,7 @@ MODULE m_mpi_proxy
                                       0, MPI_COMM_WORLD, ierr  )
             
             CALL MPI_BCAST(parallel_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            CALL MPI_BCAST(precision, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(perturb_flow, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(perturb_flow_fluid, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(perturb_sph, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

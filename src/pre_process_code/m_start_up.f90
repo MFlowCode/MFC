@@ -88,7 +88,7 @@ MODULE m_start_up
                                    a_z, x_a, y_a, z_a, x_b, y_b, z_b,         &
                                    model_eqns, num_fluids, adv_alphan, mpp_lim, &
                                    weno_order, bc_x, bc_y, bc_z, num_patches, &
-                                   patch_icpp, fluid_pp, parallel_io,         &
+                                   patch_icpp, fluid_pp, precision, parallel_io, &
                                    perturb_flow, perturb_flow_fluid,          &
                                    perturb_sph, perturb_sph_fluid, fluid_rho, &
                                    cyl_coord, loops_x, loops_y, loops_z,      &

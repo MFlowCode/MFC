@@ -69,6 +69,7 @@ pre_process_dict =                                                             \
                     'adv_alphan'                    : None,                    \
                     'mpp_lim'                       : None,                    \
                     'weno_order'                    : None,                    \
+                    'precision'                     : None,                    \
                     'parallel_io'                   : None,                    \
                     'perturb_flow'                  : None,                    \
                     'perturb_flow_fluid'            : None,                    \
@@ -828,6 +829,7 @@ simulation_dict =                                                              \
                     'We_wave_speeds'                : None,                    \
                     'lsq_deriv'                     : None,                    \
                     'parallel_io'                   : None,                    \
+                    'precision'                     : None,                    \
                     'bc_x%beg'                      : None,                    \
                     'bc_x%end'                      : None,                    \
                     'bc_y%beg'                      : None,                    \

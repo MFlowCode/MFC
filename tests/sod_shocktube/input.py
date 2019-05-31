@@ -2,11 +2,11 @@
 import math
 
 #Numerical setup
-Nx      = 399
+Nx      = 299
 dx      = 1./(1.*(Nx+1))
 
-Tend    = 0.1
-Nt      = 1000
+Tend    = 0.03
+Nt      = 400
 mydt    = Tend/(1.*Nt)
 
 # Command to navigate between directories
@@ -29,7 +29,6 @@ from m_python_proxy import f_execute_mfc_component
 
 # Serial or parallel computational engine
 engine = 'serial'
-#engine = 'parallel'
 # ==============================================================================
 
 # Case Analysis Configuration ==================================================
@@ -42,7 +41,7 @@ case_dict =                                                                     
     {                                                                           \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                   \
-                    'run_time_info'                : 'T',                       \
+                    'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
                     'ppn'                          : 1,                         \
                     'queue'                        : 'normal',                  \
@@ -59,7 +58,7 @@ case_dict =                                                                     
                     'dt'                           : mydt,                      \
                     't_step_start'                 : 0,                         \
                     't_step_stop'                  : int(Nt),                        \
-                    't_step_save'                  : int(math.ceil(Nt/10.)),    \
+                    't_step_save'                  : int(Nt),    \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -89,19 +88,9 @@ case_dict =                                                                     
                                                                                \
                     # Formatted Database Files Structure Parameters ============
                     'format'                       : 1,                        \
-                    'precision'                    : 2,                        \
+                    'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
 		    'parallel_io'                  :'F',                       \
-	            #'fd_order'                     : 1,                       \
-                    #'schlieren_wrt'                :'T',                      \
-		        #'probe_wrt'                    :'T',                   \
-		        #'num_probes'                   : 1,                    \
-		        #'probe(1)%x'                   : -2.5E+00,             \
-		        #'probe(1)%y'                   : 0.E+00,               \
-		        #'probe(1)%z'                   : 0.E+00,               \
-	    	        #'schlieren_alpha(1)'           : 4.E+00,               \
-		        #'schlieren_alpha(2)'           : 4.E+00,               \
-		        #'schlieren_alpha(3)'           : 4.E+01,               \
 		    # ==========================================================
                                                                                 
 		    # Patch 1 L ================================================
@@ -128,19 +117,8 @@ case_dict =                                                                     
                     # Surrounding liquid
                     'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),  \
                     'fluid_pp(1)%pi_inf'           : 0.0, \
-                    #'fluid_pp(1)%gamma'            : 1.E+00/(4.4E+00-1.E+00),  \
-                    #'fluid_pp(1)%pi_inf'           : 4.4E+00*6.E+08/(4.4E+00-1.E+00), \
-	            
-                    # Last fluid_pp is always reserved for the gaseous state ===
-                    # This is little gamma (ratio of specific heats) ===========
-                    #'fluid_pp(2)%gamma'             : 1./(gamma_gas-1.),      \
-                    #'fluid_pp(2)%pi_inf'            : 0.0E+00,      \
                     # ==========================================================
                     
-                    # SHB: Tait EOS ============================================
-                    #'pref'                  : pl0,                  \
-                    #'rhoref'                : rhol0,                \
-	            # ==========================================================
     }
 
 # Executing MFC component

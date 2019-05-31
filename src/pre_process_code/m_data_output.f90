@@ -69,8 +69,10 @@ MODULE m_data_output
             DIMENSION(sys_size), &
             INTENT(IN) :: q_cons_vf
 
-            logical :: file_exist !< checks if file exists
+            LOGICAL :: file_exist !< checks if file exists
             
+            CHARACTER(LEN=15) :: FMT
+
             CHARACTER(LEN = &
             INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num !< Used to store the number, in character form, of the currently
             !! manipulated conservative variable data file
@@ -145,6 +147,12 @@ MODULE m_data_output
             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
             pi_inf = fluid_pp(1)%pi_inf
 
+            IF (precision==1) THEN
+                FMT="(2F30.7)"
+            ELSE
+                FMT="(2F40.14)"
+            END IF
+
             !1D
             IF (n ==0 .AND. p ==0) THEN
                 ! writting an output directory
@@ -153,7 +161,7 @@ MODULE m_data_output
             
                 INQUIRE( FILE = TRIM(file_loc), EXIST = file_exist )
             
-                IF(.not.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+                IF(.NOT.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
                 DO i = 1, sys_size
                     WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
@@ -168,13 +176,13 @@ MODULE m_data_output
                                                       .OR.                          &
                                  ((i.ge.adv_idx%beg)  .AND. (i.le.adv_idx%end))     &
                                                      ) THEN 
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)
+                                WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
                             ELSE IF (i.eq.mom_idx%beg) THEN !u
-                                WRITE(2,*) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
+                                WRITE(2,FMT) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
                             ELSE IF (i.eq.E_idx) THEN !p
                                 IF (model_eqns == 4) THEN
                                     !Tait pressure from density
-                                    WRITE(2,*) x_cb(j), &
+                                    WRITE(2,FMT) x_cb(j), &
                                         (pref + pi_inf) * (                     &
                                         ( q_cons_vf(1)%sf(j,0,0)/               &
                                         (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
@@ -182,7 +190,7 @@ MODULE m_data_output
                                         - pi_inf
                                 ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
-                                    WRITE(2,*) x_cb(j), &
+                                    WRITE(2,FMT) x_cb(j), &
                                         (                                       & 
                                         q_cons_vf(E_idx)%sf(j,0,0)  -            &
                                         0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho - &
@@ -190,7 +198,7 @@ MODULE m_data_output
                                         ) / gamma
                                 ELSE
                                     !Stiffened gas pressure from energy with bubbles
-                                    WRITE(2,*) x_cb(j), &
+                                    WRITE(2,FMT) x_cb(j), &
                                         (                                       & 
                                         (q_cons_vf(E_idx)%sf(j,0,0)  -            &
                                         0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho) / &
@@ -204,7 +212,7 @@ MODULE m_data_output
                                 END DO
                                 CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
                                 
-                                WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
+                                WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
                             END IF
                         END DO
                     CLOSE(2)
@@ -215,7 +223,7 @@ MODULE m_data_output
 
                     OPEN(2,FILE= TRIM(file_loc) )
                         DO j=0,m
-                            WRITE(2,*) x_cb(j),q_cons_vf(i)%sf(j,0,0)
+                            WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
                         END DO
                     CLOSE(2)
                 END DO
@@ -239,12 +247,12 @@ MODULE m_data_output
                             lit_gamma = 1d0/gamma + 1d0
                             
                             IF (i==1 .OR. i==5) THEN 
-                                WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
+                                WRITE(2,FMT) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
                             ELSE IF (i==2 .OR. i==3) THEN !u
-                                WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)/rho
+                                WRITE(2,FMT) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)/rho
                             ELSE IF (i==4) THEN !p
                                 IF (model_eqns == 4) THEN
-                                    WRITE(2,*) x_cb(j),y_cb(k), &
+                                    WRITE(2,FMT) x_cb(j),y_cb(k), &
                                         (pref+fluid_pp(1)%pi_inf) *                     &
                                         ((                                               & 
                                         q_cons_vf(1)%sf(j,k,0)/                          &
@@ -252,7 +260,7 @@ MODULE m_data_output
                                         ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
                                 ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
                                     !Stiffened gas pressure from energy
-                                    WRITE(2,*) x_cb(j),y_cb(k), &
+                                    WRITE(2,FMT) x_cb(j),y_cb(k), &
                                         (                                       & 
                                         q_cons_vf(E_idx)%sf(j,k,0)  -            &
                                         0.5d0*(q_cons_vf(2)%sf(j,k,0)**2.d0)/rho - &
@@ -260,7 +268,7 @@ MODULE m_data_output
                                         ) / gamma
                                 ELSE
                                     !Stiffened gas pressure from energy with bubbles
-                                    WRITE(2,*) x_cb(j),y_cb(k), &
+                                    WRITE(2,FMT) x_cb(j),y_cb(k), &
                                         (                                       & 
                                         (q_cons_vf(E_idx)%sf(j,k,0)  -            &
                                         0.5d0*( q_cons_vf(2)%sf(j,k,0)**2.d0 + q_cons_vf(3)%sf(j,k,0)**2.d0 ) &
@@ -275,7 +283,7 @@ MODULE m_data_output
                                 END DO
                                 CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)                                
                                 
-                                WRITE(2,*) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
+                                WRITE(2,FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
                            END IF
                         END DO
                         WRITE(2,*)
@@ -286,7 +294,7 @@ MODULE m_data_output
                     OPEN(2,FILE= TRIM(file_loc) )
                         DO j=0,m
                         DO k=0,n
-                            WRITE(2,*) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
+                            WRITE(2,FMT) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
                         END DO
                         WRITE(2,*)
                         END DO
@@ -302,7 +310,7 @@ MODULE m_data_output
                         DO j=0,m
                         DO k=0,n
                         DO l=0,p
-                            WRITE(2,*) x_cb(j),y_cb(k),z_cb(l), q_cons_vf(i)%sf(j,k,l)
+                            WRITE(2,FMT) x_cb(j),y_cb(k),z_cb(l), q_cons_vf(i)%sf(j,k,l)
                         END DO
                         WRITE(2,*)
                         END DO

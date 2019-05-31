@@ -54,14 +54,14 @@ nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
-Nx      = 500
+Nx      = 100
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)
 dt      = cfl*dx*c0/cact
 Lpulse  = 0.3*Ldomain
 Tpulse  = Lpulse/cact
-Tfinal  = 0.25*10.*Tpulse*c0/x0
+Tfinal  = 0.1*10.*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
 Nfiles = 20.
@@ -93,21 +93,17 @@ from m_python_proxy import f_execute_mfc_component
 # Selecting MFC component
 comp_name = argv[1].strip()
 
-
-np = 2
-
 # Serial or parallel computational engine
 engine = 'serial'
-if (comp_name=='pre_process'): engine = 'serial'
 
 # Configuring case dictionary
 case_dict =                                                                     \
     {                                                                           \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                   \
-                    'run_time_info'                : 'T',                       \
+                    'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : np,                         \
+                    'ppn'                          : 1,                         \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -124,7 +120,7 @@ case_dict =                                                                     
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
                     't_step_stop'                  : Nt,                        \
-                    't_step_save'                  : Nout,   \
+                    't_step_save'                  : Nt,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -154,14 +150,9 @@ case_dict =                                                                     
                                                                                \
                     # Formatted Database Files Structure Parameters ============
                     'format'                       : 1,                        \
-                    'precision'                    : 2,                        \
+                    'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'T',                       \
-	            #'fd_order'                     : 1,                       \
-                    #'schlieren_wrt'                :'T',                      \
-		    #'probe_wrt'                    :'T',                   \
-		    #'num_probes'                   : 1,                    \
-		    #'probe(1)%x'                   : 0.,             \
+		    'parallel_io'                  :'F',                       \
 		    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================

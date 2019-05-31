@@ -42,7 +42,7 @@ case_dict =                                                                    \
     {                                                                          \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                  \
-                    'run_time_info'                : 'T',                      \
+                    'run_time_info'                : 'F',                      \
                     'nodes'                        : 1,                        \
                     'ppn'                          : 1,                        \
                     'queue'                        : 'normal',                 \
@@ -58,7 +58,7 @@ case_dict =                                                                    \
                     'p'                            : 0,                        \
                     'dt'                           : 5.E-08,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 15000,                    \
+                    't_step_stop'                  : 1000,                    \
                     't_step_save'                  : 1000,                     \
 		    # ==========================================================
                                                                                \
@@ -89,7 +89,7 @@ case_dict =                                                                    \
                                                                                \
                     # Formatted Database Files Structure Parameters ============
                     'format'                       : 1,                        \
-                    'precision'                    : 2,                        \
+                    'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
 		    'parallel_io'                  :'F',                       \
 		    # ==========================================================
