@@ -3,6 +3,7 @@ src/*/*.o
 src/pre_process_code/pre_process
 src/simulation_code/simulation
 src/post_process_code/post_process
+src/master_scripts/*.pyc
 cases/
 .DS_Store
 tests/*/D/*
