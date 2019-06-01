@@ -120,27 +120,15 @@ MODULE m_data_output
             
             
             ! Outputting Conservative Variables ================================
-            IF ( bubbles .eqv. .False. ) THEN
-                DO i = 1, adv_idx%end
-                    WRITE(file_num, '(I0)') i
-                    file_loc = TRIM(t_step_dir) // '/q_cons_vf' // TRIM(file_num) &
-                           // '.dat'
-                    OPEN(1, FILE = TRIM(file_loc), FORM = 'unformatted', &
-                        STATUS = 'new')
-                    WRITE(1) q_cons_vf(i)%sf
-                    CLOSE(1)
-                END DO
-            ELSE
-                DO i = 1, sys_size
-                    WRITE(file_num, '(I0)') i
-                    file_loc = TRIM(t_step_dir) // '/q_cons_vf' // TRIM(file_num) &
-                           // '.dat'
-                    OPEN(1, FILE = TRIM(file_loc), FORM = 'unformatted', &
-                        STATUS = 'new')
-                    WRITE(1) q_cons_vf(i)%sf
-                    CLOSE(1)
-                END DO
-            END IF
+            DO i = 1, sys_size
+                WRITE(file_num, '(I0)') i
+                file_loc = TRIM(t_step_dir) // '/q_cons_vf' // TRIM(file_num) &
+                       // '.dat'
+                OPEN(1, FILE = TRIM(file_loc), FORM = 'unformatted', &
+                    STATUS = 'new')
+                WRITE(1) q_cons_vf(i)%sf
+                CLOSE(1)
+            END DO
             ! ==================================================================
     
             gamma = fluid_pp(1)%gamma
