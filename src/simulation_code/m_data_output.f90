@@ -2319,7 +2319,7 @@ MODULE m_data_output
                     END IF
                 END DO
             ELSEIF (p == 0) THEN
-                IF (num_integrals .ne. 3) THEN
+                IF (num_integrals .NE. 3) THEN
                     PRINT '(A)', 'Incorrect number of integrals'
                     CALL s_mpi_abort()
                 END IF

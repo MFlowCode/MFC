@@ -316,7 +316,7 @@ MODULE m_initial_condition
             END IF
             
             ! Partial densities
-            IF (model_eqns .ne. 4) THEN
+            IF (model_eqns .NE. 4) THEN
                 DO i = 1, cont_idx%end
                     q_prim_vf(i)%sf(j,k,l) = patch_icpp(patch_id)%alpha_rho(i)
                 END DO
@@ -341,7 +341,7 @@ MODULE m_initial_condition
             
             ! Computing Mixture Variables of Smoothing Patch ===================
             
-            IF (model_eqns .ne. 4) THEN
+            IF (model_eqns .NE. 4) THEN
                 ! Partial densities
                 DO i = 1, cont_idx%end
                     q_prim_vf(i)%sf(j,k,l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
@@ -410,7 +410,7 @@ MODULE m_initial_condition
 
 
             ! Partial densities \alpha \rho
-            IF (model_eqns .ne. 4) THEN
+            IF (model_eqns .NE. 4) THEN
                 !mixture density is an input
                 DO i = 1, cont_idx%end
                     q_prim_vf(i)%sf(j,k,l) = &
@@ -995,7 +995,7 @@ MODULE m_initial_condition
                     
                     CALL s_assign_patch_primitive_variables(patch_id, i,0,0)
                    
-                    !IF ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .AND. (model_eqns .ne. 4)) THEN
+                    !IF ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .AND. (model_eqns .NE. 4)) THEN
                     !    PRINT*, 'Reassigning zero density for 1st fluid'
                     !    !zero density, reassign according to Tait EOS
                     !    q_prim_vf(1)%sf(i,0,0) = &
@@ -1445,7 +1445,7 @@ MODULE m_initial_condition
                         
                         CALL s_assign_patch_primitive_variables(patch_id, i,j,0)
 
-                        IF ( (q_prim_vf(1)%sf(i,j,0) < 1.e-10) .AND. (model_eqns .ne. 4)) THEN
+                        IF ( (q_prim_vf(1)%sf(i,j,0) < 1.e-10) .AND. (model_eqns .NE. 4)) THEN
                             !zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i,j,0) = &
                                 (((q_prim_vf(E_idx)%sf(i,j,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &

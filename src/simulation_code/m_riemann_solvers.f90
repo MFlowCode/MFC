@@ -1200,7 +1200,7 @@ MODULE m_riemann_solvers
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-                                IF ( (model_eqns .ne. 4) .AND. bubbles ) THEN
+                                IF ( (model_eqns .NE. 4) .AND. bubbles ) THEN
                                     flux_rs_vf(E_idx)%sf(j,k,l) = &
                                      xi_M*(vel_L(dir_idx(1))*(E_L + pres_L-ptilde_L) +     &
                                         s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1))) * &
@@ -1210,8 +1210,7 @@ MODULE m_riemann_solvers
                                         s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1))) * &
                                         (rho_R*s_S + (pres_R - ptilde_R) /                        &
                                         (s_R - vel_R(dir_idx(1))))) - E_R))
-                                ELSE IF ( model_eqns .ne. 4 ) THEN
-                                !IF (model_eqns .ne. 4) THEN
+                                ELSE IF ( model_eqns .NE. 4 ) THEN
                                     flux_rs_vf(E_idx)%sf(j,k,l) = &
                                      xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) +     &
                                         s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1))) * &
