@@ -54,7 +54,9 @@ MODULE m_start_up
                                    parallel_io, coarsen_silo, fourier_decomp, &
                                    fourier_modes,                             &
                                    rhoref, pref, bubbles, R0ref, nb,          &
-                                   polytropic, thermal, Ca, Web, Re_inv 
+                                   polytropic, thermal, Ca, Web, Re_inv,      &
+                                   polydisperse, poly_sigma
+
             
             ! Inquiring the status of the post_process.inp file
             file_loc = 'post_process.inp'

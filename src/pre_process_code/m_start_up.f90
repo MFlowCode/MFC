@@ -86,14 +86,17 @@ MODULE m_start_up
                                    n, p, x_domain, y_domain, z_domain,        &
                                    stretch_x, stretch_y, stretch_z, a_x, a_y, &
                                    a_z, x_a, y_a, z_a, x_b, y_b, z_b,         &
-                                   model_eqns, num_fluids, adv_alphan, mpp_lim, &
+                                   model_eqns, num_fluids,                    &
+                                   adv_alphan, mpp_lim,                       &
                                    weno_order, bc_x, bc_y, bc_z, num_patches, &
-                                   patch_icpp, fluid_pp, precision, parallel_io, &
+                                   patch_icpp, fluid_pp,                      &
+                                   precision, parallel_io,                    &
                                    perturb_flow, perturb_flow_fluid,          &
                                    perturb_sph, perturb_sph_fluid, fluid_rho, &
                                    cyl_coord, loops_x, loops_y, loops_z,      &
                                    rhoref, pref, bubbles, R0ref, nb,          &
-                                   polytropic, thermal, Ca, Web, Re_inv
+                                   polytropic, thermal, Ca, Web, Re_inv,      &
+                                   polydisperse, poly_sigma
  
 
             ! Inquiring the status of the pre_process.inp file
@@ -159,6 +162,14 @@ MODULE m_start_up
             IF(bubbles .AND. (model_eqns .NE. 4 .AND. model_eqns .NE. 2)) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'bubbles and model_eqns. '           // &
+                             'Exiting ...'
+                CALL s_mpi_abort()     
+            ELSEIF(bubbles .AND. polydisperse .and. (nb==1)) THEN
+                PRINT '(A)', 'Polydisperse bubble dynamics requires nb > 1 ' // &
+                             'Exiting ...'
+                CALL s_mpi_abort()      
+            ELSEIF(bubbles .AND. polydisperse .and. (mod(nb,2)==0)) THEN
+                PRINT '(A)', 'nb must be odd ' // &
                              'Exiting ...'
                 CALL s_mpi_abort()      
             ELSEIF(model_eqns == 4 .AND. (rhoref == dflt_real)) THEN

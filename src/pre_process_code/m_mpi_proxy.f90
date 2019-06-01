@@ -341,6 +341,12 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST( polytropic,1,          &
                         MPI_LOGICAL,0,          &
                         MPI_COMM_WORLD,ierr  )
+            CALL MPI_BCAST( polydisperse,1,          &
+                        MPI_LOGICAL,0,          &
+                        MPI_COMM_WORLD,ierr  )
+            CALL MPI_BCAST( poly_sigma,1,            &
+                        MPI_DOUBLE_PRECISION,0, &
+                        MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST( thermal,1,            &
                         MPI_INTEGER,0, &
                         MPI_COMM_WORLD,ierr)

@@ -150,61 +150,63 @@ MODULE m_data_output
                 INQUIRE( FILE = TRIM(file_loc), EXIST = file_exist )
             
                 IF(.NOT.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+                
+                IF (model_eqns == 2) THEN
+                    DO i = 1, sys_size
+                        WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
 
-                DO i = 1, sys_size
-                    WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+                        OPEN(2,FILE= TRIM(file_loc) )
+                            DO j=0,m
+                                CALL s_convert_to_mixture_variables( q_cons_vf, j, 0, 0, rho, gamma, pi_inf)
 
-                    OPEN(2,FILE= TRIM(file_loc) )
-                        DO j=0,m
-                            CALL s_convert_to_mixture_variables( q_cons_vf, j, 0, 0, rho, gamma, pi_inf)
-
-                            lit_gamma = 1d0/gamma + 1d0
-                            
-                            IF ( ((i.ge.cont_idx%beg) .AND. (i.le.cont_idx%end))    &
-                                                      .OR.                          &
-                                 ((i.ge.adv_idx%beg)  .AND. (i.le.adv_idx%end))     &
-                                                     ) THEN 
-                                WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
-                            ELSE IF (i.eq.mom_idx%beg) THEN !u
-                                WRITE(2,FMT) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
-                            ELSE IF (i.eq.E_idx) THEN !p
-                                IF (model_eqns == 4) THEN
-                                    !Tait pressure from density
-                                    WRITE(2,FMT) x_cb(j), &
-                                        (pref + pi_inf) * (                     &
-                                        ( q_cons_vf(1)%sf(j,0,0)/               &
-                                        (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
-                                        ) ** lit_gamma )                        &
-                                        - pi_inf
-                                ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
-                                    !Stiffened gas pressure from energy
-                                    WRITE(2,FMT) x_cb(j), &
-                                        (                                       & 
-                                        q_cons_vf(E_idx)%sf(j,0,0)  -            &
-                                        0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho - &
-                                        pi_inf &
-                                        ) / gamma
-                                ELSE
-                                    !Stiffened gas pressure from energy with bubbles
-                                    WRITE(2,FMT) x_cb(j), &
-                                        (                                       & 
-                                        (q_cons_vf(E_idx)%sf(j,0,0)  -            &
-                                        0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho) / &
-                                        (1.d0 - q_cons_vf(alf_idx)%sf(j,0,0)) - &
-                                        pi_inf &
-                                        ) / gamma
-                                END IF
-                            ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
-                                DO k = 1,nb
-                                    nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
-                                END DO
-                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
+                                lit_gamma = 1d0/gamma + 1d0
                                 
-                                WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
-                            END IF
-                        END DO
-                    CLOSE(2)
-                END DO
+                                IF ( ((i.ge.cont_idx%beg) .AND. (i.le.cont_idx%end))    &
+                                                          .OR.                          &
+                                     ((i.ge.adv_idx%beg)  .AND. (i.le.adv_idx%end))     &
+                                                         ) THEN 
+                                    WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
+                                ELSE IF (i.eq.mom_idx%beg) THEN !u
+                                    WRITE(2,FMT) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
+                                ELSE IF (i.eq.E_idx) THEN !p
+                                    IF (model_eqns == 4) THEN
+                                        !Tait pressure from density
+                                        WRITE(2,FMT) x_cb(j), &
+                                            (pref + pi_inf) * (                     &
+                                            ( q_cons_vf(1)%sf(j,0,0)/               &
+                                            (rhoref*(1.d0-q_cons_vf(4)%sf(j,0,0)))  & 
+                                            ) ** lit_gamma )                        &
+                                            - pi_inf
+                                    ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
+                                        !Stiffened gas pressure from energy
+                                        WRITE(2,FMT) x_cb(j), &
+                                            (                                       & 
+                                            q_cons_vf(E_idx)%sf(j,0,0)  -            &
+                                            0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho - &
+                                            pi_inf &
+                                            ) / gamma
+                                    ELSE
+                                        !Stiffened gas pressure from energy with bubbles
+                                        WRITE(2,FMT) x_cb(j), &
+                                            (                                       & 
+                                            (q_cons_vf(E_idx)%sf(j,0,0)  -            &
+                                            0.5d0*(q_cons_vf(mom_idx%beg)%sf(j,0,0)**2.d0)/rho) / &
+                                            (1.d0 - q_cons_vf(alf_idx)%sf(j,0,0)) - &
+                                            pi_inf &
+                                            ) / gamma
+                                    END IF
+                                ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
+                                    DO k = 1,nb
+                                        nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
+                                    END DO
+                                    CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
+                                    
+                                    WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
+                                END IF
+                            END DO
+                        CLOSE(2)
+                    END DO
+                END IF
 
                 DO i = 1, sys_size    
                     WRITE(file_loc,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'

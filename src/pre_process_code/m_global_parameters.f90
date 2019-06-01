@@ -159,21 +159,26 @@ MODULE m_global_parameters
 
     REAL(KIND(0d0)) :: rhoref, pref !< Reference parameters for Tait EOS
 
-    ! Bubble modeling
+    !> @name Bubble modeling
+    !> @{
     INTEGER         :: nb
     REAL(KIND(0d0)) :: R0ref
     REAL(KIND(0d0)) :: Ca, Web, Re_inv
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight, R0, V0
     LOGICAL         :: bubbles
+    !> @}
 
-
-    ! Non-polytropic bubble gas compression
+    !> @name Non-polytropic bubble gas compression
+    !> @{
     LOGICAL         :: polytropic
+    LOGICAL         :: polydisperse
     INTEGER         :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
-    REAL(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
-    REAL(kind(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
-    REAL(kind(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
-    
+    REAL(KIND(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
+    REAL(KIND(0d0)) :: poly_sigma
+    !> @}
+
     INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: logic_grid
             
     ! Mathematical and Physical Constants ======================================
@@ -290,6 +295,8 @@ MODULE m_global_parameters
             ! Bubble modeling
             bubbles     = .FALSE.
             polytropic  = .TRUE.
+            polydisperse= .FALSE.
+
             thermal     = dflt_int
             R0ref       = dflt_real
             nb          = dflt_int
@@ -297,6 +304,7 @@ MODULE m_global_parameters
             Ca      = dflt_real
             Re_inv  = dflt_real
             Web     = dflt_real
+            poly_sigma = dflt_real
 
             R_n     = dflt_real
             R_v     = dflt_real
@@ -801,9 +809,13 @@ MODULE m_global_parameters
             !R0mn = 0.3D0
             !R0mx = 6.D0
 
-            sd   = 0.7D0
-            R0mn = 0.12D0
-            R0mx = 150.D0
+            !sd   = 0.7D0
+            !R0mn = 0.12D0
+            !R0mx = 150.D0
+            
+            sd = poly_sigma
+            R0mn = 0.8D0*DEXP(-2.8D0 * sd)
+            R0mx = 0.2D0*DEXP( 9.5D0 * sd) + 1.D0
             
             ! phi = ln( R0 ) & return R0
             DO ir = 1,Npt

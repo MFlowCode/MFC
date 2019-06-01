@@ -99,8 +99,10 @@ MODULE m_start_up
                                    regularization, reg_eps, cyl_coord,       & 
                                    rhoref, pref, bubbles, bubble_model,      &
                                    R0ref, nb, Ca, Web, Re_inv,               &
-                                   monopole, mono, num_mono, polytropic, thermal,      &
-                                   integral, integral_wrt, num_integrals
+                                   monopole, mono, num_mono,                 &
+                                   polytropic, thermal,                      &
+                                   integral, integral_wrt, num_integrals,    &
+                                   polydisperse, poly_sigma
             
             
             ! Checking that an input file has been provided by the user. If it

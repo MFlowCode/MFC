@@ -101,15 +101,15 @@ MODULE m_global_parameters
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    TYPE(bounds_info) :: cont_idx                  ! Indexes of first & last continuity eqns.
-    TYPE(bounds_info) :: mom_idx                   ! Indexes of first & last momentum eqns.
-    INTEGER           :: E_idx                     ! Index of energy equation
-    TYPE(bounds_info) :: adv_idx                   ! Indexes of first & last advection eqns.
-    TYPE(bounds_info) :: internalEnergies_idx      ! Indexes of first & last internal energy eqns.
-    TYPE(bub_bounds_info) :: bub_idx                    ! Indexes of first & last bubble variable eqns.
-    INTEGER           :: gamma_idx                 ! Index of specific heat ratio func. eqn.
-    INTEGER           :: alf_idx                 ! Index of specific heat ratio func. eqn.
-    INTEGER           :: pi_inf_idx                ! Index of liquid stiffness func. eqn.
+    TYPE(bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
+    TYPE(bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
+    INTEGER           :: E_idx                     !< Index of energy equation
+    TYPE(bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
+    TYPE(bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
+    TYPE(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
+    INTEGER           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
+    INTEGER           :: alf_idx                   !< Index of specific heat ratio func. eqn.
+    INTEGER           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -231,10 +231,12 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight, R0, V0
     LOGICAL         :: bubbles
     LOGICAL         :: polytropic
-    INTEGER         :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
+    LOGICAL         :: polydisperse
+    INTEGER         :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     REAL(KIND(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
+    REAL(KIND(0d0)) :: poly_sigma
     !> @}
 
     ! Mathematical and Physical Constants ======================================
@@ -339,6 +341,8 @@ MODULE m_global_parameters
             bubbles = .FALSE.
             R0ref   = dflt_real 
             nb      = dflt_int
+            polydisperse= .FALSE.
+            poly_sigma = dflt_real
              
         END SUBROUTINE s_assign_default_values_to_user_inputs ! ----------------
         
@@ -897,9 +901,13 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), DIMENSION(Npt) :: phi
 
             ! nondiml. min. & max. initial radii for numerical quadrature
-            sd   = 0.05D0
-            R0mn = 0.75D0
-            R0mx = 1.3D0
+            !sd   = 0.05D0
+            !R0mn = 0.75D0
+            !R0mx = 1.3D0
+
+            sd = poly_sigma
+            R0mn = 0.8D0*DEXP(-2.8D0 * sd)
+            R0mx = 0.2D0*DEXP( 9.5D0 * sd) + 1.D0
 
             ! phi = ln( R0 ) & return R0
             DO ir = 1,Npt

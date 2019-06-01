@@ -260,9 +260,11 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: V0     !< Bubble velocities
     LOGICAL         :: bubbles      !< Bubbles on/off
     LOGICAL         :: polytropic   !< Polytropic  switch
+    LOGICAL         :: polydisperse !< Polydisperse bubbles 
     INTEGER         :: bubble_model !< Gilmore or Keller--Miksis bubble model
     INTEGER         :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ptil  !< Pressure modification
+    REAL(KIND(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
     !> @}
     
     !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
@@ -384,6 +386,7 @@ MODULE m_global_parameters
             bubbles     = .FALSE.
             bubble_model  = 1
             polytropic  = .TRUE.
+            polydisperse= .FALSE.
             thermal     = dflt_int
             R0ref       = dflt_real
             nb          = dflt_int
@@ -391,7 +394,8 @@ MODULE m_global_parameters
             Ca      = dflt_real
             Re_inv  = dflt_real
             Web     = dflt_real
-            
+            poly_sigma = dflt_real
+       
             ! Monopole source
             monopole = .FALSE.
             num_mono = 1
@@ -1081,9 +1085,13 @@ MODULE m_global_parameters
             !R0mn = 0.3D0
             !R0mx = 6.D0
             
-            sd   = 0.7D0
-            R0mn = 0.12D0
-            R0mx = 150.D0
+            !sd   = 0.7D0
+            !R0mn = 0.12D0
+            !R0mx = 150.D0
+
+            sd = poly_sigma
+            R0mn = 0.8D0*DEXP(-2.8D0 * sd)
+            R0mx = 0.2D0*DEXP( 9.5D0 * sd) + 1.D0
 
             ! phi = ln( R0 ) & return R0
             DO ir = 1,Npt
