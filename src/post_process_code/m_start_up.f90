@@ -585,23 +585,23 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported choice for the value of '         // &
                              'fd_order. Exiting ...'
                 CALL s_mpi_abort()
-            ELSEIF(               (omega_wrt(1) .NEQV. .TRUE.)            &
-                                             .AND.                        &
-                                  (omega_wrt(2) .NEQV. .TRUE.)            &
-                                             .AND.                        &
-                                  (omega_wrt(3) .NEQV. .TRUE.)            &
-                                             .AND.                        &
-                                  (schlieren_wrt .NEQV. .TRUE.)           &
-                                             .AND.                        &
-                                     fd_order /= dflt_int              ) THEN
-                PRINT '(A)', 'Unsupported choice of the combination of '    // &
-                             'values for omega_wrt, schlieren_wrt and '     // &
-                             'fd_order. Exiting ...'
-                CALL s_mpi_abort()
+  !          ELSEIF(               (omega_wrt(1) .NEQV. .TRUE.)            &
+  !                                           .AND.                        &
+  !                                (omega_wrt(2) .NEQV. .TRUE.)            &
+  !                                           .AND.                        &
+  !                                (omega_wrt(3) .NEQV. .TRUE.)            &
+  !                                           .AND.                        &
+  !                                !(schlieren_wrt .NEQV. .TRUE.)           &
+  !                                !           .AND.                        &
+  !                                   fd_order /= dflt_int              ) THEN
+  !              PRINT '(A)', 'AA Unsupported choice of the combination of '    // &
+  !                           'values for omega_wrt, schlieren_wrt and '     // &
+  !                           'fd_order. Exiting ...'
+  !              CALL s_mpi_abort()
             ELSEIF(         (ANY(omega_wrt) .OR. schlieren_wrt)           &
                                             .AND.                         &
                                     fd_order == dflt_int        ) THEN
-                PRINT '(A)', 'Unsupported choice of the combination of '    // &
+                PRINT '(A)', 'BB Unsupported choice of the combination of '    // &
                              'values for omega_wrt, schlieren_wrt and '     // &
                              'fd_order. Exiting ...'
                 CALL s_mpi_abort()

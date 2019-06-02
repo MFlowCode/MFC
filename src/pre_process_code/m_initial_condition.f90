@@ -668,7 +668,6 @@ MODULE m_initial_condition
                 s_assign_patch_primitive_variables => &
                             s_assign_patch_species_primitive_variables_bubbles
             ELSE ! Volume fraction model
-                PRINT*, 'assigning primative variables without bubbles'
                 s_assign_patch_primitive_variables => &
                             s_assign_patch_species_primitive_variables
             END IF
@@ -926,7 +925,6 @@ MODULE m_initial_condition
                             perturb_alpha = q_prim_vf(E_idx+perturb_flow_fluid)%sf(i,j,k)
                         END IF
                         IF (perturb_alpha == 1d0) THEN
-                            PRINT*, 'perturbing flow field'
                             ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
 !                            rand_real = rand_real / 1d2 / 1d3
@@ -959,8 +957,6 @@ MODULE m_initial_condition
             REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma
 
             INTEGER :: i,j  !< Generic loop operators
-
-            PRINT*, 'Patch type: ', 'line segment'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -996,7 +992,6 @@ MODULE m_initial_condition
                     CALL s_assign_patch_primitive_variables(patch_id, i,0,0)
                    
                     !IF ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .AND. (model_eqns .NE. 4)) THEN
-                    !    PRINT*, 'Reassigning zero density for 1st fluid'
                     !    !zero density, reassign according to Tait EOS
                     !    q_prim_vf(1)%sf(i,0,0) = &
                     !        (((q_prim_vf(E_idx)%sf(i,0,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
@@ -1005,8 +1000,6 @@ MODULE m_initial_condition
                 END IF
             END DO
            
-            PRINT*, 'patch type done'
-            
         END SUBROUTINE s_line_segment ! ----------------------------------------
        
         !>  The spiral patch is a 2D geometry that may be used, The geometry
@@ -1399,8 +1392,6 @@ MODULE m_initial_condition
 
             INTEGER :: i,j !< generic loop iterators
 
-            PRINT*, 'Patch type: ', 'rectangle'
-
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
             lit_gamma = (1d0+gamma)/gamma
@@ -1589,8 +1580,6 @@ MODULE m_initial_condition
             ! Generic loop iterators
             INTEGER :: i,j
 
-            PRINT*, 'Patch type: ', '1d_analytical'
-
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
             lit_gamma = (1d0+gamma)/gamma
@@ -1667,8 +1656,6 @@ MODULE m_initial_condition
             ! Generic loop iterators
             INTEGER :: i,j
 
-            PRINT*, 'Patch type: ', '1d_bubble pulse'
-
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
             lit_gamma = (1d0+gamma)/gamma
@@ -1742,8 +1729,6 @@ MODULE m_initial_condition
             REAL(KIND(0d0)) :: pi_inf,gamma,lit_gamma !< equation of state parameters
 
             INTEGER :: i,j !< generic loop iterators
-
-            PRINT*, 'Patch type: ', '2d_analytical'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
@@ -1879,7 +1864,6 @@ MODULE m_initial_condition
             REAL(KIND(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
             
             INTEGER :: i,j,k !< generic loop iterators
-            PRINT*, 'Patch type: ', '3d_analytical'
 
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma

@@ -120,8 +120,10 @@ PROGRAM p_main
 
     ! Time-stepping Loop =======================================================
     DO
-        IF (proc_rank ==0) PRINT*, 'Time step = ', t_step, ' of ', t_step_stop
-        
+        IF (proc_rank==0 .AND. MOD(t_step,t_step_save)==0 ) THEN
+            PRINT*, 'Time step ', t_step, ' of ', t_step_stop
+        END IF
+
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         IF(time_stepper == 1) THEN
             CALL s_1st_order_tvd_rk(t_step)
@@ -150,10 +152,6 @@ PROGRAM p_main
         END IF
 
         CALL system_clock(cpu_end)
-        
-        IF (proc_rank == 0) THEN
-            PRINT '(a)', ' ------------------------------------------------------ '
-        END IF
     END DO
     ! ==========================================================================
     

@@ -667,7 +667,6 @@ MODULE m_data_output
                           t_step, t_step*dt, icfl_max_glb
                 END IF
 
-                PRINT*, 'icflmaxglb', icfl_max_glb
                 IF (icfl_max_glb /= icfl_max_glb) THEN
                     PRINT '(A)', 'ICFL is NaN. Exiting ...'
                     CALL s_mpi_abort()
