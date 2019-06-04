@@ -7,12 +7,13 @@ compiler = mpif90
 ### Compiler flags ### 
 #Note: Requires -fpp (Intel) or -cpp (GNU) to enable preprocessor
 
+default_flags = -cpp -c -O3 -w
+
 # Intel
-#fort_flags = -fpp -c -ip -O3 -w
+#fort_flags = -fpp $(default_flags)
 
 # GCC
-#fort_flags = -cpp -ffree-line-length-none -c -O3 -w
-fort_flags = -cpp -c -O3 -w
+fort_flags = $(default_flags)
 
 ######### FFTW library and include locations #########
 
