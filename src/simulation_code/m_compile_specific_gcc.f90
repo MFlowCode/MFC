@@ -45,6 +45,7 @@ MODULE m_compile_specific
             CHARACTER(LEN=*), INTENT(IN) :: fileloc
             LOGICAL, INTENT(INOUT) :: dircheck
 
+
             INQUIRE(FILE=TRIM(fileloc),EXIST=dircheck)        !GCC
         END SUBROUTINE my_inquire
 

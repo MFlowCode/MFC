@@ -83,8 +83,12 @@ PROGRAM p_main
     
     ! Initializing MPI execution environment
     CALL s_mpi_initialize()
-    
-    
+#ifdef __INTEL_COMPILER
+    print*, 'gfortran'
+#else __
+    print*, 'else' 
+#ENDIF
+
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
     ! their consistency is checked. The identification of any inconsistencies

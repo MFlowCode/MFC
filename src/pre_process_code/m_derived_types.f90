@@ -53,7 +53,7 @@ MODULE m_derived_types
         TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: var
     END TYPE  mpi_io_var
 
-    !> INTEGER boounds for variables
+    !> Integer boounds for variables
     TYPE int_bounds_info
         INTEGER :: beg
         INTEGER :: end

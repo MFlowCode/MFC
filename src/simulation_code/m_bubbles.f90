@@ -194,13 +194,6 @@ MODULE m_bubbles
                 END DO; END DO; END DO; END DO
             END IF
             
-            IF (proc_rank == 0) THEN
-                PRINT*, 'Source terms:'
-                PRINT*, 'max adv src', maxval(abs(bub_adv_src(:,:,:)))
-                PRINT*, 'max r src', maxval(abs(bub_r_src(:,:,:,:)))
-                PRINT*, 'max v src', maxval(abs(bub_v_src(:,:,:,:)))
-            END IF
-
         END SUBROUTINE s_compute_bubble_source
 
 
