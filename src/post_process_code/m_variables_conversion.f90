@@ -1,15 +1,17 @@
 !>
 !! @file m_variables_conversion.f90
-!! @brief This module consists of subroutines used in the conversion of the
+!! @brief Contains module m_variables_conversion
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive variables. In addition,
 !!              the module also contains subroutines used to compute the mixture
 !!              variables. For a specific time-step undergoing the post-process,
 !!              the mixture variables are stored everywhere on the grid so that
 !!              they may possibly be outputted or used to compute other derived
 !!              flow quantities.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_variables_conversion
     
     

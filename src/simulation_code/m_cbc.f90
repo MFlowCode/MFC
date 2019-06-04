@@ -1,6 +1,11 @@
 !>
 !! @file m_cbc.f90
-!! @brief The module features a large database of characteristic boundary
+!! @brief Contains module m_cbc
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The module features a large database of characteristic boundary
 !!              conditions (CBC) for the Euler system of equations. This system
 !!              is augmented by the appropriate advection equations utilized to
 !!              capture the material interfaces. The closure is achieved by the
@@ -15,9 +20,6 @@
 !!                           7) Supersonic Inflow
 !!                           8) Supersonic Outflow
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_cbc
     
     

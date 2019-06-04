@@ -1,12 +1,15 @@
 !>
 !! @file m_mpi_proxy.f90
-!! @brief The module serves as a proxy to the parameters and subroutines
+!! @brief Contains module m_mpi_proxy
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The module serves as a proxy to the parameters and subroutines
 !!          available in the MPI implementation's MPI module. Specifically,
 !!          the purpose of the proxy is to harness basic MPI commands into
 !!          more complicated procedures as to accomplish the communication
 !!          goals for the simulation.
-!! @author spencer
-!! @version 1.1
 MODULE m_mpi_proxy
     
     

@@ -1,6 +1,11 @@
 !>
 !! @file m_grid.f90
-!! @brief  This module takes care of creating the rectilinear grid on which
+!! @brief Contains module m_grid
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief  This module takes care of creating the rectilinear grid on which
 !!              the data for the initial condition will be laid out and on which
 !!              the simulation will eventually be computed. The grid may either
 !!              be uniform or non-uniform. Non-uniform grids are generated using
@@ -10,9 +15,6 @@
 !!              m_start_up.f90. In such a case, the responsibility of this module
 !!              becomes only to allocate/deallocate the necessary grid variables
 !!              for the cell-centers and cell-boundaries locations.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_grid
     
     

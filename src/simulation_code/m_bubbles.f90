@@ -1,9 +1,11 @@
 !>
 !! @file m_bubbles.f90
-!! @brief This module is used to compute the ensemble-averaged bubble dynamic variables
+!! @brief Contains module m_bubbles
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
 MODULE m_bubbles
 
     ! Dependencies =============================================================

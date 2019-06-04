@@ -1,13 +1,16 @@
 !>
 !! @file m_global_parameters.f90
-!! @brief The module contains all of the parameters describing the program
-!              logistics, the computational domain and the simulation algorithm.
-!              Additionally, for the volume fraction model, physical parameters
-!              of each of the fluids present in the flow are located here. They
-!              include stiffened gas equation of state parameters, the Reynolds
-!              numbers and the Weber numbers.
+!! @brief Contains module m_global_parameters
 !! @author spencer
 !! @version 1.1
+!! @date 1/1/1
+
+!> @brief The module contains all of the parameters describing the program
+!!              logistics, the computational domain and the simulation algorithm.
+!!              Additionally, for the volume fraction model, physical parameters
+!!              of each of the fluids present in the flow are located here. They
+!!              include stiffened gas equation of state parameters, the Reynolds
+!!              numbers and the Weber numbers.
 MODULE m_global_parameters
     
     

@@ -1,13 +1,15 @@
 !>
 !! @file m_data_output.f90
-!! @brief This module enables the restructuring of the raw simulation data
-!              file(s) into formatted database file(s). The formats that may be
-!              chosen from include Silo-HDF5 and Binary. Each of these database
-!              structures contains information about the grid as well as each of
-!              the flow variable(s) that were chosen by the user to be included.
+!! @brief Contains module m_data_output
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module enables the restructuring of the raw simulation data
+!!              file(s) into formatted database file(s). The formats that may be
+!!              chosen from include Silo-HDF5 and Binary. Each of these database
+!!              structures contains information about the grid as well as each of
+!!              the flow variable(s) that were chosen by the user to be included.
 MODULE m_data_output
     
     

@@ -1,12 +1,14 @@
 !>
 !! @file m_variables_conversion.f90
-!! @brief This module consists of subroutines used in the conversion of the
-!!              conservative variables into the primitive ones and vice versa. In
-!!              addition, the module also contains the subroutines used to obtain
-!!              the mixture variables.
+!! @brief Contains module m_variables_conversion
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module consists of subroutines used in the conversion of the
+!!              conservative variables into the primitive ones and vice versa. In
+!!              addition, the module also contains the subroutines used to obtain
+!!              the mixture variables.
 MODULE m_variables_conversion
     
     

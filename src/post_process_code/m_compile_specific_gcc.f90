@@ -1,9 +1,11 @@
 !>
 !! @file m_compile_specific_gcc.f90
-!! @brief This module contains subroutines that are compiler specific (GNU/INTEL)
+!! @brief Contains module m_compile_specific 
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module contains subroutines that are compiler specific (GNU/INTEL)
 MODULE m_compile_specific
 
     IMPLICIT NONE

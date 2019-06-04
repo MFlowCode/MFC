@@ -1,9 +1,12 @@
 !>
 !! @file m_derived_types.f90
-!! @brief This module features the definitions of all the custom-defined
-!!        derived types that are utilized throughout the post_process code.
+!! @brief Contains module m_derived_types
 !! @author spencer
 !! @version 1.1
+!! @date 1/1/1
+
+!> @brief This module features the definitions of all the custom-defined
+!!        derived types that are utilized throughout the post_process code.
 MODULE m_derived_types
     
     

@@ -1,6 +1,11 @@
 !>
 !! @file p_main.f90
-!! @brief The post-process restructures raw unformatted data, outputted by
+!! @brief Contains program p_main
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The post-process restructures raw unformatted data, outputted by
 !!              the simulation, into a formatted database, Silo-HDF5 or Binary,
 !!              chosen by the user. The user may also specify which variables to
 !!              include in the database. The choices range from any one of the
@@ -8,9 +13,6 @@
 !!              can be derived from those such as the unadvected volume fraction,
 !!              specific heat ratio, liquid stiffness, speed of sound, vorticity
 !!              and the numerical Schlieren function.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 PROGRAM p_main
     
     

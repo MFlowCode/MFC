@@ -1,6 +1,11 @@
 !>
 !! @file m_weno.f90
-!! @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
+!! @brief Contains module m_weno
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
 !!              that is supplemented with monotonicity preserving bounds (MPWENO)
 !!              and a mapping function that boosts the accuracy of the non-linear
 !!              weights (WENOM). MPWENO, see Balsara and Shu (2000), prevents the
@@ -9,9 +14,6 @@
 !!              of accuracy of the reconstruction at critical points. Please note
 !!              that the basic WENO approach is implemented according to the work
 !!              of Jiang and Shu (1996).
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_weno
     
     

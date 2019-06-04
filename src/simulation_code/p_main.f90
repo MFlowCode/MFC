@@ -1,6 +1,11 @@
 !>
 !! @file p_main.f90
-!! @brief  Quasi-conservative, shock- and interface- capturing finite-volume
+!! @brief Contains program p_main
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief  Quasi-conservative, shock- and interface- capturing finite-volume
 !!              scheme for the multicomponent Navier-Stokes equations. The system
 !!              is augmented with the relevant advection equations to capture the
 !!              material interfaces and closed by the stiffened equation of state
@@ -10,9 +15,6 @@
 !!              specifics of surface tension may be found in the work by Perigaud
 !!              and Saurel (2005). Note that both viscous and capillarity effects
 !!              are only available in the volume fraction model.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 PROGRAM p_main
     
     

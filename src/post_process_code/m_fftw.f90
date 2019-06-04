@@ -1,8 +1,11 @@
 !>
 !! @file m_fftw.f90
-!! @brief The module contains the subroutines for the FFT routines
+!! @brief Contains module m_fftw
 !! @author spencer
 !! @version 1.1
+!! @date 1/1/1
+
+!> @brief The module contains the subroutines for the FFT routines
 MODULE m_fftw
 
     ! Dependencies =============================================================

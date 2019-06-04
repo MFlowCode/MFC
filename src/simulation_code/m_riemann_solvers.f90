@@ -1,6 +1,11 @@
 !>
 !! @file m_riemann_solvers.f90
-!! @brief This module features a database of approximate and exact Riemann
+!! @brief Contains module m_riemann_solvers
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief This module features a database of approximate and exact Riemann
 !!              problem solvers for the Navier-Stokes system of equations, which
 !!              is supplemented by appropriate advection equations that are used
 !!              to capture the material interfaces. The closure of the system is
@@ -15,8 +20,6 @@
 !!                  1) Harten-Lax-van Leer (HLL)
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
-!! @author spencer
-!! @version 1.1
 MODULE m_riemann_solvers
     
     

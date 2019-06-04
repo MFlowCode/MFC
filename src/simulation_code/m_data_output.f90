@@ -1,15 +1,17 @@
 !>
 !! @file m_data_output.f90
-!! @brief The primary purpose of this module is to output the grid and the
+!! @brief Contains module m_data_output
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
 !!              addition, this module is also in charge of outputting a run-time
 !!              information file which summarizes the time-dependent behavior !of
 !!              the stability criteria. The latter include the inviscid Courant–
 !!              Friedrichs–Lewy (ICFL), viscous CFL (VCFL), capillary CFL (CCFL)
 !!              and cell Reynolds (Rc) numbers.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_data_output
     
     

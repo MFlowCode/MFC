@@ -1,6 +1,11 @@
 !>
 !! @file m_time_steppers.f90
-!! @brief The following module features a variety of time-stepping schemes.
+!! @brief Contains module m_time_steppers
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:
 !!                   1) 1st Order TVD RK
 !!                   2) 2nd Order TVD RK
@@ -8,9 +13,6 @@
 !!                   4) 4th Order RK
 !!                   5) 5th Order RK
 !!              where TVD designates a total-variation-diminishing time-stepper.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_time_steppers
     
     

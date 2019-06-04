@@ -1,10 +1,12 @@
 !>
 !! @file m_start_up.f90
-!! @brief This module contains the subroutines that read in and check the
-!              consistency of the user provided inputs.
+!! @brief  Contains module m_start_up
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module contains the subroutines that read in and check the
+!!              consistency of the user provided inputs.
 MODULE m_start_up
     
     

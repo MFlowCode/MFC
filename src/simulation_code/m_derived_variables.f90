@@ -1,12 +1,15 @@
 !>
 !! @file m_derived_variables.f90
-!! @brief This module features subroutines that allow for the derivation of
+!! @brief Contains module m_derived_variables
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief This module features subroutines that allow for the derivation of
 !!              numerous flow variables from the conservative and primitive ones.
 !!              Currently, the available derived variables include the unadvected
 !!              volume fraction, specific heat ratio, liquid stiffness, speed of
 !!              sound, vorticity and the numerical Schlieren function.
-!! @author spencer
-!! @version 1.1
 MODULE m_derived_variables
     
     

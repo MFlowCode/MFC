@@ -1,10 +1,12 @@
 !>
 !! @file m_derived_types.f90
-!! @brief This file contains the definitions of all of the custom-defined
-!!              types used in the pre-process code.
+!! @brief Contains module m_derived_types
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This file contains the definitions of all of the custom-defined
+!!              types used in the pre-process code.
 MODULE m_derived_types
     
     IMPLICIT NONE

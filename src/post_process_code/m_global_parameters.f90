@@ -1,11 +1,13 @@
 !>
 !! @file m_global_parameters.f90
-!! @brief This module contains all of the parameters characterizing the
-!!      computational domain, simulation algorithm, stiffened equation of
-!!      state and finally, the formatted database file(s) structure.
+!! @brief Contains module m_global_parameters
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module contains all of the parameters characterizing the
+!!      computational domain, simulation algorithm, stiffened equation of
+!!      state and finally, the formatted database file(s) structure.
 MODULE m_global_parameters
     
     

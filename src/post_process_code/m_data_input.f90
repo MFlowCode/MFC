@@ -1,11 +1,13 @@
 !>
 !! @file m_data_input.f90
-!! @brief This module features procedures, which for a specific time-step,
-!!             read in the raw simulation data for the grid and the conservative
-!!             variables and fill out their buffer regions.
+!> @brief Contains module m_data_input
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module features procedures, which for a specific time-step,
+!!             read in the raw simulation data for the grid and the conservative
+!!             variables and fill out their buffer regions.
 MODULE m_data_input
     
     

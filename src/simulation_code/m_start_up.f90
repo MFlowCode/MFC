@@ -1,6 +1,11 @@
 !>
 !! @file m_start_up.f90
-!! @brief The purpose of the module is primarily to read in the files that
+!! @brief Contains module m_start_up
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data
 !!              that are provided by the user. The module is additionally tasked
 !!              with verifying the consistency of the user inputs and completing
@@ -9,10 +14,7 @@
 !!              contain the inputs, the initial condition data and the grid data
 !!              that are provided by the user. The module is additionally tasked
 !!              with verifying the consistency of the user inputs and completing
-!!              the grid variables..
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
+!!              the grid variables.
 MODULE m_start_up
     
     

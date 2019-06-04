@@ -1,6 +1,11 @@
 !>
 !! @file m_initial_condition.f90
-!! @brief This module provides a platform that is analagous to constructive
+!! @brief Contains module m_initial_condition
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief This module provides a platform that is analagous to constructive
 !!              solid geometry techniques and in this way allows for the creation
 !!              of a wide variety of initial conditions. Several 1D, 2D and 3D
 !!              fundamental geometries are included that may further be combined
@@ -12,9 +17,6 @@
 !!              Note that the user may choose to read in and modify a preexisting
 !!              initial condition. The module m_start_up.f90 is responsible for
 !!             reading in the relevant data files.
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
 MODULE m_initial_condition
     
     

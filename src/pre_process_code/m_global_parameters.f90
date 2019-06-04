@@ -1,11 +1,13 @@
 !>
 !! @file m_global_parameters.f90
-!! @brief This module contains all of the parameters characterizing the
-!!              computational domain, simulation algorithm, initial condition
-!!              and the stiffened equation of state.
+!! @brief Contains module m_global_parameters
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This module contains all of the parameters characterizing the
+!!              computational domain, simulation algorithm, initial condition
+!!              and the stiffened equation of state.
 MODULE m_global_parameters
     
     

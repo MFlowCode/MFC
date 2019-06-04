@@ -1,6 +1,11 @@
 !>
 !! @file m_rhs.f90
-!! @brief The module contains the subroutines used to calculate the right-
+!! @brief Contains module m_rhs
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief The module contains the subroutines used to calculate the right-
 !!              hand-side (RHS) in the quasi-conservative, shock- and interface-
 !!              capturing finite-volume framework for the multicomponent Navier-
 !!              Stokes equations supplemented by appropriate advection equations
@@ -12,8 +17,6 @@
 !!              surface tension may be found in Perigaud and Saurel (2005). Note
 !!              that both viscous and surface tension effects are only available
 !!              in the volume fraction model.
-!! @author spencer
-!! @version 1.1
 MODULE m_rhs
     
     

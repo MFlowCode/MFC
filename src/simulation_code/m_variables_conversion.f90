@@ -1,6 +1,11 @@
 !>
 !! @file m_variables_conversion.f90
-!! @brief This module features a database of subroutines that allow for the
+!! @brief Contains module m_variables_conversion 
+!! @author spencer
+!! @version 1.1
+!! @date 1/1/1
+
+!> @brief This module features a database of subroutines that allow for the
 !!              conversion of state variables from one type into another. At this
 !!              time, the state variables type conversions below are available:
 !!                             1) Mixture        => Mixture
@@ -12,10 +17,7 @@
 !!                             7) Primitive      => Characteristic
 !!                             8) Primitive      => Flux
 !!                             9) Characteristic => Conservative
-!!                            10) Characteristic => Primitive 
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
+!!                            10) Characteristic => Primitive
 MODULE m_variables_conversion
     
     

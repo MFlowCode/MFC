@@ -1,10 +1,12 @@
 !>
 !! @file p_main.f90
-!! @brief This program takes care of setting up the initial condition and
-!!              grid data for the multicomponent flow code.
+!! @brief Contains program p_main
 !! @author spencer
 !! @version 1.1
 !! @date 1/1/1
+
+!> @brief This program takes care of setting up the initial condition and
+!!              grid data for the multicomponent flow code.
 PROGRAM p_main
     
     
