@@ -1435,27 +1435,17 @@ MODULE m_start_up
 
                         dyn_pres = 0d0
                         DO i = mom_idx%beg, mom_idx%end
-                            dyn_pres = dyn_pres + 5d-1*v_vf(i)%sf(j,k,l)*v_vf(i)%sf(j,k,l) / MAX(rho,sgm_eps)
+                            dyn_pres = dyn_pres + 5d-1*v_vf(i)%sf(j,k,l)*v_vf(i)%sf(j,k,l) &
+                                / MAX(rho,sgm_eps)
                         END DO
 
                         E_We = 0d0
-                        ! //KS// To do later on when capillary effects will be undertaken
-                        ! IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THEN
-                        !      DO i = 1, We_size
-                        !         E_We = E_We &
-                        !                + q_cons_vf(E_idx+We_idx(i,1))%sf(j,k,l) * &
-                        !                      gm_alpha_vf(We_idx(i,2))%sf(j,k,l) / &
-                        !                            We(We_idx(i,1),We_idx(i,2))   &
-                        !                + q_cons_vf(E_idx+We_idx(i,2))%sf(j,k,l) * &
-                        !                      gm_alpha_vf(We_idx(i,1))%sf(j,k,l) / &
-                        !                            We(We_idx(i,1),We_idx(i,2))
-                        !      END DO
-                        ! END IF
 
                         pres = (v_vf(E_idx)%sf(j,k,l) - dyn_pres - E_We - pi_inf) / gamma
 
                         DO i = 1, num_fluids
-                            v_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = v_vf(i+adv_idx%beg-1)%sf(j,k,l)*(fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf)
+                            v_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = v_vf(i+adv_idx%beg-1)%sf(j,k,l) * &
+                                (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf)
                         END DO
 
                     END DO

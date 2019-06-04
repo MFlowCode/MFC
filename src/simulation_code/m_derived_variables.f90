@@ -311,22 +311,31 @@ MODULE m_derived_variables
                             DO r = -fd_number, fd_number
                                 IF ( n == 0) THEN ! 1D simulation
                                     q_sf(j,k,l) = q_sf(j,k,l) &
-                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg)%sf(r+j, k , l )
+                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                        q_prim_vf(mom_idx%beg)%sf(r+j, k , l )
                                 ELSEIF ( p == 0) THEN ! 2D simulation
                                     q_sf(j,k,l) = q_sf(j,k,l) &
-                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg)%sf(r+j, k , l ) &
-                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%beg)%sf( j ,r+k, l )
+                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                        q_prim_vf(mom_idx%beg)%sf(r+j, k , l ) &
+                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                        q_prim_vf(mom_idx%beg)%sf( j ,r+k, l )
                                 ELSE ! 3D simulation
                                     IF (grid_geometry == 3) THEN
                                         q_sf(j,k,l) = q_sf(j,k,l) &
-                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg)%sf(r+j, k , l ) &
-                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%beg)%sf( j ,r+k, l ) &
-                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l)*q_prim_vf(mom_idx%beg)%sf( j , k ,r+l)/y_cc(k)
+                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                            q_prim_vf(mom_idx%beg)%sf(r+j, k , l ) &
+                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                            q_prim_vf(mom_idx%beg)%sf( j ,r+k, l ) &
+                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l) * &
+                                            q_prim_vf(mom_idx%beg)%sf( j , k ,r+l)/y_cc(k)
                                     ELSE
                                         q_sf(j,k,l) = q_sf(j,k,l) &
-                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg)%sf(r+j, k , l ) &
-                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%beg)%sf( j ,r+k, l ) &
-                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l)*q_prim_vf(mom_idx%beg)%sf( j , k ,r+l)
+                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                            q_prim_vf(mom_idx%beg)%sf(r+j, k , l ) &
+                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                            q_prim_vf(mom_idx%beg)%sf( j ,r+k, l ) &
+                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l) * &
+                                            q_prim_vf(mom_idx%beg)%sf( j , k ,r+l)
                                     END IF
                                 END IF
                             END DO
@@ -349,20 +358,28 @@ MODULE m_derived_variables
                             DO r = -fd_number, fd_number
                                 IF ( p == 0) THEN ! 2D simulation
                                     q_sf(j,k,l) = q_sf(j,k,l) &
-                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg+1)%sf(r+j, k , l ) &
-                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%beg+1)%sf( j ,r+k, l )
+                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                        q_prim_vf(mom_idx%beg+1)%sf(r+j, k , l ) &
+                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                        q_prim_vf(mom_idx%beg+1)%sf( j ,r+k, l )
                                 ELSE ! 3D simulation
                                     IF (grid_geometry == 3) THEN
                                         q_sf(j,k,l) = q_sf(j,k,l) &
-                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg+1)%sf(r+j, k , l ) &
-                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%beg+1)%sf( j ,r+k, l ) &
-                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l)*q_prim_vf(mom_idx%beg+1)%sf( j , k ,r+l)/y_cc(k) &
+                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                            q_prim_vf(mom_idx%beg+1)%sf(r+j, k , l ) &
+                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * & 
+                                            q_prim_vf(mom_idx%beg+1)%sf( j ,r+k, l ) &
+                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l) * & 
+                                            q_prim_vf(mom_idx%beg+1)%sf( j , k ,r+l)/y_cc(k) &
                                             -(q_prim_vf( mom_idx%end )%sf(j,k,l)**2d0)/y_cc(k)
                                     ELSE
                                         q_sf(j,k,l) = q_sf(j,k,l) &
-                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%beg+1)%sf(r+j, k , l ) &
-                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%beg+1)%sf( j ,r+k, l ) &
-                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l)*q_prim_vf(mom_idx%beg+1)%sf( j , k ,r+l)
+                                            + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                            q_prim_vf(mom_idx%beg+1)%sf(r+j, k , l ) &
+                                            + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                            q_prim_vf(mom_idx%beg+1)%sf( j ,r+k, l ) &
+                                            + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l) * &
+                                            q_prim_vf(mom_idx%beg+1)%sf( j , k ,r+l)
                                     END IF
                                 END IF
                             END DO
@@ -384,15 +401,22 @@ MODULE m_derived_variables
                             DO r = -fd_number, fd_number
                                 IF (grid_geometry == 3) THEN
                                     q_sf(j,k,l) = q_sf(j,k,l) &
-                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%end)%sf(r+j, k , l ) &
-                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%end)%sf( j ,r+k, l ) &
-                                        + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l)*q_prim_vf(mom_idx%end)%sf( j , k ,r+l)/y_cc(k) &
-                                        +(q_prim_vf( mom_idx%end )%sf(j,k,l)*q_prim_vf(mom_idx%beg+1)%sf(j,k,l))/y_cc(k)
+                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                        q_prim_vf(mom_idx%end)%sf(r+j, k , l ) &
+                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                        q_prim_vf(mom_idx%end)%sf( j ,r+k, l ) &
+                                        + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l) * &
+                                        q_prim_vf(mom_idx%end)%sf( j , k ,r+l)/y_cc(k) &
+                                        +(q_prim_vf( mom_idx%end )%sf(j,k,l) * &
+                                        q_prim_vf(mom_idx%beg+1)%sf(j,k,l))/y_cc(k)
                                 ELSE
                                     q_sf(j,k,l) = q_sf(j,k,l) &
-                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j)*q_prim_vf(mom_idx%end)%sf(r+j, k , l ) &
-                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k)*q_prim_vf(mom_idx%end)%sf( j ,r+k, l ) &
-                                        + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l)*q_prim_vf(mom_idx%end)%sf( j , k ,r+l)
+                                        + q_prim_vf( mom_idx%beg )%sf(j,k,l)*fd_coeff_x(r,j) * &
+                                        q_prim_vf(mom_idx%end)%sf(r+j, k , l ) &
+                                        + q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*fd_coeff_y(r,k) * &
+                                        q_prim_vf(mom_idx%end)%sf( j ,r+k, l ) &
+                                        + q_prim_vf( mom_idx%end )%sf(j,k,l)*fd_coeff_z(r,l) * &
+                                        q_prim_vf(mom_idx%end)%sf( j , k ,r+l)
                                 END IF
                             END DO
                         END DO
@@ -465,10 +489,11 @@ MODULE m_derived_variables
                                     ! x-velocity weighted
                                     q_com(i,5) = q_com(i,5) + q_prim_vf(i)%sf(j,k,l)*dV*q_prim_vf(mom_idx%beg)%sf(j,k,l)
                                     ! x-acceleration weighted
-                                    q_com(i,8) = q_com(i,8) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
-                                                                  - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
-                                                                  +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
-                                                                  -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
+                                    q_com(i,8) = q_com(i,8) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l) &
+                                                    * q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
+                                                    - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
+                                                    +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
+                                                    -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
                                 END DO
                             END DO
                         END DO
@@ -513,15 +538,17 @@ MODULE m_derived_variables
                                     ! y-velocity weighted
                                     q_com(i,6) = q_com(i,6) + q_prim_vf(i)%sf(j,k,l)*dV*q_prim_vf(mom_idx%beg+1)%sf(j,k,l)
                                     ! x-acceleration weighted
-                                    q_com(i,8) = q_com(i,8) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
-                                                                  - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
-                                                                  +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
-                                                                  -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
+                                    q_com(i,8) = q_com(i,8) + dV* &
+                                        (  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
+                                        - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
+                                        +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
+                                        -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
                                     ! y-acceleration weighted
-                                    q_com(i,9) = q_com(i,9) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg+1)%sf(j,k,l)) &
-                                                                  - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)) &
-                                                                  +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)) &
-                                                                  -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)))/(6d0*dt)
+                                    q_com(i,9) = q_com(i,9) + dV * &
+                                        (  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg+1)%sf(j,k,l)) &
+                                        - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)) &
+                                        +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)) &
+                                        -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)))/(6d0*dt)
                                 END DO
                             END DO
                         END DO
@@ -564,14 +591,22 @@ MODULE m_derived_variables
                                     IF (grid_geometry == 3) THEN
 
                                         dV = (2d0*y_cb(k-1)*dy(k) + dy(k)**2d0)/2d0*dx(j)*dz(l)
-                                        cart_u_x  =  q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) -  q_prim_vf(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
-                                        cart_u_y  =  q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) +  q_prim_vf(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
-                                        cart_u_x1 = q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - q_prim_vf1(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
-                                        cart_u_y1 = q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + q_prim_vf1(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
-                                        cart_u_x2 = q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - q_prim_vf2(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
-                                        cart_u_y2 = q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + q_prim_vf2(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
-                                        cart_u_x3 = q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - q_prim_vf3(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
-                                        cart_u_y3 = q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + q_prim_vf3(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
+                                        cart_u_x  =  q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - & 
+                                            q_prim_vf(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
+                                        cart_u_y  =  q_prim_vf(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + &  
+                                            q_prim_vf(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
+                                        cart_u_x1 = q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - & 
+                                            q_prim_vf1(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
+                                        cart_u_y1 = q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + & 
+                                            q_prim_vf1(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
+                                        cart_u_x2 = q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - & 
+                                            q_prim_vf2(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
+                                        cart_u_y2 = q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + & 
+                                            q_prim_vf2(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
+                                        cart_u_x3 = q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)*COS(z_cc(l)) - & 
+                                            q_prim_vf3(mom_idx%end)%sf(j,k,l)*SIN(z_cc(l))
+                                        cart_u_y3 = q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)*SIN(z_cc(l)) + & 
+                                            q_prim_vf3(mom_idx%end)%sf(j,k,l)*COS(z_cc(l))
 
                                         ! Mass
                                         q_com(i,1) = q_com(i,1) + q_prim_vf(i)%sf(j,k,l)*dV
@@ -588,20 +623,23 @@ MODULE m_derived_variables
                                         ! z-velocity weighted
                                         q_com(i,7) = q_com(i,7) + q_prim_vf(i)%sf(j,k,l)*dV*q_prim_vf(mom_idx%beg)%sf(j,k,l)
                                         ! x-acceleration weighted
-                                        q_com(i,8) = q_com(i,8) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)*cart_u_x ) &
-                                                                      - 18d0*(q_prim_vf1(i)%sf(j,k,l)*cart_u_x1) &
-                                                                      +  9d0*(q_prim_vf2(i)%sf(j,k,l)*cart_u_x2) &
-                                                                      -  2d0*(q_prim_vf3(i)%sf(j,k,l)*cart_u_x3))/(6d0*dt)
+                                        q_com(i,8) = q_com(i,8) + dV * &
+                                            (  11d0*( q_prim_vf(i)%sf(j,k,l)*cart_u_x ) &
+                                            - 18d0*(q_prim_vf1(i)%sf(j,k,l)*cart_u_x1) &
+                                            +  9d0*(q_prim_vf2(i)%sf(j,k,l)*cart_u_x2) &
+                                            -  2d0*(q_prim_vf3(i)%sf(j,k,l)*cart_u_x3))/(6d0*dt)
                                         ! y-acceleration weighted
-                                        q_com(i,9) = q_com(i,9) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)*cart_u_y ) &
-                                                                      - 18d0*(q_prim_vf1(i)%sf(j,k,l)*cart_u_y1) &
-                                                                      +  9d0*(q_prim_vf2(i)%sf(j,k,l)*cart_u_y2) &
-                                                                      -  2d0*(q_prim_vf3(i)%sf(j,k,l)*cart_u_y3))/(6d0*dt)
+                                        q_com(i,9) = q_com(i,9) + dV * &
+                                            (  11d0*( q_prim_vf(i)%sf(j,k,l)*cart_u_y ) &
+                                                - 18d0*(q_prim_vf1(i)%sf(j,k,l)*cart_u_y1) &
+                                                +  9d0*(q_prim_vf2(i)%sf(j,k,l)*cart_u_y2) &
+                                                -  2d0*(q_prim_vf3(i)%sf(j,k,l)*cart_u_y3))/(6d0*dt)
                                         ! z-acceleration weighted
-                                        q_com(i,10) = q_com(i,10) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
-                                                                        - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
-                                                                        +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
-                                                                        -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
+                                        q_com(i,10) = q_com(i,10) + dV * &
+                                            (  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
+                                            - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
+                                            +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
+                                            -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
                                     ELSE
 
                                         dV = dx(j)*dy(k)*dz(l)
@@ -621,20 +659,23 @@ MODULE m_derived_variables
                                         ! z-velocity weighted
                                         q_com(i,7) = q_com(i,7) + q_prim_vf(i)%sf(j,k,l)*dV*q_prim_vf(mom_idx%end)%sf(j,k,l)
                                         ! x-acceleration weighted
-                                        q_com(i,8) = q_com(i,8) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
-                                                                      - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
-                                                                      +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
-                                                                      -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
+                                        q_com(i,8) = q_com(i,8) + dV * &
+                                            (  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg)%sf(j,k,l)) &
+                                            - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg)%sf(j,k,l)) &
+                                            +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg)%sf(j,k,l)) &
+                                            -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg)%sf(j,k,l)))/(6d0*dt)
                                         ! y-acceleration weighted
-                                        q_com(i,9) = q_com(i,9) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg+1)%sf(j,k,l)) &
-                                                                      - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)) &
-                                                                      +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)) &
-                                                                      -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)))/(6d0*dt)
+                                        q_com(i,9) = q_com(i,9) + dV * &
+                                            (  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%beg+1)%sf(j,k,l)) &
+                                            - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%beg+1)%sf(j,k,l)) &
+                                            +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%beg+1)%sf(j,k,l)) &
+                                            -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%beg+1)%sf(j,k,l)))/(6d0*dt)
                                         ! z-acceleration weighted
-                                        q_com(i,10) = q_com(i,10) + dV*(  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%end)%sf(j,k,l)) &
-                                                                        - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%end)%sf(j,k,l)) &
-                                                                        +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%end)%sf(j,k,l)) &
-                                                                        -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%end)%sf(j,k,l)))/(6d0*dt)
+                                        q_com(i,10) = q_com(i,10) + dV * &
+                                            (  11d0*( q_prim_vf(i)%sf(j,k,l)* q_prim_vf(mom_idx%end)%sf(j,k,l)) &
+                                            - 18d0*(q_prim_vf1(i)%sf(j,k,l)*q_prim_vf1(mom_idx%end)%sf(j,k,l)) &
+                                            +  9d0*(q_prim_vf2(i)%sf(j,k,l)*q_prim_vf2(mom_idx%end)%sf(j,k,l)) &
+                                            -  2d0*(q_prim_vf3(i)%sf(j,k,l)*q_prim_vf3(mom_idx%end)%sf(j,k,l)))/(6d0*dt)
                                     END IF
                                 END DO
                             END DO
@@ -1059,9 +1100,11 @@ MODULE m_derived_variables
                                 DO l = 0, p !Loop over grid
                                     DO k = 0, n
                                         DO j = 0, m
-                                            IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (x_cb(j-1) <= bounds(i,r,1))) THEN
+                                            IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                .AND. (x_cb(j-1) <= bounds(i,r,1))) THEN
                                                 bounds(i,r,1) = x_cb(j-1)
-                                            ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (x_cb(j) >= bounds(i,r,2))) THEN
+                                            ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                    .AND. (x_cb(j) >= bounds(i,r,2))) THEN
                                                 bounds(i,r,2) = x_cb(j)
                                             END IF
                                         END DO
@@ -1093,14 +1136,18 @@ MODULE m_derived_variables
                                 DO l = 0, p ! Loop over grid
                                     DO k = 0, n
                                         DO j = 0, m 
-                                            IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (x_cb(j-1) <= bounds(i,r,1))) THEN
+                                            IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                .AND. (x_cb(j-1) <= bounds(i,r,1))) THEN
                                                 bounds(i,r,1) = x_cb(j-1)
-                                            ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (x_cb(j) >= bounds(i,r,2))) THEN
+                                            ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                    .AND. (x_cb(j) >= bounds(i,r,2))) THEN
                                                 bounds(i,r,2) = x_cb(j)
                                             END IF
-                                            IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (y_cb(k-1) <= bounds(i,r,3))) THEN
+                                            IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                .AND. (y_cb(k-1) <= bounds(i,r,3))) THEN
                                                 bounds(i,r,3) = y_cb(k-1)
-                                            ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (y_cb(k) >= bounds(i,r,4))) THEN
+                                            ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                    .AND. (y_cb(k) >= bounds(i,r,4))) THEN
                                                 bounds(i,r,4) = y_cb(k)
                                             END IF
                                         END DO
@@ -1144,35 +1191,47 @@ MODULE m_derived_variables
                                                 cart_x = y_cc(k)*COS(z_cc(l))
                                                 cart_y = y_cc(k)*SIN(z_cc(l))
                                                 cart_z = x_cc(j)
-                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (cart_x <= bounds(i,r,1))) THEN
+                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &
+                                                    .AND. (cart_x <= bounds(i,r,1))) THEN
                                                     bounds(i,r,1) = cart_x
-                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (cart_x >= bounds(i,r,2))) THEN
+                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (cart_x >= bounds(i,r,2))) THEN
                                                     bounds(i,r,2) = cart_x
                                                 END IF
-                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (cart_y <= bounds(i,r,3))) THEN
+                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (cart_y <= bounds(i,r,3))) THEN
                                                     bounds(i,r,3) = cart_y
-                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (cart_y >= bounds(i,r,4))) THEN
+                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &  
+                                                    .AND. (cart_y >= bounds(i,r,4))) THEN
                                                     bounds(i,r,4) = cart_y
                                                 END IF
-                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (cart_z <= bounds(i,r,5))) THEN
+                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (cart_z <= bounds(i,r,5))) THEN
                                                     bounds(i,r,5) = cart_z
-                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (cart_z >= bounds(i,r,6))) THEN
+                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &  
+                                                    .AND. (cart_z >= bounds(i,r,6))) THEN
                                                     bounds(i,r,6) = cart_z
                                                 END IF
                                             ELSE
-                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (x_cb(j-1) <= bounds(i,r,1))) THEN
+                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &  
+                                                    .AND. (x_cb(j-1) <= bounds(i,r,1))) THEN
                                                     bounds(i,r,1) = x_cb(j-1)
-                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (x_cb(j) >= bounds(i,r,2))) THEN
+                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (x_cb(j) >= bounds(i,r,2))) THEN
                                                     bounds(i,r,2) = x_cb(j)
                                                 END IF
-                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (y_cb(k-1) <= bounds(i,r,3))) THEN
+                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) &  
+                                                    .AND. (y_cb(k-1) <= bounds(i,r,3))) THEN
                                                     bounds(i,r,3) = y_cb(k-1)
-                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (y_cb(k) >= bounds(i,r,4))) THEN
+                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (y_cb(k) >= bounds(i,r,4))) THEN
                                                     bounds(i,r,4) = y_cb(k)
                                                 END IF
-                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (z_cb(l-1) <= bounds(i,r,5))) THEN
+                                                IF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (z_cb(l-1) <= bounds(i,r,5))) THEN
                                                     bounds(i,r,5) = z_cb(l-1)
-                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) .AND. (z_cb(l) >= bounds(i,r,6))) THEN
+                                                ELSEIF ((q_prim_vf(i+E_idx)%sf(j,k,l) >= threshold_mf(r)) & 
+                                                    .AND. (z_cb(l) >= bounds(i,r,6))) THEN
                                                     bounds(i,r,6) = z_cb(l)
                                                 END IF
                                             END IF

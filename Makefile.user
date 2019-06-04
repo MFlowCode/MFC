@@ -1,28 +1,34 @@
+################ Compiler options ####################
 
-### Fompiler-specific modules, options [gcc,intel] ###
+### Compiler command ###
+compiler = mpif90
+#compiler = mpiifort
+   
+### Compiler flags ### 
+#Note: Requires -fpp (Intel) or -cpp (GNU) to enable preprocessor
 
-mycompiler="gcc"
+# Intel
+#fort_flags = -fpp -c -ip -O3 -w
+
+# GCC
+#fort_flags = -cpp -ffree-line-length-none -c -O3 -w
+fort_flags = -cpp -c -O3 -w
 
 ######### FFTW library and include locations #########
 
-## (for pre-packaged FFTW)
+## For the FFTW included in the MFC package
 fftw_lib_dir = ../../lib/fftw-3.3.8/lib
 fftw_include_dir = ../../lib/fftw-3.3.8/include
 
 ## Other possible locatins
-# fftw_lib_dir = /usr/local/lib
-# fftw_include_dir = /usr/include
-# fftw_include_dir = /usr/local/include
+#fftw_lib_dir = /usr/local/lib
+#fftw_include_dir = /usr/include
+#fftw_include_dir = /usr/local/include
 
 ######### Silo library and include locations #########
 
-# silo_lib_dir = /home/spencer/packages/silo-4.10.2/lib
-# silo_include_dir = /home/spencer/packages/silo-4.10.2/include
+#silo_lib_dir = /home/spencer/packages/silo-4.10.2/lib
+#silo_include_dir = /home/spencer/packages/silo-4.10.2/include
 
 silo_lib_dir = /usr/local/lib
 silo_include_dir = /usr/local/include
-
-################ Compiler command ####################
-
-compiler = mpif90
-# compiler = mpiifort

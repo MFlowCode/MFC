@@ -60,7 +60,7 @@ PROGRAM p_main
     
     IMPLICIT NONE
     
-    
+
     ! Initialization of the MPI environment
     CALL s_mpi_initialize()
     

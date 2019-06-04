@@ -630,9 +630,11 @@ MODULE m_derived_variables
                         IF (p > 0) THEN
                             q_sf(j,k,l) = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(2)**2d0*sol(8) + &
                                             sol(3)**2d0*sol(8) - 2d0*sol(3)*sol(7)*sol(9) + sol(3)**2d0*sol(4) + &
-                                            sol(7)**2d0*sol(4) - 2d0*sol(7)*sol(2)*sol(10)+ sol(7)**2d0*sol(5))/MAX(norm,sgm_eps)**3d0
+                                            sol(7)**2d0*sol(4) - 2d0*sol(7)*sol(2)*sol(10)+ sol(7)**2d0*sol(5)) / &
+                                            MAX(norm,sgm_eps)**3d0
                         ELSE
-                            q_sf(j,k,l) = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(3)**2d0*sol(4))/MAX(norm,sgm_eps)**3d0
+                            q_sf(j,k,l) = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(3)**2d0*sol(4)) / &
+                                MAX(norm,sgm_eps)**3d0
                         END IF
 
                     END DO

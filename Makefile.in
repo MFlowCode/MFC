@@ -1,13 +1,5 @@
 include ../../Makefile.user
 
-########################### Definitions #########################
-# For compiler-specific modules, options [gcc,intel]
-ifeq ($(mycompiler),"intel")
-   myfile = m_compile_specific_intel.f90
-else
-   myfile = m_compile_specific_gcc.f90
-endif
-
 ########################## FFTW Flags ###########################
 # Linker flags 
 ld_sim_flags = -L$(fftw_lib_dir) -lfftw3 -lm
@@ -15,14 +7,7 @@ ld_sim_flags = -L$(fftw_lib_dir) -lfftw3 -lm
 # Header flags
 hd_flags = -I$(fftw_include_dir)
 
-######################## Compiler Flags #########################
-ifeq ($(mycompiler),"intel")
-   # Intel
-   f90_flags = -c -ip -O3 -w $(hd_flags)
-else
-   # GCC
-   f90_flags = -ffree-line-length-none -c -O3 -w $(hd_flags)
-endif
+f90_flags = $(fort_flags) $(hd_flags)
 
 #################### Post-process Silo Flags #####################
 # Silo flags

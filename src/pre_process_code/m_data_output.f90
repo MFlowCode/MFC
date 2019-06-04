@@ -102,7 +102,8 @@ MODULE m_data_output
             CHARACTER(LEN=15) :: FMT
 
             CHARACTER(LEN = &
-            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num !< Used to store the number, in character form, of the currently
+            INT(FLOOR(LOG10(REAL(sys_size, KIND(0d0))))) + 1) :: file_num !< Used to store 
+            !! the number, in character form, of the currently
             !! manipulated conservative variable data file
 
             CHARACTER(LEN = LEN_TRIM(t_step_dir) + name_len) :: file_loc !<

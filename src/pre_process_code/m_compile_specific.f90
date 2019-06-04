@@ -25,13 +25,13 @@
 !!  If not, see <http://www.gnu.org/licenses/>.
 
 !>
-!! @file m_compile_specific_intel.f90
+!! @file m_compile_specific.f90
 !! @brief Contains module m_compile_specific
 !! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
 !! @version 1.0
 !! @date JUNE 06 2019
 
-!> @brief This module contains subroutines that are compiler specific (GNU/INTEL)
+!> @brief This module contains subroutines that are compiler specific
 MODULE m_compile_specific
 
     IMPLICIT NONE
@@ -45,7 +45,12 @@ MODULE m_compile_specific
             CHARACTER(LEN=*), INTENT(IN) :: fileloc
             LOGICAL, INTENT(INOUT) :: dircheck
 
-            INQUIRE(DIRECTORY=TRIM(fileloc),EXIST=dircheck)   !Intel
+#ifdef __INTEL_COMPILER
+    INQUIRE(DIRECTORY=TRIM(fileloc),EXIST=dircheck)   !Intel
+#else
+    INQUIRE(FILE=TRIM(fileloc),EXIST=dircheck)        !GCC
+#endif
+
         END SUBROUTINE my_inquire
 
 END MODULE m_compile_specific

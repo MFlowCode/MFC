@@ -116,7 +116,8 @@ MODULE m_data_output
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:)    :: cntrline
     REAL(KIND(0d0)), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:)  :: x_accel, y_accel, z_accel
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)           :: grad_x_vf,grad_y_vf,grad_z_vf,norm_vf,kappa_vf
-    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:)  :: energy !< Energy: Used to write out correct E and p when We_size > 0
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:,:,:)  :: energy !< Energy: 
+    !! Used to write out correct E and p when We_size > 0
     !> @}
 
     PROCEDURE(s_write_abstract_data_files), POINTER :: s_write_data_files => NULL()
@@ -486,7 +487,8 @@ MODULE m_data_output
                      ELSEIF(model_eqns == 3) THEN
                         c = 0d0
                         DO i = 1, num_fluids
-                            c = c + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
+                            c = c + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
+                                (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
                         END DO
                         c = c/rho
                      ELSE
@@ -825,7 +827,7 @@ MODULE m_data_output
 
                 IF (model_eqns==2) THEN
                     DO i = 1, sys_size
-                        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
 
                         OPEN(2,FILE= TRIM(file_path) )
                             DO j=0,m
@@ -870,7 +872,7 @@ MODULE m_data_output
                                     DO k = 1,nb
                                         nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
                                     END DO
-                                    CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub)                                
+                                    CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,0,0), nRtmp, nbub) 
                                     
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)/nbub
                                 END IF
@@ -880,7 +882,7 @@ MODULE m_data_output
                 END IF
 
                 DO i = 1, sys_size    
-                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
 
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
@@ -903,7 +905,7 @@ MODULE m_data_output
 
                 DO i = 1, sys_size
                     IF (model_eqns==2) THEN
-                        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
                         OPEN(2,FILE=TRIM(file_path) )
                             DO j=0,m; DO k=0,n
                                 CALL s_convert_to_mixture_variables( q_cons_vf, rho, gamma, pi_inf, Re, We, j,k,0)
@@ -944,7 +946,7 @@ MODULE m_data_output
                                     DO l = 1,nb
                                         nRtmp(l) = q_cons_vf(bub_idx%rs(l))%sf(j,k,0)
                                     END DO
-                                    CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)                                
+                                    CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)  
                                     
                                     WRITE(2,FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
                                END IF
@@ -2045,7 +2047,8 @@ MODULE m_data_output
                                 !Stiffened gas pressure from energy
                                 pres = (                                       & 
                                     q_cons_vf(E_idx)%sf(j-2,k-2,l)  -            &
-                                    0.5d0*( (q_cons_vf(2)%sf(j-2,k-2,l)**2.d0 + q_cons_vf(3)%sf(j-2,k-2,l)**2.d0)/q_cons_vf(1)%sf(j-2,k-2,l)) - &
+                                    0.5d0*( (q_cons_vf(2)%sf(j-2,k-2,l)**2.d0 + &
+                                    q_cons_vf(3)%sf(j-2,k-2,l)**2.d0)/q_cons_vf(1)%sf(j-2,k-2,l)) - &
                                     pi_inf &
                                     ) / gamma
                             ELSE

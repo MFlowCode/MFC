@@ -29,8 +29,6 @@ clean:
 		rm -f post_process
 
 # Treatment of the object files
-m_compile_specific.o:	$(myfile)
-		$(compiler) $(f90_post_flags) -o m_compile_specific.o $<
 %.o:	%.f90
 		$(compiler) $(f90_post_flags) $<
 

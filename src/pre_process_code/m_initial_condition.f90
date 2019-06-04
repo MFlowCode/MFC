@@ -884,22 +884,8 @@ MODULE m_initial_condition
                             DO l = adv_idx%beg, adv_idx%end
                                 perturb_alpha = perturb_alpha - q_prim_vf(l)%sf(i,j,k)
                             END DO
-!                            IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
-!                                DO l = adv_idx%beg, adv_idx%end
-!                                    q_prim_vf(l)%sf(i,j,k) = q_prim_vf(l)%sf(i,j,k) - q_prim_vf(l)%sf(i,j,k)*rand_real
-!                                END DO
-!                            END IF
                         ELSE
                             perturb_alpha = q_prim_vf(E_idx+perturb_sph_fluid)%sf(i,j,k)
-!                            IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
-!                                DO l = adv_idx%beg, adv_idx%end
-!                                    IF (l - E_idx /= perturb_sph_fluid) THEN
-!                                        q_prim_vf(l)%sf(i,j,k) = q_prim_vf(l)%sf(i,j,k) - q_prim_vf(l)%sf(i,j,k)*rand_real
-!                                    ELSE
-!                                        q_prim_vf(l)%sf(i,j,k) = q_prim_vf(l)%sf(i,j,k) + (1d0-q_prim_vf(l)%sf(i,j,k))*rand_real
-!                                    END IF                                        
-!                                END DO
-!                            END IF
                         END IF
 
                         ! Perturb partial density fields to match perturbed volume fraction fields
@@ -1818,22 +1804,6 @@ MODULE m_initial_condition
                             (((q_prim_vf(E_idx)%sf(i,j,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
                             rhoref*(1d0-q_prim_vf(alf_idx)%sf(i,j,0))
                        
-                        ! Gaussian pressure pulse at center of domain ====================================
-                        !q_prim_vf(cont_idx%beg )%sf(i,j,0) = 1.2041d0/1d3
-                        !q_prim_vf(cont_idx%end )%sf(i,j,0) = 0d0
-                        !q_prim_vf(mom_idx%beg  )%sf(i,j,0) = 0d0
-                        !q_prim_vf(mom_idx%end  )%sf(i,j,0) = 0d0
-                        !q_prim_vf(E_idx        )%sf(i,j,0) = 101325d0/(1d3*1450d0*1450d0)/SQRT(2d0*pi)*EXP(-5d-1*(x_cc(i)**2d0+y_cc(j)**2d0))
-                        !q_prim_vf(adv_idx%beg  )%sf(i,j,0) = 1d0
-                        !q_prim_vf(cont_idx%beg)%sf(i,j,0) = 1.2041d0/1d3
-                        !q_prim_vf(cont_idx%end)%sf(i,j,0) = 1.2041d0/1d3
-                        !q_prim_vf(mom_idx%beg)%sf(i,j,0)  = 0d0
-                        !q_prim_vf(mom_idx%end)%sf(i,j,0)  = 0d0
-                        !q_prim_vf(E_idx)%sf(i,j,0)        = &
-                        !(101325d0+100d0/SQRT(2d0*pi)*EXP(-5d-1*(x_cc(i)**2d0+y_cc(j)**2d0)))/(1d3*1450d0*1450d0)
-                        !q_prim_vf(E_idx)%sf(i,j,0)        = 1.01325d5/1d3/1.45d3/1.45d3
-                        !q_prim_vf(adv_idx%beg)%sf         = 1d0
-
                        ! ================================================================================
 
                         ! Sinusoidal initial condition for all flow variables =============================
@@ -1972,24 +1942,6 @@ MODULE m_initial_condition
                             (((q_prim_vf(E_idx)%sf(i,j,k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
                             rhoref*(1d0-q_prim_vf(E_idx+1)%sf(i,j,k))
 
-                        ! Spherical pressure pulse centered on axis ======================================
-!                        q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-!                        q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = 0d0
-!                        q_prim_vf(E_idx        )%sf(i,j,k) = (1d5 + 1d2*EXP(-pi*(x_cc(i)**2d0+cart_y**2d0+cart_z**2d0)))
-!                        q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
-                        ! ================================================================================
-
-                        ! Spherical pressure pulse offset from axis ======================================
-!                        q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-!                        q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = 0d0
-!                        q_prim_vf(E_idx        )%sf(i,j,k) = (1d5 + 1d2*EXP(-pi*((x_cc(i)-75d-2)**2d0+(cart_y-15d-2)**2d0+(cart_z-35d-2)**2d0)))
-!                        q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
                         ! ================================================================================
 
                         ! Constant x-velocity in cylindrical grid ========================================
@@ -2090,37 +2042,50 @@ MODULE m_initial_condition
                             IF (beta == 0d0) THEN
                                 H = 25d-2*SQRT(7d0/pi)*(5d0*COS(sph_phi)**3d0 - 3d0*COS(sph_phi))
                             ELSEIF (beta == 1d0) THEN
-                                H = -125d-3*SQRT(21d0/pi)*EXP(cmplx_i*z_cc(k))*SIN(sph_phi)*(5d0*COS(sph_phi)**2d0 - 1d0)
+                                H = -125d-3*SQRT(21d0/pi)*EXP(cmplx_i*z_cc(k))*SIN(sph_phi) * &
+                                    (5d0*COS(sph_phi)**2d0 - 1d0)
                             ELSEIF (beta == 2d0) THEN
-                                H = 25d-2*SQRT(105d0/(2d0*pi))*EXP(2d0*cmplx_i*z_cc(k))*SIN(sph_phi)**2d0*COS(sph_phi)
+                                H = 25d-2*SQRT(105d0/(2d0*pi))*EXP(2d0*cmplx_i*z_cc(k)) * &
+                                    SIN(sph_phi)**2d0*COS(sph_phi)
                             ELSEIF (beta == 3d0) THEN
                                 H = -125d-3*SQRT(35d0/pi)*EXP(3d0*cmplx_i*z_cc(k))*SIN(sph_phi)**3d0
                             END IF
                         ELSEIF (epsilon == 4d0) THEN
                             IF (beta == 0d0) THEN
-                                H = 3d0/16d0*SQRT(1d0/pi)*(35d0*COS(sph_phi)**4d0 - 3d1*COS(sph_phi)**2d0 + 3d0)
+                                H = 3d0/16d0*SQRT(1d0/pi)*(35d0*COS(sph_phi)**4d0 - &
+                                    3d1*COS(sph_phi)**2d0 + 3d0)
                             ELSEIF (beta == 1d0) THEN
-                                H = -3d0/8d0*SQRT(5d0/pi)*EXP(cmplx_i*z_cc(k))*SIN(sph_phi)*(7d0*COS(sph_phi)**3d0 - 3d0*COS(sph_phi))
+                                H = -3d0/8d0*SQRT(5d0/pi)*EXP(cmplx_i*z_cc(k))* &
+                                    SIN(sph_phi)*(7d0*COS(sph_phi)**3d0 - 3d0*COS(sph_phi))
                             ELSEIF (beta == 2d0) THEN
-                                H = 3d0/8d0*SQRT(5d0/(2d0*pi))*EXP(2d0*cmplx_i*z_cc(k))*SIN(sph_phi)**2d0*(7d0*COS(sph_phi)**2d0 - 1d0)
+                                H = 3d0/8d0*SQRT(5d0/(2d0*pi))*EXP(2d0*cmplx_i*z_cc(k))* &
+                                    SIN(sph_phi)**2d0*(7d0*COS(sph_phi)**2d0 - 1d0)
                             ELSEIF (beta == 3d0) THEN
-                                H = -3d0/8d0*SQRT(35d0/pi)*EXP(3d0*cmplx_i*z_cc(k))*SIN(sph_phi)**3d0*COS(sph_phi)
+                                H = -3d0/8d0*SQRT(35d0/pi)*EXP(3d0*cmplx_i*z_cc(k))* &
+                                    SIN(sph_phi)**3d0*COS(sph_phi)
                             ELSEIF (beta == 4d0) THEN
-                                H = 3d0/16d0*SQRT(35d0/(2d0*pi))*EXP(4d0*cmplx_i*z_cc(k))*SIN(sph_phi)**4d0
+                                H = 3d0/16d0*SQRT(35d0/(2d0*pi))*EXP(4d0*cmplx_i*z_cc(k))* &
+                                    SIN(sph_phi)**4d0
                             END IF
                         ELSEIF (epsilon == 5d0) THEN
                             IF (beta == 0d0) THEN
-                                H = 1d0/16d0*SQRT(11d0/pi)*(63d0*COS(sph_phi)**5d0 - 7d1*COS(sph_phi)**3d0 + 15d0*COS(sph_phi))
+                                H = 1d0/16d0*SQRT(11d0/pi)*(63d0*COS(sph_phi)**5d0 - &
+                                    7d1*COS(sph_phi)**3d0 + 15d0*COS(sph_phi))
                             ELSEIF (beta == 1d0) THEN
-                                H = -1d0/16d0*SQRT(165d0/(2d0*pi))*EXP(cmplx_i*z_cc(k))*SIN(sph_phi)*(21d0*COS(sph_phi)**4d0 - 14d0*COS(sph_phi)**2d0 + 1d0)
+                                H = -1d0/16d0*SQRT(165d0/(2d0*pi))*EXP(cmplx_i*z_cc(k))* &
+                                    SIN(sph_phi)*(21d0*COS(sph_phi)**4d0 - 14d0*COS(sph_phi)**2d0 + 1d0)
                             ELSEIF (beta == 2d0) THEN
-                                H = 125d-3*SQRT(1155d0/(2d0*pi))*EXP(2d0*cmplx_i*z_cc(k))*SIN(sph_phi)**2d0*(3d0*COS(sph_phi)**3d0 - COS(sph_phi))
+                                H = 125d-3*SQRT(1155d0/(2d0*pi))*EXP(2d0*cmplx_i*z_cc(k)) * &
+                                    SIN(sph_phi)**2d0*(3d0*COS(sph_phi)**3d0 - COS(sph_phi))
                             ELSEIF (beta == 3d0) THEN
-                                H = -1d0/32d0*SQRT(385d0/pi)*EXP(3d0*cmplx_i*z_cc(k))*SIN(sph_phi)**3d0*(9d0*COS(sph_phi)**2d0 - 1d0)
+                                H = -1d0/32d0*SQRT(385d0/pi)*EXP(3d0*cmplx_i*z_cc(k) )* &
+                                    SIN(sph_phi)**3d0*(9d0*COS(sph_phi)**2d0 - 1d0)
                             ELSEIF (beta == 4d0) THEN
-                                H = 3d0/16d0*SQRT(385d0/(2d0*pi))*EXP(4d0*cmplx_i*z_cc(k))*SIN(sph_phi)**4d0*COS(sph_phi)
+                                H = 3d0/16d0*SQRT(385d0/(2d0*pi))*EXP(4d0*cmplx_i*z_cc(k)) * &
+                                    SIN(sph_phi)**4d0*COS(sph_phi)
                             ELSEIF (beta == 5d0) THEN
-                                H = -3d0/32d0*SQRT(77d0/pi)*EXP(5d0*cmplx_i*z_cc(k))*SIN(sph_phi)**5d0
+                                H = -3d0/32d0*SQRT(77d0/pi)*EXP(5d0*cmplx_i*z_cc(k)) * &
+                                    SIN(sph_phi)**5d0
                             END IF
                         END IF
 
@@ -2150,7 +2115,8 @@ MODULE m_initial_condition
 
 
             REAL(KIND(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !< 
-            !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
+            !! Variables to initialize the pressure field that corresponds to the 
+            !! bubble-collapse test case found in Tiwari et al. (2013)
             
             
             ! Transferring spherical patch's radius, centroid, smoothing patch
@@ -2207,7 +2173,8 @@ MODULE m_initial_condition
                         
                      END IF
 
-                     ! Initialization of the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
+                     ! Initialization of the pressure field that corresponds to the bubble-collapse 
+                     !! test case found in Tiwari et al. (2013)
                      ! radius_pressure = SQRT(x_cc(i)**2d0) ! 1D
                      ! radius_pressure = SQRT(x_cc(i)**2d0 + cart_y**2d0) ! 2D
                      ! radius_pressure = SQRT(x_cc(i)**2d0 + cart_y**2d0 + cart_z**2d0) ! 3D

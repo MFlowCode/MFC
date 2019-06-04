@@ -682,7 +682,8 @@ MODULE m_cbc
                   ELSEIF(model_eqns == 3) THEN
                       c = 0d0
                       DO i = 1, num_fluids
-                          c = c + q_prim_rs_vf(i+adv_idx%beg-1)%sf(0,k,r) * (1d0/fluid_pp(i)%gamma+1d0) * (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
+                          c = c + q_prim_rs_vf(i+adv_idx%beg-1)%sf(0,k,r) * (1d0/fluid_pp(i)%gamma+1d0) * &
+                              (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
                       END DO
                       c = c/rho
                   ELSE

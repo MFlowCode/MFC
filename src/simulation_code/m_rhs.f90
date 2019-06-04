@@ -2009,9 +2009,12 @@ MODULE m_rhs
                     IF(model_eqns == 3) THEN
                         DO j = 1, num_fluids
                             DO k = 0, m
-                                rhs_vf(j+internalEnergies_idx%beg-1)%sf(k,:,:) = rhs_vf(j+internalEnergies_idx%beg-1)%sf(k,:,:) - 1d0/dx(k) * &
-                                                        q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(k,0:n,0:p)*q_prim_qp(0,0,0)%vf(E_idx)%sf(k,0:n,0:p) * &
-                                                        (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf( k ,0:n,0:p) - flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(k-1,0:n,0:p))
+                                rhs_vf(j+internalEnergies_idx%beg-1)%sf(k,:,:) = &
+                                    rhs_vf(j+internalEnergies_idx%beg-1)%sf(k,:,:) - 1d0/dx(k) * &
+                                    q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(k,0:n,0:p) * &
+                                    q_prim_qp(0,0,0)%vf(E_idx)%sf(k,0:n,0:p) * &
+                                    (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf( k ,0:n,0:p) - &
+                                    flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(k-1,0:n,0:p))
                             END DO
                         END DO
                     END IF
@@ -2185,12 +2188,15 @@ MODULE m_rhs
 
                     IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
+                        
                         DO j = 1,num_mono
                             CALL s_get_monopole(i,q_prim_vf,t_step,mono(j))
                         END DO
+                        
                         DO k = cont_idx%beg,cont_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mass_src(:,:,:)
                         END DO
+                        
                         DO k = mom_idx%beg,mom_idx%end
                             rhs_vf(k)%sf(:,:,:) = rhs_vf(k)%sf(:,:,:) + mono_mom_src(k-cont_idx%end,:,:,:)
                         END DO
@@ -2201,22 +2207,27 @@ MODULE m_rhs
                     IF(model_eqns == 3) THEN
                         DO j = 1, num_fluids
                             DO k = 0, n
-                                rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) = rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) - 1d0/dy(k) * &
-                                                        q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,k,0:p)*q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,k,0:p) * &
-                                                        (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m, k ,0:p) - flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,k-1,0:p))
-                                                        ! (flux_src_ndqp(i,0,0)%vf(j+adv_idx%beg-1)%sf(0:m, k ,0:p) - flux_src_ndqp(i,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,k-1,0:p)) 
-                                                        ! //KS// see remark above
+                                rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) = &
+                                    rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) - 1d0/dy(k) * &
+                                    q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,k,0:p) * &
+                                    q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,k,0:p) * &
+                                    (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m, k ,0:p) - &
+                                    flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,k-1,0:p))
                             END DO
                         END DO
-                        ! Applying the additional geometrical inviscid Riemann source fluxes for the internal energy equations
+
+                        ! Applying the additional geometrical inviscid Riemann 
+                        ! source fluxes for the internal energy equations
                         ! using the average of velocities at cell boundaries
                         IF(cyl_coord) THEN
                             DO j = 1, num_fluids
                                 DO k = 0, n
-                                    rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) = rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) - 5d-1/y_cc(k) * &
-                                                            q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,k,0:p)*q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,k,0:p) * &
-                                                            (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m, k ,0:p) + flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,k-1,0:p)) 
-                                    ! //KS// see remark above
+                                    rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) = &
+                                        rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,k,:) - 5d-1/y_cc(k) * &
+                                        q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,k,0:p) * &
+                                        q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,k,0:p) * &
+                                        (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m, k ,0:p) + &
+                                        flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,k-1,0:p)) 
                                 END DO
                             END DO
                         END IF
@@ -2461,7 +2472,7 @@ MODULE m_rhs
                                                 rhs_vf(j)%sf(:,:,k) + 1d0/dz(k) * &
                                                 q_cons_qp(0,0,0)%vf(j)%sf(0:m,0:n,k) * &
                                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n, k ) &
-                                                - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n,k-1) )                                            
+                                                - flux_src_ndqp(i,0,0)%vf(j)%sf(0:m,0:n,k-1) )
                                         ELSE IF (adv_alphan .AND. j == adv_idx%end) THEN
                                             rhs_vf(j)%sf(:,:,k) = &
                                                rhs_vf(j)%sf(:,:,k) + 1d0/dz(k) * &
@@ -2525,7 +2536,8 @@ MODULE m_rhs
                             DO k = 0, p
                                 rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,:,k) = &
                                     rhs_vf(j+internalEnergies_idx%beg-1)%sf(:,:,k) - 1d0/dz(k) * &
-                                    q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,0:n,k)*q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,0:n,k) * &
+                                    q_cons_qp(0,0,0)%vf(j+adv_idx%beg-1)%sf(0:m,0:n,k) * &
+                                    q_prim_qp(0,0,0)%vf(E_idx)%sf(0:m,0:n,k) * &
                                     (flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,0:n, k ) - &
                                     flux_src_ndqp(i,0,0)%vf(adv_idx%beg)%sf(0:m,0:n,k-1))
                             END DO
@@ -3216,7 +3228,7 @@ MODULE m_rhs
 
                     const_sos = dsqrt( n_tait )
 
-                    s2 = f_g(mytime,sound,const_sos,mymono) * f_delta(j,k,l,mymono%loc,mymono%length,mymono) !g(t)*\delta(x-x0)
+                    s2 = f_g(mytime,sound,const_sos,mymono) * f_delta(j,k,l,mymono%loc,mymono%length,mymono)
                    
                     mono_mass_src(j,k,l)    = mono_mass_src(j,k,l) + s2/sound
                     IF (n ==0) THEN
@@ -3538,13 +3550,18 @@ MODULE m_rhs
                         DO l = 0, p
                             IF (p > 0) THEN
                                 var%sf(j,k,l) = Lheaviside(j,k,l)*U0_glb * &
-                                               (un_alpha_x%sf(j,k,l)*(grad_x%sf(j,k,l) - (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_x%sf(j,k,l)) + &
-                                                un_alpha_y%sf(j,k,l)*(grad_y%sf(j,k,l) - (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_y%sf(j,k,l)) + &
-                                                un_alpha_z%sf(j,k,l)*(grad_z%sf(j,k,l) - (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_z%sf(j,k,l)))
+                                               (un_alpha_x%sf(j,k,l)*(grad_x%sf(j,k,l) - &
+                                               (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_x%sf(j,k,l)) + &
+                                                un_alpha_y%sf(j,k,l)*(grad_y%sf(j,k,l) - &
+                                                (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_y%sf(j,k,l)) + &
+                                                un_alpha_z%sf(j,k,l)*(grad_z%sf(j,k,l) - &
+                                                (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_z%sf(j,k,l)))
                             ELSE
                                 var%sf(j,k,l) = Lheaviside(j,k,l)*U0_glb * &
-                                               (un_alpha_x%sf(j,k,l)*(grad_x%sf(j,k,l) - (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_x%sf(j,k,l)) + &
-                                                un_alpha_y%sf(j,k,l)*(grad_y%sf(j,k,l) - (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_y%sf(j,k,l))) 
+                                               (un_alpha_x%sf(j,k,l)*(grad_x%sf(j,k,l) - &
+                                               (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_x%sf(j,k,l)) + &
+                                                un_alpha_y%sf(j,k,l)*(grad_y%sf(j,k,l) - &
+                                                (1d0-2d0*q_prim_vf(adv_idx%beg)%sf(j,k,l))*alpharho_grad_y%sf(j,k,l))) 
                             END IF
                         END DO
                     END DO
@@ -3743,12 +3760,15 @@ MODULE m_rhs
                         IF (mpp_lim) THEN
                             sum_alpha = 0d0
                             DO i = 1, num_fluids
-                                IF ((q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) .LT. 0d0) .OR. (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 0d0)) THEN
+                                IF ((q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) .LT. 0d0) .OR. &
+                                    (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 0d0)) THEN
                                     q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) = 0d0
                                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)  = 0d0
                                     q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)  = 0d0
                                 END IF
-                                IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. 1d0) q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = 1d0
+
+                                IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. 1d0) &
+                                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = 1d0
                                 sum_alpha = sum_alpha + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
                             END DO
                             DO i = 1, num_fluids
@@ -3770,10 +3790,13 @@ MODULE m_rhs
                             pres_relax = 0d0
                             DO i = 1, num_fluids
                                 IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. sgm_eps) THEN
-                                    pres_K_init(i) = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
-                                                     - fluid_pp(i)%pi_inf) / fluid_pp(i)%gamma
+                                    pres_K_init(i) = &
+                                            (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) / &
+                                            q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
+                                            - fluid_pp(i)%pi_inf) / fluid_pp(i)%gamma
                            
-                                    IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
+                                    IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                        pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
                                 ELSE
                                     pres_K_init(i) = 0d0
                                 END IF
@@ -3800,7 +3823,8 @@ MODULE m_rhs
 
                                 ! Physical pressure
                                 DO i = 1, num_fluids
-                                    IF (pres_relax .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
+                                    IF (pres_relax .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                        pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
                                 END DO
 
                                 ! Newton-Raphson method
@@ -3808,10 +3832,16 @@ MODULE m_rhs
                                 df_pres = 0d0
                                 DO i = 1, num_fluids
                                     IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. sgm_eps) THEN
-                                        rho_K_s(i) = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) &
-                                                      * ((pres_relax+pres_inf(i))/(pres_K_init(i)+pres_inf(i)))**(1d0/gamma_min(i))
-                                        f_pres      = f_pres  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
-                                        df_pres     = df_pres - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / (gamma_min(i)*rho_K_s(i)*(pres_relax+pres_inf(i)))
+                                        rho_K_s(i) = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / &
+                                                    MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) &
+                                                    * ((pres_relax+pres_inf(i)) / (pres_K_init(i) + &
+                                                    pres_inf(i)))**(1d0/gamma_min(i))
+
+                                        f_pres      = f_pres  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) &
+                                            / rho_K_s(i)
+
+                                        df_pres     = df_pres - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) &
+                                            / (gamma_min(i)*rho_K_s(i)*(pres_relax+pres_inf(i)))
                                     END IF
                                 END DO
 
@@ -3819,7 +3849,9 @@ MODULE m_rhs
 
                             ! Cell update of the volume fraction
                             DO i = 1, num_fluids
-                                IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. sgm_eps) q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
+                                IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. sgm_eps) &
+                                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) &
+                                        / rho_K_s(i)
                             END DO
                         END IF
 
@@ -3841,7 +3873,8 @@ MODULE m_rhs
                      
                         dyn_pres = 0d0
                         DO i = mom_idx%beg, mom_idx%end
-                            dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l)*q_cons_vf(i)%sf(j,k,l) / MAX(rho,sgm_eps)
+                            dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l) * &
+                                q_cons_vf(i)%sf(j,k,l) / MAX(rho,sgm_eps)
                         END DO
 
                         E_We = 0d0
@@ -3849,7 +3882,9 @@ MODULE m_rhs
                         pres_relax = (q_cons_vf(E_idx)%sf(j,k,l) - dyn_pres - pi_inf - E_We) / gamma
 
                         DO i = 1, num_fluids
-                            q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) * (fluid_pp(i)%gamma*pres_relax + fluid_pp(i)%pi_inf)
+                            q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) * &
+                                (fluid_pp(i)%gamma*pres_relax + fluid_pp(i)%pi_inf)
                         END DO
                         ! ==================================================================
                     END DO

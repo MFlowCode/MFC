@@ -43,7 +43,7 @@
 !!              are only available in the volume fraction model.
 PROGRAM p_main
     
-    
+ 
     ! Dependencies =============================================================
     USE m_derived_types        !< Definitions of the derived types
 
@@ -74,8 +74,9 @@ PROGRAM p_main
     USE m_time_steppers        !< Time-stepping algorithms
     ! ==========================================================================
     
-    
     IMPLICIT NONE
+
+
     
     INTEGER :: t_step !< Iterator for the time-stepping loop
 
@@ -83,11 +84,8 @@ PROGRAM p_main
     
     ! Initializing MPI execution environment
     CALL s_mpi_initialize()
-#ifdef __INTEL_COMPILER
-    print*, 'gfortran'
-#else __
-    print*, 'else' 
-#ENDIF
+
+
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and

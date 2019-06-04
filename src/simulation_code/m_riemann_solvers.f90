@@ -656,19 +656,27 @@ MODULE m_riemann_solvers
                                      lo_cons_R = lo_rho_R*(lo_s_R-lo_vel_R(dir_idx(1)))
                                      hi_cons_L = rho_L*(s_L - vel_L(dir_idx(1)))
                                      hi_cons_R = rho_R*(s_R - vel_R(dir_idx(1)))
-                                     lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(i))*(lo_s_L-lo_vel_L(dir_idx(1)))-lo_pres_L*dir_flg(dir_idx(i))
-                                     lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(i))*(lo_s_R-lo_vel_R(dir_idx(1)))-lo_pres_R*dir_flg(dir_idx(i))
-                                     hi_flux_L = rho_L * vel_L(dir_idx(i))*(s_L - vel_L(dir_idx(1))) - pres_L*dir_flg(dir_idx(i))
-                                     hi_flux_R = rho_R * vel_R(dir_idx(i))*(s_R - vel_R(dir_idx(1))) - pres_R*dir_flg(dir_idx(i))
+                                     lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(i)) * &
+                                         (lo_s_L-lo_vel_L(dir_idx(1)))-lo_pres_L*dir_flg(dir_idx(i))
+                                     lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(i)) * &
+                                         (lo_s_R-lo_vel_R(dir_idx(1)))-lo_pres_R*dir_flg(dir_idx(i))
+                                     hi_flux_L = rho_L * vel_L(dir_idx(i)) * &
+                                         (s_L - vel_L(dir_idx(1))) - pres_L*dir_flg(dir_idx(i))
+                                     hi_flux_R = rho_R * vel_R(dir_idx(i)) * &
+                                         (s_R - vel_R(dir_idx(1))) - pres_R*dir_flg(dir_idx(i))
                                 ELSE
                                      lo_cons_L = lo_rho_L*(s_L-lo_vel_L(dir_idx(1)))
                                      lo_cons_R = lo_rho_R*(s_R-lo_vel_R(dir_idx(1)))
                                      hi_cons_L = rho_L*(s_L - vel_L(dir_idx(1)))
                                      hi_cons_R = rho_R*(s_R - vel_R(dir_idx(1)))
-                                     lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(i))*(s_L-lo_vel_L(dir_idx(1)))-lo_pres_L*dir_flg(dir_idx(i))
-                                     lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(i))*(s_R-lo_vel_R(dir_idx(1)))-lo_pres_R*dir_flg(dir_idx(i))
-                                     hi_flux_L = rho_L * vel_L(dir_idx(i))*(s_L - vel_L(dir_idx(1))) - pres_L*dir_flg(dir_idx(i))
-                                     hi_flux_R = rho_R * vel_R(dir_idx(i))*(s_R - vel_R(dir_idx(1))) - pres_R*dir_flg(dir_idx(i))
+                                     lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(i))*(s_L-lo_vel_L(dir_idx(1)))-lo_pres_L * &
+                                         dir_flg(dir_idx(i))
+                                     lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(i))*(s_R-lo_vel_R(dir_idx(1)))-lo_pres_R * &
+                                         dir_flg(dir_idx(i))
+                                     hi_flux_L = rho_L * vel_L(dir_idx(i))*(s_L - vel_L(dir_idx(1))) - &
+                                         pres_L*dir_flg(dir_idx(i))
+                                     hi_flux_R = rho_R * vel_R(dir_idx(i))*(s_R - vel_R(dir_idx(1))) - &
+                                         pres_R*dir_flg(dir_idx(i))
                                 END IF
                                 tvd_cons_L = lo_cons_L + flux_lim_func*(hi_cons_L - lo_cons_L)
                                 tvd_cons_R = lo_cons_R + flux_lim_func*(hi_cons_R - lo_cons_R)
@@ -677,7 +685,8 @@ MODULE m_riemann_solvers
                 
                                 IF (tvd_wave_speeds) THEN
                                     vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = &
-                                        (tvd_xi_M*tvd_flux_L - tvd_xi_P*tvd_flux_R) / (tvd_xi_M*tvd_cons_L - tvd_xi_P*tvd_cons_R)
+                                        (tvd_xi_M*tvd_flux_L - tvd_xi_P*tvd_flux_R) &
+                                        / (tvd_xi_M*tvd_cons_L - tvd_xi_P*tvd_cons_R)
                                 ELSE
                                     vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = &
                                         (xi_M* tvd_flux_L - xi_P* tvd_flux_R) / (xi_M* tvd_cons_L - xi_P*tvd_cons_R)
@@ -909,27 +918,48 @@ MODULE m_riemann_solvers
                             IF (s_L >= 0d0) THEN
                                 p_Star = pres_L ! Only usefull to recalculate the radial momentum geometric source flux
                                 DO i = 1, num_fluids
-                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*s_S
-                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = qL_prim_rs_vf(i+cont_idx%beg-1)%sf( j ,k,l)*vel_L(dir_idx(1))
-                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*(fluid_pp(i)%gamma*pres_L+fluid_pp(i)%pi_inf)*vel_L(dir_idx(1))
+                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = &
+                                        qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*s_S
+                                    
+                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = &
+                                        qL_prim_rs_vf(i+cont_idx%beg-1)%sf( j ,k,l)*vel_L(dir_idx(1))
+                                    
+                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                        qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*&
+                                        (fluid_pp(i)%gamma*pres_L+fluid_pp(i)%pi_inf)*vel_L(dir_idx(1))
                                 END DO
                                 DO i = 1, num_dims
-                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
-                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i))) ! Compute the star velocities for the non-conservative terms
+                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = &
+                                        rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
+                                    
+                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_L(dir_idx(i)) + &
+                                        dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i))) 
+                                    ! Compute the star velocities for the non-conservative terms
                                 END DO
                                 flux_rs_vf(E_idx)%sf(j,k,l) = (E_L + pres_L)*vel_L(dir_idx(1))
 
                             ! Compute right solution state
                             ELSE IF (s_R <= 0d0) THEN
-                                p_Star = pres_R ! Only usefull to recalculate the radial momentum geometric source flux
+                                p_Star = pres_R 
+                                ! Only usefull to recalculate the radial momentum geometric source flux
                                 DO i = 1, num_fluids
-                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l)*s_S
-                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = qR_prim_rs_vf(i+cont_idx%beg-1)%sf(j+1,k,l)*vel_R(dir_idx(1))
-                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l)*(fluid_pp(i)%gamma*pres_R+fluid_pp(i)%pi_inf)*vel_R(dir_idx(1))
+                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = &
+                                        qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l)*s_S
+                                    
+                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = &
+                                        qR_prim_rs_vf(i+cont_idx%beg-1)%sf(j+1,k,l)*vel_R(dir_idx(1))
+                                    
+                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                        qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l) * &
+                                        (fluid_pp(i)%gamma*pres_R+fluid_pp(i)%pi_inf)*vel_R(dir_idx(1))
                                 END DO 
                                 DO i = 1, num_dims
-                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
-                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i))) ! Compute the star velocities for the non-conservative terms
+                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = &
+                                        rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
+                                    
+                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_R(dir_idx(i)) + &
+                                        dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i))) 
+                                    ! Compute the star velocities for the non-conservative terms
                                 END DO
                                 flux_rs_vf(E_idx)%sf(j,k,l) = (E_R + pres_R)*vel_R(dir_idx(1))
 
@@ -937,36 +967,70 @@ MODULE m_riemann_solvers
                             ELSE IF (s_S >= 0d0) THEN
                                 xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
                                 rho_Star = rho_L*xi_L
-                                E_Star = xi_L*(E_L + (s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L / (s_L - vel_L(dir_idx(1)))))
+                                E_Star = xi_L*(E_L + (s_S - vel_L(dir_idx(1))) * &
+                                    (rho_L*s_S + pres_L / (s_L - vel_L(dir_idx(1)))))
                                 p_Star = rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))) + pres_L
                                 DO i = 1, num_fluids
-                                    p_K_Star = (pres_L+fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma))*xi_L**(1d0/fluid_pp(i)%gamma+1d0) - fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma)
-                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*s_S
-                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = qL_prim_rs_vf(i+cont_idx%beg-1)%sf( j ,k,l)*xi_L*s_S
-                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*(fluid_pp(i)%gamma*p_K_Star+fluid_pp(i)%pi_inf)*s_S
+                                    p_K_Star = (pres_L+fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma)) * &
+                                        xi_L**(1d0/fluid_pp(i)%gamma+1d0) - fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma)
+                                    
+                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = &
+                                        qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l)*s_S
+                                    
+                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = &
+                                        qL_prim_rs_vf(i+cont_idx%beg-1)%sf( j ,k,l)*xi_L*s_S
+                                    
+                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                        qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l) * &
+                                        (fluid_pp(i)%gamma*p_K_Star+fluid_pp(i)%pi_inf)*s_S
                                 END DO
                                 DO i = 1, num_dims
-                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = rho_Star*s_S*(s_S*dir_flg(dir_idx(i))+vel_L(dir_idx(i))*(1d0-dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
-                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i))) ! Compute the star velocities for the non-conservative terms
+                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = &
+                                        rho_Star*s_S*(s_S*dir_flg(dir_idx(i))+vel_L(dir_idx(i)) * &
+                                        (1d0-dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
+
+                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_L(dir_idx(i)) + &
+                                        dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i))) 
+                                    ! Compute the star velocities for the non-conservative terms
                                 END DO
                                 flux_rs_vf(E_idx)%sf(j,k,l) = (E_Star + p_Star)*s_S
 
                             ! Compute right star solution state
                             ELSE
                                 xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                
                                 rho_Star = rho_R*xi_R
-                                E_Star = xi_R*(E_R + (s_S - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R / (s_R - vel_R(dir_idx(1)))))
+                                
+                                E_Star = xi_R*(E_R + (s_S - vel_R(dir_idx(1))) * &
+                                    (rho_R*s_S + pres_R / (s_R - vel_R(dir_idx(1)))))
+                                
                                 p_Star = rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))) + pres_R
+                                
                                 DO i = 1, num_fluids
-                                    p_K_Star = (pres_R+fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma))*xi_R**(1d0/fluid_pp(i)%gamma+1d0) - fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma)
-                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l)*s_S
-                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = qR_prim_rs_vf(i+cont_idx%beg-1)%sf(j+1,k,l)*xi_R*s_S
-                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l)*(fluid_pp(i)%gamma*p_K_Star+fluid_pp(i)%pi_inf)*s_S
+                                    p_K_Star = (pres_R+fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma)) * &
+                                        xi_R**(1d0/fluid_pp(i)%gamma+1d0) - fluid_pp(i)%pi_inf/(1d0+fluid_pp(i)%gamma)
+                                    
+                                    flux_rs_vf(i+adv_idx%beg-1)%sf(j,k,l) = &
+                                        qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l)*s_S
+                                    
+                                    flux_rs_vf(i+cont_idx%beg-1)%sf(j,k,l) = &
+                                        qR_prim_rs_vf(i+cont_idx%beg-1)%sf(j+1,k,l)*xi_R*s_S
+                                    
+                                    flux_rs_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                        qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l) * & 
+                                        (fluid_pp(i)%gamma*p_K_Star+fluid_pp(i)%pi_inf)*s_S
                                 END DO
+                               
                                 DO i = 1, num_dims
-                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = rho_Star*s_S*(s_S*dir_flg(dir_idx(i))+vel_R(dir_idx(i))*(1d0-dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
-                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i))) ! Compute the star velocities for the non-conservative terms
+                                    flux_rs_vf(mom_idx%beg-1+dir_idx(i))%sf(j,k,l) = rho_Star*s_S * &
+                                        (s_S*dir_flg(dir_idx(i))+vel_R(dir_idx(i))*(1d0-dir_flg(dir_idx(i)))) + &
+                                        dir_flg(dir_idx(i))*p_Star
+                                    
+                                    vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = vel_R(dir_idx(i)) + &
+                                        dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i))) 
+                                    ! Compute the star velocities for the non-conservative terms
                                 END DO
+
                                 flux_rs_vf(E_idx)%sf(j,k,l) = (E_Star + p_Star)*s_S
 
                             END IF
@@ -981,7 +1045,8 @@ MODULE m_riemann_solvers
                                     flux_gsrc_rs_vf(i)%sf(j,k,l) = flux_rs_vf(i)%sf(j,k,l)
                                 END DO
                                 ! Recalculating the radial momentum geometric source flux (substracting the pressure part)
-                                flux_gsrc_rs_vf(mom_idx%beg-1+dir_idx(1))%sf(j,k,l) = flux_gsrc_rs_vf(mom_idx%beg-1+dir_idx(1))%sf(j,k,l) - p_Star
+                                flux_gsrc_rs_vf(mom_idx%beg-1+dir_idx(1))%sf(j,k,l) = &
+                                    flux_gsrc_rs_vf(mom_idx%beg-1+dir_idx(1))%sf(j,k,l) - p_Star
                                 ! Geometrical source of the void fraction(s) is zero
                                 DO i = adv_idx%beg, adv_idx%end
                                     flux_gsrc_rs_vf(i)%sf(j,k,l) = 0d0
@@ -1092,23 +1157,34 @@ MODULE m_riemann_solvers
                                 ! Energy
                     
                                 IF (tvd_wave_speeds) THEN
-                                     lo_flux_L = lo_vel_L(dir_idx(1))*(lo_E_L+lo_pres_L)+lo_s_M*(lo_xi_L*(lo_E_L+(lo_s_S-       &
-                                            lo_vel_L(dir_idx(1)))*(lo_rho_L*lo_s_S+lo_pres_L/(lo_s_L-lo_vel_L(dir_idx(1)))))-lo_E_L)
-                                     lo_flux_R = lo_vel_R(dir_idx(1))*(lo_E_R+lo_pres_R)+lo_s_P*(lo_xi_R*(lo_E_R+(lo_s_S-       &
-                                            lo_vel_R(dir_idx(1)))*(lo_rho_R*lo_s_S+lo_pres_R/(lo_s_R-lo_vel_R(dir_idx(1)))))-lo_E_R)
-                                     hi_flux_L =    vel_L(dir_idx(1))*(   E_L+   pres_L)+s_M*(   xi_L*(   E_L+(s_S-     &
-                                               vel_L(dir_idx(1)))*(   rho_L*s_S+   pres_L/(s_L-   vel_L(dir_idx(1)))))-   E_L)
-                                     hi_flux_R =    vel_R(dir_idx(1))*(   E_R+   pres_R)+s_P*(   xi_R*(   E_R+(s_S-     &
-                                               vel_R(dir_idx(1)))*(   rho_R*s_S+   pres_R/(s_R-   vel_R(dir_idx(1)))))-   E_R)
+                                     lo_flux_L = lo_vel_L(dir_idx(1))*(lo_E_L+lo_pres_L) + &
+                                            lo_s_M*(lo_xi_L*(lo_E_L+(lo_s_S-       &
+                                            lo_vel_L(dir_idx(1)))*(lo_rho_L*lo_s_S + &
+                                            lo_pres_L/(lo_s_L-lo_vel_L(dir_idx(1)))))-lo_E_L)
+                                     lo_flux_R = lo_vel_R(dir_idx(1)) * &
+                                            (lo_E_R+lo_pres_R)+lo_s_P*(lo_xi_R*(lo_E_R+(lo_s_S-  &
+                                            lo_vel_R(dir_idx(1)))*(lo_rho_R*lo_s_S + &
+                                            lo_pres_R/(lo_s_R-lo_vel_R(dir_idx(1)))))-lo_E_R)
+                                     hi_flux_L =    vel_L(dir_idx(1))*(   E_L+   pres_L)+s_M*(   xi_L*(   E_L+(s_S-  &
+                                               vel_L(dir_idx(1)))*&
+                                               (   rho_L*s_S+   pres_L/(s_L-   vel_L(dir_idx(1)))))-   E_L)
+                                     hi_flux_R =    vel_R(dir_idx(1))*(   E_R+   pres_R)+ &
+                                         s_P*(   xi_R*(   E_R+(s_S-     &
+                                               vel_R(dir_idx(1)))*(   rho_R*s_S+   &
+                                               pres_R/(s_R-   vel_R(dir_idx(1)))))-   E_R)
                                 ELSE
                                      lo_flux_L = lo_vel_L(dir_idx(1))*(lo_E_L+lo_pres_L)+s_M*(xi_L*(lo_E_L+(s_S-        &
-                                            lo_vel_L(dir_idx(1)))*(lo_rho_L*s_S+lo_pres_L/(s_L-lo_vel_L(dir_idx(1)))))-lo_E_L)
+                                            lo_vel_L(dir_idx(1)))*(lo_rho_L*s_S+lo_pres_L / &
+                                            (s_L-lo_vel_L(dir_idx(1)))))-lo_E_L)
                                      lo_flux_R = lo_vel_R(dir_idx(1))*(lo_E_R+lo_pres_R)+s_P*(xi_R*(lo_E_R+(s_S-        &
-                                            lo_vel_R(dir_idx(1)))*(lo_rho_R*s_S+lo_pres_R/(s_R-lo_vel_R(dir_idx(1)))))-lo_E_R)
+                                            lo_vel_R(dir_idx(1)))*(lo_rho_R*s_S+lo_pres_R / &
+                                            (s_R-lo_vel_R(dir_idx(1)))))-lo_E_R)
                                      hi_flux_L =    vel_L(dir_idx(1))*(   E_L+   pres_L)+s_M*(xi_L*(   E_L+(s_S-        &
-                                               vel_L(dir_idx(1)))*(   rho_L*s_S+   pres_L/(s_L-   vel_L(dir_idx(1)))))-   E_L)
+                                               vel_L(dir_idx(1)))*(   rho_L*s_S+   pres_L / &
+                                               (s_L-   vel_L(dir_idx(1)))))-   E_L)
                                      hi_flux_R =    vel_R(dir_idx(1))*(   E_R+   pres_R)+s_P*(xi_R*(   E_R+(s_S-        &
-                                               vel_R(dir_idx(1)))*(   rho_R*s_S+   pres_R/(s_R-   vel_R(dir_idx(1)))))-   E_R)
+                                               vel_R(dir_idx(1)))*(   rho_R*s_S+   pres_R / &
+                                               (s_R-   vel_R(dir_idx(1)))))-   E_R)
                                 END IF
                                 tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
                                 tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
@@ -2034,7 +2110,8 @@ MODULE m_riemann_solvers
                                 alpha_rho_IC(i) = alpha_rho_L(i)*((pres_S + dpres_L + pi_inf_L/(gamma_L + 1d0))/ &
                                     (pres_L + pi_inf_L/(gamma_L + 1d0)))**(gamma_L/(gamma_L+1d0))
                             END DO
-                            rho_IC = rho_L*((pres_S + dpres_L + pi_inf_L/(gamma_L + 1d0))/(pres_L + pi_inf_L/(gamma_L + 1d0)))**(gamma_L/(gamma_L+1d0))
+                            rho_IC = rho_L*((pres_S + dpres_L + pi_inf_L/(gamma_L + 1d0)) / &
+                                (pres_L + pi_inf_L/(gamma_L + 1d0)))**(gamma_L/(gamma_L+1d0))
 
                             vel_IC(dir_idx(1)) = vel_S
                             DO i = 2, num_dims
@@ -2192,7 +2269,8 @@ MODULE m_riemann_solvers
                                 alpha_rho_IC(i) = alpha_rho_R(i)*((pres_S + dpres_R + pi_inf_R/(gamma_R + 1d0))/ &
                                     (pres_R + pi_inf_R/(gamma_R + 1d0)))**(gamma_R/(gamma_R+1d0))
                             END DO
-                            rho_IC = rho_R*((pres_S + dpres_R + pi_inf_R/(gamma_R + 1d0))/(pres_R + pi_inf_R/(gamma_R + 1d0)))**(gamma_R/(gamma_R+1d0))
+                            rho_IC = rho_R*((pres_S + dpres_R + pi_inf_R/(gamma_R + 1d0))/(pres_R + &
+                                pi_inf_R/(gamma_R + 1d0)))**(gamma_R/(gamma_R+1d0))
 
                             vel_IC(dir_idx(1)) = vel_S
                             DO i = 2, num_dims

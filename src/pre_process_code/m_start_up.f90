@@ -237,7 +237,8 @@ MODULE m_start_up
             IF(dir_check .NEQV. .TRUE.) THEN
                 PRINT '(A)', 'Unsupported choice for the value of '         // &
                              'case_dir.'
-                PRINT '(A)', 'WARNING: Ensure that compiler choice in Makefile.in (gcc/intel) matches your compiler! '
+                PRINT '(A)', 'WARNING: Ensure that compiler flags/choices in Makefiles match your compiler! '
+                PRINT '(A)', 'WARNING: Ensure that preprocessor flags are enabled! '
                 CALL s_mpi_abort()
                 
             ! Constraints on the use of a preexisting grid and initial condition
