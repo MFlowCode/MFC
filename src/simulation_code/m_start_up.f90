@@ -1,9 +1,35 @@
+!!       __  _______________
+!!      /  |/  / ____/ ____/
+!!     / /|_/ / /_  / /     
+!!    / /  / / __/ / /___   
+!!   /_/  /_/_/    \____/   
+!!                       
+!!  This file is part of MFC.
+!!
+!!  MFC is the legal property of its developers, whose names 
+!!  are listed in the copyright file included with this source 
+!!  distribution.
+!!
+!!  MFC is free software: you can redistribute it and/or modify
+!!  it under the terms of the GNU General Public License as published 
+!!  by the Free Software Foundation, either version 3 of the license 
+!!  or any later version.
+!!
+!!  MFC is distributed in the hope that it will be useful,
+!!  but WITHOUT ANY WARRANTY; without even the implied warranty of
+!!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+!!  GNU General Public License for more details.
+!!  
+!!  You should have received a copy of the GNU General Public License
+!!  along with MFC (LICENSE).  
+!!  If not, see <http://www.gnu.org/licenses/>.
+
 !>
 !! @file m_start_up.f90
 !! @brief Contains module m_start_up
-!! @author spencer
-!! @version 1.1
-!! @date 1/1/1
+!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
+!! @version 1.0
+!! @date JUNE 06 2019
 
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data

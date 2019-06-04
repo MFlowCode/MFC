@@ -1,34 +1,61 @@
-! MFC v3.0 - Master Scripts: m_silo_proxy.f90
-! Description: The purpose of this module is to serve as a replacement framework
-!			   for the Silo library and header file when those are not available
-!			   on the platform on which the raw simulation data is to be post-
-!			   processed. Note that this module merely allows for the code for
-!			   the post-process to be compiled and executed and does not in
-!			   actuality provide support for the creation of Silo-HDF5 database
-!			   files. This means that when using this module during the post-
-!			   process, the user must select another database output format.
-! Author: Vedran Coralic
-! Date: 06/08/12
+!!       __  _______________
+!!      /  |/  / ____/ ____/
+!!     / /|_/ / /_  / /     
+!!    / /  / / __/ / /___   
+!!   /_/  /_/_/    \____/   
+!!                       
+!!  This file is part of MFC.
+!!
+!!  MFC is the legal property of its developers, whose names 
+!!  are listed in the copyright file included with this source 
+!!  distribution.
+!!
+!!  MFC is free software: you can redistribute it and/or modify
+!!  it under the terms of the GNU General Public License as published 
+!!  by the Free Software Foundation, either version 3 of the license 
+!!  or any later version.
+!!
+!!  MFC is distributed in the hope that it will be useful,
+!!  but WITHOUT ANY WARRANTY; without even the implied warranty of
+!!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+!!  GNU General Public License for more details.
+!!  
+!!  You should have received a copy of the GNU General Public License
+!!  along with MFC (LICENSE).  
+!!  If not, see <http://www.gnu.org/licenses/>.
 
+!>
+!! @file m_mpi_proxy.f90
+!! @brief Contains module m_silo_proxy.f90 
+!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
+!! @version 1.0
+!! @date JUNE 06 2019
 
+!> @brief The purpose of this module is to serve as a replacement framework
+!!			   for the Silo library and header file when those are not available
+!!			   on the platform on which the raw simulation data is to be post-
+!!			   processed. Note that this module merely allows for the code for
+!!			   the post-process to be compiled and executed and does not in
+!!			   actuality provide support for the creation of Silo-HDF5 database
+!!			   files. This means that when using this module during the post-
+!!			   process, the user must select another database output format.
+!!  INSTRUCTIONS: To utilize this module, first place a copy of it in the
+!!	post-process code directory. Next, modify the module m_data_output.f90 to
+!!	use m_silo_proxy.f90 and erase the include command referencing the header
+!!	file silo.inc. Finally, modify the makefile so that it includes in the
+!!	compilation the Silo proxy module and remove any linker flags referencing
+!!	the Silo library. No further changes should be necessary to compile and
+!!	execute the post-process code.
 MODULE m_silo_proxy
 	
 	
 	IMPLICIT NONE
 	
 	
-	! INSTRUCTIONS: To utilize this module, first place a copy of it in the
-	! post-process code directory. Next, modify the module m_data_output.f90 to
-	! use m_silo_proxy.f90 and erase the include command referencing the header
-	! file silo.inc. Finally, modify the makefile so that it includes in the
-	! compilation the Silo proxy module and remove any linker flags referencing
-	! the Silo library. No further changes should be necessary to compile and
-	! execute the post-process code.
-	
-	
-	! Refer to Silo's user guide (10/2007, v4.6) for the variables' definitions
-	! and the header file silo.inc for their choice of values
-	INTEGER, PARAMETER :: DB_CLOBBER		 = 0
+	!> @name Refer to Silo's user guide (10/2007, v4.6) for the variables' definitions
+	!! and the header file silo.inc for their choice of values
+	!> @{
+        INTEGER, PARAMETER :: DB_CLOBBER		 = 0
 	INTEGER, PARAMETER :: DB_COLLINEAR		 = 130
 	INTEGER, PARAMETER :: DB_FLOAT			 = 19
 	INTEGER, PARAMETER :: DB_DOUBLE			 = 20
@@ -42,18 +69,15 @@ MODULE m_silo_proxy
 	INTEGER, PARAMETER :: DBOPT_EXTENTS_SIZE = 299
 	INTEGER, PARAMETER :: DBOPT_HI_OFFSET	 = 265
 	INTEGER, PARAMETER :: DBOPT_LO_OFFSET	 = 266
-	
+	!> @}
 	
 	CONTAINS
 		
 		
-		
-		
-		
-		FUNCTION DBCREATE( pathname, lpathname,   mode  , target, & ! ----------
+		!> @brief  Refer to page 28 of Silo's user guide (10/2007, v4.6) for
+		!!			   information about this subroutine
+		FUNCTION DBCREATE( pathname, lpathname,   mode  , target, & !! ----------
 						   fileinfo, lfileinfo, filetype, status  )
-		! Description: Refer to page 28 of Silo's user guide (10/2007, v4.6) for
-		!			   information about this subroutine
 			
 			
 			INTEGER						   :: DBCREATE
@@ -73,15 +97,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBCREATE ! ------------------------------------------------
+		END FUNCTION DBCREATE !! ------------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBGET2DSTRLEN() ! ---------------------------------------------
-		! Description: Refer to page 235 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+		!> @brief  Refer to page 235 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine		
+		FUNCTION DBGET2DSTRLEN() !! ---------------------------------------------
+
 			
 			
 			INTEGER :: DBGET2DSTRLEN
@@ -93,15 +117,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBGET2DSTRLEN ! -------------------------------------------
+		END FUNCTION DBGET2DSTRLEN !! -------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBSET2DSTRLEN(len) ! ------------------------------------------
-		! Description: Refer to page 234 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+		!> @brief  Refer to page 234 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine		
+		FUNCTION DBSET2DSTRLEN(len) !! ------------------------------------------
+
 			
 			
 			INTEGER				:: DBSET2DSTRLEN
@@ -114,15 +138,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBSET2DSTRLEN ! -------------------------------------------
+		END FUNCTION DBSET2DSTRLEN !! -------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBMKOPTLIST(maxopts, optlist_id) ! ----------------------------
-		! Description: Refer to page 185 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+		!> @brief  Refer to page 185 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine		
+		FUNCTION DBMKOPTLIST(maxopts, optlist_id) !! ----------------------------
+
 			
 			
 			INTEGER				:: DBMKOPTLIST
@@ -135,15 +159,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBMKOPTLIST ! ---------------------------------------------
+		END FUNCTION DBMKOPTLIST !! ---------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBADDIOPT(optlist_id, option, ivalue) ! -----------------------
-		! Description: Refer to page 186 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+		!> @brief  Refer to page 186 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine		
+		FUNCTION DBADDIOPT(optlist_id, option, ivalue) !! -----------------------
+
 			
 			
 			INTEGER				:: DBADDIOPT
@@ -158,15 +182,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBADDIOPT ! -----------------------------------------------
+		END FUNCTION DBADDIOPT !! -----------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBADDDOPT(optlist_id, option, dvalue) ! -----------------------
-		! Description: Refer to page 186 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+		!> @brief  Refer to page 186 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine		
+		FUNCTION DBADDDOPT(optlist_id, option, dvalue) !! -----------------------
+
 			
 			
 			INTEGER								:: DBADDDOPT
@@ -181,16 +205,16 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBADDDOPT ! -----------------------------------------------
+		END FUNCTION DBADDDOPT !! -----------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBPUTMMESH(    dbid, name, lname, nmesh, meshnames,   & ! -----
+		!> @brief  Refer to page 121 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine		
+		FUNCTION DBPUTMMESH(    dbid, name, lname, nmesh, meshnames,   & !! -----
 							 lmeshnames, meshtypes, optlist_id, status )
-		! Description: Refer to page 121 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+
 			
 			
 			INTEGER										 :: DBPUTMMESH
@@ -211,15 +235,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBPUTMMESH ! ----------------------------------------------
+		END FUNCTION DBPUTMMESH !! ----------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBFREEOPTLIST(optlist_id) ! -----------------------------------
-		! Description: Refer to page 189 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
+		!> @brief  Refer to page 189 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine	
+		FUNCTION DBFREEOPTLIST(optlist_id) !! -----------------------------------
+
 			
 			
 			INTEGER				:: DBFREEOPTLIST
@@ -231,17 +255,16 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBFREEOPTLIST ! -------------------------------------------
+		END FUNCTION DBFREEOPTLIST !! -------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBPUTQM( dbid, name, lname, xname, lxname, yname, lyname, & ! -
+		!> @brief  Refer to page 57 of Silo's user guide (10/2007, v4.6) for
+		!!			   information about this subroutine
+		FUNCTION DBPUTQM( dbid, name, lname, xname, lxname, yname, lyname, & !! -
 						   zname, lzname, x, y, z, dims, ndims, datatype,  &
 						  			coordtype, optlist_id, status		   )
-		! Description: Refer to page 57 of Silo's user guide (10/2007, v4.6) for
-		!			   information about this subroutine
 			
 			
 			INTEGER										 :: DBPUTQM
@@ -271,16 +294,16 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBPUTQM ! -------------------------------------------------
+		END FUNCTION DBPUTQM !! -------------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBPUTCURVE( dbid, curvename, lcurvename, xvals, yvals, & ! ----
+		!> @brief  Refer to page 46 of Silo's user guide (10/2007, v4.6) for
+		!!			   information about this subroutine
+		FUNCTION DBPUTCURVE( dbid, curvename, lcurvename, xvals, yvals, & !! ----
 							   datatype, npoints, optlist_id, status	)
-		! Description: Refer to page 46 of Silo's user guide (10/2007, v4.6) for
-		!			   information about this subroutine
+
 			
 			
 			INTEGER										 :: DBPUTCURVE
@@ -301,17 +324,16 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBPUTCURVE ! ----------------------------------------------
+		END FUNCTION DBPUTCURVE !! ----------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBPUTMVAR( dbid, name, lname, nvar, varnames, lvarnames, & ! --
+		!> @brief  Refer to page 130 of Silo's user guide (10/2007, v4.6)
+		!!			   for information about this subroutine
+		FUNCTION DBPUTMVAR( dbid, name, lname, nvar, varnames, lvarnames, & !! --
 									vartypes, optlist_id, status		  )
-		! Description: Refer to page 130 of Silo's user guide (10/2007, v4.6)
-		!			   for information about this subroutine
-			
+
 			
 			INTEGER										 :: DBPUTMVAR
 			INTEGER			  ,				  INTENT(IN) :: dbid
@@ -331,17 +353,17 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBPUTMVAR ! -----------------------------------------------
+		END FUNCTION DBPUTMVAR !! -----------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBPUTQV1( dbid, name, lname, meshname, lmeshname, var, & ! ----
+		!> @brief  Refer to page 64 of Silo's user guide (10/2007, v4.6) for
+		!!			   information about this subroutine	
+		FUNCTION DBPUTQV1( dbid, name, lname, meshname, lmeshname, var, & !! ----
 						      dims, ndims, mixvar, mixlen, datatype,	&
 						          centering, optlist_id, status			)
-		! Description: Refer to page 64 of Silo's user guide (10/2007, v4.6) for
-		!			   information about this subroutine
+
 			
 			
 			INTEGER											 :: DBPUTQV1
@@ -367,15 +389,15 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBPUTQV1 ! ------------------------------------------------
+		END FUNCTION DBPUTQV1 !! ------------------------------------------------
 		
 		
 		
 		
-		
-		FUNCTION DBCLOSE(dbid) ! -----------------------------------------------
-		! Description: Refer to page 31 of Silo's user guide (10/2007, v4.6) for
-		!			   information about this subroutine
+		!> @brief  Refer to page 31 of Silo's user guide (10/2007, v4.6) for
+		!!			   information about this subroutine
+		FUNCTION DBCLOSE(dbid) !! -----------------------------------------------
+
 			
 			
 			INTEGER				:: DBCLOSE
@@ -388,7 +410,7 @@ MODULE m_silo_proxy
 			STOP
 			
 			
-		END FUNCTION DBCLOSE ! -------------------------------------------------
+		END FUNCTION DBCLOSE !! -------------------------------------------------
 		
 		
 		

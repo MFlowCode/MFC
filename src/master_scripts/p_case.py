@@ -1,17 +1,38 @@
 #!/usr/bin/python
 
+##       __  _______________
+##      /  |/  / ____/ ____/
+##     / /|_/ / /_  / /     
+##    / /  / / __/ / /___   
+##   /_/  /_/_/    \____/   
+##                       
+##  This file is part of MFC.
+##
+##  MFC is the legal property of its developers, whose names 
+##  are listed in the copyright file included with this source 
+##  distribution.
+##
+##  MFC is free software: you can redistribute it and/or modify
+##  it under the terms of the GNU General Public License as published 
+##  by the Free Software Foundation, either version 3 of the license 
+##  or any later version.
+##
+##  MFC is distributed in the hope that it will be useful,
+##  but WITHOUT ANY WARRANTY; without even the implied warranty of
+##  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+##  GNU General Public License for more details.
+##  
+##  You should have received a copy of the GNU General Public License
+##  along with MFC (LICENSE).  
+##  If not, see <http://www.gnu.org/licenses/>.
 
-# MFC v3.0 - Master Scripts: p_case.py
-# Description: The following script describes the steps necessary to configure
-#			   and interconnect the pre-process, simulation and post-process
-#			   components of the MFC for the analysis of a sample case. Note
-#			   that this file is meant to serve as a template and so should
-#			   not be edited in this location. Suggestions on how to properly
-#			   customize this script for practical use are described at the end
-#			   of the file.
-# Author: Vedran Coralic
-# Date: 06/27/12
-
+## @brief The following script describes the steps necessary to configure
+##		and interconnect the pre-process, simulation and post-process
+##		components of the MFC for the analysis of a sample case. Note
+##		that this file is meant to serve as a template and so should
+##		not be edited in this location. Suggestions on how to properly
+##		customize this script for practical use are described at the end
+##		of the file.
 
 # Dependencies and Logistics ===================================================
 
