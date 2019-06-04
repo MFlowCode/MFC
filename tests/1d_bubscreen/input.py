@@ -101,7 +101,7 @@ case_dict =                                                                     
     {                                                                           \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                   \
-                    'run_time_info'                : 'T',                       \
+                    'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
                     'ppn'                          : 1,                         \
                     'queue'                        : 'normal',                  \
@@ -149,10 +149,10 @@ case_dict =                                                                     
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
-                    'format'                       : 2,                        \
+                    'format'                       : 1,                        \
                     'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'T',                       \
+		    'parallel_io'                  :'F',                       \
 		    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================

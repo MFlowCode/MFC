@@ -13,9 +13,13 @@ for mytest in "${mytests[@]}"; do
         rm -f diff.out
         diff check/$check_file D/$check_file > diff.out
         if [ -s diff.txt ]; then
-            echo $mytest: Check failed!
+        #if [[ -s diff.txt || ! -f "D/$check_file" ]]; then
+            echo $mytest: Check failed! Output files are different.
+        elif [ ! -f "D/$check_file" ]; then
+            echo $mytest: Check failed! Output file was not found.
         else
             echo $mytest: Check passed!
         fi
+
     cd ..
 done
