@@ -68,6 +68,8 @@ Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
 
+print("as;kdjf") 
+
 # Command to navigate between directories
 from os import chdir
 

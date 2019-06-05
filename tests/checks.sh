@@ -19,8 +19,8 @@ for mytest in "${mytests[@]}"; do
     cd $mytest
         
         #Run test case
-        python ./input.py pre_process > pre_process.out
-        python ./input.py  simulation > simulation.out
+        ./input.py pre_process > pre_process.out
+        ./input.py  simulation > simulation.out
         
         cd check
             check_file=$(echo *)
