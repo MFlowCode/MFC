@@ -4,7 +4,7 @@
 FC = mpif90
 #FC = mpiifort
    
-### Compiler flags ### 
+### Compiler flags [set according to your compiler] ### 
 #Note: Requires -fpp (Intel) or -cpp (GNU) to enable preprocessor
 
 default_flags = -cpp -c -O3 -w
@@ -16,6 +16,7 @@ default_flags = -cpp -c -O3 -w
 fort_flags = $(default_flags)
 
 ######### FFTW library and include locations #########
+######### Set these to the location of FFTW  #########
 
 ## For the FFTW included in the MFC package
 fftw_lib_dir = ../../lib/fftw-3.3.8/lib
@@ -27,6 +28,7 @@ fftw_include_dir = ../../lib/fftw-3.3.8/include
 #fftw_include_dir = /usr/local/include
 
 ######### Silo library and include locations #########
+######### Set these to the location of Silo  #########
 
 #silo_lib_dir = /home/spencer/packages/silo-4.10.2/lib
 #silo_include_dir = /home/spencer/packages/silo-4.10.2/include

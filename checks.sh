@@ -1,3 +1,6 @@
+#!/bin/bash
+
+
 rm -rf ./tests/*/D ./tests/*/*.inp ./tests/*/p_all ./tests/*/*.out
 
 mytests=( 1d_bubscreen kapila_shocktube sod_shocktube vacuum_generation )
