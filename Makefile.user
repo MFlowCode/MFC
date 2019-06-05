@@ -5,15 +5,9 @@ FC = mpif90
 #FC = mpiifort
    
 ### Compiler flags [set according to your compiler] ### 
-#Note: Requires -fpp (Intel) or -cpp (GNU) to enable preprocessor
+#Note: Requires -cpp to enable preprocessor
 
-default_flags = -cpp -c -O3 -w
-
-# Intel
-#fort_flags = -fpp -ip $(default_flags)
-
-# GCC
-fort_flags = $(default_flags)
+FFLAGS = -cpp -c -O3 -w
 
 ######### FFTW library and include locations #########
 ######### Set these to the location of FFTW  #########
