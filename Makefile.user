@@ -10,7 +10,7 @@ FC = mpif90
 default_flags = -cpp -c -O3 -w
 
 # Intel
-#fort_flags = -fpp $(default_flags)
+#fort_flags = -fpp -ip $(default_flags)
 
 # GCC
 fort_flags = $(default_flags)

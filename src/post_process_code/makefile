@@ -16,7 +16,7 @@ PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 
 # make without parameters will make first target found.
-default : $(PROGRAM)
+all : $(PROGRAM)
 
 # Compiler steps for all objects
 $(OBJS) : %.o : %.f90
@@ -26,7 +26,7 @@ $(OBJS) : %.o : %.f90
 $(PROGRAM) : $(OBJS)
 	$(FC) $(FLFLAGS) -o $(EXEC) $(OBJS)
 
-.PHONY: debug default clean
+.PHONY: all clean
 
 clean:
 	rm -rf $(OBJS) $(PROGRAM) $(EXEC)  $(patsubst %.o,%.mod,$(MOD_OBJS))
