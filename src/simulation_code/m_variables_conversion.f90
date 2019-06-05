@@ -633,7 +633,7 @@ MODULE m_variables_conversion
                             END DO
                             CALL s_comp_n_from_cons( qK_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)                            
                            
-                            IF ( nbub < 0.d0) ) STOP 'nbub is negative'
+                            IF ( nbub < 0.d0) STOP 'nbub is negative'
                             DO i = bub_idx%beg, sys_size
                                 qk_prim_vf(i)%sf(j,k,l) = qk_cons_vf(i)%sf(j,k,l)/nbub
                             END DO
