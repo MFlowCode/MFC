@@ -176,12 +176,6 @@ MODULE m_bubbles
 
                     bub_v_src(q,j,k,l) = nbub(j,k,l) * rddot
                     
-                    IF (isnan(bub_r_src(q,j,k,l))) THEN
-                        STOP 'bub_r_src NaN'
-                    ELSE IF (isnan(bub_v_src(q,j,k,l))) THEN
-                        STOP 'bub_v_src NaN'
-                    END IF
-
                     IF (alf < 1.d-10) THEN
                         bub_adv_src(j,k,l) = 0d0
                         bub_r_src(q,j,k,l) = 0d0

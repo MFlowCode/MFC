@@ -1255,17 +1255,6 @@ MODULE m_riemann_solvers
                                     flux_rs_vf(cont_idx%end)%sf(j,k,l) = 0.d0
                                 END IF
 
-                                IF (isnan(xi_m)) STOP '"xi_m" is a NaN'
-                                IF (isnan(xi_p)) STOP '"xi_p" is a NaN'
-                                IF (isnan(xi_l)) STOP '"xi_L" is a NaN'
-                                IF (isnan(xi_r)) STOP '"xi_R" is a NaN'
-                                IF (isnan(s_m)) STOP '"s_m" is a NaN'
-                                IF (isnan(s_p)) STOP '"s_p" is a NaN'
-                                IF (isnan(alpha_rho_L(1))) STOP '"alpha_rho_L" is a NaN'
-                                IF (isnan(alpha_rho_R(1))) STOP '"alpha_rho_R" is a NaN'
-                                IF (isnan(vel_L(dir_idx(1)))) STOP '"ve_L" is a NaN'
-                                IF (isnan(vel_R(dir_idx(1)))) STOP '"ve_R" is a NaN'
-
                                 ! Momentum flux. 
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 IF (bubbles .NEQV. .TRUE.) THEN
@@ -2694,10 +2683,6 @@ MODULE m_riemann_solvers
                            lo_rho_R*(lo_s_R - lo_vel_R(dir_idx(1))))
             END IF
 
-            IF (isnan(s_L)) STOP 's_l is NaN'
-            IF (isnan(s_R)) STOP 's_r is NaN'
-            IF (isnan(s_s)) STOP 's_s is NaN'
-            
         END SUBROUTINE s_compute_direct_wave_speeds ! --------------------------
         
         

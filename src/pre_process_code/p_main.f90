@@ -153,6 +153,5 @@ PROGRAM p_main
 
     ! Finalization of the MPI environment
     CALL s_mpi_finalize()
-    STOP 
     
 END PROGRAM p_main
