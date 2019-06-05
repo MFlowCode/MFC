@@ -24,7 +24,7 @@ $(OBJS) : %.o : %.f90
 
 # Linker
 $(PROGRAM) : $(OBJS)
-	$(FC) $(FLFLAGS) -o $(EXEC) $(OBJS)
+	$(FC) -o $(EXEC) $(OBJS) $(FLFLAGS) 
 
 .PHONY: all clean
 
