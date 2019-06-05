@@ -12,6 +12,10 @@ simulation:
 post_process:
 	@$(MAKE) -C src/post_process_code -f makefile
 
+check:
+	./tests/checks.sh
+
+
 .PHONY: clean
 clean:
 	@$(MAKE) -C src/pre_process_code -f makefile clean

@@ -8,7 +8,8 @@ components can be built via
     $$ make [component]
 
 where [component] is one of "pre_process,simulation,post_process". 
+
 Once this is completed, you can ensure that the software is working 
 as intended by running
 
-    $$ sh check.sh
+    $$ make check

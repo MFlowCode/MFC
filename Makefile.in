@@ -7,7 +7,7 @@ ld_sim_flags = -L$(fftw_lib_dir) -lfftw3 -lm
 # Header flags
 hd_flags = -I$(fftw_include_dir)
 
-f90_flags = $(fort_flags) $(hd_flags)
+f90_flags = $(FFLAGS) $(hd_flags)
 
 #################### Post-process Silo Flags #####################
 # Silo flags
