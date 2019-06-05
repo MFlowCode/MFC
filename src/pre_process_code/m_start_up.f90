@@ -37,11 +37,16 @@ MODULE m_start_up
     
     ! Dependencies =============================================================
     USE m_derived_types          !< Definitions of the derived types
+
     USE m_global_parameters      !< Global parameters for the code
+
     USE m_mpi_proxy              !< Message passing interface (MPI) module proxy
+
     USE m_data_output            !< Procedures to write the grid data and the
                                  !! conservative variables to files
+
     USE mpi                      !< Message passing interface (MPI) module
+
     USE m_compile_specific
     ! ==========================================================================
     

@@ -52,7 +52,7 @@ MODULE m_derived_types
         REAL(KIND(0d0)), POINTER, DIMENSION(:,:,:) :: sf !< Scalar field
     END TYPE scalar_field
 
-    !< MPI pass-throughs
+    !> MPI pass-throughs
     TYPE mpi_io_var
         INTEGER, ALLOCATABLE, DIMENSION(:) :: view
         TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: var

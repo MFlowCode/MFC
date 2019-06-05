@@ -1,33 +1,45 @@
 include ../../Makefile.in
 
-# List of the object files that are members of the pre-process code
-object_files = m_derived_types.o \
-                           m_compile_specific.o \
-                           m_global_parameters.o \
-                           m_mpi_proxy.o \
-                           m_variables_conversion.o \
-                           m_data_output.o \
-                           m_start_up.o \
-                           m_grid.o \
-                           m_initial_condition.o \
-                           p_main.o
+# Find all source files, create a list of corresponding object files
+SRCS=$(wildcard *.f90)
+OBJS=$(patsubst %.f90,%.o,$(SRCS))
 
-# ==============================================================================
+# Ditto for mods (They will be in both lists)
+MODS=$(wildcard m*.f90)
+MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
+# Compiler/Linker settings
+FLFLAGS = -g
+FCFLAGS = -g $(f90_flags)
+EXEC = pre_process
+PROGRAM = p_main
+PRG_OBJ = $(PROGRAM).o
 
-# Rules ========================================================================
+# make without parameters will make first target found.
+default : $(PROGRAM)
 
-# Creation of the executable
-all:	 $(object_files)
-		$(compiler) $(object_files) -o ./pre_process
+# Compiler steps for all objects
+$(OBJS) : %.o : %.f90
+	$(FC) $(FCFLAGS) -o $@ $<
 
-# Clean-up of the working directory
+# Linker
+$(PROGRAM) : $(OBJS)
+	$(FC) $(FLFLAGS) -o $(EXEC) $(OBJS)
+
+.PHONY: debug default clean
+
 clean:
-		rm -f *.o *.mod *.f90~
-		rm -f pre_process
+	rm -rf $(OBJS) $(PROGRAM) $(EXEC)  $(patsubst %.o,%.mod,$(MOD_OBJS))
 
-# Treatment of the object files
-%.o:	%.f90
-		$(compiler) $(f90_flags) $<
+# Dependencies
 
-# ==============================================================================
+# Main program depends on all modules
+$(PRG_OBJ) : $(MOD_OBJS)
+
+# Modules depend on each other
+m_data_output.o m_start_up.o : m_compile_specific.o
+m_start_up.o : m_data_output.o
+m_data_output.o m_global_parameters.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_start_up.o m_variables_conversion.o : m_derived_types.o
+m_data_output.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_variables_conversion.o m_start_up.o : m_global_parameters.o
+m_data_output.o m_grid.o m_start_up.o : m_mpi_proxy.o
+m_data_output.o m_initial_condition.o : m_variables_conversion.o

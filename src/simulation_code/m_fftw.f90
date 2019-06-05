@@ -40,6 +40,7 @@ MODULE m_fftw
     USE m_derived_types        !< Definitions of the derived types
     
     USE m_global_parameters    !< Definitions of the global parameters
+    
     USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     ! ==========================================================================
 

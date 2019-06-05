@@ -1,8 +1,8 @@
 ################ Compiler options ####################
 
 ### Compiler command ###
-compiler = mpif90
-#compiler = mpiifort
+FC = mpif90
+#FC = mpiifort
    
 ### Compiler flags ### 
 #Note: Requires -fpp (Intel) or -cpp (GNU) to enable preprocessor

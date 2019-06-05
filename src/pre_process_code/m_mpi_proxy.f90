@@ -41,7 +41,9 @@ MODULE m_mpi_proxy
     
     ! Dependencies =============================================================
     USE mpi                     !< Message passing interface (MPI) module
+
     USE m_derived_types         !< Definitions of the derived types
+    
     USE m_global_parameters     !< Global parameters for the code
     ! ==========================================================================
     
