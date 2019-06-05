@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cd ../lib
 
 tar -zxf fftw-3.3.8.tar.gz
