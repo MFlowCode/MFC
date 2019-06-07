@@ -15,10 +15,6 @@ on OSX:
     $$ brew install open-mpi
 or compiled via another package manager on Unix systems.
 
-## NOTE! ##
-Set the appropriate compiler flags in Makefile.user!
-Ensure that a pre-processing flag is enabled.
-
 ## FFTW ##
 If you already have FFTW compiled:
     - Specify the location of your FFTW library and 
