@@ -1,0 +1,560 @@
+\hypertarget{m__rhs_8f90}{}\section{m\+\_\+rhs.\+f90 File Reference}
+\label{m__rhs_8f90}\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+
+
+Contains module \hyperlink{namespacem__rhs}{m\+\_\+rhs}.  
+
+
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__rhs}{m\+\_\+rhs}
+\begin{DoxyCompactList}\small\item\em The module contains the subroutines used to calculate the right-\/ hand-\/side (R\+HS) in the quasi-\/conservative, shock-\/ and interface-\/ capturing finite-\/volume framework for the multicomponent Navier-\/ Stokes equations supplemented by appropriate advection equations used to capture the material interfaces. The system of equations is closed by the stiffened gas equation of state, as well as any required mixture relationships. Capillarity effects are included and are modeled by the means of a volume force acting across the diffuse material interface region. The implementation details of surface tension may be found in Perigaud and Saurel (2005). Note that both viscous and surface tension effects are only available in the volume fraction model. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__rhs_ae6f7edb814859919c5d1f739574155bd}{m\+\_\+rhs\+::s\+\_\+initialize\+\_\+rhs\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__rhs_a361f0038973069452cc88430c49bcfe8}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+rhs} (q\+\_\+cons\+\_\+vf, q\+\_\+prim\+\_\+vf, rhs\+\_\+vf, t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to employ the inputted cell-\/average conservative variables in order to compute the cell-\/average R\+HS variables of the semidiscrete form of the governing equations by utilizing the appropriate Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_aa8bc1b17f230cbd06b702f34bd199ef1}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+flux\+\_\+lim} (top, bottom, flux\+\_\+lim\+\_\+func)
+\begin{DoxyCompactList}\small\item\em This subroutine takes the consecutive changes in volume fraction at a cell boundary and computes the desired slope and flux limiter function value at the cell boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_a2da1b596b26740b8edff160297676447}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+viscous\+\_\+stress\+\_\+tensor} (q\+\_\+prim\+\_\+vf, grad\+\_\+x\+\_\+vf, grad\+\_\+y\+\_\+vf, grad\+\_\+z\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to compute the viscous stress tensor for the cells directly next to the axis in cylindrical coordinates. This is necessary to avoid the 1/r singularity that arises at the cell boundary coinciding with the axis, i.\+e., y\+\_\+cb(-\/1) = 0. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_af771a6193fc6e856bcbfc269f096e3c9}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+capillary\+\_\+stress\+\_\+tensor} (norm\+\_\+dir, q\+\_\+prim\+\_\+vf, grad\+\_\+x\+\_\+vf, grad\+\_\+y\+\_\+vf, grad\+\_\+z\+\_\+vf, norm\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to calculate the capillary stress tensor at the cell centers in the non-\/conservative formulation of the equations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_aca45586b8c966f8e3a5477444cf60dda}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+capillary\+\_\+source} (\hyperlink{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, q\+\_\+prim\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to compute the source term that accounts for capillary effects in the momentum equations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_aacbe385f29e71aa174541d4931bdcbbe}{m\+\_\+rhs\+::s\+\_\+get\+\_\+divergence} (idir, q\+\_\+prim\+\_\+vf, mydivu)
+\begin{DoxyCompactList}\small\item\em Gets the divergence term for k div(\+U) \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ae064d7adeace0bde4fc2b42d437a01b1}{m\+\_\+rhs\+::s\+\_\+get\+\_\+monopole} (idir, q\+\_\+prim\+\_\+vf, t\+\_\+step, mymono)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to compute the source term that are needed for generating one-\/way acoustic waves. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__rhs_ad316cbfbf94736b4677bacf07d8d9027}{m\+\_\+rhs\+::f\+\_\+g} (mytime, sos, mysos, mymono)
+\begin{DoxyCompactList}\small\item\em This function gives the temporally varying amplitude of the pulse. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__rhs_a87bc24802f4abe7b3cb36864d631a275}{m\+\_\+rhs\+::f\+\_\+delta} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l}, mono\+\_\+loc, mono\+\_\+leng, mymono)
+\begin{DoxyCompactList}\small\item\em This function give the spatial support of the acoustic source. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_aa1cd3a5b83eabb0344ecae0cf321ca87}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+regularization\+\_\+source} (\hyperlink{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, q\+\_\+prim\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to compute the interface sharpening regularization source terms. Only applicable for 2-\/fluid system! \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_abf11c6f8bb16f3c74cc0205b16d31e96}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+fd\+\_\+gradient} (var, grad\+\_\+x, grad\+\_\+y, grad\+\_\+z, norm)
+\begin{DoxyCompactList}\small\item\em Computes the scalar gradient fields via finite differences. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a646c5130e5b695e4eecf0e85a797ba7c}{m\+\_\+rhs\+::q\+\_\+cons\+\_\+qp}
+\begin{DoxyCompactList}\small\item\em This variable contains the W\+E\+N\+O-\/reconstructed values of the cell-\/average conservative variables, which are located in q\+\_\+cons\+\_\+vf, at cell-\/interior Gaussian quadrature points (QP). \end{DoxyCompactList}\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_af2af2a542d5af4fec546eda34af4ef74}{m\+\_\+rhs\+::q\+\_\+prim\+\_\+qp}
+\begin{DoxyCompactList}\small\item\em The primitive variables at cell-\/interior Gaussian quadrature points. These are calculated from the conservative variables and gradient magnitude (GM) of the volume fractions, q\+\_\+cons\+\_\+qp and gm\+\_\+alpha\+\_\+qp, respectively. \end{DoxyCompactList}\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a1141883715f63c7b9d54dde459434fcc}{m\+\_\+rhs\+::gm\+\_\+alpha\+\_\+qp}
+\begin{DoxyCompactList}\small\item\em The gradient magnitude of the volume fractions at cell-\/interior Gaussian quadrature points. gm\+\_\+alpha\+\_\+qp is calculated from individual first-\/order spatial derivatives located in dq\+\_\+prim\+\_\+ds\+\_\+qp. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__rhs_a33739bde53c5512b62c38b0575973897}{m\+\_\+rhs\+::kappa\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/average curvature of volume fractions. kappa\+\_\+vf is calculated by the divergence theorem using the integral-\/average cell-\/boundary values of of the components of the unit normals, which are located in the variables un\+\_\+alpha\+K\+\_\+s\+\_\+ndqp. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__rhs_ae60a6ab812c015411331658e16e5ab77}{m\+\_\+rhs\+::reg\+\_\+src\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Additional field for regularization terms. \end{DoxyCompactList}\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_a4ab97e22609b5ebbb97524ca7bae05ef}{m\+\_\+rhs\+::iv}
+\begin{DoxyCompactList}\small\item\em Vector field indical bounds. \end{DoxyCompactList}\item 
+character(50) \hyperlink{namespacem__rhs_a31f27cef4252ee5a36802fd02b3f8ac9}{m\+\_\+rhs\+::file\+\_\+path}
+\begin{DoxyCompactList}\small\item\em Local file path for saving debug files. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ The left (L) and the right (R) W\+E\+N\+O-\/reconstructed cell-\/boundary values,}\par
+{\em including cell-\/boundary Gaussian quadrature points, of the cell-\/average conservative variables. The latter are stored in the variable q\+\_\+cons\+\_\+qp (N\+D\+QP -\/ normal direction quadrature points). }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_abe42bc1610e9369b701122a870fed48d}{m\+\_\+rhs\+::ql\+\_\+cons\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a1b6a05895f56a60c075e4eee3f1b4d51}{m\+\_\+rhs\+::qr\+\_\+cons\+\_\+ndqp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The left and right W\+E\+N\+O-\/reconstructed cell-\/boundary values, that include}\par
+{\em cell-\/boundary Gaussian quadrature points, of the cell-\/averaged primitive variables. The latter are stored in the variable q\+\_\+prim\+\_\+qp. }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_aeb611ac510e15d25ae5313627f9a55af}{m\+\_\+rhs\+::ql\+\_\+prim\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_addb553c30e5a799670b33c66a27995d6}{m\+\_\+rhs\+::qr\+\_\+prim\+\_\+ndqp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The first-\/order spatial derivatives of the primitive variables at cell-\/}\par
+{\em interior Guassian quadrature points. These are W\+E\+N\+O-\/reconstructed from their respective cell-\/average values, obtained through the application of the divergence theorem on the integral-\/average cell-\/boundary values of the primitive variables, located in q\+K\+\_\+prim\+\_\+ndqp, where K = L or R. }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a48f3d69bb519043ca76fb10f8a2f44c0}{m\+\_\+rhs\+::dq\+\_\+prim\+\_\+dx\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_aa727628a4ae8fa3af715f416b7bcadbe}{m\+\_\+rhs\+::dq\+\_\+prim\+\_\+dy\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a145666708445ab1fa66bb58fa248b0c1}{m\+\_\+rhs\+::dq\+\_\+prim\+\_\+dz\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ae49e4c2622ff0adf0b066da12e8256c8}{m\+\_\+rhs\+::gm\+\_\+vel\+\_\+qp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The left and right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/}\par
+{\em average curvature of the volume fractions. The cell-\/average quantities are located in the variable kappa\+\_\+vf. }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_af321ac08aa0b1f2b444dc81d922445be}{m\+\_\+rhs\+::dql\+\_\+prim\+\_\+dx\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_abd2dcf26ba04cbfac917774656aef38b}{m\+\_\+rhs\+::dql\+\_\+prim\+\_\+dy\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a4fdfac6ef18dff54b9f466f8cfb12c50}{m\+\_\+rhs\+::dql\+\_\+prim\+\_\+dz\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a190b9d019243f3504246e0e621e4bc66}{m\+\_\+rhs\+::dqr\+\_\+prim\+\_\+dx\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a40f05825c656c34602ba19e320537359}{m\+\_\+rhs\+::dqr\+\_\+prim\+\_\+dy\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a9cf1c914824cb4cc3476416da9be78f4}{m\+\_\+rhs\+::dqr\+\_\+prim\+\_\+dz\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a5886ad6e79bba7c4cf7fa1475aac824a}{m\+\_\+rhs\+::gm\+\_\+alphal\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a871a36bf12852bfc85560beba25cbfb9}{m\+\_\+rhs\+::gm\+\_\+alphar\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a52c1749bb933147f34129949411d72cd}{m\+\_\+rhs\+::kappal\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a5114054db70e67aaf7b2c8e71d63c934}{m\+\_\+rhs\+::kappar\+\_\+ndqp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The left and right cell-\/boundary values of the vector components of the}\par
+{\em unit normal (UN) of the volume fractions. These are directly calculated from the first-\/order spatial derivatives, stored in dq\+K\+\_\+prim\+\_\+ds\+\_\+ndqp. }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ab49ec164612765d8947ccf4250dd0fb0}{m\+\_\+rhs\+::un\+\_\+alphal\+\_\+x\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ab99096402fadc8b539f8a031dfdb3ffe}{m\+\_\+rhs\+::un\+\_\+alphal\+\_\+y\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a3a70e0b6fb4faaa4800bf2a7aa2519af}{m\+\_\+rhs\+::un\+\_\+alphal\+\_\+z\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_aca82442008ec6a9c478cdfa1b67b7e40}{m\+\_\+rhs\+::un\+\_\+alphar\+\_\+x\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a2b31029abb8eed5463485244c8029420}{m\+\_\+rhs\+::un\+\_\+alphar\+\_\+y\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a9a204df83f1d0c0ce63177fbc33e1f76}{m\+\_\+rhs\+::un\+\_\+alphar\+\_\+z\+\_\+ndqp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The cell-\/boundary values of the fluxes (src -\/ source, gsrc -\/ geometrical}\par
+{\em source). These are computed by applying the chosen Riemann problem solver on the left and right cell-\/boundary values of the primitive variables, q\+K\+\_\+prim\+\_\+ndqp, the first-\/order spatial derivatives, dq\+K\+\_\+prim\+\_\+ds\+\_\+ndqp, as well as the curvature of volume fractions, kappa\+K\+\_\+ndqp. }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a10d1ea6f5c8a0d7137be28b1e8c4780f}{m\+\_\+rhs\+::flux\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_aec977e848537c8ecd3317aefd2bd8607}{m\+\_\+rhs\+::flux\+\_\+src\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a5542f5954178123cbe052df43d09dc38}{m\+\_\+rhs\+::flux\+\_\+gsrc\+\_\+ndqp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Additional vector and scalar fields needed in alternate computation}\par
+{\em of the cell-\/average curvature of volume fractions. }\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a1ecb03602517ea0c6a8594ac84d7baf6}{m\+\_\+rhs\+::dgm\+\_\+alpha\+\_\+dx\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ada84d050bc469e99491f0df609abae94}{m\+\_\+rhs\+::dgm\+\_\+alpha\+\_\+dy\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ade3320ea2b49d294014da588f54e09b4}{m\+\_\+rhs\+::dgm\+\_\+alpha\+\_\+dz\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a7b00376acfcaf5c7628428725986f223}{m\+\_\+rhs\+::un\+\_\+alpha\+\_\+x\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a2b0b138349cb9c896cb7985bdcedafe1}{m\+\_\+rhs\+::un\+\_\+alpha\+\_\+y\+\_\+qp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_aa0d0342fdf7c5d5f795c151fc10d1cee}{m\+\_\+rhs\+::un\+\_\+alpha\+\_\+z\+\_\+qp}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__rhs_aa2587a1fc99a23d4d7fe552602e72bbc}{m\+\_\+rhs\+::laplacian\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__rhs_adf9ba6fc1bd79727d1f7ce5fe7a302ed}{m\+\_\+rhs\+::alt\+\_\+kappa\+\_\+vf}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Additional field for capillary source terms}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ace0c30f610f7a6b9e87eadd79e7197c0}{m\+\_\+rhs\+::we\+\_\+mtm\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_adf3ae8008dd304f908c21bc0f0fcb2ac}{m\+\_\+rhs\+::we\+\_\+nrg\+\_\+src}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__rhs_acc8e8d46f11ebb8f5c7389de8be28b60}{m\+\_\+rhs\+::tau\+\_\+we\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__rhs_a7e3b4d8f32649ff607c52440009f903f}{m\+\_\+rhs\+::tau\+\_\+re\+\_\+vf}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Additional variables for applying a flux limiter to the advection equation}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a93dc4910f18014dacfb740debe18356d}{m\+\_\+rhs\+::flux\+\_\+lim\+\_\+func}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a3b8952eebc8ad3082a6dae29c2ddd480}{m\+\_\+rhs\+::lo\+\_\+flux\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_abb201391897c33f0eb782f74f88d4ec0}{m\+\_\+rhs\+::lo\+\_\+flux\+\_\+src\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_af07ecd26e050830ebeedaae6da3eb72a}{m\+\_\+rhs\+::lo\+\_\+flux\+\_\+gsrc\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_af2fd928afcca77f0351ad57592dc53f4}{m\+\_\+rhs\+::hi\+\_\+flux\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a41372eab4f40baf2501e543f406a1cab}{m\+\_\+rhs\+::hi\+\_\+flux\+\_\+src\+\_\+ndqp}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a95522bf6827d87664b25022fe145eddf}{m\+\_\+rhs\+::hi\+\_\+flux\+\_\+gsrc\+\_\+ndqp}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The indical bounds in the coordinate directions of the Gaussian numerical}\par
+{\em integration that identify the locations of the quadrature points that are necessary to evaluate cell-\/boundary integral-\/averages. }\begin{DoxyCompactItemize}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_a806c4c0942bfd830bb0b8b6276258d01}{m\+\_\+rhs\+::ieta}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_a6b5d4a4e84fc5b93c1a13151ae398cc6}{m\+\_\+rhs\+::iksi}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_afa742a72b96bfdbfa7d4ed2702f9d5f1}{m\+\_\+rhs\+::itau}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_ad2b935d288f68dbde65021da0498007d}{m\+\_\+rhs\+::ichi}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_ae55731ba38044366ff7ddecf95297657}{m\+\_\+rhs\+::ipsi}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Indical bounds in the x-\/, y-\/ and z-\/directions}\par
+\begin{DoxyCompactItemize}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_a25b43c26b2e6ed431b9ec51d6af30c74}{m\+\_\+rhs\+::ix}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_a3d9a864b60496c110f161a93eebc86c6}{m\+\_\+rhs\+::iy}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__rhs_a83ac0b7807345a6879af324bae08c419}{m\+\_\+rhs\+::iz}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Bubble dynamic source terms}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a09ebe4906d3bb2a6656da08fea5a4e49}{m\+\_\+rhs\+::bub\+\_\+adv\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ab1f280657ebd60c51baf22e79dffaeb2}{m\+\_\+rhs\+::bub\+\_\+r\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a35e063bb3f8fd0f8210a6305d01cae96}{m\+\_\+rhs\+::bub\+\_\+v\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ab0521faf3afa606d8ebfd272176f3301}{m\+\_\+rhs\+::bub\+\_\+p\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a45d112ac19bd1a893d86a1a49fd6d6b6}{m\+\_\+rhs\+::bub\+\_\+m\+\_\+src}
+\item 
+type(scalar\+\_\+field) \hyperlink{namespacem__rhs_abf83c819d81616e9342f773a4067938c}{m\+\_\+rhs\+::divu}
+\begin{DoxyCompactList}\small\item\em matrix for div(u) \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Monopole source terms}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_acfcb0aeeb4659d44b0dd6fbf0b82ee79}{m\+\_\+rhs\+::mono\+\_\+mass\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a307adefdd895260e42e85872aa306929}{m\+\_\+rhs\+::mono\+\_\+e\+\_\+src}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_ad2c988fa9d53b74f824dfd0666df27c0}{m\+\_\+rhs\+::mono\+\_\+mom\+\_\+src}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Saved fluxes for testing}\par
+\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_a32b605d9d7c6a2dd06b13df3beb0b4ce}{m\+\_\+rhs\+::myflux\+\_\+vf}
+\item 
+type(vector\+\_\+field), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__rhs_affa0b502273a1db4307c4c7d36a088e7}{m\+\_\+rhs\+::myflux\+\_\+src\+\_\+vf}
+\item 
+type(scalar\+\_\+field) \hyperlink{namespacem__rhs_aaaecb99341e4534ec839e9356bf90536}{m\+\_\+rhs\+::alf\+\_\+sum}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Relaxed pressure, initial partial pressures, function f(p) and its partial}\par
+{\em The purpose of this procedure is to infinitely relax the pressures from the internal-\/energy equations to a unique pressure, from which the corresponding volume fraction of each phase are recomputed. For conservation purpose, this pressure is finally corrected using the mixture-\/total-\/energy equation.
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+cons\+\_\+vf} & Cell-\/average conservative variables \\
+\hline
+\end{DoxyParams}
+}\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a9dff053a7e3f9c1702a161f55d3e1726}{pres\+\_\+relax}
+\item 
+real(kind(0d0)), dimension(num\+\_\+fluids) \hyperlink{m__rhs_8f90_a762d1c12479dcf998f8a5a47dc258ddc}{pres\+\_\+k\+\_\+init}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a250b49b4cd6e8ad9bcd9e2a7b46c39dc}{f\+\_\+pres}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_afab53b80fef38424acbbd772be46d333}{df\+\_\+pres}
+\item 
+real(kind(0d0)), dimension(num\+\_\+fluids) \hyperlink{m__rhs_8f90_aa5195db0f89eb91b6f5544e9764412a0}{rho\+\_\+k\+\_\+s}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a796247036b68f5c2f04db3b4c943b5f2}{sum\+\_\+alpha}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a340bafa0c8d745c3060facd9cfef7ec4}{rho}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a2d84a02a65f699f43818db9feca4e25d}{dyn\+\_\+pres}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a4cb69ecc8e60cb3bfbe57aab771d6c48}{e\+\_\+we}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_a298183e270a405e0f180d45940bb6f8a}{gamma}
+\item 
+real(kind(0d0)) \hyperlink{m__rhs_8f90_aeed4eb93ccb2725da7a4756e510dda03}{pi\+\_\+inf}
+\item 
+real(kind(0d0)), dimension(num\+\_\+fluids) \hyperlink{m__rhs_8f90_aba715ebddc63d396377dc69d35cb50f8}{gamma\+\_\+min}
+\item 
+real(kind(0d0)), dimension(num\+\_\+fluids) \hyperlink{m__rhs_8f90_a5e9ec5159360030b214597511982bb81}{pres\+\_\+inf}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{m__rhs_8f90_a6c337b82dc4c47f2d3cc57408aa1fc9f}{re}
+\item 
+real(kind(0d0)), dimension(num\+\_\+fluids, num\+\_\+fluids) \hyperlink{m__rhs_8f90_a19a438a95f2945b7c9e492f2ee983263}{we}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}
+\item 
+integer \hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}
+\item 
+integer \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}
+\item 
+integer \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l}
+\item 
+integer \hyperlink{m__rhs_8f90_ae0579cdf6d579b6ff5e6a5945a99c42c}{iter}
+\begin{DoxyCompactList}\small\item\em Generic loop iterators. \end{DoxyCompactList}\item 
+integer \hyperlink{m__rhs_8f90_a0048c79fcd5325fffae011dc032b86fb}{relax}
+\begin{DoxyCompactList}\small\item\em Relaxation procedure determination variable. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_a6b6be41d990e9bda7c4830531d7c3470}{m\+\_\+rhs\+::s\+\_\+get\+\_\+tvd\+\_\+flux} (q\+\_\+cons\+\_\+vf, q\+\_\+prim\+\_\+vf, rhs\+\_\+vf, \hyperlink{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i})
+\begin{DoxyCompactList}\small\item\em This subroutine compute the T\+VD flux function. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__rhs_aac41721bd3275fb997f51c1afaebac4a}{m\+\_\+rhs\+::s\+\_\+get\+\_\+viscous} (q\+\_\+cons\+\_\+vf, q\+\_\+prim\+\_\+vf, rhs\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em Computes viscous terms. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__rhs_ae70cf6ec305a948efab279a0bf802095}{m\+\_\+rhs\+::s\+\_\+get\+\_\+crv} (q\+\_\+cons\+\_\+vf, q\+\_\+prim\+\_\+vf, rhs\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em Computes curvatures for surface tension terms. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__rhs_a5735aa0dc9d5759c2056a79d4a8c484b}{m\+\_\+rhs\+::s\+\_\+populate\+\_\+variables\+\_\+buffers} (v\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to populate the buffers of the conservative variables, depending on the selected boundary conditions. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_a2647dbdf6b09315564ef060e1f49df0d}{m\+\_\+rhs\+::s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffers} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to populate the buffers of the conservative variables, depending on the selected boundary conditions. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_a379b85ad4f20d9a3108b3a9df2ef9ff1}{m\+\_\+rhs\+::s\+\_\+reconstruct\+\_\+cell\+\_\+interior\+\_\+values} (v\+\_\+qp)
+\begin{DoxyCompactList}\small\item\em The goal of this procedure is to W\+E\+N\+O-\/reconstruct the inputted cell-\/averaged variables at the cell-\/interior Gaussian quadrature points. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ab3b720ac99f76621fd7086da9405490f}{m\+\_\+rhs\+::s\+\_\+average\+\_\+cell\+\_\+interior\+\_\+values} (v\+\_\+qp)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to numerically approximate the cell-\/interior integral-\/average of the given variables by taking the arithmetic mean of their W\+E\+N\+O-\/reconstructed values at the cell-\/interior Gaussian quadrature points. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ac5aa3e8228234f05fd5b899a6d309260}{m\+\_\+rhs\+::s\+\_\+reconstruct\+\_\+cell\+\_\+boundary\+\_\+values} (v\+\_\+vf, v\+L\+\_\+qp, v\+R\+\_\+qp, cd\+\_\+vars, norm\+\_\+dir)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to W\+E\+N\+O-\/reconstruct the left and the right cell-\/boundary values, including values at the Gaussian quadrature points, from the cell-\/averaged variables. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ada159015fa6f204a01a0c1b254affdae}{m\+\_\+rhs\+::s\+\_\+average\+\_\+cell\+\_\+boundary\+\_\+values} (v\+K\+\_\+qp)
+\begin{DoxyCompactList}\small\item\em The goal of the procedure is to numerically approximate the left or right cell-\/boundary integral-\/average of the given variables by getting the arithmetic mean of their W\+E\+N\+O-\/reconstructed values at the cell-\/boundary Gaussian quadrature points. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ac7d49938e97f8843c84f335ff0f6cceb}{m\+\_\+rhs\+::s\+\_\+apply\+\_\+scalar\+\_\+divergence\+\_\+theorem} (v\+L\+\_\+vf, v\+R\+\_\+vf, dv\+\_\+ds\+\_\+vf, norm\+\_\+dir)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to employ the inputted left and right cell-\/boundary integral-\/averaged variables to compute the relevant cell-\/average first-\/order spatial derivatives in the x-\/, y-\/ or z-\/direction by means of the scalar divergence theorem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ad6141c10a72d8ff3a9fb5f16b89bdcc3}{m\+\_\+rhs\+::s\+\_\+apply\+\_\+vector\+\_\+divergence\+\_\+theorem} (v\+L\+\_\+x\+\_\+ndqp, v\+L\+\_\+y\+\_\+ndqp, v\+L\+\_\+z\+\_\+ndqp, v\+R\+\_\+x\+\_\+ndqp, v\+R\+\_\+y\+\_\+ndqp, v\+R\+\_\+z\+\_\+ndqp, div\+\_\+v\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The goal of this procedure is to utilize the inputted left and right cell-\/boundary integral-\/averaged vector components in the x-\/, y-\/, and z-\/directions to compute the vector divergence by using the divergence theorem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__rhs_ab733571c02acf3c3d16b0bfbed34b79e}{m\+\_\+rhs\+::s\+\_\+compute\+\_\+gradient\+\_\+magnitude} (dv\+\_\+dx\+\_\+vf, dv\+\_\+dy\+\_\+vf, dv\+\_\+dz\+\_\+vf, gm\+\_\+v\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of the procedure is to utilize the inputted cell-\/averaged first-\/order spatial derivatives in the x-\/, y-\/ and z-\/directions to calculate the gradient magnitude. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__rhs_a73fc1430500bdd1786b121a9ed08a107}{m\+\_\+rhs\+::s\+\_\+finalize\+\_\+rhs\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__rhs}{m\+\_\+rhs}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{m__rhs_8f90_afab53b80fef38424acbbd772be46d333}\label{m__rhs_8f90_afab53b80fef38424acbbd772be46d333}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!df\+\_\+pres@{df\+\_\+pres}}
+\index{df\+\_\+pres@{df\+\_\+pres}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{df\+\_\+pres}{df\_pres}}
+{\footnotesize\ttfamily real(kind(0d0)) df\+\_\+pres}
+
+
+
+Definition at line 3733 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a2d84a02a65f699f43818db9feca4e25d}\label{m__rhs_8f90_a2d84a02a65f699f43818db9feca4e25d}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!dyn\+\_\+pres@{dyn\+\_\+pres}}
+\index{dyn\+\_\+pres@{dyn\+\_\+pres}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{dyn\+\_\+pres}{dyn\_pres}}
+{\footnotesize\ttfamily real(kind(0d0)) dyn\+\_\+pres}
+
+
+
+Definition at line 3737 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a4cb69ecc8e60cb3bfbe57aab771d6c48}\label{m__rhs_8f90_a4cb69ecc8e60cb3bfbe57aab771d6c48}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!e\+\_\+we@{e\+\_\+we}}
+\index{e\+\_\+we@{e\+\_\+we}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{e\+\_\+we}{e\_we}}
+{\footnotesize\ttfamily real(kind(0d0)) e\+\_\+we}
+
+
+
+Definition at line 3738 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a250b49b4cd6e8ad9bcd9e2a7b46c39dc}\label{m__rhs_8f90_a250b49b4cd6e8ad9bcd9e2a7b46c39dc}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!f\+\_\+pres@{f\+\_\+pres}}
+\index{f\+\_\+pres@{f\+\_\+pres}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{f\+\_\+pres}{f\_pres}}
+{\footnotesize\ttfamily real(kind(0d0)) f\+\_\+pres}
+
+
+
+Definition at line 3732 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a298183e270a405e0f180d45940bb6f8a}\label{m__rhs_8f90_a298183e270a405e0f180d45940bb6f8a}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!gamma@{gamma}}
+\index{gamma@{gamma}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{gamma}{gamma}}
+{\footnotesize\ttfamily real(kind(0d0)) gamma}
+
+
+
+Definition at line 3739 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_aba715ebddc63d396377dc69d35cb50f8}\label{m__rhs_8f90_aba715ebddc63d396377dc69d35cb50f8}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!gamma\+\_\+min@{gamma\+\_\+min}}
+\index{gamma\+\_\+min@{gamma\+\_\+min}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{gamma\+\_\+min}{gamma\_min}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(num\+\_\+fluids) gamma\+\_\+min}
+
+
+
+Definition at line 3741 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}\label{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!i@{i}}
+\index{i@{i}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{i}{i}}
+{\footnotesize\ttfamily integer i}
+
+
+
+Definition at line 3747 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_ae0579cdf6d579b6ff5e6a5945a99c42c}\label{m__rhs_8f90_ae0579cdf6d579b6ff5e6a5945a99c42c}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!iter@{iter}}
+\index{iter@{iter}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{iter}{iter}}
+{\footnotesize\ttfamily integer iter}
+
+
+
+Generic loop iterators. 
+
+
+
+Definition at line 3747 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}\label{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!j@{j}}
+\index{j@{j}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{j}{j}}
+{\footnotesize\ttfamily integer j}
+
+
+
+Definition at line 3747 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_af22c486581933c52df7d4aa306382074}\label{m__rhs_8f90_af22c486581933c52df7d4aa306382074}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!k@{k}}
+\index{k@{k}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{k}{k}}
+{\footnotesize\ttfamily integer k}
+
+
+
+Definition at line 3747 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}\label{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!l@{l}}
+\index{l@{l}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{l}{l}}
+{\footnotesize\ttfamily integer l}
+
+
+
+Definition at line 3747 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_aeed4eb93ccb2725da7a4756e510dda03}\label{m__rhs_8f90_aeed4eb93ccb2725da7a4756e510dda03}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!pi\+\_\+inf@{pi\+\_\+inf}}
+\index{pi\+\_\+inf@{pi\+\_\+inf}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{pi\+\_\+inf}{pi\_inf}}
+{\footnotesize\ttfamily real(kind(0d0)) pi\+\_\+inf}
+
+
+
+Definition at line 3740 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a5e9ec5159360030b214597511982bb81}\label{m__rhs_8f90_a5e9ec5159360030b214597511982bb81}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!pres\+\_\+inf@{pres\+\_\+inf}}
+\index{pres\+\_\+inf@{pres\+\_\+inf}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{pres\+\_\+inf}{pres\_inf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(num\+\_\+fluids) pres\+\_\+inf}
+
+
+
+Definition at line 3742 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a762d1c12479dcf998f8a5a47dc258ddc}\label{m__rhs_8f90_a762d1c12479dcf998f8a5a47dc258ddc}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!pres\+\_\+k\+\_\+init@{pres\+\_\+k\+\_\+init}}
+\index{pres\+\_\+k\+\_\+init@{pres\+\_\+k\+\_\+init}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{pres\+\_\+k\+\_\+init}{pres\_k\_init}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(num\+\_\+fluids) pres\+\_\+k\+\_\+init}
+
+
+
+Definition at line 3731 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a9dff053a7e3f9c1702a161f55d3e1726}\label{m__rhs_8f90_a9dff053a7e3f9c1702a161f55d3e1726}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!pres\+\_\+relax@{pres\+\_\+relax}}
+\index{pres\+\_\+relax@{pres\+\_\+relax}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{pres\+\_\+relax}{pres\_relax}}
+{\footnotesize\ttfamily real(kind(0d0)) pres\+\_\+relax}
+
+
+
+Definition at line 3730 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a6c337b82dc4c47f2d3cc57408aa1fc9f}\label{m__rhs_8f90_a6c337b82dc4c47f2d3cc57408aa1fc9f}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!re@{re}}
+\index{re@{re}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{re}{re}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(2) re}
+
+
+
+Definition at line 3743 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a0048c79fcd5325fffae011dc032b86fb}\label{m__rhs_8f90_a0048c79fcd5325fffae011dc032b86fb}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!relax@{relax}}
+\index{relax@{relax}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{relax}{relax}}
+{\footnotesize\ttfamily integer relax}
+
+
+
+Relaxation procedure determination variable. 
+
+
+
+Definition at line 3748 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a340bafa0c8d745c3060facd9cfef7ec4}\label{m__rhs_8f90_a340bafa0c8d745c3060facd9cfef7ec4}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!rho@{rho}}
+\index{rho@{rho}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{rho}{rho}}
+{\footnotesize\ttfamily real(kind(0d0)) rho}
+
+
+
+Definition at line 3736 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_aa5195db0f89eb91b6f5544e9764412a0}\label{m__rhs_8f90_aa5195db0f89eb91b6f5544e9764412a0}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!rho\+\_\+k\+\_\+s@{rho\+\_\+k\+\_\+s}}
+\index{rho\+\_\+k\+\_\+s@{rho\+\_\+k\+\_\+s}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{rho\+\_\+k\+\_\+s}{rho\_k\_s}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(num\+\_\+fluids) rho\+\_\+k\+\_\+s}
+
+
+
+Definition at line 3734 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a796247036b68f5c2f04db3b4c943b5f2}\label{m__rhs_8f90_a796247036b68f5c2f04db3b4c943b5f2}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!sum\+\_\+alpha@{sum\+\_\+alpha}}
+\index{sum\+\_\+alpha@{sum\+\_\+alpha}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{sum\+\_\+alpha}{sum\_alpha}}
+{\footnotesize\ttfamily real(kind(0d0)) sum\+\_\+alpha}
+
+
+
+Definition at line 3735 of file m\+\_\+rhs.\+f90.
+
+\mbox{\Hypertarget{m__rhs_8f90_a19a438a95f2945b7c9e492f2ee983263}\label{m__rhs_8f90_a19a438a95f2945b7c9e492f2ee983263}} 
+\index{m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}!we@{we}}
+\index{we@{we}!m\+\_\+rhs.\+f90@{m\+\_\+rhs.\+f90}}
+\subsubsection{\texorpdfstring{we}{we}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(num\+\_\+fluids,num\+\_\+fluids) we}
+
+
+
+Definition at line 3744 of file m\+\_\+rhs.\+f90.
+

@@ -1,0 +1,56 @@
+\hypertarget{interfacem__variables__conversion_1_1s__convert__xxxxx__to__mixture__variables}{}\section{m\+\_\+variables\+\_\+conversion\+:\+:s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables Interface Reference}
+\label{interfacem__variables__conversion_1_1s__convert__xxxxx__to__mixture__variables}\index{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables@{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables}}
+
+
+Abstract interface to two subroutines designed for the transfer/conversion of the mixture/species variables to the mixture variables.  
+
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{interfacem__variables__conversion_1_1s__convert__xxxxx__to__mixture__variables_a603ed4c3b600fb1f4e9a0c1bc2574573}{s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables} (q\+\_\+vf, i, j, k, rho, gamma, pi\+\_\+inf)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Abstract interface to two subroutines designed for the transfer/conversion of the mixture/species variables to the mixture variables. 
+
+Structure of the s\+\_\+convert\+\_\+mixture\+\_\+to\+\_\+mixture\+\_\+variables and s\+\_\+convert\+\_\+species\+\_\+to\+\_\+mixture\+\_\+variables subroutines 
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+vf} & Conservative or primitive variables \\
+\hline
+{\em i} & First-\/coordinate cell index \\
+\hline
+{\em j} & First-\/coordinate cell index \\
+\hline
+{\em k} & First-\/coordinate cell index \\
+\hline
+{\em rho} & Density \\
+\hline
+{\em gamma} & Specific heat ratio function \\
+\hline
+{\em pi\+\_\+inf} & Liquid stiffness function \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 64 of file m\+\_\+variables\+\_\+conversion.\+f90.
+
+
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{interfacem__variables__conversion_1_1s__convert__xxxxx__to__mixture__variables_a603ed4c3b600fb1f4e9a0c1bc2574573}\label{interfacem__variables__conversion_1_1s__convert__xxxxx__to__mixture__variables_a603ed4c3b600fb1f4e9a0c1bc2574573}} 
+\index{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables@{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables}!s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables@{s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables}}
+\index{s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables@{s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables}!m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables@{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables()}{s\_convert\_xxxxx\_to\_mixture\_variables()}}
+{\footnotesize\ttfamily subroutine m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+vf,  }\item[{integer, intent(in)}]{i,  }\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{real(kind(0d0)), intent(out)}]{rho,  }\item[{real(kind(0d0)), intent(out)}]{gamma,  }\item[{real(kind(0d0)), intent(out)}]{pi\+\_\+inf }\end{DoxyParamCaption})}
+
+
+
+Definition at line 66 of file m\+\_\+variables\+\_\+conversion.\+f90.
+
+
+
+The documentation for this interface was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+\hyperlink{m__variables__conversion_8f90}{m\+\_\+variables\+\_\+conversion.\+f90}\end{DoxyCompactItemize}

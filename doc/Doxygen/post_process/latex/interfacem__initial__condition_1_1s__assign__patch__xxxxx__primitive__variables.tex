@@ -1,0 +1,50 @@
+\hypertarget{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables}{}\section{m\+\_\+initial\+\_\+condition\+:\+:s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables Interface Reference}
+\label{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables}\index{m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables@{m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}}
+
+
+Abstract interface to the two subroutines that assign the patch primitive variables, either mixture or species, depending on the subroutine, to a particular cell in the computational domain.  
+
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables_ac27723d90d114627926a6d04b00b42f3}{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables} (patch\+\_\+id, j, k, l)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Abstract interface to the two subroutines that assign the patch primitive variables, either mixture or species, depending on the subroutine, to a particular cell in the computational domain. 
+
+Skeleton of s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables and s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables 
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+{\em j} & (x) cell index in which the mixture or species primitive variables from the indicated patch areassigned \\
+\hline
+{\em k} & (y,th) cell index in which the mixture or species primitive variables from the indicated patch areassigned \\
+\hline
+{\em l} & (z) cell index in which the mixture or species primitive variables from the indicated patch areassigned \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 73 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables_ac27723d90d114627926a6d04b00b42f3}\label{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables_ac27723d90d114627926a6d04b00b42f3}} 
+\index{m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables@{m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}!s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}}
+\index{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}!m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables@{m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables()}{s\_assign\_patch\_xxxxx\_primitive\_variables()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables\+::s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id,  }\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+Definition at line 74 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+
+
+The documentation for this interface was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+\hyperlink{m__initial__condition_8f90}{m\+\_\+initial\+\_\+condition.\+f90}\end{DoxyCompactItemize}

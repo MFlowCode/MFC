@@ -1,0 +1,47 @@
+\hypertarget{m__grid_8f90}{}\section{m\+\_\+grid.\+f90 File Reference}
+\label{m__grid_8f90}\index{m\+\_\+grid.\+f90@{m\+\_\+grid.\+f90}}
+
+
+Contains module \hyperlink{namespacem__grid}{m\+\_\+grid}.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__grid_1_1s__generate__abstract__grid}{m\+\_\+grid\+::s\+\_\+generate\+\_\+abstract\+\_\+grid}
+\end{DoxyCompactItemize}
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__grid}{m\+\_\+grid}
+\begin{DoxyCompactList}\small\item\em This module takes care of creating the rectilinear grid on which the data for the initial condition will be laid out and on which the simulation will eventually be computed. The grid may either be uniform or non-\/uniform. Non-\/uniform grids are generated using the hyperbolic tangent function, see Johnsen (2007) for details. Alternatively to synthesizing a new grid, the user may select to read in a preexisting one. This is carried out through the module \hyperlink{m__start__up_8f90}{m\+\_\+start\+\_\+up.\+f90}. In such a case, the responsibility of this module becomes only to allocate/deallocate the necessary grid variables for the cell-\/centers and cell-\/boundaries locations. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__grid_a7c0d1c6fcecd2759774be2b3786a6b50}{m\+\_\+grid\+::s\+\_\+generate\+\_\+serial\+\_\+grid} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The following subroutine generates either a uniform or non-\/uniform rectilinear grid in serial, defined by the parameters inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell-\/ centers and cell-\/boundaries. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__grid_abcc7c446abd0c768e42b2a2f7323a2d7}{m\+\_\+grid\+::s\+\_\+generate\+\_\+parallel\+\_\+grid} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The following subroutine generates either a uniform or non-\/uniform rectilinear grid in parallel, defined by the parameters inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell-\/ centers and cell-\/boundaries. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__grid_a08c7d18352873ceab95c10629c1ce317}{m\+\_\+grid\+::s\+\_\+initialize\+\_\+grid\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__grid_a128e8c4d55df21039d945edda39205aa}{m\+\_\+grid\+::s\+\_\+finalize\+\_\+grid\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+procedure(s\+\_\+generate\+\_\+abstract\+\_\+grid), pointer, public \hyperlink{namespacem__grid_a3af3e5a8e440ff542dfd274546fb8150}{m\+\_\+grid\+::s\+\_\+generate\+\_\+grid} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__grid}{m\+\_\+grid}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

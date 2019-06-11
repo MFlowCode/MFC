@@ -1,0 +1,966 @@
+\hypertarget{namespacem__initial__condition}{}\section{m\+\_\+initial\+\_\+condition Module Reference}
+\label{namespacem__initial__condition}\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+
+
+This module provides a platform that is analagous to constructive solid geometry techniques and in this way allows for the creation of a wide variety of initial conditions. Several 1D, 2D and 3D fundamental geometries are included that may further be combined into more complex shapes. This is achieved by carefully setting up the order in which the patches are laid out in the domain and specifying the priority that each patch has over the preceeding ones. The resulting shapes may be identified both by the values of their primitive variables and the associated patch identities. Note that the user may choose to read in and modify a preexisting initial condition. The module \hyperlink{m__start__up_8f90}{m\+\_\+start\+\_\+up.\+f90} is responsible for reading in the relevant data files.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables}{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}
+\begin{DoxyCompactList}\small\item\em Abstract interface to the two subroutines that assign the patch primitive variables, either mixture or species, depending on the subroutine, to a particular cell in the computational domain. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__initial__condition_ac414f08eb31dad32ed313767d214df72}{s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables} (patch\+\_\+id, j, k, l)
+\begin{DoxyCompactList}\small\item\em This subroutine assigns the mixture primitive variables of the patch designated by the patch\+\_\+id, to the cell that is designated by the indexes (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated with the new assignment. Note that if the smoothing of the patch\textquotesingle{}s boundaries is employed, the ensuing primitive variables in the cell will be a type of combination of the current patch\textquotesingle{}s primitive variables with those of the smoothing patch. The specific details of the combination may be found in Shyue\textquotesingle{}s work (1998). \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_abd7cee461afabc01b81373e4be5a20c7}{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles} (patch\+\_\+id, j, k, l)
+\begin{DoxyCompactList}\small\item\em This subroutine assigns the species primitive variables. This follows s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables with adaptation for ensemble-\/averaged bubble modeling. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a0024bfbe15f4f49cb2a5a2c574d89e19}{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables} (patch\+\_\+id, j, k, l)
+\begin{DoxyCompactList}\small\item\em This subroutine assigns the species primitive variables of the patch designated by the patch\+\_\+id, to the cell that is designated by the indexes (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated with the new assignment. Note that if the smoothing of the patch\textquotesingle{}s boundaries is employed, the ensuing primitive variables in the cell will be a type of combination of the current patch\textquotesingle{}s primitive variables with those of the smoothing patch. The specific details of the combination may be found in Shyue\textquotesingle{}s work (1998). \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a07a665ff41297455ac2da7b54243bac5}{s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_aa74a70029e3ec0fd3225b369e7c5443e}{s\+\_\+generate\+\_\+initial\+\_\+condition} ()
+\begin{DoxyCompactList}\small\item\em This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters. The subroutine is complete once the primitive variables are converted to conservative ones. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a791e5fa466dd15343882711c91bae63d}{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord} (cyl\+\_\+y, cyl\+\_\+z)
+\item 
+subroutine \hyperlink{namespacem__initial__condition_a88d2e8debdc097d4d811fb67d6fbc880}{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord} (cyl\+\_\+x, cyl\+\_\+y)
+\item 
+subroutine \hyperlink{namespacem__initial__condition_afef3f507e182798fcfd7aecc52878fc9}{s\+\_\+perturb\+\_\+sphere} ()
+\item 
+subroutine \hyperlink{namespacem__initial__condition_ab66e3b04024a8ae7327857b1b265bc27}{s\+\_\+perturb\+\_\+surrounding\+\_\+flow} ()
+\item 
+subroutine \hyperlink{namespacem__initial__condition_a3be32c8ee8a7dffae734d063200471e8}{s\+\_\+line\+\_\+segment} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The line segment patch is a 1D geometry that may be used, for example, in creating a Riemann problem. The geometry of the patch is well-\/defined when its centroid and length in the x-\/coordinate direction are provided. Note that the line segment patch D\+O\+ES N\+OT allow for the smearing of its boundaries. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_ac4540baa01372eb3df51b268769fa6fc}{s\+\_\+spiral} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The spiral patch is a 2D geometry that may be used, The geometry of the patch is well-\/defined when its centroid and radius are provided. Note that the circular patch D\+O\+ES allow for the smoothing of its boundary. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__initial__condition_a6bd15d72ae72d7c598bbc3b57cf0b90e}{f\+\_\+r} (myth, offset, \hyperlink{namespacem__initial__condition_a8a559b4d7a1e1e69f5e3b9ea0474e3fa}{a})
+\begin{DoxyCompactList}\small\item\em Archimedes spiral function. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a75d13cb7c7c4f88e8b532cf7e7dda498}{s\+\_\+circle} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the patch is well-\/defined when its centroid and radius are provided. Note that the circular patch D\+O\+ES allow for the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a3e1c1480513e75b444ce7a77ed0fe598}{s\+\_\+varcircle} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The varcircle patch is a 2D geometry that may be used . It generatres an annulus. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_aea2bf07e8890b1a108f2f891609174c9}{s\+\_\+3dvarcircle} (patch\+\_\+id)
+\item 
+subroutine \hyperlink{namespacem__initial__condition_a5e999ad19f23f5f2b059b80e49c0a086}{s\+\_\+ellipse} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The elliptical patch is a 2D geometry. The geometry of the patch is well-\/defined when its centroid and radii are provided. Note that the elliptical patch D\+O\+ES allow for the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a524f37de8423b7943c22c5d105eda922}{s\+\_\+ellipsoid} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The ellipsoidal patch is a 3D geometry. The geometry of the patch is well-\/defined when its centroid and radii are provided. Note that the ellipsoidal patch D\+O\+ES allow for the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a9c54a1e384e94493914688f9a2a2cf14}{s\+\_\+rectangle} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The rectangular patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/ shock region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well-\/ defined when its centroid and lengths in the x-\/ and y-\/ coordinate directions are provided. Please note that the rectangular patch D\+O\+ES N\+OT allow for the smoothing of its boundaries. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_ab056c04c30f55423904517abe61ebd99}{s\+\_\+sweep\+\_\+line} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The swept line patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/ shock region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-\/defined when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep line patch D\+O\+ES allow the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_ab329077796ad7579df0a96543263150d}{s\+\_\+isentropic\+\_\+vortex} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The isentropic vortex is a 2D geometry that may be used, for example, to generate an isentropic flow disturbance. Geometry of the patch is well-\/defined when its centroid and radius are provided. Notice that the patch D\+O\+ES N\+OT allow for the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a3b4fe978231e74b699695a35fb544236}{s\+\_\+1d\+\_\+analytical} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em This patch assigns the primitive variables as analytical functions such that the code can be verified. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a7685befab45f10089fc46907fa4cc049}{s\+\_\+1d\+\_\+bubble\+\_\+pulse} (patch\+\_\+id)
+\item 
+subroutine \hyperlink{namespacem__initial__condition_a50f5727753c025d26925640a19259102}{s\+\_\+2d\+\_\+analytical} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em This patch assigns the primitive variables as analytical functions such that the code can be verified. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_abb87c531b4d42302dd22863b95a7cdb2}{s\+\_\+3d\+\_\+analytical} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em This patch assigns the primitive variables as analytical functions such that the code can be verified. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_af17f90ba4a3878feb6e38bc8d66cb950}{s\+\_\+spherical\+\_\+harmonic} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em This patch generates the shape of the spherical harmonics as a perturbation to a perfect sphere. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a9037159f591341d05fa5fb23fe82bc2c}{s\+\_\+sphere} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is well-\/defined when its centroid and radius are provided. Please note that the spherical patch D\+O\+ES allow for the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a2297a9b98d2478b3594083197bd9b8b5}{s\+\_\+cuboid} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The cuboidal patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/shock region, which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well-\/ defined when its centroid and lengths in the x-\/, y-\/ and z-\/coordinate directions are provided. Please notice that the cuboidal patch D\+O\+ES N\+OT allow for the smearing of its boundaries. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_af834c631376de6906fb6b002df70ce49}{s\+\_\+cylinder} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The cylindrical patch is a 3D geometry that may be used, for example, in setting up a cylindrical solid boundary confinement, like a blood vessel. The geometry of this patch is well-\/defined when the centroid, the radius and the length along the cylinder\textquotesingle{}s axis, parallel to the x-\/, y-\/ or z-\/coordinate direction, are provided. Please note that the cylindrical patch D\+O\+ES allow for the smoothing of its lateral boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a51f30d0a86584bdc757c22ebf7993e88}{s\+\_\+sweep\+\_\+plane} (patch\+\_\+id)
+\begin{DoxyCompactList}\small\item\em The swept plane patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/ shock region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-\/defined when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep plane patch D\+O\+ES allow the smoothing of its boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__initial__condition_a944c63abd61afab021ab664246f80495}{s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__initial__condition_ad9935d4b9c2f6a7af08f3630681d0c1a}{q\+\_\+prim\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em primitive variables \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__initial__condition_a1f42c68f3b3d167616d52b7cf7a7d56a}{q\+\_\+cons\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em conservative variables \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}) \hyperlink{namespacem__initial__condition_a2fa2c238e1c0c522aeecada3f6cc314d}{alf\+\_\+sum}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_aaf66843a6e051174a3cde0729daa1300}{x\+\_\+centroid}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a6cef3dccb0374a24cb372bd7d4c0b43f}{y\+\_\+centroid}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_aca427fa4af7501277f10bf96977a9766}{z\+\_\+centroid}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_ab59e590873d32a54651ac60af6b1a6e4}{length\+\_\+x}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a49ed82b4f9548cd8166844888028c8cd}{length\+\_\+y}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a0d9d1bcde238177f0beb7684e252aa69}{length\+\_\+z}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a51a6afec0ff2f62c62b6cf86bd2c16e4}{radius}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a0fb096d74052e49545e6ec72b3c2a114}{epsilon}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_aa61b446189c2c88bb9261649f4b594b3}{beta}
+\item 
+integer \hyperlink{namespacem__initial__condition_adf36787dd781f2f28d1b49d06116c401}{smooth\+\_\+patch\+\_\+id}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a7ab7ae2808ac3b52319477860c6dbf80}{smooth\+\_\+coeff}
+\begin{DoxyCompactList}\small\item\em These variables are analogous in both meaning and use to the similarly named components in the ic\+\_\+patch\+\_\+parameters type (see \hyperlink{m__derived__types_8f90}{m\+\_\+derived\+\_\+types.\+f90} for additional details). They are employed as a means to more concisely perform the actions necessary to lay out a particular patch on the grid. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__initial__condition_abcd86e737c47247631a1fb95c1764b00}{x\+\_\+boundary}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__initial__condition_ab669c9fbfa80cdc9139ea45f293b7f49}{y\+\_\+boundary}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__initial__condition_aaae7053fde0b060e39db9f943f000389}{z\+\_\+boundary}
+\begin{DoxyCompactList}\small\item\em These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the patch boundaries in the x-\/, y-\/ and z-\/coordinate directions. They are used as a means to concisely perform the actions necessary to lay out a particular patch on the grid. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a8a559b4d7a1e1e69f5e3b9ea0474e3fa}{a}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a0932a1bcb9b0293f1368e204a8fda4b9}{b}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a03d80b7b8ee41e5b16d996b46a605706}{c}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_af692b3658ab0d7bcda937394fe3e2903}{d}
+\begin{DoxyCompactList}\small\item\em When a line or a plane sweep patch geometry is employed, these variables represent the coefficients associated with the equation describing the said line or plane. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a44e267143646437278341b252110443b}{eta}
+\begin{DoxyCompactList}\small\item\em In the case that smoothing of patch boundaries is enabled and the boundary between two adjacent patches is to be smeared out, this variable\textquotesingle{}s purpose is to act as a pseudo volume fraction to indicate the contribution of each patch toward the composition of a cell\textquotesingle{}s fluid state. \end{DoxyCompactList}\item 
+integer, dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__initial__condition_a0014f6589f0b33ea2372c1d4b7f0c824}{patch\+\_\+id\+\_\+fp}
+\begin{DoxyCompactList}\small\item\em Bookkepping variable used to track the patch identities (id) associated with each of the cells in the computational domain. Note that only one patch identity may be associated with any one cell. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a71a9905eff9a292e2fc61b0e25e47db0}{cart\+\_\+y}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_a224e30cb2d1e2e99f2c2c059a1227d49}{cart\+\_\+z}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__initial__condition_aba65d4cbd29f3b8eda828037c7215e2d}{sph\+\_\+phi}
+\begin{DoxyCompactList}\small\item\em Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates. \end{DoxyCompactList}\item 
+procedure(\hyperlink{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables}{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}), pointer \hyperlink{namespacem__initial__condition_a3151c58d3a628c7ac8aff34bce727867}{s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+This module provides a platform that is analagous to constructive solid geometry techniques and in this way allows for the creation of a wide variety of initial conditions. Several 1D, 2D and 3D fundamental geometries are included that may further be combined into more complex shapes. This is achieved by carefully setting up the order in which the patches are laid out in the domain and specifying the priority that each patch has over the preceeding ones. The resulting shapes may be identified both by the values of their primitive variables and the associated patch identities. Note that the user may choose to read in and modify a preexisting initial condition. The module \hyperlink{m__start__up_8f90}{m\+\_\+start\+\_\+up.\+f90} is responsible for reading in the relevant data files. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__initial__condition_a6bd15d72ae72d7c598bbc3b57cf0b90e}\label{namespacem__initial__condition_a6bd15d72ae72d7c598bbc3b57cf0b90e}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!f\+\_\+r@{f\+\_\+r}}
+\index{f\+\_\+r@{f\+\_\+r}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{f\+\_\+r()}{f\_r()}}
+{\footnotesize\ttfamily real(kind(0d0)) function m\+\_\+initial\+\_\+condition\+::f\+\_\+r (\begin{DoxyParamCaption}\item[{real(kind(0d0)), intent(in)}]{myth,  }\item[{real(kind(0d0)), intent(in)}]{offset,  }\item[{real(kind(0d0)), intent(in)}]{a }\end{DoxyParamCaption})}
+
+
+
+Archimedes spiral function. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em myth} & Angle \\
+\hline
+{\em offset} & Thickness \\
+\hline
+{\em a} & Starting position \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1079 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a3b4fe978231e74b699695a35fb544236}\label{namespacem__initial__condition_a3b4fe978231e74b699695a35fb544236}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+1d\+\_\+analytical@{s\+\_\+1d\+\_\+analytical}}
+\index{s\+\_\+1d\+\_\+analytical@{s\+\_\+1d\+\_\+analytical}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+1d\+\_\+analytical()}{s\_1d\_analytical()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+1d\+\_\+analytical (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+This patch assigns the primitive variables as analytical functions such that the code can be verified. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1587 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a7685befab45f10089fc46907fa4cc049}\label{namespacem__initial__condition_a7685befab45f10089fc46907fa4cc049}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+1d\+\_\+bubble\+\_\+pulse@{s\+\_\+1d\+\_\+bubble\+\_\+pulse}}
+\index{s\+\_\+1d\+\_\+bubble\+\_\+pulse@{s\+\_\+1d\+\_\+bubble\+\_\+pulse}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+1d\+\_\+bubble\+\_\+pulse()}{s\_1d\_bubble\_pulse()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+1d\+\_\+bubble\+\_\+pulse (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+Definition at line 1661 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a50f5727753c025d26925640a19259102}\label{namespacem__initial__condition_a50f5727753c025d26925640a19259102}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+2d\+\_\+analytical@{s\+\_\+2d\+\_\+analytical}}
+\index{s\+\_\+2d\+\_\+analytical@{s\+\_\+2d\+\_\+analytical}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+2d\+\_\+analytical()}{s\_2d\_analytical()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+2d\+\_\+analytical (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+This patch assigns the primitive variables as analytical functions such that the code can be verified. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1739 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_abb87c531b4d42302dd22863b95a7cdb2}\label{namespacem__initial__condition_abb87c531b4d42302dd22863b95a7cdb2}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+3d\+\_\+analytical@{s\+\_\+3d\+\_\+analytical}}
+\index{s\+\_\+3d\+\_\+analytical@{s\+\_\+3d\+\_\+analytical}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+3d\+\_\+analytical()}{s\_3d\_analytical()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+3d\+\_\+analytical (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+This patch assigns the primitive variables as analytical functions such that the code can be verified. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1859 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aea2bf07e8890b1a108f2f891609174c9}\label{namespacem__initial__condition_aea2bf07e8890b1a108f2f891609174c9}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+3dvarcircle@{s\+\_\+3dvarcircle}}
+\index{s\+\_\+3dvarcircle@{s\+\_\+3dvarcircle}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+3dvarcircle()}{s\_3dvarcircle()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+3dvarcircle (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+Definition at line 1208 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ac414f08eb31dad32ed313767d214df72}\label{namespacem__initial__condition_ac414f08eb31dad32ed313767d214df72}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables}}
+\index{s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables()}{s\_assign\_patch\_mixture\_primitive\_variables()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+mixture\+\_\+primitive\+\_\+variables (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id,  }\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+This subroutine assigns the mixture primitive variables of the patch designated by the patch\+\_\+id, to the cell that is designated by the indexes (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated with the new assignment. Note that if the smoothing of the patch\textquotesingle{}s boundaries is employed, the ensuing primitive variables in the cell will be a type of combination of the current patch\textquotesingle{}s primitive variables with those of the smoothing patch. The specific details of the combination may be found in Shyue\textquotesingle{}s work (1998). 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & the patch identifier \\
+\hline
+{\em j} & the x-\/dir node index \\
+\hline
+{\em k} & the y-\/dir node index \\
+\hline
+{\em l} & the z-\/dir node index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 159 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a0024bfbe15f4f49cb2a5a2c574d89e19}\label{namespacem__initial__condition_a0024bfbe15f4f49cb2a5a2c574d89e19}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables}}
+\index{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables()}{s\_assign\_patch\_species\_primitive\_variables()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id,  }\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+This subroutine assigns the species primitive variables of the patch designated by the patch\+\_\+id, to the cell that is designated by the indexes (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated with the new assignment. Note that if the smoothing of the patch\textquotesingle{}s boundaries is employed, the ensuing primitive variables in the cell will be a type of combination of the current patch\textquotesingle{}s primitive variables with those of the smoothing patch. The specific details of the combination may be found in Shyue\textquotesingle{}s work (1998). 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & the patch identifier \\
+\hline
+{\em j} & the x-\/dir node index \\
+\hline
+{\em k} & the y-\/dir node index \\
+\hline
+{\em l} & the z-\/dir node index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 528 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_abd7cee461afabc01b81373e4be5a20c7}\label{namespacem__initial__condition_abd7cee461afabc01b81373e4be5a20c7}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles@{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles}}
+\index{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles@{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles()}{s\_assign\_patch\_species\_primitive\_variables\_bubbles()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables\+\_\+bubbles (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id,  }\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+This subroutine assigns the species primitive variables. This follows s\+\_\+assign\+\_\+patch\+\_\+species\+\_\+primitive\+\_\+variables with adaptation for ensemble-\/averaged bubble modeling. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & the patch identifier \\
+\hline
+{\em j} & the x-\/dir node index \\
+\hline
+{\em k} & the y-\/dir node index \\
+\hline
+{\em l} & the z-\/dir node index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 277 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a75d13cb7c7c4f88e8b532cf7e7dda498}\label{namespacem__initial__condition_a75d13cb7c7c4f88e8b532cf7e7dda498}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+circle@{s\+\_\+circle}}
+\index{s\+\_\+circle@{s\+\_\+circle}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+circle()}{s\_circle()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+circle (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the patch is well-\/defined when its centroid and radius are provided. Note that the circular patch D\+O\+ES allow for the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1096 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a791e5fa466dd15343882711c91bae63d}\label{namespacem__initial__condition_a791e5fa466dd15343882711c91bae63d}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord@{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord}}
+\index{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord@{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord()}{s\_convert\_cylindrical\_to\_cartesian\_coord()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+cartesian\+\_\+coord (\begin{DoxyParamCaption}\item[{real(kind(0d0)), intent(in)}]{cyl\+\_\+y,  }\item[{real(kind(0d0)), intent(in)}]{cyl\+\_\+z }\end{DoxyParamCaption})}
+
+
+
+Definition at line 852 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a88d2e8debdc097d4d811fb67d6fbc880}\label{namespacem__initial__condition_a88d2e8debdc097d4d811fb67d6fbc880}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord@{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord}}
+\index{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord@{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord()}{s\_convert\_cylindrical\_to\_spherical\_coord()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+convert\+\_\+cylindrical\+\_\+to\+\_\+spherical\+\_\+coord (\begin{DoxyParamCaption}\item[{real(kind(0d0)), intent(in)}]{cyl\+\_\+x,  }\item[{real(kind(0d0)), intent(in)}]{cyl\+\_\+y }\end{DoxyParamCaption})}
+
+
+
+Definition at line 861 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a2297a9b98d2478b3594083197bd9b8b5}\label{namespacem__initial__condition_a2297a9b98d2478b3594083197bd9b8b5}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+cuboid@{s\+\_\+cuboid}}
+\index{s\+\_\+cuboid@{s\+\_\+cuboid}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+cuboid()}{s\_cuboid()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+cuboid (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The cuboidal patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/shock region, which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well-\/ defined when its centroid and lengths in the x-\/, y-\/ and z-\/coordinate directions are provided. Please notice that the cuboidal patch D\+O\+ES N\+OT allow for the smearing of its boundaries. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2212 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_af834c631376de6906fb6b002df70ce49}\label{namespacem__initial__condition_af834c631376de6906fb6b002df70ce49}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+cylinder@{s\+\_\+cylinder}}
+\index{s\+\_\+cylinder@{s\+\_\+cylinder}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+cylinder()}{s\_cylinder()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+cylinder (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The cylindrical patch is a 3D geometry that may be used, for example, in setting up a cylindrical solid boundary confinement, like a blood vessel. The geometry of this patch is well-\/defined when the centroid, the radius and the length along the cylinder\textquotesingle{}s axis, parallel to the x-\/, y-\/ or z-\/coordinate direction, are provided. Please note that the cylindrical patch D\+O\+ES allow for the smoothing of its lateral boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2290 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a5e999ad19f23f5f2b059b80e49c0a086}\label{namespacem__initial__condition_a5e999ad19f23f5f2b059b80e49c0a086}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+ellipse@{s\+\_\+ellipse}}
+\index{s\+\_\+ellipse@{s\+\_\+ellipse}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+ellipse()}{s\_ellipse()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+ellipse (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The elliptical patch is a 2D geometry. The geometry of the patch is well-\/defined when its centroid and radii are provided. Note that the elliptical patch D\+O\+ES allow for the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1269 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a524f37de8423b7943c22c5d105eda922}\label{namespacem__initial__condition_a524f37de8423b7943c22c5d105eda922}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+ellipsoid@{s\+\_\+ellipsoid}}
+\index{s\+\_\+ellipsoid@{s\+\_\+ellipsoid}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+ellipsoid()}{s\_ellipsoid()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+ellipsoid (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The ellipsoidal patch is a 3D geometry. The geometry of the patch is well-\/defined when its centroid and radii are provided. Note that the ellipsoidal patch D\+O\+ES allow for the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1326 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a944c63abd61afab021ab664246f80495}\label{namespacem__initial__condition_a944c63abd61afab021ab664246f80495}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module@{s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module@{s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module()}{s\_finalize\_initial\_condition\_module()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+finalize\+\_\+initial\+\_\+condition\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Deallocation procedures for the module. 
+
+
+
+Definition at line 2477 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aa74a70029e3ec0fd3225b369e7c5443e}\label{namespacem__initial__condition_aa74a70029e3ec0fd3225b369e7c5443e}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+generate\+\_\+initial\+\_\+condition@{s\+\_\+generate\+\_\+initial\+\_\+condition}}
+\index{s\+\_\+generate\+\_\+initial\+\_\+condition@{s\+\_\+generate\+\_\+initial\+\_\+condition}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+generate\+\_\+initial\+\_\+condition()}{s\_generate\_initial\_condition()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+generate\+\_\+initial\+\_\+condition (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters. The subroutine is complete once the primitive variables are converted to conservative ones. 
+
+
+
+Definition at line 715 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a07a665ff41297455ac2da7b54243bac5}\label{namespacem__initial__condition_a07a665ff41297455ac2da7b54243bac5}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module@{s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module@{s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module()}{s\_initialize\_initial\_condition\_module()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+initialize\+\_\+initial\+\_\+condition\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. 
+
+
+
+Definition at line 651 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ab329077796ad7579df0a96543263150d}\label{namespacem__initial__condition_ab329077796ad7579df0a96543263150d}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+isentropic\+\_\+vortex@{s\+\_\+isentropic\+\_\+vortex}}
+\index{s\+\_\+isentropic\+\_\+vortex@{s\+\_\+isentropic\+\_\+vortex}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+isentropic\+\_\+vortex()}{s\_isentropic\_vortex()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+isentropic\+\_\+vortex (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The isentropic vortex is a 2D geometry that may be used, for example, to generate an isentropic flow disturbance. Geometry of the patch is well-\/defined when its centroid and radius are provided. Notice that the patch D\+O\+ES N\+OT allow for the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1537 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a3be32c8ee8a7dffae734d063200471e8}\label{namespacem__initial__condition_a3be32c8ee8a7dffae734d063200471e8}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+line\+\_\+segment@{s\+\_\+line\+\_\+segment}}
+\index{s\+\_\+line\+\_\+segment@{s\+\_\+line\+\_\+segment}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+line\+\_\+segment()}{s\_line\_segment()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+line\+\_\+segment (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The line segment patch is a 1D geometry that may be used, for example, in creating a Riemann problem. The geometry of the patch is well-\/defined when its centroid and length in the x-\/coordinate direction are provided. Note that the line segment patch D\+O\+ES N\+OT allow for the smearing of its boundaries. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 968 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_afef3f507e182798fcfd7aecc52878fc9}\label{namespacem__initial__condition_afef3f507e182798fcfd7aecc52878fc9}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+perturb\+\_\+sphere@{s\+\_\+perturb\+\_\+sphere}}
+\index{s\+\_\+perturb\+\_\+sphere@{s\+\_\+perturb\+\_\+sphere}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+perturb\+\_\+sphere()}{s\_perturb\_sphere()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+perturb\+\_\+sphere (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Definition at line 870 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ab66e3b04024a8ae7327857b1b265bc27}\label{namespacem__initial__condition_ab66e3b04024a8ae7327857b1b265bc27}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+perturb\+\_\+surrounding\+\_\+flow@{s\+\_\+perturb\+\_\+surrounding\+\_\+flow}}
+\index{s\+\_\+perturb\+\_\+surrounding\+\_\+flow@{s\+\_\+perturb\+\_\+surrounding\+\_\+flow}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+perturb\+\_\+surrounding\+\_\+flow()}{s\_perturb\_surrounding\_flow()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+perturb\+\_\+surrounding\+\_\+flow (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Definition at line 922 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a9c54a1e384e94493914688f9a2a2cf14}\label{namespacem__initial__condition_a9c54a1e384e94493914688f9a2a2cf14}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+rectangle@{s\+\_\+rectangle}}
+\index{s\+\_\+rectangle@{s\+\_\+rectangle}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+rectangle()}{s\_rectangle()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+rectangle (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The rectangular patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/ shock region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well-\/ defined when its centroid and lengths in the x-\/ and y-\/ coordinate directions are provided. Please note that the rectangular patch D\+O\+ES N\+OT allow for the smoothing of its boundaries. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1402 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a9037159f591341d05fa5fb23fe82bc2c}\label{namespacem__initial__condition_a9037159f591341d05fa5fb23fe82bc2c}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+sphere@{s\+\_\+sphere}}
+\index{s\+\_\+sphere@{s\+\_\+sphere}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+sphere()}{s\_sphere()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+sphere (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is well-\/defined when its centroid and radius are provided. Please note that the spherical patch D\+O\+ES allow for the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2110 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_af17f90ba4a3878feb6e38bc8d66cb950}\label{namespacem__initial__condition_af17f90ba4a3878feb6e38bc8d66cb950}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+spherical\+\_\+harmonic@{s\+\_\+spherical\+\_\+harmonic}}
+\index{s\+\_\+spherical\+\_\+harmonic@{s\+\_\+spherical\+\_\+harmonic}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+spherical\+\_\+harmonic()}{s\_spherical\_harmonic()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+spherical\+\_\+harmonic (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+This patch generates the shape of the spherical harmonics as a perturbation to a perfect sphere. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1981 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ac4540baa01372eb3df51b268769fa6fc}\label{namespacem__initial__condition_ac4540baa01372eb3df51b268769fa6fc}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+spiral@{s\+\_\+spiral}}
+\index{s\+\_\+spiral@{s\+\_\+spiral}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+spiral()}{s\_spiral()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+spiral (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The spiral patch is a 2D geometry that may be used, The geometry of the patch is well-\/defined when its centroid and radius are provided. Note that the circular patch D\+O\+ES allow for the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1025 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ab056c04c30f55423904517abe61ebd99}\label{namespacem__initial__condition_ab056c04c30f55423904517abe61ebd99}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+sweep\+\_\+line@{s\+\_\+sweep\+\_\+line}}
+\index{s\+\_\+sweep\+\_\+line@{s\+\_\+sweep\+\_\+line}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+sweep\+\_\+line()}{s\_sweep\_line()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+sweep\+\_\+line (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The swept line patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/ shock region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-\/defined when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep line patch D\+O\+ES allow the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1476 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a51f30d0a86584bdc757c22ebf7993e88}\label{namespacem__initial__condition_a51f30d0a86584bdc757c22ebf7993e88}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+sweep\+\_\+plane@{s\+\_\+sweep\+\_\+plane}}
+\index{s\+\_\+sweep\+\_\+plane@{s\+\_\+sweep\+\_\+plane}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+sweep\+\_\+plane()}{s\_sweep\_plane()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+sweep\+\_\+plane (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The swept plane patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-\//post-\/ shock region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-\/defined when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep plane patch D\+O\+ES allow the smoothing of its boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2405 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a3e1c1480513e75b444ce7a77ed0fe598}\label{namespacem__initial__condition_a3e1c1480513e75b444ce7a77ed0fe598}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+varcircle@{s\+\_\+varcircle}}
+\index{s\+\_\+varcircle@{s\+\_\+varcircle}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+varcircle()}{s\_varcircle()}}
+{\footnotesize\ttfamily subroutine m\+\_\+initial\+\_\+condition\+::s\+\_\+varcircle (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{patch\+\_\+id }\end{DoxyParamCaption})}
+
+
+
+The varcircle patch is a 2D geometry that may be used . It generatres an annulus. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em patch\+\_\+id} & is the patch identifier \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1155 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__initial__condition_a8a559b4d7a1e1e69f5e3b9ea0474e3fa}\label{namespacem__initial__condition_a8a559b4d7a1e1e69f5e3b9ea0474e3fa}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!a@{a}}
+\index{a@{a}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{a}{a}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::a}
+
+
+
+Definition at line 110 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a2fa2c238e1c0c522aeecada3f6cc314d}\label{namespacem__initial__condition_a2fa2c238e1c0c522aeecada3f6cc314d}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!alf\+\_\+sum@{alf\+\_\+sum}}
+\index{alf\+\_\+sum@{alf\+\_\+sum}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{alf\+\_\+sum}{alf\_sum}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}) m\+\_\+initial\+\_\+condition\+::alf\+\_\+sum}
+
+
+
+Definition at line 90 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a0932a1bcb9b0293f1368e204a8fda4b9}\label{namespacem__initial__condition_a0932a1bcb9b0293f1368e204a8fda4b9}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!b@{b}}
+\index{b@{b}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{b}{b}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::b}
+
+
+
+Definition at line 110 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aa61b446189c2c88bb9261649f4b594b3}\label{namespacem__initial__condition_aa61b446189c2c88bb9261649f4b594b3}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!beta@{beta}}
+\index{beta@{beta}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{beta}{beta}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::beta}
+
+
+
+Definition at line 95 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a03d80b7b8ee41e5b16d996b46a605706}\label{namespacem__initial__condition_a03d80b7b8ee41e5b16d996b46a605706}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!c@{c}}
+\index{c@{c}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{c}{c}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::c}
+
+
+
+Definition at line 110 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a71a9905eff9a292e2fc61b0e25e47db0}\label{namespacem__initial__condition_a71a9905eff9a292e2fc61b0e25e47db0}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!cart\+\_\+y@{cart\+\_\+y}}
+\index{cart\+\_\+y@{cart\+\_\+y}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{cart\+\_\+y}{cart\_y}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::cart\+\_\+y}
+
+
+
+Definition at line 128 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a224e30cb2d1e2e99f2c2c059a1227d49}\label{namespacem__initial__condition_a224e30cb2d1e2e99f2c2c059a1227d49}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!cart\+\_\+z@{cart\+\_\+z}}
+\index{cart\+\_\+z@{cart\+\_\+z}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{cart\+\_\+z}{cart\_z}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::cart\+\_\+z}
+
+
+
+Definition at line 128 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_af692b3658ab0d7bcda937394fe3e2903}\label{namespacem__initial__condition_af692b3658ab0d7bcda937394fe3e2903}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!d@{d}}
+\index{d@{d}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{d}{d}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::d}
+
+
+
+When a line or a plane sweep patch geometry is employed, these variables represent the coefficients associated with the equation describing the said line or plane. 
+
+
+
+Definition at line 110 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a0fb096d74052e49545e6ec72b3c2a114}\label{namespacem__initial__condition_a0fb096d74052e49545e6ec72b3c2a114}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!epsilon@{epsilon}}
+\index{epsilon@{epsilon}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{epsilon}{epsilon}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::epsilon}
+
+
+
+Definition at line 95 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a44e267143646437278341b252110443b}\label{namespacem__initial__condition_a44e267143646437278341b252110443b}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!eta@{eta}}
+\index{eta@{eta}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{eta}{eta}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::eta}
+
+
+
+In the case that smoothing of patch boundaries is enabled and the boundary between two adjacent patches is to be smeared out, this variable\textquotesingle{}s purpose is to act as a pseudo volume fraction to indicate the contribution of each patch toward the composition of a cell\textquotesingle{}s fluid state. 
+
+
+
+Definition at line 116 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ab59e590873d32a54651ac60af6b1a6e4}\label{namespacem__initial__condition_ab59e590873d32a54651ac60af6b1a6e4}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!length\+\_\+x@{length\+\_\+x}}
+\index{length\+\_\+x@{length\+\_\+x}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{length\+\_\+x}{length\_x}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::length\+\_\+x}
+
+
+
+Definition at line 93 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a49ed82b4f9548cd8166844888028c8cd}\label{namespacem__initial__condition_a49ed82b4f9548cd8166844888028c8cd}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!length\+\_\+y@{length\+\_\+y}}
+\index{length\+\_\+y@{length\+\_\+y}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{length\+\_\+y}{length\_y}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::length\+\_\+y}
+
+
+
+Definition at line 93 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a0d9d1bcde238177f0beb7684e252aa69}\label{namespacem__initial__condition_a0d9d1bcde238177f0beb7684e252aa69}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!length\+\_\+z@{length\+\_\+z}}
+\index{length\+\_\+z@{length\+\_\+z}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{length\+\_\+z}{length\_z}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::length\+\_\+z}
+
+
+
+Definition at line 93 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a0014f6589f0b33ea2372c1d4b7f0c824}\label{namespacem__initial__condition_a0014f6589f0b33ea2372c1d4b7f0c824}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!patch\+\_\+id\+\_\+fp@{patch\+\_\+id\+\_\+fp}}
+\index{patch\+\_\+id\+\_\+fp@{patch\+\_\+id\+\_\+fp}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{patch\+\_\+id\+\_\+fp}{patch\_id\_fp}}
+{\footnotesize\ttfamily integer, dimension(\+:,\+:,\+:), allocatable m\+\_\+initial\+\_\+condition\+::patch\+\_\+id\+\_\+fp}
+
+
+
+Bookkepping variable used to track the patch identities (id) associated with each of the cells in the computational domain. Note that only one patch identity may be associated with any one cell. 
+
+
+
+Definition at line 123 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a1f42c68f3b3d167616d52b7cf7a7d56a}\label{namespacem__initial__condition_a1f42c68f3b3d167616d52b7cf7a7d56a}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!q\+\_\+cons\+\_\+vf@{q\+\_\+cons\+\_\+vf}}
+\index{q\+\_\+cons\+\_\+vf@{q\+\_\+cons\+\_\+vf}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{q\+\_\+cons\+\_\+vf}{q\_cons\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+initial\+\_\+condition\+::q\+\_\+cons\+\_\+vf}
+
+
+
+conservative variables 
+
+
+
+Definition at line 88 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ad9935d4b9c2f6a7af08f3630681d0c1a}\label{namespacem__initial__condition_ad9935d4b9c2f6a7af08f3630681d0c1a}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!q\+\_\+prim\+\_\+vf@{q\+\_\+prim\+\_\+vf}}
+\index{q\+\_\+prim\+\_\+vf@{q\+\_\+prim\+\_\+vf}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{q\+\_\+prim\+\_\+vf}{q\_prim\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+initial\+\_\+condition\+::q\+\_\+prim\+\_\+vf}
+
+
+
+primitive variables 
+
+
+
+Definition at line 86 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a51a6afec0ff2f62c62b6cf86bd2c16e4}\label{namespacem__initial__condition_a51a6afec0ff2f62c62b6cf86bd2c16e4}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!radius@{radius}}
+\index{radius@{radius}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{radius}{radius}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::radius}
+
+
+
+Definition at line 94 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a3151c58d3a628c7ac8aff34bce727867}\label{namespacem__initial__condition_a3151c58d3a628c7ac8aff34bce727867}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables}}
+\index{s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables@{s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables}{s\_assign\_patch\_primitive\_variables}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables}{s\+\_\+assign\+\_\+patch\+\_\+xxxxx\+\_\+primitive\+\_\+variables}), pointer m\+\_\+initial\+\_\+condition\+::s\+\_\+assign\+\_\+patch\+\_\+primitive\+\_\+variables =$>$ N\+U\+LL()}
+
+
+
+Definition at line 134 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a7ab7ae2808ac3b52319477860c6dbf80}\label{namespacem__initial__condition_a7ab7ae2808ac3b52319477860c6dbf80}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!smooth\+\_\+coeff@{smooth\+\_\+coeff}}
+\index{smooth\+\_\+coeff@{smooth\+\_\+coeff}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{smooth\+\_\+coeff}{smooth\_coeff}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::smooth\+\_\+coeff}
+
+
+
+These variables are analogous in both meaning and use to the similarly named components in the ic\+\_\+patch\+\_\+parameters type (see \hyperlink{m__derived__types_8f90}{m\+\_\+derived\+\_\+types.\+f90} for additional details). They are employed as a means to more concisely perform the actions necessary to lay out a particular patch on the grid. 
+
+
+
+Definition at line 97 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_adf36787dd781f2f28d1b49d06116c401}\label{namespacem__initial__condition_adf36787dd781f2f28d1b49d06116c401}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!smooth\+\_\+patch\+\_\+id@{smooth\+\_\+patch\+\_\+id}}
+\index{smooth\+\_\+patch\+\_\+id@{smooth\+\_\+patch\+\_\+id}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{smooth\+\_\+patch\+\_\+id}{smooth\_patch\_id}}
+{\footnotesize\ttfamily integer m\+\_\+initial\+\_\+condition\+::smooth\+\_\+patch\+\_\+id}
+
+
+
+Definition at line 96 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aba65d4cbd29f3b8eda828037c7215e2d}\label{namespacem__initial__condition_aba65d4cbd29f3b8eda828037c7215e2d}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!sph\+\_\+phi@{sph\+\_\+phi}}
+\index{sph\+\_\+phi@{sph\+\_\+phi}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{sph\+\_\+phi}{sph\_phi}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::sph\+\_\+phi}
+
+
+
+Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates. 
+
+
+
+Definition at line 129 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_abcd86e737c47247631a1fb95c1764b00}\label{namespacem__initial__condition_abcd86e737c47247631a1fb95c1764b00}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!x\+\_\+boundary@{x\+\_\+boundary}}
+\index{x\+\_\+boundary@{x\+\_\+boundary}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{x\+\_\+boundary}{x\_boundary}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+initial\+\_\+condition\+::x\+\_\+boundary}
+
+
+
+Definition at line 103 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aaf66843a6e051174a3cde0729daa1300}\label{namespacem__initial__condition_aaf66843a6e051174a3cde0729daa1300}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!x\+\_\+centroid@{x\+\_\+centroid}}
+\index{x\+\_\+centroid@{x\+\_\+centroid}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{x\+\_\+centroid}{x\_centroid}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::x\+\_\+centroid}
+
+
+
+Definition at line 92 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_ab669c9fbfa80cdc9139ea45f293b7f49}\label{namespacem__initial__condition_ab669c9fbfa80cdc9139ea45f293b7f49}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!y\+\_\+boundary@{y\+\_\+boundary}}
+\index{y\+\_\+boundary@{y\+\_\+boundary}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{y\+\_\+boundary}{y\_boundary}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+initial\+\_\+condition\+::y\+\_\+boundary}
+
+
+
+Definition at line 103 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_a6cef3dccb0374a24cb372bd7d4c0b43f}\label{namespacem__initial__condition_a6cef3dccb0374a24cb372bd7d4c0b43f}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!y\+\_\+centroid@{y\+\_\+centroid}}
+\index{y\+\_\+centroid@{y\+\_\+centroid}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{y\+\_\+centroid}{y\_centroid}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::y\+\_\+centroid}
+
+
+
+Definition at line 92 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aaae7053fde0b060e39db9f943f000389}\label{namespacem__initial__condition_aaae7053fde0b060e39db9f943f000389}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!z\+\_\+boundary@{z\+\_\+boundary}}
+\index{z\+\_\+boundary@{z\+\_\+boundary}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{z\+\_\+boundary}{z\_boundary}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+initial\+\_\+condition\+::z\+\_\+boundary}
+
+
+
+These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the patch boundaries in the x-\/, y-\/ and z-\/coordinate directions. They are used as a means to concisely perform the actions necessary to lay out a particular patch on the grid. 
+
+
+
+Definition at line 103 of file m\+\_\+initial\+\_\+condition.\+f90.
+
+\mbox{\Hypertarget{namespacem__initial__condition_aca427fa4af7501277f10bf96977a9766}\label{namespacem__initial__condition_aca427fa4af7501277f10bf96977a9766}} 
+\index{m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}!z\+\_\+centroid@{z\+\_\+centroid}}
+\index{z\+\_\+centroid@{z\+\_\+centroid}!m\+\_\+initial\+\_\+condition@{m\+\_\+initial\+\_\+condition}}
+\subsubsection{\texorpdfstring{z\+\_\+centroid}{z\_centroid}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+initial\+\_\+condition\+::z\+\_\+centroid}
+
+
+
+Definition at line 92 of file m\+\_\+initial\+\_\+condition.\+f90.
+

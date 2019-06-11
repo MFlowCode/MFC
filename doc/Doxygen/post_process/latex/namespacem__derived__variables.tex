@@ -1,0 +1,382 @@
+\hypertarget{namespacem__derived__variables}{}\section{m\+\_\+derived\+\_\+variables Module Reference}
+\label{namespacem__derived__variables}\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+
+
+This module features subroutines that allow for the derivation of numerous flow variables from the conservative and primitive ones. Currently, the available derived variables include the unadvected volume fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function.  
+
+
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a15a6d70e2bd1c9b7001c753ca1f2ee27}{s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ The purpose of this subroutine is to compute the finite-\/}\par
+{\em difference coefficients for the centered schemes utilized in computations of first order spatial derivatives in the s-\/coordinate direction. The s-\/coordinate direction refers to the x-\/, y-\/ or z-\/coordinate direction, depending on the subroutine\textquotesingle{}s inputs. Note that coefficients of up to 4th order accuracy are available.
+
+
+\begin{DoxyParams}{Parameters}
+{\em q} & Number of cells in the s-\/coordinate direction \\
+\hline
+{\em offset\+\_\+s} & Size of the ghost zone layer in the s-\/coordinate direction \\
+\hline
+{\em s\+\_\+cc} & Locations of the cell-\/centers in the s-\/coordinate direction \\
+\hline
+{\em fd\+\_\+coeff\+\_\+s} & Finite-\/diff. coefficients in the s-\/coordinate direction \\
+\hline
+\end{DoxyParams}
+}\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__derived__variables_acf313542c783139e0798f2097d1f68fc}{s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients} (q, offset\+\_\+s, s\+\_\+cc, fd\+\_\+coeff\+\_\+s)
+\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a7fadac6924cf61654373f9f334106001}{s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction} (q\+\_\+cons\+\_\+vf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine is used together with the volume fraction model and when called upon, it computes the values of the unadvected volume fraction from the inputted conservative variables, q\+\_\+cons\+\_\+vf. The calculated values are stored in the derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_aab235aa45c622ecf7f387cbf7994387d}{s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio} (gamma\+\_\+sf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine receives as input the specific heat ratio function, gamma\+\_\+sf, and derives from it the specific heat ratio. The latter is stored in the derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a02166198be4da04f6b6ce69fd432910d}{s\+\_\+derive\+\_\+liquid\+\_\+stiffness} (gamma\+\_\+sf, pi\+\_\+inf\+\_\+sf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine admits as inputs the specific heat ratio function and the liquid stiffness function, gamma\+\_\+sf and pi\+\_\+inf\+\_\+sf, respectively. These are used to calculate the values of the liquid stiffness, which are stored in the derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a51eb66162227584de46a25cac55b5b6b}{s\+\_\+derive\+\_\+sound\+\_\+speed} (q\+\_\+prim\+\_\+vf, rho\+\_\+sf, gamma\+\_\+sf, pi\+\_\+inf\+\_\+sf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine admits as inputs the primitive variables, the density, the specific heat ratio function and liquid stiffness function. It then computes from those variables the values of the speed of sound, which are stored in the derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_ac85e77b0312f21389eb166960446f6ec}{s\+\_\+derive\+\_\+flux\+\_\+limiter} (\hyperlink{m__data__output_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, q\+\_\+prim\+\_\+vf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine derives the flux\+\_\+limiter at cell boundary i+1/2. This is an approximation because the velocity used to determine the upwind direction is the velocity at the cell center i instead of the contact velocity at the cell boundary from the Riemann solver. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a2c43e6d73417e237731fdad2eea07b22}{s\+\_\+derive\+\_\+curvature} (\hyperlink{m__data__output_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, q\+\_\+prim\+\_\+vf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em Computes the local curvatures. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a2604318b4c2822441b485a32c755e5b6}{s\+\_\+solve\+\_\+linear\+\_\+system} (A, b, sol, ndim)
+\begin{DoxyCompactList}\small\item\em Computes the solution to the linear system Ax=b w/ sol = x. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_aa038ec37a8a0c8fe8d7185b9ef6d54a9}{s\+\_\+derive\+\_\+vorticity\+\_\+component} (\hyperlink{m__data__output_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, q\+\_\+prim\+\_\+vf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine receives as inputs the indicator of the component of the vorticity that should be outputted and the primitive variables. From those inputs, it proceeds to calculate values of the desired vorticity component, which are subsequently stored in derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_af816bc88ed55a050bfe8f2ab94d89cba}{s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function} (q\+\_\+cons\+\_\+vf, rho\+\_\+sf, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine gets as inputs the conservative variables and density. From those inputs, it proceeds to calculate the values of the numerical Schlieren function, which are subsequently stored in the derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a735665bf598281689158d9d6e075f3d4}{s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__derived__variables_a102e235b77ff78573a043c5c9b9bb0d8}{gm\+\_\+rho\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em Gradient magnitude (gm) of the density for each cell of the computational sub-\/domain. This variable is employed in the calculation of the numerical Schlieren function. \end{DoxyCompactList}\item 
+integer, private \hyperlink{namespacem__derived__variables_a2a27e1fa08c6751186a38d562b826955}{flg}
+\begin{DoxyCompactList}\small\item\em Flagging (flg) variable used to annotate the dimensionality of the dataset that is undergoing the post-\/process. A flag value of 1 indicates that the dataset is 3D, while a flag value of 0 indicates that it is not. This flg variable is necessary to avoid cycling through the third dimension of the flow variable(s) when the simulation is not 3D and the size of the buffer is non-\/zero. Note that a similar procedure does not have to be applied to the second dimension since in 1D, the buffer size is always zero. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ Finite-\/difference (fd) coefficients in x-\/, y-\/ and z-\/coordinate directions.}\par
+{\em Note that because sufficient boundary information is available for all the active coordinate directions, the centered family of the finite-\/difference schemes is used. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__derived__variables_a4f61d6bef7f53e49a0f5e4a3f9577912}{fd\+\_\+coeff\+\_\+x}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__derived__variables_ab273055cd131e3ce73c1f468b78af7b7}{fd\+\_\+coeff\+\_\+y}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__derived__variables_a3cafc9204d5773653e119ce3a3b98722}{fd\+\_\+coeff\+\_\+z}
+\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+This module features subroutines that allow for the derivation of numerous flow variables from the conservative and primitive ones. Currently, the available derived variables include the unadvected volume fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__derived__variables_acf313542c783139e0798f2097d1f68fc}\label{namespacem__derived__variables_acf313542c783139e0798f2097d1f68fc}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients@{s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients}}
+\index{s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients@{s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients()}{s\_compute\_finite\_difference\_coefficients()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{q,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{offset\+\_\+s,  }\item[{real(kind(0d0)), dimension(-\/buff\+\_\+size\+:q+buff\+\_\+size), intent(in)}]{s\+\_\+cc,  }\item[{real(kind(0d0)), dimension(-\/fd\+\_\+number\+:fd\+\_\+number, -\/offset\+\_\+s\%beg\+:q+offset\+\_\+s\%end), intent(inout)}]{fd\+\_\+coeff\+\_\+s }\end{DoxyParamCaption})}
+
+
+
+Definition at line 166 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a2c43e6d73417e237731fdad2eea07b22}\label{namespacem__derived__variables_a2c43e6d73417e237731fdad2eea07b22}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+curvature@{s\+\_\+derive\+\_\+curvature}}
+\index{s\+\_\+derive\+\_\+curvature@{s\+\_\+derive\+\_\+curvature}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+curvature()}{s\_derive\_curvature()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+curvature (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{i,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{real(kind(0d0)), dimension (-\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end ,                                         -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end ,                                         -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+Computes the local curvatures. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em i} & Fluid indicator \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Primitive variables \\
+\hline
+{\em q\+\_\+sf} & Curvature \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 513 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_ac85e77b0312f21389eb166960446f6ec}\label{namespacem__derived__variables_ac85e77b0312f21389eb166960446f6ec}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+flux\+\_\+limiter@{s\+\_\+derive\+\_\+flux\+\_\+limiter}}
+\index{s\+\_\+derive\+\_\+flux\+\_\+limiter@{s\+\_\+derive\+\_\+flux\+\_\+limiter}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+flux\+\_\+limiter()}{s\_derive\_flux\_limiter()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+flux\+\_\+limiter (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{i,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{real(kind(0d0)), dimension (    -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end ,                                             -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end ,                                             -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine derives the flux\+\_\+limiter at cell boundary i+1/2. This is an approximation because the velocity used to determine the upwind direction is the velocity at the cell center i instead of the contact velocity at the cell boundary from the Riemann solver. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em i} & Component indicator \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Primitive variables \\
+\hline
+{\em q\+\_\+sf} & Flux limiter \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 417 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a02166198be4da04f6b6ce69fd432910d}\label{namespacem__derived__variables_a02166198be4da04f6b6ce69fd432910d}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+liquid\+\_\+stiffness@{s\+\_\+derive\+\_\+liquid\+\_\+stiffness}}
+\index{s\+\_\+derive\+\_\+liquid\+\_\+stiffness@{s\+\_\+derive\+\_\+liquid\+\_\+stiffness}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+liquid\+\_\+stiffness()}{s\_derive\_liquid\_stiffness()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+liquid\+\_\+stiffness (\begin{DoxyParamCaption}\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{gamma\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{pi\+\_\+inf\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine admits as inputs the specific heat ratio function and the liquid stiffness function, gamma\+\_\+sf and pi\+\_\+inf\+\_\+sf, respectively. These are used to calculate the values of the liquid stiffness, which are stored in the derived flow quantity storage variable, q\+\_\+sf. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em gamma\+\_\+sf} & Specific heat ratio \\
+\hline
+{\em pi\+\_\+inf\+\_\+sf} & Liquid stiffness function \\
+\hline
+{\em q\+\_\+sf} & Liquid stiffness \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 305 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_af816bc88ed55a050bfe8f2ab94d89cba}\label{namespacem__derived__variables_af816bc88ed55a050bfe8f2ab94d89cba}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function@{s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function}}
+\index{s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function@{s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function()}{s\_derive\_numerical\_schlieren\_function()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+numerical\+\_\+schlieren\+\_\+function (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+cons\+\_\+vf,  }\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{rho\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine gets as inputs the conservative variables and density. From those inputs, it proceeds to calculate the values of the numerical Schlieren function, which are subsequently stored in the derived flow quantity storage variable, q\+\_\+sf. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+cons\+\_\+vf} & Conservative variables \\
+\hline
+{\em rho\+\_\+sf} & Density \\
+\hline
+{\em q\+\_\+sf} & Numerical Schlieren function \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 840 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a51eb66162227584de46a25cac55b5b6b}\label{namespacem__derived__variables_a51eb66162227584de46a25cac55b5b6b}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+sound\+\_\+speed@{s\+\_\+derive\+\_\+sound\+\_\+speed}}
+\index{s\+\_\+derive\+\_\+sound\+\_\+speed@{s\+\_\+derive\+\_\+sound\+\_\+speed}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+sound\+\_\+speed()}{s\_derive\_sound\_speed()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+sound\+\_\+speed (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{rho\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{gamma\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{pi\+\_\+inf\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine admits as inputs the primitive variables, the density, the specific heat ratio function and liquid stiffness function. It then computes from those variables the values of the speed of sound, which are stored in the derived flow quantity storage variable, q\+\_\+sf. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+prim\+\_\+vf} & Primitive variables \\
+\hline
+{\em rho\+\_\+sf} & Density \\
+\hline
+{\em gamma\+\_\+sf} & Specific heat ratio function \\
+\hline
+{\em pi\+\_\+inf\+\_\+sf} & Liquid stiffness function \\
+\hline
+{\em q\+\_\+sf} & Speed of sound \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 349 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_aab235aa45c622ecf7f387cbf7994387d}\label{namespacem__derived__variables_aab235aa45c622ecf7f387cbf7994387d}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio@{s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio}}
+\index{s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio@{s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio()}{s\_derive\_specific\_heat\_ratio()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+specific\+\_\+heat\+\_\+ratio (\begin{DoxyParamCaption}\item[{real(kind(0d0)), dimension( -\/buff\+\_\+size     \+:  m+buff\+\_\+size       ,                        -\/buff\+\_\+size     \+:  n+buff\+\_\+size       ,                        -\/buff\+\_\+size$\ast$flg \+: (p+buff\+\_\+size)$\ast$flg ), intent(in)}]{gamma\+\_\+sf,  }\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine receives as input the specific heat ratio function, gamma\+\_\+sf, and derives from it the specific heat ratio. The latter is stored in the derived flow quantity storage variable, q\+\_\+sf. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em gamma\+\_\+sf} & Specific heat ratio function \\
+\hline
+{\em q\+\_\+sf} & Specific heat ratio \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 265 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a7fadac6924cf61654373f9f334106001}\label{namespacem__derived__variables_a7fadac6924cf61654373f9f334106001}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction@{s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction}}
+\index{s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction@{s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction()}{s\_derive\_unadvected\_volume\_fraction()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+unadvected\+\_\+volume\+\_\+fraction (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+cons\+\_\+vf,  }\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine is used together with the volume fraction model and when called upon, it computes the values of the unadvected volume fraction from the inputted conservative variables, q\+\_\+cons\+\_\+vf. The calculated values are stored in the derived flow quantity storage variable, q\+\_\+sf. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+cons\+\_\+vf} & Conservative variables \\
+\hline
+{\em q\+\_\+sf} & Unadvected volume fraction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 223 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_aa038ec37a8a0c8fe8d7185b9ef6d54a9}\label{namespacem__derived__variables_aa038ec37a8a0c8fe8d7185b9ef6d54a9}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+derive\+\_\+vorticity\+\_\+component@{s\+\_\+derive\+\_\+vorticity\+\_\+component}}
+\index{s\+\_\+derive\+\_\+vorticity\+\_\+component@{s\+\_\+derive\+\_\+vorticity\+\_\+component}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+derive\+\_\+vorticity\+\_\+component()}{s\_derive\_vorticity\_component()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+vorticity\+\_\+component (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{i,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf }\end{DoxyParamCaption})}
+
+
+
+This subroutine receives as inputs the indicator of the component of the vorticity that should be outputted and the primitive variables. From those inputs, it proceeds to calculate values of the desired vorticity component, which are subsequently stored in derived flow quantity storage variable, q\+\_\+sf. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em i} & Vorticity component indicator \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Primitive variables \\
+\hline
+{\em q\+\_\+sf} & Vorticity component \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 728 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a735665bf598281689158d9d6e075f3d4}\label{namespacem__derived__variables_a735665bf598281689158d9d6e075f3d4}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module@{s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module@{s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module()}{s\_finalize\_derived\_variables\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Deallocation procedures for the module. 
+
+
+
+Definition at line 1003 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a15a6d70e2bd1c9b7001c753ca1f2ee27}\label{namespacem__derived__variables_a15a6d70e2bd1c9b7001c753ca1f2ee27}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module@{s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module@{s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module()}{s\_initialize\_derived\_variables\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+derived\+\_\+variables\+::s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. 
+
+
+
+Definition at line 98 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a2604318b4c2822441b485a32c755e5b6}\label{namespacem__derived__variables_a2604318b4c2822441b485a32c755e5b6}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!s\+\_\+solve\+\_\+linear\+\_\+system@{s\+\_\+solve\+\_\+linear\+\_\+system}}
+\index{s\+\_\+solve\+\_\+linear\+\_\+system@{s\+\_\+solve\+\_\+linear\+\_\+system}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+solve\+\_\+linear\+\_\+system()}{s\_solve\_linear\_system()}}
+{\footnotesize\ttfamily subroutine m\+\_\+derived\+\_\+variables\+::s\+\_\+solve\+\_\+linear\+\_\+system (\begin{DoxyParamCaption}\item[{real(kind(0d0)), dimension(ndim,ndim), intent(inout)}]{A,  }\item[{real(kind(0d0)), dimension(ndim), intent(inout)}]{b,  }\item[{real(kind(0d0)), dimension(ndim), intent(out)}]{sol,  }\item[{integer, intent(in)}]{ndim }\end{DoxyParamCaption})}
+
+
+
+Computes the solution to the linear system Ax=b w/ sol = x. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em A} & Input matrix \\
+\hline
+{\em b} & right-\/hand-\/side \\
+\hline
+{\em sol} & Solution \\
+\hline
+{\em ndim} & Problem size \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 658 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__derived__variables_a4f61d6bef7f53e49a0f5e4a3f9577912}\label{namespacem__derived__variables_a4f61d6bef7f53e49a0f5e4a3f9577912}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!fd\+\_\+coeff\+\_\+x@{fd\+\_\+coeff\+\_\+x}}
+\index{fd\+\_\+coeff\+\_\+x@{fd\+\_\+coeff\+\_\+x}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{fd\+\_\+coeff\+\_\+x}{fd\_coeff\_x}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, public m\+\_\+derived\+\_\+variables\+::fd\+\_\+coeff\+\_\+x}
+
+
+
+Definition at line 75 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_ab273055cd131e3ce73c1f468b78af7b7}\label{namespacem__derived__variables_ab273055cd131e3ce73c1f468b78af7b7}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!fd\+\_\+coeff\+\_\+y@{fd\+\_\+coeff\+\_\+y}}
+\index{fd\+\_\+coeff\+\_\+y@{fd\+\_\+coeff\+\_\+y}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{fd\+\_\+coeff\+\_\+y}{fd\_coeff\_y}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, public m\+\_\+derived\+\_\+variables\+::fd\+\_\+coeff\+\_\+y}
+
+
+
+Definition at line 76 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a3cafc9204d5773653e119ce3a3b98722}\label{namespacem__derived__variables_a3cafc9204d5773653e119ce3a3b98722}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!fd\+\_\+coeff\+\_\+z@{fd\+\_\+coeff\+\_\+z}}
+\index{fd\+\_\+coeff\+\_\+z@{fd\+\_\+coeff\+\_\+z}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{fd\+\_\+coeff\+\_\+z}{fd\_coeff\_z}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, public m\+\_\+derived\+\_\+variables\+::fd\+\_\+coeff\+\_\+z}
+
+
+
+Definition at line 77 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a2a27e1fa08c6751186a38d562b826955}\label{namespacem__derived__variables_a2a27e1fa08c6751186a38d562b826955}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!flg@{flg}}
+\index{flg@{flg}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{flg}{flg}}
+{\footnotesize\ttfamily integer, private m\+\_\+derived\+\_\+variables\+::flg\hspace{0.3cm}{\ttfamily [private]}}
+
+
+
+Flagging (flg) variable used to annotate the dimensionality of the dataset that is undergoing the post-\/process. A flag value of 1 indicates that the dataset is 3D, while a flag value of 0 indicates that it is not. This flg variable is necessary to avoid cycling through the third dimension of the flow variable(s) when the simulation is not 3D and the size of the buffer is non-\/zero. Note that a similar procedure does not have to be applied to the second dimension since in 1D, the buffer size is always zero. 
+
+
+
+Definition at line 80 of file m\+\_\+derived\+\_\+variables.\+f90.
+
+\mbox{\Hypertarget{namespacem__derived__variables_a102e235b77ff78573a043c5c9b9bb0d8}\label{namespacem__derived__variables_a102e235b77ff78573a043c5c9b9bb0d8}} 
+\index{m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}!gm\+\_\+rho\+\_\+sf@{gm\+\_\+rho\+\_\+sf}}
+\index{gm\+\_\+rho\+\_\+sf@{gm\+\_\+rho\+\_\+sf}!m\+\_\+derived\+\_\+variables@{m\+\_\+derived\+\_\+variables}}
+\subsubsection{\texorpdfstring{gm\+\_\+rho\+\_\+sf}{gm\_rho\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+derived\+\_\+variables\+::gm\+\_\+rho\+\_\+sf}
+
+
+
+Gradient magnitude (gm) of the density for each cell of the computational sub-\/domain. This variable is employed in the calculation of the numerical Schlieren function. 
+
+
+
+Definition at line 65 of file m\+\_\+derived\+\_\+variables.\+f90.
+

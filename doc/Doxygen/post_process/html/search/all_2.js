@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['c_5fwrt',['c_wrt',['../namespacem__global__parameters.html#a56a071ae0b79b39a826646ace37972eb',1,'m_global_parameters']]],
+  ['ca',['ca',['../namespacem__global__parameters.html#a1fcd6cc13ad7f604ef81708716a1feac',1,'m_global_parameters']]],
+  ['case_5fdir',['case_dir',['../namespacem__global__parameters.html#a0b91e533fe3b3e112c42af4024014544',1,'m_global_parameters']]],
+  ['cmplx_5fsize',['cmplx_size',['../namespacem__fftw.html#afa99ee82497ae0ee316e97734ad0d7d3',1,'m_fftw']]],
+  ['coarse_5fx_5fcb',['coarse_x_cb',['../namespacem__global__parameters.html#aef538f2e7f1cb4a0072fba0794efec40',1,'m_global_parameters']]],
+  ['coarse_5fx_5fq_5fsf',['coarse_x_q_sf',['../namespacem__data__output.html#a8a822ed22e0ffe582b2dc7f49109fa1d',1,'m_data_output']]],
+  ['coarse_5fxy_5fq_5fsf',['coarse_xy_q_sf',['../namespacem__data__output.html#a9d75551d2f262e079c3b6397404d5a79',1,'m_data_output']]],
+  ['coarse_5fxyz_5fq_5fsf',['coarse_xyz_q_sf',['../namespacem__data__output.html#ac2d6c1c8ab5cc7a2762b462673086bbe',1,'m_data_output']]],
+  ['coarse_5fy_5fcb',['coarse_y_cb',['../namespacem__global__parameters.html#a17215aa76b13fd4cf185945c445dc88f',1,'m_global_parameters']]],
+  ['coarse_5fz_5fcb',['coarse_z_cb',['../namespacem__global__parameters.html#ac5e4f1860cfc9d58840a935de349811e',1,'m_global_parameters']]],
+  ['coarsen_5fsilo',['coarsen_silo',['../namespacem__global__parameters.html#a2db51a0beed308d7a3c51c5c0ed45609',1,'m_global_parameters']]],
+  ['cons_5fvars_5fwrt',['cons_vars_wrt',['../namespacem__global__parameters.html#ad23223100223bdb6d7f59fed5ec7bbb9',1,'m_global_parameters']]],
+  ['cont_5fidx',['cont_idx',['../namespacem__global__parameters.html#adefe3b78bf286d73a56aef49880dfb0d',1,'m_global_parameters']]],
+  ['cyl_5fcoarse_5fq_5fsf',['cyl_coarse_q_sf',['../namespacem__data__output.html#a6dbb29fcb50e8ca2140326f4ba85dd02',1,'m_data_output']]],
+  ['cyl_5fcoord',['cyl_coord',['../namespacem__global__parameters.html#a53f0d5eed7783c9760aaeeaa0abbd58c',1,'m_global_parameters']]],
+  ['cyl_5fq_5fsf',['cyl_q_sf',['../namespacem__data__output.html#a0a9ac4d26ce8ac2ea87cacf581b49692',1,'m_data_output']]]
+];

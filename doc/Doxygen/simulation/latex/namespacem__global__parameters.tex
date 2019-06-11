@@ -1,0 +1,2643 @@
+\hypertarget{namespacem__global__parameters}{}\section{m\+\_\+global\+\_\+parameters Module Reference}
+\label{namespacem__global__parameters}\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+
+
+The module contains all of the parameters describing the program logistics, the computational domain and the simulation algorithm. Additionally, for the volume fraction model, physical parameters of each of the fluids present in the flow are located here. They include stiffened gas equation of state parameters, the Reynolds numbers and the Weber numbers.  
+
+
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__global__parameters_a433eac37597eb46a3cac84ca0471f5d3}{s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs} ()
+\begin{DoxyCompactList}\small\item\em Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these parameters once they are read from the input file. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_a8a76198d180cb9736c21dde108cb0dbf}{s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_a1611e2cf82243c04b04a11281ef67993}{s\+\_\+initialize\+\_\+nonpoly}
+\begin{DoxyCompactList}\small\item\em Initializes non-\/polydisperse bubble modeling. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_af52b102f1c17e28aa4ca3070f8806ca6}{s\+\_\+transcoeff} (omega, peclet, Re\+\_\+trans, Im\+\_\+trans)
+\begin{DoxyCompactList}\small\item\em Computes transfer coefficient for non-\/polydisperse bubble modeling (Preston 2007) \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_a54905a7a2ce9e15fc33ebac52c0d3c27}{s\+\_\+initialize\+\_\+parallel\+\_\+io} ()
+\begin{DoxyCompactList}\small\item\em Initializes parallel infrastructure. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_aa2237c2ed3662bbd69ef39e2e92af7bf}{s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_aac1a5a73b1eae759c913983b38047167}{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons} (vftmp, n\+Rtmp, ntmp)
+\begin{DoxyCompactList}\small\item\em Computes the bubble number density n from the conservative variables $ n = \sqrt{ \frac{4 \pi}{3} } \frac{ nR^3}{\alpha} $. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_acdaa3827df6fee38a3e55e8b13130c27}{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim} (vftmp, Rtmp, ntmp)
+\begin{DoxyCompactList}\small\item\em Computes the bubble number density n from the primitive variables $ n = \sqrt{ \frac{3}{4 \pi} } \frac{ \alpha }{ R^3} $. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_aa5a48fa9cc196136634022cfa6708213}{s\+\_\+quad} (func, mom)
+\begin{DoxyCompactList}\small\item\em Computes the quadrature for polydisperse bubble populations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__global__parameters_a78f4bf8bb59af4396bf11aca330463ec}{s\+\_\+simpson} (Npt)
+\begin{DoxyCompactList}\small\item\em Computes the Simpson weights for quadrature. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_aafb65952c33f1c363d1040bde29734ea}{num\+\_\+procs}
+\begin{DoxyCompactList}\small\item\em Number of processors. \end{DoxyCompactList}\item 
+integer, parameter \hyperlink{namespacem__global__parameters_a71f091e6074e6c248fd7e03218b89218}{num\+\_\+stcls\+\_\+min} = 5
+\begin{DoxyCompactList}\small\item\em Mininum \# of stencils. \end{DoxyCompactList}\item 
+integer, parameter \hyperlink{namespacem__global__parameters_aa9d578c318044b2f2ec990b5fc0dfab9}{path\+\_\+len} = 400
+\begin{DoxyCompactList}\small\item\em Maximum path length. \end{DoxyCompactList}\item 
+integer, parameter \hyperlink{namespacem__global__parameters_ac8252b115e717c6f1c8595be6f897df7}{name\+\_\+len} = 50
+\begin{DoxyCompactList}\small\item\em Maximum name length. \end{DoxyCompactList}\item 
+character, parameter \hyperlink{namespacem__global__parameters_ae482a2c5436761ab7b01fc973d64002d}{dflt\+\_\+char} = \textquotesingle{} \textquotesingle{}
+\begin{DoxyCompactList}\small\item\em Default string value. \end{DoxyCompactList}\item 
+real(kind(0d0)), parameter \hyperlink{namespacem__global__parameters_a99ba7e33a1870ac89386d376e0d20526}{dflt\+\_\+real} = -\/1d6
+\begin{DoxyCompactList}\small\item\em Default real value. \end{DoxyCompactList}\item 
+integer, parameter \hyperlink{namespacem__global__parameters_a4e4e3806190a62a77cf6542f6d07dbbd}{dflt\+\_\+int} = -\/100
+\begin{DoxyCompactList}\small\item\em Default integer value. \end{DoxyCompactList}\item 
+real(kind(0d0)), parameter \hyperlink{namespacem__global__parameters_aec97838cc58623019b07ae47da7f4c1c}{sgm\+\_\+eps} = 1d-\/16
+\begin{DoxyCompactList}\small\item\em Segmentation tolerance. \end{DoxyCompactList}\item 
+integer, parameter \hyperlink{namespacem__global__parameters_aadeb708160fdfee48fe55e83e41b5064}{fourier\+\_\+rings} = 5
+\begin{DoxyCompactList}\small\item\em Fourier filter ring limit. \end{DoxyCompactList}\item 
+character(len=\hyperlink{namespacem__global__parameters_aa9d578c318044b2f2ec990b5fc0dfab9}{path\+\_\+len}) \hyperlink{namespacem__global__parameters_a0b91e533fe3b3e112c42af4024014544}{case\+\_\+dir}
+\begin{DoxyCompactList}\small\item\em Case folder location. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a63e30bca2565699c008b6b0442ef5494}{run\+\_\+time\+\_\+info}
+\begin{DoxyCompactList}\small\item\em Run-\/time output flag. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a5d0554c4fef91acf46f683e8bcd29133}{t\+\_\+step\+\_\+old}
+\begin{DoxyCompactList}\small\item\em Existing I\+C/grid folder. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a383c6ff025d4ea09ddd4e2356042d86b}{proc\+\_\+rank}
+\begin{DoxyCompactList}\small\item\em Rank of the local processor. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a7fa880b937b54214312469a34268b883}{dt}
+\begin{DoxyCompactList}\small\item\em Size of the time-\/step. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a6cf2e92cfc3b519fb6da6fe9e88fab31}{model\+\_\+eqns}
+\begin{DoxyCompactList}\small\item\em Multicomponent flow model. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a76e251296a28212df87bf9f653ff9a3b}{num\+\_\+dims}
+\begin{DoxyCompactList}\small\item\em Number of spatial dimensions. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a2f0b96a5aef3925aa7e3cc816754e17e}{num\+\_\+fluids}
+\begin{DoxyCompactList}\small\item\em Number of fluids in the flow. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_abebd95d9d0271fbda40f47f75a2d829b}{adv\+\_\+alphan}
+\begin{DoxyCompactList}\small\item\em Advection of the last volume fraction. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_adc35ba450a192812db36f1d6659d64e6}{mpp\+\_\+lim}
+\begin{DoxyCompactList}\small\item\em Mixture physical parameters (M\+PP) limits. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_aeb707079ac4a6d4135c3b7121a8a3232}{time\+\_\+stepper}
+\begin{DoxyCompactList}\small\item\em Time-\/stepper algorithm. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_aa254277cf111be2267a61b7884279844}{weno\+\_\+vars}
+\begin{DoxyCompactList}\small\item\em W\+E\+N\+O-\/reconstructed state variables type. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_ab8488205257dab4e94258eee55d0d1aa}{weno\+\_\+order}
+\begin{DoxyCompactList}\small\item\em Order of the W\+E\+NO reconstruction. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a351be005cfac23e82310e91393f5d535}{weno\+\_\+polyn}
+\begin{DoxyCompactList}\small\item\em Degree of the W\+E\+NO polynomials (polyn) \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_aa25252e327df938260ddd7cc5e0a5dda}{weno\+\_\+eps}
+\begin{DoxyCompactList}\small\item\em Binding for the W\+E\+NO nonlinear weights. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_ab62b8c589dcddff0e6295f4956012c7a}{char\+\_\+decomp}
+\begin{DoxyCompactList}\small\item\em Characteristic decomposition. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_af2a0f6c4c9454f92703fb3bc96b4e799}{mapped\+\_\+weno}
+\begin{DoxyCompactList}\small\item\em W\+E\+NO with mapping of nonlinear weights. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a9106f4f1ad8f317bafc9c8934297752d}{mp\+\_\+weno}
+\begin{DoxyCompactList}\small\item\em Monotonicity preserving (MP) W\+E\+NO. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a1b38593c502f05d17607529d38c97a82}{weno\+\_\+avg}
+\begin{DoxyCompactList}\small\item\em Average left/right cell-\/boundary states. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a3c3cd38abc3ece085bab77788afece73}{weno\+\_\+re\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em W\+E\+NO reconstruct velocity gradients for viscous stress tensor. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a6b9c81f07f8444654924e3075e4edaf8}{riemann\+\_\+solver}
+\begin{DoxyCompactList}\small\item\em Riemann solver algorithm. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a0f798e4b3d19b7d49d747cc89cbe0b69}{wave\+\_\+speeds}
+\begin{DoxyCompactList}\small\item\em Wave speeds estimation method. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a1a3314b39e21e17d7e72a9837db2ab42}{avg\+\_\+state}
+\begin{DoxyCompactList}\small\item\em Average state evaluation method. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a5a340deb003a37dc81b7a560343242b1}{commute\+\_\+err}
+\begin{DoxyCompactList}\small\item\em Commutative error correction. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a9adf65c5de7c360aa44f595f561c87b0}{split\+\_\+err}
+\begin{DoxyCompactList}\small\item\em Dimensional splitting error correction. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a3805bb400f71c84b76e3111dd595648d}{alt\+\_\+crv}
+\begin{DoxyCompactList}\small\item\em Alternate curvature definition. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a5a19b6ba65c32dfc21f4762eceb25f29}{alt\+\_\+soundspeed}
+\begin{DoxyCompactList}\small\item\em Alternate mixture sound speed. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_ac60a57ea5298dde379e24b6b77762101}{regularization}
+\begin{DoxyCompactList}\small\item\em Regularization terms of Tiwari (2013) \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a4491f30721e61e94907cac95ff506795}{reg\+\_\+eps}
+\begin{DoxyCompactList}\small\item\em User-\/defined interface thickness parameter for regularization terms. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a04b52ed3df1c7aac47f18748b3cdddc5}{null\+\_\+weights}
+\begin{DoxyCompactList}\small\item\em Null undesired W\+E\+NO weights. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a3981c7e6886ba3cde245ce4dcc6ca664}{mixture\+\_\+err}
+\begin{DoxyCompactList}\small\item\em Mixture properties correction. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_af2383f23c599d5936d0559dac1edee9b}{tvd\+\_\+riemann\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em Apply T\+VD flux limiter to left and right states inside Riemann solver. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a19e98f005eebfd43e924ed2339a1a430}{tvd\+\_\+rhs\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em Apply T\+VD flux limiter to to intercell fluxes outside Riemann solver. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a4ed04ef4019b9be697d7f13b3d207a17}{tvd\+\_\+wave\+\_\+speeds}
+\begin{DoxyCompactList}\small\item\em Use T\+VD wavespeeds when computing fluxes inside Riemann solver. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_acbb163a79ff0011a4327c3fb65a04c14}{flux\+\_\+lim}
+\begin{DoxyCompactList}\small\item\em Choice of flux limiter. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a99557d578d538a853b5fd9e445ad6303}{we\+\_\+riemann\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em Account for capillary effects in the Riemann solver. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_acfd358e345eac06daf89ca40651ba2c8}{we\+\_\+rhs\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em Account for capillary effects using the conservative formulation in R\+HS. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a897b4f61353235b3af13bac633d5b9a0}{we\+\_\+src}
+\begin{DoxyCompactList}\small\item\em Account for capillary effects in non-\/conservative formulation in R\+HS. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_afe755241e6fe1e3a132aec6feab74ae4}{we\+\_\+wave\+\_\+speeds}
+\begin{DoxyCompactList}\small\item\em Account for capillary effects when computing the contact wave speed. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_ad367bbe26f93b9fd058c58ec11337fdf}{lsq\+\_\+deriv}
+\begin{DoxyCompactList}\small\item\em Use linear least squares to calculate normals and curvatures. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a5422a3820409740b5c3b0b2e88bdb2b0}{cpu\+\_\+start}
+\item 
+integer \hyperlink{namespacem__global__parameters_a8ed3dee47bbaa5de7ae564ca9d770404}{cpu\+\_\+end}
+\item 
+integer \hyperlink{namespacem__global__parameters_aa513ad8900dd8de41a5bd8a17e7943c7}{cpu\+\_\+rate}
+\item 
+logical \hyperlink{namespacem__global__parameters_ac127ac2a9036e1cdb7e6c41159cacdfb}{parallel\+\_\+io}
+\begin{DoxyCompactList}\small\item\em Format of the data files. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a6ed5e5561c16f30a4010f6612877029d}{precision}
+\begin{DoxyCompactList}\small\item\em Precision of output files. \end{DoxyCompactList}\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a48dea2bc17c5e4465a444c926070ae9b}{proc\+\_\+coords}
+\begin{DoxyCompactList}\small\item\em Processor coordinates in M\+P\+I\+\_\+\+C\+A\+R\+T\+\_\+\+C\+O\+MM. \end{DoxyCompactList}\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a4bd117ae744eab60f3d681fd03d6e90d}{start\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Starting cell-\/center index of local processor in global grid. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1mpi__io__var}{mpi\+\_\+io\+\_\+var}), public \hyperlink{namespacem__global__parameters_ad80f68aac31aa898ab2d7729f60e375f}{mpi\+\_\+io\+\_\+data}
+\item 
+integer, private \hyperlink{namespacem__global__parameters_a46461347b5094736adfa94ef005b49a6}{ierr}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_ac4851cbb47e6541bfcf40706bd08eee6}{wa\+\_\+flg}
+\begin{DoxyCompactList}\small\item\em The W\+E\+NO average (WA) flag regulates whether the calculation of any cell-\/ average spatial derivatives is carried out in each cell by utilizing the arithmetic mean of the left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values or simply, the unaltered left and right, W\+E\+N\+O-\/reconstructed, cell-\/ boundary values. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a6e342ae3eb66f89e0eeb94e11aa42d92}{buff\+\_\+size}
+\begin{DoxyCompactList}\small\item\em The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the physical computational domain to the next time-\/step. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1physical__parameters}{physical\+\_\+parameters}), dimension(num\+\_\+fluids\+\_\+max) \hyperlink{namespacem__global__parameters_a7297abec8863ecabf95e24ebdae46a17}{fluid\+\_\+pp}
+\begin{DoxyCompactList}\small\item\em Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas equation of state parameters, the Reynolds numbers and the Weber numbers. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a8892cc67c7d04be4d8e6d02a86e209bc}{fd\+\_\+order}
+\begin{DoxyCompactList}\small\item\em The order of the finite-\/difference (fd) approximations of the first-\/order derivatives that need to be evaluated when the CoM or flow probe data files are to be written at each time step. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a60d7ab72fdab2b005144a5a45aa572de}{fd\+\_\+number}
+\begin{DoxyCompactList}\small\item\em The finite-\/difference number is given by M\+AX(1, fd\+\_\+order/2). Essentially, it is a measure of the half-\/size of the finite-\/difference stencil for the selected order of accuracy. \end{DoxyCompactList}\item 
+logical, dimension(num\+\_\+fluids\+\_\+max) \hyperlink{namespacem__global__parameters_a36d8d56515556bc34bc0c88da60f6b62}{com\+\_\+wrt}
+\item 
+logical, dimension(num\+\_\+fluids\+\_\+max) \hyperlink{namespacem__global__parameters_a2ed9e718df8c2a250e5d8cce2e04cbb7}{cb\+\_\+wrt}
+\item 
+logical \hyperlink{namespacem__global__parameters_a2de4a56202a6e2f47ce657fcda4ecdb4}{probe\+\_\+wrt}
+\item 
+logical \hyperlink{namespacem__global__parameters_a530bdd6416ce213046d14488fb48dbc2}{integral\+\_\+wrt}
+\item 
+integer \hyperlink{namespacem__global__parameters_aa4e0d015d4064b37e132c5088089394d}{num\+\_\+probes}
+\item 
+integer \hyperlink{namespacem__global__parameters_a7a86e6e9d4c8b59d28b7404d836fdee8}{num\+\_\+integrals}
+\item 
+type(\hyperlink{structm__derived__types_1_1probe__parameters}{probe\+\_\+parameters}), dimension(num\+\_\+probes\+\_\+max) \hyperlink{namespacem__global__parameters_a028c7e09aaa23dc9ee8844febffed3af}{probe}
+\item 
+type(\hyperlink{structm__derived__types_1_1integral__parameters}{integral\+\_\+parameters}), dimension(num\+\_\+probes\+\_\+max) \hyperlink{namespacem__global__parameters_ac1d4fc341c170b243af0d776ad7ede02}{integral}
+\item 
+real(kind(0d0)), dimension(5) \hyperlink{namespacem__global__parameters_a38317a39628eb007769f26f29b70c958}{threshold\+\_\+mf}
+\item 
+integer, dimension(5) \hyperlink{namespacem__global__parameters_a4ddb20fdeec324ed6100359e83111a7c}{moment\+\_\+order}
+\item 
+real(kind(0d0)), parameter \hyperlink{namespacem__global__parameters_a21765a90c01d221524670d1344b126cd}{pi} = 3.\+141592653589793d0
+\begin{DoxyCompactList}\small\item\em Pi. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ Number of cells in the x-\/, y-\/ and z-\/directions, respectively}\par
+\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_aee38c9d03e9195858a93ec611b605f33}{m}
+\item 
+integer \hyperlink{namespacem__global__parameters_ac72422e5f77149bd32cf0cfd01a36544}{n}
+\item 
+integer \hyperlink{namespacem__global__parameters_ac040dbf547e6d5de8df08e864d8131e7}{p}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Global number of cells in each direction}\par
+\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_ad4e160df8d0de7ea1801a1ca29f8e9b0}{m\+\_\+glb}
+\item 
+integer \hyperlink{namespacem__global__parameters_adab11dab474410541d4c37725bea01e1}{n\+\_\+glb}
+\item 
+integer \hyperlink{namespacem__global__parameters_a1072f221ca8e41b0ea3240b33374cc1e}{p\+\_\+glb}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Cylindrical coordinates (either axisymmetric or full 3D)}\par
+\begin{DoxyCompactItemize}
+\item 
+logical \hyperlink{namespacem__global__parameters_a53f0d5eed7783c9760aaeeaa0abbd58c}{cyl\+\_\+coord}
+\item 
+integer \hyperlink{namespacem__global__parameters_a0f2d413d9739928f8e1a98f0a5783ab9}{grid\+\_\+geometry}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Cell-\/boundary (CB) locations in the x-\/, y-\/ and z-\/directions, respectively}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_a800c19cad11fe2774ac137b12ec89e33}{x\+\_\+cb}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_a4bb8b661a170fc6ccd9fa3cc4b32c960}{y\+\_\+cb}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_aa75fcd53fdc4fb58ca0fbc2cc9678673}{z\+\_\+cb}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Cell-\/center (CC) locations in the x-\/, y-\/ and z-\/directions, respectively}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_aea5b911d65b330f65e97052e9e8c0383}{x\+\_\+cc}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_aaa584e01b4153d246d84eef286482632}{y\+\_\+cc}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_a9fef803dde37fd067fd4b2215df851b9}{z\+\_\+cc}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Cell-\/width distributions in the x-\/, y-\/ and z-\/directions, respectively}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_af7508eba0a53c9a35913a502d58dfb54}{dx}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_adc2bc27e809a773b7f5a6a65edac3b89}{dy}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable, target \hyperlink{namespacem__global__parameters_a04878814b8097100a179152ba853262a}{dz}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Starting time-\/step iteration, stopping time-\/step iteration and the number}\par
+{\em of time-\/step iterations between successive solution backups, respectively }\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_ace0c8a67825d0dccd2e23b5d0f9985c0}{t\+\_\+step\+\_\+start}
+\item 
+integer \hyperlink{namespacem__global__parameters_aff1140575af25247060f3e7f31a8a10f}{t\+\_\+step\+\_\+stop}
+\item 
+integer \hyperlink{namespacem__global__parameters_a98b51eda2c46660b439c0a8375385165}{t\+\_\+step\+\_\+save}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Boundary conditions (BC) in the x-\/, y-\/ and z-\/directions, respectively}\par
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_aa46a7f3638e49fa9ec33ea859b9e6a5a}{bc\+\_\+x}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_a68eaaca2982b39252417b29ef5d0f9c3}{bc\+\_\+y}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_a6769808569174ff0eef096e958889837}{bc\+\_\+z}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_a18f8ba3144b698c2753731b6e27fc581}{bc\+\_\+x\+\_\+glb}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_ac480f572058786c13c3e94efb6496a71}{bc\+\_\+y\+\_\+glb}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_aeb29c88b4fa96ec8edcfed6c42861280}{bc\+\_\+z\+\_\+glb}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ M\+PI info for parallel IO with Lustre file systems}\par
+\begin{DoxyCompactItemize}
+\item 
+character(len=\hyperlink{namespacem__global__parameters_ac8252b115e717c6f1c8595be6f897df7}{name\+\_\+len}) \hyperlink{namespacem__global__parameters_ad4713c1e89eaa8fac3bb2181ba87b192}{mpiiofs}
+\item 
+integer \hyperlink{namespacem__global__parameters_a2663d07998d11d25e223cd7ad0bbd748}{mpi\+\_\+info\+\_\+int}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Annotations of the structure of the state and flux vectors in terms of the}\par
+{\em size and the configuration of the system of equations to which they belong }\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_a4dac2e4ead915635e0c6c33af87be01b}{sys\+\_\+size}
+\begin{DoxyCompactList}\small\item\em Number of unknowns in system of eqns. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_adefe3b78bf286d73a56aef49880dfb0d}{cont\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Indexes of first \& last continuity eqns. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_ad138d35528cf27ff42dba00d13c269be}{mom\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Indexes of first \& last momentum eqns. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_ac6ef72ca6aa7a22e60c864df25559892}{e\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Index of energy equation. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_ae8e6c40b6ec73cb126b0cce7496e0057}{adv\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Indexes of first \& last advection eqns. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_aac5ed9f316eeebbe04258bb1120cbea4}{internalenergies\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Indexes of first \& last internal energy eqns. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bub__bounds__info}{bub\+\_\+bounds\+\_\+info}) \hyperlink{namespacem__global__parameters_a9a425d1bd91d1765043adf8410b98bf7}{bub\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Indexes of first \& last bubble variable eqns. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_af451fa7762c859ef20552498fa6edb16}{alf\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Index of void fraction. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a4ecdedaf3db880f8d71dbefc816322f8}{gamma\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Index of specific heat ratio func. eqn. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a7db1a23566279bdbc7da68850c596c69}{pi\+\_\+inf\+\_\+idx}
+\begin{DoxyCompactList}\small\item\em Index of liquid stiffness func. eqn. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The number of fluids, along with their identifying indexes, respectively,}\par
+{\em for which the physical and the geometric curvatures (crv) of the material interfaces will be calculated. }\begin{DoxyCompactItemize}
+\item 
+integer, dimension(2) \hyperlink{namespacem__global__parameters_a0a67704d4c227871a155d6c26590f685}{re\+\_\+size}
+\item 
+integer, dimension(\+:,\+:), allocatable \hyperlink{namespacem__global__parameters_a33b4272ac0c75aff15851f9dfa6a9d14}{re\+\_\+idx}
+\item 
+integer \hyperlink{namespacem__global__parameters_a30e6fe4c4ff6a8cfefa1bf882dc2e90e}{crv\+\_\+size}
+\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a7b7945c133bf17eb1f25468a6d1a6925}{crv\+\_\+idx}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The number of idiosyncratic material interfaces, along with the indexes of}\par
+{\em the fluids comprising them, respectively, for which the effects of surface tension, e.\+g. the Weber (We) numbers, will be non-\/negligible. }\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_af329319354912b90787e0dff7cdc8a37}{we\+\_\+size}
+\item 
+integer, dimension(\+:,\+:), allocatable \hyperlink{namespacem__global__parameters_a0d20192b0175dc677ba88b14bf0d5104}{we\+\_\+idx}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The coordinate direction indexes and flags (flg), respectively, for which}\par
+{\em the configurations will be determined with respect to a working direction and that will be used to isolate the contributions, in that direction, in the dimensionally split system of equations. }\begin{DoxyCompactItemize}
+\item 
+integer, dimension(3) \hyperlink{namespacem__global__parameters_a5c017ac8b7bf0d36b4b3b88efe5ffc5f}{dir\+\_\+idx}
+\item 
+real(kind(0d0)), dimension(3) \hyperlink{namespacem__global__parameters_a9dc07be63393049ae70d9dceeff403e9}{dir\+\_\+flg}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Reference density and pressure for Tait E\+OS}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a485a360d73013d7bce1daa01df404534}{rhoref}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_aae2170af8a68c7dcdd91910aad867ef4}{pref}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Bubble modeling}\par
+\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__global__parameters_ad76c4758994b52559f478d251dc0cba5}{nb}
+\begin{DoxyCompactList}\small\item\em Number of eq. bubble sizes. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a24492f9b474683476a342e7ee42c1c6d}{r0ref}
+\begin{DoxyCompactList}\small\item\em Reference bubble size. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a1fcd6cc13ad7f604ef81708716a1feac}{ca}
+\begin{DoxyCompactList}\small\item\em Cavitation number. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_af2ed21959a90158c2459574230cdfcff}{web}
+\begin{DoxyCompactList}\small\item\em Weber number. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a4438313a11564fa911c586d2dee15b8d}{re\+\_\+inv}
+\begin{DoxyCompactList}\small\item\em Inverse Reynolds number. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a121ed97f0ae913d37bce5bbf1c7b2cc2}{weight}
+\begin{DoxyCompactList}\small\item\em Simpson quadrature weights. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a585a72037bbffe12e8d4512a57f52418}{r0}
+\begin{DoxyCompactList}\small\item\em Bubble sizes. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a334b440356a4353d073c43e68c2372da}{v0}
+\begin{DoxyCompactList}\small\item\em Bubble velocities. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a4a22ed160838f8fbe6bd506f334b8815}{bubbles}
+\begin{DoxyCompactList}\small\item\em Bubbles on/off. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a8d670f2f984167bae71b7b3f12d0908a}{polytropic}
+\begin{DoxyCompactList}\small\item\em Polytropic switch. \end{DoxyCompactList}\item 
+logical \hyperlink{namespacem__global__parameters_a32791d9d5fef0213f01fc31713b17ae8}{polydisperse}
+\begin{DoxyCompactList}\small\item\em Polydisperse bubbles. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_aef0de5da0e41de495e9fe67accd62d77}{bubble\+\_\+model}
+\begin{DoxyCompactList}\small\item\em Gilmore or Keller--Miksis bubble model. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a17169a5387f8f1efd5ac34cb4eae7c81}{thermal}
+\begin{DoxyCompactList}\small\item\em Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__global__parameters_ac6ff480000eaa7af51481d0f17b78423}{ptil}
+\begin{DoxyCompactList}\small\item\em Pressure modification. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a29164826db891e5662ce2bccdbc57d3c}{poly\+\_\+sigma}
+\begin{DoxyCompactList}\small\item\em log normal sigma for polydisperse P\+DF \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Physical bubble parameters (see Ando 2010, Preston 2007)}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_ae818e88601b1dc579a87e7c0c8cd87cb}{r\+\_\+n}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_af2ee1ad578115833bb6b8e9550eb5f18}{r\+\_\+v}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_acc6771df62005731bbec282b0c9a5659}{phi\+\_\+vn}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a7dbd1ec1fd1ece4e997a825fa07785eb}{phi\+\_\+nv}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_ac1375e5145e018847d9025e83e58b49d}{pe\+\_\+c}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_aa77b0836fe22478b69e10e656ef7fcc2}{tw}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_acc5b8b153cee23d65a886df38f821f08}{pv}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a5600a60608bd352783350438a2efb0fe}{m\+\_\+n}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__global__parameters_a35a6f248eec9c489110fad19d906bd40}{m\+\_\+v}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a555eda1318a218d37d1bdd8f4d57eaf2}{k\+\_\+n}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a1943ea5a5127e94a197afae57be95758}{k\+\_\+v}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a1097b95561b65a9035e5f9218de577f9}{pb0}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_ae3701f74c9487c9e56c2a11fb6a52e40}{mass\+\_\+n0}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a6a06981be6cdab78452a106009022aa4}{mass\+\_\+v0}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a8a75928178eef1550c6a0389ff12b44a}{pe\+\_\+t}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_ae0e61a10cd5b33db394052fbefee2681}{re\+\_\+trans\+\_\+t}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a666c8f5f6663ab81f55c2298e642a3a9}{re\+\_\+trans\+\_\+c}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_a62b213889b2dc5da7d81e7fa636231f6}{im\+\_\+trans\+\_\+t}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_aa93addd83f0134aaaf319ca2b743233c}{im\+\_\+trans\+\_\+c}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__global__parameters_ae152b49c742928bc52f6da61dd805693}{omegan}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_ad7bef3ef71a8dfe1ce24000cff0eff8d}{mul0}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_ab2260b0199f0043981fba75890dbff3d}{ss}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_a9a7da412ab2c84481f1c2bb636e83e10}{gamma\+\_\+v}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_a2224d20370b84925128e1b1bbae8e8df}{mu\+\_\+v}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_adfa6a4a17c338d84a6d6ad5a0b9412de}{gamma\+\_\+m}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_ad507a6f681cefe17e49f283d47a7c0ad}{gamma\+\_\+n}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__global__parameters_a7829126e47034f2e39153efa144bc17b}{mu\+\_\+n}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Acoustic monopole parameters}\par
+\begin{DoxyCompactItemize}
+\item 
+logical \hyperlink{namespacem__global__parameters_a459b1e7574742f115d5562325c575428}{monopole}
+\begin{DoxyCompactList}\small\item\em Monopole switch. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1mono__parameters}{mono\+\_\+parameters}), dimension(num\+\_\+probes\+\_\+max) \hyperlink{namespacem__global__parameters_ac91cb1bc506e2e71e46001986a7232b4}{mono}
+\begin{DoxyCompactList}\small\item\em Monopole parameters. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__global__parameters_a987e51cca357206f1e35d38a1cb7e5e6}{num\+\_\+mono}
+\begin{DoxyCompactList}\small\item\em Number of monopoles. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+The module contains all of the parameters describing the program logistics, the computational domain and the simulation algorithm. Additionally, for the volume fraction model, physical parameters of each of the fluids present in the flow are located here. They include stiffened gas equation of state parameters, the Reynolds numbers and the Weber numbers. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__global__parameters_a433eac37597eb46a3cac84ca0471f5d3}\label{namespacem__global__parameters_a433eac37597eb46a3cac84ca0471f5d3}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs@{s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs}}
+\index{s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs@{s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs()}{s\_assign\_default\_values\_to\_user\_inputs()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+assign\+\_\+default\+\_\+values\+\_\+to\+\_\+user\+\_\+inputs (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these parameters once they are read from the input file. 
+
+
+
+Definition at line 330 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aac1a5a73b1eae759c913983b38047167}\label{namespacem__global__parameters_aac1a5a73b1eae759c913983b38047167}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons@{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons}}
+\index{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons@{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons()}{s\_comp\_n\_from\_cons()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+comp\+\_\+n\+\_\+from\+\_\+cons (\begin{DoxyParamCaption}\item[{real(kind(0.d0)), intent(in)}]{vftmp,  }\item[{real(kind(0.d0)), dimension(\hyperlink{namespacem__global__parameters_ad76c4758994b52559f478d251dc0cba5}{nb}), intent(in)}]{n\+Rtmp,  }\item[{real(kind(0.d0)), intent(out)}]{ntmp }\end{DoxyParamCaption})}
+
+
+
+Computes the bubble number density n from the conservative variables $ n = \sqrt{ \frac{4 \pi}{3} } \frac{ nR^3}{\alpha} $. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em vftmp} & is the void fraction \\
+\hline
+{\em n\+Rtmp} & is the bubble number density times the bubble radii \\
+\hline
+{\em ntmp} & is the output number bubble density \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1051 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_acdaa3827df6fee38a3e55e8b13130c27}\label{namespacem__global__parameters_acdaa3827df6fee38a3e55e8b13130c27}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim@{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim}}
+\index{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim@{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim()}{s\_comp\_n\_from\_prim()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+comp\+\_\+n\+\_\+from\+\_\+prim (\begin{DoxyParamCaption}\item[{real(kind(0.d0)), intent(in)}]{vftmp,  }\item[{real(kind(0.d0)), dimension(\hyperlink{namespacem__global__parameters_ad76c4758994b52559f478d251dc0cba5}{nb}), intent(in)}]{Rtmp,  }\item[{real(kind(0.d0)), intent(out)}]{ntmp }\end{DoxyParamCaption})}
+
+
+
+Computes the bubble number density n from the primitive variables $ n = \sqrt{ \frac{3}{4 \pi} } \frac{ \alpha }{ R^3} $. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em vftmp} & is the void fraction \\
+\hline
+{\em Rtmp} & is the bubble radii \\
+\hline
+{\em ntmp} & is the output number bubble density \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1072 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa2237c2ed3662bbd69ef39e2e92af7bf}\label{namespacem__global__parameters_aa2237c2ed3662bbd69ef39e2e92af7bf}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module@{s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module@{s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module()}{s\_finalize\_global\_parameters\_module()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+finalize\+\_\+global\+\_\+parameters\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Module deallocation and/or disassociation procedures. 
+
+
+
+Definition at line 1013 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a8a76198d180cb9736c21dde108cb0dbf}\label{namespacem__global__parameters_a8a76198d180cb9736c21dde108cb0dbf}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module@{s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module@{s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module()}{s\_initialize\_global\_parameters\_module()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+initialize\+\_\+global\+\_\+parameters\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. 
+
+
+
+Definition at line 479 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1611e2cf82243c04b04a11281ef67993}\label{namespacem__global__parameters_a1611e2cf82243c04b04a11281ef67993}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+initialize\+\_\+nonpoly@{s\+\_\+initialize\+\_\+nonpoly}}
+\index{s\+\_\+initialize\+\_\+nonpoly@{s\+\_\+initialize\+\_\+nonpoly}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+nonpoly()}{s\_initialize\_nonpoly()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+initialize\+\_\+nonpoly (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Initializes non-\/polydisperse bubble modeling. 
+
+
+
+Definition at line 844 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a54905a7a2ce9e15fc33ebac52c0d3c27}\label{namespacem__global__parameters_a54905a7a2ce9e15fc33ebac52c0d3c27}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+initialize\+\_\+parallel\+\_\+io@{s\+\_\+initialize\+\_\+parallel\+\_\+io}}
+\index{s\+\_\+initialize\+\_\+parallel\+\_\+io@{s\+\_\+initialize\+\_\+parallel\+\_\+io}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+parallel\+\_\+io()}{s\_initialize\_parallel\_io()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+initialize\+\_\+parallel\+\_\+io (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Initializes parallel infrastructure. 
+
+
+
+Definition at line 986 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa5a48fa9cc196136634022cfa6708213}\label{namespacem__global__parameters_aa5a48fa9cc196136634022cfa6708213}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+quad@{s\+\_\+quad}}
+\index{s\+\_\+quad@{s\+\_\+quad}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+quad()}{s\_quad()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+quad (\begin{DoxyParamCaption}\item[{real(kind(0.d0)), dimension(\hyperlink{namespacem__global__parameters_ad76c4758994b52559f478d251dc0cba5}{nb}), intent(in)}]{func,  }\item[{real(kind(0.d0)), intent(out)}]{mom }\end{DoxyParamCaption})}
+
+
+
+Computes the quadrature for polydisperse bubble populations. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em func} & is the bubble dynamic variables for each bin \\
+\hline
+{\em mom} & is the computed moment \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1087 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a78f4bf8bb59af4396bf11aca330463ec}\label{namespacem__global__parameters_a78f4bf8bb59af4396bf11aca330463ec}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+simpson@{s\+\_\+simpson}}
+\index{s\+\_\+simpson@{s\+\_\+simpson}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+simpson()}{s\_simpson()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+simpson (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{Npt }\end{DoxyParamCaption})}
+
+
+
+Computes the Simpson weights for quadrature. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em Npt} & is the number of bins that represent the polydisperse bubble population \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1098 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af52b102f1c17e28aa4ca3070f8806ca6}\label{namespacem__global__parameters_af52b102f1c17e28aa4ca3070f8806ca6}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!s\+\_\+transcoeff@{s\+\_\+transcoeff}}
+\index{s\+\_\+transcoeff@{s\+\_\+transcoeff}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{s\+\_\+transcoeff()}{s\_transcoeff()}}
+{\footnotesize\ttfamily subroutine m\+\_\+global\+\_\+parameters\+::s\+\_\+transcoeff (\begin{DoxyParamCaption}\item[{real(kind(0.d0)), intent(in)}]{omega,  }\item[{real(kind(0.d0)), intent(in)}]{peclet,  }\item[{real(kind(0.d0)), intent(out)}]{Re\+\_\+trans,  }\item[{real(kind(0.d0)), intent(out)}]{Im\+\_\+trans }\end{DoxyParamCaption})}
+
+
+
+Computes transfer coefficient for non-\/polydisperse bubble modeling (Preston 2007) 
+
+
+\begin{DoxyParams}{Parameters}
+{\em omega} & Frequency \\
+\hline
+{\em peclet} & Peclet number \\
+\hline
+{\em Re\+\_\+trans} & Real part of transfer coefficient \\
+\hline
+{\em Im\+\_\+trans} & Imaginary part of transfer coefficient \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 965 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__global__parameters_abebd95d9d0271fbda40f47f75a2d829b}\label{namespacem__global__parameters_abebd95d9d0271fbda40f47f75a2d829b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!adv\+\_\+alphan@{adv\+\_\+alphan}}
+\index{adv\+\_\+alphan@{adv\+\_\+alphan}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{adv\+\_\+alphan}{adv\_alphan}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::adv\+\_\+alphan}
+
+
+
+Advection of the last volume fraction. 
+
+
+
+Definition at line 121 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ae8e6c40b6ec73cb126b0cce7496e0057}\label{namespacem__global__parameters_ae8e6c40b6ec73cb126b0cce7496e0057}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!adv\+\_\+idx@{adv\+\_\+idx}}
+\index{adv\+\_\+idx@{adv\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{adv\+\_\+idx}{adv\_idx}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::adv\+\_\+idx}
+
+
+
+Indexes of first \& last advection eqns. 
+
+
+
+Definition at line 189 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af451fa7762c859ef20552498fa6edb16}\label{namespacem__global__parameters_af451fa7762c859ef20552498fa6edb16}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!alf\+\_\+idx@{alf\+\_\+idx}}
+\index{alf\+\_\+idx@{alf\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{alf\+\_\+idx}{alf\_idx}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::alf\+\_\+idx}
+
+
+
+Index of void fraction. 
+
+
+
+Definition at line 192 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a3805bb400f71c84b76e3111dd595648d}\label{namespacem__global__parameters_a3805bb400f71c84b76e3111dd595648d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!alt\+\_\+crv@{alt\+\_\+crv}}
+\index{alt\+\_\+crv@{alt\+\_\+crv}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{alt\+\_\+crv}{alt\_crv}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::alt\+\_\+crv}
+
+
+
+Alternate curvature definition. 
+
+
+
+Definition at line 138 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a5a19b6ba65c32dfc21f4762eceb25f29}\label{namespacem__global__parameters_a5a19b6ba65c32dfc21f4762eceb25f29}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!alt\+\_\+soundspeed@{alt\+\_\+soundspeed}}
+\index{alt\+\_\+soundspeed@{alt\+\_\+soundspeed}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{alt\+\_\+soundspeed}{alt\_soundspeed}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::alt\+\_\+soundspeed}
+
+
+
+Alternate mixture sound speed. 
+
+
+
+Definition at line 139 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1a3314b39e21e17d7e72a9837db2ab42}\label{namespacem__global__parameters_a1a3314b39e21e17d7e72a9837db2ab42}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!avg\+\_\+state@{avg\+\_\+state}}
+\index{avg\+\_\+state@{avg\+\_\+state}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{avg\+\_\+state}{avg\_state}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::avg\+\_\+state}
+
+
+
+Average state evaluation method. 
+
+
+
+Definition at line 135 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa46a7f3638e49fa9ec33ea859b9e6a5a}\label{namespacem__global__parameters_aa46a7f3638e49fa9ec33ea859b9e6a5a}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bc\+\_\+x@{bc\+\_\+x}}
+\index{bc\+\_\+x@{bc\+\_\+x}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bc\+\_\+x}{bc\_x}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bc\+\_\+x}
+
+
+
+Definition at line 158 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a18f8ba3144b698c2753731b6e27fc581}\label{namespacem__global__parameters_a18f8ba3144b698c2753731b6e27fc581}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bc\+\_\+x\+\_\+glb@{bc\+\_\+x\+\_\+glb}}
+\index{bc\+\_\+x\+\_\+glb@{bc\+\_\+x\+\_\+glb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bc\+\_\+x\+\_\+glb}{bc\_x\_glb}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bc\+\_\+x\+\_\+glb}
+
+
+
+Definition at line 159 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a68eaaca2982b39252417b29ef5d0f9c3}\label{namespacem__global__parameters_a68eaaca2982b39252417b29ef5d0f9c3}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bc\+\_\+y@{bc\+\_\+y}}
+\index{bc\+\_\+y@{bc\+\_\+y}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bc\+\_\+y}{bc\_y}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bc\+\_\+y}
+
+
+
+Definition at line 158 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac480f572058786c13c3e94efb6496a71}\label{namespacem__global__parameters_ac480f572058786c13c3e94efb6496a71}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bc\+\_\+y\+\_\+glb@{bc\+\_\+y\+\_\+glb}}
+\index{bc\+\_\+y\+\_\+glb@{bc\+\_\+y\+\_\+glb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bc\+\_\+y\+\_\+glb}{bc\_y\_glb}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bc\+\_\+y\+\_\+glb}
+
+
+
+Definition at line 159 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a6769808569174ff0eef096e958889837}\label{namespacem__global__parameters_a6769808569174ff0eef096e958889837}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bc\+\_\+z@{bc\+\_\+z}}
+\index{bc\+\_\+z@{bc\+\_\+z}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bc\+\_\+z}{bc\_z}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bc\+\_\+z}
+
+
+
+Definition at line 158 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aeb29c88b4fa96ec8edcfed6c42861280}\label{namespacem__global__parameters_aeb29c88b4fa96ec8edcfed6c42861280}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bc\+\_\+z\+\_\+glb@{bc\+\_\+z\+\_\+glb}}
+\index{bc\+\_\+z\+\_\+glb@{bc\+\_\+z\+\_\+glb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bc\+\_\+z\+\_\+glb}{bc\_z\_glb}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bc\+\_\+z\+\_\+glb}
+
+
+
+Definition at line 159 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a9a425d1bd91d1765043adf8410b98bf7}\label{namespacem__global__parameters_a9a425d1bd91d1765043adf8410b98bf7}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bub\+\_\+idx@{bub\+\_\+idx}}
+\index{bub\+\_\+idx@{bub\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bub\+\_\+idx}{bub\_idx}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bub__bounds__info}{bub\+\_\+bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::bub\+\_\+idx}
+
+
+
+Indexes of first \& last bubble variable eqns. 
+
+
+
+Definition at line 191 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aef0de5da0e41de495e9fe67accd62d77}\label{namespacem__global__parameters_aef0de5da0e41de495e9fe67accd62d77}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bubble\+\_\+model@{bubble\+\_\+model}}
+\index{bubble\+\_\+model@{bubble\+\_\+model}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bubble\+\_\+model}{bubble\_model}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::bubble\+\_\+model}
+
+
+
+Gilmore or Keller--Miksis bubble model. 
+
+
+
+Definition at line 293 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4a22ed160838f8fbe6bd506f334b8815}\label{namespacem__global__parameters_a4a22ed160838f8fbe6bd506f334b8815}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!bubbles@{bubbles}}
+\index{bubbles@{bubbles}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{bubbles}{bubbles}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::bubbles}
+
+
+
+Bubbles on/off. 
+
+
+
+Definition at line 290 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a6e342ae3eb66f89e0eeb94e11aa42d92}\label{namespacem__global__parameters_a6e342ae3eb66f89e0eeb94e11aa42d92}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!buff\+\_\+size@{buff\+\_\+size}}
+\index{buff\+\_\+size@{buff\+\_\+size}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{buff\+\_\+size}{buff\_size}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::buff\+\_\+size}
+
+
+
+The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the physical computational domain to the next time-\/step. 
+
+
+
+Definition at line 237 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1fcd6cc13ad7f604ef81708716a1feac}\label{namespacem__global__parameters_a1fcd6cc13ad7f604ef81708716a1feac}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!ca@{ca}}
+\index{ca@{ca}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{ca}{ca}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::ca}
+
+
+
+Cavitation number. 
+
+
+
+Definition at line 284 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a0b91e533fe3b3e112c42af4024014544}\label{namespacem__global__parameters_a0b91e533fe3b3e112c42af4024014544}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!case\+\_\+dir@{case\+\_\+dir}}
+\index{case\+\_\+dir@{case\+\_\+dir}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{case\+\_\+dir}{case\_dir}}
+{\footnotesize\ttfamily character(len = \hyperlink{namespacem__global__parameters_aa9d578c318044b2f2ec990b5fc0dfab9}{path\+\_\+len}) m\+\_\+global\+\_\+parameters\+::case\+\_\+dir}
+
+
+
+Case folder location. 
+
+
+
+Definition at line 63 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a2ed9e718df8c2a250e5d8cce2e04cbb7}\label{namespacem__global__parameters_a2ed9e718df8c2a250e5d8cce2e04cbb7}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!cb\+\_\+wrt@{cb\+\_\+wrt}}
+\index{cb\+\_\+wrt@{cb\+\_\+wrt}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{cb\+\_\+wrt}{cb\_wrt}}
+{\footnotesize\ttfamily logical, dimension(num\+\_\+fluids\+\_\+max) m\+\_\+global\+\_\+parameters\+::cb\+\_\+wrt}
+
+
+
+Definition at line 265 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ab62b8c589dcddff0e6295f4956012c7a}\label{namespacem__global__parameters_ab62b8c589dcddff0e6295f4956012c7a}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!char\+\_\+decomp@{char\+\_\+decomp}}
+\index{char\+\_\+decomp@{char\+\_\+decomp}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{char\+\_\+decomp}{char\_decomp}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::char\+\_\+decomp}
+
+
+
+Characteristic decomposition. 
+
+
+
+Definition at line 128 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a36d8d56515556bc34bc0c88da60f6b62}\label{namespacem__global__parameters_a36d8d56515556bc34bc0c88da60f6b62}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!com\+\_\+wrt@{com\+\_\+wrt}}
+\index{com\+\_\+wrt@{com\+\_\+wrt}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{com\+\_\+wrt}{com\_wrt}}
+{\footnotesize\ttfamily logical, dimension(num\+\_\+fluids\+\_\+max) m\+\_\+global\+\_\+parameters\+::com\+\_\+wrt}
+
+
+
+Definition at line 265 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a5a340deb003a37dc81b7a560343242b1}\label{namespacem__global__parameters_a5a340deb003a37dc81b7a560343242b1}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!commute\+\_\+err@{commute\+\_\+err}}
+\index{commute\+\_\+err@{commute\+\_\+err}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{commute\+\_\+err}{commute\_err}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::commute\+\_\+err}
+
+
+
+Commutative error correction. 
+
+
+
+Definition at line 136 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_adefe3b78bf286d73a56aef49880dfb0d}\label{namespacem__global__parameters_adefe3b78bf286d73a56aef49880dfb0d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!cont\+\_\+idx@{cont\+\_\+idx}}
+\index{cont\+\_\+idx@{cont\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{cont\+\_\+idx}{cont\_idx}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::cont\+\_\+idx}
+
+
+
+Indexes of first \& last continuity eqns. 
+
+
+
+Definition at line 186 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a8ed3dee47bbaa5de7ae564ca9d770404}\label{namespacem__global__parameters_a8ed3dee47bbaa5de7ae564ca9d770404}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!cpu\+\_\+end@{cpu\+\_\+end}}
+\index{cpu\+\_\+end@{cpu\+\_\+end}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{cpu\+\_\+end}{cpu\_end}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::cpu\+\_\+end}
+
+
+
+Definition at line 154 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa513ad8900dd8de41a5bd8a17e7943c7}\label{namespacem__global__parameters_aa513ad8900dd8de41a5bd8a17e7943c7}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!cpu\+\_\+rate@{cpu\+\_\+rate}}
+\index{cpu\+\_\+rate@{cpu\+\_\+rate}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{cpu\+\_\+rate}{cpu\_rate}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::cpu\+\_\+rate}
+
+
+
+Definition at line 154 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a5422a3820409740b5c3b0b2e88bdb2b0}\label{namespacem__global__parameters_a5422a3820409740b5c3b0b2e88bdb2b0}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!cpu\+\_\+start@{cpu\+\_\+start}}
+\index{cpu\+\_\+start@{cpu\+\_\+start}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{cpu\+\_\+start}{cpu\_start}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::cpu\+\_\+start}
+
+
+
+Definition at line 154 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7b7945c133bf17eb1f25468a6d1a6925}\label{namespacem__global__parameters_a7b7945c133bf17eb1f25468a6d1a6925}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!crv\+\_\+idx@{crv\+\_\+idx}}
+\index{crv\+\_\+idx@{crv\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{crv\+\_\+idx}{crv\_idx}}
+{\footnotesize\ttfamily integer, dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::crv\+\_\+idx}
+
+
+
+Definition at line 218 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a30e6fe4c4ff6a8cfefa1bf882dc2e90e}\label{namespacem__global__parameters_a30e6fe4c4ff6a8cfefa1bf882dc2e90e}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!crv\+\_\+size@{crv\+\_\+size}}
+\index{crv\+\_\+size@{crv\+\_\+size}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{crv\+\_\+size}{crv\_size}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::crv\+\_\+size}
+
+
+
+Definition at line 217 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a53f0d5eed7783c9760aaeeaa0abbd58c}\label{namespacem__global__parameters_a53f0d5eed7783c9760aaeeaa0abbd58c}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!cyl\+\_\+coord@{cyl\+\_\+coord}}
+\index{cyl\+\_\+coord@{cyl\+\_\+coord}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{cyl\+\_\+coord}{cyl\_coord}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::cyl\+\_\+coord}
+
+
+
+Definition at line 86 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ae482a2c5436761ab7b01fc973d64002d}\label{namespacem__global__parameters_ae482a2c5436761ab7b01fc973d64002d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dflt\+\_\+char@{dflt\+\_\+char}}
+\index{dflt\+\_\+char@{dflt\+\_\+char}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dflt\+\_\+char}{dflt\_char}}
+{\footnotesize\ttfamily character, parameter m\+\_\+global\+\_\+parameters\+::dflt\+\_\+char = \textquotesingle{} \textquotesingle{}}
+
+
+
+Default string value. 
+
+
+
+Definition at line 58 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4e4e3806190a62a77cf6542f6d07dbbd}\label{namespacem__global__parameters_a4e4e3806190a62a77cf6542f6d07dbbd}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dflt\+\_\+int@{dflt\+\_\+int}}
+\index{dflt\+\_\+int@{dflt\+\_\+int}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dflt\+\_\+int}{dflt\_int}}
+{\footnotesize\ttfamily integer, parameter m\+\_\+global\+\_\+parameters\+::dflt\+\_\+int = -\/100}
+
+
+
+Default integer value. 
+
+
+
+Definition at line 60 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a99ba7e33a1870ac89386d376e0d20526}\label{namespacem__global__parameters_a99ba7e33a1870ac89386d376e0d20526}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dflt\+\_\+real@{dflt\+\_\+real}}
+\index{dflt\+\_\+real@{dflt\+\_\+real}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dflt\+\_\+real}{dflt\_real}}
+{\footnotesize\ttfamily real(kind(0d0)), parameter m\+\_\+global\+\_\+parameters\+::dflt\+\_\+real = -\/1d6}
+
+
+
+Default real value. 
+
+
+
+Definition at line 59 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a9dc07be63393049ae70d9dceeff403e9}\label{namespacem__global__parameters_a9dc07be63393049ae70d9dceeff403e9}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dir\+\_\+flg@{dir\+\_\+flg}}
+\index{dir\+\_\+flg@{dir\+\_\+flg}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dir\+\_\+flg}{dir\_flg}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(3) m\+\_\+global\+\_\+parameters\+::dir\+\_\+flg}
+
+
+
+Definition at line 227 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a5c017ac8b7bf0d36b4b3b88efe5ffc5f}\label{namespacem__global__parameters_a5c017ac8b7bf0d36b4b3b88efe5ffc5f}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dir\+\_\+idx@{dir\+\_\+idx}}
+\index{dir\+\_\+idx@{dir\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dir\+\_\+idx}{dir\_idx}}
+{\footnotesize\ttfamily integer, dimension(3) m\+\_\+global\+\_\+parameters\+::dir\+\_\+idx}
+
+
+
+Definition at line 226 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7fa880b937b54214312469a34268b883}\label{namespacem__global__parameters_a7fa880b937b54214312469a34268b883}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dt@{dt}}
+\index{dt@{dt}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dt}{dt}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::dt}
+
+
+
+Size of the time-\/step. 
+
+
+
+Definition at line 106 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af7508eba0a53c9a35913a502d58dfb54}\label{namespacem__global__parameters_af7508eba0a53c9a35913a502d58dfb54}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dx@{dx}}
+\index{dx@{dx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dx}{dx}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::dx}
+
+
+
+Definition at line 102 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_adc2bc27e809a773b7f5a6a65edac3b89}\label{namespacem__global__parameters_adc2bc27e809a773b7f5a6a65edac3b89}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dy@{dy}}
+\index{dy@{dy}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dy}{dy}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::dy}
+
+
+
+Definition at line 102 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a04878814b8097100a179152ba853262a}\label{namespacem__global__parameters_a04878814b8097100a179152ba853262a}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!dz@{dz}}
+\index{dz@{dz}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{dz}{dz}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::dz}
+
+
+
+Definition at line 102 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac6ef72ca6aa7a22e60c864df25559892}\label{namespacem__global__parameters_ac6ef72ca6aa7a22e60c864df25559892}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!e\+\_\+idx@{e\+\_\+idx}}
+\index{e\+\_\+idx@{e\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{e\+\_\+idx}{e\_idx}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::e\+\_\+idx}
+
+
+
+Index of energy equation. 
+
+
+
+Definition at line 188 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a60d7ab72fdab2b005144a5a45aa572de}\label{namespacem__global__parameters_a60d7ab72fdab2b005144a5a45aa572de}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!fd\+\_\+number@{fd\+\_\+number}}
+\index{fd\+\_\+number@{fd\+\_\+number}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{fd\+\_\+number}{fd\_number}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::fd\+\_\+number}
+
+
+
+The finite-\/difference number is given by M\+AX(1, fd\+\_\+order/2). Essentially, it is a measure of the half-\/size of the finite-\/difference stencil for the selected order of accuracy. 
+
+
+
+Definition at line 260 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a8892cc67c7d04be4d8e6d02a86e209bc}\label{namespacem__global__parameters_a8892cc67c7d04be4d8e6d02a86e209bc}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!fd\+\_\+order@{fd\+\_\+order}}
+\index{fd\+\_\+order@{fd\+\_\+order}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{fd\+\_\+order}{fd\_order}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::fd\+\_\+order}
+
+
+
+The order of the finite-\/difference (fd) approximations of the first-\/order derivatives that need to be evaluated when the CoM or flow probe data files are to be written at each time step. 
+
+
+
+Definition at line 255 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7297abec8863ecabf95e24ebdae46a17}\label{namespacem__global__parameters_a7297abec8863ecabf95e24ebdae46a17}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!fluid\+\_\+pp@{fluid\+\_\+pp}}
+\index{fluid\+\_\+pp@{fluid\+\_\+pp}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{fluid\+\_\+pp}{fluid\_pp}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1physical__parameters}{physical\+\_\+parameters}), dimension(num\+\_\+fluids\+\_\+max) m\+\_\+global\+\_\+parameters\+::fluid\+\_\+pp}
+
+
+
+Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas equation of state parameters, the Reynolds numbers and the Weber numbers. 
+
+
+
+Definition at line 247 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_acbb163a79ff0011a4327c3fb65a04c14}\label{namespacem__global__parameters_acbb163a79ff0011a4327c3fb65a04c14}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!flux\+\_\+lim@{flux\+\_\+lim}}
+\index{flux\+\_\+lim@{flux\+\_\+lim}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{flux\+\_\+lim}{flux\_lim}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::flux\+\_\+lim}
+
+
+
+Choice of flux limiter. 
+
+
+
+Definition at line 147 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aadeb708160fdfee48fe55e83e41b5064}\label{namespacem__global__parameters_aadeb708160fdfee48fe55e83e41b5064}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!fourier\+\_\+rings@{fourier\+\_\+rings}}
+\index{fourier\+\_\+rings@{fourier\+\_\+rings}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{fourier\+\_\+rings}{fourier\_rings}}
+{\footnotesize\ttfamily integer, parameter m\+\_\+global\+\_\+parameters\+::fourier\+\_\+rings = 5}
+
+
+
+Fourier filter ring limit. 
+
+
+
+Definition at line 62 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4ecdedaf3db880f8d71dbefc816322f8}\label{namespacem__global__parameters_a4ecdedaf3db880f8d71dbefc816322f8}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!gamma\+\_\+idx@{gamma\+\_\+idx}}
+\index{gamma\+\_\+idx@{gamma\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{gamma\+\_\+idx}{gamma\_idx}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::gamma\+\_\+idx}
+
+
+
+Index of specific heat ratio func. eqn. 
+
+
+
+Definition at line 193 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_adfa6a4a17c338d84a6d6ad5a0b9412de}\label{namespacem__global__parameters_adfa6a4a17c338d84a6d6ad5a0b9412de}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!gamma\+\_\+m@{gamma\+\_\+m}}
+\index{gamma\+\_\+m@{gamma\+\_\+m}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{gamma\+\_\+m}{gamma\_m}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::gamma\+\_\+m}
+
+
+
+Definition at line 305 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad507a6f681cefe17e49f283d47a7c0ad}\label{namespacem__global__parameters_ad507a6f681cefe17e49f283d47a7c0ad}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!gamma\+\_\+n@{gamma\+\_\+n}}
+\index{gamma\+\_\+n@{gamma\+\_\+n}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{gamma\+\_\+n}{gamma\_n}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::gamma\+\_\+n}
+
+
+
+Definition at line 305 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a9a7da412ab2c84481f1c2bb636e83e10}\label{namespacem__global__parameters_a9a7da412ab2c84481f1c2bb636e83e10}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!gamma\+\_\+v@{gamma\+\_\+v}}
+\index{gamma\+\_\+v@{gamma\+\_\+v}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{gamma\+\_\+v}{gamma\_v}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::gamma\+\_\+v}
+
+
+
+Definition at line 304 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a0f2d413d9739928f8e1a98f0a5783ab9}\label{namespacem__global__parameters_a0f2d413d9739928f8e1a98f0a5783ab9}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!grid\+\_\+geometry@{grid\+\_\+geometry}}
+\index{grid\+\_\+geometry@{grid\+\_\+geometry}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{grid\+\_\+geometry}{grid\_geometry}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::grid\+\_\+geometry}
+
+
+
+Definition at line 87 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a46461347b5094736adfa94ef005b49a6}\label{namespacem__global__parameters_a46461347b5094736adfa94ef005b49a6}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!ierr@{ierr}}
+\index{ierr@{ierr}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{ierr}{ierr}}
+{\footnotesize\ttfamily integer, private m\+\_\+global\+\_\+parameters\+::ierr\hspace{0.3cm}{\ttfamily [private]}}
+
+
+
+Definition at line 180 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa93addd83f0134aaaf319ca2b743233c}\label{namespacem__global__parameters_aa93addd83f0134aaaf319ca2b743233c}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!im\+\_\+trans\+\_\+c@{im\+\_\+trans\+\_\+c}}
+\index{im\+\_\+trans\+\_\+c@{im\+\_\+trans\+\_\+c}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{im\+\_\+trans\+\_\+c}{im\_trans\_c}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::im\+\_\+trans\+\_\+c}
+
+
+
+Definition at line 303 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a62b213889b2dc5da7d81e7fa636231f6}\label{namespacem__global__parameters_a62b213889b2dc5da7d81e7fa636231f6}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!im\+\_\+trans\+\_\+t@{im\+\_\+trans\+\_\+t}}
+\index{im\+\_\+trans\+\_\+t@{im\+\_\+trans\+\_\+t}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{im\+\_\+trans\+\_\+t}{im\_trans\_t}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::im\+\_\+trans\+\_\+t}
+
+
+
+Definition at line 303 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac1d4fc341c170b243af0d776ad7ede02}\label{namespacem__global__parameters_ac1d4fc341c170b243af0d776ad7ede02}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!integral@{integral}}
+\index{integral@{integral}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{integral}{integral}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1integral__parameters}{integral\+\_\+parameters}), dimension(num\+\_\+probes\+\_\+max) m\+\_\+global\+\_\+parameters\+::integral}
+
+
+
+Definition at line 271 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a530bdd6416ce213046d14488fb48dbc2}\label{namespacem__global__parameters_a530bdd6416ce213046d14488fb48dbc2}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!integral\+\_\+wrt@{integral\+\_\+wrt}}
+\index{integral\+\_\+wrt@{integral\+\_\+wrt}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{integral\+\_\+wrt}{integral\_wrt}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::integral\+\_\+wrt}
+
+
+
+Definition at line 267 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aac5ed9f316eeebbe04258bb1120cbea4}\label{namespacem__global__parameters_aac5ed9f316eeebbe04258bb1120cbea4}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!internalenergies\+\_\+idx@{internalenergies\+\_\+idx}}
+\index{internalenergies\+\_\+idx@{internalenergies\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{internalenergies\+\_\+idx}{internalenergies\_idx}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::internalenergies\+\_\+idx}
+
+
+
+Indexes of first \& last internal energy eqns. 
+
+
+
+Definition at line 190 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a555eda1318a218d37d1bdd8f4d57eaf2}\label{namespacem__global__parameters_a555eda1318a218d37d1bdd8f4d57eaf2}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!k\+\_\+n@{k\+\_\+n}}
+\index{k\+\_\+n@{k\+\_\+n}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{k\+\_\+n}{k\_n}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::k\+\_\+n}
+
+
+
+Definition at line 302 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1943ea5a5127e94a197afae57be95758}\label{namespacem__global__parameters_a1943ea5a5127e94a197afae57be95758}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!k\+\_\+v@{k\+\_\+v}}
+\index{k\+\_\+v@{k\+\_\+v}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{k\+\_\+v}{k\_v}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::k\+\_\+v}
+
+
+
+Definition at line 302 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad367bbe26f93b9fd058c58ec11337fdf}\label{namespacem__global__parameters_ad367bbe26f93b9fd058c58ec11337fdf}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!lsq\+\_\+deriv@{lsq\+\_\+deriv}}
+\index{lsq\+\_\+deriv@{lsq\+\_\+deriv}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{lsq\+\_\+deriv}{lsq\_deriv}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::lsq\+\_\+deriv}
+
+
+
+Use linear least squares to calculate normals and curvatures. 
+
+
+
+Definition at line 152 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aee38c9d03e9195858a93ec611b605f33}\label{namespacem__global__parameters_aee38c9d03e9195858a93ec611b605f33}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!m@{m}}
+\index{m@{m}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{m}{m}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::m}
+
+
+
+Definition at line 76 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad4e160df8d0de7ea1801a1ca29f8e9b0}\label{namespacem__global__parameters_ad4e160df8d0de7ea1801a1ca29f8e9b0}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!m\+\_\+glb@{m\+\_\+glb}}
+\index{m\+\_\+glb@{m\+\_\+glb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{m\+\_\+glb}{m\_glb}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::m\+\_\+glb}
+
+
+
+Definition at line 81 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a5600a60608bd352783350438a2efb0fe}\label{namespacem__global__parameters_a5600a60608bd352783350438a2efb0fe}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!m\+\_\+n@{m\+\_\+n}}
+\index{m\+\_\+n@{m\+\_\+n}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{m\+\_\+n}{m\_n}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::m\+\_\+n}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a35a6f248eec9c489110fad19d906bd40}\label{namespacem__global__parameters_a35a6f248eec9c489110fad19d906bd40}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!m\+\_\+v@{m\+\_\+v}}
+\index{m\+\_\+v@{m\+\_\+v}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{m\+\_\+v}{m\_v}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::m\+\_\+v}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af2a0f6c4c9454f92703fb3bc96b4e799}\label{namespacem__global__parameters_af2a0f6c4c9454f92703fb3bc96b4e799}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mapped\+\_\+weno@{mapped\+\_\+weno}}
+\index{mapped\+\_\+weno@{mapped\+\_\+weno}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mapped\+\_\+weno}{mapped\_weno}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::mapped\+\_\+weno}
+
+
+
+W\+E\+NO with mapping of nonlinear weights. 
+
+
+
+Definition at line 129 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ae3701f74c9487c9e56c2a11fb6a52e40}\label{namespacem__global__parameters_ae3701f74c9487c9e56c2a11fb6a52e40}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mass\+\_\+n0@{mass\+\_\+n0}}
+\index{mass\+\_\+n0@{mass\+\_\+n0}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mass\+\_\+n0}{mass\_n0}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::mass\+\_\+n0}
+
+
+
+Definition at line 302 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a6a06981be6cdab78452a106009022aa4}\label{namespacem__global__parameters_a6a06981be6cdab78452a106009022aa4}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mass\+\_\+v0@{mass\+\_\+v0}}
+\index{mass\+\_\+v0@{mass\+\_\+v0}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mass\+\_\+v0}{mass\_v0}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::mass\+\_\+v0}
+
+
+
+Definition at line 302 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a3981c7e6886ba3cde245ce4dcc6ca664}\label{namespacem__global__parameters_a3981c7e6886ba3cde245ce4dcc6ca664}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mixture\+\_\+err@{mixture\+\_\+err}}
+\index{mixture\+\_\+err@{mixture\+\_\+err}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mixture\+\_\+err}{mixture\_err}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::mixture\+\_\+err}
+
+
+
+Mixture properties correction. 
+
+
+
+Definition at line 143 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a6cf2e92cfc3b519fb6da6fe9e88fab31}\label{namespacem__global__parameters_a6cf2e92cfc3b519fb6da6fe9e88fab31}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!model\+\_\+eqns@{model\+\_\+eqns}}
+\index{model\+\_\+eqns@{model\+\_\+eqns}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{model\+\_\+eqns}{model\_eqns}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::model\+\_\+eqns}
+
+
+
+Multicomponent flow model. 
+
+
+
+Definition at line 118 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad138d35528cf27ff42dba00d13c269be}\label{namespacem__global__parameters_ad138d35528cf27ff42dba00d13c269be}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mom\+\_\+idx@{mom\+\_\+idx}}
+\index{mom\+\_\+idx@{mom\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mom\+\_\+idx}{mom\_idx}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+global\+\_\+parameters\+::mom\+\_\+idx}
+
+
+
+Indexes of first \& last momentum eqns. 
+
+
+
+Definition at line 187 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4ddb20fdeec324ed6100359e83111a7c}\label{namespacem__global__parameters_a4ddb20fdeec324ed6100359e83111a7c}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!moment\+\_\+order@{moment\+\_\+order}}
+\index{moment\+\_\+order@{moment\+\_\+order}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{moment\+\_\+order}{moment\_order}}
+{\footnotesize\ttfamily integer, dimension(5) m\+\_\+global\+\_\+parameters\+::moment\+\_\+order}
+
+
+
+Definition at line 273 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac91cb1bc506e2e71e46001986a7232b4}\label{namespacem__global__parameters_ac91cb1bc506e2e71e46001986a7232b4}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mono@{mono}}
+\index{mono@{mono}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mono}{mono}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1mono__parameters}{mono\+\_\+parameters}), dimension(num\+\_\+probes\+\_\+max) m\+\_\+global\+\_\+parameters\+::mono}
+
+
+
+Monopole parameters. 
+
+
+
+Definition at line 312 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a459b1e7574742f115d5562325c575428}\label{namespacem__global__parameters_a459b1e7574742f115d5562325c575428}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!monopole@{monopole}}
+\index{monopole@{monopole}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{monopole}{monopole}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::monopole}
+
+
+
+Monopole switch. 
+
+
+
+Definition at line 311 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a9106f4f1ad8f317bafc9c8934297752d}\label{namespacem__global__parameters_a9106f4f1ad8f317bafc9c8934297752d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mp\+\_\+weno@{mp\+\_\+weno}}
+\index{mp\+\_\+weno@{mp\+\_\+weno}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mp\+\_\+weno}{mp\_weno}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::mp\+\_\+weno}
+
+
+
+Monotonicity preserving (MP) W\+E\+NO. 
+
+
+
+Definition at line 130 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a2663d07998d11d25e223cd7ad0bbd748}\label{namespacem__global__parameters_a2663d07998d11d25e223cd7ad0bbd748}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mpi\+\_\+info\+\_\+int@{mpi\+\_\+info\+\_\+int}}
+\index{mpi\+\_\+info\+\_\+int@{mpi\+\_\+info\+\_\+int}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mpi\+\_\+info\+\_\+int}{mpi\_info\_int}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::mpi\+\_\+info\+\_\+int}
+
+
+
+Definition at line 177 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad80f68aac31aa898ab2d7729f60e375f}\label{namespacem__global__parameters_ad80f68aac31aa898ab2d7729f60e375f}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mpi\+\_\+io\+\_\+data@{mpi\+\_\+io\+\_\+data}}
+\index{mpi\+\_\+io\+\_\+data@{mpi\+\_\+io\+\_\+data}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mpi\+\_\+io\+\_\+data}{mpi\_io\_data}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1mpi__io__var}{mpi\+\_\+io\+\_\+var}), public m\+\_\+global\+\_\+parameters\+::mpi\+\_\+io\+\_\+data}
+
+
+
+Definition at line 172 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad4713c1e89eaa8fac3bb2181ba87b192}\label{namespacem__global__parameters_ad4713c1e89eaa8fac3bb2181ba87b192}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mpiiofs@{mpiiofs}}
+\index{mpiiofs@{mpiiofs}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mpiiofs}{mpiiofs}}
+{\footnotesize\ttfamily character(len = \hyperlink{namespacem__global__parameters_ac8252b115e717c6f1c8595be6f897df7}{name\+\_\+len}) m\+\_\+global\+\_\+parameters\+::mpiiofs}
+
+
+
+Definition at line 176 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_adc35ba450a192812db36f1d6659d64e6}\label{namespacem__global__parameters_adc35ba450a192812db36f1d6659d64e6}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mpp\+\_\+lim@{mpp\+\_\+lim}}
+\index{mpp\+\_\+lim@{mpp\+\_\+lim}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mpp\+\_\+lim}{mpp\_lim}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::mpp\+\_\+lim}
+
+
+
+Mixture physical parameters (M\+PP) limits. 
+
+
+
+Definition at line 122 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7829126e47034f2e39153efa144bc17b}\label{namespacem__global__parameters_a7829126e47034f2e39153efa144bc17b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mu\+\_\+n@{mu\+\_\+n}}
+\index{mu\+\_\+n@{mu\+\_\+n}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mu\+\_\+n}{mu\_n}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::mu\+\_\+n}
+
+
+
+Definition at line 305 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a2224d20370b84925128e1b1bbae8e8df}\label{namespacem__global__parameters_a2224d20370b84925128e1b1bbae8e8df}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mu\+\_\+v@{mu\+\_\+v}}
+\index{mu\+\_\+v@{mu\+\_\+v}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mu\+\_\+v}{mu\_v}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::mu\+\_\+v}
+
+
+
+Definition at line 304 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad7bef3ef71a8dfe1ce24000cff0eff8d}\label{namespacem__global__parameters_ad7bef3ef71a8dfe1ce24000cff0eff8d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!mul0@{mul0}}
+\index{mul0@{mul0}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{mul0}{mul0}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::mul0}
+
+
+
+Definition at line 304 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac72422e5f77149bd32cf0cfd01a36544}\label{namespacem__global__parameters_ac72422e5f77149bd32cf0cfd01a36544}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!n@{n}}
+\index{n@{n}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{n}{n}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::n}
+
+
+
+Definition at line 76 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_adab11dab474410541d4c37725bea01e1}\label{namespacem__global__parameters_adab11dab474410541d4c37725bea01e1}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!n\+\_\+glb@{n\+\_\+glb}}
+\index{n\+\_\+glb@{n\+\_\+glb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{n\+\_\+glb}{n\_glb}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::n\+\_\+glb}
+
+
+
+Definition at line 81 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac8252b115e717c6f1c8595be6f897df7}\label{namespacem__global__parameters_ac8252b115e717c6f1c8595be6f897df7}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!name\+\_\+len@{name\+\_\+len}}
+\index{name\+\_\+len@{name\+\_\+len}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{name\+\_\+len}{name\_len}}
+{\footnotesize\ttfamily integer, parameter m\+\_\+global\+\_\+parameters\+::name\+\_\+len = 50}
+
+
+
+Maximum name length. 
+
+
+
+Definition at line 57 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ad76c4758994b52559f478d251dc0cba5}\label{namespacem__global__parameters_ad76c4758994b52559f478d251dc0cba5}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!nb@{nb}}
+\index{nb@{nb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{nb}{nb}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::nb}
+
+
+
+Number of eq. bubble sizes. 
+
+
+
+Definition at line 282 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a04b52ed3df1c7aac47f18748b3cdddc5}\label{namespacem__global__parameters_a04b52ed3df1c7aac47f18748b3cdddc5}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!null\+\_\+weights@{null\+\_\+weights}}
+\index{null\+\_\+weights@{null\+\_\+weights}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{null\+\_\+weights}{null\_weights}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::null\+\_\+weights}
+
+
+
+Null undesired W\+E\+NO weights. 
+
+
+
+Definition at line 142 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a76e251296a28212df87bf9f653ff9a3b}\label{namespacem__global__parameters_a76e251296a28212df87bf9f653ff9a3b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+dims@{num\+\_\+dims}}
+\index{num\+\_\+dims@{num\+\_\+dims}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+dims}{num\_dims}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::num\+\_\+dims}
+
+
+
+Number of spatial dimensions. 
+
+
+
+Definition at line 119 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a2f0b96a5aef3925aa7e3cc816754e17e}\label{namespacem__global__parameters_a2f0b96a5aef3925aa7e3cc816754e17e}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+fluids@{num\+\_\+fluids}}
+\index{num\+\_\+fluids@{num\+\_\+fluids}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+fluids}{num\_fluids}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::num\+\_\+fluids}
+
+
+
+Number of fluids in the flow. 
+
+
+
+Definition at line 120 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7a86e6e9d4c8b59d28b7404d836fdee8}\label{namespacem__global__parameters_a7a86e6e9d4c8b59d28b7404d836fdee8}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+integrals@{num\+\_\+integrals}}
+\index{num\+\_\+integrals@{num\+\_\+integrals}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+integrals}{num\_integrals}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::num\+\_\+integrals}
+
+
+
+Definition at line 269 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a987e51cca357206f1e35d38a1cb7e5e6}\label{namespacem__global__parameters_a987e51cca357206f1e35d38a1cb7e5e6}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+mono@{num\+\_\+mono}}
+\index{num\+\_\+mono@{num\+\_\+mono}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+mono}{num\_mono}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::num\+\_\+mono}
+
+
+
+Number of monopoles. 
+
+
+
+Definition at line 313 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa4e0d015d4064b37e132c5088089394d}\label{namespacem__global__parameters_aa4e0d015d4064b37e132c5088089394d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+probes@{num\+\_\+probes}}
+\index{num\+\_\+probes@{num\+\_\+probes}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+probes}{num\_probes}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::num\+\_\+probes}
+
+
+
+Definition at line 268 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aafb65952c33f1c363d1040bde29734ea}\label{namespacem__global__parameters_aafb65952c33f1c363d1040bde29734ea}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+procs@{num\+\_\+procs}}
+\index{num\+\_\+procs@{num\+\_\+procs}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+procs}{num\_procs}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::num\+\_\+procs}
+
+
+
+Number of processors. 
+
+
+
+Definition at line 54 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a71f091e6074e6c248fd7e03218b89218}\label{namespacem__global__parameters_a71f091e6074e6c248fd7e03218b89218}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!num\+\_\+stcls\+\_\+min@{num\+\_\+stcls\+\_\+min}}
+\index{num\+\_\+stcls\+\_\+min@{num\+\_\+stcls\+\_\+min}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{num\+\_\+stcls\+\_\+min}{num\_stcls\_min}}
+{\footnotesize\ttfamily integer, parameter m\+\_\+global\+\_\+parameters\+::num\+\_\+stcls\+\_\+min = 5}
+
+
+
+Mininum \# of stencils. 
+
+
+
+Definition at line 55 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ae152b49c742928bc52f6da61dd805693}\label{namespacem__global__parameters_ae152b49c742928bc52f6da61dd805693}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!omegan@{omegan}}
+\index{omegan@{omegan}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{omegan}{omegan}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::omegan}
+
+
+
+Definition at line 303 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac040dbf547e6d5de8df08e864d8131e7}\label{namespacem__global__parameters_ac040dbf547e6d5de8df08e864d8131e7}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!p@{p}}
+\index{p@{p}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{p}{p}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::p}
+
+
+
+Definition at line 76 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1072f221ca8e41b0ea3240b33374cc1e}\label{namespacem__global__parameters_a1072f221ca8e41b0ea3240b33374cc1e}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!p\+\_\+glb@{p\+\_\+glb}}
+\index{p\+\_\+glb@{p\+\_\+glb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{p\+\_\+glb}{p\_glb}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::p\+\_\+glb}
+
+
+
+Definition at line 81 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac127ac2a9036e1cdb7e6c41159cacdfb}\label{namespacem__global__parameters_ac127ac2a9036e1cdb7e6c41159cacdfb}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!parallel\+\_\+io@{parallel\+\_\+io}}
+\index{parallel\+\_\+io@{parallel\+\_\+io}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{parallel\+\_\+io}{parallel\_io}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::parallel\+\_\+io}
+
+
+
+Format of the data files. 
+
+
+
+Definition at line 162 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa9d578c318044b2f2ec990b5fc0dfab9}\label{namespacem__global__parameters_aa9d578c318044b2f2ec990b5fc0dfab9}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!path\+\_\+len@{path\+\_\+len}}
+\index{path\+\_\+len@{path\+\_\+len}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{path\+\_\+len}{path\_len}}
+{\footnotesize\ttfamily integer, parameter m\+\_\+global\+\_\+parameters\+::path\+\_\+len = 400}
+
+
+
+Maximum path length. 
+
+
+
+Definition at line 56 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1097b95561b65a9035e5f9218de577f9}\label{namespacem__global__parameters_a1097b95561b65a9035e5f9218de577f9}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pb0@{pb0}}
+\index{pb0@{pb0}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pb0}{pb0}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::pb0}
+
+
+
+Definition at line 302 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac1375e5145e018847d9025e83e58b49d}\label{namespacem__global__parameters_ac1375e5145e018847d9025e83e58b49d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pe\+\_\+c@{pe\+\_\+c}}
+\index{pe\+\_\+c@{pe\+\_\+c}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pe\+\_\+c}{pe\_c}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::pe\+\_\+c}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a8a75928178eef1550c6a0389ff12b44a}\label{namespacem__global__parameters_a8a75928178eef1550c6a0389ff12b44a}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pe\+\_\+t@{pe\+\_\+t}}
+\index{pe\+\_\+t@{pe\+\_\+t}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pe\+\_\+t}{pe\_t}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::pe\+\_\+t}
+
+
+
+Definition at line 302 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7dbd1ec1fd1ece4e997a825fa07785eb}\label{namespacem__global__parameters_a7dbd1ec1fd1ece4e997a825fa07785eb}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!phi\+\_\+nv@{phi\+\_\+nv}}
+\index{phi\+\_\+nv@{phi\+\_\+nv}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{phi\+\_\+nv}{phi\_nv}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::phi\+\_\+nv}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_acc6771df62005731bbec282b0c9a5659}\label{namespacem__global__parameters_acc6771df62005731bbec282b0c9a5659}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!phi\+\_\+vn@{phi\+\_\+vn}}
+\index{phi\+\_\+vn@{phi\+\_\+vn}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{phi\+\_\+vn}{phi\_vn}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::phi\+\_\+vn}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a21765a90c01d221524670d1344b126cd}\label{namespacem__global__parameters_a21765a90c01d221524670d1344b126cd}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pi@{pi}}
+\index{pi@{pi}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pi}{pi}}
+{\footnotesize\ttfamily real(kind(0d0)), parameter m\+\_\+global\+\_\+parameters\+::pi = 3.\+141592653589793d0}
+
+
+
+Pi. 
+
+
+
+Definition at line 320 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a7db1a23566279bdbc7da68850c596c69}\label{namespacem__global__parameters_a7db1a23566279bdbc7da68850c596c69}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pi\+\_\+inf\+\_\+idx@{pi\+\_\+inf\+\_\+idx}}
+\index{pi\+\_\+inf\+\_\+idx@{pi\+\_\+inf\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pi\+\_\+inf\+\_\+idx}{pi\_inf\_idx}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::pi\+\_\+inf\+\_\+idx}
+
+
+
+Index of liquid stiffness func. eqn. 
+
+
+
+Definition at line 194 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a29164826db891e5662ce2bccdbc57d3c}\label{namespacem__global__parameters_a29164826db891e5662ce2bccdbc57d3c}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!poly\+\_\+sigma@{poly\+\_\+sigma}}
+\index{poly\+\_\+sigma@{poly\+\_\+sigma}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{poly\+\_\+sigma}{poly\_sigma}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::poly\+\_\+sigma}
+
+
+
+log normal sigma for polydisperse P\+DF 
+
+
+
+Definition at line 296 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a32791d9d5fef0213f01fc31713b17ae8}\label{namespacem__global__parameters_a32791d9d5fef0213f01fc31713b17ae8}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!polydisperse@{polydisperse}}
+\index{polydisperse@{polydisperse}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{polydisperse}{polydisperse}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::polydisperse}
+
+
+
+Polydisperse bubbles. 
+
+
+
+Definition at line 292 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a8d670f2f984167bae71b7b3f12d0908a}\label{namespacem__global__parameters_a8d670f2f984167bae71b7b3f12d0908a}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!polytropic@{polytropic}}
+\index{polytropic@{polytropic}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{polytropic}{polytropic}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::polytropic}
+
+
+
+Polytropic switch. 
+
+
+
+Definition at line 291 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a6ed5e5561c16f30a4010f6612877029d}\label{namespacem__global__parameters_a6ed5e5561c16f30a4010f6612877029d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!precision@{precision}}
+\index{precision@{precision}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{precision}{precision}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::precision}
+
+
+
+Precision of output files. 
+
+
+
+Definition at line 163 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aae2170af8a68c7dcdd91910aad867ef4}\label{namespacem__global__parameters_aae2170af8a68c7dcdd91910aad867ef4}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pref@{pref}}
+\index{pref@{pref}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pref}{pref}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::pref}
+
+
+
+Definition at line 277 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a028c7e09aaa23dc9ee8844febffed3af}\label{namespacem__global__parameters_a028c7e09aaa23dc9ee8844febffed3af}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!probe@{probe}}
+\index{probe@{probe}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{probe}{probe}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1probe__parameters}{probe\+\_\+parameters}), dimension(num\+\_\+probes\+\_\+max) m\+\_\+global\+\_\+parameters\+::probe}
+
+
+
+Definition at line 270 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a2de4a56202a6e2f47ce657fcda4ecdb4}\label{namespacem__global__parameters_a2de4a56202a6e2f47ce657fcda4ecdb4}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!probe\+\_\+wrt@{probe\+\_\+wrt}}
+\index{probe\+\_\+wrt@{probe\+\_\+wrt}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{probe\+\_\+wrt}{probe\_wrt}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::probe\+\_\+wrt}
+
+
+
+Definition at line 266 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a48dea2bc17c5e4465a444c926070ae9b}\label{namespacem__global__parameters_a48dea2bc17c5e4465a444c926070ae9b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!proc\+\_\+coords@{proc\+\_\+coords}}
+\index{proc\+\_\+coords@{proc\+\_\+coords}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{proc\+\_\+coords}{proc\_coords}}
+{\footnotesize\ttfamily integer, dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::proc\+\_\+coords}
+
+
+
+Processor coordinates in M\+P\+I\+\_\+\+C\+A\+R\+T\+\_\+\+C\+O\+MM. 
+
+
+
+Definition at line 165 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a383c6ff025d4ea09ddd4e2356042d86b}\label{namespacem__global__parameters_a383c6ff025d4ea09ddd4e2356042d86b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!proc\+\_\+rank@{proc\+\_\+rank}}
+\index{proc\+\_\+rank@{proc\+\_\+rank}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{proc\+\_\+rank}{proc\_rank}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::proc\+\_\+rank}
+
+
+
+Rank of the local processor. 
+
+
+
+Definition at line 72 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac6ff480000eaa7af51481d0f17b78423}\label{namespacem__global__parameters_ac6ff480000eaa7af51481d0f17b78423}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!ptil@{ptil}}
+\index{ptil@{ptil}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{ptil}{ptil}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+global\+\_\+parameters\+::ptil}
+
+
+
+Pressure modification. 
+
+
+
+Definition at line 295 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_acc5b8b153cee23d65a886df38f821f08}\label{namespacem__global__parameters_acc5b8b153cee23d65a886df38f821f08}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!pv@{pv}}
+\index{pv@{pv}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{pv}{pv}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::pv}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a585a72037bbffe12e8d4512a57f52418}\label{namespacem__global__parameters_a585a72037bbffe12e8d4512a57f52418}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!r0@{r0}}
+\index{r0@{r0}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{r0}{r0}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::r0}
+
+
+
+Bubble sizes. 
+
+
+
+Definition at line 288 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a24492f9b474683476a342e7ee42c1c6d}\label{namespacem__global__parameters_a24492f9b474683476a342e7ee42c1c6d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!r0ref@{r0ref}}
+\index{r0ref@{r0ref}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{r0ref}{r0ref}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::r0ref}
+
+
+
+Reference bubble size. 
+
+
+
+Definition at line 283 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ae818e88601b1dc579a87e7c0c8cd87cb}\label{namespacem__global__parameters_ae818e88601b1dc579a87e7c0c8cd87cb}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!r\+\_\+n@{r\+\_\+n}}
+\index{r\+\_\+n@{r\+\_\+n}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{r\+\_\+n}{r\_n}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::r\+\_\+n}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af2ee1ad578115833bb6b8e9550eb5f18}\label{namespacem__global__parameters_af2ee1ad578115833bb6b8e9550eb5f18}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!r\+\_\+v@{r\+\_\+v}}
+\index{r\+\_\+v@{r\+\_\+v}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{r\+\_\+v}{r\_v}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::r\+\_\+v}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a33b4272ac0c75aff15851f9dfa6a9d14}\label{namespacem__global__parameters_a33b4272ac0c75aff15851f9dfa6a9d14}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!re\+\_\+idx@{re\+\_\+idx}}
+\index{re\+\_\+idx@{re\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{re\+\_\+idx}{re\_idx}}
+{\footnotesize\ttfamily integer, dimension(\+:,\+:), allocatable m\+\_\+global\+\_\+parameters\+::re\+\_\+idx}
+
+
+
+Definition at line 202 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4438313a11564fa911c586d2dee15b8d}\label{namespacem__global__parameters_a4438313a11564fa911c586d2dee15b8d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!re\+\_\+inv@{re\+\_\+inv}}
+\index{re\+\_\+inv@{re\+\_\+inv}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{re\+\_\+inv}{re\_inv}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::re\+\_\+inv}
+
+
+
+Inverse Reynolds number. 
+
+
+
+Definition at line 286 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a0a67704d4c227871a155d6c26590f685}\label{namespacem__global__parameters_a0a67704d4c227871a155d6c26590f685}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!re\+\_\+size@{re\+\_\+size}}
+\index{re\+\_\+size@{re\+\_\+size}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{re\+\_\+size}{re\_size}}
+{\footnotesize\ttfamily integer, dimension(2) m\+\_\+global\+\_\+parameters\+::re\+\_\+size}
+
+
+
+Definition at line 201 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a666c8f5f6663ab81f55c2298e642a3a9}\label{namespacem__global__parameters_a666c8f5f6663ab81f55c2298e642a3a9}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!re\+\_\+trans\+\_\+c@{re\+\_\+trans\+\_\+c}}
+\index{re\+\_\+trans\+\_\+c@{re\+\_\+trans\+\_\+c}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{re\+\_\+trans\+\_\+c}{re\_trans\_c}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::re\+\_\+trans\+\_\+c}
+
+
+
+Definition at line 303 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ae0e61a10cd5b33db394052fbefee2681}\label{namespacem__global__parameters_ae0e61a10cd5b33db394052fbefee2681}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!re\+\_\+trans\+\_\+t@{re\+\_\+trans\+\_\+t}}
+\index{re\+\_\+trans\+\_\+t@{re\+\_\+trans\+\_\+t}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{re\+\_\+trans\+\_\+t}{re\_trans\_t}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::re\+\_\+trans\+\_\+t}
+
+
+
+Definition at line 303 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4491f30721e61e94907cac95ff506795}\label{namespacem__global__parameters_a4491f30721e61e94907cac95ff506795}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!reg\+\_\+eps@{reg\+\_\+eps}}
+\index{reg\+\_\+eps@{reg\+\_\+eps}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{reg\+\_\+eps}{reg\_eps}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::reg\+\_\+eps}
+
+
+
+User-\/defined interface thickness parameter for regularization terms. 
+
+
+
+Definition at line 141 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac60a57ea5298dde379e24b6b77762101}\label{namespacem__global__parameters_ac60a57ea5298dde379e24b6b77762101}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!regularization@{regularization}}
+\index{regularization@{regularization}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{regularization}{regularization}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::regularization}
+
+
+
+Regularization terms of Tiwari (2013) 
+
+
+
+Definition at line 140 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a485a360d73013d7bce1daa01df404534}\label{namespacem__global__parameters_a485a360d73013d7bce1daa01df404534}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!rhoref@{rhoref}}
+\index{rhoref@{rhoref}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{rhoref}{rhoref}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::rhoref}
+
+
+
+Definition at line 277 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a6b9c81f07f8444654924e3075e4edaf8}\label{namespacem__global__parameters_a6b9c81f07f8444654924e3075e4edaf8}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!riemann\+\_\+solver@{riemann\+\_\+solver}}
+\index{riemann\+\_\+solver@{riemann\+\_\+solver}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{riemann\+\_\+solver}{riemann\_solver}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::riemann\+\_\+solver}
+
+
+
+Riemann solver algorithm. 
+
+
+
+Definition at line 133 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a63e30bca2565699c008b6b0442ef5494}\label{namespacem__global__parameters_a63e30bca2565699c008b6b0442ef5494}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!run\+\_\+time\+\_\+info@{run\+\_\+time\+\_\+info}}
+\index{run\+\_\+time\+\_\+info@{run\+\_\+time\+\_\+info}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{run\+\_\+time\+\_\+info}{run\_time\_info}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::run\+\_\+time\+\_\+info}
+
+
+
+Run-\/time output flag. 
+
+
+
+Definition at line 64 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aec97838cc58623019b07ae47da7f4c1c}\label{namespacem__global__parameters_aec97838cc58623019b07ae47da7f4c1c}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!sgm\+\_\+eps@{sgm\+\_\+eps}}
+\index{sgm\+\_\+eps@{sgm\+\_\+eps}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{sgm\+\_\+eps}{sgm\_eps}}
+{\footnotesize\ttfamily real(kind(0d0)), parameter m\+\_\+global\+\_\+parameters\+::sgm\+\_\+eps = 1d-\/16}
+
+
+
+Segmentation tolerance. 
+
+
+
+Definition at line 61 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a9adf65c5de7c360aa44f595f561c87b0}\label{namespacem__global__parameters_a9adf65c5de7c360aa44f595f561c87b0}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!split\+\_\+err@{split\+\_\+err}}
+\index{split\+\_\+err@{split\+\_\+err}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{split\+\_\+err}{split\_err}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::split\+\_\+err}
+
+
+
+Dimensional splitting error correction. 
+
+
+
+Definition at line 137 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ab2260b0199f0043981fba75890dbff3d}\label{namespacem__global__parameters_ab2260b0199f0043981fba75890dbff3d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!ss@{ss}}
+\index{ss@{ss}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{ss}{ss}}
+{\footnotesize\ttfamily real(kind(0.d0)) m\+\_\+global\+\_\+parameters\+::ss}
+
+
+
+Definition at line 304 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4bd117ae744eab60f3d681fd03d6e90d}\label{namespacem__global__parameters_a4bd117ae744eab60f3d681fd03d6e90d}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!start\+\_\+idx@{start\+\_\+idx}}
+\index{start\+\_\+idx@{start\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{start\+\_\+idx}{start\_idx}}
+{\footnotesize\ttfamily integer, dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::start\+\_\+idx}
+
+
+
+Starting cell-\/center index of local processor in global grid. 
+
+
+
+Definition at line 169 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4dac2e4ead915635e0c6c33af87be01b}\label{namespacem__global__parameters_a4dac2e4ead915635e0c6c33af87be01b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!sys\+\_\+size@{sys\+\_\+size}}
+\index{sys\+\_\+size@{sys\+\_\+size}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{sys\+\_\+size}{sys\_size}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::sys\+\_\+size}
+
+
+
+Number of unknowns in system of eqns. 
+
+
+
+Definition at line 185 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a5d0554c4fef91acf46f683e8bcd29133}\label{namespacem__global__parameters_a5d0554c4fef91acf46f683e8bcd29133}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!t\+\_\+step\+\_\+old@{t\+\_\+step\+\_\+old}}
+\index{t\+\_\+step\+\_\+old@{t\+\_\+step\+\_\+old}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{t\+\_\+step\+\_\+old}{t\_step\_old}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::t\+\_\+step\+\_\+old}
+
+
+
+Existing I\+C/grid folder. 
+
+
+
+Definition at line 65 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a98b51eda2c46660b439c0a8375385165}\label{namespacem__global__parameters_a98b51eda2c46660b439c0a8375385165}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!t\+\_\+step\+\_\+save@{t\+\_\+step\+\_\+save}}
+\index{t\+\_\+step\+\_\+save@{t\+\_\+step\+\_\+save}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{t\+\_\+step\+\_\+save}{t\_step\_save}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::t\+\_\+step\+\_\+save}
+
+
+
+Definition at line 111 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ace0c8a67825d0dccd2e23b5d0f9985c0}\label{namespacem__global__parameters_ace0c8a67825d0dccd2e23b5d0f9985c0}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!t\+\_\+step\+\_\+start@{t\+\_\+step\+\_\+start}}
+\index{t\+\_\+step\+\_\+start@{t\+\_\+step\+\_\+start}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{t\+\_\+step\+\_\+start}{t\_step\_start}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::t\+\_\+step\+\_\+start}
+
+
+
+Definition at line 111 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aff1140575af25247060f3e7f31a8a10f}\label{namespacem__global__parameters_aff1140575af25247060f3e7f31a8a10f}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!t\+\_\+step\+\_\+stop@{t\+\_\+step\+\_\+stop}}
+\index{t\+\_\+step\+\_\+stop@{t\+\_\+step\+\_\+stop}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{t\+\_\+step\+\_\+stop}{t\_step\_stop}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::t\+\_\+step\+\_\+stop}
+
+
+
+Definition at line 111 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a17169a5387f8f1efd5ac34cb4eae7c81}\label{namespacem__global__parameters_a17169a5387f8f1efd5ac34cb4eae7c81}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!thermal@{thermal}}
+\index{thermal@{thermal}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{thermal}{thermal}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::thermal}
+
+
+
+Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer. 
+
+
+
+Definition at line 294 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a38317a39628eb007769f26f29b70c958}\label{namespacem__global__parameters_a38317a39628eb007769f26f29b70c958}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!threshold\+\_\+mf@{threshold\+\_\+mf}}
+\index{threshold\+\_\+mf@{threshold\+\_\+mf}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{threshold\+\_\+mf}{threshold\_mf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(5) m\+\_\+global\+\_\+parameters\+::threshold\+\_\+mf}
+
+
+
+Definition at line 272 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aeb707079ac4a6d4135c3b7121a8a3232}\label{namespacem__global__parameters_aeb707079ac4a6d4135c3b7121a8a3232}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!time\+\_\+stepper@{time\+\_\+stepper}}
+\index{time\+\_\+stepper@{time\+\_\+stepper}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{time\+\_\+stepper}{time\_stepper}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::time\+\_\+stepper}
+
+
+
+Time-\/stepper algorithm. 
+
+
+
+Definition at line 123 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a19e98f005eebfd43e924ed2339a1a430}\label{namespacem__global__parameters_a19e98f005eebfd43e924ed2339a1a430}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!tvd\+\_\+rhs\+\_\+flux@{tvd\+\_\+rhs\+\_\+flux}}
+\index{tvd\+\_\+rhs\+\_\+flux@{tvd\+\_\+rhs\+\_\+flux}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{tvd\+\_\+rhs\+\_\+flux}{tvd\_rhs\_flux}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::tvd\+\_\+rhs\+\_\+flux}
+
+
+
+Apply T\+VD flux limiter to to intercell fluxes outside Riemann solver. 
+
+
+
+Definition at line 145 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af2383f23c599d5936d0559dac1edee9b}\label{namespacem__global__parameters_af2383f23c599d5936d0559dac1edee9b}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!tvd\+\_\+riemann\+\_\+flux@{tvd\+\_\+riemann\+\_\+flux}}
+\index{tvd\+\_\+riemann\+\_\+flux@{tvd\+\_\+riemann\+\_\+flux}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{tvd\+\_\+riemann\+\_\+flux}{tvd\_riemann\_flux}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::tvd\+\_\+riemann\+\_\+flux}
+
+
+
+Apply T\+VD flux limiter to left and right states inside Riemann solver. 
+
+
+
+Definition at line 144 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4ed04ef4019b9be697d7f13b3d207a17}\label{namespacem__global__parameters_a4ed04ef4019b9be697d7f13b3d207a17}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!tvd\+\_\+wave\+\_\+speeds@{tvd\+\_\+wave\+\_\+speeds}}
+\index{tvd\+\_\+wave\+\_\+speeds@{tvd\+\_\+wave\+\_\+speeds}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{tvd\+\_\+wave\+\_\+speeds}{tvd\_wave\_speeds}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::tvd\+\_\+wave\+\_\+speeds}
+
+
+
+Use T\+VD wavespeeds when computing fluxes inside Riemann solver. 
+
+
+
+Definition at line 146 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa77b0836fe22478b69e10e656ef7fcc2}\label{namespacem__global__parameters_aa77b0836fe22478b69e10e656ef7fcc2}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!tw@{tw}}
+\index{tw@{tw}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{tw}{tw}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::tw}
+
+
+
+Definition at line 301 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a334b440356a4353d073c43e68c2372da}\label{namespacem__global__parameters_a334b440356a4353d073c43e68c2372da}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!v0@{v0}}
+\index{v0@{v0}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{v0}{v0}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::v0}
+
+
+
+Bubble velocities. 
+
+
+
+Definition at line 289 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ac4851cbb47e6541bfcf40706bd08eee6}\label{namespacem__global__parameters_ac4851cbb47e6541bfcf40706bd08eee6}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!wa\+\_\+flg@{wa\+\_\+flg}}
+\index{wa\+\_\+flg@{wa\+\_\+flg}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{wa\+\_\+flg}{wa\_flg}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::wa\+\_\+flg}
+
+
+
+The W\+E\+NO average (WA) flag regulates whether the calculation of any cell-\/ average spatial derivatives is carried out in each cell by utilizing the arithmetic mean of the left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values or simply, the unaltered left and right, W\+E\+N\+O-\/reconstructed, cell-\/ boundary values. 
+
+
+
+Definition at line 230 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a0f798e4b3d19b7d49d747cc89cbe0b69}\label{namespacem__global__parameters_a0f798e4b3d19b7d49d747cc89cbe0b69}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!wave\+\_\+speeds@{wave\+\_\+speeds}}
+\index{wave\+\_\+speeds@{wave\+\_\+speeds}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{wave\+\_\+speeds}{wave\_speeds}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::wave\+\_\+speeds}
+
+
+
+Wave speeds estimation method. 
+
+
+
+Definition at line 134 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a0d20192b0175dc677ba88b14bf0d5104}\label{namespacem__global__parameters_a0d20192b0175dc677ba88b14bf0d5104}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!we\+\_\+idx@{we\+\_\+idx}}
+\index{we\+\_\+idx@{we\+\_\+idx}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{we\+\_\+idx}{we\_idx}}
+{\footnotesize\ttfamily integer, dimension(\+:,\+:), allocatable m\+\_\+global\+\_\+parameters\+::we\+\_\+idx}
+
+
+
+Definition at line 210 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_acfd358e345eac06daf89ca40651ba2c8}\label{namespacem__global__parameters_acfd358e345eac06daf89ca40651ba2c8}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!we\+\_\+rhs\+\_\+flux@{we\+\_\+rhs\+\_\+flux}}
+\index{we\+\_\+rhs\+\_\+flux@{we\+\_\+rhs\+\_\+flux}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{we\+\_\+rhs\+\_\+flux}{we\_rhs\_flux}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::we\+\_\+rhs\+\_\+flux}
+
+
+
+Account for capillary effects using the conservative formulation in R\+HS. 
+
+
+
+Definition at line 149 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a99557d578d538a853b5fd9e445ad6303}\label{namespacem__global__parameters_a99557d578d538a853b5fd9e445ad6303}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!we\+\_\+riemann\+\_\+flux@{we\+\_\+riemann\+\_\+flux}}
+\index{we\+\_\+riemann\+\_\+flux@{we\+\_\+riemann\+\_\+flux}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{we\+\_\+riemann\+\_\+flux}{we\_riemann\_flux}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::we\+\_\+riemann\+\_\+flux}
+
+
+
+Account for capillary effects in the Riemann solver. 
+
+
+
+Definition at line 148 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af329319354912b90787e0dff7cdc8a37}\label{namespacem__global__parameters_af329319354912b90787e0dff7cdc8a37}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!we\+\_\+size@{we\+\_\+size}}
+\index{we\+\_\+size@{we\+\_\+size}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{we\+\_\+size}{we\_size}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::we\+\_\+size}
+
+
+
+Definition at line 209 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a897b4f61353235b3af13bac633d5b9a0}\label{namespacem__global__parameters_a897b4f61353235b3af13bac633d5b9a0}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!we\+\_\+src@{we\+\_\+src}}
+\index{we\+\_\+src@{we\+\_\+src}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{we\+\_\+src}{we\_src}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::we\+\_\+src}
+
+
+
+Account for capillary effects in non-\/conservative formulation in R\+HS. 
+
+
+
+Definition at line 150 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_afe755241e6fe1e3a132aec6feab74ae4}\label{namespacem__global__parameters_afe755241e6fe1e3a132aec6feab74ae4}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!we\+\_\+wave\+\_\+speeds@{we\+\_\+wave\+\_\+speeds}}
+\index{we\+\_\+wave\+\_\+speeds@{we\+\_\+wave\+\_\+speeds}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{we\+\_\+wave\+\_\+speeds}{we\_wave\_speeds}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::we\+\_\+wave\+\_\+speeds}
+
+
+
+Account for capillary effects when computing the contact wave speed. 
+
+
+
+Definition at line 151 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_af2ed21959a90158c2459574230cdfcff}\label{namespacem__global__parameters_af2ed21959a90158c2459574230cdfcff}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!web@{web}}
+\index{web@{web}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{web}{web}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::web}
+
+
+
+Weber number. 
+
+
+
+Definition at line 285 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a121ed97f0ae913d37bce5bbf1c7b2cc2}\label{namespacem__global__parameters_a121ed97f0ae913d37bce5bbf1c7b2cc2}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weight@{weight}}
+\index{weight@{weight}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weight}{weight}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+global\+\_\+parameters\+::weight}
+
+
+
+Simpson quadrature weights. 
+
+
+
+Definition at line 287 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a1b38593c502f05d17607529d38c97a82}\label{namespacem__global__parameters_a1b38593c502f05d17607529d38c97a82}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weno\+\_\+avg@{weno\+\_\+avg}}
+\index{weno\+\_\+avg@{weno\+\_\+avg}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weno\+\_\+avg}{weno\_avg}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::weno\+\_\+avg}
+
+
+
+Average left/right cell-\/boundary states. 
+
+
+
+Definition at line 131 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa25252e327df938260ddd7cc5e0a5dda}\label{namespacem__global__parameters_aa25252e327df938260ddd7cc5e0a5dda}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weno\+\_\+eps@{weno\+\_\+eps}}
+\index{weno\+\_\+eps@{weno\+\_\+eps}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weno\+\_\+eps}{weno\_eps}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+global\+\_\+parameters\+::weno\+\_\+eps}
+
+
+
+Binding for the W\+E\+NO nonlinear weights. 
+
+
+
+Definition at line 127 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_ab8488205257dab4e94258eee55d0d1aa}\label{namespacem__global__parameters_ab8488205257dab4e94258eee55d0d1aa}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weno\+\_\+order@{weno\+\_\+order}}
+\index{weno\+\_\+order@{weno\+\_\+order}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weno\+\_\+order}{weno\_order}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::weno\+\_\+order}
+
+
+
+Order of the W\+E\+NO reconstruction. 
+
+
+
+Definition at line 125 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a351be005cfac23e82310e91393f5d535}\label{namespacem__global__parameters_a351be005cfac23e82310e91393f5d535}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weno\+\_\+polyn@{weno\+\_\+polyn}}
+\index{weno\+\_\+polyn@{weno\+\_\+polyn}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weno\+\_\+polyn}{weno\_polyn}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::weno\+\_\+polyn}
+
+
+
+Degree of the W\+E\+NO polynomials (polyn) 
+
+
+
+Definition at line 126 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a3c3cd38abc3ece085bab77788afece73}\label{namespacem__global__parameters_a3c3cd38abc3ece085bab77788afece73}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weno\+\_\+re\+\_\+flux@{weno\+\_\+re\+\_\+flux}}
+\index{weno\+\_\+re\+\_\+flux@{weno\+\_\+re\+\_\+flux}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weno\+\_\+re\+\_\+flux}{weno\_re\_flux}}
+{\footnotesize\ttfamily logical m\+\_\+global\+\_\+parameters\+::weno\+\_\+re\+\_\+flux}
+
+
+
+W\+E\+NO reconstruct velocity gradients for viscous stress tensor. 
+
+
+
+Definition at line 132 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa254277cf111be2267a61b7884279844}\label{namespacem__global__parameters_aa254277cf111be2267a61b7884279844}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!weno\+\_\+vars@{weno\+\_\+vars}}
+\index{weno\+\_\+vars@{weno\+\_\+vars}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{weno\+\_\+vars}{weno\_vars}}
+{\footnotesize\ttfamily integer m\+\_\+global\+\_\+parameters\+::weno\+\_\+vars}
+
+
+
+W\+E\+N\+O-\/reconstructed state variables type. 
+
+
+
+Definition at line 124 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a800c19cad11fe2774ac137b12ec89e33}\label{namespacem__global__parameters_a800c19cad11fe2774ac137b12ec89e33}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!x\+\_\+cb@{x\+\_\+cb}}
+\index{x\+\_\+cb@{x\+\_\+cb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{x\+\_\+cb}{x\_cb}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::x\+\_\+cb}
+
+
+
+Definition at line 92 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aea5b911d65b330f65e97052e9e8c0383}\label{namespacem__global__parameters_aea5b911d65b330f65e97052e9e8c0383}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!x\+\_\+cc@{x\+\_\+cc}}
+\index{x\+\_\+cc@{x\+\_\+cc}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{x\+\_\+cc}{x\_cc}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::x\+\_\+cc}
+
+
+
+Definition at line 97 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a4bb8b661a170fc6ccd9fa3cc4b32c960}\label{namespacem__global__parameters_a4bb8b661a170fc6ccd9fa3cc4b32c960}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!y\+\_\+cb@{y\+\_\+cb}}
+\index{y\+\_\+cb@{y\+\_\+cb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{y\+\_\+cb}{y\_cb}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::y\+\_\+cb}
+
+
+
+Definition at line 92 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aaa584e01b4153d246d84eef286482632}\label{namespacem__global__parameters_aaa584e01b4153d246d84eef286482632}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!y\+\_\+cc@{y\+\_\+cc}}
+\index{y\+\_\+cc@{y\+\_\+cc}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{y\+\_\+cc}{y\_cc}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::y\+\_\+cc}
+
+
+
+Definition at line 97 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_aa75fcd53fdc4fb58ca0fbc2cc9678673}\label{namespacem__global__parameters_aa75fcd53fdc4fb58ca0fbc2cc9678673}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!z\+\_\+cb@{z\+\_\+cb}}
+\index{z\+\_\+cb@{z\+\_\+cb}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{z\+\_\+cb}{z\_cb}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::z\+\_\+cb}
+
+
+
+Definition at line 92 of file m\+\_\+global\+\_\+parameters.\+f90.
+
+\mbox{\Hypertarget{namespacem__global__parameters_a9fef803dde37fd067fd4b2215df851b9}\label{namespacem__global__parameters_a9fef803dde37fd067fd4b2215df851b9}} 
+\index{m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}!z\+\_\+cc@{z\+\_\+cc}}
+\index{z\+\_\+cc@{z\+\_\+cc}!m\+\_\+global\+\_\+parameters@{m\+\_\+global\+\_\+parameters}}
+\subsubsection{\texorpdfstring{z\+\_\+cc}{z\_cc}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable, target m\+\_\+global\+\_\+parameters\+::z\+\_\+cc}
+
+
+
+Definition at line 97 of file m\+\_\+global\+\_\+parameters.\+f90.
+

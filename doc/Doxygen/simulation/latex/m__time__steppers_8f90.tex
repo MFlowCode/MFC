@@ -1,0 +1,58 @@
+\hypertarget{m__time__steppers_8f90}{}\section{m\+\_\+time\+\_\+steppers.\+f90 File Reference}
+\label{m__time__steppers_8f90}\index{m\+\_\+time\+\_\+steppers.\+f90@{m\+\_\+time\+\_\+steppers.\+f90}}
+
+
+Contains module \hyperlink{namespacem__time__steppers}{m\+\_\+time\+\_\+steppers}.  
+
+
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__time__steppers}{m\+\_\+time\+\_\+steppers}
+\begin{DoxyCompactList}\small\item\em The following module features a variety of time-\/stepping schemes. Currently, it includes the following Runge-\/\+Kutta (RK) algorithms\+: 1) 1st Order T\+VD RK 2) 2nd Order T\+VD RK 3) 3rd Order T\+VD RK 4) 4th Order RK 5) 5th Order RK where T\+VD designates a total-\/variation-\/diminishing time-\/stepper. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__time__steppers_a9287671ffb47dce60f906e5d885fb96f}{m\+\_\+time\+\_\+steppers\+::s\+\_\+initialize\+\_\+time\+\_\+steppers\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_a1057850f94e9e749da9687baa7478246}{m\+\_\+time\+\_\+steppers\+::s\+\_\+1st\+\_\+order\+\_\+tvd\+\_\+rk} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em 1st order T\+VD RK time-\/stepping algorithm \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_a5b758874c713da801a47aa3d6246b2fd}{m\+\_\+time\+\_\+steppers\+::s\+\_\+2nd\+\_\+order\+\_\+tvd\+\_\+rk} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em 2nd order T\+VD RK time-\/stepping algorithm \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_a1cc10f406268344cc54a55159c4ff08f}{m\+\_\+time\+\_\+steppers\+::s\+\_\+3rd\+\_\+order\+\_\+tvd\+\_\+rk} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em 3rd order T\+VD RK time-\/stepping algorithm \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_ac53b0d079d514df2bf662bc0e042c8db}{m\+\_\+time\+\_\+steppers\+::s\+\_\+4th\+\_\+order\+\_\+rk} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em 4th order RK time-\/stepping algorithm \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_a4920633ffe7f703c3827b956b21b7417}{m\+\_\+time\+\_\+steppers\+::s\+\_\+5th\+\_\+order\+\_\+rk} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em 5th order RK time-\/stepping algorithm \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_a575aa7f95bf96994f49d81d71d19c192}{m\+\_\+time\+\_\+steppers\+::s\+\_\+time\+\_\+step\+\_\+cycling} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em This subroutine saves the temporary q\+\_\+prim\+\_\+vf vector into the q\+\_\+prim\+\_\+ts vector that is then used in p\+\_\+main. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__time__steppers_aa065ccea3fd76bafc98da7cea5d50416}{m\+\_\+time\+\_\+steppers\+::s\+\_\+finalize\+\_\+time\+\_\+steppers\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(vector\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__time__steppers_a4bbe3aedc07e11e85679ec0c7a094f37}{m\+\_\+time\+\_\+steppers\+::q\+\_\+cons\+\_\+ts}
+\begin{DoxyCompactList}\small\item\em Cell-\/average conservative variables at each time-\/stage (TS) \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable, private \hyperlink{namespacem__time__steppers_a10a568906592e51b56cf5dbfba0d9edb}{m\+\_\+time\+\_\+steppers\+::q\+\_\+prim\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Cell-\/average primitive variables at the current time-\/stage. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__time__steppers_a3d0867c3c2572c712d2aed6d677e6fc2}{m\+\_\+time\+\_\+steppers\+::rhs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Cell-\/average R\+HS variables at the current time-\/stage. \end{DoxyCompactList}\item 
+type(vector\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__time__steppers_a5fbb5dbdd477579d17f067ec7900e659}{m\+\_\+time\+\_\+steppers\+::q\+\_\+prim\+\_\+ts}
+\begin{DoxyCompactList}\small\item\em Cell-\/average primitive variables at consecutive T\+I\+M\+E\+S\+T\+E\+PS. \end{DoxyCompactList}\item 
+integer, private \hyperlink{namespacem__time__steppers_af1bbf3b693b9d269249a93dca5069b56}{m\+\_\+time\+\_\+steppers\+::num\+\_\+ts}
+\begin{DoxyCompactList}\small\item\em Number of time stages in the time-\/stepping scheme. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__time__steppers}{m\+\_\+time\+\_\+steppers}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

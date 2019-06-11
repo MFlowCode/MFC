@@ -1,0 +1,51 @@
+\hypertarget{m__data__output_8f90}{}\section{m\+\_\+data\+\_\+output.\+f90 File Reference}
+\label{m__data__output_8f90}\index{m\+\_\+data\+\_\+output.\+f90@{m\+\_\+data\+\_\+output.\+f90}}
+
+
+Contains module \hyperlink{namespacem__data__output}{m\+\_\+data\+\_\+output}.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__data__output_1_1s__write__abstract__data__files}{m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+abstract\+\_\+data\+\_\+files}
+\begin{DoxyCompactList}\small\item\em Interface for the conservative data. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__data__output}{m\+\_\+data\+\_\+output}
+\begin{DoxyCompactList}\small\item\em This module takes care of writing the grid and initial condition data files into the \char`\"{}0\char`\"{} time-\/step directory located in the folder associated with the rank of the local processor, which is a sub-\/ directory of the case folder specified by the user in the input file pre\+\_\+process.\+inp. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__data__output_abaf86e34cd05a2227a23bcef0671a391}{m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files} (q\+\_\+cons\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em Writes grid and initial condition data files to the \char`\"{}0\char`\"{} time-\/step directory in the local processor rank folder. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a12a171700eb3f8a63d17c01a0033cf39}{m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files} (q\+\_\+cons\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em Writes grid and initial condition data files in parallel to the \char`\"{}0\char`\"{} time-\/step directory in the local processor rank folder. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}{m\+\_\+data\+\_\+output\+::s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}{m\+\_\+data\+\_\+output\+::s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Resets s\+\_\+write\+\_\+data\+\_\+files pointer. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+character(len=path\+\_\+len+2 $\ast$name\+\_\+len), private \hyperlink{namespacem__data__output_aba17ac5a2fbc723664abf5c17e07c4e8}{m\+\_\+data\+\_\+output\+::t\+\_\+step\+\_\+dir}
+\begin{DoxyCompactList}\small\item\em Time-\/step folder into which grid and initial condition data will be placed. \end{DoxyCompactList}\item 
+character(len=path\+\_\+len+2 $\ast$name\+\_\+len), public \hyperlink{namespacem__data__output_aa2b7bc17089e38b53927e6b77b61b6c7}{m\+\_\+data\+\_\+output\+::restart\+\_\+dir}
+\begin{DoxyCompactList}\small\item\em Restart data folder. \end{DoxyCompactList}\item 
+procedure(s\+\_\+write\+\_\+abstract\+\_\+data\+\_\+files), pointer, public \hyperlink{namespacem__data__output_a1ba4e8126b198fb2147d4d9b60f74e44}{m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+data\+\_\+files} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__data__output}{m\+\_\+data\+\_\+output}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

@@ -1,0 +1,66 @@
+\hypertarget{m__derived__variables_8f90}{}\section{m\+\_\+derived\+\_\+variables.\+f90 File Reference}
+\label{m__derived__variables_8f90}\index{m\+\_\+derived\+\_\+variables.\+f90@{m\+\_\+derived\+\_\+variables.\+f90}}
+
+
+Contains module \hyperlink{namespacem__derived__variables}{m\+\_\+derived\+\_\+variables}.  
+
+
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__derived__variables}{m\+\_\+derived\+\_\+variables}
+\begin{DoxyCompactList}\small\item\em This module features subroutines that allow for the derivation of numerous flow variables from the conservative and primitive ones. Currently, the available derived variables include the unadvected volume fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a15a6d70e2bd1c9b7001c753ca1f2ee27}{m\+\_\+derived\+\_\+variables\+::s\+\_\+initialize\+\_\+derived\+\_\+variables\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_ae9dbea9bb47e84dbd380c480ad5144b8}{m\+\_\+derived\+\_\+variables\+::s\+\_\+initialize\+\_\+derived\+\_\+variables} ()
+\begin{DoxyCompactList}\small\item\em Allocate and open derived variables. Computing FD coefficients. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a516a9808b3446b7b45029f6451d02b3f}{m\+\_\+derived\+\_\+variables\+::s\+\_\+compute\+\_\+derived\+\_\+variables} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em Writes coherent body information, communication files, and probes. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a908281ae7fe786ef19397e268ede0ece}{m\+\_\+derived\+\_\+variables\+::s\+\_\+compute\+\_\+finite\+\_\+difference\+\_\+coefficients} (q, s\+\_\+cc, fd\+\_\+coeff\+\_\+s)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to compute the finite-\/ difference coefficients for the centered schemes utilized in computations of first order spatial derivatives in the s-\/coordinate direction. The s-\/coordinate direction refers to the x-\/, y-\/ or z-\/coordinate direction, depending on the subroutine\textquotesingle{}s inputs. Note that coefficients of up to 4th order accuracy are available. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a5c6df8a69a463ae2c56fb2c2bb8c59a7}{m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+acceleration\+\_\+component} (\hyperlink{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, q\+\_\+prim\+\_\+vf, q\+\_\+prim\+\_\+vf1, q\+\_\+prim\+\_\+vf2, q\+\_\+prim\+\_\+vf3, q\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine receives as inputs the indicator of the component of the acceleration that should be outputted and the primitive variables. From those inputs, it proceeds to calculate values of the desired acceleration component, which are subsequently stored in derived flow quantity storage variable, q\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a1a849dc545128f9a6de155bed61035ff}{m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+center\+\_\+of\+\_\+mass} (q\+\_\+prim\+\_\+vf, q\+\_\+prim\+\_\+vf1, q\+\_\+prim\+\_\+vf2, q\+\_\+prim\+\_\+vf3, q\+\_\+com)
+\begin{DoxyCompactList}\small\item\em This subroutine is used together with the volume fraction model and when called upon, it computes the location of of the center of mass for each fluid from the inputted primitive variables, q\+\_\+prim\+\_\+vf. The computed location is then written to a formatted data file by the root process. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_ab28af564606ca901d3953e6012e9a452}{m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+higher\+\_\+moments} (q\+\_\+prim\+\_\+vf, moments)
+\begin{DoxyCompactList}\small\item\em Subroutine to compute the higher moments in an attempt to find the maximal size of the droplet. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a2ee18c156bb444c6ab73d4762960ef67}{m\+\_\+derived\+\_\+variables\+::s\+\_\+non\+\_\+symmetric\+\_\+moments} (q\+\_\+prim\+\_\+vf, moments, dir)
+\begin{DoxyCompactList}\small\item\em Compute non-\/symmetric moments. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_ade52fa354cc5b681c4d6ef6fc8b2c61b}{m\+\_\+derived\+\_\+variables\+::s\+\_\+symmetric\+\_\+moments} (q\+\_\+prim\+\_\+vf, moments, dir)
+\begin{DoxyCompactList}\small\item\em Compute symmetric moments. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_abdf1859a7ad678848feb69bbe89a2f95}{m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+fluid\+\_\+bounds} (q\+\_\+prim\+\_\+vf, bounds)
+\begin{DoxyCompactList}\small\item\em This subroutine is used together with the volume fraction model and when called upon, it computes the min and max bounds of the fluid in each direction in the domain. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a2472e46739cdedf315aefa209a08f211}{m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+coherent\+\_\+body} (q\+\_\+prim\+\_\+vf, cb\+\_\+mass)
+\begin{DoxyCompactList}\small\item\em This subroutine is used together with the volume fraction model and when called upon, it computes the total mass of a fluid in the entire domain for which the volume fraction is greater than a threshold value. This gives the mass of the coherent body. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__derived__variables_a976bfd341efaba6840dc23d6abc4f29e}{m\+\_\+derived\+\_\+variables\+::s\+\_\+derive\+\_\+centerline} (q\+\_\+prim\+\_\+vf, cntrline)
+\begin{DoxyCompactList}\small\item\em This subroutine is used together with the volume fraction model and when called upon, it computes the centerline length of the fluid. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__derived__variables_a735665bf598281689158d9d6e075f3d4}{m\+\_\+derived\+\_\+variables\+::s\+\_\+finalize\+\_\+derived\+\_\+variables\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{Indent}\textbf{ Finite-\/difference coefficients}\par
+{\em Finite-\/difference (fd) coefficients in x-\/, y-\/ and z-\/coordinate directions. Note that because sufficient boundary information is available for all the active coordinate directions, the centered family of the finite-\/difference schemes is used. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__derived__variables_a4f61d6bef7f53e49a0f5e4a3f9577912}{m\+\_\+derived\+\_\+variables\+::fd\+\_\+coeff\+\_\+x}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__derived__variables_ab273055cd131e3ce73c1f468b78af7b7}{m\+\_\+derived\+\_\+variables\+::fd\+\_\+coeff\+\_\+y}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__derived__variables_a3cafc9204d5773653e119ce3a3b98722}{m\+\_\+derived\+\_\+variables\+::fd\+\_\+coeff\+\_\+z}
+\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__derived__variables}{m\+\_\+derived\+\_\+variables}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

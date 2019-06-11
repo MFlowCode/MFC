@@ -1,0 +1,67 @@
+\hypertarget{m__start__up_8f90}{}\section{m\+\_\+start\+\_\+up.\+f90 File Reference}
+\label{m__start__up_8f90}\index{m\+\_\+start\+\_\+up.\+f90@{m\+\_\+start\+\_\+up.\+f90}}
+
+
+Contains module \hyperlink{namespacem__start__up}{m\+\_\+start\+\_\+up}.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__start__up_1_1s__read__abstract__data__files}{m\+\_\+start\+\_\+up\+::s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files}
+\end{DoxyCompactItemize}
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__start__up}{m\+\_\+start\+\_\+up}
+\begin{DoxyCompactList}\small\item\em The purpose of the module is primarily to read in the files that contain the inputs, the initial condition data and the grid data that are provided by the user. The module is additionally tasked with verifying the consistency of the user inputs and completing the grid variables\+The purpose of the module is primarily to read in the files that contain the inputs, the initial condition data and the grid data that are provided by the user. The module is additionally tasked with verifying the consistency of the user inputs and completing the grid variables. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__start__up_ae0571e78c0179c22d3811df31c33c321}{m\+\_\+start\+\_\+up\+::s\+\_\+read\+\_\+input\+\_\+file} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to first verify that an input file has been made available by the user. Provided that this is so, the input file is then read in. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__start__up_ab5f7e03f1da1999ee699cec4f26370e0}{m\+\_\+start\+\_\+up\+::s\+\_\+check\+\_\+input\+\_\+file} ()
+\begin{DoxyCompactList}\small\item\em The goal of this procedure is to verify that each of the user provided inputs is valid and that their combination consitutes a meaningful configuration for the simulation. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__start__up_abd3c3fd9fbb80ef2ddaf82945c1c1af9}{m\+\_\+start\+\_\+up\+::s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files} (q\+\_\+cons\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The primary purpose of this procedure is to read in the initial condition and grid data files. The cell-\/average conservative variables constitute the former, while the cell-\/boundary locations in x-\/, y-\/ and z-\/directions make up the latter. This procedure also calculates the cell-\/ width distributions from the cell-\/boundary locations. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__start__up_a45c8fef6680263063a1c7d2fa1748013}{m\+\_\+start\+\_\+up\+::s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files} (q\+\_\+cons\+\_\+vf)
+\item 
+subroutine, public \hyperlink{namespacem__start__up_afd813d91357dc4664a58c690e935ccbd}{m\+\_\+start\+\_\+up\+::s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffers} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to populate the buffers of the grid variables, which are constituted of the cell-\/ boundary locations and cell-\/width distributions, based on the boundary conditions. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__start__up_a7e47c12de90e408e70de7da3f2d24e28}{m\+\_\+start\+\_\+up\+::s\+\_\+account\+\_\+for\+\_\+capillary\+\_\+potential\+\_\+energy} (v\+\_\+vf)
+\item 
+subroutine, public \hyperlink{namespacem__start__up_a38182f7fcc92c1c687840339a20e85cd}{m\+\_\+start\+\_\+up\+::s\+\_\+initialize\+\_\+internal\+\_\+energy\+\_\+equations} (v\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to initialize the values of the internal-\/energy equations of each phase from the mass of each phase, the mixture momentum and mixture-\/total-\/energy equations. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__start__up_a37202711d89d04cd18f08170ba608aa1}{m\+\_\+start\+\_\+up\+::s\+\_\+initialize\+\_\+start\+\_\+up\+\_\+module} ()
+\item 
+subroutine, public \hyperlink{namespacem__start__up_a65fd279db64882a3732a0549ec74e335}{m\+\_\+start\+\_\+up\+::s\+\_\+finalize\+\_\+start\+\_\+up\+\_\+module} ()
+\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__start__up_acd3b736578c59b1bd9dfc4b81f4a7279}{m\+\_\+start\+\_\+up\+::grad\+\_\+x\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__start__up_a2e9ad6009d63488a8f8c7a3a548ba433}{m\+\_\+start\+\_\+up\+::grad\+\_\+y\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__start__up_ada153b7f1b2f725b026b89cd187d3206}{m\+\_\+start\+\_\+up\+::grad\+\_\+z\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__start__up_ae380781597535aa125ff18847b85a206}{m\+\_\+start\+\_\+up\+::norm\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__start__up_a7744b5bc78146b1334d0c019d83c985e}{m\+\_\+start\+\_\+up\+::kappa\+\_\+vf}
+\item 
+procedure(s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files), pointer, public \hyperlink{namespacem__start__up_a76bcd559339a2dac17d36b71eb912556}{m\+\_\+start\+\_\+up\+::s\+\_\+read\+\_\+data\+\_\+files} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__start__up}{m\+\_\+start\+\_\+up}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

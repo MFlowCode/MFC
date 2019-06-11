@@ -1,0 +1,90 @@
+\hypertarget{m__mpi__proxy_8f90}{}\section{m\+\_\+mpi\+\_\+proxy.\+f90 File Reference}
+\label{m__mpi__proxy_8f90}\index{m\+\_\+mpi\+\_\+proxy.\+f90@{m\+\_\+mpi\+\_\+proxy.\+f90}}
+
+
+Contains module \hyperlink{namespacem__mpi__proxy}{m\+\_\+mpi\+\_\+proxy}.  
+
+
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__mpi__proxy}{m\+\_\+mpi\+\_\+proxy}
+\begin{DoxyCompactList}\small\item\em This module serves as a proxy to the parameters and subroutines available in the M\+PI implementation\textquotesingle{}s M\+PI module. Specifically, the role of the proxy is to harness basic M\+PI commands into more complex procedures as to achieve the required communication goals for the post-\/process. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a9bc4c617505152d3cc553e5bc25c1ee1}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+initialize} ()
+\begin{DoxyCompactList}\small\item\em The subroutine intializes the M\+PI environment and queries both the number of processors that will be available for the job as well as the local processor rank. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a04ac565bad2b22dc045a5eeb4f516e2e}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+abort} ()
+\begin{DoxyCompactList}\small\item\em The subroutine terminates the M\+PI execution environment. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ q\+\_\+cons\+\_\+vf Conservative variables}\par
+{\em This subroutine defines local and global sizes for the data }\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a2ff35ede51e90c483969e44c31303415}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+initialize\+\_\+mpi\+\_\+data} (q\+\_\+cons\+\_\+vf)
+\item 
+subroutine \hyperlink{namespacem__mpi__proxy_abfbc42cea69273bc9fa4a2d78f636eb1}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+barrier} ()
+\begin{DoxyCompactList}\small\item\em Halts all processes until all have reached barrier. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a015ee2c0892e9cfcb858da8f27b646d5}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+initialize\+\_\+mpi\+\_\+proxy\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a69660c5fe9302a8c0496b622fa3b5286}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs} ()
+\begin{DoxyCompactList}\small\item\em Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are not available to the remaining processors. This subroutine is then in charge of broadcasting the required information. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a80c5e235786545276fe6ffa06965017f}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain} ()
+\begin{DoxyCompactList}\small\item\em This subroutine takes care of efficiently distributing the computational domain among the available processors as well as recomputing some of the global parameters so that they reflect the configuration of sub-\/domain that is overseen by the local processor. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a8e48d59a04981a6594f25ad7a7562492}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+sendrecv\+\_\+grid\+\_\+vars\+\_\+buffer\+\_\+regions} (pbc\+\_\+loc, sweep\+\_\+coord)
+\begin{DoxyCompactList}\small\item\em Communicates the buffer regions associated with the grid variables with processors in charge of the neighbooring sub-\/domains. Note that only cell-\/width spacings feature buffer regions so that no information relating to the cell-\/boundary locations is communicated. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a4d7ec0d1976967504babdf44ec83c1b1}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+sendrecv\+\_\+cons\+\_\+vars\+\_\+buffer\+\_\+regions} (q\+\_\+cons\+\_\+vf, pbc\+\_\+loc, sweep\+\_\+coord)
+\begin{DoxyCompactList}\small\item\em Communicates buffer regions associated with conservative variables with processors in charge of the neighbooring sub-\/domains. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_adaa028bb99f844487de8d6e4507e7734}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+reduce\+\_\+maxloc} (var\+\_\+loc)
+\begin{DoxyCompactList}\small\item\em The following subroutine takes the first element of the 2-\/element inputted variable and determines its maximum value on the entire computational domain. The result is stored back into the first element of the variable while the rank of the processor that is in charge of the sub-\/ domain containing the maximum is stored into the second element of the variable. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_ab2ced8f095b812fcc355539c2c5fa162}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+gather\+\_\+spatial\+\_\+extents} (spatial\+\_\+extents)
+\begin{DoxyCompactList}\small\item\em This subroutine gathers the Silo database metadata for the spatial extents in order to boost the performance of the multidimensional visualization. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_ac15a15ba12e6110bb015af0ece5bba47}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+defragment\+\_\+1d\+\_\+grid\+\_\+variable} ()
+\begin{DoxyCompactList}\small\item\em This subroutine collects the sub-\/domain cell-\/boundary or cell-\/center locations data from all of the processors and puts back together the grid of the entire computational domain on the rank 0 processor. This is only done for 1D simulations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a0b226acd5a9097566685604292c3ae0d}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+gather\+\_\+data\+\_\+extents} (q\+\_\+sf, data\+\_\+extents)
+\begin{DoxyCompactList}\small\item\em This subroutine gathers the Silo database metadata for the flow variable\textquotesingle{}s extents as to boost performance of the multidimensional visualization. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_ae5286531f6390643aad1e4db5d5f6d91}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+defragment\+\_\+1d\+\_\+flow\+\_\+variable} (q\+\_\+sf, q\+\_\+root\+\_\+sf)
+\begin{DoxyCompactList}\small\item\em This subroutine gathers the sub-\/domain flow variable data from all of the processors and puts it back together for the entire computational domain on the rank 0 processor. This is only done for 1D simulations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_ac984c84fe4140876d6600250af9807da}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+finalize\+\_\+mpi\+\_\+proxy\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a43fbda10c02ec8bc1fc572c83090f2e5}{m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+finalize} ()
+\begin{DoxyCompactList}\small\item\em Finalization of all M\+PI related processes. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+\subsection*{Variables}
+\begin{Indent}\textbf{ Buffers of the conservative variables recieved/sent from/to neighbooring}\par
+{\em processors. Note that these variables are structured as vectors rather than arrays. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__mpi__proxy_af08f3246d9efac15d6391dc4205d4611}{m\+\_\+mpi\+\_\+proxy\+::q\+\_\+cons\+\_\+buffer\+\_\+in}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__mpi__proxy_a3d449655a88a9e5248af35a82caf877a}{m\+\_\+mpi\+\_\+proxy\+::q\+\_\+cons\+\_\+buffer\+\_\+out}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Recieve counts and displacement vector variables, respectively, used in}\par
+{\em enabling M\+PI to gather varying amounts of data from all processes to the root process }\begin{DoxyCompactItemize}
+\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__mpi__proxy_a2198e825f0884d4ee9e96b6efdb69cee}{m\+\_\+mpi\+\_\+proxy\+::recvcounts}
+\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__mpi__proxy_aebaa6e3cc66d2431c5fb49896d40d7e6}{m\+\_\+mpi\+\_\+proxy\+::displs}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Generic flags used to identify and report M\+PI errors}\par
+\begin{DoxyCompactItemize}
+\item 
+integer, private \hyperlink{namespacem__mpi__proxy_ae5709407e3600d19d79b183e409bb982}{m\+\_\+mpi\+\_\+proxy\+::err\+\_\+code}
+\item 
+integer, private \hyperlink{namespacem__mpi__proxy_a306ba163b09cfc692125f2c0ba82ef8c}{m\+\_\+mpi\+\_\+proxy\+::ierr}
+\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__mpi__proxy}{m\+\_\+mpi\+\_\+proxy}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

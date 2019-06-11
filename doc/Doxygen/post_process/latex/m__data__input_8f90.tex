@@ -1,0 +1,55 @@
+\hypertarget{m__data__input_8f90}{}\section{m\+\_\+data\+\_\+input.\+f90 File Reference}
+\label{m__data__input_8f90}\index{m\+\_\+data\+\_\+input.\+f90@{m\+\_\+data\+\_\+input.\+f90}}
+
+
+Contains module \hyperlink{namespacem__data__input}{m\+\_\+data\+\_\+input}.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__data__input_1_1s__read__abstract__data__files}{m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files}
+\begin{DoxyCompactList}\small\item\em Subroutine for reading data files. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__data__input}{m\+\_\+data\+\_\+input}
+\begin{DoxyCompactList}\small\item\em This module features procedures, which for a specific time-\/step, read in the raw simulation data for the grid and the conservative variables and fill out their buffer regions. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__data__input_a9d69f4bcb771c60157b62bc4b04a6ba1}{m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em This subroutine is called at each time-\/step that has to be post-\/processed in order to read the raw data files present in the corresponding time-\/step directory and to populate the associated grid and conservative variables. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_a0dd37369dd52b1299b06563f96c25805}{m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em This subroutine is called at each time-\/step that has to be post-\/processed in order to parallel-\/read the raw data files present in the corresponding time-\/step directory and to populate the associated grid and conservative variables. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_afc05d7714001946feb2485ce18cb00f6}{m\+\_\+data\+\_\+input\+::s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions} ()
+\begin{DoxyCompactList}\small\item\em The following subroutine populates the buffer regions of the cell-\/width spacings, the cell-\/boundary locations and the cell-\/center locations. Note that the buffer regions of the last two variables should be interpreted slightly differently than usual. They are really ghost zones that are used in aiding the multidimensional visualization of Silo database files, in Vis\+It, when processor boundary conditions are present. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_a5cef0da967dbbf0d148b26bd67046c8d}{m\+\_\+data\+\_\+input\+::s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to populate the buffers of the cell-\/average conservative variables, depending on the boundary conditions. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_a806c2edb19d6a47fd494f8491d2b93d3}{m\+\_\+data\+\_\+input\+::s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_aa29d4a799cd1c1cd7d0f05f05f42abe0}{m\+\_\+data\+\_\+input\+::s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable, public \hyperlink{namespacem__data__input_a464b144d544f769a0d9a1b549c510e1f}{m\+\_\+data\+\_\+input\+::q\+\_\+cons\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Conservative variables. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable, public \hyperlink{namespacem__data__input_a65ba499d27d4b21b1ec8bcfe02816bd4}{m\+\_\+data\+\_\+input\+::q\+\_\+prim\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Primitive variables. \end{DoxyCompactList}\item 
+procedure(s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files), pointer, public \hyperlink{namespacem__data__input_aba1cbfb151ed869483feb37291104830}{m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+data\+\_\+files} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__data__input}{m\+\_\+data\+\_\+input}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

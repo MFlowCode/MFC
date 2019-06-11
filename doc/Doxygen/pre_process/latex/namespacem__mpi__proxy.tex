@@ -1,0 +1,179 @@
+\hypertarget{namespacem__mpi__proxy}{}\section{m\+\_\+mpi\+\_\+proxy Module Reference}
+\label{namespacem__mpi__proxy}\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+
+
+This module serves as a proxy to the parameters and subroutines available in the M\+PI implementation\textquotesingle{}s M\+PI module. Specifically, the role of the proxy is to harness basic M\+PI commands into more complex procedures as to achieve the required pre-\/processing communication goals.  
+
+
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a9bc4c617505152d3cc553e5bc25c1ee1}{s\+\_\+mpi\+\_\+initialize} ()
+\begin{DoxyCompactList}\small\item\em The subroutine intializes the M\+PI environment and queries both the number of processors that will be available for the job as well as the local processor rank. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a04ac565bad2b22dc045a5eeb4f516e2e}{s\+\_\+mpi\+\_\+abort} ()
+\begin{DoxyCompactList}\small\item\em The subroutine terminates the M\+PI execution environment. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a2ff35ede51e90c483969e44c31303415}{s\+\_\+initialize\+\_\+mpi\+\_\+data} (q\+\_\+cons\+\_\+vf)
+\item 
+subroutine \hyperlink{namespacem__mpi__proxy_abfbc42cea69273bc9fa4a2d78f636eb1}{s\+\_\+mpi\+\_\+barrier} ()
+\begin{DoxyCompactList}\small\item\em Halts all processes until all have reached barrier. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a69660c5fe9302a8c0496b622fa3b5286}{s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs} ()
+\begin{DoxyCompactList}\small\item\em Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are not available to the remaining processors. This subroutine is then in charge of broadcasting the required information. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a80c5e235786545276fe6ffa06965017f}{s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain} ()
+\begin{DoxyCompactList}\small\item\em Description\+: This subroutine takes care of efficiently distributing the computational domain among the available processors as well as recomputing some of the global parameters so that they reflect the configuration of sub-\/domain that is overseen by the local processor. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_ad02d11c9b94b9354f7d8234937bb27a2}{s\+\_\+mpi\+\_\+reduce\+\_\+min} (var\+\_\+loc)
+\begin{DoxyCompactList}\small\item\em The following subroutine takes the inputted variable and determines its minimum value on the entire computational domain. The result is stored back into inputted variable. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__mpi__proxy_a43fbda10c02ec8bc1fc572c83090f2e5}{s\+\_\+mpi\+\_\+finalize} ()
+\begin{DoxyCompactList}\small\item\em Finalization of all M\+PI related processes. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+integer, private \hyperlink{namespacem__mpi__proxy_ae5709407e3600d19d79b183e409bb982}{err\+\_\+code}
+\item 
+integer, private \hyperlink{namespacem__mpi__proxy_a306ba163b09cfc692125f2c0ba82ef8c}{ierr}
+\begin{DoxyCompactList}\small\item\em Generic flags used to identify and report M\+PI errors. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+This module serves as a proxy to the parameters and subroutines available in the M\+PI implementation\textquotesingle{}s M\+PI module. Specifically, the role of the proxy is to harness basic M\+PI commands into more complex procedures as to achieve the required pre-\/processing communication goals. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__mpi__proxy_a2ff35ede51e90c483969e44c31303415}\label{namespacem__mpi__proxy_a2ff35ede51e90c483969e44c31303415}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+initialize\+\_\+mpi\+\_\+data@{s\+\_\+initialize\+\_\+mpi\+\_\+data}}
+\index{s\+\_\+initialize\+\_\+mpi\+\_\+data@{s\+\_\+initialize\+\_\+mpi\+\_\+data}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+mpi\+\_\+data()}{s\_initialize\_mpi\_data()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+initialize\+\_\+mpi\+\_\+data (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+cons\+\_\+vf }\end{DoxyParamCaption})}
+
+
+
+Definition at line 101 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_a04ac565bad2b22dc045a5eeb4f516e2e}\label{namespacem__mpi__proxy_a04ac565bad2b22dc045a5eeb4f516e2e}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+abort@{s\+\_\+mpi\+\_\+abort}}
+\index{s\+\_\+mpi\+\_\+abort@{s\+\_\+mpi\+\_\+abort}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+abort()}{s\_mpi\_abort()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+abort (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The subroutine terminates the M\+PI execution environment. 
+
+
+
+Definition at line 91 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_abfbc42cea69273bc9fa4a2d78f636eb1}\label{namespacem__mpi__proxy_abfbc42cea69273bc9fa4a2d78f636eb1}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+barrier@{s\+\_\+mpi\+\_\+barrier}}
+\index{s\+\_\+mpi\+\_\+barrier@{s\+\_\+mpi\+\_\+barrier}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+barrier()}{s\_mpi\_barrier()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+barrier (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Halts all processes until all have reached barrier. 
+
+
+
+Definition at line 140 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_a69660c5fe9302a8c0496b622fa3b5286}\label{namespacem__mpi__proxy_a69660c5fe9302a8c0496b622fa3b5286}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs@{s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs}}
+\index{s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs@{s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs()}{s\_mpi\_bcast\_user\_inputs()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+bcast\+\_\+user\+\_\+inputs (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are not available to the remaining processors. This subroutine is then in charge of broadcasting the required information. 
+
+
+
+Definition at line 154 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_a80c5e235786545276fe6ffa06965017f}\label{namespacem__mpi__proxy_a80c5e235786545276fe6ffa06965017f}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain@{s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain}}
+\index{s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain@{s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain()}{s\_mpi\_decompose\_computational\_domain()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+decompose\+\_\+computational\+\_\+domain (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Description\+: This subroutine takes care of efficiently distributing the computational domain among the available processors as well as recomputing some of the global parameters so that they reflect the configuration of sub-\/domain that is overseen by the local processor. 
+
+
+
+Definition at line 412 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_a43fbda10c02ec8bc1fc572c83090f2e5}\label{namespacem__mpi__proxy_a43fbda10c02ec8bc1fc572c83090f2e5}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+finalize@{s\+\_\+mpi\+\_\+finalize}}
+\index{s\+\_\+mpi\+\_\+finalize@{s\+\_\+mpi\+\_\+finalize}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+finalize()}{s\_mpi\_finalize()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+finalize (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Finalization of all M\+PI related processes. 
+
+
+
+Definition at line 859 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_a9bc4c617505152d3cc553e5bc25c1ee1}\label{namespacem__mpi__proxy_a9bc4c617505152d3cc553e5bc25c1ee1}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+initialize@{s\+\_\+mpi\+\_\+initialize}}
+\index{s\+\_\+mpi\+\_\+initialize@{s\+\_\+mpi\+\_\+initialize}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+initialize()}{s\_mpi\_initialize()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+initialize (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The subroutine intializes the M\+PI environment and queries both the number of processors that will be available for the job as well as the local processor rank. 
+
+
+
+Definition at line 63 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_ad02d11c9b94b9354f7d8234937bb27a2}\label{namespacem__mpi__proxy_ad02d11c9b94b9354f7d8234937bb27a2}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!s\+\_\+mpi\+\_\+reduce\+\_\+min@{s\+\_\+mpi\+\_\+reduce\+\_\+min}}
+\index{s\+\_\+mpi\+\_\+reduce\+\_\+min@{s\+\_\+mpi\+\_\+reduce\+\_\+min}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{s\+\_\+mpi\+\_\+reduce\+\_\+min()}{s\_mpi\_reduce\_min()}}
+{\footnotesize\ttfamily subroutine m\+\_\+mpi\+\_\+proxy\+::s\+\_\+mpi\+\_\+reduce\+\_\+min (\begin{DoxyParamCaption}\item[{real(kind(0d0)), intent(inout)}]{var\+\_\+loc }\end{DoxyParamCaption})}
+
+
+
+The following subroutine takes the inputted variable and determines its minimum value on the entire computational domain. The result is stored back into inputted variable. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em var\+\_\+loc} & holds the local value to be reduced among all the processors in communicator. On output, the variable holds the minimum value, reduced amongst all of the local values. \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 834 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__mpi__proxy_ae5709407e3600d19d79b183e409bb982}\label{namespacem__mpi__proxy_ae5709407e3600d19d79b183e409bb982}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!err\+\_\+code@{err\+\_\+code}}
+\index{err\+\_\+code@{err\+\_\+code}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{err\+\_\+code}{err\_code}}
+{\footnotesize\ttfamily integer, private m\+\_\+mpi\+\_\+proxy\+::err\+\_\+code\hspace{0.3cm}{\ttfamily [private]}}
+
+
+
+Definition at line 53 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+
+\mbox{\Hypertarget{namespacem__mpi__proxy_a306ba163b09cfc692125f2c0ba82ef8c}\label{namespacem__mpi__proxy_a306ba163b09cfc692125f2c0ba82ef8c}} 
+\index{m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}!ierr@{ierr}}
+\index{ierr@{ierr}!m\+\_\+mpi\+\_\+proxy@{m\+\_\+mpi\+\_\+proxy}}
+\subsubsection{\texorpdfstring{ierr}{ierr}}
+{\footnotesize\ttfamily integer, private m\+\_\+mpi\+\_\+proxy\+::ierr\hspace{0.3cm}{\ttfamily [private]}}
+
+
+
+Generic flags used to identify and report M\+PI errors. 
+
+
+
+Definition at line 53 of file m\+\_\+mpi\+\_\+proxy.\+f90.
+

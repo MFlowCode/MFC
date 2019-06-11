@@ -1,0 +1,197 @@
+\hypertarget{namespacem__fftw}{}\section{m\+\_\+fftw Module Reference}
+\label{namespacem__fftw}\index{m\+\_\+fftw@{m\+\_\+fftw}}
+
+
+The module contains the subroutines for the F\+FT routines.  
+
+
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__fftw_a6f924722e9573d6526d5d1ba173f4ac6}{s\+\_\+initialize\+\_\+fftw\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to create the fftw plan that will be used in the forward and backward D\+F\+Ts when applying the Fourier filter in the azimuthal direction. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__fftw_a23c9c885c472ef518a89306f78dab97c}{s\+\_\+apply\+\_\+fourier\+\_\+decomposition} (q\+\_\+sf, \hyperlink{m__data__output_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i})
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to Fourier decompose the flow field. Not done in most efficient manner since subroutine is called for every mode, but can deal with efficiency later. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__fftw_a0666fa4d38fb46540fd108b76e835b45}{s\+\_\+finalize\+\_\+fftw\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to destroy the fftw plan that will be used in the forward and backward D\+F\+Ts when applying the Fourier filter in the azimuthal direction. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(c\+\_\+ptr) \hyperlink{namespacem__fftw_af605e2137e55bfc3b5e95bbdad51803a}{fwd\+\_\+plan}
+\item 
+type(c\+\_\+ptr) \hyperlink{namespacem__fftw_a5120d0924ad190de0c0967cfdfdffb64}{bwd\+\_\+plan}
+\item 
+type(c\+\_\+ptr) \hyperlink{namespacem__fftw_a0db6f31d6d28b16d18982654bd98501a}{fftw\+\_\+real\+\_\+data}
+\item 
+type(c\+\_\+ptr) \hyperlink{namespacem__fftw_a5ec1a65aeb900c5fc0c437c04a15bb1c}{fftw\+\_\+cmplx\+\_\+data}
+\item 
+type(c\+\_\+ptr) \hyperlink{namespacem__fftw_acf83109d9518ac141074223356bc9385}{fftw\+\_\+fltr\+\_\+cmplx\+\_\+data}
+\item 
+integer \hyperlink{namespacem__fftw_a7963f79188a7191b7d8436707e2aa4a5}{real\+\_\+size}
+\item 
+integer \hyperlink{namespacem__fftw_afa99ee82497ae0ee316e97734ad0d7d3}{cmplx\+\_\+size}
+\item 
+real(c\+\_\+double), dimension(\+:), pointer \hyperlink{namespacem__fftw_a5fc31000de6fec8b2dc1a9a1259f8089}{data\+\_\+real}
+\item 
+complex(c\+\_\+double\+\_\+complex), dimension(\+:), pointer \hyperlink{namespacem__fftw_a46b5b6c6849f50f0fe5f96301520e981}{data\+\_\+cmplx}
+\item 
+complex(c\+\_\+double\+\_\+complex), dimension(\+:), pointer \hyperlink{namespacem__fftw_a2baa49912c2585f5937bcb41804edc3a}{data\+\_\+fltr\+\_\+cmplx}
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+The module contains the subroutines for the F\+FT routines. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__fftw_a23c9c885c472ef518a89306f78dab97c}\label{namespacem__fftw_a23c9c885c472ef518a89306f78dab97c}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!s\+\_\+apply\+\_\+fourier\+\_\+decomposition@{s\+\_\+apply\+\_\+fourier\+\_\+decomposition}}
+\index{s\+\_\+apply\+\_\+fourier\+\_\+decomposition@{s\+\_\+apply\+\_\+fourier\+\_\+decomposition}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{s\+\_\+apply\+\_\+fourier\+\_\+decomposition()}{s\_apply\_fourier\_decomposition()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+fftw\+::s\+\_\+apply\+\_\+fourier\+\_\+decomposition (\begin{DoxyParamCaption}\item[{real(kind(0d0)), dimension( -\/offset\+\_\+x\%beg \+: m+offset\+\_\+x\%end  ,                        -\/offset\+\_\+y\%beg \+: n+offset\+\_\+y\%end  ,                        -\/offset\+\_\+z\%beg \+: p+offset\+\_\+z\%end ), intent(inout)}]{q\+\_\+sf,  }\item[{integer, intent(in)}]{i }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to Fourier decompose the flow field. Not done in most efficient manner since subroutine is called for every mode, but can deal with efficiency later. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+sf} & Scalar field to transform \\
+\hline
+{\em i} & Fourier component \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 102 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a0666fa4d38fb46540fd108b76e835b45}\label{namespacem__fftw_a0666fa4d38fb46540fd108b76e835b45}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!s\+\_\+finalize\+\_\+fftw\+\_\+module@{s\+\_\+finalize\+\_\+fftw\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+fftw\+\_\+module@{s\+\_\+finalize\+\_\+fftw\+\_\+module}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+fftw\+\_\+module()}{s\_finalize\_fftw\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+fftw\+::s\+\_\+finalize\+\_\+fftw\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to destroy the fftw plan that will be used in the forward and backward D\+F\+Ts when applying the Fourier filter in the azimuthal direction. 
+
+
+
+Definition at line 143 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a6f924722e9573d6526d5d1ba173f4ac6}\label{namespacem__fftw_a6f924722e9573d6526d5d1ba173f4ac6}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!s\+\_\+initialize\+\_\+fftw\+\_\+module@{s\+\_\+initialize\+\_\+fftw\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+fftw\+\_\+module@{s\+\_\+initialize\+\_\+fftw\+\_\+module}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+fftw\+\_\+module()}{s\_initialize\_fftw\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+fftw\+::s\+\_\+initialize\+\_\+fftw\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to create the fftw plan that will be used in the forward and backward D\+F\+Ts when applying the Fourier filter in the azimuthal direction. 
+
+
+
+Definition at line 72 of file m\+\_\+fftw.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__fftw_a5120d0924ad190de0c0967cfdfdffb64}\label{namespacem__fftw_a5120d0924ad190de0c0967cfdfdffb64}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!bwd\+\_\+plan@{bwd\+\_\+plan}}
+\index{bwd\+\_\+plan@{bwd\+\_\+plan}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{bwd\+\_\+plan}{bwd\_plan}}
+{\footnotesize\ttfamily type(c\+\_\+ptr) m\+\_\+fftw\+::bwd\+\_\+plan}
+
+
+
+Definition at line 55 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_afa99ee82497ae0ee316e97734ad0d7d3}\label{namespacem__fftw_afa99ee82497ae0ee316e97734ad0d7d3}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!cmplx\+\_\+size@{cmplx\+\_\+size}}
+\index{cmplx\+\_\+size@{cmplx\+\_\+size}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{cmplx\+\_\+size}{cmplx\_size}}
+{\footnotesize\ttfamily integer m\+\_\+fftw\+::cmplx\+\_\+size}
+
+
+
+Definition at line 57 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a46b5b6c6849f50f0fe5f96301520e981}\label{namespacem__fftw_a46b5b6c6849f50f0fe5f96301520e981}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!data\+\_\+cmplx@{data\+\_\+cmplx}}
+\index{data\+\_\+cmplx@{data\+\_\+cmplx}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{data\+\_\+cmplx}{data\_cmplx}}
+{\footnotesize\ttfamily complex(c\+\_\+double\+\_\+complex), dimension(\+:), pointer m\+\_\+fftw\+::data\+\_\+cmplx}
+
+
+
+Definition at line 61 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a2baa49912c2585f5937bcb41804edc3a}\label{namespacem__fftw_a2baa49912c2585f5937bcb41804edc3a}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!data\+\_\+fltr\+\_\+cmplx@{data\+\_\+fltr\+\_\+cmplx}}
+\index{data\+\_\+fltr\+\_\+cmplx@{data\+\_\+fltr\+\_\+cmplx}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{data\+\_\+fltr\+\_\+cmplx}{data\_fltr\_cmplx}}
+{\footnotesize\ttfamily complex(c\+\_\+double\+\_\+complex), dimension(\+:), pointer m\+\_\+fftw\+::data\+\_\+fltr\+\_\+cmplx}
+
+
+
+Definition at line 63 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a5fc31000de6fec8b2dc1a9a1259f8089}\label{namespacem__fftw_a5fc31000de6fec8b2dc1a9a1259f8089}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!data\+\_\+real@{data\+\_\+real}}
+\index{data\+\_\+real@{data\+\_\+real}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{data\+\_\+real}{data\_real}}
+{\footnotesize\ttfamily real(c\+\_\+double), dimension(\+:), pointer m\+\_\+fftw\+::data\+\_\+real}
+
+
+
+Definition at line 59 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a5ec1a65aeb900c5fc0c437c04a15bb1c}\label{namespacem__fftw_a5ec1a65aeb900c5fc0c437c04a15bb1c}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!fftw\+\_\+cmplx\+\_\+data@{fftw\+\_\+cmplx\+\_\+data}}
+\index{fftw\+\_\+cmplx\+\_\+data@{fftw\+\_\+cmplx\+\_\+data}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{fftw\+\_\+cmplx\+\_\+data}{fftw\_cmplx\_data}}
+{\footnotesize\ttfamily type(c\+\_\+ptr) m\+\_\+fftw\+::fftw\+\_\+cmplx\+\_\+data}
+
+
+
+Definition at line 56 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_acf83109d9518ac141074223356bc9385}\label{namespacem__fftw_acf83109d9518ac141074223356bc9385}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!fftw\+\_\+fltr\+\_\+cmplx\+\_\+data@{fftw\+\_\+fltr\+\_\+cmplx\+\_\+data}}
+\index{fftw\+\_\+fltr\+\_\+cmplx\+\_\+data@{fftw\+\_\+fltr\+\_\+cmplx\+\_\+data}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{fftw\+\_\+fltr\+\_\+cmplx\+\_\+data}{fftw\_fltr\_cmplx\_data}}
+{\footnotesize\ttfamily type(c\+\_\+ptr) m\+\_\+fftw\+::fftw\+\_\+fltr\+\_\+cmplx\+\_\+data}
+
+
+
+Definition at line 56 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a0db6f31d6d28b16d18982654bd98501a}\label{namespacem__fftw_a0db6f31d6d28b16d18982654bd98501a}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!fftw\+\_\+real\+\_\+data@{fftw\+\_\+real\+\_\+data}}
+\index{fftw\+\_\+real\+\_\+data@{fftw\+\_\+real\+\_\+data}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{fftw\+\_\+real\+\_\+data}{fftw\_real\_data}}
+{\footnotesize\ttfamily type(c\+\_\+ptr) m\+\_\+fftw\+::fftw\+\_\+real\+\_\+data}
+
+
+
+Definition at line 56 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_af605e2137e55bfc3b5e95bbdad51803a}\label{namespacem__fftw_af605e2137e55bfc3b5e95bbdad51803a}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!fwd\+\_\+plan@{fwd\+\_\+plan}}
+\index{fwd\+\_\+plan@{fwd\+\_\+plan}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{fwd\+\_\+plan}{fwd\_plan}}
+{\footnotesize\ttfamily type(c\+\_\+ptr) m\+\_\+fftw\+::fwd\+\_\+plan}
+
+
+
+Definition at line 55 of file m\+\_\+fftw.\+f90.
+
+\mbox{\Hypertarget{namespacem__fftw_a7963f79188a7191b7d8436707e2aa4a5}\label{namespacem__fftw_a7963f79188a7191b7d8436707e2aa4a5}} 
+\index{m\+\_\+fftw@{m\+\_\+fftw}!real\+\_\+size@{real\+\_\+size}}
+\index{real\+\_\+size@{real\+\_\+size}!m\+\_\+fftw@{m\+\_\+fftw}}
+\subsubsection{\texorpdfstring{real\+\_\+size}{real\_size}}
+{\footnotesize\ttfamily integer m\+\_\+fftw\+::real\+\_\+size}
+
+
+
+Definition at line 57 of file m\+\_\+fftw.\+f90.
+

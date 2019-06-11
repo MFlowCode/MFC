@@ -1,0 +1,677 @@
+\hypertarget{namespacem__data__output}{}\section{m\+\_\+data\+\_\+output Module Reference}
+\label{namespacem__data__output}\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+
+
+The primary purpose of this module is to output the grid and the conservative variables data at the chosen time-\/step interval. In addition, this module is also in charge of outputting a run-\/time information file which summarizes the time-\/dependent behavior !of the stability criteria. The latter include the inviscid Courant– Friedrichs–\+Lewy (I\+C\+FL), viscous C\+FL (V\+C\+FL), capillary C\+FL (C\+C\+FL) and cell Reynolds (Rc) numbers.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__data__output_1_1s__write__abstract__data__files}{s\+\_\+write\+\_\+abstract\+\_\+data\+\_\+files}
+\begin{DoxyCompactList}\small\item\em Write data files. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__data__output_a050b4b01f11c1d352f55b46b6514634d}{s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to open a new or pre-\/ existing run-\/time information file and append to it the basic header information relevant to current simulation. In general, this requires generating a table header for those stability criteria which will be written at every time-\/step. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a36714d4cf746d5beb2736752fdd6d747}{s\+\_\+open\+\_\+com\+\_\+files} ()
+\begin{DoxyCompactList}\small\item\em This opens a formatted data file where the root processor can write out the CoM information. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a411af1336ca1bc899d3b7352d9383a81}{s\+\_\+open\+\_\+cb\+\_\+files} ()
+\begin{DoxyCompactList}\small\item\em This opens a formatted data file where the root processor can write out the coherent body (cb) information. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_af469c3d867d96eb1ca255832e586ec97}{s\+\_\+open\+\_\+probe\+\_\+files} ()
+\begin{DoxyCompactList}\small\item\em This opens a formatted data file where the root processor can write out flow probe information. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a33a72559ec5cfdedf7162a8269d41201}{s\+\_\+write\+\_\+run\+\_\+time\+\_\+information} (q\+\_\+prim\+\_\+vf, t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em The goal of the procedure is to output to the run-\/time information file the stability criteria extrema in the entire computational domain and at the given time-\/step. Moreover, the subroutine is also in charge of tracking these stability criteria extrema over all time-\/steps. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a04c6b0f01b8561e248a740b017fc4f7d}{s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files} (q\+\_\+cons\+\_\+vf, t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to output the grid and conservative variables data files for given time-\/step. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__data__output_a178b41597f79f2c0a42c0d6e65275b71}{s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy} (v\+\_\+vf)
+\item 
+subroutine, public \hyperlink{namespacem__data__output_a9c1271b2c588c1ae3275791d41550f75}{s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files} (q\+\_\+cons\+\_\+vf, t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to output the grid and conservative variables data files for given time-\/step. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a6be3381410dd028014de2c1d02b05139}{s\+\_\+write\+\_\+com\+\_\+files} (t\+\_\+step, \hyperlink{namespacem__data__output_ac5b476661d64159fdcd7364715495f30}{q\+\_\+com}, \hyperlink{namespacem__data__output_abd8505e33c0dce0f0aba7e27ae53bef5}{moments})
+\begin{DoxyCompactList}\small\item\em This writes a formatted data file where the root processor can write out the CoM information. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a40724c992117a24479573d9fbcdfa21b}{s\+\_\+write\+\_\+cb\+\_\+files} (t\+\_\+step, \hyperlink{namespacem__data__output_a775b8128a9261b4d095f9132508d309f}{cb\+\_\+mass}, \hyperlink{namespacem__data__output_a1e7a93a0d32bbc7c691381689771b6f9}{bounds}, \hyperlink{namespacem__data__output_a4f2a6c0ed44fb82d337013e700479ce5}{cntrline})
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to output coherent body information. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a29f34883bc8e9d895dbb4232493397a1}{s\+\_\+write\+\_\+probe\+\_\+files} (t\+\_\+step, q\+\_\+cons\+\_\+vf, \hyperlink{namespacem__data__output_a1ccababc9891f8a719df1c52b49e969a}{accel\+\_\+mag})
+\begin{DoxyCompactList}\small\item\em This writes a formatted data file for the flow probe information. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a390239a7390ec5d07e31298573bf09bf}{s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file} ()
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to write to the run-\/time information file basic footer information applicable to the current computation and to close the file when done. The footer contains the stability criteria extrema over all of the time-\/steps and the simulation run-\/time. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a5646b1076ff72b2260ebefa3f44d4754}{s\+\_\+close\+\_\+com\+\_\+files} ()
+\begin{DoxyCompactList}\small\item\em Closes communication files. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_aa0eb8be31f69888d750e18df197c6011}{s\+\_\+close\+\_\+cb\+\_\+files} ()
+\begin{DoxyCompactList}\small\item\em Closes coherent body files. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a4036cc239adda35d59422a3e61bb657e}{s\+\_\+close\+\_\+probe\+\_\+files} ()
+\begin{DoxyCompactList}\small\item\em Closes probe files. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a1ca202582d46c282b83b5510e6b6d626}{icfl\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em I\+C\+FL stability criterion. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a629c072bc28e09fe890b966f8adb5f55}{vcfl\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em V\+C\+FL stability criterion. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a660d600ba9338118f6992a0d76bd6a68}{ccfl\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em C\+C\+FL stability criterion. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a700c4b4763b7c2c1479fc05a658fa28d}{rc\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em Rc stability criterion. \end{DoxyCompactList}\item 
+procedure(\hyperlink{interfacem__data__output_1_1s__write__abstract__data__files}{s\+\_\+write\+\_\+abstract\+\_\+data\+\_\+files}), pointer, public \hyperlink{namespacem__data__output_a1ba4e8126b198fb2147d4d9b60f74e44}{s\+\_\+write\+\_\+data\+\_\+files} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ I\+C\+FL, V\+C\+FL, C\+C\+FL and Rc stability criteria extrema over all the time-\/steps}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__data__output_a08a5f85ca151336658398a0eccc93cb4}{icfl\+\_\+max}
+\begin{DoxyCompactList}\small\item\em I\+C\+FL criterion maximum. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__data__output_ada9b22b5a158b2ce980f43cec00a1ac6}{vcfl\+\_\+max}
+\begin{DoxyCompactList}\small\item\em V\+C\+FL criterion maximum. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__data__output_afc429263f629a2ba4b5655dec5fd2509}{ccfl\+\_\+max}
+\begin{DoxyCompactList}\small\item\em C\+C\+FL criterion maximum. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__data__output_adb7a215382fddf4e405b97cd2f1ddf0d}{rc\+\_\+min}
+\begin{DoxyCompactList}\small\item\em Rc criterion maximum. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\end{Indent}
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_a1ccababc9891f8a719df1c52b49e969a}{accel\+\_\+mag}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_ac5b476661d64159fdcd7364715495f30}{q\+\_\+com}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_abd8505e33c0dce0f0aba7e27ae53bef5}{moments}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_a775b8128a9261b4d095f9132508d309f}{cb\+\_\+mass}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_a1e7a93a0d32bbc7c691381689771b6f9}{bounds}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_a4f2a6c0ed44fb82d337013e700479ce5}{cntrline}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_ac465283e56b508af6500bea1ad4c745c}{x\+\_\+accel}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_a9170ca95f1f4493fd30a48052ed214a7}{y\+\_\+accel}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_aef4cabc25090173d5817782631af2781}{z\+\_\+accel}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__data__output_a40d8d6be32c01d80e224dcae55f6ee50}{grad\+\_\+x\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__data__output_ac21a93203a6e7e5bc4ffb8c1082440ae}{grad\+\_\+y\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__data__output_a5b33b9c60a91e08f0e67da2de15e7d6d}{grad\+\_\+z\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__data__output_ae17a432fc2e0bc9f3a0c0614ea1cd6f8}{norm\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__data__output_a1b71fe1b222b55aa5315838816902b33}{kappa\+\_\+vf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target \hyperlink{namespacem__data__output_a8ef7ff0b857e6a25f92ddfba6ffdc731}{energy}
+\begin{DoxyCompactList}\small\item\em Energy\+: Used to write out correct E and p when We\+\_\+size $>$ 0. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+
+\subsection{Detailed Description}
+The primary purpose of this module is to output the grid and the conservative variables data at the chosen time-\/step interval. In addition, this module is also in charge of outputting a run-\/time information file which summarizes the time-\/dependent behavior !of the stability criteria. The latter include the inviscid Courant– Friedrichs–\+Lewy (I\+C\+FL), viscous C\+FL (V\+C\+FL), capillary C\+FL (C\+C\+FL) and cell Reynolds (Rc) numbers. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__data__output_aa0eb8be31f69888d750e18df197c6011}\label{namespacem__data__output_aa0eb8be31f69888d750e18df197c6011}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+close\+\_\+cb\+\_\+files@{s\+\_\+close\+\_\+cb\+\_\+files}}
+\index{s\+\_\+close\+\_\+cb\+\_\+files@{s\+\_\+close\+\_\+cb\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+close\+\_\+cb\+\_\+files()}{s\_close\_cb\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+close\+\_\+cb\+\_\+files (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Closes coherent body files. 
+
+
+
+Definition at line 2496 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a5646b1076ff72b2260ebefa3f44d4754}\label{namespacem__data__output_a5646b1076ff72b2260ebefa3f44d4754}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+close\+\_\+com\+\_\+files@{s\+\_\+close\+\_\+com\+\_\+files}}
+\index{s\+\_\+close\+\_\+com\+\_\+files@{s\+\_\+close\+\_\+com\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+close\+\_\+com\+\_\+files()}{s\_close\_com\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+close\+\_\+com\+\_\+files (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Closes communication files. 
+
+
+
+Definition at line 2480 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a4036cc239adda35d59422a3e61bb657e}\label{namespacem__data__output_a4036cc239adda35d59422a3e61bb657e}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+close\+\_\+probe\+\_\+files@{s\+\_\+close\+\_\+probe\+\_\+files}}
+\index{s\+\_\+close\+\_\+probe\+\_\+files@{s\+\_\+close\+\_\+probe\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+close\+\_\+probe\+\_\+files()}{s\_close\_probe\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+close\+\_\+probe\+\_\+files (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Closes probe files. 
+
+
+
+Definition at line 2512 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a390239a7390ec5d07e31298573bf09bf}\label{namespacem__data__output_a390239a7390ec5d07e31298573bf09bf}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file@{s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file}}
+\index{s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file@{s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file()}{s\_close\_run\_time\_information\_file()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+close\+\_\+run\+\_\+time\+\_\+information\+\_\+file (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The goal of this subroutine is to write to the run-\/time information file basic footer information applicable to the current computation and to close the file when done. The footer contains the stability criteria extrema over all of the time-\/steps and the simulation run-\/time. 
+
+
+
+Definition at line 2449 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}\label{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module()}{s\_finalize\_data\_output\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Module deallocation and/or disassociation procedures. 
+
+
+
+Definition at line 2630 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}\label{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module()}{s\_initialize\_data\_output\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. 
+
+
+
+Definition at line 2529 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a411af1336ca1bc899d3b7352d9383a81}\label{namespacem__data__output_a411af1336ca1bc899d3b7352d9383a81}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+open\+\_\+cb\+\_\+files@{s\+\_\+open\+\_\+cb\+\_\+files}}
+\index{s\+\_\+open\+\_\+cb\+\_\+files@{s\+\_\+open\+\_\+cb\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+open\+\_\+cb\+\_\+files()}{s\_open\_cb\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+open\+\_\+cb\+\_\+files (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+This opens a formatted data file where the root processor can write out the coherent body (cb) information. 
+
+
+
+Definition at line 324 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a36714d4cf746d5beb2736752fdd6d747}\label{namespacem__data__output_a36714d4cf746d5beb2736752fdd6d747}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+open\+\_\+com\+\_\+files@{s\+\_\+open\+\_\+com\+\_\+files}}
+\index{s\+\_\+open\+\_\+com\+\_\+files@{s\+\_\+open\+\_\+com\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+open\+\_\+com\+\_\+files()}{s\_open\_com\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+open\+\_\+com\+\_\+files (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+This opens a formatted data file where the root processor can write out the CoM information. 
+
+
+
+Definition at line 227 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_af469c3d867d96eb1ca255832e586ec97}\label{namespacem__data__output_af469c3d867d96eb1ca255832e586ec97}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+open\+\_\+probe\+\_\+files@{s\+\_\+open\+\_\+probe\+\_\+files}}
+\index{s\+\_\+open\+\_\+probe\+\_\+files@{s\+\_\+open\+\_\+probe\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+open\+\_\+probe\+\_\+files()}{s\_open\_probe\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+open\+\_\+probe\+\_\+files (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+This opens a formatted data file where the root processor can write out flow probe information. 
+
+
+
+Definition at line 362 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a050b4b01f11c1d352f55b46b6514634d}\label{namespacem__data__output_a050b4b01f11c1d352f55b46b6514634d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file@{s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file}}
+\index{s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file@{s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file()}{s\_open\_run\_time\_information\_file()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+open\+\_\+run\+\_\+time\+\_\+information\+\_\+file (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to open a new or pre-\/ existing run-\/time information file and append to it the basic header information relevant to current simulation. In general, this requires generating a table header for those stability criteria which will be written at every time-\/step. 
+
+
+
+Definition at line 136 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a178b41597f79f2c0a42c0d6e65275b71}\label{namespacem__data__output_a178b41597f79f2c0a42c0d6e65275b71}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy@{s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy}}
+\index{s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy@{s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy()}{s\_remove\_capillary\_potential\_energy()}}
+{\footnotesize\ttfamily subroutine m\+\_\+data\+\_\+output\+::s\+\_\+remove\+\_\+capillary\+\_\+potential\+\_\+energy (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{v\+\_\+vf }\end{DoxyParamCaption})}
+
+
+
+Definition at line 995 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a40724c992117a24479573d9fbcdfa21b}\label{namespacem__data__output_a40724c992117a24479573d9fbcdfa21b}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+cb\+\_\+files@{s\+\_\+write\+\_\+cb\+\_\+files}}
+\index{s\+\_\+write\+\_\+cb\+\_\+files@{s\+\_\+write\+\_\+cb\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+cb\+\_\+files()}{s\_write\_cb\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+cb\+\_\+files (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{t\+\_\+step,  }\item[{real(kind(0d0)), dimension(num\+\_\+fluids,10), intent(in)}]{cb\+\_\+mass,  }\item[{real(kind(0d0)), dimension(num\+\_\+fluids,5,6), intent(in)}]{bounds,  }\item[{real(kind(0d0)), dimension(num\+\_\+fluids,5), intent(in)}]{cntrline }\end{DoxyParamCaption})}
+
+
+
+The goal of this subroutine is to output coherent body information. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+{\em cb\+\_\+mass} & Coherent body mass \\
+\hline
+{\em bounds} & Coherent body boundary \\
+\hline
+{\em cntrline} & Coherent body center line \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1412 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a6be3381410dd028014de2c1d02b05139}\label{namespacem__data__output_a6be3381410dd028014de2c1d02b05139}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+com\+\_\+files@{s\+\_\+write\+\_\+com\+\_\+files}}
+\index{s\+\_\+write\+\_\+com\+\_\+files@{s\+\_\+write\+\_\+com\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+com\+\_\+files()}{s\_write\_com\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+com\+\_\+files (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{t\+\_\+step,  }\item[{real(kind(0d0)), dimension(num\+\_\+fluids,10), intent(in)}]{q\+\_\+com,  }\item[{real(kind(0d0)), dimension(num\+\_\+fluids,2,5), intent(in)}]{moments }\end{DoxyParamCaption})}
+
+
+
+This writes a formatted data file where the root processor can write out the CoM information. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+{\em q\+\_\+com} & Center of mass information \\
+\hline
+{\em moments} & Higher moment information \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1142 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a9c1271b2c588c1ae3275791d41550f75}\label{namespacem__data__output_a9c1271b2c588c1ae3275791d41550f75}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files@{s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files}}
+\index{s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files@{s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files()}{s\_write\_parallel\_data\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+parallel\+\_\+data\+\_\+files (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+cons\+\_\+vf,  }\item[{integer, intent(in)}]{t\+\_\+step }\end{DoxyParamCaption})}
+
+
+
+The goal of this subroutine is to output the grid and conservative variables data files for given time-\/step. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+cons\+\_\+vf} & Cell-\/average conservative variables \\
+\hline
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1054 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a29f34883bc8e9d895dbb4232493397a1}\label{namespacem__data__output_a29f34883bc8e9d895dbb4232493397a1}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+probe\+\_\+files@{s\+\_\+write\+\_\+probe\+\_\+files}}
+\index{s\+\_\+write\+\_\+probe\+\_\+files@{s\+\_\+write\+\_\+probe\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+probe\+\_\+files()}{s\_write\_probe\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+probe\+\_\+files (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{t\+\_\+step,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+cons\+\_\+vf,  }\item[{real(kind(0d0)), dimension(0\+:m,0\+:n,0\+:p), intent(in)}]{accel\+\_\+mag }\end{DoxyParamCaption})}
+
+
+
+This writes a formatted data file for the flow probe information. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+{\em q\+\_\+cons\+\_\+vf} & Conservative variables \\
+\hline
+{\em accel\+\_\+mag} & Acceleration magnitude information \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1860 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a33a72559ec5cfdedf7162a8269d41201}\label{namespacem__data__output_a33a72559ec5cfdedf7162a8269d41201}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+run\+\_\+time\+\_\+information@{s\+\_\+write\+\_\+run\+\_\+time\+\_\+information}}
+\index{s\+\_\+write\+\_\+run\+\_\+time\+\_\+information@{s\+\_\+write\+\_\+run\+\_\+time\+\_\+information}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+run\+\_\+time\+\_\+information()}{s\_write\_run\_time\_information()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+run\+\_\+time\+\_\+information (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{integer, intent(in)}]{t\+\_\+step }\end{DoxyParamCaption})}
+
+
+
+The goal of the procedure is to output to the run-\/time information file the stability criteria extrema in the entire computational domain and at the given time-\/step. Moreover, the subroutine is also in charge of tracking these stability criteria extrema over all time-\/steps. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/average primitive variables \\
+\hline
+{\em t\+\_\+step} & Current time step \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 421 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a04c6b0f01b8561e248a740b017fc4f7d}\label{namespacem__data__output_a04c6b0f01b8561e248a740b017fc4f7d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files@{s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files}}
+\index{s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files@{s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files()}{s\_write\_serial\_data\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+serial\+\_\+data\+\_\+files (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+cons\+\_\+vf,  }\item[{integer, intent(in)}]{t\+\_\+step }\end{DoxyParamCaption})}
+
+
+
+The goal of this subroutine is to output the grid and conservative variables data files for given time-\/step. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+cons\+\_\+vf} & Cell-\/average conservative variables \\
+\hline
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 720 of file m\+\_\+data\+\_\+output.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__data__output_a1ccababc9891f8a719df1c52b49e969a}\label{namespacem__data__output_a1ccababc9891f8a719df1c52b49e969a}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!accel\+\_\+mag@{accel\+\_\+mag}}
+\index{accel\+\_\+mag@{accel\+\_\+mag}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{accel\+\_\+mag}{accel\_mag}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::accel\+\_\+mag}
+
+
+
+Definition at line 111 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a1e7a93a0d32bbc7c691381689771b6f9}\label{namespacem__data__output_a1e7a93a0d32bbc7c691381689771b6f9}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!bounds@{bounds}}
+\index{bounds@{bounds}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{bounds}{bounds}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::bounds}
+
+
+
+Definition at line 115 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a775b8128a9261b4d095f9132508d309f}\label{namespacem__data__output_a775b8128a9261b4d095f9132508d309f}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!cb\+\_\+mass@{cb\+\_\+mass}}
+\index{cb\+\_\+mass@{cb\+\_\+mass}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{cb\+\_\+mass}{cb\_mass}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::cb\+\_\+mass}
+
+
+
+Definition at line 114 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_afc429263f629a2ba4b5655dec5fd2509}\label{namespacem__data__output_afc429263f629a2ba4b5655dec5fd2509}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!ccfl\+\_\+max@{ccfl\+\_\+max}}
+\index{ccfl\+\_\+max@{ccfl\+\_\+max}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{ccfl\+\_\+max}{ccfl\_max}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+data\+\_\+output\+::ccfl\+\_\+max}
+
+
+
+C\+C\+FL criterion maximum. 
+
+
+
+Definition at line 105 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a660d600ba9338118f6992a0d76bd6a68}\label{namespacem__data__output_a660d600ba9338118f6992a0d76bd6a68}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!ccfl\+\_\+sf@{ccfl\+\_\+sf}}
+\index{ccfl\+\_\+sf@{ccfl\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{ccfl\+\_\+sf}{ccfl\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::ccfl\+\_\+sf}
+
+
+
+C\+C\+FL stability criterion. 
+
+
+
+Definition at line 98 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a4f2a6c0ed44fb82d337013e700479ce5}\label{namespacem__data__output_a4f2a6c0ed44fb82d337013e700479ce5}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!cntrline@{cntrline}}
+\index{cntrline@{cntrline}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{cntrline}{cntrline}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::cntrline}
+
+
+
+Definition at line 116 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a8ef7ff0b857e6a25f92ddfba6ffdc731}\label{namespacem__data__output_a8ef7ff0b857e6a25f92ddfba6ffdc731}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!energy@{energy}}
+\index{energy@{energy}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{energy}{energy}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target m\+\_\+data\+\_\+output\+::energy}
+
+
+
+Energy\+: Used to write out correct E and p when We\+\_\+size $>$ 0. 
+
+
+
+Definition at line 119 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a40d8d6be32c01d80e224dcae55f6ee50}\label{namespacem__data__output_a40d8d6be32c01d80e224dcae55f6ee50}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!grad\+\_\+x\+\_\+vf@{grad\+\_\+x\+\_\+vf}}
+\index{grad\+\_\+x\+\_\+vf@{grad\+\_\+x\+\_\+vf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{grad\+\_\+x\+\_\+vf}{grad\_x\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::grad\+\_\+x\+\_\+vf}
+
+
+
+Definition at line 118 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ac21a93203a6e7e5bc4ffb8c1082440ae}\label{namespacem__data__output_ac21a93203a6e7e5bc4ffb8c1082440ae}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!grad\+\_\+y\+\_\+vf@{grad\+\_\+y\+\_\+vf}}
+\index{grad\+\_\+y\+\_\+vf@{grad\+\_\+y\+\_\+vf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{grad\+\_\+y\+\_\+vf}{grad\_y\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::grad\+\_\+y\+\_\+vf}
+
+
+
+Definition at line 118 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a5b33b9c60a91e08f0e67da2de15e7d6d}\label{namespacem__data__output_a5b33b9c60a91e08f0e67da2de15e7d6d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!grad\+\_\+z\+\_\+vf@{grad\+\_\+z\+\_\+vf}}
+\index{grad\+\_\+z\+\_\+vf@{grad\+\_\+z\+\_\+vf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{grad\+\_\+z\+\_\+vf}{grad\_z\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::grad\+\_\+z\+\_\+vf}
+
+
+
+Definition at line 118 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a08a5f85ca151336658398a0eccc93cb4}\label{namespacem__data__output_a08a5f85ca151336658398a0eccc93cb4}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!icfl\+\_\+max@{icfl\+\_\+max}}
+\index{icfl\+\_\+max@{icfl\+\_\+max}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{icfl\+\_\+max}{icfl\_max}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+data\+\_\+output\+::icfl\+\_\+max}
+
+
+
+I\+C\+FL criterion maximum. 
+
+
+
+Definition at line 103 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a1ca202582d46c282b83b5510e6b6d626}\label{namespacem__data__output_a1ca202582d46c282b83b5510e6b6d626}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!icfl\+\_\+sf@{icfl\+\_\+sf}}
+\index{icfl\+\_\+sf@{icfl\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{icfl\+\_\+sf}{icfl\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::icfl\+\_\+sf}
+
+
+
+I\+C\+FL stability criterion. 
+
+
+
+Definition at line 96 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a1b71fe1b222b55aa5315838816902b33}\label{namespacem__data__output_a1b71fe1b222b55aa5315838816902b33}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!kappa\+\_\+vf@{kappa\+\_\+vf}}
+\index{kappa\+\_\+vf@{kappa\+\_\+vf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{kappa\+\_\+vf}{kappa\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::kappa\+\_\+vf}
+
+
+
+Definition at line 118 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_abd8505e33c0dce0f0aba7e27ae53bef5}\label{namespacem__data__output_abd8505e33c0dce0f0aba7e27ae53bef5}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!moments@{moments}}
+\index{moments@{moments}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{moments}{moments}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::moments}
+
+
+
+Definition at line 113 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ae17a432fc2e0bc9f3a0c0614ea1cd6f8}\label{namespacem__data__output_ae17a432fc2e0bc9f3a0c0614ea1cd6f8}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!norm\+\_\+vf@{norm\+\_\+vf}}
+\index{norm\+\_\+vf@{norm\+\_\+vf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{norm\+\_\+vf}{norm\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::norm\+\_\+vf}
+
+
+
+Definition at line 118 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ac5b476661d64159fdcd7364715495f30}\label{namespacem__data__output_ac5b476661d64159fdcd7364715495f30}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!q\+\_\+com@{q\+\_\+com}}
+\index{q\+\_\+com@{q\+\_\+com}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{q\+\_\+com}{q\_com}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::q\+\_\+com}
+
+
+
+Definition at line 112 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_adb7a215382fddf4e405b97cd2f1ddf0d}\label{namespacem__data__output_adb7a215382fddf4e405b97cd2f1ddf0d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!rc\+\_\+min@{rc\+\_\+min}}
+\index{rc\+\_\+min@{rc\+\_\+min}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{rc\+\_\+min}{rc\_min}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+data\+\_\+output\+::rc\+\_\+min}
+
+
+
+Rc criterion maximum. 
+
+
+
+Definition at line 106 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a700c4b4763b7c2c1479fc05a658fa28d}\label{namespacem__data__output_a700c4b4763b7c2c1479fc05a658fa28d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!rc\+\_\+sf@{rc\+\_\+sf}}
+\index{rc\+\_\+sf@{rc\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{rc\+\_\+sf}{rc\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::rc\+\_\+sf}
+
+
+
+Rc stability criterion. 
+
+
+
+Definition at line 99 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a1ba4e8126b198fb2147d4d9b60f74e44}\label{namespacem__data__output_a1ba4e8126b198fb2147d4d9b60f74e44}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+write\+\_\+data\+\_\+files@{s\+\_\+write\+\_\+data\+\_\+files}}
+\index{s\+\_\+write\+\_\+data\+\_\+files@{s\+\_\+write\+\_\+data\+\_\+files}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+write\+\_\+data\+\_\+files}{s\_write\_data\_files}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__data__output_1_1s__write__abstract__data__files}{s\+\_\+write\+\_\+abstract\+\_\+data\+\_\+files}), pointer, public m\+\_\+data\+\_\+output\+::s\+\_\+write\+\_\+data\+\_\+files =$>$ N\+U\+LL()}
+
+
+
+Definition at line 123 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ada9b22b5a158b2ce980f43cec00a1ac6}\label{namespacem__data__output_ada9b22b5a158b2ce980f43cec00a1ac6}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!vcfl\+\_\+max@{vcfl\+\_\+max}}
+\index{vcfl\+\_\+max@{vcfl\+\_\+max}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{vcfl\+\_\+max}{vcfl\_max}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+data\+\_\+output\+::vcfl\+\_\+max}
+
+
+
+V\+C\+FL criterion maximum. 
+
+
+
+Definition at line 104 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a629c072bc28e09fe890b966f8adb5f55}\label{namespacem__data__output_a629c072bc28e09fe890b966f8adb5f55}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!vcfl\+\_\+sf@{vcfl\+\_\+sf}}
+\index{vcfl\+\_\+sf@{vcfl\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{vcfl\+\_\+sf}{vcfl\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::vcfl\+\_\+sf}
+
+
+
+V\+C\+FL stability criterion. 
+
+
+
+Definition at line 97 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ac465283e56b508af6500bea1ad4c745c}\label{namespacem__data__output_ac465283e56b508af6500bea1ad4c745c}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!x\+\_\+accel@{x\+\_\+accel}}
+\index{x\+\_\+accel@{x\+\_\+accel}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{x\+\_\+accel}{x\_accel}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::x\+\_\+accel}
+
+
+
+Definition at line 117 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a9170ca95f1f4493fd30a48052ed214a7}\label{namespacem__data__output_a9170ca95f1f4493fd30a48052ed214a7}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!y\+\_\+accel@{y\+\_\+accel}}
+\index{y\+\_\+accel@{y\+\_\+accel}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{y\+\_\+accel}{y\_accel}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::y\+\_\+accel}
+
+
+
+Definition at line 117 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_aef4cabc25090173d5817782631af2781}\label{namespacem__data__output_aef4cabc25090173d5817782631af2781}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!z\+\_\+accel@{z\+\_\+accel}}
+\index{z\+\_\+accel@{z\+\_\+accel}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{z\+\_\+accel}{z\_accel}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::z\+\_\+accel}
+
+
+
+Definition at line 117 of file m\+\_\+data\+\_\+output.\+f90.
+

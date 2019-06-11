@@ -1,0 +1,2495 @@
+\hypertarget{namespacem__riemann__solvers}{}\section{m\+\_\+riemann\+\_\+solvers Module Reference}
+\label{namespacem__riemann__solvers}\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+
+
+This module features a database of approximate and exact Riemann problem solvers for the Navier-\/\+Stokes system of equations, which is supplemented by appropriate advection equations that are used to capture the material interfaces. The closure of the system is achieved by the stiffened gas equation of state and any required mixture relations. Surface tension effects are accounted for and are modeled by means of a volume force acting across the diffuse material interface region. The implementation details of viscous and capillary effects, into the Riemann solvers, may be found in Perigaud and Saurel (2005). Note that both effects are available only in the volume fraction model. At this time, the approximate and exact Riemann solvers that are listed below are available\+: 1) Harten-\/\+Lax-\/van Leer (H\+LL) 2) Harten-\/\+Lax-\/van Leer-\/\+Contact (H\+L\+LC) 3) Exact.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__abstract__riemann__solver}{s\+\_\+abstract\+\_\+riemann\+\_\+solver}
+\begin{DoxyCompactList}\small\item\em Abstract interface to the subroutines that are utilized to compute the Riemann problem solution. For additional information please reference\+: 1) s\+\_\+hll\+\_\+riemann\+\_\+solver 2) s\+\_\+hllc\+\_\+riemann\+\_\+solver 3) s\+\_\+exact\+\_\+riemann\+\_\+solver. \end{DoxyCompactList}\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__average__state}{s\+\_\+compute\+\_\+abstract\+\_\+average\+\_\+state}
+\begin{DoxyCompactList}\small\item\em The abstract interface to the subroutines that are used to calculate the Roe and arithmetic average states. For more information refer to\+: 1) s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state 2) s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state. \end{DoxyCompactList}\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__viscous__source__flux}{s\+\_\+compute\+\_\+abstract\+\_\+viscous\+\_\+source\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em The abstract interface to the subroutines that are utilized to compute the viscous source fluxes for either Cartesian or cylindrical geometries. For more information please refer to\+: 1) s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux 2) s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux. \end{DoxyCompactList}\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__wave__speeds}{s\+\_\+compute\+\_\+abstract\+\_\+wave\+\_\+speeds}
+\begin{DoxyCompactList}\small\item\em The abstract interface to the subroutines that are utilized to compute the wave speeds of the Riemann problem either directly or by the means of pressure-\/velocity estimates. For more information please refer to\+: 1) s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds 2) s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_a3062ef97dfec8673afd80dcbee6e3814}{s\+\_\+hll\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The procedure features the Harten, Lax and van Leer (H\+LL) approximate Riemann solver algorithm, see Toro (1999) as well as Saurel and Abgrall (1999). Viscous and capillary effects have been included by adapting the exact Riemann solver of Perigaud and Saurel (2005). \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_ae2ad588d58b624a8320805f3860a3eb8}{s\+\_\+hllc\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em This procedure is the implementation of the Harten, Lax, van Leer, and contact (H\+L\+LC) approximate Riemann solver, see Toro (1999) and Johnsen (2007). The viscous and the surface tension effects have been included by modifying the exact Riemann solver of Perigaud and Saurel (2005). \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_a9fa393b97819b253e8b85f0444a15c27}{s\+\_\+exact\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em This procedure is the implementation of the exact Riemann solver, see Toro (1999). The effects of viscosity and the surface tension have been incorporated following the work of Perigaud and Saurel (2005). \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a16383eccdd2d0ecca7d1c26467daaaab}{s\+\_\+compute\+\_\+constant\+\_\+states} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em The procedure assigns and computes the left and right states of the Riemann problem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a16d6f8f4c3ad64fdb574a50c189750c5}{s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em Compute mixture sound speed. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a947bc1c7da743ee0820ff6648fef3c25}{s\+\_\+compute\+\_\+star\+\_\+region} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to compute the solution for pressure and velocity in the star region when using the exact Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_aba768ee53f47327a70508a913b55254d}{s\+\_\+pressure\+\_\+function} (f\+\_\+K, dfdp\+\_\+K, pres, side)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to evaluate the pressure functions f\+\_\+K in the exact Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a7e533d9eadb12af316d72f1b722735d8}{s\+\_\+guess\+\_\+pressure} (pres\+\_\+start)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to provide a guess value for pressure in the star region. The choice is made according to adaptive Riemann solver using the P\+V\+RS, T\+R\+RS. and T\+S\+RS approximate Riemann solvers. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a68651027acd974568fd5f94ed39c8e82}{s\+\_\+compute\+\_\+intercell\+\_\+solution} ()
+\begin{DoxyCompactList}\small\item\em Computes the averaged intrercell variables for the Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_aeeea1cc689aa550f3c1f182fe33a4939}{s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em The procedure computes the Roe average density, velocity, enthalpy, volume fractions, specific heat ratio function, speed of sound, shear and volume Reynolds numbers, Weber numbers and curvatures, at the cell-\/boundaries, from the left and right states of the Riemann problem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a14b6f4fa2f3b1d567a3f3347105ce61e}{s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em This procedure calculates the arithmetic average density, velocity, enthalpy, volume fractions, spec\+I\+Fic heat ratio function, sound speed, shear and volume Reynolds numbers, Weber numbers and the curvatures, at the cell-\/boundaries, from the left and right states of the Riemann problem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a1adcb619a7800a87bf5785ca59c63233}{s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em The direct estimation of the left, right and middle wave speeds, proposed by Batten et al. (1997) that results in the exact resolution of isolated shock and contact waves. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a107a13616d23f81b60bab83209067b01}{s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em Estimation of the left, right and star region wave speeds by the approximation of the pressures and velocity in the star regions, see Toro (1999). The pressures and velocity are approximated by using the primitive variables Riemann solver (P\+V\+RS) and the wave speeds are then estimated from those approximations using the exact wave relations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a6301a5631fda64dd97c11777807a22c9}{s\+\_\+compute\+\_\+flux\+\_\+limiter} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l}, \hyperlink{namespacem__riemann__solvers_a7af64bd01982bc9c8e40b9a662d106c5}{flux\+\_\+lim\+\_\+func}, norm\+\_\+dir)
+\begin{DoxyCompactList}\small\item\em This subroutine computes the flux limiter function value at the cell boundary. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_aab7e6bf69b7d0b8b9d911f418b872130}{s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_ae82ad8216dcc6938b86cf0bd5c17467b}{s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to populate the buffers of the left and right Riemann states variables, depending on the boundary conditions. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a86766279fcf7527f2b148adff4666b1c}{s\+\_\+initialize\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures needed to configure the chosen Riemann solver algorithm. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a50ff087624d23846c62cd711dd003757}{s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux} (vel\+L\+\_\+vf, dvel\+L\+\_\+dx\+\_\+vf, dvel\+L\+\_\+dy\+\_\+vf, dvel\+L\+\_\+dz\+\_\+vf, vel\+R\+\_\+vf, dvel\+R\+\_\+dx\+\_\+vf, dvel\+R\+\_\+dy\+\_\+vf, dvel\+R\+\_\+dz\+\_\+vf, flux\+\_\+src\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to evaluate and account for the contribution of viscous stresses in the source flux for the momentum and energy. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a58c0a2ab06eb5094f60c5e68dbde7300}{s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux} (vel\+L\+\_\+vf, dvel\+L\+\_\+dx\+\_\+vf, dvel\+L\+\_\+dy\+\_\+vf, dvel\+L\+\_\+dz\+\_\+vf, vel\+R\+\_\+vf, dvel\+R\+\_\+dx\+\_\+vf, dvel\+R\+\_\+dy\+\_\+vf, dvel\+R\+\_\+dz\+\_\+vf, flux\+\_\+src\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to evaluate and account for the contribution of viscous stresses in the source flux for the momentum and energy. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_aeab4abb9a37e1f537fee511bdcadc9da}{s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux} (dalpha\+L\+\_\+dx\+\_\+vf, dalpha\+L\+\_\+dy\+\_\+vf, dalpha\+L\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, dalpha\+R\+\_\+dx\+\_\+vf, dalpha\+R\+\_\+dy\+\_\+vf, dalpha\+R\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, flux\+\_\+src\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The purpose of the subroutine is to evaluate and account for the contribution of capillary stresses in the source flux for the momentum and energy. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_ab679d890c95c6cb1ee3dc5e5a9ae1c19}{s\+\_\+finalize\+\_\+riemann\+\_\+solver} (flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_a5bd1ce6fbbb840b5b1c6dd97ccb8d674}{s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa67462b01acb62fbe8730a28aa37b7a9}{flux\+\_\+gsrc\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/boundary values of the geometrical source flux that are computed through the chosen Riemann problem solver by using the left and right states given in q\+K\+\_\+prim\+\_\+rs\+\_\+vf. Currently 2D axisymmetric for inviscid only. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aee9f1299db2c29eabb5d2ef096f0abe0}{vel\+\_\+src\+\_\+rs\+\_\+vf}
+\item 
+procedure(\hyperlink{interfacem__riemann__solvers_1_1s__abstract__riemann__solver}{s\+\_\+abstract\+\_\+riemann\+\_\+solver}), pointer, public \hyperlink{namespacem__riemann__solvers_a7edc50538c81447bf49e9242d85ee1ff}{s\+\_\+riemann\+\_\+solver} =$>$ N\+U\+LL()
+\item 
+procedure(\hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__average__state}{s\+\_\+compute\+\_\+abstract\+\_\+average\+\_\+state}), pointer \hyperlink{namespacem__riemann__solvers_a7bf84258c88a5e2c0accdc130ac812d9}{s\+\_\+compute\+\_\+average\+\_\+state} =$>$ N\+U\+LL()
+\item 
+procedure(\hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__wave__speeds}{s\+\_\+compute\+\_\+abstract\+\_\+wave\+\_\+speeds}), pointer \hyperlink{namespacem__riemann__solvers_a3e2b4d51fda04b61d6f54069c5bb66c6}{s\+\_\+compute\+\_\+wave\+\_\+speeds} =$>$ N\+U\+LL()
+\item 
+procedure(\hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__viscous__source__flux}{s\+\_\+compute\+\_\+abstract\+\_\+viscous\+\_\+source\+\_\+flux}), pointer \hyperlink{namespacem__riemann__solvers_a334d729c58a5c746cb0045d1f5f00b01}{s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa4fd04af7adfbb38e425f6e91e041ecc}{ql\+\_\+prim\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The left (L) and right (R) W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables that define the left and right states of the Riemann problem. Variables q\+K\+\_\+prim\+\_\+rs\+\_\+vf, K = L or R, are obtained by reshaping (RS) q\+K\+\_\+prim\+\_\+vf in a coordinate direction that is normal to the cell-\/boundaries along which the fluxes are to be determined. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a70fefa4f5849fa4c952030b0ac04482a}{qr\+\_\+prim\+\_\+rs\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_afe077d6837688601705ac13df3d9c3dc}{q\+\_\+prim\+\_\+rs\+\_\+vf}
+\end{DoxyCompactItemize}
+
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ac277f9426d7112e2b42fdc0fd6583f5e}{kappal\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values of the cell-\/ average curvatures of the volume fractions that define the left and right states of the Riemann problem. The variables kappa\+K\+\_\+rs\+\_\+vf are obtained by reshaping kappa\+K\+\_\+vf in a coordinate direction that is normal to the cell-\/ boundaries on which the fluxes are to be determined. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ae8a2bf891d899a2441210a29da0e03a1}{kappar\+\_\+rs\+\_\+vf}
+\end{DoxyCompactItemize}
+
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a3d8e1f9ad9ca68e97109e0cff7aa1c4b}{flux\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/boundary values of the fluxes (src -\/ source) that are computed through the chosen Riemann problem solver, and the direct evaluation of source terms, by using the left and right states given in q\+K\+\_\+prim\+\_\+rs\+\_\+vf, dq\+K\+\_\+prim\+\_\+ds\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf, where ds = dx, dy or dz. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a0b6d2f192a1df76abc59b85b03f7a187}{flux\+\_\+src\+\_\+rs\+\_\+vf}
+\end{DoxyCompactItemize}
+
+\begin{Indent}\textbf{ Left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values of cell-\/average}\par
+{\em bubble density, radius, radial velocity, pressure, wall pressure, and modified pressure. These variables are left and right states of the Riemann problem obtained from q\+K\+\_\+prim\+\_\+rs\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_acfbe99c9151b71dadc19e80851d33bfe}{alpha\+\_\+rho\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a2d815c8ccf9b96727876621c46f3da00}{alpha\+\_\+rho\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_afc9d9cb504eca33ca970f4340c259161}{rho\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a03542f2527def3010f55cd456ccca698}{rho\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ab17d29f1de63b4669165d7d92f209986}{vel\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a27a761fd83f4f8f7178b8c57b09b825e}{vel\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a81973da2ed5f2e08dd363d889c0e21d7}{pres\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abe054616c664c4f090dfff5ba0aa679d}{pres\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a44eda4124cd70f22697144d295b47009}{e\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a5c08b40ab939ec42b3eb2f50f41a045d}{e\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a075a895b8ab81335f21a168603f29f37}{h\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac585ca9198161cf6d9130b696a2f1196}{h\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a485dc456f00eaa35c862ca3a2daa3d8c}{alpha\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_abdd33525dd128beda2d0c33454e0d9de}{alpha\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ad79d372c1bc1971b870ab2c455d9ff90}{y\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aef2c7eeabded0734aaa0cd95adac91ab}{y\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a8159569b322091efa55bbeb377532352}{gamma\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac422e0817e2011364cc6fc9c9a56b82b}{gamma\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac90ee6bf146aa47944bb11cd5de0a580}{pi\+\_\+inf\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a925187e709792a5fcfa80daebd568e8f}{pi\+\_\+inf\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a9c1dab7bfde55cdc6f738752c077f08a}{c\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a9393a8d17da2a98f5061804baca0349d}{c\+\_\+r}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_a2a804f5759af46c82fdd62633b5e7605}{re\+\_\+l}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_a31045aff8e978fd620943eaed4fbb973}{re\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a953a81975cc1627c87baca12ed51ed95}{we\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_ab9b568d4ea77b665c1f6cea77144acc8}{we\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_afbf6423349d95b7b3472eb84b9ba7f56}{nbub\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a4b6ffaeeaa4365c642ef3a5295635b07}{nbub\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_af0757998bd9843f9bb978a600d0ae2b0}{r0\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a132ff53b628e32e8d047d3a3f983b933}{r0\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_af425cfd91bc8a567e44b36c9bdbfb2bc}{v0\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a1bf4d8c27c1ed947af13b86a63f5b3aa}{v0\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a2b69a3c582d14aba043c3cb6376335a5}{p0\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa7deddacb25e873c573761963f680efc}{p0\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a31ac5fad05a69c3c0c76fbdc872f5494}{pbw\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_af14a2b29ba2692adfb1ed257e91482e8}{pbw\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abeca9cdf8ede1fe479660ab70ff789c7}{ptilde\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_addd3d84b7a9bae473b0c17744d5cac31}{ptilde\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary, low-\/order values of cell-\/average}\par
+{\em partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed of sound, shear and volume Reynolds numbers and the Weber numbers. These variables are left and right states of the Riemann problem obtained from q\+K\+\_\+prim\+\_\+rs\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ad1c29f933978f01c9402ad5287abdfe6}{lo\+\_\+alpha\+\_\+rho\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a3874a511fdd71a444bfcc9193103e148}{lo\+\_\+alpha\+\_\+rho\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac99e69e03846f742aa0ce5e228d5167f}{lo\+\_\+rho\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a81537cffcfd4fb575ffaffdc1ed64028}{lo\+\_\+rho\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ae939a1e2f36044a0729480d09e05d74f}{lo\+\_\+vel\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_acf54d997ef4105fd507c180db700c873}{lo\+\_\+vel\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ab0807a312841bf144ff78338bf11a89b}{lo\+\_\+pres\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a8ac4fca37ee46e90e61ca83a1e4eb2c5}{lo\+\_\+pres\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abf27be79fc84bb7830520e08774fd56c}{lo\+\_\+e\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a7596585d3504d397f16723b6a6ffd862}{lo\+\_\+e\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a75cca68e31742083e0ebbef418300c78}{lo\+\_\+h\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a985a98321338d51bc8a43695b490b102}{lo\+\_\+h\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a57eb3b7013680ab3c30a1e8f049a0402}{lo\+\_\+alpha\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a89059f36a5b3db54b3bd35cc3215a4be}{lo\+\_\+alpha\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aa0a0c169528cc9c4a379f641fb653712}{lo\+\_\+gamma\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a48b0505675e2bd1d0b36bda9de508655}{lo\+\_\+gamma\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a1cfaf511a3605cef96d95b88de661071}{lo\+\_\+pi\+\_\+inf\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a5e682fb9d377f50935dfbe4d5dd67120}{lo\+\_\+pi\+\_\+inf\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_af060aa45ac1c0c96428fd428ca3f63af}{lo\+\_\+c\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ad056500eedb3761b13485edb94ec773e}{lo\+\_\+c\+\_\+r}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_abbde404883793a9aae3708896b4a2781}{lo\+\_\+re\+\_\+l}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_a6d89cb45833bdcb48f3f1b01badaedcf}{lo\+\_\+re\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a8388f446036552682910bbe06da81f70}{lo\+\_\+we\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a7883028b185740c1d507b486eceef969}{lo\+\_\+we\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Gamma-\/related constants for use in exact Riemann solver (following Toro (1999) pp.153)}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_adbaf70dfc178970c3e210dddedc31971}{g1\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a44476fe6f5a4cfd8e7bd9b7369a2bfd8}{g1\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a80405eb6d8eaa75206edeef312c782d7}{g2\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a29b168c298a62892312beaf804d88ebd}{g2\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac58b25fbd4733d5adff39c28b32673b8}{g3\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a1e94f6d0053552684cebcc569b1a6f8a}{g3\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac44a4218c43a64bbe1b4d0dadc4726f1}{g4\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_adb408aa0458d5f80528aff6fa2d7eeb1}{g4\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_af4a82bacd4c2232f466428d41f34dffa}{g5\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a8e9c08866eae6dd81d694a5685306973}{g5\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aa0c3d3e0ab3821f201308018c8d3e550}{g6\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aff8b1fce6e33a0d7e18fbf87c252f1cd}{g6\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abbed27f1ec9cca777a83635a05fc8525}{g7\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a746eb452c1a5c1db204624afaad5b478}{g7\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a0f213519240daa52e669ecb053edae70}{g8\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a6ece114ee17503f716a99a601c2ba5d1}{g8\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Star region pressure and velocity}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a41ed4fe5b767afd06561f8618d1d7012}{pres\+\_\+s}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a594596688927700679b18b484a495504}{vel\+\_\+s}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Intercell solution used to calculated intercell flux}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a5f6f2613083fc30ff684c4183014a67c}{alpha\+\_\+rho\+\_\+ic}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a45a3cc332ef2fd7fc391a4ae82763f1a}{rho\+\_\+ic}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a81bfe96b264a5bba316c60965e787cbf}{vel\+\_\+ic}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a6c0b79ed34cb9be88abdd713eb207295}{pres\+\_\+ic}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac997c4db6eac9f175803bc4fd81ef096}{e\+\_\+ic}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a0e605952054968421a3e444c8ba71063}{alpha\+\_\+ic}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Surface tension pressure contribution}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a2378fe152ecbad0e98558ae177297493}{dpres\+\_\+we}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abc4d393041248b9e5f72a38f797e4683}{dpres\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a25a8dae8bbd769f28c67f1747520f373}{dpres\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Roe or arithmetic average density, velocity, enthalpy, volume fractions,}\par
+{\em specific heat ratio function, speed of sound, shear and volume Reynolds numbers, Weber numbers and curvatures, at the cell-\/boundaries, computed from the left and the right states of the Riemann problem }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a09cb56d16d4e4c5300be1ceee6e15acf}{rho\+\_\+avg}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a0fd22ed964af8ed09333c72744f561bd}{vel\+\_\+avg}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abff32786a11d3a71828b4e30d26773fb}{h\+\_\+avg}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ac459ed9a3a6c08d8032f3e06ccf96885}{alpha\+\_\+avg\+\_\+rs\+\_\+vf}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a122bd2abb655fffd36e070fa376c131d}{gamma\+\_\+avg}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a2739a94dffd4557f28f432f86aff6c45}{c\+\_\+avg}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ada8ab10b02113187113eed8f49f1ed2d}{re\+\_\+avg\+\_\+rs\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a298482aa3e595dfe2401920ad841eb8f}{we\+\_\+avg\+\_\+rs\+\_\+vf}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa6e6b00985be177b0a4a92f1aed48629}{kappa\+\_\+avg}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Left, right and star (S) region wave speeds}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a83a70908c66bbb071647bb383dc72975}{s\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac5cbbc98622cdafe56142b26d67ad2d9}{s\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a576586da8d3d80052a335d379001059a}{s\+\_\+s}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Star region variables (H\+L\+LC)}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a6c143ed17587d6f4b1a39e1f49e030e8}{rho\+\_\+star}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a74301c7719264f4c4ca9ab6318a438cb}{e\+\_\+star}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ab48bf742ff1449dd3e044ce44cc59a56}{p\+\_\+star}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac5dad78660af09505fe587f052afdfd5}{p\+\_\+k\+\_\+star}
+\end{DoxyCompactItemize}
+\end{Indent}
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a418fedb6a95524db57eeb364db8c5c0c}{s\+\_\+m}
+\begin{DoxyCompactList}\small\item\em Minus (M) and plus (P) wave speeds. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ae941c64575d69a7b369f9f5bb921a384}{s\+\_\+p}
+\end{DoxyCompactItemize}
+
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a2da04da751b4d4e1e1d8783d80f4ebe1}{xi\+\_\+m}
+\begin{DoxyCompactList}\small\item\em Minus and plus wave speeds functions. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a549a425e9a863451e770d405f092417c}{xi\+\_\+p}
+\end{DoxyCompactItemize}
+
+\begin{Indent}\textbf{ Additional variables for applying a flux limiter}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a7af64bd01982bc9c8e40b9a662d106c5}{flux\+\_\+lim\+\_\+func}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a61bf6c3eebae289a1826c4acd303ae6e}{lo\+\_\+s\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ae880c4216083a3203b42996f2010f080}{lo\+\_\+s\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a28e9af865b5ffd2a8cef04c1004b3aea}{lo\+\_\+s\+\_\+s}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_af7c9f253cc0584146992cc0b1858e888}{lo\+\_\+s\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a62f6549c30232e14a06efa8dfe7f19a4}{lo\+\_\+s\+\_\+p}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a1b9d56d4ae46805db6489e72a09f765b}{tvd\+\_\+s\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aa0a8636a3aef10f1989ce432bd825bf5}{tvd\+\_\+s\+\_\+p}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_adeb97ac789df26b14a090d09fb8598b7}{lo\+\_\+xi\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aad491932ac39e9c830cb24d395a00c3c}{lo\+\_\+xi\+\_\+p}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ad13ea7f1ad55e7119a36ca61bb353ded}{tvd\+\_\+xi\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a5e4f81b0b96e326a19154e0a4b8ae01a}{tvd\+\_\+xi\+\_\+p}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Indical bounds in the s1-\/, s2-\/ and s3-\/directions}\par
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__riemann__solvers_ad7ef4f9e239961cacd291ee2e31bf0be}{is1}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__riemann__solvers_ad0d94c92ddccee51dc2412707fcab447}{is2}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__riemann__solvers_a90256be0540e3f9279305be0e9ab32f4}{is3}
+\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+This module features a database of approximate and exact Riemann problem solvers for the Navier-\/\+Stokes system of equations, which is supplemented by appropriate advection equations that are used to capture the material interfaces. The closure of the system is achieved by the stiffened gas equation of state and any required mixture relations. Surface tension effects are accounted for and are modeled by means of a volume force acting across the diffuse material interface region. The implementation details of viscous and capillary effects, into the Riemann solvers, may be found in Perigaud and Saurel (2005). Note that both effects are available only in the volume fraction model. At this time, the approximate and exact Riemann solvers that are listed below are available\+: 1) Harten-\/\+Lax-\/van Leer (H\+LL) 2) Harten-\/\+Lax-\/van Leer-\/\+Contact (H\+L\+LC) 3) Exact. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__riemann__solvers_a14b6f4fa2f3b1d567a3f3347105ce61e}\label{namespacem__riemann__solvers_a14b6f4fa2f3b1d567a3f3347105ce61e}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state@{s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state}}
+\index{s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state@{s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state()}{s\_compute\_arithmetic\_average\_state()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+This procedure calculates the arithmetic average density, velocity, enthalpy, volume fractions, spec\+I\+Fic heat ratio function, sound speed, shear and volume Reynolds numbers, Weber numbers and the curvatures, at the cell-\/boundaries, from the left and right states of the Riemann problem. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2443 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aeab4abb9a37e1f537fee511bdcadc9da}\label{namespacem__riemann__solvers_aeab4abb9a37e1f537fee511bdcadc9da}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux}}
+\index{s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux()}{s\_compute\_capillary\_source\_flux()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{dalpha\+L\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{dalpha\+L\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{dalpha\+L\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{gm\+\_\+alpha\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{dalpha\+R\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{dalpha\+R\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{dalpha\+R\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+fluids), intent(in)}]{gm\+\_\+alpha\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The purpose of the subroutine is to evaluate and account for the contribution of capillary stresses in the source flux for the momentum and energy. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dalpha\+L\+\_\+dx\+\_\+vf} & Left W\+E\+N\+O-\/reconstructed cell-\/bndry value of cell-\/avg x-\/dir derivative of vol. frac. \\
+\hline
+{\em dalpha\+L\+\_\+dy\+\_\+vf} & Left W\+E\+N\+O-\/reconstructed cell-\/bndry value of cell-\/avg y-\/dir derivative of vol. frac. \\
+\hline
+{\em dalpha\+L\+\_\+dz\+\_\+vf} & Left W\+E\+N\+O-\/reconstructed cell-\/bndry value of cell-\/avg z-\/dir derivative of vol. frac. \\
+\hline
+{\em dalpha\+R\+\_\+dx\+\_\+vf} & Right W\+E\+N\+O-\/reconstructed cell-\/bndry value of cell-\/avg x-\/dir derivative of vol. frac. \\
+\hline
+{\em dalpha\+R\+\_\+dy\+\_\+vf} & Right W\+E\+N\+O-\/reconstructed cell-\/bndry value of cell-\/avg y-\/dir derivative of vol. frac. \\
+\hline
+{\em dalpha\+R\+\_\+dz\+\_\+vf} & Right W\+E\+N\+O-\/reconstructed cell-\/bndry value of cell-\/avg z-\/dir derivative of vol. frac. \\
+\hline
+{\em gm\+\_\+alpha\+L\+\_\+vf} & Left W\+E\+N\+O-\/reconstructed cell-\/bndry value of the gradient magnitude \\
+\hline
+{\em gm\+\_\+alpha\+R\+\_\+vf} & Right W\+E\+N\+O-\/reconstructed cell-\/bndry value of the gradient magnitude \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intercell flux \\
+\hline
+{\em norm\+\_\+dir} & Dimensional splitting coordinate direction \\
+\hline
+{\em ix} & Index bounds in first coordinate direction \\
+\hline
+{\em iy} & Index bounds in second coordinate direction \\
+\hline
+{\em iz} & Index bounds in third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 4810 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a58c0a2ab06eb5094f60c5e68dbde7300}\label{namespacem__riemann__solvers_a58c0a2ab06eb5094f60c5e68dbde7300}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux}}
+\index{s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux()}{s\_compute\_cartesian\_viscous\_source\_flux()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{vel\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+L\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+L\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+L\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{vel\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+R\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+R\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+R\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The goal of this subroutine is to evaluate and account for the contribution of viscous stresses in the source flux for the momentum and energy. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em vel\+L\+\_\+vf} & Left, W\+E\+NO reconstructed, cell-\/boundary values of the velocity \\
+\hline
+{\em vel\+R\+\_\+vf} & Right, W\+E\+NO reconstructed, cell-\/boundary values of the velocity \\
+\hline
+{\em dvel\+L\+\_\+dx\+\_\+vf} & Left, W\+E\+NO reconstructed cell-\/avg. x-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+L\+\_\+dy\+\_\+vf} & Left, W\+E\+NO reconstructed cell-\/avg. y-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+L\+\_\+dz\+\_\+vf} & Left, W\+E\+NO reconstructed cell-\/avg. z-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+R\+\_\+dx\+\_\+vf} & Right, W\+E\+NO reconstructed cell-\/avg. x-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+R\+\_\+dy\+\_\+vf} & Right, W\+E\+NO reconstructed cell-\/avg. y-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+R\+\_\+dz\+\_\+vf} & Right, W\+E\+NO reconstructed cell-\/avg. z-\/dir derivative of the velocity \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intercell flux \\
+\hline
+{\em norm\+\_\+dir} & Dimensional splitting coordinate direction \\
+\hline
+{\em ix} & Index bounds in first coordinate direction \\
+\hline
+{\em iy} & Index bounds in second coordinate direction \\
+\hline
+{\em iz} & Index bounds in third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 4333 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a16383eccdd2d0ecca7d1c26467daaaab}\label{namespacem__riemann__solvers_a16383eccdd2d0ecca7d1c26467daaaab}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+constant\+\_\+states@{s\+\_\+compute\+\_\+constant\+\_\+states}}
+\index{s\+\_\+compute\+\_\+constant\+\_\+states@{s\+\_\+compute\+\_\+constant\+\_\+states}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+constant\+\_\+states()}{s\_compute\_constant\_states()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+constant\+\_\+states (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+The procedure assigns and computes the left and right states of the Riemann problem. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1664 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a50ff087624d23846c62cd711dd003757}\label{namespacem__riemann__solvers_a50ff087624d23846c62cd711dd003757}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux}}
+\index{s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux()}{s\_compute\_cylindrical\_viscous\_source\_flux()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{vel\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+L\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+L\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+L\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{vel\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+R\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+R\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(num\+\_\+dims), intent(in)}]{dvel\+R\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The goal of this subroutine is to evaluate and account for the contribution of viscous stresses in the source flux for the momentum and energy. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em vel\+L\+\_\+vf} & Left, W\+E\+NO reconstructed, cell-\/boundary values of the velocity \\
+\hline
+{\em vel\+R\+\_\+vf} & Right, W\+E\+NO reconstructed, cell-\/boundary values of the velocity \\
+\hline
+{\em dvel\+L\+\_\+dx\+\_\+vf} & Left, W\+E\+NO reconstructed cell-\/avg. x-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+L\+\_\+dy\+\_\+vf} & Left, W\+E\+NO reconstructed cell-\/avg. y-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+L\+\_\+dz\+\_\+vf} & Left, W\+E\+NO reconstructed cell-\/avg. z-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+R\+\_\+dx\+\_\+vf} & Right, W\+E\+NO reconstructed cell-\/avg. x-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+R\+\_\+dy\+\_\+vf} & Right, W\+E\+NO reconstructed cell-\/avg. y-\/dir derivative of the velocity \\
+\hline
+{\em dvel\+R\+\_\+dz\+\_\+vf} & Right, W\+E\+NO reconstructed cell-\/avg. z-\/dir derivative of the velocity \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intercell flux \\
+\hline
+{\em norm\+\_\+dir} & Dimensional splitting coordinate direction \\
+\hline
+{\em ix} & Index bounds in first coordinate direction \\
+\hline
+{\em iy} & Index bounds in second coordinate direction \\
+\hline
+{\em iz} & Index bounds in third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 3820 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a1adcb619a7800a87bf5785ca59c63233}\label{namespacem__riemann__solvers_a1adcb619a7800a87bf5785ca59c63233}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds@{s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds}}
+\index{s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds@{s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds()}{s\_compute\_direct\_wave\_speeds()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+The direct estimation of the left, right and middle wave speeds, proposed by Batten et al. (1997) that results in the exact resolution of isolated shock and contact waves. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2640 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a6301a5631fda64dd97c11777807a22c9}\label{namespacem__riemann__solvers_a6301a5631fda64dd97c11777807a22c9}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+flux\+\_\+limiter@{s\+\_\+compute\+\_\+flux\+\_\+limiter}}
+\index{s\+\_\+compute\+\_\+flux\+\_\+limiter@{s\+\_\+compute\+\_\+flux\+\_\+limiter}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+flux\+\_\+limiter()}{s\_compute\_flux\_limiter()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+flux\+\_\+limiter (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l,  }\item[{real(kind(0d0)), intent(out)}]{flux\+\_\+lim\+\_\+func,  }\item[{integer, intent(in)}]{norm\+\_\+dir }\end{DoxyParamCaption})}
+
+
+
+This subroutine computes the flux limiter function value at the cell boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+{\em flux\+\_\+lim\+\_\+func} & The flux limiter \\
+\hline
+{\em norm\+\_\+dir} & Directional splitting index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2782 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a68651027acd974568fd5f94ed39c8e82}\label{namespacem__riemann__solvers_a68651027acd974568fd5f94ed39c8e82}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+intercell\+\_\+solution@{s\+\_\+compute\+\_\+intercell\+\_\+solution}}
+\index{s\+\_\+compute\+\_\+intercell\+\_\+solution@{s\+\_\+compute\+\_\+intercell\+\_\+solution}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+intercell\+\_\+solution()}{s\_compute\_intercell\_solution()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+intercell\+\_\+solution (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Computes the averaged intrercell variables for the Riemann solver. 
+
+
+
+Definition at line 2061 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a16d6f8f4c3ad64fdb574a50c189750c5}\label{namespacem__riemann__solvers_a16d6f8f4c3ad64fdb574a50c189750c5}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds@{s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds}}
+\index{s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds@{s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds()}{s\_compute\_mixture\_sound\_speeds()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+Compute mixture sound speed. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1766 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a107a13616d23f81b60bab83209067b01}\label{namespacem__riemann__solvers_a107a13616d23f81b60bab83209067b01}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds@{s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds}}
+\index{s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds@{s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds()}{s\_compute\_pressure\_velocity\_wave\_speeds()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+Estimation of the left, right and star region wave speeds by the approximation of the pressures and velocity in the star regions, see Toro (1999). The pressures and velocity are approximated by using the primitive variables Riemann solver (P\+V\+RS) and the wave speeds are then estimated from those approximations using the exact wave relations. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2699 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aeeea1cc689aa550f3c1f182fe33a4939}\label{namespacem__riemann__solvers_aeeea1cc689aa550f3c1f182fe33a4939}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state@{s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state}}
+\index{s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state@{s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state()}{s\_compute\_roe\_average\_state()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k,  }\item[{integer, intent(in)}]{l }\end{DoxyParamCaption})}
+
+
+
+The procedure computes the Roe average density, velocity, enthalpy, volume fractions, specific heat ratio function, speed of sound, shear and volume Reynolds numbers, Weber numbers and curvatures, at the cell-\/boundaries, from the left and right states of the Riemann problem. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em j} & First coordinate index \\
+\hline
+{\em k} & Second coordinate index \\
+\hline
+{\em l} & Third coordinate index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 2315 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a947bc1c7da743ee0820ff6648fef3c25}\label{namespacem__riemann__solvers_a947bc1c7da743ee0820ff6648fef3c25}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+star\+\_\+region@{s\+\_\+compute\+\_\+star\+\_\+region}}
+\index{s\+\_\+compute\+\_\+star\+\_\+region@{s\+\_\+compute\+\_\+star\+\_\+region}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+star\+\_\+region()}{s\_compute\_star\_region()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+star\+\_\+region (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to compute the solution for pressure and velocity in the star region when using the exact Riemann solver. 
+
+
+
+Definition at line 1891 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a9fa393b97819b253e8b85f0444a15c27}\label{namespacem__riemann__solvers_a9fa393b97819b253e8b85f0444a15c27}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+exact\+\_\+riemann\+\_\+solver@{s\+\_\+exact\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+exact\+\_\+riemann\+\_\+solver@{s\+\_\+exact\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+exact\+\_\+riemann\+\_\+solver()}{s\_exact\_riemann\_solver()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+riemann\+\_\+solvers\+::s\+\_\+exact\+\_\+riemann\+\_\+solver (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+L\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+R\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+gsrc\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+This procedure is the implementation of the exact Riemann solver, see Toro (1999). The effects of viscosity and the surface tension have been incorporated following the work of Perigaud and Saurel (2005). 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+L\+\_\+prim\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em q\+R\+\_\+prim\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dx\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dy\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dz\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dx\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dy\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dz\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em gm\+\_\+alpha\+L\+\_\+vf} & Left averaged gradient magnitude \\
+\hline
+{\em gm\+\_\+alpha\+R\+\_\+vf} & Right averaged gradient magnitude \\
+\hline
+{\em kappa\+L\+\_\+vf} & Left averaged vol. frac. curvatures \\
+\hline
+{\em kappa\+R\+\_\+vf} & Right averaged vol. frac. curvatures \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/averaged primitive variables \\
+\hline
+{\em flux\+\_\+vf} & Intra-\/cell fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intra-\/cell fluxes sources \\
+\hline
+{\em flux\+\_\+gsrc\+\_\+vf} & Intra-\/cell geometric fluxes sources \\
+\hline
+{\em norm\+\_\+dir} & Dir. splitting direction \\
+\hline
+{\em ix} & Index bounds in the x-\/dir \\
+\hline
+{\em iy} & Index bounds in the y-\/dir \\
+\hline
+{\em iz} & Index bounds in the z-\/dir \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1517 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ab679d890c95c6cb1ee3dc5e5a9ae1c19}\label{namespacem__riemann__solvers_ab679d890c95c6cb1ee3dc5e5a9ae1c19}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+finalize\+\_\+riemann\+\_\+solver@{s\+\_\+finalize\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+finalize\+\_\+riemann\+\_\+solver@{s\+\_\+finalize\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+riemann\+\_\+solver()}{s\_finalize\_riemann\_solver()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+finalize\+\_\+riemann\+\_\+solver (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+gsrc\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em flux\+\_\+vf} & Intercell fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intercell source fluxes \\
+\hline
+{\em flux\+\_\+gsrc\+\_\+vf} & Intercell geometric source fluxes \\
+\hline
+{\em norm\+\_\+dir} & Dimensional splitting coordinate direction \\
+\hline
+{\em ix} & Index bounds in first coordinate direction \\
+\hline
+{\em iy} & Index bounds in second coordinate direction \\
+\hline
+{\em iz} & Index bounds in third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 5244 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a5bd1ce6fbbb840b5b1c6dd97ccb8d674}\label{namespacem__riemann__solvers_a5bd1ce6fbbb840b5b1c6dd97ccb8d674}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module@{s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module@{s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module()}{s\_finalize\_riemann\_solvers\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+riemann\+\_\+solvers\+::s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Module deallocation and/or disassociation procedures. 
+
+
+
+Definition at line 5400 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a7e533d9eadb12af316d72f1b722735d8}\label{namespacem__riemann__solvers_a7e533d9eadb12af316d72f1b722735d8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+guess\+\_\+pressure@{s\+\_\+guess\+\_\+pressure}}
+\index{s\+\_\+guess\+\_\+pressure@{s\+\_\+guess\+\_\+pressure}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+guess\+\_\+pressure()}{s\_guess\_pressure()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+guess\+\_\+pressure (\begin{DoxyParamCaption}\item[{real(kind(0d0)), intent(inout)}]{pres\+\_\+start }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to provide a guess value for pressure in the star region. The choice is made according to adaptive Riemann solver using the P\+V\+RS, T\+R\+RS. and T\+S\+RS approximate Riemann solvers. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em pres\+\_\+start} & Initial and output pressure \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1994 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a3062ef97dfec8673afd80dcbee6e3814}\label{namespacem__riemann__solvers_a3062ef97dfec8673afd80dcbee6e3814}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+hll\+\_\+riemann\+\_\+solver@{s\+\_\+hll\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+hll\+\_\+riemann\+\_\+solver@{s\+\_\+hll\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+hll\+\_\+riemann\+\_\+solver()}{s\_hll\_riemann\_solver()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+riemann\+\_\+solvers\+::s\+\_\+hll\+\_\+riemann\+\_\+solver (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+L\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+R\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+gsrc\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The procedure features the Harten, Lax and van Leer (H\+LL) approximate Riemann solver algorithm, see Toro (1999) as well as Saurel and Abgrall (1999). Viscous and capillary effects have been included by adapting the exact Riemann solver of Perigaud and Saurel (2005). 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+L\+\_\+prim\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em q\+R\+\_\+prim\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dx\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dy\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dz\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dx\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dy\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dz\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em gm\+\_\+alpha\+L\+\_\+vf} & Left averaged gradient magnitude \\
+\hline
+{\em gm\+\_\+alpha\+R\+\_\+vf} & Right averaged gradient magnitude \\
+\hline
+{\em kappa\+L\+\_\+vf} & Left averaged vol. frac. curvatures \\
+\hline
+{\em kappa\+R\+\_\+vf} & Right averaged vol. frac. curvatures \\
+\hline
+{\em flux\+\_\+vf} & Intra-\/cell fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intra-\/cell fluxes sources \\
+\hline
+{\em flux\+\_\+gsrc\+\_\+vf} & Intra-\/cell geometric fluxes sources \\
+\hline
+{\em norm\+\_\+dir} & Dir. splitting direction \\
+\hline
+{\em ix} & Index bounds in the x-\/dir \\
+\hline
+{\em iy} & Index bounds in the y-\/dir \\
+\hline
+{\em iz} & Index bounds in the z-\/dir \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/averaged primitive variables \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 464 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ae2ad588d58b624a8320805f3860a3eb8}\label{namespacem__riemann__solvers_ae2ad588d58b624a8320805f3860a3eb8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+hllc\+\_\+riemann\+\_\+solver@{s\+\_\+hllc\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+hllc\+\_\+riemann\+\_\+solver@{s\+\_\+hllc\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+hllc\+\_\+riemann\+\_\+solver()}{s\_hllc\_riemann\_solver()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+riemann\+\_\+solvers\+::s\+\_\+hllc\+\_\+riemann\+\_\+solver (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+L\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+R\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+gsrc\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+This procedure is the implementation of the Harten, Lax, van Leer, and contact (H\+L\+LC) approximate Riemann solver, see Toro (1999) and Johnsen (2007). The viscous and the surface tension effects have been included by modifying the exact Riemann solver of Perigaud and Saurel (2005). 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+L\+\_\+prim\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em q\+R\+\_\+prim\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dx\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dy\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dz\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dx\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dy\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dz\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em gm\+\_\+alpha\+L\+\_\+vf} & Left averaged gradient magnitude \\
+\hline
+{\em gm\+\_\+alpha\+R\+\_\+vf} & Right averaged gradient magnitude \\
+\hline
+{\em kappa\+L\+\_\+vf} & Left averaged vol. frac. curvatures \\
+\hline
+{\em kappa\+R\+\_\+vf} & Right averaged vol. rac. curvatures \\
+\hline
+{\em flux\+\_\+vf} & Intra-\/cell fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intra-\/cell fluxes sources \\
+\hline
+{\em flux\+\_\+gsrc\+\_\+vf} & Intra-\/cell geometric fluxes sources \\
+\hline
+{\em norm\+\_\+dir} & Dir. splitting direction \\
+\hline
+{\em ix} & Index bounds in the x-\/dir \\
+\hline
+{\em iy} & Index bounds in the y-\/dir \\
+\hline
+{\em iz} & Index bounds in the z-\/dir \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/averaged primitive variables \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 849 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a86766279fcf7527f2b148adff4666b1c}\label{namespacem__riemann__solvers_a86766279fcf7527f2b148adff4666b1c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+initialize\+\_\+riemann\+\_\+solver@{s\+\_\+initialize\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+initialize\+\_\+riemann\+\_\+solver@{s\+\_\+initialize\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+riemann\+\_\+solver()}{s\_initialize\_riemann\_solver()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+initialize\+\_\+riemann\+\_\+solver (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+L\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(in), allocatable}]{kappa\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+R\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(in), allocatable}]{kappa\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+gsrc\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures needed to configure the chosen Riemann solver algorithm. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+L\+\_\+prim\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em q\+R\+\_\+prim\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em kappa\+L\+\_\+vf} & Left averaged vol. frac. curvatures \\
+\hline
+{\em kappa\+R\+\_\+vf} & Right averaged vol. frac. curvatures \\
+\hline
+{\em flux\+\_\+vf} & Intra-\/cell fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intra-\/cell fluxes sources \\
+\hline
+{\em flux\+\_\+gsrc\+\_\+vf} & Intra-\/cell geometric fluxes sources \\
+\hline
+{\em norm\+\_\+dir} & Dir. splitting direction \\
+\hline
+{\em ix} & Index bounds in the x-\/dir \\
+\hline
+{\em iy} & Index bounds in the y-\/dir \\
+\hline
+{\em iz} & Index bounds in the z-\/dir \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/averaged primitive variables \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 3531 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aab7e6bf69b7d0b8b9d911f418b872130}\label{namespacem__riemann__solvers_aab7e6bf69b7d0b8b9d911f418b872130}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module@{s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module@{s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module()}{s\_initialize\_riemann\_solvers\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+riemann\+\_\+solvers\+::s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. 
+
+
+
+Definition at line 2843 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ae82ad8216dcc6938b86cf0bd5c17467b}\label{namespacem__riemann__solvers_ae82ad8216dcc6938b86cf0bd5c17467b}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers@{s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers}}
+\index{s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers@{s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers()}{s\_populate\_riemann\_states\_variables\_buffers()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+L\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+R\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+R\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to populate the buffers of the left and right Riemann states variables, depending on the boundary conditions. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+L\+\_\+prim\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em q\+R\+\_\+prim\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dx\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dy\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dz\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dx\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dy\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dz\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em gm\+\_\+alpha\+L\+\_\+vf} & Left averaged gradient magnitude \\
+\hline
+{\em gm\+\_\+alpha\+R\+\_\+vf} & Right averaged gradient magnitude \\
+\hline
+{\em kappa\+L\+\_\+vf} & Left averaged vol. frac. curvatures \\
+\hline
+{\em kappa\+R\+\_\+vf} & Right averaged vol. frac. curvatures \\
+\hline
+{\em norm\+\_\+dir} & Dir. splitting direction \\
+\hline
+{\em ix} & Index bounds in the x-\/dir \\
+\hline
+{\em iy} & Index bounds in the y-\/dir \\
+\hline
+{\em iz} & Index bounds in the z-\/dir \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 3002 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aba768ee53f47327a70508a913b55254d}\label{namespacem__riemann__solvers_aba768ee53f47327a70508a913b55254d}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+pressure\+\_\+function@{s\+\_\+pressure\+\_\+function}}
+\index{s\+\_\+pressure\+\_\+function@{s\+\_\+pressure\+\_\+function}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+pressure\+\_\+function()}{s\_pressure\_function()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+pressure\+\_\+function (\begin{DoxyParamCaption}\item[{real(kind(0d0)), intent(out)}]{f\+\_\+K,  }\item[{real(kind(0d0)), intent(out)}]{dfdp\+\_\+K,  }\item[{real(kind(0d0)), intent(in)}]{pres,  }\item[{integer, intent(in)}]{side }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to evaluate the pressure functions f\+\_\+K in the exact Riemann solver. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em f\+\_\+K} & Pressure function \\
+\hline
+{\em dfdp\+\_\+K} & Mixture pressure derivative \\
+\hline
+{\em pres} & Pressure \\
+\hline
+{\em side} & Wave side \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1934 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac459ed9a3a6c08d8032f3e06ccf96885}\label{namespacem__riemann__solvers_ac459ed9a3a6c08d8032f3e06ccf96885}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+avg\+\_\+rs\+\_\+vf@{alpha\+\_\+avg\+\_\+rs\+\_\+vf}}
+\index{alpha\+\_\+avg\+\_\+rs\+\_\+vf@{alpha\+\_\+avg\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+avg\+\_\+rs\+\_\+vf}{alpha\_avg\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+avg\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 350 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a0e605952054968421a3e444c8ba71063}\label{namespacem__riemann__solvers_a0e605952054968421a3e444c8ba71063}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+ic@{alpha\+\_\+ic}}
+\index{alpha\+\_\+ic@{alpha\+\_\+ic}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+ic}{alpha\_ic}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+ic}
+
+
+
+Definition at line 333 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a485dc456f00eaa35c862ca3a2daa3d8c}\label{namespacem__riemann__solvers_a485dc456f00eaa35c862ca3a2daa3d8c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+l@{alpha\+\_\+l}}
+\index{alpha\+\_\+l@{alpha\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+l}{alpha\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+l}
+
+
+
+Definition at line 265 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abdd33525dd128beda2d0c33454e0d9de}\label{namespacem__riemann__solvers_abdd33525dd128beda2d0c33454e0d9de}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+r@{alpha\+\_\+r}}
+\index{alpha\+\_\+r@{alpha\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+r}{alpha\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+r}
+
+
+
+Definition at line 265 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a5f6f2613083fc30ff684c4183014a67c}\label{namespacem__riemann__solvers_a5f6f2613083fc30ff684c4183014a67c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+rho\+\_\+ic@{alpha\+\_\+rho\+\_\+ic}}
+\index{alpha\+\_\+rho\+\_\+ic@{alpha\+\_\+rho\+\_\+ic}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+rho\+\_\+ic}{alpha\_rho\_ic}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+rho\+\_\+ic}
+
+
+
+Definition at line 328 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_acfbe99c9151b71dadc19e80851d33bfe}\label{namespacem__riemann__solvers_acfbe99c9151b71dadc19e80851d33bfe}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+rho\+\_\+l@{alpha\+\_\+rho\+\_\+l}}
+\index{alpha\+\_\+rho\+\_\+l@{alpha\+\_\+rho\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+rho\+\_\+l}{alpha\_rho\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+rho\+\_\+l}
+
+
+
+Definition at line 259 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a2d815c8ccf9b96727876621c46f3da00}\label{namespacem__riemann__solvers_a2d815c8ccf9b96727876621c46f3da00}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!alpha\+\_\+rho\+\_\+r@{alpha\+\_\+rho\+\_\+r}}
+\index{alpha\+\_\+rho\+\_\+r@{alpha\+\_\+rho\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{alpha\+\_\+rho\+\_\+r}{alpha\_rho\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+rho\+\_\+r}
+
+
+
+Definition at line 259 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a2739a94dffd4557f28f432f86aff6c45}\label{namespacem__riemann__solvers_a2739a94dffd4557f28f432f86aff6c45}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!c\+\_\+avg@{c\+\_\+avg}}
+\index{c\+\_\+avg@{c\+\_\+avg}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{c\+\_\+avg}{c\_avg}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::c\+\_\+avg}
+
+
+
+Definition at line 352 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a9c1dab7bfde55cdc6f738752c077f08a}\label{namespacem__riemann__solvers_a9c1dab7bfde55cdc6f738752c077f08a}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!c\+\_\+l@{c\+\_\+l}}
+\index{c\+\_\+l@{c\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{c\+\_\+l}{c\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::c\+\_\+l}
+
+
+
+Definition at line 269 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a9393a8d17da2a98f5061804baca0349d}\label{namespacem__riemann__solvers_a9393a8d17da2a98f5061804baca0349d}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!c\+\_\+r@{c\+\_\+r}}
+\index{c\+\_\+r@{c\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{c\+\_\+r}{c\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::c\+\_\+r}
+
+
+
+Definition at line 269 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abc4d393041248b9e5f72a38f797e4683}\label{namespacem__riemann__solvers_abc4d393041248b9e5f72a38f797e4683}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!dpres\+\_\+l@{dpres\+\_\+l}}
+\index{dpres\+\_\+l@{dpres\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{dpres\+\_\+l}{dpres\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::dpres\+\_\+l}
+
+
+
+Definition at line 339 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a25a8dae8bbd769f28c67f1747520f373}\label{namespacem__riemann__solvers_a25a8dae8bbd769f28c67f1747520f373}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!dpres\+\_\+r@{dpres\+\_\+r}}
+\index{dpres\+\_\+r@{dpres\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{dpres\+\_\+r}{dpres\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::dpres\+\_\+r}
+
+
+
+Definition at line 339 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a2378fe152ecbad0e98558ae177297493}\label{namespacem__riemann__solvers_a2378fe152ecbad0e98558ae177297493}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!dpres\+\_\+we@{dpres\+\_\+we}}
+\index{dpres\+\_\+we@{dpres\+\_\+we}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{dpres\+\_\+we}{dpres\_we}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::dpres\+\_\+we}
+
+
+
+Definition at line 338 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac997c4db6eac9f175803bc4fd81ef096}\label{namespacem__riemann__solvers_ac997c4db6eac9f175803bc4fd81ef096}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!e\+\_\+ic@{e\+\_\+ic}}
+\index{e\+\_\+ic@{e\+\_\+ic}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{e\+\_\+ic}{e\_ic}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::e\+\_\+ic}
+
+
+
+Definition at line 332 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a44eda4124cd70f22697144d295b47009}\label{namespacem__riemann__solvers_a44eda4124cd70f22697144d295b47009}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!e\+\_\+l@{e\+\_\+l}}
+\index{e\+\_\+l@{e\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{e\+\_\+l}{e\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::e\+\_\+l}
+
+
+
+Definition at line 263 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a5c08b40ab939ec42b3eb2f50f41a045d}\label{namespacem__riemann__solvers_a5c08b40ab939ec42b3eb2f50f41a045d}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!e\+\_\+r@{e\+\_\+r}}
+\index{e\+\_\+r@{e\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{e\+\_\+r}{e\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::e\+\_\+r}
+
+
+
+Definition at line 263 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a74301c7719264f4c4ca9ab6318a438cb}\label{namespacem__riemann__solvers_a74301c7719264f4c4ca9ab6318a438cb}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!e\+\_\+star@{e\+\_\+star}}
+\index{e\+\_\+star@{e\+\_\+star}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{e\+\_\+star}{e\_star}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::e\+\_\+star}
+
+
+
+Definition at line 365 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa67462b01acb62fbe8730a28aa37b7a9}\label{namespacem__riemann__solvers_aa67462b01acb62fbe8730a28aa37b7a9}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!flux\+\_\+gsrc\+\_\+rs\+\_\+vf@{flux\+\_\+gsrc\+\_\+rs\+\_\+vf}}
+\index{flux\+\_\+gsrc\+\_\+rs\+\_\+vf@{flux\+\_\+gsrc\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{flux\+\_\+gsrc\+\_\+rs\+\_\+vf}{flux\_gsrc\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+gsrc\+\_\+rs\+\_\+vf}
+
+
+
+The cell-\/boundary values of the geometrical source flux that are computed through the chosen Riemann problem solver by using the left and right states given in q\+K\+\_\+prim\+\_\+rs\+\_\+vf. Currently 2D axisymmetric for inviscid only. 
+
+
+
+Definition at line 243 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a7af64bd01982bc9c8e40b9a662d106c5}\label{namespacem__riemann__solvers_a7af64bd01982bc9c8e40b9a662d106c5}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!flux\+\_\+lim\+\_\+func@{flux\+\_\+lim\+\_\+func}}
+\index{flux\+\_\+lim\+\_\+func@{flux\+\_\+lim\+\_\+func}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{flux\+\_\+lim\+\_\+func}{flux\_lim\_func}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+lim\+\_\+func}
+
+
+
+Definition at line 380 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a3d8e1f9ad9ca68e97109e0cff7aa1c4b}\label{namespacem__riemann__solvers_a3d8e1f9ad9ca68e97109e0cff7aa1c4b}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!flux\+\_\+rs\+\_\+vf@{flux\+\_\+rs\+\_\+vf}}
+\index{flux\+\_\+rs\+\_\+vf@{flux\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{flux\+\_\+rs\+\_\+vf}{flux\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+rs\+\_\+vf}
+
+
+
+The cell-\/boundary values of the fluxes (src -\/ source) that are computed through the chosen Riemann problem solver, and the direct evaluation of source terms, by using the left and right states given in q\+K\+\_\+prim\+\_\+rs\+\_\+vf, dq\+K\+\_\+prim\+\_\+ds\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf, where ds = dx, dy or dz. 
+
+
+
+Definition at line 239 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a0b6d2f192a1df76abc59b85b03f7a187}\label{namespacem__riemann__solvers_a0b6d2f192a1df76abc59b85b03f7a187}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!flux\+\_\+src\+\_\+rs\+\_\+vf@{flux\+\_\+src\+\_\+rs\+\_\+vf}}
+\index{flux\+\_\+src\+\_\+rs\+\_\+vf@{flux\+\_\+src\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{flux\+\_\+src\+\_\+rs\+\_\+vf}{flux\_src\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+src\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 239 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_adbaf70dfc178970c3e210dddedc31971}\label{namespacem__riemann__solvers_adbaf70dfc178970c3e210dddedc31971}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g1\+\_\+l@{g1\+\_\+l}}
+\index{g1\+\_\+l@{g1\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g1\+\_\+l}{g1\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g1\+\_\+l}
+
+
+
+Definition at line 310 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a44476fe6f5a4cfd8e7bd9b7369a2bfd8}\label{namespacem__riemann__solvers_a44476fe6f5a4cfd8e7bd9b7369a2bfd8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g1\+\_\+r@{g1\+\_\+r}}
+\index{g1\+\_\+r@{g1\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g1\+\_\+r}{g1\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g1\+\_\+r}
+
+
+
+Definition at line 310 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a80405eb6d8eaa75206edeef312c782d7}\label{namespacem__riemann__solvers_a80405eb6d8eaa75206edeef312c782d7}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g2\+\_\+l@{g2\+\_\+l}}
+\index{g2\+\_\+l@{g2\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g2\+\_\+l}{g2\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g2\+\_\+l}
+
+
+
+Definition at line 311 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a29b168c298a62892312beaf804d88ebd}\label{namespacem__riemann__solvers_a29b168c298a62892312beaf804d88ebd}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g2\+\_\+r@{g2\+\_\+r}}
+\index{g2\+\_\+r@{g2\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g2\+\_\+r}{g2\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g2\+\_\+r}
+
+
+
+Definition at line 311 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac58b25fbd4733d5adff39c28b32673b8}\label{namespacem__riemann__solvers_ac58b25fbd4733d5adff39c28b32673b8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g3\+\_\+l@{g3\+\_\+l}}
+\index{g3\+\_\+l@{g3\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g3\+\_\+l}{g3\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g3\+\_\+l}
+
+
+
+Definition at line 312 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a1e94f6d0053552684cebcc569b1a6f8a}\label{namespacem__riemann__solvers_a1e94f6d0053552684cebcc569b1a6f8a}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g3\+\_\+r@{g3\+\_\+r}}
+\index{g3\+\_\+r@{g3\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g3\+\_\+r}{g3\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g3\+\_\+r}
+
+
+
+Definition at line 312 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac44a4218c43a64bbe1b4d0dadc4726f1}\label{namespacem__riemann__solvers_ac44a4218c43a64bbe1b4d0dadc4726f1}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g4\+\_\+l@{g4\+\_\+l}}
+\index{g4\+\_\+l@{g4\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g4\+\_\+l}{g4\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g4\+\_\+l}
+
+
+
+Definition at line 313 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_adb408aa0458d5f80528aff6fa2d7eeb1}\label{namespacem__riemann__solvers_adb408aa0458d5f80528aff6fa2d7eeb1}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g4\+\_\+r@{g4\+\_\+r}}
+\index{g4\+\_\+r@{g4\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g4\+\_\+r}{g4\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g4\+\_\+r}
+
+
+
+Definition at line 313 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_af4a82bacd4c2232f466428d41f34dffa}\label{namespacem__riemann__solvers_af4a82bacd4c2232f466428d41f34dffa}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g5\+\_\+l@{g5\+\_\+l}}
+\index{g5\+\_\+l@{g5\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g5\+\_\+l}{g5\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g5\+\_\+l}
+
+
+
+Definition at line 314 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a8e9c08866eae6dd81d694a5685306973}\label{namespacem__riemann__solvers_a8e9c08866eae6dd81d694a5685306973}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g5\+\_\+r@{g5\+\_\+r}}
+\index{g5\+\_\+r@{g5\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g5\+\_\+r}{g5\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g5\+\_\+r}
+
+
+
+Definition at line 314 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa0c3d3e0ab3821f201308018c8d3e550}\label{namespacem__riemann__solvers_aa0c3d3e0ab3821f201308018c8d3e550}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g6\+\_\+l@{g6\+\_\+l}}
+\index{g6\+\_\+l@{g6\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g6\+\_\+l}{g6\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g6\+\_\+l}
+
+
+
+Definition at line 315 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aff8b1fce6e33a0d7e18fbf87c252f1cd}\label{namespacem__riemann__solvers_aff8b1fce6e33a0d7e18fbf87c252f1cd}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g6\+\_\+r@{g6\+\_\+r}}
+\index{g6\+\_\+r@{g6\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g6\+\_\+r}{g6\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g6\+\_\+r}
+
+
+
+Definition at line 315 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abbed27f1ec9cca777a83635a05fc8525}\label{namespacem__riemann__solvers_abbed27f1ec9cca777a83635a05fc8525}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g7\+\_\+l@{g7\+\_\+l}}
+\index{g7\+\_\+l@{g7\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g7\+\_\+l}{g7\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g7\+\_\+l}
+
+
+
+Definition at line 316 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a746eb452c1a5c1db204624afaad5b478}\label{namespacem__riemann__solvers_a746eb452c1a5c1db204624afaad5b478}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g7\+\_\+r@{g7\+\_\+r}}
+\index{g7\+\_\+r@{g7\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g7\+\_\+r}{g7\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g7\+\_\+r}
+
+
+
+Definition at line 316 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a0f213519240daa52e669ecb053edae70}\label{namespacem__riemann__solvers_a0f213519240daa52e669ecb053edae70}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g8\+\_\+l@{g8\+\_\+l}}
+\index{g8\+\_\+l@{g8\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g8\+\_\+l}{g8\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g8\+\_\+l}
+
+
+
+Definition at line 317 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a6ece114ee17503f716a99a601c2ba5d1}\label{namespacem__riemann__solvers_a6ece114ee17503f716a99a601c2ba5d1}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!g8\+\_\+r@{g8\+\_\+r}}
+\index{g8\+\_\+r@{g8\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{g8\+\_\+r}{g8\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::g8\+\_\+r}
+
+
+
+Definition at line 317 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a122bd2abb655fffd36e070fa376c131d}\label{namespacem__riemann__solvers_a122bd2abb655fffd36e070fa376c131d}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!gamma\+\_\+avg@{gamma\+\_\+avg}}
+\index{gamma\+\_\+avg@{gamma\+\_\+avg}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{gamma\+\_\+avg}{gamma\_avg}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::gamma\+\_\+avg}
+
+
+
+Definition at line 351 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a8159569b322091efa55bbeb377532352}\label{namespacem__riemann__solvers_a8159569b322091efa55bbeb377532352}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!gamma\+\_\+l@{gamma\+\_\+l}}
+\index{gamma\+\_\+l@{gamma\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{gamma\+\_\+l}{gamma\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::gamma\+\_\+l}
+
+
+
+Definition at line 267 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac422e0817e2011364cc6fc9c9a56b82b}\label{namespacem__riemann__solvers_ac422e0817e2011364cc6fc9c9a56b82b}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!gamma\+\_\+r@{gamma\+\_\+r}}
+\index{gamma\+\_\+r@{gamma\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{gamma\+\_\+r}{gamma\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::gamma\+\_\+r}
+
+
+
+Definition at line 267 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abff32786a11d3a71828b4e30d26773fb}\label{namespacem__riemann__solvers_abff32786a11d3a71828b4e30d26773fb}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!h\+\_\+avg@{h\+\_\+avg}}
+\index{h\+\_\+avg@{h\+\_\+avg}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{h\+\_\+avg}{h\_avg}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::h\+\_\+avg}
+
+
+
+Definition at line 349 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a075a895b8ab81335f21a168603f29f37}\label{namespacem__riemann__solvers_a075a895b8ab81335f21a168603f29f37}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!h\+\_\+l@{h\+\_\+l}}
+\index{h\+\_\+l@{h\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{h\+\_\+l}{h\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::h\+\_\+l}
+
+
+
+Definition at line 264 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac585ca9198161cf6d9130b696a2f1196}\label{namespacem__riemann__solvers_ac585ca9198161cf6d9130b696a2f1196}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!h\+\_\+r@{h\+\_\+r}}
+\index{h\+\_\+r@{h\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{h\+\_\+r}{h\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::h\+\_\+r}
+
+
+
+Definition at line 264 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ad7ef4f9e239961cacd291ee2e31bf0be}\label{namespacem__riemann__solvers_ad7ef4f9e239961cacd291ee2e31bf0be}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!is1@{is1}}
+\index{is1@{is1}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{is1}{is1}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+riemann\+\_\+solvers\+::is1}
+
+
+
+Definition at line 411 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ad0d94c92ddccee51dc2412707fcab447}\label{namespacem__riemann__solvers_ad0d94c92ddccee51dc2412707fcab447}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!is2@{is2}}
+\index{is2@{is2}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{is2}{is2}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+riemann\+\_\+solvers\+::is2}
+
+
+
+Definition at line 411 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a90256be0540e3f9279305be0e9ab32f4}\label{namespacem__riemann__solvers_a90256be0540e3f9279305be0e9ab32f4}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!is3@{is3}}
+\index{is3@{is3}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{is3}{is3}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+riemann\+\_\+solvers\+::is3}
+
+
+
+Definition at line 411 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa6e6b00985be177b0a4a92f1aed48629}\label{namespacem__riemann__solvers_aa6e6b00985be177b0a4a92f1aed48629}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!kappa\+\_\+avg@{kappa\+\_\+avg}}
+\index{kappa\+\_\+avg@{kappa\+\_\+avg}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{kappa\+\_\+avg}{kappa\_avg}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::kappa\+\_\+avg}
+
+
+
+Definition at line 355 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac277f9426d7112e2b42fdc0fd6583f5e}\label{namespacem__riemann__solvers_ac277f9426d7112e2b42fdc0fd6583f5e}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!kappal\+\_\+rs\+\_\+vf@{kappal\+\_\+rs\+\_\+vf}}
+\index{kappal\+\_\+rs\+\_\+vf@{kappal\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{kappal\+\_\+rs\+\_\+vf}{kappal\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::kappal\+\_\+rs\+\_\+vf}
+
+
+
+The left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values of the cell-\/ average curvatures of the volume fractions that define the left and right states of the Riemann problem. The variables kappa\+K\+\_\+rs\+\_\+vf are obtained by reshaping kappa\+K\+\_\+vf in a coordinate direction that is normal to the cell-\/ boundaries on which the fluxes are to be determined. 
+
+
+
+Definition at line 231 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ae8a2bf891d899a2441210a29da0e03a1}\label{namespacem__riemann__solvers_ae8a2bf891d899a2441210a29da0e03a1}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!kappar\+\_\+rs\+\_\+vf@{kappar\+\_\+rs\+\_\+vf}}
+\index{kappar\+\_\+rs\+\_\+vf@{kappar\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{kappar\+\_\+rs\+\_\+vf}{kappar\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::kappar\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 231 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a57eb3b7013680ab3c30a1e8f049a0402}\label{namespacem__riemann__solvers_a57eb3b7013680ab3c30a1e8f049a0402}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+alpha\+\_\+l@{lo\+\_\+alpha\+\_\+l}}
+\index{lo\+\_\+alpha\+\_\+l@{lo\+\_\+alpha\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+alpha\+\_\+l}{lo\_alpha\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+l}
+
+
+
+Definition at line 300 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a89059f36a5b3db54b3bd35cc3215a4be}\label{namespacem__riemann__solvers_a89059f36a5b3db54b3bd35cc3215a4be}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+alpha\+\_\+r@{lo\+\_\+alpha\+\_\+r}}
+\index{lo\+\_\+alpha\+\_\+r@{lo\+\_\+alpha\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+alpha\+\_\+r}{lo\_alpha\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+r}
+
+
+
+Definition at line 300 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ad1c29f933978f01c9402ad5287abdfe6}\label{namespacem__riemann__solvers_ad1c29f933978f01c9402ad5287abdfe6}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+alpha\+\_\+rho\+\_\+l@{lo\+\_\+alpha\+\_\+rho\+\_\+l}}
+\index{lo\+\_\+alpha\+\_\+rho\+\_\+l@{lo\+\_\+alpha\+\_\+rho\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+alpha\+\_\+rho\+\_\+l}{lo\_alpha\_rho\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+rho\+\_\+l}
+
+
+
+Definition at line 294 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a3874a511fdd71a444bfcc9193103e148}\label{namespacem__riemann__solvers_a3874a511fdd71a444bfcc9193103e148}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+alpha\+\_\+rho\+\_\+r@{lo\+\_\+alpha\+\_\+rho\+\_\+r}}
+\index{lo\+\_\+alpha\+\_\+rho\+\_\+r@{lo\+\_\+alpha\+\_\+rho\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+alpha\+\_\+rho\+\_\+r}{lo\_alpha\_rho\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+rho\+\_\+r}
+
+
+
+Definition at line 294 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_af060aa45ac1c0c96428fd428ca3f63af}\label{namespacem__riemann__solvers_af060aa45ac1c0c96428fd428ca3f63af}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+c\+\_\+l@{lo\+\_\+c\+\_\+l}}
+\index{lo\+\_\+c\+\_\+l@{lo\+\_\+c\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+c\+\_\+l}{lo\_c\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+c\+\_\+l}
+
+
+
+Definition at line 303 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ad056500eedb3761b13485edb94ec773e}\label{namespacem__riemann__solvers_ad056500eedb3761b13485edb94ec773e}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+c\+\_\+r@{lo\+\_\+c\+\_\+r}}
+\index{lo\+\_\+c\+\_\+r@{lo\+\_\+c\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+c\+\_\+r}{lo\_c\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+c\+\_\+r}
+
+
+
+Definition at line 303 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abf27be79fc84bb7830520e08774fd56c}\label{namespacem__riemann__solvers_abf27be79fc84bb7830520e08774fd56c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+e\+\_\+l@{lo\+\_\+e\+\_\+l}}
+\index{lo\+\_\+e\+\_\+l@{lo\+\_\+e\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+e\+\_\+l}{lo\_e\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+e\+\_\+l}
+
+
+
+Definition at line 298 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a7596585d3504d397f16723b6a6ffd862}\label{namespacem__riemann__solvers_a7596585d3504d397f16723b6a6ffd862}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+e\+\_\+r@{lo\+\_\+e\+\_\+r}}
+\index{lo\+\_\+e\+\_\+r@{lo\+\_\+e\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+e\+\_\+r}{lo\_e\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+e\+\_\+r}
+
+
+
+Definition at line 298 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa0a0c169528cc9c4a379f641fb653712}\label{namespacem__riemann__solvers_aa0a0c169528cc9c4a379f641fb653712}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+gamma\+\_\+l@{lo\+\_\+gamma\+\_\+l}}
+\index{lo\+\_\+gamma\+\_\+l@{lo\+\_\+gamma\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+gamma\+\_\+l}{lo\_gamma\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+gamma\+\_\+l}
+
+
+
+Definition at line 301 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a48b0505675e2bd1d0b36bda9de508655}\label{namespacem__riemann__solvers_a48b0505675e2bd1d0b36bda9de508655}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+gamma\+\_\+r@{lo\+\_\+gamma\+\_\+r}}
+\index{lo\+\_\+gamma\+\_\+r@{lo\+\_\+gamma\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+gamma\+\_\+r}{lo\_gamma\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+gamma\+\_\+r}
+
+
+
+Definition at line 301 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a75cca68e31742083e0ebbef418300c78}\label{namespacem__riemann__solvers_a75cca68e31742083e0ebbef418300c78}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+h\+\_\+l@{lo\+\_\+h\+\_\+l}}
+\index{lo\+\_\+h\+\_\+l@{lo\+\_\+h\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+h\+\_\+l}{lo\_h\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+h\+\_\+l}
+
+
+
+Definition at line 299 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a985a98321338d51bc8a43695b490b102}\label{namespacem__riemann__solvers_a985a98321338d51bc8a43695b490b102}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+h\+\_\+r@{lo\+\_\+h\+\_\+r}}
+\index{lo\+\_\+h\+\_\+r@{lo\+\_\+h\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+h\+\_\+r}{lo\_h\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+h\+\_\+r}
+
+
+
+Definition at line 299 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a1cfaf511a3605cef96d95b88de661071}\label{namespacem__riemann__solvers_a1cfaf511a3605cef96d95b88de661071}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+pi\+\_\+inf\+\_\+l@{lo\+\_\+pi\+\_\+inf\+\_\+l}}
+\index{lo\+\_\+pi\+\_\+inf\+\_\+l@{lo\+\_\+pi\+\_\+inf\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+pi\+\_\+inf\+\_\+l}{lo\_pi\_inf\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pi\+\_\+inf\+\_\+l}
+
+
+
+Definition at line 302 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a5e682fb9d377f50935dfbe4d5dd67120}\label{namespacem__riemann__solvers_a5e682fb9d377f50935dfbe4d5dd67120}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+pi\+\_\+inf\+\_\+r@{lo\+\_\+pi\+\_\+inf\+\_\+r}}
+\index{lo\+\_\+pi\+\_\+inf\+\_\+r@{lo\+\_\+pi\+\_\+inf\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+pi\+\_\+inf\+\_\+r}{lo\_pi\_inf\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pi\+\_\+inf\+\_\+r}
+
+
+
+Definition at line 302 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ab0807a312841bf144ff78338bf11a89b}\label{namespacem__riemann__solvers_ab0807a312841bf144ff78338bf11a89b}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+pres\+\_\+l@{lo\+\_\+pres\+\_\+l}}
+\index{lo\+\_\+pres\+\_\+l@{lo\+\_\+pres\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+pres\+\_\+l}{lo\_pres\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pres\+\_\+l}
+
+
+
+Definition at line 297 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a8ac4fca37ee46e90e61ca83a1e4eb2c5}\label{namespacem__riemann__solvers_a8ac4fca37ee46e90e61ca83a1e4eb2c5}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+pres\+\_\+r@{lo\+\_\+pres\+\_\+r}}
+\index{lo\+\_\+pres\+\_\+r@{lo\+\_\+pres\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+pres\+\_\+r}{lo\_pres\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pres\+\_\+r}
+
+
+
+Definition at line 297 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abbde404883793a9aae3708896b4a2781}\label{namespacem__riemann__solvers_abbde404883793a9aae3708896b4a2781}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+re\+\_\+l@{lo\+\_\+re\+\_\+l}}
+\index{lo\+\_\+re\+\_\+l@{lo\+\_\+re\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+re\+\_\+l}{lo\_re\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(2) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+re\+\_\+l}
+
+
+
+Definition at line 304 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a6d89cb45833bdcb48f3f1b01badaedcf}\label{namespacem__riemann__solvers_a6d89cb45833bdcb48f3f1b01badaedcf}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+re\+\_\+r@{lo\+\_\+re\+\_\+r}}
+\index{lo\+\_\+re\+\_\+r@{lo\+\_\+re\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+re\+\_\+r}{lo\_re\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(2) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+re\+\_\+r}
+
+
+
+Definition at line 304 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac99e69e03846f742aa0ce5e228d5167f}\label{namespacem__riemann__solvers_ac99e69e03846f742aa0ce5e228d5167f}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+rho\+\_\+l@{lo\+\_\+rho\+\_\+l}}
+\index{lo\+\_\+rho\+\_\+l@{lo\+\_\+rho\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+rho\+\_\+l}{lo\_rho\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+rho\+\_\+l}
+
+
+
+Definition at line 295 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a81537cffcfd4fb575ffaffdc1ed64028}\label{namespacem__riemann__solvers_a81537cffcfd4fb575ffaffdc1ed64028}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+rho\+\_\+r@{lo\+\_\+rho\+\_\+r}}
+\index{lo\+\_\+rho\+\_\+r@{lo\+\_\+rho\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+rho\+\_\+r}{lo\_rho\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+rho\+\_\+r}
+
+
+
+Definition at line 295 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a61bf6c3eebae289a1826c4acd303ae6e}\label{namespacem__riemann__solvers_a61bf6c3eebae289a1826c4acd303ae6e}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+s\+\_\+l@{lo\+\_\+s\+\_\+l}}
+\index{lo\+\_\+s\+\_\+l@{lo\+\_\+s\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+s\+\_\+l}{lo\_s\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+l}
+
+
+
+Definition at line 381 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_af7c9f253cc0584146992cc0b1858e888}\label{namespacem__riemann__solvers_af7c9f253cc0584146992cc0b1858e888}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+s\+\_\+m@{lo\+\_\+s\+\_\+m}}
+\index{lo\+\_\+s\+\_\+m@{lo\+\_\+s\+\_\+m}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+s\+\_\+m}{lo\_s\_m}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+m}
+
+
+
+Definition at line 382 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a62f6549c30232e14a06efa8dfe7f19a4}\label{namespacem__riemann__solvers_a62f6549c30232e14a06efa8dfe7f19a4}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+s\+\_\+p@{lo\+\_\+s\+\_\+p}}
+\index{lo\+\_\+s\+\_\+p@{lo\+\_\+s\+\_\+p}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+s\+\_\+p}{lo\_s\_p}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+p}
+
+
+
+Definition at line 382 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ae880c4216083a3203b42996f2010f080}\label{namespacem__riemann__solvers_ae880c4216083a3203b42996f2010f080}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+s\+\_\+r@{lo\+\_\+s\+\_\+r}}
+\index{lo\+\_\+s\+\_\+r@{lo\+\_\+s\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+s\+\_\+r}{lo\_s\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+r}
+
+
+
+Definition at line 381 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a28e9af865b5ffd2a8cef04c1004b3aea}\label{namespacem__riemann__solvers_a28e9af865b5ffd2a8cef04c1004b3aea}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+s\+\_\+s@{lo\+\_\+s\+\_\+s}}
+\index{lo\+\_\+s\+\_\+s@{lo\+\_\+s\+\_\+s}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+s\+\_\+s}{lo\_s\_s}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+s}
+
+
+
+Definition at line 381 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ae939a1e2f36044a0729480d09e05d74f}\label{namespacem__riemann__solvers_ae939a1e2f36044a0729480d09e05d74f}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+vel\+\_\+l@{lo\+\_\+vel\+\_\+l}}
+\index{lo\+\_\+vel\+\_\+l@{lo\+\_\+vel\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+vel\+\_\+l}{lo\_vel\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+vel\+\_\+l}
+
+
+
+Definition at line 296 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_acf54d997ef4105fd507c180db700c873}\label{namespacem__riemann__solvers_acf54d997ef4105fd507c180db700c873}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+vel\+\_\+r@{lo\+\_\+vel\+\_\+r}}
+\index{lo\+\_\+vel\+\_\+r@{lo\+\_\+vel\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+vel\+\_\+r}{lo\_vel\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+vel\+\_\+r}
+
+
+
+Definition at line 296 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a8388f446036552682910bbe06da81f70}\label{namespacem__riemann__solvers_a8388f446036552682910bbe06da81f70}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+we\+\_\+l@{lo\+\_\+we\+\_\+l}}
+\index{lo\+\_\+we\+\_\+l@{lo\+\_\+we\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+we\+\_\+l}{lo\_we\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+we\+\_\+l}
+
+
+
+Definition at line 305 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a7883028b185740c1d507b486eceef969}\label{namespacem__riemann__solvers_a7883028b185740c1d507b486eceef969}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+we\+\_\+r@{lo\+\_\+we\+\_\+r}}
+\index{lo\+\_\+we\+\_\+r@{lo\+\_\+we\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+we\+\_\+r}{lo\_we\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+we\+\_\+r}
+
+
+
+Definition at line 305 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_adeb97ac789df26b14a090d09fb8598b7}\label{namespacem__riemann__solvers_adeb97ac789df26b14a090d09fb8598b7}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+xi\+\_\+m@{lo\+\_\+xi\+\_\+m}}
+\index{lo\+\_\+xi\+\_\+m@{lo\+\_\+xi\+\_\+m}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+xi\+\_\+m}{lo\_xi\_m}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+xi\+\_\+m}
+
+
+
+Definition at line 384 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aad491932ac39e9c830cb24d395a00c3c}\label{namespacem__riemann__solvers_aad491932ac39e9c830cb24d395a00c3c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!lo\+\_\+xi\+\_\+p@{lo\+\_\+xi\+\_\+p}}
+\index{lo\+\_\+xi\+\_\+p@{lo\+\_\+xi\+\_\+p}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{lo\+\_\+xi\+\_\+p}{lo\_xi\_p}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+xi\+\_\+p}
+
+
+
+Definition at line 384 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_afbf6423349d95b7b3472eb84b9ba7f56}\label{namespacem__riemann__solvers_afbf6423349d95b7b3472eb84b9ba7f56}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!nbub\+\_\+l@{nbub\+\_\+l}}
+\index{nbub\+\_\+l@{nbub\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{nbub\+\_\+l}{nbub\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::nbub\+\_\+l}
+
+
+
+Definition at line 279 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a4b6ffaeeaa4365c642ef3a5295635b07}\label{namespacem__riemann__solvers_a4b6ffaeeaa4365c642ef3a5295635b07}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!nbub\+\_\+r@{nbub\+\_\+r}}
+\index{nbub\+\_\+r@{nbub\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{nbub\+\_\+r}{nbub\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::nbub\+\_\+r}
+
+
+
+Definition at line 279 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a2b69a3c582d14aba043c3cb6376335a5}\label{namespacem__riemann__solvers_a2b69a3c582d14aba043c3cb6376335a5}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!p0\+\_\+l@{p0\+\_\+l}}
+\index{p0\+\_\+l@{p0\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{p0\+\_\+l}{p0\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::p0\+\_\+l}
+
+
+
+Definition at line 282 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa7deddacb25e873c573761963f680efc}\label{namespacem__riemann__solvers_aa7deddacb25e873c573761963f680efc}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!p0\+\_\+r@{p0\+\_\+r}}
+\index{p0\+\_\+r@{p0\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{p0\+\_\+r}{p0\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::p0\+\_\+r}
+
+
+
+Definition at line 282 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac5dad78660af09505fe587f052afdfd5}\label{namespacem__riemann__solvers_ac5dad78660af09505fe587f052afdfd5}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!p\+\_\+k\+\_\+star@{p\+\_\+k\+\_\+star}}
+\index{p\+\_\+k\+\_\+star@{p\+\_\+k\+\_\+star}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{p\+\_\+k\+\_\+star}{p\_k\_star}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::p\+\_\+k\+\_\+star}
+
+
+
+Definition at line 365 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ab48bf742ff1449dd3e044ce44cc59a56}\label{namespacem__riemann__solvers_ab48bf742ff1449dd3e044ce44cc59a56}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!p\+\_\+star@{p\+\_\+star}}
+\index{p\+\_\+star@{p\+\_\+star}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{p\+\_\+star}{p\_star}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::p\+\_\+star}
+
+
+
+Definition at line 365 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a31ac5fad05a69c3c0c76fbdc872f5494}\label{namespacem__riemann__solvers_a31ac5fad05a69c3c0c76fbdc872f5494}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pbw\+\_\+l@{pbw\+\_\+l}}
+\index{pbw\+\_\+l@{pbw\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pbw\+\_\+l}{pbw\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::pbw\+\_\+l}
+
+
+
+Definition at line 283 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_af14a2b29ba2692adfb1ed257e91482e8}\label{namespacem__riemann__solvers_af14a2b29ba2692adfb1ed257e91482e8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pbw\+\_\+r@{pbw\+\_\+r}}
+\index{pbw\+\_\+r@{pbw\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pbw\+\_\+r}{pbw\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::pbw\+\_\+r}
+
+
+
+Definition at line 283 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac90ee6bf146aa47944bb11cd5de0a580}\label{namespacem__riemann__solvers_ac90ee6bf146aa47944bb11cd5de0a580}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pi\+\_\+inf\+\_\+l@{pi\+\_\+inf\+\_\+l}}
+\index{pi\+\_\+inf\+\_\+l@{pi\+\_\+inf\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pi\+\_\+inf\+\_\+l}{pi\_inf\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::pi\+\_\+inf\+\_\+l}
+
+
+
+Definition at line 268 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a925187e709792a5fcfa80daebd568e8f}\label{namespacem__riemann__solvers_a925187e709792a5fcfa80daebd568e8f}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pi\+\_\+inf\+\_\+r@{pi\+\_\+inf\+\_\+r}}
+\index{pi\+\_\+inf\+\_\+r@{pi\+\_\+inf\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pi\+\_\+inf\+\_\+r}{pi\_inf\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::pi\+\_\+inf\+\_\+r}
+
+
+
+Definition at line 268 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a6c0b79ed34cb9be88abdd713eb207295}\label{namespacem__riemann__solvers_a6c0b79ed34cb9be88abdd713eb207295}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pres\+\_\+ic@{pres\+\_\+ic}}
+\index{pres\+\_\+ic@{pres\+\_\+ic}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pres\+\_\+ic}{pres\_ic}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+ic}
+
+
+
+Definition at line 331 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a81973da2ed5f2e08dd363d889c0e21d7}\label{namespacem__riemann__solvers_a81973da2ed5f2e08dd363d889c0e21d7}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pres\+\_\+l@{pres\+\_\+l}}
+\index{pres\+\_\+l@{pres\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pres\+\_\+l}{pres\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+l}
+
+
+
+Definition at line 262 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abe054616c664c4f090dfff5ba0aa679d}\label{namespacem__riemann__solvers_abe054616c664c4f090dfff5ba0aa679d}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pres\+\_\+r@{pres\+\_\+r}}
+\index{pres\+\_\+r@{pres\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pres\+\_\+r}{pres\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+r}
+
+
+
+Definition at line 262 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a41ed4fe5b767afd06561f8618d1d7012}\label{namespacem__riemann__solvers_a41ed4fe5b767afd06561f8618d1d7012}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!pres\+\_\+s@{pres\+\_\+s}}
+\index{pres\+\_\+s@{pres\+\_\+s}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{pres\+\_\+s}{pres\_s}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+s}
+
+
+
+Definition at line 322 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_abeca9cdf8ede1fe479660ab70ff789c7}\label{namespacem__riemann__solvers_abeca9cdf8ede1fe479660ab70ff789c7}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!ptilde\+\_\+l@{ptilde\+\_\+l}}
+\index{ptilde\+\_\+l@{ptilde\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{ptilde\+\_\+l}{ptilde\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::ptilde\+\_\+l}
+
+
+
+Definition at line 284 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_addd3d84b7a9bae473b0c17744d5cac31}\label{namespacem__riemann__solvers_addd3d84b7a9bae473b0c17744d5cac31}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!ptilde\+\_\+r@{ptilde\+\_\+r}}
+\index{ptilde\+\_\+r@{ptilde\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{ptilde\+\_\+r}{ptilde\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::ptilde\+\_\+r}
+
+
+
+Definition at line 284 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_afe077d6837688601705ac13df3d9c3dc}\label{namespacem__riemann__solvers_afe077d6837688601705ac13df3d9c3dc}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!q\+\_\+prim\+\_\+rs\+\_\+vf@{q\+\_\+prim\+\_\+rs\+\_\+vf}}
+\index{q\+\_\+prim\+\_\+rs\+\_\+vf@{q\+\_\+prim\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{q\+\_\+prim\+\_\+rs\+\_\+vf}{q\_prim\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::q\+\_\+prim\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 222 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa4fd04af7adfbb38e425f6e91e041ecc}\label{namespacem__riemann__solvers_aa4fd04af7adfbb38e425f6e91e041ecc}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!ql\+\_\+prim\+\_\+rs\+\_\+vf@{ql\+\_\+prim\+\_\+rs\+\_\+vf}}
+\index{ql\+\_\+prim\+\_\+rs\+\_\+vf@{ql\+\_\+prim\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{ql\+\_\+prim\+\_\+rs\+\_\+vf}{ql\_prim\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::ql\+\_\+prim\+\_\+rs\+\_\+vf}
+
+
+
+The left (L) and right (R) W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables that define the left and right states of the Riemann problem. Variables q\+K\+\_\+prim\+\_\+rs\+\_\+vf, K = L or R, are obtained by reshaping (RS) q\+K\+\_\+prim\+\_\+vf in a coordinate direction that is normal to the cell-\/boundaries along which the fluxes are to be determined. 
+
+
+
+Definition at line 220 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a70fefa4f5849fa4c952030b0ac04482a}\label{namespacem__riemann__solvers_a70fefa4f5849fa4c952030b0ac04482a}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!qr\+\_\+prim\+\_\+rs\+\_\+vf@{qr\+\_\+prim\+\_\+rs\+\_\+vf}}
+\index{qr\+\_\+prim\+\_\+rs\+\_\+vf@{qr\+\_\+prim\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{qr\+\_\+prim\+\_\+rs\+\_\+vf}{qr\_prim\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::qr\+\_\+prim\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 221 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_af0757998bd9843f9bb978a600d0ae2b0}\label{namespacem__riemann__solvers_af0757998bd9843f9bb978a600d0ae2b0}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!r0\+\_\+l@{r0\+\_\+l}}
+\index{r0\+\_\+l@{r0\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{r0\+\_\+l}{r0\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::r0\+\_\+l}
+
+
+
+Definition at line 280 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a132ff53b628e32e8d047d3a3f983b933}\label{namespacem__riemann__solvers_a132ff53b628e32e8d047d3a3f983b933}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!r0\+\_\+r@{r0\+\_\+r}}
+\index{r0\+\_\+r@{r0\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{r0\+\_\+r}{r0\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::r0\+\_\+r}
+
+
+
+Definition at line 280 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ada8ab10b02113187113eed8f49f1ed2d}\label{namespacem__riemann__solvers_ada8ab10b02113187113eed8f49f1ed2d}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!re\+\_\+avg\+\_\+rs\+\_\+vf@{re\+\_\+avg\+\_\+rs\+\_\+vf}}
+\index{re\+\_\+avg\+\_\+rs\+\_\+vf@{re\+\_\+avg\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{re\+\_\+avg\+\_\+rs\+\_\+vf}{re\_avg\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::re\+\_\+avg\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 353 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a2a804f5759af46c82fdd62633b5e7605}\label{namespacem__riemann__solvers_a2a804f5759af46c82fdd62633b5e7605}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!re\+\_\+l@{re\+\_\+l}}
+\index{re\+\_\+l@{re\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{re\+\_\+l}{re\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(2) m\+\_\+riemann\+\_\+solvers\+::re\+\_\+l}
+
+
+
+Definition at line 270 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a31045aff8e978fd620943eaed4fbb973}\label{namespacem__riemann__solvers_a31045aff8e978fd620943eaed4fbb973}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!re\+\_\+r@{re\+\_\+r}}
+\index{re\+\_\+r@{re\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{re\+\_\+r}{re\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(2) m\+\_\+riemann\+\_\+solvers\+::re\+\_\+r}
+
+
+
+Definition at line 270 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a09cb56d16d4e4c5300be1ceee6e15acf}\label{namespacem__riemann__solvers_a09cb56d16d4e4c5300be1ceee6e15acf}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!rho\+\_\+avg@{rho\+\_\+avg}}
+\index{rho\+\_\+avg@{rho\+\_\+avg}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{rho\+\_\+avg}{rho\_avg}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+avg}
+
+
+
+Definition at line 347 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a45a3cc332ef2fd7fc391a4ae82763f1a}\label{namespacem__riemann__solvers_a45a3cc332ef2fd7fc391a4ae82763f1a}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!rho\+\_\+ic@{rho\+\_\+ic}}
+\index{rho\+\_\+ic@{rho\+\_\+ic}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{rho\+\_\+ic}{rho\_ic}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+ic}
+
+
+
+Definition at line 329 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_afc9d9cb504eca33ca970f4340c259161}\label{namespacem__riemann__solvers_afc9d9cb504eca33ca970f4340c259161}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!rho\+\_\+l@{rho\+\_\+l}}
+\index{rho\+\_\+l@{rho\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{rho\+\_\+l}{rho\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+l}
+
+
+
+Definition at line 260 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a03542f2527def3010f55cd456ccca698}\label{namespacem__riemann__solvers_a03542f2527def3010f55cd456ccca698}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!rho\+\_\+r@{rho\+\_\+r}}
+\index{rho\+\_\+r@{rho\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{rho\+\_\+r}{rho\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+r}
+
+
+
+Definition at line 260 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a6c143ed17587d6f4b1a39e1f49e030e8}\label{namespacem__riemann__solvers_a6c143ed17587d6f4b1a39e1f49e030e8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!rho\+\_\+star@{rho\+\_\+star}}
+\index{rho\+\_\+star@{rho\+\_\+star}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{rho\+\_\+star}{rho\_star}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+star}
+
+
+
+Definition at line 365 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a7bf84258c88a5e2c0accdc130ac812d9}\label{namespacem__riemann__solvers_a7bf84258c88a5e2c0accdc130ac812d9}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+average\+\_\+state@{s\+\_\+compute\+\_\+average\+\_\+state}}
+\index{s\+\_\+compute\+\_\+average\+\_\+state@{s\+\_\+compute\+\_\+average\+\_\+state}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+average\+\_\+state}{s\_compute\_average\_state}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__average__state}{s\+\_\+compute\+\_\+abstract\+\_\+average\+\_\+state}), pointer m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+average\+\_\+state =$>$ N\+U\+LL()}
+
+
+
+Definition at line 393 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a334d729c58a5c746cb0045d1f5f00b01}\label{namespacem__riemann__solvers_a334d729c58a5c746cb0045d1f5f00b01}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux}}
+\index{s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux@{s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux}{s\_compute\_viscous\_source\_flux}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__viscous__source__flux}{s\+\_\+compute\+\_\+abstract\+\_\+viscous\+\_\+source\+\_\+flux}), pointer m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux =$>$ N\+U\+LL()}
+
+
+
+Definition at line 404 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a3e2b4d51fda04b61d6f54069c5bb66c6}\label{namespacem__riemann__solvers_a3e2b4d51fda04b61d6f54069c5bb66c6}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+compute\+\_\+wave\+\_\+speeds@{s\+\_\+compute\+\_\+wave\+\_\+speeds}}
+\index{s\+\_\+compute\+\_\+wave\+\_\+speeds@{s\+\_\+compute\+\_\+wave\+\_\+speeds}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+wave\+\_\+speeds}{s\_compute\_wave\_speeds}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__wave__speeds}{s\+\_\+compute\+\_\+abstract\+\_\+wave\+\_\+speeds}), pointer m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+wave\+\_\+speeds =$>$ N\+U\+LL()}
+
+
+
+Definition at line 398 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a83a70908c66bbb071647bb383dc72975}\label{namespacem__riemann__solvers_a83a70908c66bbb071647bb383dc72975}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+l@{s\+\_\+l}}
+\index{s\+\_\+l@{s\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+l}{s\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::s\+\_\+l}
+
+
+
+Definition at line 360 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a418fedb6a95524db57eeb364db8c5c0c}\label{namespacem__riemann__solvers_a418fedb6a95524db57eeb364db8c5c0c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+m@{s\+\_\+m}}
+\index{s\+\_\+m@{s\+\_\+m}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+m}{s\_m}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::s\+\_\+m}
+
+
+
+Minus (M) and plus (P) wave speeds. 
+
+
+
+Definition at line 370 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ae941c64575d69a7b369f9f5bb921a384}\label{namespacem__riemann__solvers_ae941c64575d69a7b369f9f5bb921a384}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+p@{s\+\_\+p}}
+\index{s\+\_\+p@{s\+\_\+p}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+p}{s\_p}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::s\+\_\+p}
+
+
+
+Definition at line 370 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ac5cbbc98622cdafe56142b26d67ad2d9}\label{namespacem__riemann__solvers_ac5cbbc98622cdafe56142b26d67ad2d9}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+r@{s\+\_\+r}}
+\index{s\+\_\+r@{s\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+r}{s\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::s\+\_\+r}
+
+
+
+Definition at line 360 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a7edc50538c81447bf49e9242d85ee1ff}\label{namespacem__riemann__solvers_a7edc50538c81447bf49e9242d85ee1ff}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+riemann\+\_\+solver@{s\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+riemann\+\_\+solver@{s\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+riemann\+\_\+solver}{s\_riemann\_solver}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__riemann__solvers_1_1s__abstract__riemann__solver}{s\+\_\+abstract\+\_\+riemann\+\_\+solver}), pointer, public m\+\_\+riemann\+\_\+solvers\+::s\+\_\+riemann\+\_\+solver =$>$ N\+U\+LL()}
+
+
+
+Definition at line 388 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a576586da8d3d80052a335d379001059a}\label{namespacem__riemann__solvers_a576586da8d3d80052a335d379001059a}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!s\+\_\+s@{s\+\_\+s}}
+\index{s\+\_\+s@{s\+\_\+s}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{s\+\_\+s}{s\_s}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::s\+\_\+s}
+
+
+
+Definition at line 360 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a1b9d56d4ae46805db6489e72a09f765b}\label{namespacem__riemann__solvers_a1b9d56d4ae46805db6489e72a09f765b}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!tvd\+\_\+s\+\_\+m@{tvd\+\_\+s\+\_\+m}}
+\index{tvd\+\_\+s\+\_\+m@{tvd\+\_\+s\+\_\+m}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{tvd\+\_\+s\+\_\+m}{tvd\_s\_m}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+s\+\_\+m}
+
+
+
+Definition at line 383 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aa0a8636a3aef10f1989ce432bd825bf5}\label{namespacem__riemann__solvers_aa0a8636a3aef10f1989ce432bd825bf5}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!tvd\+\_\+s\+\_\+p@{tvd\+\_\+s\+\_\+p}}
+\index{tvd\+\_\+s\+\_\+p@{tvd\+\_\+s\+\_\+p}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{tvd\+\_\+s\+\_\+p}{tvd\_s\_p}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+s\+\_\+p}
+
+
+
+Definition at line 383 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ad13ea7f1ad55e7119a36ca61bb353ded}\label{namespacem__riemann__solvers_ad13ea7f1ad55e7119a36ca61bb353ded}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!tvd\+\_\+xi\+\_\+m@{tvd\+\_\+xi\+\_\+m}}
+\index{tvd\+\_\+xi\+\_\+m@{tvd\+\_\+xi\+\_\+m}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{tvd\+\_\+xi\+\_\+m}{tvd\_xi\_m}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+xi\+\_\+m}
+
+
+
+Definition at line 385 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a5e4f81b0b96e326a19154e0a4b8ae01a}\label{namespacem__riemann__solvers_a5e4f81b0b96e326a19154e0a4b8ae01a}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!tvd\+\_\+xi\+\_\+p@{tvd\+\_\+xi\+\_\+p}}
+\index{tvd\+\_\+xi\+\_\+p@{tvd\+\_\+xi\+\_\+p}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{tvd\+\_\+xi\+\_\+p}{tvd\_xi\_p}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+xi\+\_\+p}
+
+
+
+Definition at line 385 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_af425cfd91bc8a567e44b36c9bdbfb2bc}\label{namespacem__riemann__solvers_af425cfd91bc8a567e44b36c9bdbfb2bc}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!v0\+\_\+l@{v0\+\_\+l}}
+\index{v0\+\_\+l@{v0\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{v0\+\_\+l}{v0\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::v0\+\_\+l}
+
+
+
+Definition at line 281 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a1bf4d8c27c1ed947af13b86a63f5b3aa}\label{namespacem__riemann__solvers_a1bf4d8c27c1ed947af13b86a63f5b3aa}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!v0\+\_\+r@{v0\+\_\+r}}
+\index{v0\+\_\+r@{v0\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{v0\+\_\+r}{v0\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::v0\+\_\+r}
+
+
+
+Definition at line 281 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a0fd22ed964af8ed09333c72744f561bd}\label{namespacem__riemann__solvers_a0fd22ed964af8ed09333c72744f561bd}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!vel\+\_\+avg@{vel\+\_\+avg}}
+\index{vel\+\_\+avg@{vel\+\_\+avg}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{vel\+\_\+avg}{vel\_avg}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+avg}
+
+
+
+Definition at line 348 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a81bfe96b264a5bba316c60965e787cbf}\label{namespacem__riemann__solvers_a81bfe96b264a5bba316c60965e787cbf}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!vel\+\_\+ic@{vel\+\_\+ic}}
+\index{vel\+\_\+ic@{vel\+\_\+ic}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{vel\+\_\+ic}{vel\_ic}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+ic}
+
+
+
+Definition at line 330 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ab17d29f1de63b4669165d7d92f209986}\label{namespacem__riemann__solvers_ab17d29f1de63b4669165d7d92f209986}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!vel\+\_\+l@{vel\+\_\+l}}
+\index{vel\+\_\+l@{vel\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{vel\+\_\+l}{vel\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+l}
+
+
+
+Definition at line 261 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a27a761fd83f4f8f7178b8c57b09b825e}\label{namespacem__riemann__solvers_a27a761fd83f4f8f7178b8c57b09b825e}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!vel\+\_\+r@{vel\+\_\+r}}
+\index{vel\+\_\+r@{vel\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{vel\+\_\+r}{vel\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+r}
+
+
+
+Definition at line 261 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a594596688927700679b18b484a495504}\label{namespacem__riemann__solvers_a594596688927700679b18b484a495504}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!vel\+\_\+s@{vel\+\_\+s}}
+\index{vel\+\_\+s@{vel\+\_\+s}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{vel\+\_\+s}{vel\_s}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+s}
+
+
+
+Definition at line 323 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aee9f1299db2c29eabb5d2ef096f0abe0}\label{namespacem__riemann__solvers_aee9f1299db2c29eabb5d2ef096f0abe0}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!vel\+\_\+src\+\_\+rs\+\_\+vf@{vel\+\_\+src\+\_\+rs\+\_\+vf}}
+\index{vel\+\_\+src\+\_\+rs\+\_\+vf@{vel\+\_\+src\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{vel\+\_\+src\+\_\+rs\+\_\+vf}{vel\_src\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+src\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 250 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a298482aa3e595dfe2401920ad841eb8f}\label{namespacem__riemann__solvers_a298482aa3e595dfe2401920ad841eb8f}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!we\+\_\+avg\+\_\+rs\+\_\+vf@{we\+\_\+avg\+\_\+rs\+\_\+vf}}
+\index{we\+\_\+avg\+\_\+rs\+\_\+vf@{we\+\_\+avg\+\_\+rs\+\_\+vf}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{we\+\_\+avg\+\_\+rs\+\_\+vf}{we\_avg\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:,\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::we\+\_\+avg\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 354 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a953a81975cc1627c87baca12ed51ed95}\label{namespacem__riemann__solvers_a953a81975cc1627c87baca12ed51ed95}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!we\+\_\+l@{we\+\_\+l}}
+\index{we\+\_\+l@{we\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{we\+\_\+l}{we\_l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::we\+\_\+l}
+
+
+
+Definition at line 271 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ab9b568d4ea77b665c1f6cea77144acc8}\label{namespacem__riemann__solvers_ab9b568d4ea77b665c1f6cea77144acc8}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!we\+\_\+r@{we\+\_\+r}}
+\index{we\+\_\+r@{we\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{we\+\_\+r}{we\_r}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+riemann\+\_\+solvers\+::we\+\_\+r}
+
+
+
+Definition at line 271 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a2da04da751b4d4e1e1d8783d80f4ebe1}\label{namespacem__riemann__solvers_a2da04da751b4d4e1e1d8783d80f4ebe1}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!xi\+\_\+m@{xi\+\_\+m}}
+\index{xi\+\_\+m@{xi\+\_\+m}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{xi\+\_\+m}{xi\_m}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::xi\+\_\+m}
+
+
+
+Minus and plus wave speeds functions. 
+
+
+
+Definition at line 375 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_a549a425e9a863451e770d405f092417c}\label{namespacem__riemann__solvers_a549a425e9a863451e770d405f092417c}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!xi\+\_\+p@{xi\+\_\+p}}
+\index{xi\+\_\+p@{xi\+\_\+p}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{xi\+\_\+p}{xi\_p}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::xi\+\_\+p}
+
+
+
+Definition at line 375 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_ad79d372c1bc1971b870ab2c455d9ff90}\label{namespacem__riemann__solvers_ad79d372c1bc1971b870ab2c455d9ff90}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!y\+\_\+l@{y\+\_\+l}}
+\index{y\+\_\+l@{y\+\_\+l}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{y\+\_\+l}{y\_l}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::y\+\_\+l}
+
+
+
+Definition at line 266 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+\mbox{\Hypertarget{namespacem__riemann__solvers_aef2c7eeabded0734aaa0cd95adac91ab}\label{namespacem__riemann__solvers_aef2c7eeabded0734aaa0cd95adac91ab}} 
+\index{m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}!y\+\_\+r@{y\+\_\+r}}
+\index{y\+\_\+r@{y\+\_\+r}!m\+\_\+riemann\+\_\+solvers@{m\+\_\+riemann\+\_\+solvers}}
+\subsubsection{\texorpdfstring{y\+\_\+r}{y\_r}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+riemann\+\_\+solvers\+::y\+\_\+r}
+
+
+
+Definition at line 266 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+

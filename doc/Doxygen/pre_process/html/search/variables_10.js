@@ -1,0 +1,20 @@
+var searchData=
+[
+  ['s_5fassign_5fpatch_5fprimitive_5fvariables',['s_assign_patch_primitive_variables',['../namespacem__initial__condition.html#a3151c58d3a628c7ac8aff34bce727867',1,'m_initial_condition']]],
+  ['s_5fconvert_5fto_5fmixture_5fvariables',['s_convert_to_mixture_variables',['../namespacem__variables__conversion.html#a3bd150e984abfe14c8269e759ea4cb60',1,'m_variables_conversion']]],
+  ['s_5fgenerate_5fgrid',['s_generate_grid',['../namespacem__grid.html#a3af3e5a8e440ff542dfd274546fb8150',1,'m_grid']]],
+  ['s_5fread_5fgrid_5fdata_5ffiles',['s_read_grid_data_files',['../namespacem__start__up.html#af646e0769cd88c45b2acfc47a3b15d7b',1,'m_start_up']]],
+  ['s_5fread_5fic_5fdata_5ffiles',['s_read_ic_data_files',['../namespacem__start__up.html#a7a35339ce3c84eaf721a80e77be63c07',1,'m_start_up']]],
+  ['s_5fwrite_5fdata_5ffiles',['s_write_data_files',['../namespacem__data__output.html#a1ba4e8126b198fb2147d4d9b60f74e44',1,'m_data_output']]],
+  ['sf',['sf',['../structm__derived__types_1_1scalar__field.html#a81eef148a1645bae2476fffacb82d735',1,'m_derived_types::scalar_field']]],
+  ['smooth_5fcoeff',['smooth_coeff',['../structm__derived__types_1_1ic__patch__parameters.html#a72c1ce27d5eb46084832a91e80ef6beb',1,'m_derived_types::ic_patch_parameters::smooth_coeff()'],['../namespacem__initial__condition.html#a7ab7ae2808ac3b52319477860c6dbf80',1,'m_initial_condition::smooth_coeff()']]],
+  ['smooth_5fpatch_5fid',['smooth_patch_id',['../structm__derived__types_1_1ic__patch__parameters.html#a1e1bb0d754aa7f3eaf43204794f18e05',1,'m_derived_types::ic_patch_parameters::smooth_patch_id()'],['../namespacem__initial__condition.html#adf36787dd781f2f28d1b49d06116c401',1,'m_initial_condition::smooth_patch_id()']]],
+  ['smoothen',['smoothen',['../structm__derived__types_1_1ic__patch__parameters.html#a14ab0ad536844406d181e43519aa3ec0',1,'m_derived_types::ic_patch_parameters']]],
+  ['sph_5fphi',['sph_phi',['../namespacem__initial__condition.html#aba65d4cbd29f3b8eda828037c7215e2d',1,'m_initial_condition']]],
+  ['ss',['ss',['../structm__derived__types_1_1physical__parameters.html#aabd7a1fe772c4e9a6e2f108266ebd94e',1,'m_derived_types::physical_parameters']]],
+  ['start_5fidx',['start_idx',['../namespacem__global__parameters.html#a4bd117ae744eab60f3d681fd03d6e90d',1,'m_global_parameters']]],
+  ['stretch_5fx',['stretch_x',['../namespacem__global__parameters.html#a95a3647227ae84b17613caee22408853',1,'m_global_parameters']]],
+  ['stretch_5fy',['stretch_y',['../namespacem__global__parameters.html#acd02bb9d62d1e2a5a3185e12b0bdaea9',1,'m_global_parameters']]],
+  ['stretch_5fz',['stretch_z',['../namespacem__global__parameters.html#aaeee716bda208dc0427196cdb8ad8cdf',1,'m_global_parameters']]],
+  ['sys_5fsize',['sys_size',['../namespacem__global__parameters.html#a4dac2e4ead915635e0c6c33af87be01b',1,'m_global_parameters']]]
+];

@@ -1,0 +1,60 @@
+\hypertarget{interfacem__variables__conversion_1_1s__convert__abstract__to__mixture__variables}{}\section{m\+\_\+variables\+\_\+conversion\+:\+:s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables Interface Reference}
+\label{interfacem__variables__conversion_1_1s__convert__abstract__to__mixture__variables}\index{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables@{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables}}
+
+
+The abstract interface to the procedures that are utilized to convert the mixture and the species variables into the mixture variables. For more information, refer to\+: 1) s\+\_\+convert\+\_\+mixture\+\_\+to\+\_\+mixture\+\_\+variables 2) s\+\_\+convert\+\_\+species\+\_\+to\+\_\+mixture\+\_\+variables.  
+
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{interfacem__variables__conversion_1_1s__convert__abstract__to__mixture__variables_a8bc488ab9d36a5b761fbe1dc5da4a1ce}{s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables} (q\+K\+\_\+vf, rho\+\_\+K, gamma\+\_\+K, pi\+\_\+inf\+\_\+K, Re\+\_\+K, We\+\_\+K, \hyperlink{m__rhs_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, \hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k})
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+The abstract interface to the procedures that are utilized to convert the mixture and the species variables into the mixture variables. For more information, refer to\+: 1) s\+\_\+convert\+\_\+mixture\+\_\+to\+\_\+mixture\+\_\+variables 2) s\+\_\+convert\+\_\+species\+\_\+to\+\_\+mixture\+\_\+variables. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+K\+\_\+vf} & Conservative/primitive variables \\
+\hline
+{\em rho\+\_\+K} & Mixture density \\
+\hline
+{\em gamma\+\_\+K} & Mixture sp. heat ratio \\
+\hline
+{\em pi\+\_\+inf\+\_\+K} & Mixture stiffness function \\
+\hline
+{\em Re\+\_\+K} & Reynolds number \\
+\hline
+{\em We\+\_\+K} & Weber number \\
+\hline
+{\em i} & Cell location first index \\
+\hline
+{\em j} & Cell location second index \\
+\hline
+{\em k} & Cell location third index \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 95 of file m\+\_\+variables\+\_\+conversion.\+f90.
+
+
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{interfacem__variables__conversion_1_1s__convert__abstract__to__mixture__variables_a8bc488ab9d36a5b761fbe1dc5da4a1ce}\label{interfacem__variables__conversion_1_1s__convert__abstract__to__mixture__variables_a8bc488ab9d36a5b761fbe1dc5da4a1ce}} 
+\index{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables@{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables}!s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables@{s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables}}
+\index{s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables@{s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables}!m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables@{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables}}
+\subsubsection{\texorpdfstring{s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables()}{s\_convert\_abstract\_to\_mixture\_variables()}}
+{\footnotesize\ttfamily subroutine m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables\+::s\+\_\+convert\+\_\+abstract\+\_\+to\+\_\+mixture\+\_\+variables (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+K\+\_\+vf,  }\item[{real(kind(0d0)), intent(out)}]{rho\+\_\+K,  }\item[{real(kind(0d0)), intent(out)}]{gamma\+\_\+K,  }\item[{real(kind(0d0)), intent(out)}]{pi\+\_\+inf\+\_\+K,  }\item[{real(kind(0d0)), dimension(2), intent(out)}]{Re\+\_\+K,  }\item[{real(kind(0d0)), dimension( num\+\_\+fluids,                                         num\+\_\+fluids  ), intent(out)}]{We\+\_\+K,  }\item[{integer, intent(in)}]{i,  }\item[{integer, intent(in)}]{j,  }\item[{integer, intent(in)}]{k }\end{DoxyParamCaption})}
+
+
+
+Definition at line 98 of file m\+\_\+variables\+\_\+conversion.\+f90.
+
+
+
+The documentation for this interface was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+\hyperlink{m__variables__conversion_8f90}{m\+\_\+variables\+\_\+conversion.\+f90}\end{DoxyCompactItemize}

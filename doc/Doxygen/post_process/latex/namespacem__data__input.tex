@@ -1,0 +1,177 @@
+\hypertarget{namespacem__data__input}{}\section{m\+\_\+data\+\_\+input Module Reference}
+\label{namespacem__data__input}\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+
+
+This module features procedures, which for a specific time-\/step, read in the raw simulation data for the grid and the conservative variables and fill out their buffer regions.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__data__input_1_1s__read__abstract__data__files}{s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files}
+\begin{DoxyCompactList}\small\item\em Subroutine for reading data files. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__data__input_a9d69f4bcb771c60157b62bc4b04a6ba1}{s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em This subroutine is called at each time-\/step that has to be post-\/processed in order to read the raw data files present in the corresponding time-\/step directory and to populate the associated grid and conservative variables. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_a0dd37369dd52b1299b06563f96c25805}{s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em This subroutine is called at each time-\/step that has to be post-\/processed in order to parallel-\/read the raw data files present in the corresponding time-\/step directory and to populate the associated grid and conservative variables. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_afc05d7714001946feb2485ce18cb00f6}{s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions} ()
+\begin{DoxyCompactList}\small\item\em The following subroutine populates the buffer regions of the cell-\/width spacings, the cell-\/boundary locations and the cell-\/center locations. Note that the buffer regions of the last two variables should be interpreted slightly differently than usual. They are really ghost zones that are used in aiding the multidimensional visualization of Silo database files, in Vis\+It, when processor boundary conditions are present. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_a5cef0da967dbbf0d148b26bd67046c8d}{s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to populate the buffers of the cell-\/average conservative variables, depending on the boundary conditions. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_a806c2edb19d6a47fd494f8491d2b93d3}{s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__input_aa29d4a799cd1c1cd7d0f05f05f42abe0}{s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable, public \hyperlink{namespacem__data__input_a464b144d544f769a0d9a1b549c510e1f}{q\+\_\+cons\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Conservative variables. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable, public \hyperlink{namespacem__data__input_a65ba499d27d4b21b1ec8bcfe02816bd4}{q\+\_\+prim\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Primitive variables. \end{DoxyCompactList}\item 
+procedure(\hyperlink{interfacem__data__input_1_1s__read__abstract__data__files}{s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files}), pointer, public \hyperlink{namespacem__data__input_aba1cbfb151ed869483feb37291104830}{s\+\_\+read\+\_\+data\+\_\+files} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+This module features procedures, which for a specific time-\/step, read in the raw simulation data for the grid and the conservative variables and fill out their buffer regions. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__data__input_aa29d4a799cd1c1cd7d0f05f05f42abe0}\label{namespacem__data__input_aa29d4a799cd1c1cd7d0f05f05f42abe0}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module@{s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module@{s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module()}{s\_finalize\_data\_input\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+input\+::s\+\_\+finalize\+\_\+data\+\_\+input\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Deallocation procedures for the module. 
+
+
+
+Definition at line 1134 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_a806c2edb19d6a47fd494f8491d2b93d3}\label{namespacem__data__input_a806c2edb19d6a47fd494f8491d2b93d3}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module@{s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module@{s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module()}{s\_initialize\_data\_input\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+input\+::s\+\_\+initialize\+\_\+data\+\_\+input\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. 
+
+
+
+Definition at line 1062 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_a5cef0da967dbbf0d148b26bd67046c8d}\label{namespacem__data__input_a5cef0da967dbbf0d148b26bd67046c8d}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions@{s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions}}
+\index{s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions@{s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions()}{s\_populate\_conservative\_variables\_buffer\_regions()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+input\+::s\+\_\+populate\+\_\+conservative\+\_\+variables\+\_\+buffer\+\_\+regions (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this procedure is to populate the buffers of the cell-\/average conservative variables, depending on the boundary conditions. 
+
+
+
+Definition at line 676 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_afc05d7714001946feb2485ce18cb00f6}\label{namespacem__data__input_afc05d7714001946feb2485ce18cb00f6}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions@{s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions}}
+\index{s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions@{s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions()}{s\_populate\_grid\_variables\_buffer\_regions()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+input\+::s\+\_\+populate\+\_\+grid\+\_\+variables\+\_\+buffer\+\_\+regions (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The following subroutine populates the buffer regions of the cell-\/width spacings, the cell-\/boundary locations and the cell-\/center locations. Note that the buffer regions of the last two variables should be interpreted slightly differently than usual. They are really ghost zones that are used in aiding the multidimensional visualization of Silo database files, in Vis\+It, when processor boundary conditions are present. 
+
+
+
+Definition at line 425 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_a0dd37369dd52b1299b06563f96c25805}\label{namespacem__data__input_a0dd37369dd52b1299b06563f96c25805}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files@{s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files}}
+\index{s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files@{s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files()}{s\_read\_parallel\_data\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+parallel\+\_\+data\+\_\+files (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{t\+\_\+step }\end{DoxyParamCaption})}
+
+
+
+This subroutine is called at each time-\/step that has to be post-\/processed in order to parallel-\/read the raw data files present in the corresponding time-\/step directory and to populate the associated grid and conservative variables. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 263 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_a9d69f4bcb771c60157b62bc4b04a6ba1}\label{namespacem__data__input_a9d69f4bcb771c60157b62bc4b04a6ba1}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files@{s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files}}
+\index{s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files@{s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files()}{s\_read\_serial\_data\_files()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+serial\+\_\+data\+\_\+files (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{t\+\_\+step }\end{DoxyParamCaption})}
+
+
+
+This subroutine is called at each time-\/step that has to be post-\/processed in order to read the raw data files present in the corresponding time-\/step directory and to populate the associated grid and conservative variables. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em t\+\_\+step} & Current time-\/step \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 95 of file m\+\_\+data\+\_\+input.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__data__input_a464b144d544f769a0d9a1b549c510e1f}\label{namespacem__data__input_a464b144d544f769a0d9a1b549c510e1f}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!q\+\_\+cons\+\_\+vf@{q\+\_\+cons\+\_\+vf}}
+\index{q\+\_\+cons\+\_\+vf@{q\+\_\+cons\+\_\+vf}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{q\+\_\+cons\+\_\+vf}{q\_cons\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable, public m\+\_\+data\+\_\+input\+::q\+\_\+cons\+\_\+vf}
+
+
+
+Conservative variables. 
+
+
+
+Definition at line 76 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_a65ba499d27d4b21b1ec8bcfe02816bd4}\label{namespacem__data__input_a65ba499d27d4b21b1ec8bcfe02816bd4}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!q\+\_\+prim\+\_\+vf@{q\+\_\+prim\+\_\+vf}}
+\index{q\+\_\+prim\+\_\+vf@{q\+\_\+prim\+\_\+vf}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{q\+\_\+prim\+\_\+vf}{q\_prim\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable, public m\+\_\+data\+\_\+input\+::q\+\_\+prim\+\_\+vf}
+
+
+
+Primitive variables. 
+
+
+
+Definition at line 79 of file m\+\_\+data\+\_\+input.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__input_aba1cbfb151ed869483feb37291104830}\label{namespacem__data__input_aba1cbfb151ed869483feb37291104830}} 
+\index{m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}!s\+\_\+read\+\_\+data\+\_\+files@{s\+\_\+read\+\_\+data\+\_\+files}}
+\index{s\+\_\+read\+\_\+data\+\_\+files@{s\+\_\+read\+\_\+data\+\_\+files}!m\+\_\+data\+\_\+input@{m\+\_\+data\+\_\+input}}
+\subsubsection{\texorpdfstring{s\+\_\+read\+\_\+data\+\_\+files}{s\_read\_data\_files}}
+{\footnotesize\ttfamily procedure(\hyperlink{interfacem__data__input_1_1s__read__abstract__data__files}{s\+\_\+read\+\_\+abstract\+\_\+data\+\_\+files}), pointer, public m\+\_\+data\+\_\+input\+::s\+\_\+read\+\_\+data\+\_\+files =$>$ N\+U\+LL()}
+
+
+
+Definition at line 82 of file m\+\_\+data\+\_\+input.\+f90.
+

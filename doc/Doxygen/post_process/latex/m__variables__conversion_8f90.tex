@@ -1,0 +1,59 @@
+\hypertarget{m__variables__conversion_8f90}{}\section{m\+\_\+variables\+\_\+conversion.\+f90 File Reference}
+\label{m__variables__conversion_8f90}\index{m\+\_\+variables\+\_\+conversion.\+f90@{m\+\_\+variables\+\_\+conversion.\+f90}}
+
+
+Contains module \hyperlink{namespacem__variables__conversion}{m\+\_\+variables\+\_\+conversion}.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__variables__conversion_1_1s__convert__xxxxx__to__mixture__variables}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables}
+\begin{DoxyCompactList}\small\item\em Abstract interface to two subroutines designed for the transfer/conversion of the mixture/species variables to the mixture variables. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__variables__conversion}{m\+\_\+variables\+\_\+conversion}
+\begin{DoxyCompactList}\small\item\em This module consists of subroutines used in the conversion of the conservative variables into the primitive variables. In addition, the module also contains subroutines used to compute the mixture variables. For a specific time-\/step undergoing the post-\/process, the mixture variables are stored everywhere on the grid so that they may possibly be outputted or used to compute other derived flow quantities. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__variables__conversion_a272a4452dad903bf877b475d322b921a}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+mixture\+\_\+to\+\_\+mixture\+\_\+variables} (q\+\_\+cons\+\_\+vf, \hyperlink{m__data__output_8f90_aaea4baed8fd8b780f6938f0dc1fb0f72}{i}, \hyperlink{m__data__output_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__data__output_8f90_af22c486581933c52df7d4aa306382074}{k})
+\begin{DoxyCompactList}\small\item\em This subroutine is constructed for the gamma/pi\+\_\+inf model and provided a set of conservative variables, transfers the density, specific heat ratio function and the liquid stiffness function from q\+\_\+cons\+\_\+vf to rho\+\_\+sf, gamma\+\_\+sf and pi\+\_\+inf\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__variables__conversion_acf8095b9ff1a0e61e857cd39cc4b87cc}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+species\+\_\+to\+\_\+mixture\+\_\+variables\+\_\+bubbles} (q\+K\+\_\+vf, \hyperlink{m__data__output_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__data__output_8f90_af22c486581933c52df7d4aa306382074}{k}, l)
+\begin{DoxyCompactList}\small\item\em This subroutine is designed for the volume fraction model with sub-\/grid ensemble averaged bubbles (Bryngelson 2019) and provided a set of conservative variables, calculates the density, the specific heat ratio function and liquid stiffness function from q\+\_\+cons\+\_\+vf and stores the results into rho\+\_\+sf, gamma\+\_\+sf and pi\+\_\+inf\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__variables__conversion_ae1178f49330fb2bccdc60a6076432626}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+species\+\_\+to\+\_\+mixture\+\_\+variables} (q\+\_\+cons\+\_\+vf, \hyperlink{m__data__output_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__data__output_8f90_af22c486581933c52df7d4aa306382074}{k}, l)
+\begin{DoxyCompactList}\small\item\em This subroutine is designed for the volume fraction model and provided a set of conservative variables, calculates the density, the specific heat ratio function and liquid stiffness function from q\+\_\+cons\+\_\+vf and stores the results into rho\+\_\+sf, gamma\+\_\+sf and pi\+\_\+inf\+\_\+sf. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__variables__conversion_ac006af9a5403b2fdad7f81ce0a67ecec}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+initialize\+\_\+variables\+\_\+conversion\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__variables__conversion_abecd489e8c769f12646d2647fab7dd53}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+conservative\+\_\+to\+\_\+primitive\+\_\+variables} (q\+\_\+cons\+\_\+vf, q\+\_\+prim\+\_\+vf)
+\begin{DoxyCompactList}\small\item\em Converts the conservative variables to the primitive ones. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__variables__conversion_a6a3f90e69ef4dea304495d0f7c068de2}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+finalize\+\_\+variables\+\_\+conversion\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__variables__conversion_a8c8453ac97029955f5a3d1247c37059d}{m\+\_\+variables\+\_\+conversion\+::rho\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em Scalar density function. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__variables__conversion_a3a21cf2a54ae67e6a2e22f6cffb97c75}{m\+\_\+variables\+\_\+conversion\+::gamma\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em Scalar sp. heat ratio function. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__variables__conversion_a364012a38a5ba3bcb14bbb6084206fae}{m\+\_\+variables\+\_\+conversion\+::pi\+\_\+inf\+\_\+sf}
+\begin{DoxyCompactList}\small\item\em Scalar liquid stiffness function. \end{DoxyCompactList}\item 
+procedure(s\+\_\+convert\+\_\+xxxxx\+\_\+to\+\_\+mixture\+\_\+variables), pointer, public \hyperlink{namespacem__variables__conversion_a13c16c62aae8663c39c82c23cff0e84a}{m\+\_\+variables\+\_\+conversion\+::s\+\_\+convert\+\_\+to\+\_\+mixture\+\_\+variables} =$>$ N\+U\+LL()
+\item 
+integer, private \hyperlink{namespacem__variables__conversion_adcf907c5965b8d933e502c0a7878709b}{m\+\_\+variables\+\_\+conversion\+::flg}
+\begin{DoxyCompactList}\small\item\em Flagging (flg) variable used to annotate the dimensionality of the dataset that is undergoing the post-\/process. A flag value of 1 indicates that the dataset is 3D, while a flag value of 0 indicates that it is not. This flg variable is necessary to avoid cycling through the third dimension of the flow variable(s) when the simulation is not 3D and the size of the buffer is non-\/zero. Note that a similar procedure does not have to be applied to the second dimension since in 1D, the buffer size is always zero. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__variables__conversion}{m\+\_\+variables\+\_\+conversion}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

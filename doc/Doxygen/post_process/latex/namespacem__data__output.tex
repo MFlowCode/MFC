@@ -1,0 +1,407 @@
+\hypertarget{namespacem__data__output}{}\section{m\+\_\+data\+\_\+output Module Reference}
+\label{namespacem__data__output}\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+
+
+This module enables the restructuring of the raw simulation data file(s) into formatted database file(s). The formats that may be chosen from include Silo-\/\+H\+D\+F5 and Binary. Each of these database structures contains information about the grid as well as each of the flow variable(s) that were chosen by the user to be included.  
+
+
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_ae767b4364e76ee05872868171fd2f05d}{s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file} (t\+\_\+step)
+\begin{DoxyCompactList}\small\item\em This subroutine opens a new formatted database file, or replaces an old one, and readies it for the data storage of the grid and the flow variable(s) associated with the current time-\/step, t\+\_\+step. This is performed by all the local process(es). The root processor, in addition, must also generate a master formatted database file whose job will be to link, and thus combine, the data from all of the local process(es). Note that for the Binary format, this extra task that is assigned to the root process is not performed in multidimensions. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__data__output_ae32f7bdb38c6c216a819fb0b3a7e06cd}{s\+\_\+coarsen\+\_\+variable} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to coarsen any variable that is to be written to the formatted database file by averaging every two cells together into a single value. This averaging is done separately in each dimension. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a9ab4e5bfbf085c126a58c78383d38fa7}{s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to close any formatted database file(s) that may be opened at the time-\/step that is currently being post-\/processed. The root process must typically close two files, one associated with the local sub-\/domain and the other with the entire domain. The non-\/ root process(es) must close one file, which is associated with the local sub-\/domain. Note that for the Binary data-\/ base format and multidimensional data, the root process only has to close the file associated with the local sub-\/ domain, because one associated with the entire domain is not generated. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Deallocation procedures for the module. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__data__output_a98d3ca969b0e32fa09436f1a9cfbd77c}{dims}
+\begin{DoxyCompactList}\small\item\em For Silo-\/\+H\+D\+F5 database format, this variable is used to keep track of the number of cell-\/boundaries, for the grid associated with the local process, in each of the active coordinate directions. \end{DoxyCompactList}\item 
+integer \hyperlink{namespacem__data__output_acc04177c6c6ab23be61767b187ece0ba}{dbvars}
+\begin{DoxyCompactList}\small\item\em The total number of flow variable(s) to be stored in a formatted database file. Note that this is only needed when using the Binary format. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\begin{Indent}\textbf{ Generic storage for flow variable(s) that are to be written to formatted}\par
+{\em database file(s). Note that for 1D simulations, q\+\_\+root\+\_\+sf is employed to gather the flow variable(s) from all sub-\/domains on to the root process. If the run is not parallel, but serial, then q\+\_\+root\+\_\+sf is equal to q\+\_\+sf. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_aa211f0ff6c5213825ff0d7fa0357ccef}{q\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public \hyperlink{namespacem__data__output_a94a7c7e9bb108dc2d3360e1cd40d4909}{dft\+\_\+q\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a8a822ed22e0ffe582b2dc7f49109fa1d}{coarse\+\_\+x\+\_\+q\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a9d75551d2f262e079c3b6397404d5a79}{coarse\+\_\+xy\+\_\+q\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_ac2d6c1c8ab5cc7a2762b462673086bbe}{coarse\+\_\+xyz\+\_\+q\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_af74e742ddb67173d205d037902ce73f4}{q\+\_\+root\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a0a9ac4d26ce8ac2ea87cacf581b49692}{cyl\+\_\+q\+\_\+sf}
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable \hyperlink{namespacem__data__output_a6dbb29fcb50e8ca2140326f4ba85dd02}{cyl\+\_\+coarse\+\_\+q\+\_\+sf}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The spatial and data extents array variables contain information about the}\par
+{\em minimum and maximum values of the grid and flow variable(s), respectively. The purpose of bookkeeping this information is to boost the visualization of the Silo-\/\+H\+D\+F5 database file(s) in Vis\+It. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__data__output_a20a29bb6bd9724b83d4abab91f1b99a3}{spatial\+\_\+extents}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__data__output_a10cecf686032e4df4cd0b9835b159d07}{data\+\_\+extents}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ The size of the ghost zone layer at beginning of each coordinate direction}\par
+{\em (lo) and at end of each coordinate direction (hi). Adding this information to Silo-\/\+H\+D\+F5 database file(s) is recommended since it supplies Vis\+It with connectivity information between the sub-\/domains of a parallel data set. }\begin{DoxyCompactItemize}
+\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__data__output_a4b7e6567b3bb7fdd4384180d1a7475af}{lo\+\_\+offset}
+\item 
+integer, dimension(\+:), allocatable \hyperlink{namespacem__data__output_a1a779679774e1161511609f18e8d9c27}{hi\+\_\+offset}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Locations of various folders in the case\textquotesingle{}s directory tree, associated with}\par
+{\em the choice of the formatted database format. These include, in order, the location of the folder named after the selected formatted database format, and the locations of two sub-\/directories of the latter, the first of which is named after the local processor rank, while the second is named \textquotesingle{}root\textquotesingle{}. The folder associated with the local processor rank contains only the data pertaining to the part of the domain taken care of by the local processor. The root directory, on the other hand, will contain either the information about the connectivity required to put the entire domain back together, or the actual data associated with the entire computational domain. This all depends on dimensionality and the choice of the formatted database format. }\begin{DoxyCompactItemize}
+\item 
+character(len=path\+\_\+len+name\+\_\+len) \hyperlink{namespacem__data__output_a5b3bbbc3392c3196bee8219d550fd9aa}{dbdir}
+\item 
+character(len=path\+\_\+len+2 $\ast$name\+\_\+len) \hyperlink{namespacem__data__output_a135059f1848c713ebe5156659da1929a}{proc\+\_\+rank\+\_\+dir}
+\item 
+character(len=path\+\_\+len+2 $\ast$name\+\_\+len) \hyperlink{namespacem__data__output_ae33b2fd4aa2594f18dd34e20b66813bb}{rootdir}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Handles of the formatted database master/root file, slave/local processor}\par
+{\em file and options list. The list of options is explicitly used in the Silo-\/ H\+D\+F5 database format to provide additional details about the contents of a formatted database file, such as the previously described spatial and data extents. }\begin{DoxyCompactItemize}
+\item 
+integer \hyperlink{namespacem__data__output_a5cd7e79fd8f57db6362eeae681f8a9d8}{dbroot}
+\item 
+integer \hyperlink{namespacem__data__output_aec51d3900a580048a3c9f5bddfa38ed2}{dbfile}
+\item 
+integer \hyperlink{namespacem__data__output_a21c768216c63e43ea9e1f13e498a3558}{optlist}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Generic error flags utilized in the handling, checking and the reporting}\par
+{\em of the input and output operations errors with a formatted database file }\begin{DoxyCompactItemize}
+\item 
+integer, private \hyperlink{namespacem__data__output_a9200025029de298307a47699927a60fa}{err}
+\item 
+integer, private \hyperlink{namespacem__data__output_afa88ae36e1e20ff64867261ef6c9be15}{ierr}
+\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+This module enables the restructuring of the raw simulation data file(s) into formatted database file(s). The formats that may be chosen from include Silo-\/\+H\+D\+F5 and Binary. Each of these database structures contains information about the grid as well as each of the flow variable(s) that were chosen by the user to be included. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__data__output_a9ab4e5bfbf085c126a58c78383d38fa7}\label{namespacem__data__output_a9ab4e5bfbf085c126a58c78383d38fa7}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file@{s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file}}
+\index{s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file@{s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file()}{s\_close\_formatted\_database\_file()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+close\+\_\+formatted\+\_\+database\+\_\+file (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to close any formatted database file(s) that may be opened at the time-\/step that is currently being post-\/processed. The root process must typically close two files, one associated with the local sub-\/domain and the other with the entire domain. The non-\/ root process(es) must close one file, which is associated with the local sub-\/domain. Note that for the Binary data-\/ base format and multidimensional data, the root process only has to close the file associated with the local sub-\/ domain, because one associated with the entire domain is not generated. 
+
+
+
+Definition at line 1166 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ae32f7bdb38c6c216a819fb0b3a7e06cd}\label{namespacem__data__output_ae32f7bdb38c6c216a819fb0b3a7e06cd}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+coarsen\+\_\+variable@{s\+\_\+coarsen\+\_\+variable}}
+\index{s\+\_\+coarsen\+\_\+variable@{s\+\_\+coarsen\+\_\+variable}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+coarsen\+\_\+variable()}{s\_coarsen\_variable()}}
+{\footnotesize\ttfamily subroutine m\+\_\+data\+\_\+output\+::s\+\_\+coarsen\+\_\+variable (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The purpose of this subroutine is to coarsen any variable that is to be written to the formatted database file by averaging every two cells together into a single value. This averaging is done separately in each dimension. 
+
+
+
+Definition at line 1114 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}\label{namespacem__data__output_a02f2b04a434c1f0ebf9156147d0f976e}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module()}{s\_finalize\_data\_output\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+finalize\+\_\+data\+\_\+output\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Deallocation procedures for the module. 
+
+
+
+Definition at line 1186 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}\label{namespacem__data__output_ab65b312ef83adb104cafafada9c998b6}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module@{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module()}{s\_initialize\_data\_output\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+initialize\+\_\+data\+\_\+output\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module. 
+
+
+
+Definition at line 149 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ae767b4364e76ee05872868171fd2f05d}\label{namespacem__data__output_ae767b4364e76ee05872868171fd2f05d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file@{s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file}}
+\index{s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file@{s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file()}{s\_open\_formatted\_database\_file()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+data\+\_\+output\+::s\+\_\+open\+\_\+formatted\+\_\+database\+\_\+file (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{t\+\_\+step }\end{DoxyParamCaption})}
+
+
+
+This subroutine opens a new formatted database file, or replaces an old one, and readies it for the data storage of the grid and the flow variable(s) associated with the current time-\/step, t\+\_\+step. This is performed by all the local process(es). The root processor, in addition, must also generate a master formatted database file whose job will be to link, and thus combine, the data from all of the local process(es). Note that for the Binary format, this extra task that is assigned to the root process is not performed in multidimensions. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em t\+\_\+step} & Time-\/step that is currently being post-\/processed \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 517 of file m\+\_\+data\+\_\+output.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__data__output_a8a822ed22e0ffe582b2dc7f49109fa1d}\label{namespacem__data__output_a8a822ed22e0ffe582b2dc7f49109fa1d}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!coarse\+\_\+x\+\_\+q\+\_\+sf@{coarse\+\_\+x\+\_\+q\+\_\+sf}}
+\index{coarse\+\_\+x\+\_\+q\+\_\+sf@{coarse\+\_\+x\+\_\+q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{coarse\+\_\+x\+\_\+q\+\_\+sf}{coarse\_x\_q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::coarse\+\_\+x\+\_\+q\+\_\+sf}
+
+
+
+Definition at line 75 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a9d75551d2f262e079c3b6397404d5a79}\label{namespacem__data__output_a9d75551d2f262e079c3b6397404d5a79}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!coarse\+\_\+xy\+\_\+q\+\_\+sf@{coarse\+\_\+xy\+\_\+q\+\_\+sf}}
+\index{coarse\+\_\+xy\+\_\+q\+\_\+sf@{coarse\+\_\+xy\+\_\+q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{coarse\+\_\+xy\+\_\+q\+\_\+sf}{coarse\_xy\_q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::coarse\+\_\+xy\+\_\+q\+\_\+sf}
+
+
+
+Definition at line 76 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ac2d6c1c8ab5cc7a2762b462673086bbe}\label{namespacem__data__output_ac2d6c1c8ab5cc7a2762b462673086bbe}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!coarse\+\_\+xyz\+\_\+q\+\_\+sf@{coarse\+\_\+xyz\+\_\+q\+\_\+sf}}
+\index{coarse\+\_\+xyz\+\_\+q\+\_\+sf@{coarse\+\_\+xyz\+\_\+q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{coarse\+\_\+xyz\+\_\+q\+\_\+sf}{coarse\_xyz\_q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::coarse\+\_\+xyz\+\_\+q\+\_\+sf}
+
+
+
+Definition at line 77 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a6dbb29fcb50e8ca2140326f4ba85dd02}\label{namespacem__data__output_a6dbb29fcb50e8ca2140326f4ba85dd02}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!cyl\+\_\+coarse\+\_\+q\+\_\+sf@{cyl\+\_\+coarse\+\_\+q\+\_\+sf}}
+\index{cyl\+\_\+coarse\+\_\+q\+\_\+sf@{cyl\+\_\+coarse\+\_\+q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{cyl\+\_\+coarse\+\_\+q\+\_\+sf}{cyl\_coarse\_q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::cyl\+\_\+coarse\+\_\+q\+\_\+sf}
+
+
+
+Definition at line 80 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a0a9ac4d26ce8ac2ea87cacf581b49692}\label{namespacem__data__output_a0a9ac4d26ce8ac2ea87cacf581b49692}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!cyl\+\_\+q\+\_\+sf@{cyl\+\_\+q\+\_\+sf}}
+\index{cyl\+\_\+q\+\_\+sf@{cyl\+\_\+q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{cyl\+\_\+q\+\_\+sf}{cyl\_q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::cyl\+\_\+q\+\_\+sf}
+
+
+
+Definition at line 79 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a10cecf686032e4df4cd0b9835b159d07}\label{namespacem__data__output_a10cecf686032e4df4cd0b9835b159d07}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!data\+\_\+extents@{data\+\_\+extents}}
+\index{data\+\_\+extents@{data\+\_\+extents}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{data\+\_\+extents}{data\_extents}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::data\+\_\+extents}
+
+
+
+Definition at line 89 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a5b3bbbc3392c3196bee8219d550fd9aa}\label{namespacem__data__output_a5b3bbbc3392c3196bee8219d550fd9aa}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!dbdir@{dbdir}}
+\index{dbdir@{dbdir}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{dbdir}{dbdir}}
+{\footnotesize\ttfamily character(len = path\+\_\+len + name\+\_\+len) m\+\_\+data\+\_\+output\+::dbdir}
+
+
+
+Definition at line 118 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_aec51d3900a580048a3c9f5bddfa38ed2}\label{namespacem__data__output_aec51d3900a580048a3c9f5bddfa38ed2}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!dbfile@{dbfile}}
+\index{dbfile@{dbfile}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{dbfile}{dbfile}}
+{\footnotesize\ttfamily integer m\+\_\+data\+\_\+output\+::dbfile}
+
+
+
+Definition at line 130 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a5cd7e79fd8f57db6362eeae681f8a9d8}\label{namespacem__data__output_a5cd7e79fd8f57db6362eeae681f8a9d8}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!dbroot@{dbroot}}
+\index{dbroot@{dbroot}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{dbroot}{dbroot}}
+{\footnotesize\ttfamily integer m\+\_\+data\+\_\+output\+::dbroot}
+
+
+
+Definition at line 129 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_acc04177c6c6ab23be61767b187ece0ba}\label{namespacem__data__output_acc04177c6c6ab23be61767b187ece0ba}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!dbvars@{dbvars}}
+\index{dbvars@{dbvars}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{dbvars}{dbvars}}
+{\footnotesize\ttfamily integer m\+\_\+data\+\_\+output\+::dbvars}
+
+
+
+The total number of flow variable(s) to be stored in a formatted database file. Note that this is only needed when using the Binary format. 
+
+
+
+Definition at line 134 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a94a7c7e9bb108dc2d3360e1cd40d4909}\label{namespacem__data__output_a94a7c7e9bb108dc2d3360e1cd40d4909}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!dft\+\_\+q\+\_\+sf@{dft\+\_\+q\+\_\+sf}}
+\index{dft\+\_\+q\+\_\+sf@{dft\+\_\+q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{dft\+\_\+q\+\_\+sf}{dft\_q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::dft\+\_\+q\+\_\+sf}
+
+
+
+Definition at line 74 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a98d3ca969b0e32fa09436f1a9cfbd77c}\label{namespacem__data__output_a98d3ca969b0e32fa09436f1a9cfbd77c}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!dims@{dims}}
+\index{dims@{dims}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{dims}{dims}}
+{\footnotesize\ttfamily integer, dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::dims}
+
+
+
+For Silo-\/\+H\+D\+F5 database format, this variable is used to keep track of the number of cell-\/boundaries, for the grid associated with the local process, in each of the active coordinate directions. 
+
+
+
+Definition at line 101 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a9200025029de298307a47699927a60fa}\label{namespacem__data__output_a9200025029de298307a47699927a60fa}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!err@{err}}
+\index{err@{err}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{err}{err}}
+{\footnotesize\ttfamily integer, private m\+\_\+data\+\_\+output\+::err\hspace{0.3cm}{\ttfamily [private]}}
+
+
+
+Definition at line 141 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a1a779679774e1161511609f18e8d9c27}\label{namespacem__data__output_a1a779679774e1161511609f18e8d9c27}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!hi\+\_\+offset@{hi\+\_\+offset}}
+\index{hi\+\_\+offset@{hi\+\_\+offset}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{hi\+\_\+offset}{hi\_offset}}
+{\footnotesize\ttfamily integer, dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::hi\+\_\+offset}
+
+
+
+Definition at line 98 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_afa88ae36e1e20ff64867261ef6c9be15}\label{namespacem__data__output_afa88ae36e1e20ff64867261ef6c9be15}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!ierr@{ierr}}
+\index{ierr@{ierr}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{ierr}{ierr}}
+{\footnotesize\ttfamily integer, private m\+\_\+data\+\_\+output\+::ierr\hspace{0.3cm}{\ttfamily [private]}}
+
+
+
+Definition at line 141 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a4b7e6567b3bb7fdd4384180d1a7475af}\label{namespacem__data__output_a4b7e6567b3bb7fdd4384180d1a7475af}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!lo\+\_\+offset@{lo\+\_\+offset}}
+\index{lo\+\_\+offset@{lo\+\_\+offset}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{lo\+\_\+offset}{lo\_offset}}
+{\footnotesize\ttfamily integer, dimension(\+:), allocatable m\+\_\+data\+\_\+output\+::lo\+\_\+offset}
+
+
+
+Definition at line 97 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a21c768216c63e43ea9e1f13e498a3558}\label{namespacem__data__output_a21c768216c63e43ea9e1f13e498a3558}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!optlist@{optlist}}
+\index{optlist@{optlist}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{optlist}{optlist}}
+{\footnotesize\ttfamily integer m\+\_\+data\+\_\+output\+::optlist}
+
+
+
+Definition at line 131 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a135059f1848c713ebe5156659da1929a}\label{namespacem__data__output_a135059f1848c713ebe5156659da1929a}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!proc\+\_\+rank\+\_\+dir@{proc\+\_\+rank\+\_\+dir}}
+\index{proc\+\_\+rank\+\_\+dir@{proc\+\_\+rank\+\_\+dir}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{proc\+\_\+rank\+\_\+dir}{proc\_rank\_dir}}
+{\footnotesize\ttfamily character(len = path\+\_\+len + 2$\ast$name\+\_\+len) m\+\_\+data\+\_\+output\+::proc\+\_\+rank\+\_\+dir}
+
+
+
+Definition at line 119 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_af74e742ddb67173d205d037902ce73f4}\label{namespacem__data__output_af74e742ddb67173d205d037902ce73f4}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!q\+\_\+root\+\_\+sf@{q\+\_\+root\+\_\+sf}}
+\index{q\+\_\+root\+\_\+sf@{q\+\_\+root\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{q\+\_\+root\+\_\+sf}{q\_root\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::q\+\_\+root\+\_\+sf}
+
+
+
+Definition at line 78 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_aa211f0ff6c5213825ff0d7fa0357ccef}\label{namespacem__data__output_aa211f0ff6c5213825ff0d7fa0357ccef}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!q\+\_\+sf@{q\+\_\+sf}}
+\index{q\+\_\+sf@{q\+\_\+sf}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{q\+\_\+sf}{q\_sf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, public m\+\_\+data\+\_\+output\+::q\+\_\+sf}
+
+
+
+Definition at line 73 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_ae33b2fd4aa2594f18dd34e20b66813bb}\label{namespacem__data__output_ae33b2fd4aa2594f18dd34e20b66813bb}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!rootdir@{rootdir}}
+\index{rootdir@{rootdir}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{rootdir}{rootdir}}
+{\footnotesize\ttfamily character(len = path\+\_\+len + 2$\ast$name\+\_\+len) m\+\_\+data\+\_\+output\+::rootdir}
+
+
+
+Definition at line 120 of file m\+\_\+data\+\_\+output.\+f90.
+
+\mbox{\Hypertarget{namespacem__data__output_a20a29bb6bd9724b83d4abab91f1b99a3}\label{namespacem__data__output_a20a29bb6bd9724b83d4abab91f1b99a3}} 
+\index{m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}!spatial\+\_\+extents@{spatial\+\_\+extents}}
+\index{spatial\+\_\+extents@{spatial\+\_\+extents}!m\+\_\+data\+\_\+output@{m\+\_\+data\+\_\+output}}
+\subsubsection{\texorpdfstring{spatial\+\_\+extents}{spatial\_extents}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+data\+\_\+output\+::spatial\+\_\+extents}
+
+
+
+Definition at line 88 of file m\+\_\+data\+\_\+output.\+f90.
+

@@ -1,0 +1,922 @@
+\hypertarget{namespacem__cbc}{}\section{m\+\_\+cbc Module Reference}
+\label{namespacem__cbc}\index{m\+\_\+cbc@{m\+\_\+cbc}}
+
+
+The module features a large database of characteristic boundary conditions (C\+BC) for the Euler system of equations. This system is augmented by the appropriate advection equations utilized to capture the material interfaces. The closure is achieved by the stiffened equation of state and mixture relations. At this time, the following C\+BC are available\+: 1) Slip Wall 2) Nonreflecting Subsonic Buffer 3) Nonreflecting Subsonic Inflow 4) Nonreflecting Subsonic Outflow 5) Force-\/\+Free Subsonic Outflow 6) Constant Pressure Subsonic Outflow 7) Supersonic Inflow 8) Supersonic Outflow Please refer to Thompson (1987, 1990) for detailed descriptions.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__cbc_1_1s__compute__abstract___l}{s\+\_\+compute\+\_\+abstract\+\_\+L}
+\begin{DoxyCompactList}\small\item\em Abstract interface to the procedures that are utilized to calculate the L variables. For additional information refer to the following\+: 1) s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+L 2) s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+L 3) s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+L 4) s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+L 5) s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+L 6) s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+L 7) s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+L 8) s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+L. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__cbc_a0afb287e68b0d1d970fd073849525c36}{s\+\_\+initialize\+\_\+cbc\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_aee8ead62642bc2783deb6403a961679d}{s\+\_\+compute\+\_\+cbc\+\_\+coefficients} (cbc\+\_\+dir, cbc\+\_\+loc)
+\item 
+subroutine \hyperlink{namespacem__cbc_a76e19dea2a654c9a7f311baa16ef118c}{s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers} (cbc\+\_\+dir, cbc\+\_\+loc)
+\item 
+subroutine, public \hyperlink{namespacem__cbc_a72cc3ba5a0de327fae70742734e77492}{s\+\_\+cbc} (q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, cbc\+\_\+dir, cbc\+\_\+loc, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The following is the implementation of the C\+BC based on the work of Thompson (1987, 1990) on hyperbolic systems. The C\+BC is indirectly applied in the computation of the right-\/hand-\/side (R\+HS) near the relevant domain boundary through the modification of the fluxes. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_ad51ac21554842928259732d09a7eaf51}{s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The L variables for the slip wall C\+BC, see pg. 451 of Thompson (1990). At the slip wall (frictionless wall), the normal component of velocity is zero at all times, while the transverse velocities may be nonzero. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_a39d803573d65c9c8ba7cc8b44b8053e1}{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The L variables for the nonreflecting subsonic buffer C\+BC see pg. 13 of Thompson (1987). The nonreflecting subsonic buffer reduces the amplitude of any reflections caused by outgoing waves. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_aaaa6698b1ae1671a9124bb22617b4b8c}{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The L variables for the nonreflecting subsonic inflow C\+BC see pg. 455, Thompson (1990). This nonreflecting subsonic C\+BC assumes an incoming flow and reduces the amplitude of any reflections caused by outgoing waves. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_af0664437857269683e572ec7b5e3b4b7}{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The L variables for the nonreflecting subsonic outflow C\+BC see pg. 454 of Thompson (1990). This nonreflecting subsonic C\+BC presumes an outgoing flow and reduces the amplitude of any reflections caused by outgoing waves. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_ab95f6f268802b6330f4aef16685ae498}{s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em The L variables for the force-\/free subsonic outflow C\+BC, see pg. 454 of Thompson (1990). The force-\/free subsonic outflow sets to zero the sum of all of the forces which are acting on a fluid element for the normal coordinate direction to the boundary. As a result, a fluid element at the boundary is simply advected outward at the fluid velocity. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_abbe02209311e19efb816f7678a8a9584}{s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em L variables for the constant pressure subsonic outflow C\+BC see pg. 455 Thompson (1990). The constant pressure subsonic outflow maintains a fixed pressure at the C\+BC boundary in absence of any transverse effects. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_aef459892802977978a425cd85648c706}{s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em L variables for the supersonic inflow C\+BC, see pg. 453 Thompson (1990). The supersonic inflow C\+BC is a steady state, or nearly a steady state, C\+BC in which only the transverse terms may generate a time dependence at the inflow boundary. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_a95f3cad9b9fec4f08b561da8f0db6584}{s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l} (dflt\+\_\+int)
+\begin{DoxyCompactList}\small\item\em L variables for the supersonic outflow C\+BC, see pg. 453 of Thompson (1990). For the supersonic outflow C\+BC, the flow evolution at the boundary is determined completely by the interior data. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_a50fed863b4ee14bf81590ed80154b539}{s\+\_\+initialize\+\_\+cbc} (q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, cbc\+\_\+dir, cbc\+\_\+loc, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are required for the setup of the selected C\+BC. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__cbc_a3fcf7cde1a04a7ee72ced4aa62cf53d0}{s\+\_\+finalize\+\_\+cbc} (flux\+\_\+vf, flux\+\_\+src\+\_\+vf, cbc\+\_\+dir, cbc\+\_\+loc, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em Deallocation and/or the disassociation procedures that are necessary in order to finalize the C\+BC application. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__cbc_a76b737dff5c827677888ffde0aff9cf1}{s\+\_\+finalize\+\_\+cbc\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a12e2d4feb2b8425b8f2270a8da529555}{q\+\_\+prim\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/average primitive variables. They are obtained by reshaping (RS) q\+\_\+prim\+\_\+vf in the coordinate direction normal to the domain boundary along which the C\+BC is applied. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a9023ac4f88b32e7d88ca8fadb649b84f}{f\+\_\+rs\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__cbc_ab079ec31add26b8d5f591b3cb5e5b88f}{f\+\_\+src\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em Cell-\/average fluxes (src -\/ source). These are directly determined from the cell-\/average primitive variables, q\+\_\+prims\+\_\+rs\+\_\+vf, and not a Riemann solver. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__cbc_abbb35cbd4d0951e9231865bd4120e682}{flux\+\_\+rs\+\_\+vf}
+\item 
+type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a5075a07fe184dfe7d109f6b4e14f7302}{flux\+\_\+src\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/boundary-\/average of the fluxes. They are initially determined by reshaping flux\+\_\+vf and flux\+\_\+src\+\_\+vf in a coordinate direction normal to the domain boundary along which C\+BC is applied. flux\+\_\+rs\+\_\+vf and flux\+\_\+src\+\_\+rs\+\_\+vf are subsequently modified based on the selected C\+BC. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a23d4bcbedc528222237094361a4ff43f}{alpha\+\_\+rho}
+\begin{DoxyCompactList}\small\item\em Cell averaged partial densiy. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_afece2e0a449e76d45bd85eeec0207ce8}{rho}
+\begin{DoxyCompactList}\small\item\em Cell averaged density. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_ad80b730485604931948331f36eb7b6e2}{vel}
+\begin{DoxyCompactList}\small\item\em Cell averaged velocity. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_ad6960b075aa8db0bcc08761273a6c4c3}{pres}
+\begin{DoxyCompactList}\small\item\em Cell averaged pressure. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_a4e9565add4d8b423cbcecb0da55e232c}{e}
+\begin{DoxyCompactList}\small\item\em Cell averaged energy. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_afef2a31e21e4f17b6852005a08ee86ce}{h}
+\begin{DoxyCompactList}\small\item\em Cell averaged enthalpy. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_af8d317b53da9384f50a1c51dd46bc8fe}{adv}
+\begin{DoxyCompactList}\small\item\em Cell averaged advected variables. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a4f6b082aae7f83fcad04d8c5d59f6d89}{mf}
+\begin{DoxyCompactList}\small\item\em Cell averaged mass fraction. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_aa657c2e47d8b48e2648c12a454ceec96}{gamma}
+\begin{DoxyCompactList}\small\item\em Cell averaged specific heat ratio. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_a2187e55d648bf7c40be489b5a2b75ca7}{pi\+\_\+inf}
+\begin{DoxyCompactList}\small\item\em Cell averaged liquid stiffness. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_a982b2364cfaa61896b8143231fc9e380}{c}
+\begin{DoxyCompactList}\small\item\em Cell averaged speed of sound. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__cbc_af36bd73bae305dd791c6da0a37d2f6f8}{re}
+\begin{DoxyCompactList}\small\item\em Cell averaged Reynolds numbers. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__cbc_a532334846efcbbca82ab11f26e28c5f7}{we}
+\begin{DoxyCompactList}\small\item\em Cell averaged Weber numbers. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a5d23c9c92bd474ce0a0d5af3c1f37cb8}{dalpha\+\_\+rho\+\_\+ds}
+\begin{DoxyCompactList}\small\item\em Spatial derivatives in s-\/dir of partial density. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_ac2bd4c0c73cfb0582f003473d0ec4f7f}{dvel\+\_\+ds}
+\begin{DoxyCompactList}\small\item\em Spatial derivatives in s-\/dir of velocity. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__cbc_ae49b66468d949880db575e26231b641c}{dpres\+\_\+ds}
+\begin{DoxyCompactList}\small\item\em Spatial derivatives in s-\/dir of pressure. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_ad0e1fd6e716ca51ccf5d6954e15fb02e}{dadv\+\_\+ds}
+\begin{DoxyCompactList}\small\item\em Spatial derivatives in s-\/dir of advection variables Note that these are only obtained in those cells on the domain boundary along which the C\+BC is applied by employing finite differences (FD) on the cell-\/average primitive variables, q\+\_\+prim\+\_\+rs\+\_\+vf. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(3) \hyperlink{namespacem__cbc_a7ff1c86cd167654a9c0765dea4a93ba5}{lambda}
+\begin{DoxyCompactList}\small\item\em Eigenvalues (see Thompson 1987,1990) \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_a44a30ad8ee6642f20f106e99fe3608f9}{l}
+\begin{DoxyCompactList}\small\item\em L matrix (see Thompson 1987,1990) \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__cbc_ae49e36ba93b9f5cb3adf9551c1cfb276}{ds}
+\begin{DoxyCompactList}\small\item\em Cell-\/width distribution in the s-\/direction. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, target \hyperlink{namespacem__cbc_a6f324c692d5e60e85314b1e21c81736b}{fd\+\_\+coef\+\_\+x}
+\begin{DoxyCompactList}\small\item\em Finite diff. coefficients x-\/dir. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, target \hyperlink{namespacem__cbc_ae86e3f027b189005a2b00f8f2bb9ae32}{fd\+\_\+coef\+\_\+y}
+\begin{DoxyCompactList}\small\item\em Finite diff. coefficients y-\/dir. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable, target \hyperlink{namespacem__cbc_a025a2f672d7d9997966bdedab3f333de}{fd\+\_\+coef\+\_\+z}
+\begin{DoxyCompactList}\small\item\em Finite diff. coefficients z-\/dir The first dimension identifies the location of a coefficient in the FD formula, while the last dimension denotes the location of the C\+BC. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:), pointer \hyperlink{namespacem__cbc_a5950f5d9fbc613591a42a3f9587f32f5}{fd\+\_\+coef} =$>$ N\+U\+LL()
+\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target \hyperlink{namespacem__cbc_a906043af9a1ee38feda508ccb40c5402}{pi\+\_\+coef\+\_\+x}
+\begin{DoxyCompactList}\small\item\em Polynominal interpolant coefficients in x-\/dir. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target \hyperlink{namespacem__cbc_a54a6e22ead2511305b7370369f46af7a}{pi\+\_\+coef\+\_\+y}
+\begin{DoxyCompactList}\small\item\em Polynominal interpolant coefficients in y-\/dir. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target \hyperlink{namespacem__cbc_af820095dcf800b727c19f2b5ee95a814}{pi\+\_\+coef\+\_\+z}
+\begin{DoxyCompactList}\small\item\em Polynominal interpolant coefficients in z-\/dir The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients and the last dimension denotes the location of the C\+BC. \end{DoxyCompactList}\item 
+real(kind(0d0)), dimension(\+:,\+:,\+:), pointer \hyperlink{namespacem__cbc_ace0392bdc9bb94c00e11d4e51432e0ad}{pi\+\_\+coef} =$>$ N\+U\+LL()
+\item 
+procedure(s\+\_\+compute\+\_\+abstract\+\_\+l), pointer \hyperlink{namespacem__cbc_a6ba3d055b8d3c0d003ff74ccd2762b1c}{s\+\_\+compute\+\_\+l} =$>$ N\+U\+LL()
+\begin{DoxyCompactList}\small\item\em Pointer to procedure used to calculate L variables, based on choice of C\+BC. \end{DoxyCompactList}\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__cbc_a2995ecb6263724a4421d1622f513103c}{is1}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__cbc_acfe8efda790266c75260db5e3917d337}{is2}
+\item 
+type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) \hyperlink{namespacem__cbc_a8477d940e9515138e8405c9302a026c8}{is3}
+\begin{DoxyCompactList}\small\item\em Indical bounds in the s1-\/, s2-\/ and s3-\/directions. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+The module features a large database of characteristic boundary conditions (C\+BC) for the Euler system of equations. This system is augmented by the appropriate advection equations utilized to capture the material interfaces. The closure is achieved by the stiffened equation of state and mixture relations. At this time, the following C\+BC are available\+: 1) Slip Wall 2) Nonreflecting Subsonic Buffer 3) Nonreflecting Subsonic Inflow 4) Nonreflecting Subsonic Outflow 5) Force-\/\+Free Subsonic Outflow 6) Constant Pressure Subsonic Outflow 7) Supersonic Inflow 8) Supersonic Outflow Please refer to Thompson (1987, 1990) for detailed descriptions. 
+
+\subsection{Function/\+Subroutine Documentation}
+\mbox{\Hypertarget{namespacem__cbc_a76e19dea2a654c9a7f311baa16ef118c}\label{namespacem__cbc_a76e19dea2a654c9a7f311baa16ef118c}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers@{s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers}}
+\index{s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers@{s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers()}{s\_associate\_cbc\_coefficients\_pointers()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+associate\+\_\+cbc\+\_\+coefficients\+\_\+pointers (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{cbc\+\_\+dir,  }\item[{integer, intent(in)}]{cbc\+\_\+loc }\end{DoxyParamCaption})}
+
+
+
+Definition at line 458 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a72cc3ba5a0de327fae70742734e77492}\label{namespacem__cbc_a72cc3ba5a0de327fae70742734e77492}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+cbc@{s\+\_\+cbc}}
+\index{s\+\_\+cbc@{s\+\_\+cbc}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+cbc()}{s\_cbc()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+cbc\+::s\+\_\+cbc (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{integer, intent(in)}]{cbc\+\_\+dir,  }\item[{integer, intent(in)}]{cbc\+\_\+loc,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The following is the implementation of the C\+BC based on the work of Thompson (1987, 1990) on hyperbolic systems. The C\+BC is indirectly applied in the computation of the right-\/hand-\/side (R\+HS) near the relevant domain boundary through the modification of the fluxes. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/average primitive variables \\
+\hline
+{\em flux\+\_\+vf} & Cell-\/boundary-\/average fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Cell-\/boundary-\/average flux sources \\
+\hline
+{\em cbc\+\_\+dir} & C\+BC coordinate direction \\
+\hline
+{\em cbc\+\_\+loc} & C\+BC coordinate location \\
+\hline
+{\em ix} & Index bound in the first coordinate direction \\
+\hline
+{\em iy} & Index bound in the second coordinate direction \\
+\hline
+{\em iz} & Index bound in the third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 539 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_aee8ead62642bc2783deb6403a961679d}\label{namespacem__cbc_aee8ead62642bc2783deb6403a961679d}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+cbc\+\_\+coefficients@{s\+\_\+compute\+\_\+cbc\+\_\+coefficients}}
+\index{s\+\_\+compute\+\_\+cbc\+\_\+coefficients@{s\+\_\+compute\+\_\+cbc\+\_\+coefficients}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+cbc\+\_\+coefficients()}{s\_compute\_cbc\_coefficients()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+cbc\+\_\+coefficients (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{cbc\+\_\+dir,  }\item[{integer, intent(in)}]{cbc\+\_\+loc }\end{DoxyParamCaption})}
+
+
+
+Definition at line 344 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_abbe02209311e19efb816f7678a8a9584}\label{namespacem__cbc_abbe02209311e19efb816f7678a8a9584}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l}}
+\index{s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l()}{s\_compute\_constant\_pressure\_subsonic\_outflow\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+constant\+\_\+pressure\+\_\+subsonic\+\_\+outflow\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+L variables for the constant pressure subsonic outflow C\+BC see pg. 455 Thompson (1990). The constant pressure subsonic outflow maintains a fixed pressure at the C\+BC boundary in absence of any transverse effects. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1014 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ab95f6f268802b6330f4aef16685ae498}\label{namespacem__cbc_ab95f6f268802b6330f4aef16685ae498}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l}}
+\index{s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l()}{s\_compute\_force\_free\_subsonic\_outflow\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+force\+\_\+free\+\_\+subsonic\+\_\+outflow\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+The L variables for the force-\/free subsonic outflow C\+BC, see pg. 454 of Thompson (1990). The force-\/free subsonic outflow sets to zero the sum of all of the forces which are acting on a fluid element for the normal coordinate direction to the boundary. As a result, a fluid element at the boundary is simply advected outward at the fluid velocity. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 980 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a39d803573d65c9c8ba7cc8b44b8053e1}\label{namespacem__cbc_a39d803573d65c9c8ba7cc8b44b8053e1}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l@{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l}}
+\index{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l@{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l()}{s\_compute\_nonreflecting\_subsonic\_buffer\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+buffer\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+The L variables for the nonreflecting subsonic buffer C\+BC see pg. 13 of Thompson (1987). The nonreflecting subsonic buffer reduces the amplitude of any reflections caused by outgoing waves. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 886 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_aaaa6698b1ae1671a9124bb22617b4b8c}\label{namespacem__cbc_aaaa6698b1ae1671a9124bb22617b4b8c}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l@{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l}}
+\index{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l@{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l()}{s\_compute\_nonreflecting\_subsonic\_inflow\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+inflow\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+The L variables for the nonreflecting subsonic inflow C\+BC see pg. 455, Thompson (1990). This nonreflecting subsonic C\+BC assumes an incoming flow and reduces the amplitude of any reflections caused by outgoing waves. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 925 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_af0664437857269683e572ec7b5e3b4b7}\label{namespacem__cbc_af0664437857269683e572ec7b5e3b4b7}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l}}
+\index{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l()}{s\_compute\_nonreflecting\_subsonic\_outflow\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+nonreflecting\+\_\+subsonic\+\_\+outflow\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+The L variables for the nonreflecting subsonic outflow C\+BC see pg. 454 of Thompson (1990). This nonreflecting subsonic C\+BC presumes an outgoing flow and reduces the amplitude of any reflections caused by outgoing waves. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 944 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ad51ac21554842928259732d09a7eaf51}\label{namespacem__cbc_ad51ac21554842928259732d09a7eaf51}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l@{s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l}}
+\index{s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l@{s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l()}{s\_compute\_slip\_wall\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+slip\+\_\+wall\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+The L variables for the slip wall C\+BC, see pg. 451 of Thompson (1990). At the slip wall (frictionless wall), the normal component of velocity is zero at all times, while the transverse velocities may be nonzero. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 864 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_aef459892802977978a425cd85648c706}\label{namespacem__cbc_aef459892802977978a425cd85648c706}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l@{s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l}}
+\index{s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l@{s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l()}{s\_compute\_supersonic\_inflow\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+supersonic\+\_\+inflow\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+L variables for the supersonic inflow C\+BC, see pg. 453 Thompson (1990). The supersonic inflow C\+BC is a steady state, or nearly a steady state, C\+BC in which only the transverse terms may generate a time dependence at the inflow boundary. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1050 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a95f3cad9b9fec4f08b561da8f0db6584}\label{namespacem__cbc_a95f3cad9b9fec4f08b561da8f0db6584}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l}}
+\index{s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l@{s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l()}{s\_compute\_supersonic\_outflow\_l()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+compute\+\_\+supersonic\+\_\+outflow\+\_\+l (\begin{DoxyParamCaption}\item[{integer, intent(in)}]{dflt\+\_\+int }\end{DoxyParamCaption})}
+
+
+
+L variables for the supersonic outflow C\+BC, see pg. 453 of Thompson (1990). For the supersonic outflow C\+BC, the flow evolution at the boundary is determined completely by the interior data. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em dflt\+\_\+int} & Default null integer \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1066 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a3fcf7cde1a04a7ee72ced4aa62cf53d0}\label{namespacem__cbc_a3fcf7cde1a04a7ee72ced4aa62cf53d0}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+finalize\+\_\+cbc@{s\+\_\+finalize\+\_\+cbc}}
+\index{s\+\_\+finalize\+\_\+cbc@{s\+\_\+finalize\+\_\+cbc}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+cbc()}{s\_finalize\_cbc()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+finalize\+\_\+cbc (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{integer, intent(in)}]{cbc\+\_\+dir,  }\item[{integer, intent(in)}]{cbc\+\_\+loc,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+Deallocation and/or the disassociation procedures that are necessary in order to finalize the C\+BC application. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em flux\+\_\+vf} & Cell-\/boundary-\/average fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Cell-\/boundary-\/average flux sources \\
+\hline
+{\em cbc\+\_\+dir} & C\+BC coordinate direction \\
+\hline
+{\em cbc\+\_\+loc} & C\+BC coordinate location \\
+\hline
+{\em ix} & Index bound in the first coordinate direction \\
+\hline
+{\em iy} & Index bound in the second coordinate direction \\
+\hline
+{\em iz} & Index bound in the third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1538 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a76b737dff5c827677888ffde0aff9cf1}\label{namespacem__cbc_a76b737dff5c827677888ffde0aff9cf1}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+finalize\+\_\+cbc\+\_\+module@{s\+\_\+finalize\+\_\+cbc\+\_\+module}}
+\index{s\+\_\+finalize\+\_\+cbc\+\_\+module@{s\+\_\+finalize\+\_\+cbc\+\_\+module}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+finalize\+\_\+cbc\+\_\+module()}{s\_finalize\_cbc\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+cbc\+::s\+\_\+finalize\+\_\+cbc\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Module deallocation and/or disassociation procedures. 
+
+
+
+Definition at line 1788 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a50fed863b4ee14bf81590ed80154b539}\label{namespacem__cbc_a50fed863b4ee14bf81590ed80154b539}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+initialize\+\_\+cbc@{s\+\_\+initialize\+\_\+cbc}}
+\index{s\+\_\+initialize\+\_\+cbc@{s\+\_\+initialize\+\_\+cbc}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+cbc()}{s\_initialize\_cbc()}}
+{\footnotesize\ttfamily subroutine m\+\_\+cbc\+::s\+\_\+initialize\+\_\+cbc (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{flux\+\_\+src\+\_\+vf,  }\item[{integer, intent(in)}]{cbc\+\_\+dir,  }\item[{integer, intent(in)}]{cbc\+\_\+loc,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are required for the setup of the selected C\+BC. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/average primitive variables \\
+\hline
+{\em flux\+\_\+vf} & Cell-\/boundary-\/average fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Cell-\/boundary-\/average flux sources \\
+\hline
+{\em cbc\+\_\+dir} & C\+BC coordinate direction \\
+\hline
+{\em cbc\+\_\+loc} & C\+BC coordinate location \\
+\hline
+{\em ix} & Index bound in the first coordinate direction \\
+\hline
+{\em iy} & Index bound in the second coordinate direction \\
+\hline
+{\em iz} & Index bound in the third coordinate direction \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 1108 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a0afb287e68b0d1d970fd073849525c36}\label{namespacem__cbc_a0afb287e68b0d1d970fd073849525c36}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+initialize\+\_\+cbc\+\_\+module@{s\+\_\+initialize\+\_\+cbc\+\_\+module}}
+\index{s\+\_\+initialize\+\_\+cbc\+\_\+module@{s\+\_\+initialize\+\_\+cbc\+\_\+module}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+initialize\+\_\+cbc\+\_\+module()}{s\_initialize\_cbc\_module()}}
+{\footnotesize\ttfamily subroutine, public m\+\_\+cbc\+::s\+\_\+initialize\+\_\+cbc\+\_\+module (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. 
+
+
+
+Definition at line 167 of file m\+\_\+cbc.\+f90.
+
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{namespacem__cbc_af8d317b53da9384f50a1c51dd46bc8fe}\label{namespacem__cbc_af8d317b53da9384f50a1c51dd46bc8fe}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!adv@{adv}}
+\index{adv@{adv}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{adv}{adv}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::adv}
+
+
+
+Cell averaged advected variables. 
+
+
+
+Definition at line 109 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a23d4bcbedc528222237094361a4ff43f}\label{namespacem__cbc_a23d4bcbedc528222237094361a4ff43f}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!alpha\+\_\+rho@{alpha\+\_\+rho}}
+\index{alpha\+\_\+rho@{alpha\+\_\+rho}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{alpha\+\_\+rho}{alpha\_rho}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::alpha\+\_\+rho}
+
+
+
+Cell averaged partial densiy. 
+
+
+
+Definition at line 103 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a982b2364cfaa61896b8143231fc9e380}\label{namespacem__cbc_a982b2364cfaa61896b8143231fc9e380}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!c@{c}}
+\index{c@{c}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{c}{c}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::c}
+
+
+
+Cell averaged speed of sound. 
+
+
+
+Definition at line 113 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ad0e1fd6e716ca51ccf5d6954e15fb02e}\label{namespacem__cbc_ad0e1fd6e716ca51ccf5d6954e15fb02e}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!dadv\+\_\+ds@{dadv\+\_\+ds}}
+\index{dadv\+\_\+ds@{dadv\+\_\+ds}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{dadv\+\_\+ds}{dadv\_ds}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::dadv\+\_\+ds}
+
+
+
+Spatial derivatives in s-\/dir of advection variables Note that these are only obtained in those cells on the domain boundary along which the C\+BC is applied by employing finite differences (FD) on the cell-\/average primitive variables, q\+\_\+prim\+\_\+rs\+\_\+vf. 
+
+
+
+Definition at line 120 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a5d23c9c92bd474ce0a0d5af3c1f37cb8}\label{namespacem__cbc_a5d23c9c92bd474ce0a0d5af3c1f37cb8}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!dalpha\+\_\+rho\+\_\+ds@{dalpha\+\_\+rho\+\_\+ds}}
+\index{dalpha\+\_\+rho\+\_\+ds@{dalpha\+\_\+rho\+\_\+ds}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{dalpha\+\_\+rho\+\_\+ds}{dalpha\_rho\_ds}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::dalpha\+\_\+rho\+\_\+ds}
+
+
+
+Spatial derivatives in s-\/dir of partial density. 
+
+
+
+Definition at line 117 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ae49b66468d949880db575e26231b641c}\label{namespacem__cbc_ae49b66468d949880db575e26231b641c}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!dpres\+\_\+ds@{dpres\+\_\+ds}}
+\index{dpres\+\_\+ds@{dpres\+\_\+ds}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{dpres\+\_\+ds}{dpres\_ds}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::dpres\+\_\+ds}
+
+
+
+Spatial derivatives in s-\/dir of pressure. 
+
+
+
+Definition at line 119 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ae49e36ba93b9f5cb3adf9551c1cfb276}\label{namespacem__cbc_ae49e36ba93b9f5cb3adf9551c1cfb276}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!ds@{ds}}
+\index{ds@{ds}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{ds}{ds}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::ds}
+
+
+
+Cell-\/width distribution in the s-\/direction. 
+
+
+
+Definition at line 129 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ac2bd4c0c73cfb0582f003473d0ec4f7f}\label{namespacem__cbc_ac2bd4c0c73cfb0582f003473d0ec4f7f}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!dvel\+\_\+ds@{dvel\+\_\+ds}}
+\index{dvel\+\_\+ds@{dvel\+\_\+ds}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{dvel\+\_\+ds}{dvel\_ds}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::dvel\+\_\+ds}
+
+
+
+Spatial derivatives in s-\/dir of velocity. 
+
+
+
+Definition at line 118 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a4e9565add4d8b423cbcecb0da55e232c}\label{namespacem__cbc_a4e9565add4d8b423cbcecb0da55e232c}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!e@{e}}
+\index{e@{e}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{e}{e}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::e}
+
+
+
+Cell averaged energy. 
+
+
+
+Definition at line 107 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a9023ac4f88b32e7d88ca8fadb649b84f}\label{namespacem__cbc_a9023ac4f88b32e7d88ca8fadb649b84f}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!f\+\_\+rs\+\_\+vf@{f\+\_\+rs\+\_\+vf}}
+\index{f\+\_\+rs\+\_\+vf@{f\+\_\+rs\+\_\+vf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{f\+\_\+rs\+\_\+vf}{f\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+cbc\+::f\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 93 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ab079ec31add26b8d5f591b3cb5e5b88f}\label{namespacem__cbc_ab079ec31add26b8d5f591b3cb5e5b88f}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!f\+\_\+src\+\_\+rs\+\_\+vf@{f\+\_\+src\+\_\+rs\+\_\+vf}}
+\index{f\+\_\+src\+\_\+rs\+\_\+vf@{f\+\_\+src\+\_\+rs\+\_\+vf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{f\+\_\+src\+\_\+rs\+\_\+vf}{f\_src\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+cbc\+::f\+\_\+src\+\_\+rs\+\_\+vf}
+
+
+
+Cell-\/average fluxes (src -\/ source). These are directly determined from the cell-\/average primitive variables, q\+\_\+prims\+\_\+rs\+\_\+vf, and not a Riemann solver. 
+
+
+
+Definition at line 93 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a5950f5d9fbc613591a42a3f9587f32f5}\label{namespacem__cbc_a5950f5d9fbc613591a42a3f9587f32f5}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!fd\+\_\+coef@{fd\+\_\+coef}}
+\index{fd\+\_\+coef@{fd\+\_\+coef}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{fd\+\_\+coef}{fd\_coef}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), pointer m\+\_\+cbc\+::fd\+\_\+coef =$>$ N\+U\+LL()}
+
+
+
+Definition at line 140 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a6f324c692d5e60e85314b1e21c81736b}\label{namespacem__cbc_a6f324c692d5e60e85314b1e21c81736b}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!fd\+\_\+coef\+\_\+x@{fd\+\_\+coef\+\_\+x}}
+\index{fd\+\_\+coef\+\_\+x@{fd\+\_\+coef\+\_\+x}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{fd\+\_\+coef\+\_\+x}{fd\_coef\_x}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, target m\+\_\+cbc\+::fd\+\_\+coef\+\_\+x}
+
+
+
+Finite diff. coefficients x-\/dir. 
+
+
+
+Definition at line 133 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ae86e3f027b189005a2b00f8f2bb9ae32}\label{namespacem__cbc_ae86e3f027b189005a2b00f8f2bb9ae32}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!fd\+\_\+coef\+\_\+y@{fd\+\_\+coef\+\_\+y}}
+\index{fd\+\_\+coef\+\_\+y@{fd\+\_\+coef\+\_\+y}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{fd\+\_\+coef\+\_\+y}{fd\_coef\_y}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, target m\+\_\+cbc\+::fd\+\_\+coef\+\_\+y}
+
+
+
+Finite diff. coefficients y-\/dir. 
+
+
+
+Definition at line 134 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a025a2f672d7d9997966bdedab3f333de}\label{namespacem__cbc_a025a2f672d7d9997966bdedab3f333de}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!fd\+\_\+coef\+\_\+z@{fd\+\_\+coef\+\_\+z}}
+\index{fd\+\_\+coef\+\_\+z@{fd\+\_\+coef\+\_\+z}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{fd\+\_\+coef\+\_\+z}{fd\_coef\_z}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable, target m\+\_\+cbc\+::fd\+\_\+coef\+\_\+z}
+
+
+
+Finite diff. coefficients z-\/dir The first dimension identifies the location of a coefficient in the FD formula, while the last dimension denotes the location of the C\+BC. 
+
+
+
+Definition at line 135 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_abbb35cbd4d0951e9231865bd4120e682}\label{namespacem__cbc_abbb35cbd4d0951e9231865bd4120e682}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!flux\+\_\+rs\+\_\+vf@{flux\+\_\+rs\+\_\+vf}}
+\index{flux\+\_\+rs\+\_\+vf@{flux\+\_\+rs\+\_\+vf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{flux\+\_\+rs\+\_\+vf}{flux\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+cbc\+::flux\+\_\+rs\+\_\+vf}
+
+
+
+Definition at line 97 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a5075a07fe184dfe7d109f6b4e14f7302}\label{namespacem__cbc_a5075a07fe184dfe7d109f6b4e14f7302}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!flux\+\_\+src\+\_\+rs\+\_\+vf@{flux\+\_\+src\+\_\+rs\+\_\+vf}}
+\index{flux\+\_\+src\+\_\+rs\+\_\+vf@{flux\+\_\+src\+\_\+rs\+\_\+vf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{flux\+\_\+src\+\_\+rs\+\_\+vf}{flux\_src\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+cbc\+::flux\+\_\+src\+\_\+rs\+\_\+vf}
+
+
+
+The cell-\/boundary-\/average of the fluxes. They are initially determined by reshaping flux\+\_\+vf and flux\+\_\+src\+\_\+vf in a coordinate direction normal to the domain boundary along which C\+BC is applied. flux\+\_\+rs\+\_\+vf and flux\+\_\+src\+\_\+rs\+\_\+vf are subsequently modified based on the selected C\+BC. 
+
+
+
+Definition at line 97 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_aa657c2e47d8b48e2648c12a454ceec96}\label{namespacem__cbc_aa657c2e47d8b48e2648c12a454ceec96}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!gamma@{gamma}}
+\index{gamma@{gamma}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{gamma}{gamma}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::gamma}
+
+
+
+Cell averaged specific heat ratio. 
+
+
+
+Definition at line 111 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_afef2a31e21e4f17b6852005a08ee86ce}\label{namespacem__cbc_afef2a31e21e4f17b6852005a08ee86ce}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!h@{h}}
+\index{h@{h}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{h}{h}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::h}
+
+
+
+Cell averaged enthalpy. 
+
+
+
+Definition at line 108 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a2995ecb6263724a4421d1622f513103c}\label{namespacem__cbc_a2995ecb6263724a4421d1622f513103c}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!is1@{is1}}
+\index{is1@{is1}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{is1}{is1}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+cbc\+::is1}
+
+
+
+Definition at line 158 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_acfe8efda790266c75260db5e3917d337}\label{namespacem__cbc_acfe8efda790266c75260db5e3917d337}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!is2@{is2}}
+\index{is2@{is2}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{is2}{is2}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+cbc\+::is2}
+
+
+
+Definition at line 158 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a8477d940e9515138e8405c9302a026c8}\label{namespacem__cbc_a8477d940e9515138e8405c9302a026c8}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!is3@{is3}}
+\index{is3@{is3}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{is3}{is3}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}) m\+\_\+cbc\+::is3}
+
+
+
+Indical bounds in the s1-\/, s2-\/ and s3-\/directions. 
+
+
+
+Definition at line 158 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a44a30ad8ee6642f20f106e99fe3608f9}\label{namespacem__cbc_a44a30ad8ee6642f20f106e99fe3608f9}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!l@{l}}
+\index{l@{l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{l}{l}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::l}
+
+
+
+L matrix (see Thompson 1987,1990) 
+
+
+
+Definition at line 126 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a7ff1c86cd167654a9c0765dea4a93ba5}\label{namespacem__cbc_a7ff1c86cd167654a9c0765dea4a93ba5}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!lambda@{lambda}}
+\index{lambda@{lambda}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{lambda}{lambda}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(3) m\+\_\+cbc\+::lambda}
+
+
+
+Eigenvalues (see Thompson 1987,1990) 
+
+
+
+Definition at line 125 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a4f6b082aae7f83fcad04d8c5d59f6d89}\label{namespacem__cbc_a4f6b082aae7f83fcad04d8c5d59f6d89}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!mf@{mf}}
+\index{mf@{mf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{mf}{mf}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::mf}
+
+
+
+Cell averaged mass fraction. 
+
+
+
+Definition at line 110 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ace0392bdc9bb94c00e11d4e51432e0ad}\label{namespacem__cbc_ace0392bdc9bb94c00e11d4e51432e0ad}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!pi\+\_\+coef@{pi\+\_\+coef}}
+\index{pi\+\_\+coef@{pi\+\_\+coef}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{pi\+\_\+coef}{pi\_coef}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), pointer m\+\_\+cbc\+::pi\+\_\+coef =$>$ N\+U\+LL()}
+
+
+
+Definition at line 149 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a906043af9a1ee38feda508ccb40c5402}\label{namespacem__cbc_a906043af9a1ee38feda508ccb40c5402}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!pi\+\_\+coef\+\_\+x@{pi\+\_\+coef\+\_\+x}}
+\index{pi\+\_\+coef\+\_\+x@{pi\+\_\+coef\+\_\+x}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{pi\+\_\+coef\+\_\+x}{pi\_coef\_x}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target m\+\_\+cbc\+::pi\+\_\+coef\+\_\+x}
+
+
+
+Polynominal interpolant coefficients in x-\/dir. 
+
+
+
+Definition at line 142 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a54a6e22ead2511305b7370369f46af7a}\label{namespacem__cbc_a54a6e22ead2511305b7370369f46af7a}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!pi\+\_\+coef\+\_\+y@{pi\+\_\+coef\+\_\+y}}
+\index{pi\+\_\+coef\+\_\+y@{pi\+\_\+coef\+\_\+y}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{pi\+\_\+coef\+\_\+y}{pi\_coef\_y}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target m\+\_\+cbc\+::pi\+\_\+coef\+\_\+y}
+
+
+
+Polynominal interpolant coefficients in y-\/dir. 
+
+
+
+Definition at line 143 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_af820095dcf800b727c19f2b5ee95a814}\label{namespacem__cbc_af820095dcf800b727c19f2b5ee95a814}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!pi\+\_\+coef\+\_\+z@{pi\+\_\+coef\+\_\+z}}
+\index{pi\+\_\+coef\+\_\+z@{pi\+\_\+coef\+\_\+z}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{pi\+\_\+coef\+\_\+z}{pi\_coef\_z}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:,\+:), allocatable, target m\+\_\+cbc\+::pi\+\_\+coef\+\_\+z}
+
+
+
+Polynominal interpolant coefficients in z-\/dir The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients and the last dimension denotes the location of the C\+BC. 
+
+
+
+Definition at line 144 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a2187e55d648bf7c40be489b5a2b75ca7}\label{namespacem__cbc_a2187e55d648bf7c40be489b5a2b75ca7}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!pi\+\_\+inf@{pi\+\_\+inf}}
+\index{pi\+\_\+inf@{pi\+\_\+inf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{pi\+\_\+inf}{pi\_inf}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::pi\+\_\+inf}
+
+
+
+Cell averaged liquid stiffness. 
+
+
+
+Definition at line 112 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ad6960b075aa8db0bcc08761273a6c4c3}\label{namespacem__cbc_ad6960b075aa8db0bcc08761273a6c4c3}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!pres@{pres}}
+\index{pres@{pres}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{pres}{pres}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::pres}
+
+
+
+Cell averaged pressure. 
+
+
+
+Definition at line 106 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a12e2d4feb2b8425b8f2270a8da529555}\label{namespacem__cbc_a12e2d4feb2b8425b8f2270a8da529555}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!q\+\_\+prim\+\_\+rs\+\_\+vf@{q\+\_\+prim\+\_\+rs\+\_\+vf}}
+\index{q\+\_\+prim\+\_\+rs\+\_\+vf@{q\+\_\+prim\+\_\+rs\+\_\+vf}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{q\+\_\+prim\+\_\+rs\+\_\+vf}{q\_prim\_rs\_vf}}
+{\footnotesize\ttfamily type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), allocatable m\+\_\+cbc\+::q\+\_\+prim\+\_\+rs\+\_\+vf}
+
+
+
+The cell-\/average primitive variables. They are obtained by reshaping (RS) q\+\_\+prim\+\_\+vf in the coordinate direction normal to the domain boundary along which the C\+BC is applied. 
+
+
+
+Definition at line 88 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_af36bd73bae305dd791c6da0a37d2f6f8}\label{namespacem__cbc_af36bd73bae305dd791c6da0a37d2f6f8}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!re@{re}}
+\index{re@{re}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{re}{re}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(2) m\+\_\+cbc\+::re}
+
+
+
+Cell averaged Reynolds numbers. 
+
+
+
+Definition at line 114 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_afece2e0a449e76d45bd85eeec0207ce8}\label{namespacem__cbc_afece2e0a449e76d45bd85eeec0207ce8}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!rho@{rho}}
+\index{rho@{rho}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{rho}{rho}}
+{\footnotesize\ttfamily real(kind(0d0)) m\+\_\+cbc\+::rho}
+
+
+
+Cell averaged density. 
+
+
+
+Definition at line 104 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a6ba3d055b8d3c0d003ff74ccd2762b1c}\label{namespacem__cbc_a6ba3d055b8d3c0d003ff74ccd2762b1c}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!s\+\_\+compute\+\_\+l@{s\+\_\+compute\+\_\+l}}
+\index{s\+\_\+compute\+\_\+l@{s\+\_\+compute\+\_\+l}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{s\+\_\+compute\+\_\+l}{s\_compute\_l}}
+{\footnotesize\ttfamily procedure(s\+\_\+compute\+\_\+abstract\+\_\+l), pointer m\+\_\+cbc\+::s\+\_\+compute\+\_\+l =$>$ N\+U\+LL()}
+
+
+
+Pointer to procedure used to calculate L variables, based on choice of C\+BC. 
+
+
+
+Definition at line 154 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_ad80b730485604931948331f36eb7b6e2}\label{namespacem__cbc_ad80b730485604931948331f36eb7b6e2}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!vel@{vel}}
+\index{vel@{vel}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{vel}{vel}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:), allocatable m\+\_\+cbc\+::vel}
+
+
+
+Cell averaged velocity. 
+
+
+
+Definition at line 105 of file m\+\_\+cbc.\+f90.
+
+\mbox{\Hypertarget{namespacem__cbc_a532334846efcbbca82ab11f26e28c5f7}\label{namespacem__cbc_a532334846efcbbca82ab11f26e28c5f7}} 
+\index{m\+\_\+cbc@{m\+\_\+cbc}!we@{we}}
+\index{we@{we}!m\+\_\+cbc@{m\+\_\+cbc}}
+\subsubsection{\texorpdfstring{we}{we}}
+{\footnotesize\ttfamily real(kind(0d0)), dimension(\+:,\+:), allocatable m\+\_\+cbc\+::we}
+
+
+
+Cell averaged Weber numbers. 
+
+
+
+Definition at line 115 of file m\+\_\+cbc.\+f90.
+

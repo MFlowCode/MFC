@@ -1,0 +1,425 @@
+\hypertarget{m__riemann__solvers_8f90}{}\section{m\+\_\+riemann\+\_\+solvers.\+f90 File Reference}
+\label{m__riemann__solvers_8f90}\index{m\+\_\+riemann\+\_\+solvers.\+f90@{m\+\_\+riemann\+\_\+solvers.\+f90}}
+
+
+Contains module \hyperlink{namespacem__riemann__solvers}{m\+\_\+riemann\+\_\+solvers}.  
+
+
+\subsection*{Data Types}
+\begin{DoxyCompactItemize}
+\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__abstract__riemann__solver}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver}
+\begin{DoxyCompactList}\small\item\em Abstract interface to the subroutines that are utilized to compute the Riemann problem solution. For additional information please reference\+: 1) s\+\_\+hll\+\_\+riemann\+\_\+solver 2) s\+\_\+hllc\+\_\+riemann\+\_\+solver 3) s\+\_\+exact\+\_\+riemann\+\_\+solver. \end{DoxyCompactList}\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__average__state}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+abstract\+\_\+average\+\_\+state}
+\begin{DoxyCompactList}\small\item\em The abstract interface to the subroutines that are used to calculate the Roe and arithmetic average states. For more information refer to\+: 1) s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state 2) s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state. \end{DoxyCompactList}\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__wave__speeds}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+abstract\+\_\+wave\+\_\+speeds}
+\begin{DoxyCompactList}\small\item\em The abstract interface to the subroutines that are utilized to compute the wave speeds of the Riemann problem either directly or by the means of pressure-\/velocity estimates. For more information please refer to\+: 1) s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds 2) s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds. \end{DoxyCompactList}\item 
+interface \hyperlink{interfacem__riemann__solvers_1_1s__compute__abstract__viscous__source__flux}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+abstract\+\_\+viscous\+\_\+source\+\_\+flux}
+\begin{DoxyCompactList}\small\item\em The abstract interface to the subroutines that are utilized to compute the viscous source fluxes for either Cartesian or cylindrical geometries. For more information please refer to\+: 1) s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux 2) s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__riemann__solvers}{m\+\_\+riemann\+\_\+solvers}
+\begin{DoxyCompactList}\small\item\em This module features a database of approximate and exact Riemann problem solvers for the Navier-\/\+Stokes system of equations, which is supplemented by appropriate advection equations that are used to capture the material interfaces. The closure of the system is achieved by the stiffened gas equation of state and any required mixture relations. Surface tension effects are accounted for and are modeled by means of a volume force acting across the diffuse material interface region. The implementation details of viscous and capillary effects, into the Riemann solvers, may be found in Perigaud and Saurel (2005). Note that both effects are available only in the volume fraction model. At this time, the approximate and exact Riemann solvers that are listed below are available\+: 1) Harten-\/\+Lax-\/van Leer (H\+LL) 2) Harten-\/\+Lax-\/van Leer-\/\+Contact (H\+L\+LC) 3) Exact. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_a3062ef97dfec8673afd80dcbee6e3814}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+hll\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The procedure features the Harten, Lax and van Leer (H\+LL) approximate Riemann solver algorithm, see Toro (1999) as well as Saurel and Abgrall (1999). Viscous and capillary effects have been included by adapting the exact Riemann solver of Perigaud and Saurel (2005). \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_ae2ad588d58b624a8320805f3860a3eb8}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+hllc\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em This procedure is the implementation of the Harten, Lax, van Leer, and contact (H\+L\+LC) approximate Riemann solver, see Toro (1999) and Johnsen (2007). The viscous and the surface tension effects have been included by modifying the exact Riemann solver of Perigaud and Saurel (2005). \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_a9fa393b97819b253e8b85f0444a15c27}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+exact\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em This procedure is the implementation of the exact Riemann solver, see Toro (1999). The effects of viscosity and the surface tension have been incorporated following the work of Perigaud and Saurel (2005). \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a16383eccdd2d0ecca7d1c26467daaaab}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+constant\+\_\+states} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em The procedure assigns and computes the left and right states of the Riemann problem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a16d6f8f4c3ad64fdb574a50c189750c5}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+mixture\+\_\+sound\+\_\+speeds} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em Compute mixture sound speed. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a947bc1c7da743ee0820ff6648fef3c25}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+star\+\_\+region} ()
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to compute the solution for pressure and velocity in the star region when using the exact Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_aba768ee53f47327a70508a913b55254d}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+pressure\+\_\+function} (f\+\_\+K, dfdp\+\_\+K, pres, side)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to evaluate the pressure functions f\+\_\+K in the exact Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a7e533d9eadb12af316d72f1b722735d8}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+guess\+\_\+pressure} (pres\+\_\+start)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to provide a guess value for pressure in the star region. The choice is made according to adaptive Riemann solver using the P\+V\+RS, T\+R\+RS. and T\+S\+RS approximate Riemann solvers. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a68651027acd974568fd5f94ed39c8e82}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+intercell\+\_\+solution} ()
+\begin{DoxyCompactList}\small\item\em Computes the averaged intrercell variables for the Riemann solver. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_aeeea1cc689aa550f3c1f182fe33a4939}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+roe\+\_\+average\+\_\+state} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em The procedure computes the Roe average density, velocity, enthalpy, volume fractions, specific heat ratio function, speed of sound, shear and volume Reynolds numbers, Weber numbers and curvatures, at the cell-\/boundaries, from the left and right states of the Riemann problem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a14b6f4fa2f3b1d567a3f3347105ce61e}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+arithmetic\+\_\+average\+\_\+state} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em This procedure calculates the arithmetic average density, velocity, enthalpy, volume fractions, spec\+I\+Fic heat ratio function, sound speed, shear and volume Reynolds numbers, Weber numbers and the curvatures, at the cell-\/boundaries, from the left and right states of the Riemann problem. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a1adcb619a7800a87bf5785ca59c63233}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+direct\+\_\+wave\+\_\+speeds} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em The direct estimation of the left, right and middle wave speeds, proposed by Batten et al. (1997) that results in the exact resolution of isolated shock and contact waves. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a107a13616d23f81b60bab83209067b01}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+pressure\+\_\+velocity\+\_\+wave\+\_\+speeds} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l})
+\begin{DoxyCompactList}\small\item\em Estimation of the left, right and star region wave speeds by the approximation of the pressures and velocity in the star regions, see Toro (1999). The pressures and velocity are approximated by using the primitive variables Riemann solver (P\+V\+RS) and the wave speeds are then estimated from those approximations using the exact wave relations. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a6301a5631fda64dd97c11777807a22c9}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+flux\+\_\+limiter} (\hyperlink{m__rhs_8f90_aeadbc0ce9b66517f8fde156199772ec1}{j}, \hyperlink{m__rhs_8f90_af22c486581933c52df7d4aa306382074}{k}, \hyperlink{m__rhs_8f90_a2ac747380de0e6e5e11b01f4137fb75c}{l}, flux\+\_\+lim\+\_\+func, norm\+\_\+dir)
+\begin{DoxyCompactList}\small\item\em This subroutine computes the flux limiter function value at the cell boundary. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_aab7e6bf69b7d0b8b9d911f418b872130}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+initialize\+\_\+riemann\+\_\+solvers\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures that are necessary to setup the module. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_ae82ad8216dcc6938b86cf0bd5c17467b}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+populate\+\_\+riemann\+\_\+states\+\_\+variables\+\_\+buffers} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The purpose of this subroutine is to populate the buffers of the left and right Riemann states variables, depending on the boundary conditions. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a86766279fcf7527f2b148adff4666b1c}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+initialize\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other procedures needed to configure the chosen Riemann solver algorithm. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a50ff087624d23846c62cd711dd003757}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+cylindrical\+\_\+viscous\+\_\+source\+\_\+flux} (vel\+L\+\_\+vf, dvel\+L\+\_\+dx\+\_\+vf, dvel\+L\+\_\+dy\+\_\+vf, dvel\+L\+\_\+dz\+\_\+vf, vel\+R\+\_\+vf, dvel\+R\+\_\+dx\+\_\+vf, dvel\+R\+\_\+dy\+\_\+vf, dvel\+R\+\_\+dz\+\_\+vf, flux\+\_\+src\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to evaluate and account for the contribution of viscous stresses in the source flux for the momentum and energy. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_a58c0a2ab06eb5094f60c5e68dbde7300}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+cartesian\+\_\+viscous\+\_\+source\+\_\+flux} (vel\+L\+\_\+vf, dvel\+L\+\_\+dx\+\_\+vf, dvel\+L\+\_\+dy\+\_\+vf, dvel\+L\+\_\+dz\+\_\+vf, vel\+R\+\_\+vf, dvel\+R\+\_\+dx\+\_\+vf, dvel\+R\+\_\+dy\+\_\+vf, dvel\+R\+\_\+dz\+\_\+vf, flux\+\_\+src\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The goal of this subroutine is to evaluate and account for the contribution of viscous stresses in the source flux for the momentum and energy. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_aeab4abb9a37e1f537fee511bdcadc9da}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+capillary\+\_\+source\+\_\+flux} (dalpha\+L\+\_\+dx\+\_\+vf, dalpha\+L\+\_\+dy\+\_\+vf, dalpha\+L\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, dalpha\+R\+\_\+dx\+\_\+vf, dalpha\+R\+\_\+dy\+\_\+vf, dalpha\+R\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, flux\+\_\+src\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em The purpose of the subroutine is to evaluate and account for the contribution of capillary stresses in the source flux for the momentum and energy. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__riemann__solvers_ab679d890c95c6cb1ee3dc5e5a9ae1c19}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+finalize\+\_\+riemann\+\_\+solver} (flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\begin{DoxyCompactList}\small\item\em Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver. \end{DoxyCompactList}\item 
+subroutine, public \hyperlink{namespacem__riemann__solvers_a5bd1ce6fbbb840b5b1c6dd97ccb8d674}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+finalize\+\_\+riemann\+\_\+solvers\+\_\+module} ()
+\begin{DoxyCompactList}\small\item\em Module deallocation and/or disassociation procedures. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa67462b01acb62fbe8730a28aa37b7a9}{m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+gsrc\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/boundary values of the geometrical source flux that are computed through the chosen Riemann problem solver by using the left and right states given in q\+K\+\_\+prim\+\_\+rs\+\_\+vf. Currently 2D axisymmetric for inviscid only. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aee9f1299db2c29eabb5d2ef096f0abe0}{m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+src\+\_\+rs\+\_\+vf}
+\item 
+procedure(s\+\_\+abstract\+\_\+riemann\+\_\+solver), pointer, public \hyperlink{namespacem__riemann__solvers_a7edc50538c81447bf49e9242d85ee1ff}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+riemann\+\_\+solver} =$>$ N\+U\+LL()
+\item 
+procedure(s\+\_\+compute\+\_\+abstract\+\_\+average\+\_\+state), pointer \hyperlink{namespacem__riemann__solvers_a7bf84258c88a5e2c0accdc130ac812d9}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+average\+\_\+state} =$>$ N\+U\+LL()
+\item 
+procedure(s\+\_\+compute\+\_\+abstract\+\_\+wave\+\_\+speeds), pointer \hyperlink{namespacem__riemann__solvers_a3e2b4d51fda04b61d6f54069c5bb66c6}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+wave\+\_\+speeds} =$>$ N\+U\+LL()
+\item 
+procedure(s\+\_\+compute\+\_\+abstract\+\_\+viscous\+\_\+source\+\_\+flux), pointer \hyperlink{namespacem__riemann__solvers_a334d729c58a5c746cb0045d1f5f00b01}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+compute\+\_\+viscous\+\_\+source\+\_\+flux} =$>$ N\+U\+LL()
+\end{DoxyCompactItemize}
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa4fd04af7adfbb38e425f6e91e041ecc}{m\+\_\+riemann\+\_\+solvers\+::ql\+\_\+prim\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The left (L) and right (R) W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables that define the left and right states of the Riemann problem. Variables q\+K\+\_\+prim\+\_\+rs\+\_\+vf, K = L or R, are obtained by reshaping (RS) q\+K\+\_\+prim\+\_\+vf in a coordinate direction that is normal to the cell-\/boundaries along which the fluxes are to be determined. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a70fefa4f5849fa4c952030b0ac04482a}{m\+\_\+riemann\+\_\+solvers\+::qr\+\_\+prim\+\_\+rs\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_afe077d6837688601705ac13df3d9c3dc}{m\+\_\+riemann\+\_\+solvers\+::q\+\_\+prim\+\_\+rs\+\_\+vf}
+\end{DoxyCompactItemize}
+
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ac277f9426d7112e2b42fdc0fd6583f5e}{m\+\_\+riemann\+\_\+solvers\+::kappal\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values of the cell-\/ average curvatures of the volume fractions that define the left and right states of the Riemann problem. The variables kappa\+K\+\_\+rs\+\_\+vf are obtained by reshaping kappa\+K\+\_\+vf in a coordinate direction that is normal to the cell-\/ boundaries on which the fluxes are to be determined. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ae8a2bf891d899a2441210a29da0e03a1}{m\+\_\+riemann\+\_\+solvers\+::kappar\+\_\+rs\+\_\+vf}
+\end{DoxyCompactItemize}
+
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a3d8e1f9ad9ca68e97109e0cff7aa1c4b}{m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+rs\+\_\+vf}
+\begin{DoxyCompactList}\small\item\em The cell-\/boundary values of the fluxes (src -\/ source) that are computed through the chosen Riemann problem solver, and the direct evaluation of source terms, by using the left and right states given in q\+K\+\_\+prim\+\_\+rs\+\_\+vf, dq\+K\+\_\+prim\+\_\+ds\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf, where ds = dx, dy or dz. \end{DoxyCompactList}\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a0b6d2f192a1df76abc59b85b03f7a187}{m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+src\+\_\+rs\+\_\+vf}
+\end{DoxyCompactItemize}
+
+\begin{Indent}\textbf{ Left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary values of cell-\/average}\par
+{\em bubble density, radius, radial velocity, pressure, wall pressure, and modified pressure. These variables are left and right states of the Riemann problem obtained from q\+K\+\_\+prim\+\_\+rs\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_acfbe99c9151b71dadc19e80851d33bfe}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+rho\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a2d815c8ccf9b96727876621c46f3da00}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+rho\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_afc9d9cb504eca33ca970f4340c259161}{m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a03542f2527def3010f55cd456ccca698}{m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ab17d29f1de63b4669165d7d92f209986}{m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a27a761fd83f4f8f7178b8c57b09b825e}{m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a81973da2ed5f2e08dd363d889c0e21d7}{m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abe054616c664c4f090dfff5ba0aa679d}{m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a44eda4124cd70f22697144d295b47009}{m\+\_\+riemann\+\_\+solvers\+::e\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a5c08b40ab939ec42b3eb2f50f41a045d}{m\+\_\+riemann\+\_\+solvers\+::e\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a075a895b8ab81335f21a168603f29f37}{m\+\_\+riemann\+\_\+solvers\+::h\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac585ca9198161cf6d9130b696a2f1196}{m\+\_\+riemann\+\_\+solvers\+::h\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a485dc456f00eaa35c862ca3a2daa3d8c}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_abdd33525dd128beda2d0c33454e0d9de}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ad79d372c1bc1971b870ab2c455d9ff90}{m\+\_\+riemann\+\_\+solvers\+::y\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aef2c7eeabded0734aaa0cd95adac91ab}{m\+\_\+riemann\+\_\+solvers\+::y\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a8159569b322091efa55bbeb377532352}{m\+\_\+riemann\+\_\+solvers\+::gamma\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac422e0817e2011364cc6fc9c9a56b82b}{m\+\_\+riemann\+\_\+solvers\+::gamma\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac90ee6bf146aa47944bb11cd5de0a580}{m\+\_\+riemann\+\_\+solvers\+::pi\+\_\+inf\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a925187e709792a5fcfa80daebd568e8f}{m\+\_\+riemann\+\_\+solvers\+::pi\+\_\+inf\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a9c1dab7bfde55cdc6f738752c077f08a}{m\+\_\+riemann\+\_\+solvers\+::c\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a9393a8d17da2a98f5061804baca0349d}{m\+\_\+riemann\+\_\+solvers\+::c\+\_\+r}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_a2a804f5759af46c82fdd62633b5e7605}{m\+\_\+riemann\+\_\+solvers\+::re\+\_\+l}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_a31045aff8e978fd620943eaed4fbb973}{m\+\_\+riemann\+\_\+solvers\+::re\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a953a81975cc1627c87baca12ed51ed95}{m\+\_\+riemann\+\_\+solvers\+::we\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_ab9b568d4ea77b665c1f6cea77144acc8}{m\+\_\+riemann\+\_\+solvers\+::we\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_afbf6423349d95b7b3472eb84b9ba7f56}{m\+\_\+riemann\+\_\+solvers\+::nbub\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a4b6ffaeeaa4365c642ef3a5295635b07}{m\+\_\+riemann\+\_\+solvers\+::nbub\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_af0757998bd9843f9bb978a600d0ae2b0}{m\+\_\+riemann\+\_\+solvers\+::r0\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a132ff53b628e32e8d047d3a3f983b933}{m\+\_\+riemann\+\_\+solvers\+::r0\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_af425cfd91bc8a567e44b36c9bdbfb2bc}{m\+\_\+riemann\+\_\+solvers\+::v0\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a1bf4d8c27c1ed947af13b86a63f5b3aa}{m\+\_\+riemann\+\_\+solvers\+::v0\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a2b69a3c582d14aba043c3cb6376335a5}{m\+\_\+riemann\+\_\+solvers\+::p0\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa7deddacb25e873c573761963f680efc}{m\+\_\+riemann\+\_\+solvers\+::p0\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a31ac5fad05a69c3c0c76fbdc872f5494}{m\+\_\+riemann\+\_\+solvers\+::pbw\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_af14a2b29ba2692adfb1ed257e91482e8}{m\+\_\+riemann\+\_\+solvers\+::pbw\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abeca9cdf8ede1fe479660ab70ff789c7}{m\+\_\+riemann\+\_\+solvers\+::ptilde\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_addd3d84b7a9bae473b0c17744d5cac31}{m\+\_\+riemann\+\_\+solvers\+::ptilde\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Left and right, W\+E\+N\+O-\/reconstructed, cell-\/boundary, low-\/order values of cell-\/average}\par
+{\em partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed of sound, shear and volume Reynolds numbers and the Weber numbers. These variables are left and right states of the Riemann problem obtained from q\+K\+\_\+prim\+\_\+rs\+\_\+vf and kappa\+K\+\_\+rs\+\_\+vf. }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ad1c29f933978f01c9402ad5287abdfe6}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+rho\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a3874a511fdd71a444bfcc9193103e148}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+rho\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac99e69e03846f742aa0ce5e228d5167f}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+rho\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a81537cffcfd4fb575ffaffdc1ed64028}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+rho\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ae939a1e2f36044a0729480d09e05d74f}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+vel\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_acf54d997ef4105fd507c180db700c873}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+vel\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ab0807a312841bf144ff78338bf11a89b}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pres\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a8ac4fca37ee46e90e61ca83a1e4eb2c5}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pres\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abf27be79fc84bb7830520e08774fd56c}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+e\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a7596585d3504d397f16723b6a6ffd862}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+e\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a75cca68e31742083e0ebbef418300c78}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+h\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a985a98321338d51bc8a43695b490b102}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+h\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a57eb3b7013680ab3c30a1e8f049a0402}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a89059f36a5b3db54b3bd35cc3215a4be}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+alpha\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aa0a0c169528cc9c4a379f641fb653712}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+gamma\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a48b0505675e2bd1d0b36bda9de508655}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+gamma\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a1cfaf511a3605cef96d95b88de661071}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pi\+\_\+inf\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a5e682fb9d377f50935dfbe4d5dd67120}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+pi\+\_\+inf\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_af060aa45ac1c0c96428fd428ca3f63af}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+c\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ad056500eedb3761b13485edb94ec773e}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+c\+\_\+r}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_abbde404883793a9aae3708896b4a2781}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+re\+\_\+l}
+\item 
+real(kind(0d0)), dimension(2) \hyperlink{namespacem__riemann__solvers_a6d89cb45833bdcb48f3f1b01badaedcf}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+re\+\_\+r}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a8388f446036552682910bbe06da81f70}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+we\+\_\+l}
+\item 
+real(kind(0d0)), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a7883028b185740c1d507b486eceef969}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+we\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Gamma-\/related constants for use in exact Riemann solver (following Toro (1999) pp.153)}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_adbaf70dfc178970c3e210dddedc31971}{m\+\_\+riemann\+\_\+solvers\+::g1\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a44476fe6f5a4cfd8e7bd9b7369a2bfd8}{m\+\_\+riemann\+\_\+solvers\+::g1\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a80405eb6d8eaa75206edeef312c782d7}{m\+\_\+riemann\+\_\+solvers\+::g2\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a29b168c298a62892312beaf804d88ebd}{m\+\_\+riemann\+\_\+solvers\+::g2\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac58b25fbd4733d5adff39c28b32673b8}{m\+\_\+riemann\+\_\+solvers\+::g3\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a1e94f6d0053552684cebcc569b1a6f8a}{m\+\_\+riemann\+\_\+solvers\+::g3\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac44a4218c43a64bbe1b4d0dadc4726f1}{m\+\_\+riemann\+\_\+solvers\+::g4\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_adb408aa0458d5f80528aff6fa2d7eeb1}{m\+\_\+riemann\+\_\+solvers\+::g4\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_af4a82bacd4c2232f466428d41f34dffa}{m\+\_\+riemann\+\_\+solvers\+::g5\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a8e9c08866eae6dd81d694a5685306973}{m\+\_\+riemann\+\_\+solvers\+::g5\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aa0c3d3e0ab3821f201308018c8d3e550}{m\+\_\+riemann\+\_\+solvers\+::g6\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aff8b1fce6e33a0d7e18fbf87c252f1cd}{m\+\_\+riemann\+\_\+solvers\+::g6\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abbed27f1ec9cca777a83635a05fc8525}{m\+\_\+riemann\+\_\+solvers\+::g7\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a746eb452c1a5c1db204624afaad5b478}{m\+\_\+riemann\+\_\+solvers\+::g7\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a0f213519240daa52e669ecb053edae70}{m\+\_\+riemann\+\_\+solvers\+::g8\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a6ece114ee17503f716a99a601c2ba5d1}{m\+\_\+riemann\+\_\+solvers\+::g8\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Star region pressure and velocity}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a41ed4fe5b767afd06561f8618d1d7012}{m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+s}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a594596688927700679b18b484a495504}{m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+s}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Intercell solution used to calculated intercell flux}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a5f6f2613083fc30ff684c4183014a67c}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+rho\+\_\+ic}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a45a3cc332ef2fd7fc391a4ae82763f1a}{m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+ic}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a81bfe96b264a5bba316c60965e787cbf}{m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+ic}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a6c0b79ed34cb9be88abdd713eb207295}{m\+\_\+riemann\+\_\+solvers\+::pres\+\_\+ic}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac997c4db6eac9f175803bc4fd81ef096}{m\+\_\+riemann\+\_\+solvers\+::e\+\_\+ic}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a0e605952054968421a3e444c8ba71063}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+ic}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Surface tension pressure contribution}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a2378fe152ecbad0e98558ae177297493}{m\+\_\+riemann\+\_\+solvers\+::dpres\+\_\+we}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abc4d393041248b9e5f72a38f797e4683}{m\+\_\+riemann\+\_\+solvers\+::dpres\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a25a8dae8bbd769f28c67f1747520f373}{m\+\_\+riemann\+\_\+solvers\+::dpres\+\_\+r}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Roe or arithmetic average density, velocity, enthalpy, volume fractions,}\par
+{\em specific heat ratio function, speed of sound, shear and volume Reynolds numbers, Weber numbers and curvatures, at the cell-\/boundaries, computed from the left and the right states of the Riemann problem }\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a09cb56d16d4e4c5300be1ceee6e15acf}{m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+avg}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_a0fd22ed964af8ed09333c72744f561bd}{m\+\_\+riemann\+\_\+solvers\+::vel\+\_\+avg}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_abff32786a11d3a71828b4e30d26773fb}{m\+\_\+riemann\+\_\+solvers\+::h\+\_\+avg}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ac459ed9a3a6c08d8032f3e06ccf96885}{m\+\_\+riemann\+\_\+solvers\+::alpha\+\_\+avg\+\_\+rs\+\_\+vf}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a122bd2abb655fffd36e070fa376c131d}{m\+\_\+riemann\+\_\+solvers\+::gamma\+\_\+avg}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a2739a94dffd4557f28f432f86aff6c45}{m\+\_\+riemann\+\_\+solvers\+::c\+\_\+avg}
+\item 
+type(scalar\+\_\+field), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_ada8ab10b02113187113eed8f49f1ed2d}{m\+\_\+riemann\+\_\+solvers\+::re\+\_\+avg\+\_\+rs\+\_\+vf}
+\item 
+type(scalar\+\_\+field), dimension(\+:,\+:), allocatable \hyperlink{namespacem__riemann__solvers_a298482aa3e595dfe2401920ad841eb8f}{m\+\_\+riemann\+\_\+solvers\+::we\+\_\+avg\+\_\+rs\+\_\+vf}
+\item 
+real(kind(0d0)), dimension(\+:), allocatable \hyperlink{namespacem__riemann__solvers_aa6e6b00985be177b0a4a92f1aed48629}{m\+\_\+riemann\+\_\+solvers\+::kappa\+\_\+avg}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Left, right and star (S) region wave speeds}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a83a70908c66bbb071647bb383dc72975}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac5cbbc98622cdafe56142b26d67ad2d9}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a576586da8d3d80052a335d379001059a}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+s}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Star region variables (H\+L\+LC)}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a6c143ed17587d6f4b1a39e1f49e030e8}{m\+\_\+riemann\+\_\+solvers\+::rho\+\_\+star}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a74301c7719264f4c4ca9ab6318a438cb}{m\+\_\+riemann\+\_\+solvers\+::e\+\_\+star}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ab48bf742ff1449dd3e044ce44cc59a56}{m\+\_\+riemann\+\_\+solvers\+::p\+\_\+star}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ac5dad78660af09505fe587f052afdfd5}{m\+\_\+riemann\+\_\+solvers\+::p\+\_\+k\+\_\+star}
+\end{DoxyCompactItemize}
+\end{Indent}
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a418fedb6a95524db57eeb364db8c5c0c}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+m}
+\begin{DoxyCompactList}\small\item\em Minus (M) and plus (P) wave speeds. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ae941c64575d69a7b369f9f5bb921a384}{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+p}
+\end{DoxyCompactItemize}
+
+\textbf{ }\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a2da04da751b4d4e1e1d8783d80f4ebe1}{m\+\_\+riemann\+\_\+solvers\+::xi\+\_\+m}
+\begin{DoxyCompactList}\small\item\em Minus and plus wave speeds functions. \end{DoxyCompactList}\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a549a425e9a863451e770d405f092417c}{m\+\_\+riemann\+\_\+solvers\+::xi\+\_\+p}
+\end{DoxyCompactItemize}
+
+\begin{Indent}\textbf{ Additional variables for applying a flux limiter}\par
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a7af64bd01982bc9c8e40b9a662d106c5}{m\+\_\+riemann\+\_\+solvers\+::flux\+\_\+lim\+\_\+func}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a61bf6c3eebae289a1826c4acd303ae6e}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+l}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ae880c4216083a3203b42996f2010f080}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+r}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a28e9af865b5ffd2a8cef04c1004b3aea}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+s}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_af7c9f253cc0584146992cc0b1858e888}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a62f6549c30232e14a06efa8dfe7f19a4}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+s\+\_\+p}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a1b9d56d4ae46805db6489e72a09f765b}{m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+s\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aa0a8636a3aef10f1989ce432bd825bf5}{m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+s\+\_\+p}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_adeb97ac789df26b14a090d09fb8598b7}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+xi\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_aad491932ac39e9c830cb24d395a00c3c}{m\+\_\+riemann\+\_\+solvers\+::lo\+\_\+xi\+\_\+p}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_ad13ea7f1ad55e7119a36ca61bb353ded}{m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+xi\+\_\+m}
+\item 
+real(kind(0d0)) \hyperlink{namespacem__riemann__solvers_a5e4f81b0b96e326a19154e0a4b8ae01a}{m\+\_\+riemann\+\_\+solvers\+::tvd\+\_\+xi\+\_\+p}
+\end{DoxyCompactItemize}
+\end{Indent}
+\begin{Indent}\textbf{ Indical bounds in the s1-\/, s2-\/ and s3-\/directions}\par
+\begin{DoxyCompactItemize}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__riemann__solvers_ad7ef4f9e239961cacd291ee2e31bf0be}{m\+\_\+riemann\+\_\+solvers\+::is1}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__riemann__solvers_ad0d94c92ddccee51dc2412707fcab447}{m\+\_\+riemann\+\_\+solvers\+::is2}
+\item 
+type(bounds\+\_\+info) \hyperlink{namespacem__riemann__solvers_a90256be0540e3f9279305be0e9ab32f4}{m\+\_\+riemann\+\_\+solvers\+::is3}
+\end{DoxyCompactItemize}
+\end{Indent}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__riemann__solvers}{m\+\_\+riemann\+\_\+solvers}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}

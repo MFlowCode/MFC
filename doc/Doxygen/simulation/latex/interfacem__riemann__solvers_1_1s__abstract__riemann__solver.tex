@@ -1,0 +1,82 @@
+\hypertarget{interfacem__riemann__solvers_1_1s__abstract__riemann__solver}{}\section{m\+\_\+riemann\+\_\+solvers\+:\+:s\+\_\+abstract\+\_\+riemann\+\_\+solver Interface Reference}
+\label{interfacem__riemann__solvers_1_1s__abstract__riemann__solver}\index{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver@{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver}}
+
+
+Abstract interface to the subroutines that are utilized to compute the Riemann problem solution. For additional information please reference\+: 1) s\+\_\+hll\+\_\+riemann\+\_\+solver 2) s\+\_\+hllc\+\_\+riemann\+\_\+solver 3) s\+\_\+exact\+\_\+riemann\+\_\+solver.  
+
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{interfacem__riemann__solvers_1_1s__abstract__riemann__solver_ab54b3c177b8ba55e930c859cee028f8f}{s\+\_\+abstract\+\_\+riemann\+\_\+solver} (q\+L\+\_\+prim\+\_\+vf, dq\+L\+\_\+prim\+\_\+dx\+\_\+vf, dq\+L\+\_\+prim\+\_\+dy\+\_\+vf, dq\+L\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+L\+\_\+vf, kappa\+L\+\_\+vf, q\+R\+\_\+prim\+\_\+vf, dq\+R\+\_\+prim\+\_\+dx\+\_\+vf, dq\+R\+\_\+prim\+\_\+dy\+\_\+vf, dq\+R\+\_\+prim\+\_\+dz\+\_\+vf, gm\+\_\+alpha\+R\+\_\+vf, kappa\+R\+\_\+vf, q\+\_\+prim\+\_\+vf, flux\+\_\+vf, flux\+\_\+src\+\_\+vf, flux\+\_\+gsrc\+\_\+vf, norm\+\_\+dir, ix, iy, iz)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Abstract interface to the subroutines that are utilized to compute the Riemann problem solution. For additional information please reference\+: 1) s\+\_\+hll\+\_\+riemann\+\_\+solver 2) s\+\_\+hllc\+\_\+riemann\+\_\+solver 3) s\+\_\+exact\+\_\+riemann\+\_\+solver. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em q\+L\+\_\+prim\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em q\+R\+\_\+prim\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the cell-\/average primitive variables \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dx\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dy\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+L\+\_\+prim\+\_\+dz\+\_\+vf} & The left W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dx\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order x-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dy\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order y-\/dir spatial derivatives \\
+\hline
+{\em dq\+R\+\_\+prim\+\_\+dz\+\_\+vf} & The right W\+E\+N\+O-\/reconstructed cell-\/boundary values of the first-\/order z-\/dir spatial derivatives \\
+\hline
+{\em gm\+\_\+alpha\+L\+\_\+vf} & Left averaged gradient magnitude \\
+\hline
+{\em gm\+\_\+alpha\+R\+\_\+vf} & Right averaged gradient magnitude \\
+\hline
+{\em kappa\+L\+\_\+vf} & Left averaged vol. frac. curvatures \\
+\hline
+{\em kappa\+R\+\_\+vf} & Right averaged vol. frac. curvatures \\
+\hline
+{\em flux\+\_\+vf} & Intra-\/cell fluxes \\
+\hline
+{\em flux\+\_\+src\+\_\+vf} & Intra-\/cell fluxes sources \\
+\hline
+{\em flux\+\_\+gsrc\+\_\+vf} & Intra-\/cell geometric fluxes sources \\
+\hline
+{\em norm\+\_\+dir} & Dir. splitting direction \\
+\hline
+{\em ix} & Index bounds in the x-\/dir \\
+\hline
+{\em iy} & Index bounds in the y-\/dir \\
+\hline
+{\em iz} & Index bounds in the z-\/dir \\
+\hline
+{\em q\+\_\+prim\+\_\+vf} & Cell-\/averaged primitive variables \\
+\hline
+\end{DoxyParams}
+
+
+Definition at line 107 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{interfacem__riemann__solvers_1_1s__abstract__riemann__solver_ab54b3c177b8ba55e930c859cee028f8f}\label{interfacem__riemann__solvers_1_1s__abstract__riemann__solver_ab54b3c177b8ba55e930c859cee028f8f}} 
+\index{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver@{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver}!s\+\_\+abstract\+\_\+riemann\+\_\+solver@{s\+\_\+abstract\+\_\+riemann\+\_\+solver}}
+\index{s\+\_\+abstract\+\_\+riemann\+\_\+solver@{s\+\_\+abstract\+\_\+riemann\+\_\+solver}!m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver@{m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver}}
+\subsubsection{\texorpdfstring{s\+\_\+abstract\+\_\+riemann\+\_\+solver()}{s\_abstract\_riemann\_solver()}}
+{\footnotesize\ttfamily subroutine m\+\_\+riemann\+\_\+solvers\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver\+::s\+\_\+abstract\+\_\+riemann\+\_\+solver (\begin{DoxyParamCaption}\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+L\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+L\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+L\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{q\+R\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dx\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dy\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{dq\+R\+\_\+prim\+\_\+dz\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{gm\+\_\+alpha\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(\+:), intent(inout), allocatable}]{kappa\+R\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(in)}]{q\+\_\+prim\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+src\+\_\+vf,  }\item[{type(\hyperlink{structm__derived__types_1_1scalar__field}{scalar\+\_\+field}), dimension(sys\+\_\+size), intent(inout)}]{flux\+\_\+gsrc\+\_\+vf,  }\item[{integer, intent(in)}]{norm\+\_\+dir,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{ix,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iy,  }\item[{type(\hyperlink{structm__derived__types_1_1bounds__info}{bounds\+\_\+info}), intent(in)}]{iz }\end{DoxyParamCaption})}
+
+
+
+Definition at line 121 of file m\+\_\+riemann\+\_\+solvers.\+f90.
+
+
+
+The documentation for this interface was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+\hyperlink{m__riemann__solvers_8f90}{m\+\_\+riemann\+\_\+solvers.\+f90}\end{DoxyCompactItemize}

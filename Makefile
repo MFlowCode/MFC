@@ -1,4 +1,8 @@
-include Makefile.user
+include Makefile.user 
+
+default: all
+
+include installers/Makefile.messages
 
 all: pre_process simulation post_process
 
@@ -11,14 +15,10 @@ ifneq ("$(wildcard $(fftw_include_dir)/fftw3.*)","")
 ifneq ("$(wildcard $(fftw_lib_dir)/libfftw*.la)","")
 	@$(MAKE) -C src/simulation_code -f makefile
 else
-	@echo "==================================="
-	@echo "Error: FFTW library files not found"
-	@echo "==================================="
+	@echo "$$FFTW_LIB_ERR"
 endif
 else
-	@echo "==================================="
-	@echo "Error: FFTW include files not found"
-	@echo "==================================="
+	@echo "$$FFTW_INC_ERR"
 endif
 
 post_process:
@@ -27,17 +27,13 @@ ifneq ("$(wildcard $(silo_include_dir)/silo_*.inc)","")
 ifneq ("$(wildcard $(silo_lib_dir)/libsilo*.*a)","")
 	@$(MAKE) -C src/post_process_code -f makefile
 else
-	@echo "==================================="
-	@echo "Error: Silo library files not found"
-	@echo "==================================="
+	@echo "$$SILO_LIB_ERR"
 endif
 else
-	@echo "==================================="
-	@echo "Error: Silo include files not found"
-	@echo "==================================="
+	@echo "$$SILO_INC_ERR"
 endif
 
-check:
+test:
 	./tests/checks.sh
 
 .PHONY: clean

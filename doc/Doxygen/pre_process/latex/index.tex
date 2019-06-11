@@ -1,0 +1,67 @@
+\hypertarget{index_org}{}\section{Organization\+: Pre\+\_\+process\+\_\+code}\label{index_org}
+Go back to home\+: \begin{DoxyItemize}
+\item Home\+: \mbox{[}link here\mbox{]}\end{DoxyItemize}
+Go to another part of the code\+: \begin{DoxyItemize}
+\item Simulation code\+: \mbox{[}link here\mbox{]} \item Post-\/process code\+: \mbox{[}link here\mbox{]}\end{DoxyItemize}
+\hypertarget{index_intro_sec}{}\section{Introduction}\label{index_intro_sec}
+This is the documentation for the M\+FC. The M\+FC is a simulation software for multi-\/component, multi-\/phase, and bubbly flows. M\+FC was developed at Caltech by a group of post-\/doctoral scientists and graduate research students under the supervision of Tim Colonius. These contributors include\+: \begin{DoxyItemize}
+\item Spencer Bryngelson \item Kevin Schmidmayer \item Vedran Coralic \item Jomela Meng \item Kazuki Maeda\end{DoxyItemize}
+and their contact information is located in the \char`\"{}\+A\+U\+T\+H\+O\+R\+S\char`\"{} file in the source code.\hypertarget{index_install_sec}{}\section{Installation}\label{index_install_sec}
+The documents that describe how to configure and install the M\+FC are located in the source code as \char`\"{}\+C\+O\+N\+F\+I\+G\+U\+R\+E\char`\"{} and \char`\"{}\+I\+N\+S\+T\+A\+L\+L\char`\"{}. They are also described here.\hypertarget{index_step1}{}\subsection{Step 1\+: Configure and ensure dependencies can be located}\label{index_step1}
+\subsection*{Main dependencies\+: M\+PI and Python}
+
+If you do not have Python, it can be installed via Homebrew on O\+SX (\href{https://www.brew.sh}{\tt https\+://www.\+brew.\+sh}) as\+: \begin{DoxyItemize}
+\item brew install python\end{DoxyItemize}
+or compiled via your favorite package manager on Unix systems.
+
+An M\+PI fortran compiler is required for all systems. If you do not have one, Homebrew can take care of this on O\+SX\+: \begin{DoxyItemize}
+\item brew install open-\/mpi\end{DoxyItemize}
+or compiled via another package manager on Unix systems.
+
+\subsection*{Simulation code dependency\+: F\+F\+TW}
+
+If you already have F\+F\+TW compiled\+: \begin{DoxyItemize}
+\item Specify the location of your F\+F\+TW library and include files in Makefile.\+user (fftw\+\_\+lib\+\_\+dir and fftw\+\_\+include\+\_\+dir)\end{DoxyItemize}
+If you do not have F\+F\+TW compiler, the library and installer are included in this package. Just\+: \begin{DoxyItemize}
+\item cd installers \item ./install\+\_\+fftw.sh\end{DoxyItemize}
+\subsection*{Post process code dependency\+: Silo/\+H\+D\+F5}
+
+Post-\/processing of parallel data files is not required, but can indeed be handled with the M\+FC. For this, H\+D\+F5 and Silo must be installed
+
+On O\+SX, a custom Homebrew tap for Silo is included in the installers directory. You can use it via \begin{DoxyItemize}
+\item cd installers \item brew install silo.\+rb\end{DoxyItemize}
+This will install silo and its dependences (including H\+D\+F5) in their usual locations (/usr/local/lib and /usr/local/include)
+
+On Unix systems, you can install via a package manager or from source. On Cent\+OS (also Windows 7), H\+D\+F5 binaries can be found at \href{https://support.hdfgroup.org/ftp/HDF5/current18/bin/}{\tt https\+://support.\+hdfgroup.\+org/ftp/\+H\+D\+F5/current18/bin/} Untar this archive in your intended location via \begin{DoxyItemize}
+\item tar -\/zxf \mbox{[}your H\+D\+F5 archive\mbox{]}\end{DoxyItemize}
+Silo should be downloaded at \href{https://wci.llnl.gov/simulation/computer-codes/silo/downloads}{\tt https\+://wci.\+llnl.\+gov/simulation/computer-\/codes/silo/downloads} then \begin{DoxyItemize}
+\item tar -\/zxf \mbox{[}your Silo archive\mbox{]} \item cd \mbox{[}your Silo archive\mbox{]} \item ./configure --prefix=\mbox{[}target installation directory\mbox{]} --enable-\/pythonmodule --enable-\/optimization --disable-\/hzip --disable-\/fpzip --enableportable-\/binary FC=mpif90 F77=mpif77 -\/with-\/hdf5=\mbox{[}your hdf5 directory\mbox{]}/include,/\mbox{[}your hdf5 directory\mbox{]}/lib --disable-\/silex \item make \item make install\end{DoxyItemize}
+Add the following line to your $\sim$/.bash\+\_\+profile \+: export L\+D\+\_\+\+L\+I\+B\+R\+A\+R\+Y\+\_\+\+P\+A\+TH=\$\+L\+D\+\_\+\+L\+I\+B\+R\+A\+R\+Y\+\_\+\+P\+A\+TH\+:\$\+H\+O\+ME/\mbox{[}your silo directory\mbox{]}/lib\+:/\mbox{[}your hdf5 directory\mbox{]}/lib
+
+Finally\+: \begin{DoxyItemize}
+\item source $\sim$/.bash\+\_\+profile\end{DoxyItemize}
+You will then need to modify silo\+\_\+lib\+\_\+dir and silo\+\_\+include\+\_\+dir in Makefile.\+user to point to your silo directory.\hypertarget{index_step2}{}\subsection{Step 2\+: Install/\+Build}\label{index_step2}
+Once all dependencies have been installed, the M\+FC can be built via \begin{DoxyItemize}
+\item make\end{DoxyItemize}
+from the M\+FC directory. This will build all M\+FC components. Individual components can be built via \begin{DoxyItemize}
+\item make \mbox{[}component\mbox{]}\end{DoxyItemize}
+where \mbox{[}component\mbox{]} is one of \char`\"{}pre\+\_\+process,simulation,post\+\_\+process\char`\"{}.
+
+Once this is completed, you can ensure that the software is working as intended by \begin{DoxyItemize}
+\item make check\end{DoxyItemize}
+\hypertarget{index_step4}{}\subsection{Step 3\+: Making your own cases}\label{index_step4}
+\hypertarget{index_license_sec}{}\section{License}\label{index_license_sec}
+M\+FC is free software\+: you can redistribute it and/or modify it under the terms of the G\+NU General Public License, either version 3 of the License, or any later version. A copy of the G\+NU General Public License is included with the M\+FC, and is also located at \href{http://www.gnu.org/licenses}{\tt http\+://www.\+gnu.\+org/licenses}.
+
+The M\+FC is distributed in the hope that it will be useful, but W\+I\+T\+H\+O\+UT A\+NY W\+A\+R\+R\+A\+N\+TY; without even the implied warranty of M\+E\+R\+C\+H\+A\+N\+T\+A\+B\+I\+L\+I\+TY or F\+I\+T\+N\+E\+SS F\+OR A P\+A\+R\+T\+I\+C\+U\+L\+AR P\+U\+R\+P\+O\+SE. See the G\+NU General Public License for more details.
+
+Copyright 2019 California Institute of Technology\hypertarget{index_documents_sec}{}\section{Useful documents}\label{index_documents_sec}
+\hypertarget{index_user}{}\subsection{User\textquotesingle{}s guide}\label{index_user}
+A user\textquotesingle{}s guide is included here\+:\hypertarget{index_paper}{}\subsection{M\+F\+C paper}\label{index_paper}
+The paper that describes the M\+FC\textquotesingle{}s capabilities is located here\+:\hypertarget{index_pub}{}\subsection{Related publications}\label{index_pub}
+Several publications have used the M\+FC. A partial list is included here.
+
+Refereed journal publications\+: \begin{DoxyItemize}
+\item Meng and Colonius (2018) J\+FM \item Meng and Colonius (2015) Shock waves \item Bryngelson, Schmidmayer, Colonius (2019) I\+J\+MF \item Schmidmayer, Bryngelson, Colonius (2019) under review \item Coralic and Colonius (2014) J\+CP\end{DoxyItemize}
+Ph.\+D. Disserations\+: \begin{DoxyItemize}
+\item K. Maeda (2018) Ph.\+D. thesis, California Institute of Technology \item J. Meng (2016) Ph.\+D. thesis, California Institute of Technology \item V. Coralic (2014) Ph.\+D. thesis, California Institute of Technology \end{DoxyItemize}

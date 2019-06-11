@@ -1,0 +1,62 @@
+\hypertarget{m__bubbles_8f90}{}\section{m\+\_\+bubbles.\+f90 File Reference}
+\label{m__bubbles_8f90}\index{m\+\_\+bubbles.\+f90@{m\+\_\+bubbles.\+f90}}
+
+
+Contains module \hyperlink{namespacem__bubbles}{m\+\_\+bubbles}.  
+
+
+\subsection*{Modules}
+\begin{DoxyCompactItemize}
+\item 
+module \hyperlink{namespacem__bubbles}{m\+\_\+bubbles}
+\begin{DoxyCompactList}\small\item\em This module is used to compute the ensemble-\/averaged bubble dynamic variables. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions/\+Subroutines}
+\begin{DoxyCompactItemize}
+\item 
+subroutine \hyperlink{namespacem__bubbles_af5559af46da9282b9cc64db837958f90}{m\+\_\+bubbles\+::s\+\_\+compute\+\_\+bubble\+\_\+source} (idir, q\+\_\+prim\+\_\+vf, q\+\_\+cons\+\_\+vf, mydivu, bub\+\_\+adv\+\_\+src, bub\+\_\+r\+\_\+src, bub\+\_\+v\+\_\+src, bub\+\_\+p\+\_\+src, bub\+\_\+m\+\_\+src)
+\begin{DoxyCompactList}\small\item\em The purpose of this procedure is to compute the source terms that are needed for the bubble modeling. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_acfe552b68c999e11b895e5cfca6a8786}{m\+\_\+bubbles\+::f\+\_\+cpbw} (f\+R0, fR, fV, fgamma\+\_\+gas, fpb)
+\begin{DoxyCompactList}\small\item\em Function that computes that bubble wall pressure for Gilmore bubbles. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_a8f3891f06e63f4c4ee3d749f68bfabd8}{m\+\_\+bubbles\+::f\+\_\+h} (f\+Cpbw, f\+Cpinf, fntait, f\+Btait)
+\begin{DoxyCompactList}\small\item\em Function that computes the bubble enthalpy. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_a5c730e118a27d95c21388bcc2189cc76}{m\+\_\+bubbles\+::f\+\_\+cgas} (f\+Cpinf, fntait, f\+Btait, fH)
+\begin{DoxyCompactList}\small\item\em Function that computes the sound speed for the bubble. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_aa55a0894ed331f2e462b83b8df1d265b}{m\+\_\+bubbles\+::f\+\_\+cpinfdot} (f\+Rho, fP, falf, fntait, f\+Btait, advsrc, divu)
+\begin{DoxyCompactList}\small\item\em Function that computes the time derivative of the driving pressure. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_aa7656a8db7cafecfff27383756eacce7}{m\+\_\+bubbles\+::f\+\_\+hdot} (f\+Cpbw, f\+Cpinf, f\+Cpinf\+\_\+dot, fntait, f\+Btait, fgamma\+\_\+gas, fR, fV, f\+R0, fpbdot)
+\begin{DoxyCompactList}\small\item\em Function that computes the time derivative of the enthalpy. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_a1795309127be53d799a3374ba984498c}{m\+\_\+bubbles\+::f\+\_\+rddot} (f\+Cpbw, fR, fV, fH, f\+Hdot, fcgas, fntait, f\+Btait)
+\begin{DoxyCompactList}\small\item\em Function that computes the bubble radial acceleration. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_a3af121d17dd214c10e2ea5881e124e28}{m\+\_\+bubbles\+::f\+\_\+cpbw\+\_\+km} (f\+R0, fR, fV, fgamma\+\_\+gas, fpb)
+\begin{DoxyCompactList}\small\item\em Function that computes the bubble wall pressure for Keller--Miksis bubbles. \end{DoxyCompactList}\item 
+real(kind(0d0)) function \hyperlink{namespacem__bubbles_a0d72f8fddc9e7423b723b71bd792463e}{m\+\_\+bubbles\+::f\+\_\+rddot\+\_\+km} (fpbdot, fgamma\+\_\+gas, f\+Cp, f\+Cpbw, f\+Rho, fR, fV, f\+R0, fC)
+\begin{DoxyCompactList}\small\item\em Function that computes the bubble radial acceleration for Keller--Miksis bubbles. \end{DoxyCompactList}\item 
+subroutine \hyperlink{namespacem__bubbles_a784afc585b20a8450d23867931c0b5fc}{m\+\_\+bubbles\+::s\+\_\+bwproperty} (pb, i\+R0)
+\begin{DoxyCompactList}\small\item\em Subroutine that computes bubble wall properties for vapor bubbles. \end{DoxyCompactList}\item 
+real(kind(0.d0)) function \hyperlink{namespacem__bubbles_ac487d49429a9af0456e14bedbadd0ef0}{m\+\_\+bubbles\+::f\+\_\+vflux} (fR, fV, fmass\+\_\+v, i\+R0)
+\begin{DoxyCompactList}\small\item\em Function that computes the vapour flux. \end{DoxyCompactList}\item 
+real(kind(0.d0)) function \hyperlink{namespacem__bubbles_a8d0c865e6ff2c884cb6b4147d7b58491}{m\+\_\+bubbles\+::f\+\_\+bpres\+\_\+dot} (fvflux, fR, fV, fpb, fmass\+\_\+v, i\+R0)
+\begin{DoxyCompactList}\small\item\em Function that computes the time derivative of the internal bubble pressure. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+real(kind(0.d0)) \hyperlink{namespacem__bubbles_afaab8f73b4f1cc413ad9ee2c2d32512a}{m\+\_\+bubbles\+::chi\+\_\+vw}
+\begin{DoxyCompactList}\small\item\em Bubble wall properties (Ando 2010) \end{DoxyCompactList}\item 
+real(kind(0.d0)) \hyperlink{namespacem__bubbles_a1ffd14079710afb89dad86916cbb91fc}{m\+\_\+bubbles\+::k\+\_\+mw}
+\begin{DoxyCompactList}\small\item\em Bubble wall properties (Ando 2010) \end{DoxyCompactList}\item 
+real(kind(0.d0)) \hyperlink{namespacem__bubbles_adeca2bd43645a6f7bcd59c88151eb3bc}{m\+\_\+bubbles\+::rho\+\_\+mw}
+\begin{DoxyCompactList}\small\item\em Bubble wall properties (Ando 2010) \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Contains module \hyperlink{namespacem__bubbles}{m\+\_\+bubbles}. 
+
+\begin{DoxyAuthor}{Author}
+S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius 
+\end{DoxyAuthor}
+\begin{DoxyVersion}{Version}
+1.\+0 
+\end{DoxyVersion}
+\begin{DoxyDate}{Date}
+J\+U\+NE 06 2019 
+\end{DoxyDate}
