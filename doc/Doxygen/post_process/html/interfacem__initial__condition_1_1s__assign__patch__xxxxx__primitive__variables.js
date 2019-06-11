@@ -1,4 +1,0 @@
-var interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables =
-[
-    [ "s_assign_patch_xxxxx_primitive_variables", "interfacem__initial__condition_1_1s__assign__patch__xxxxx__primitive__variables.html#ac27723d90d114627926a6d04b00b42f3", null ]
-];
