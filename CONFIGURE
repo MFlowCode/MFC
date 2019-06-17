@@ -32,7 +32,7 @@ installer are included in this package. Just:
 
 On OSX, a custom tap for Silo is included in the installers
 directory. You can use it via
-    $$ cd installers
+    $$ cd lib
     $$ brew install silo.rb
 This will install silo and its dependences (including HDF5)
 in their usual locations (/usr/local/lib and 
