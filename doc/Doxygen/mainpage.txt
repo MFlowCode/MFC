@@ -1,0 +1,9 @@
+/*! \mainpage MFC documentation
+ *
+ * \arg <a href="https://mfc-caltech.github.io/index.html">Home page</a> 
+ *
+ * \arg <a href="https://mfc-caltech.github.io/pre_process/index.html">Pre_process</a> 
+ * \arg <a href="https://mfc-caltech.github.io/simulation/index.html">Simulation</a> 
+ * \arg <a href="https://mfc-caltech.github.io/post_process/index.html">Post_process</a> 
+ *
+*/

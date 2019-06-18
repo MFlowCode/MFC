@@ -1,11 +1,11 @@
 /*! \mainpage MFC documentation
- * \section Organization
- * This software consists of three main, though separate components.
- * The Doxygen documentation for these components are located at
- * the following locations:
- * \arg Pre-process code: [link here]
- * \arg Simulation code: [link here]
- * \arg Post-process code: [link here]
+ *
+ * \section org Organization
+ *
+ * The following codes are documented, please follow the links to see their Doxygen:
+ * \arg <a href="https://mfc-caltech.github.io/pre_process/index.html">Pre_process</a> 
+ * \arg <a href="https://mfc-caltech.github.io/simulation/index.html">Simulation</a> 
+ * \arg <a href="https://mfc-caltech.github.io/post_process/index.html">Post_process</a> 
  *
  * \section intro_sec Introduction
  *
@@ -108,13 +108,7 @@
  *
  * Once this is completed, you can ensure that the software is working
  * as intended by
- * 	\arg make check
- *
- *
- * \subsection step4 Step 3: Making your own cases
- *
- *
- *
+ * 	\arg make test
  *
  *
  * \section license_sec License
