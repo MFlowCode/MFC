@@ -7,10 +7,10 @@ FC = mpif90
 #FC = mpiifort
    
 ### Compiler flags [set according to your compiler] ### 
-#Note: Requires -cpp to enable preprocessor
+#Note: Requires -cpp to enable preprocessor 
 
 FFLAGS = -cpp -c -w 
-#-O3
+#NOTE: Cray compilers require: -eZ
 
 ######### FFTW library and include locations #########
 ######### Set these to the location of FFTW  #########

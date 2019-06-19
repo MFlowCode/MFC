@@ -13,13 +13,13 @@
  * The MFC is a simulation software for multi-component, multi-phase,
  * and bubbly flows. MFC was developed at Caltech by a group
  * of post-doctoral scientists and graduate research students
- * under the supervision of Tim Colonius. These contributors 
+ * under the supervision of Professor Tim Colonius. These contributors 
  * include:
- * \arg Spencer Bryngelson
- * \arg Kevin Schmidmayer
- * \arg Vedran Coralic
- * \arg Jomela Meng
- * \arg Kazuki Maeda
+ * \arg Dr. Spencer Bryngelson
+ * \arg Dr. Kevin Schmidmayer
+ * \arg Dr. Vedran Coralic
+ * \arg Dr. Jomela Meng
+ * \arg Dr. Kazuki Maeda
  *
  * and their contact information is located in the "AUTHORS" file in the source code.
  *
@@ -33,7 +33,7 @@
  *
  * ## Main dependencies: MPI and Python ##
  * If you do not have Python, it can be installed via
- * Homebrew on OSX (https://www.brew.sh) as:
+ * Homebrew on OSX (https://brew.sh/) as:
  *   \arg brew install python
  *
  * or compiled via your favorite package manager on Unix systems.
@@ -137,18 +137,46 @@
  * 
  * \subsection pub Related publications
  *
- * Several publications have used the MFC. A partial list is included here.
+ * Several publications have used the MFC in various stages of its 
+ * development. A partial list is included here.
  *
  * Refereed journal publications:
- * \arg Meng and Colonius (2018) JFM
- * \arg Meng and Colonius (2015) Shock waves
- * \arg Bryngelson, Schmidmayer, Colonius (2019) IJMF 
- * \arg Schmidmayer, Bryngelson, Colonius (2019) under review
- * \arg Coralic and Colonius (2014) JCP
+ * \arg <a href="https://arxiv.org/pdf/1903.08242.pdf">
+        K. Schmidmayer, S. H. Bryngelson, T. Colonius (2019) under review, arXiv: 1903.08242
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/BryngelsonSchmidmayerColonius2019.pdf">
+        S. H. Bryngelson, K. Schmidmayer, T. Colonius (2019) International Journal of Multiphase Flow, Vol. 115, pp. 137-143  
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/MaedaColonius2019.pdf">
+        K. Maeda and T. Colonius (2019) Journal of Fluid Mechanics, Vol. 862, pp. 1105-1134 
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/MaedaColonius2018c.pdf">
+        K. Maeda and T. Colonius (2018) Journal of Computational Physics, Vol. 371, pp. 994-1017 
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/MengColonius2018.pdf">
+        J. C. Meng and T. Colonius (2018) Journal of Fluid Mechanics,  Vol. 835, pp. 1108-1135 
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/MaedaColonius2017.pdf">
+        K. Maeda and T. Colonius (2017) Wave Motion, Vol. 75, pp. 36-49 
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/MengColonius2015.pdf">
+        J. C. Meng and T. Colonius (2015) Shock Waves, Vol. 25(4), pp. 399-414 
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/CoralicColonius2014.pdf">
+        V. Coralic and T. Colonius (2014) Journal of Computational Physics, Vol. 274, pp. 95-121 
+        </a>
+ * \arg <a href="http://colonius.caltech.edu/pdfs/CoralicColonius2013.pdf">
+        V. Coralic and T. Colonius (2013) European Journal of Mechanics B-Fluids, Vol. 40, pp. 64-74 
+        </a>
  *
  * Ph.D. Disserations:
- * \arg K. Maeda (2018) Ph.D. thesis, California Institute of Technology 
- * \arg J. Meng (2016) Ph.D. thesis, California Institute of Technology
- * \arg V. Coralic (2014) Ph.D. thesis, California Institute of Technology
- *
+ * \arg <a href="https://thesis.library.caltech.edu/11007/">
+        K. Maeda (2018) Ph.D. thesis, California Institute of Technology 
+        </a>
+ * \arg <a href="https://thesis.library.caltech.edu/9764/">
+        J. Meng (2016) Ph.D. thesis, California Institute of Technology
+        </a>
+ * \arg <a href="https://thesis.library.caltech.edu/8758/">
+        V. Coralic (2014) Ph.D. thesis, California Institute of Technology
+        </a>
 */
