@@ -8,7 +8,7 @@ src/simulation_code/simulation
 src/post_process_code/post_process
 src/master_scripts/*.pyc
 src/master_scripts/__*
-remake_doc.sh
+make_doc.sh
 cases/
 .DS_Store
 tests/*/D/*
