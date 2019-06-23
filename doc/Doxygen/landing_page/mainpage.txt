@@ -179,4 +179,18 @@
  * \arg <a href="https://thesis.library.caltech.edu/8758/">
         V. Coralic (2014) Ph.D. thesis, California Institute of Technology
         </a>
+
+ *
+ *
+ * \section Acknowledgements
+ *
+ * The development of the MFC  was supported in part by multiple past grants from the US Office of 
+Naval Research (ONR), the US National Institute of 
+Health (NIH), and the US National Science Foundation (NSF), as well as current ONR grant numbers 
+N0014-17-1-2676 and N0014-18-1-2625 and NIH grant number 2P01-DK043881.
+The computations presented here utilized the Extreme Science
+and Engineering Discovery Environment, which is supported under NSF
+grant number CTS120005.
+K.M. acknowledges support from the Funai Foundation
+for Information Technology via the Overseas Scholarship.
 */
