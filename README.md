@@ -6,7 +6,7 @@
 * <a href="https://mfc-caltech.github.io/post_process/index.html">Post_process</a>
     
 # Authors
- 
+
   This is the documentation for the MFC.
   The MFC is a simulation software for multi-component, multi-phase,
   and bubbly flows. MFC was developed at Caltech by a group
@@ -31,7 +31,7 @@
  
 ### Main dependencies: MPI and Python 
   If you do not have Python, it can be installed via
-  Homebrew on OSX (https://brew.sh/) as:  
+  <a href="https://brew.sh/">Homebrew on OSX</a> as:  
 `brew install python`
  
   or compiled via your favorite package manager on Unix systems.
@@ -73,13 +73,13 @@ If you do not have FFTW compiler, the library and
  
   On Unix systems, you can install via a package manager or
   from source. On CentOS (also Windows 7), HDF5
-  binaries can be found at
-      https://support.hdfgroup.org/ftp/HDF5/current18/bin/
+  binaries can be found <a href="https://support.hdfgroup.org/ftp/HDF5/current18/bin/">here.</a>
+  
   Untar this archive in your intended location via  
 `tar -zxf [your HDF5 archive]`  
   
-  Silo should be downloaded at
-      https://wci.llnl.gov/simulation/computer-codes/silo/downloads
+  Silo should be downloaded 
+  <a href="https://wci.llnl.gov/simulation/computer-codes/silo/downloads">here,</a>
   then  
 `tar -zxf [your Silo archive]`  
 `cd [your Silo archive]`  
@@ -118,7 +118,7 @@ If you do not have FFTW compiler, the library and
   the terms of the GNU General Public License, either version 3 
   of the License, or any later version. 
   A copy of the GNU General Public License is included with the MFC, and is
-  also located at http://www.gnu.org/licenses.
+  also located at <a href="http://www.gnu.org/licenses">http://www.gnu.org/licenses</a>.
  
   The MFC is distributed in the hope that it will be useful, 
   but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
@@ -166,6 +166,7 @@ If you do not have FFTW compiler, the library and
 * <a href="http://colonius.caltech.edu/pdfs/CoralicColonius2014.pdf">
         V. Coralic and T. Colonius (2014) Journal of Computational Physics, Vol. 274, pp. 95-121 
         </a>
+ 
  
 Ph.D. Disserations:
 * <a href="https://thesis.library.caltech.edu/11007/">
