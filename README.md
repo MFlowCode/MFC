@@ -166,10 +166,6 @@ If you do not have FFTW compiler, the library and
 * <a href="http://colonius.caltech.edu/pdfs/CoralicColonius2014.pdf">
         V. Coralic and T. Colonius (2014) Journal of Computational Physics, Vol. 274, pp. 95-121 
         </a>
-* <a href="http://colonius.caltech.edu/pdfs/CoralicColonius2013.pdf">
-        V. Coralic and T. Colonius (2013) European Journal of Mechanics B-Fluids, Vol. 40, pp. 64-74 
-        </a>
- 
  
 Ph.D. Disserations:
 * <a href="https://thesis.library.caltech.edu/11007/">
