@@ -145,7 +145,7 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported choice for the value of '         // &
                              'case_dir. Exiting ...'
                 CALL s_mpi_abort()
-                
+             
             ! Constraints on dimensionality and the number of cells for the grid
             ELSEIF(m <= 0) THEN
                 PRINT '(A)', 'Unsupported choice for the value of m. '      // &
@@ -426,7 +426,11 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported choice for the value of format. ' // &
                              'Exiting ...'
                 CALL s_mpi_abort()
-                
+            ELSEIF( (precision /= 2) .AND. (parallel_io .NEQV. .FALSE.) ) THEN
+                PRINT '(A)', 'Unsupported combination of precision and parallel IO. '         // &
+                             'Please use precision == 2 when enabling parallel_io.  Exiting ...'
+                CALL s_mpi_abort()
+
             ! Constraints on the precision of the formatted database file(s)
             ELSEIF(precision /= 1 .AND. precision /= 2) THEN
                 PRINT '(A)', 'Unsupported choice for the value of '         // &
