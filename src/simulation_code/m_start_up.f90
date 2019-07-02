@@ -271,6 +271,12 @@ MODULE m_start_up
             ELSEIF( bubbles .AND. (adv_alphan .NEQV. .TRUE.) ) THEN
                 PRINT '(A)', 'Bubble modeling requires adv_alphan'
                 CALL s_mpi_abort()
+            ELSEIF( (bubbles  .NEQV. .TRUE.) .AND. polydisperse ) THEN
+                PRINT '(A)', 'Polydisperse bubble modeling requires the bubble switch to be activated'
+                CALL s_mpi_abort()
+            ELSEIF( polydisperse .and. (poly_sigma == dflt_real) ) THEN
+                PRINT '(A)', 'Polydisperse bubble modeling requires poly_sigma > 0'
+                CALL s_mpi_abort()
             ELSEIF(model_eqns == 3 .AND. riemann_solver /= 2) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
                              'model_eqns (6-eq) and riemann_solver (please use riemann_solver = 2). '  // &

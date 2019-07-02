@@ -2198,8 +2198,7 @@ MODULE m_data_output
                 IF (proc_rank == 0) THEN
                     IF (n == 0) THEN
                         IF (bubbles .AND. (num_fluids <= 2)) THEN
-                            WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // &
-                                           'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
+                            WRITE(i+30,'(6x,f12.6,10f24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
