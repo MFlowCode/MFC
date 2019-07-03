@@ -21,7 +21,7 @@ mfc_dir = '../../src'; path[:0] = [mfc_dir + '/master_scripts']
 from m_python_proxy import f_execute_mfc_component
 
 # Serial or parallel computational engine
-engine = 'parallel'
+engine = 'serial'
 # ==============================================================================
 
 
@@ -37,7 +37,7 @@ case_dict =                                                                    \
                     'case_dir'                     : '\'.\'',                  \
                     'run_time_info'                : 'T',                      \
                     'nodes'                        : 1,                        \
-                    'ppn'                          : 24,                       \
+                    'ppn'                          : 1,                       \
                     'queue'                        : 'normal',                   \
                     'walltime'                     : '120:00:00',              \
                     'mail_list'                    : '',                       \
@@ -66,10 +66,10 @@ case_dict =                                                                    \
                     'm'                            : 99,                       \
                     'n'                            : 99,                       \
                     'p'                            : 99,                       \
-                    'dt'                           : 1.5E-09/1.E-03,           \
+                    'dt'                           : 0.2E-09/1.E-03,           \
                     't_step_start'                 : 0,                        \
                     't_step_stop'                  : 133300,                   \
-                    't_step_save'                  : 100,                      \
+                    't_step_save'                  : 1,                      \
 		    # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
@@ -90,20 +90,11 @@ case_dict =                                                                    \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'F',                      \
                     'weno_avg'                     : 'F',                      \
-                    'weno_Re_flux'                 : 'F',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'commute_err'                  : 'F',                      \
                     'split_err'                    : 'F',                      \
-                    'regularization'               : 'F',                      \
                     'reg_eps'                      : 1.E+00,                   \
-                    'anti_diffusion'               : 'F',                      \
-                    'We_riemann_flux'              : 'F',                      \
-                    'We_rhs_flux'                  : 'F',                      \
-                    'We_src'                       : 'F',                      \
-                    'We_wave_speeds'               : 'F',                      \
-                    'lsq_deriv'                    : 'F',                      \
-                    'alt_crv'                      : 'F',                      \
                     'bc_x%beg'                     : -2,                       \
                     'bc_x%end'                     : -6,                       \
                     'bc_y%beg'                     : -2,                       \

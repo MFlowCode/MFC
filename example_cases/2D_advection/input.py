@@ -53,7 +53,7 @@ case_dict =                                                                    \
                     'dt'                           : 5.E-07,                   \
                     't_step_start'                 : 0,                        \
                     't_step_stop'                  : 1000,                     \
-                    't_step_save'                  : 1000,                     \
+                    't_step_save'                  : 100,                     \
 		    # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
@@ -102,9 +102,9 @@ case_dict =                                                                    \
                     'patch_icpp(1)%vel(2)'         : 100.E+00,                 \
                     'patch_icpp(1)%pres'           : 1.E+05,                   \
                     'patch_icpp(1)%alpha_rho(1)'   : 1000.E+00,                \
-                    'patch_icpp(1)%alpha_rho(2)'   : 0.E+00,                   \
-                    'patch_icpp(1)%alpha(1)'       : 1.E+00,                   \
-                    'patch_icpp(1)%alpha(2)'       : 0.E+00,                   \
+                    'patch_icpp(1)%alpha_rho(2)'   : 1.,                   \
+                    'patch_icpp(1)%alpha(1)'       : 1.E-12,                   \
+                    'patch_icpp(1)%alpha(2)'       : 1. - 1.E-12,                   \
                     # ==========================================================
 
                     # Patch 2: Density to transport ============================
@@ -119,10 +119,10 @@ case_dict =                                                                    \
                     'patch_icpp(2)%vel(1)'         : 100.E+00,                 \
                     'patch_icpp(2)%vel(2)'         : 100.E+00,                 \
                     'patch_icpp(2)%pres'           : 1.E+05,                   \
-                    'patch_icpp(2)%alpha_rho(1)'   : 0.E+00,                   \
-                    'patch_icpp(2)%alpha_rho(2)'   : 1.E+00,                   \
-                    'patch_icpp(2)%alpha(1)'       : 0.E+00,                   \
-                    'patch_icpp(2)%alpha(2)'       : 1.E+00,                   \
+                    'patch_icpp(2)%alpha_rho(1)'   : 1.,                   \
+                    'patch_icpp(2)%alpha_rho(2)'   : 1.0,                   \
+                    'patch_icpp(2)%alpha(1)'       : 0,                   \
+                    'patch_icpp(2)%alpha(2)'       : 1.,                   \
                     # ==========================================================
  
 		    # Fluids Physical Parameters ===============================

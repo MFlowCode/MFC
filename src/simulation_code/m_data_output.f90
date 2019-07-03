@@ -490,7 +490,6 @@ MODULE m_data_output
                             c = c + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
                                 (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
                         END DO
-                        c = c/rho
                      ELSE
                          DO i = 1, crv_size
                              alpha(crv_idx(i))= q_prim_vf(E_idx+crv_idx(i))%sf(j,k,l)
@@ -813,17 +812,17 @@ MODULE m_data_output
             ELSE
                 FMT="(2F40.14)"
             END IF
-            
+
+            ! writting an output directory
+            WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
+            file_path = TRIM(t_step_dir) // '/.'
+        
+            INQUIRE( FILE = TRIM(file_path), EXIST = file_exist       )
+        
+            IF(.NOT.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+
             !1D
             IF (n==0 .AND. p==0) THEN
-
-                ! writting an output directory
-                WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
-                file_path = TRIM(t_step_dir) // '/.'
-            
-                INQUIRE( FILE = TRIM(file_path), EXIST = file_exist       )
-            
-                IF(.NOT.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
                 IF (model_eqns==2) THEN
                     DO i = 1, sys_size
@@ -892,75 +891,14 @@ MODULE m_data_output
                 END DO
             END IF
 
-
-            !2D
-            IF (n > 0 .AND. p ==0) THEN
-                WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/D'
-                file_path = TRIM(t_step_dir) // '/.'
-            
-                INQUIRE( FILE      = TRIM(file_path), EXIST     = file_exist       )
-            
-                IF(.NOT.file_exist) CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
-
-
-                DO i = 1, sys_size
-                    IF (model_eqns==2) THEN
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
-                        OPEN(2,FILE=TRIM(file_path) )
-                            DO j=0,m; DO k=0,n
-                                CALL s_convert_to_mixture_variables( q_cons_vf, rho, gamma, pi_inf, Re, We, j,k,0)
-                                lit_gamma = 1d0/gamma + 1d0
-                                
-                                IF (i==1 .OR. i==5) THEN 
-                                    WRITE(2,FMT) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
-                                ELSE IF (i==2 .OR. i==3) THEN !u
-                                    WRITE(2,FMT) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)/rho
-                                ELSE IF (i==4) THEN !p
-                                    IF (model_eqns == 4) THEN
-                                        WRITE(2,FMT) x_cb(j),y_cb(k), &
-                                            (pref+fluid_pp(1)%pi_inf) *                     &
-                                            ((                                               & 
-                                            q_cons_vf(1)%sf(j,k,0)/                          &
-                                            (rhoref*(1.-q_cons_vf(4)%sf(j,k,0)))             & 
-                                            ) ** (1./fluid_pp(1)%gamma + 1.)) - fluid_pp(1)%pi_inf
-                                    ELSE IF (model_eqns == 2 .AND. (bubbles .NEQV. .TRUE.)) THEN
-                                        !Stiffened gas pressure from energy
-                                        WRITE(2,FMT) x_cb(j),y_cb(k), &
-                                            (                                       & 
-                                            q_cons_vf(E_idx)%sf(j,k,0)  -            &
-                                            0.5d0*(q_cons_vf(2)%sf(j,k,0)**2.d0)/rho - &
-                                            pi_inf &
-                                            ) / gamma
-                                    ELSE
-                                        !Stiffened gas pressure from energy with bubbles
-                                        WRITE(2,FMT) x_cb(j),y_cb(k), &
-                                            (                                       & 
-                                            (q_cons_vf(E_idx)%sf(j,k,0)  -            &
-                                            0.5d0*( q_cons_vf(2)%sf(j,k,0)**2.d0 + q_cons_vf(3)%sf(j,k,0)**2.d0 ) &
-                                            / rho) / &
-                                            (1.d0 - q_cons_vf(alf_idx)%sf(j,k,0)) - &
-                                            pi_inf &
-                                            ) / gamma
-                                    END IF
-                                ELSE IF ( (i .GT. alf_idx) .AND. bubbles) THEN
-                                    DO l = 1,nb
-                                        nRtmp(l) = q_cons_vf(bub_idx%rs(l))%sf(j,k,0)
-                                    END DO
-                                    CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,0), nRtmp, nbub)  
-                                    
-                                    WRITE(2,FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j,k,0)/nbub
-                               END IF
-                            END DO
-                            WRITE(2,*)
-                            END DO
-                        CLOSE(2)
-                    END IF
-
-                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+            ! 2D
+            IF ( (n>0) .AND. (p==0) ) THEN
+                DO i = 1,sys_size
+        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
                         DO k=0,n
-                            WRITE(2,FMT) x_cb(j),y_cb(k),q_cons_vf(i)%sf(j,k,0)
+                            WRITE(2,FMT) x_cb(j),y_cb(k), q_cons_vf(i)%sf(j,k,0)
                         END DO
                         WRITE(2,*)
                         END DO
@@ -971,7 +909,7 @@ MODULE m_data_output
             ! 3D
             IF ( p > 0) THEN
                 DO i = 1,sys_size
-                    WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
                         DO k=0,n
@@ -987,8 +925,6 @@ MODULE m_data_output
             END IF
 
         END SUBROUTINE s_write_serial_data_files ! ------------------------------------
-        
-        
         
         
         SUBROUTINE s_remove_capillary_potential_energy(v_vf)
