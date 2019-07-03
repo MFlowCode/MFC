@@ -7,7 +7,7 @@
     
 # Authors
 
-  This is the documentation for the MFC.
+  This is the documentation for the MFC (Multi-component Flow Code).
   The MFC is a simulation software for multi-component, multi-phase,
   and bubbly flows. MFC was developed at Caltech by a group
   of post-doctoral scientists and graduate research students
