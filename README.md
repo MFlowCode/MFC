@@ -169,6 +169,9 @@ If you do not have FFTW compiler, the library and
  
  
 Ph.D. Disserations:
+* <a href="https://thesis.library.caltech.edu/11395/">
+        J.-C. Veilleux (2019) Ph.D. thesis, California Institute of Technology 
+        </a>
 * <a href="https://thesis.library.caltech.edu/11007/">
         K. Maeda (2018) Ph.D. thesis, California Institute of Technology 
         </a>
