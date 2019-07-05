@@ -1450,7 +1450,7 @@ MODULE m_initial_condition
                         
                         CALL s_assign_patch_primitive_variables(patch_id, i,j,0)
 
-                        IF ( (q_prim_vf(1)%sf(i,j,0) < 1.e-10) .AND. (model_eqns .NE. 4)) THEN
+                        IF ( (q_prim_vf(1)%sf(i,j,0) < 1.e-10) .AND. (model_eqns == 4)) THEN
                             !zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i,j,0) = &
                                 (((q_prim_vf(E_idx)%sf(i,j,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
