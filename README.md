@@ -1,3 +1,8 @@
+# Multi-component Flow Code (MFC)
+
+Welcome to the MFC! The MFC is a fully-documented parallel simulation software
+for multi-component, multi-phase, and bubbly flows.
+
 # Documentation
  
   The following codes are documented, please follow the links to see their Doxygen:
@@ -7,9 +12,7 @@
     
 # Authors
 
-  This is the documentation for the MFC (Multi-component Flow Code).
-  The MFC is a simulation software for multi-component, multi-phase,
-  and bubbly flows. MFC was developed at Caltech by a group
+  MFC was developed at Caltech by a group
   of post-doctoral scientists and graduate research students
   under the supervision of Professor Tim Colonius. These contributors 
   include:
