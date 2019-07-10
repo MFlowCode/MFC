@@ -3,13 +3,6 @@
 Welcome to the MFC! The MFC is a fully-documented parallel simulation software
 for multi-component, multi-phase, and bubbly flows.
 
-# Documentation
- 
-  The following codes are documented, please follow the links to see their Doxygen:
-* <a href="https://mfc-caltech.github.io/pre_process/namespaces.html">Pre_process</a> 
-* <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
-* <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
-    
 # Authors
 
   MFC was developed at Caltech by a group
@@ -114,20 +107,12 @@ If you do not have FFTW compiler, the library and
   as intended by  
 `make test`  
  
+# Documentation
  
-# License
- 
-  MFC is free software: you can redistribute it and/or modify it under 
-  the terms of the GNU General Public License, either version 3 
-  of the License, or any later version. 
-  A copy of the GNU General Public License is included with the MFC, and is
-  also located at <a href="http://www.gnu.org/licenses">http://www.gnu.org/licenses</a>.
- 
-  The MFC is distributed in the hope that it will be useful, 
-  but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
-  FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- 
-  Copyright 2019 California Institute of Technology
+  The following codes are documented, please follow the links to see their Doxygen:
+* <a href="https://mfc-caltech.github.io/pre_process/namespaces.html">Pre_process</a> 
+* <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
+* <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
  
 # Useful documents
   
@@ -184,6 +169,20 @@ Ph.D. Disserations:
 * <a href="https://thesis.library.caltech.edu/8758/">
         V. Coralic (2014) Ph.D. thesis, California Institute of Technology
         </a>
+
+# License
+ 
+  MFC is free software: you can redistribute it and/or modify it under 
+  the terms of the GNU General Public License, either version 3 
+  of the License, or any later version. 
+  A copy of the GNU General Public License is included with the MFC, and is
+  also located at <a href="http://www.gnu.org/licenses">http://www.gnu.org/licenses</a>.
+ 
+  The MFC is distributed in the hope that it will be useful, 
+  but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+  FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ 
+  Copyright 2019 California Institute of Technology
 
 # Acknowledgements
  
