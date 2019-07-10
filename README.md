@@ -114,8 +114,6 @@ If you do not have FFTW compiler, the library and
 * <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
 * <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
  
-# Useful documents
-  
 ## User's guide
  
   A user's guide is included here:
