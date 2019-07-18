@@ -106,7 +106,31 @@ If you do not have FFTW compiler, the library and
   Once this is completed, you can ensure that the software is working
   as intended by  
 `make test`  
- 
+
+# Running
+
+The MFC can be run by changing into
+a case directory and executing the appropriate Python input file.
+Example Python input files can be found in the 
+`example_cases` directories, and they are called `input.py`.
+Their contents, and a guide to filling them out, are documented
+in the user manual. A commented, tutorial script
+can also be found in `example_cases/3d_sphbubcollapse`.
+MFC can be executed as
+`python pre_process`
+
+which will generate the restart and grid files that will be read 
+by the simulation code. Then
+`python simulation`
+
+will execute the flow solver. The last (optional) step
+is to post treat the data files and output HDF5 databases
+for the flow variables via
+`python post_process`
+
+Note that the post-processing step 
+requires installation of Silo and HDF5.
+
 # Documentation
  
   The following codes are documented, please follow the links to see their Doxygen:
