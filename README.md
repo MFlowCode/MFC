@@ -116,16 +116,16 @@ Example Python input files can be found in the
 Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
 can also be found in `example_cases/3d_sphbubcollapse`.
-MFC can be executed as
+MFC can be executed as  
 `python pre_process`
 
 which will generate the restart and grid files that will be read 
-by the simulation code. Then
+by the simulation code. Then  
 `python simulation`
 
 will execute the flow solver. The last (optional) step
 is to post treat the data files and output HDF5 databases
-for the flow variables via
+for the flow variables via  
 `python post_process`
 
 Note that the post-processing step 
