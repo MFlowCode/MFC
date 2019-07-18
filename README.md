@@ -94,7 +94,7 @@ If you do not have FFTW compiler, the library and
  
 ## Step 2: Build and test
  
-  Once all dependencies have been installed, the MFC can be built via
+  Once all dependencies have been installed, the MFC can be built via  
 `make`
  
   from the MFC directory. This will build all MFC components. Individual
@@ -138,13 +138,17 @@ requires installation of Silo and HDF5.
 * <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
 * <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
  
+
 ## User's guide
  
-  A user's guide is included here:
+  A user's guide is included 
+  <a href="https://github.com/ComputationalFlowPhysics/MFC-Caltech/raw/master/doc/MFC_user_guide.pdf">here.</a>
  
 ## MFC paper
  
-  The paper that describes the MFC's capabilities is located here:
+  The paper that describes the MFC's capabilities is located
+  <a href="https://github.com/ComputationalFlowPhysics/MFC-Caltech/raw/master/doc/MFC_paper.pdf">here.</a>
+  
   
 ## Related publications
  
