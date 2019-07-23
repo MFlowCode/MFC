@@ -1,0 +1,18 @@
+
+READ "CONFIGURE" BEFORE PROCEEDING WITH INSTALL
+
+Once all dependencies have been installed, the MFC can be built via
+
+    $$ make
+
+from the MFC directory. This will build all MFC components. Individual
+components can be built via
+
+    $$ make [component]
+
+where [component] is one of "pre_process,simulation,post_process". 
+
+Once this is completed, you can ensure that the software is working 
+as intended by running
+
+    $$ make test

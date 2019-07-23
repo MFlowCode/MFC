@@ -1,0 +1,22 @@
+
+-- Version 1.0 ---------------------------------------------------------------
+
+We introduce the MFC (multi-component flow code), a CFD-framework for
+simulation of compressible, multi-component fluid flows. It has been developed
+by the Computational Flow Physics group at the California Institute of
+Technology under the guidance of Professor Tim Colonius. The philosophy adopted
+for the MFC began as early as with Eric Johnsen in 2006 [Johnsen and Colonius,
+JCP 2006], though the principal architecture was developed by Vedran Coralic
+[Coralic and Colonius, JCP 2014]. The accuracy and capabilities of the MFC has
+been demonstrated through problems including shock-induced collapse of a gas
+bubble in a liquid confined in a deformable vessel, that was used to predict
+the cavitation-induced damage potential on blood vessel wall in the human body
+during shock-wave lithotripsy [Coralic and Colonius, EJMF-B 2013]. The MFC has
+subsequently been extended and modernized to simulate various other problems
+including shock-induced droplet breakup [Meng and Colonius JFM 2016, 2018],
+one-way acoustic generation [Maeda and Colonius 2017], violent collapse of gas
+bubbles [Veilleux (Caltech thesis) 2019, Schmidmayer, Bryngelson, Colonius
+ArXiv 2019], and cavitating flows [Bryngelson, Schmidmayer, Colonius IJMF
+2019]. The release of the MFC is aimed at providing a unified platform on which
+end-users can access the code and participate in its development for further
+enhancement and modification. The MFC is licensed under the GNU GPLv3.
