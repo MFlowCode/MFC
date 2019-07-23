@@ -1,0 +1,35 @@
+################ Compiler options ####################
+# Gets the MFC directory [do not modify]
+MFC_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+### Compiler command ###
+FC = mpif90
+#FC = mpiifort
+   
+### Compiler flags [set according to your compiler] ### 
+#Note: Requires -cpp to enable preprocessor 
+
+FFLAGS = -cpp -c -w 
+#NOTE: Cray compilers require: -eZ
+
+######### FFTW library and include locations #########
+######### Set these to the location of FFTW  #########
+
+## For the FFTW included in the MFC package
+fftw_lib_dir     = $(MFC_DIR)/lib/fftw-3.3.8/lib
+fftw_include_dir = $(MFC_DIR)/lib/fftw-3.3.8/include
+
+## Other possible locatins [only use absolute paths]
+#fftw_lib_dir = /usr/local/lib
+#fftw_include_dir = /usr/include
+#fftw_include_dir = /usr/local/include
+
+######### Silo library and include locations #########
+######### Set these to the location of Silo  #########
+#########   [  only use absolute paths   ]   #########
+
+silo_lib_dir = /usr/local/lib
+silo_include_dir = /usr/local/include
+
+#silo_lib_dir = /home/spencer/packages/silo-4.10.2/lib
+#silo_include_dir = /home/spencer/packages/silo-4.10.2/include

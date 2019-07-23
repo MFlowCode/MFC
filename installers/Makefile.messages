@@ -1,0 +1,43 @@
+define SILO_LIB_ERR
+===============================================================================
+Error when compiling post_process: Silo library files not found!
+----> The post_process code will not be built
+----> This feature is optional!
+----> To install Silo and use this part of
+----> the code, follow the instructions in CONFIGURE
+===============================================================================
+endef
+
+define SILO_INC_ERR
+===============================================================================
+Error when compiling post_process: Silo include files not found!
+----> The post_process code will not be built
+----> This feature is optional!
+----> To install Silo and use this part of
+----> the code, follow the instructions in CONFIGURE
+===============================================================================
+endef
+
+define FFTW_INC_ERR
+===============================================================================
+Error when compiling simulation: FFTW include files not found!
+----> Either set the fftw_lib_dir in Makefile.user "
+----> to the proper location, or install the included "
+----> FFTW package in the MFC by "
+---->    ## cd installers "
+---->    ## ./install_fftw.sh "
+===============================================================================
+endef
+
+define FFTW_LIB_ERR
+===============================================================================
+Error when compiling simulation: FFTW library files not found!
+----> Either set the fftw_lib_dir in Makefile.user
+----> to the proper location, or install the included
+----> FFTW package in the MFC by
+---->    ## cd installers
+---->    ## ./install_fftw.sh
+===============================================================================
+endef
+
+export SILO_LIB_ERR SILO_INC_ERR FFTW_INC_ERR FFTW_LIB_ERR
