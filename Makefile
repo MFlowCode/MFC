@@ -23,7 +23,7 @@ endif
 
 post_process:
 
-ifneq ("$(wildcard $(silo_include_dir)/silo_*.inc)","")
+ifneq ("$(wildcard $(silo_include_dir)/silo*.inc)","")
 ifneq ("$(wildcard $(silo_lib_dir)/libsilo*.*a)","")
 	@$(MAKE) -C src/post_process_code -f makefile
 else
