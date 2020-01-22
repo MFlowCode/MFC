@@ -401,7 +401,7 @@ MODULE m_bubbles
             cdot_star = tmp1 + ( 2.d0/Web + 4.d0*Re_inv*fV )*fV/(fR**2.d0)
             tmp1 = fV/fC
             tmp2 =  1.5D0*fV**2d0*( tmp1/3.D0-1.D0 ) +                      &
-                    (fCpbw - fCp)/fRho * (1.d0 - tmp1) +      &
+                    (fCpbw - fCp)/fRho * (1.d0 + tmp1) +      &
                     cdot_star * fR/fRho/fC
                   
             f_rddot_KM = tmp2/( fR*(1.d0-tmp1) + 4.d0*Re_inv/(fRho*fC) )
