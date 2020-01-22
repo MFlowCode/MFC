@@ -32,9 +32,10 @@ for multi-component, multi-phase, and bubbly flows.
  
 ## MFC paper
  
-  The paper that describes the MFC's capabilities is located
-  <a href="https://github.com/ComputationalFlowPhysics/MFC-Caltech/raw/master/doc/MFC_paper.pdf">here.</a>
-  
+  The paper that describes the MFC's capabilities:
+* <a href="https://arxiv.org/pdf/1907.10512.pdf">
+        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2019) arXiv: 1907.10512
+        </a>
   
 ## Related publications
  
@@ -42,8 +43,11 @@ for multi-component, multi-phase, and bubbly flows.
   development. A partial list is included here.
  
   Refereed journal publications:
-* <a href="https://arxiv.org/pdf/1903.08242.pdf">
-        K. Schmidmayer, S. H. Bryngelson, T. Colonius (2019) under review, arXiv: 1903.08242
+* <a href="https://arxiv.org/pdf/1909.11768.pdf">
+        S. H. Bryngelson and T. Colonius (2020) arXiv: 1909.11768
+        </a>
+* <a href="https://www.sciencedirect.com/science/article/pii/S0021999119307855">
+        K. Schmidmayer, S. H. Bryngelson, T. Colonius (2020) Journal of Computational Physics, Vol. 402, 109080
         </a>
 * <a href="http://colonius.caltech.edu/pdfs/BryngelsonSchmidmayerColonius2019.pdf">
         S. H. Bryngelson, K. Schmidmayer, T. Colonius (2019) International Journal of Multiphase Flow, Vol. 115, pp. 137-143  
