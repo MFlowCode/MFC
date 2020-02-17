@@ -43,8 +43,8 @@ for multi-component, multi-phase, and bubbly flows.
   development. A partial list is included here.
  
   Refereed journal publications:
-* <a href="https://arxiv.org/pdf/1909.11768.pdf">
-        S. H. Bryngelson and T. Colonius (2020) arXiv: 1909.11768
+* <a href="https://asa.scitation.org/doi/full/10.1121/10.0000746">
+        S. H. Bryngelson and T. Colonius (2020) Journal of the Acoustical Society of America, Vol. 147, pp. 1126-1135
         </a>
 * <a href="https://www.sciencedirect.com/science/article/pii/S0021999119307855">
         K. Schmidmayer, S. H. Bryngelson, T. Colonius (2020) Journal of Computational Physics, Vol. 402, 109080
