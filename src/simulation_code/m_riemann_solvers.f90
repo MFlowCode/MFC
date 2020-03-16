@@ -269,6 +269,8 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              ::         c_L,         c_R
     REAL(KIND(0d0)),              DIMENSION(2)   ::        Re_L,        Re_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::        We_L,        We_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::     tau_e_L,     tau_e_R
+
     !> @}
 
     !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
@@ -303,6 +305,7 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              ::         lo_c_L,         lo_c_R
     REAL(KIND(0d0)),              DIMENSION(2)   ::        lo_Re_L,        lo_Re_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::        lo_We_L,        lo_We_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::     lo_tau_e_L,     lo_tau_e_R
     !> @}
 
     !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
@@ -331,6 +334,7 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              :: pres_IC
     REAL(KIND(0d0))                              :: E_IC
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_IC
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: tau_e_IC
     !> @}
 
     !> @name Surface tension pressure contribution
@@ -648,6 +652,31 @@ MODULE m_riemann_solvers
                                     flux_src_rs_vf(i)%sf(j,k,l) = (s_M* tvd_flux_R - s_P* tvd_flux_L) / (s_M - s_P)
                                 END IF
                             END DO
+
+                            ! Stress eq
+                            IF (hypoelasticity) THEN
+                                DO i = 1, (num_dims*(num_dims+1))/2
+
+                                    lo_cons   = lo_rho_L*lo_tau_e_L(i) - lo_rho_R*lo_tau_e_L(i)
+                                    hi_cons   = rho_L * tau_e_L(i) - rho_R * tau_e_R(i)
+                                   tvd_cons   = lo_cons + flux_lim_func*(hi_cons - lo_cons)
+                                    lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_tau_e_L(i)
+                                    lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_tau_e_R(i)
+                                    hi_flux_L = rho_L * vel_L(dir_idx(1)) * tau_e_L(i)
+                                    hi_flux_R = rho_R * vel_R(dir_idx(1)) * tau_e_R(i)
+                                   tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
+                                   tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
+
+                                    IF (tvd_wave_speeds) THEN
+                                        flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) = &
+                                            ( tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L + tvd_s_M*tvd_s_P*tvd_cons) &
+                                            / (tvd_s_M - tvd_s_P)
+                                    ELSE
+                                        flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) = &
+                                            ( s_M * tvd_flux_R - s_P * tvd_flux_L + s_M*s_P * tvd_cons) / (s_M - s_P)
+                                    END IF
+                                END DO
+                            END IF
                 
                             ! Source terms
                             DO i = 1, num_dims
@@ -743,6 +772,20 @@ MODULE m_riemann_solvers
                                      / ( xi_M*rho_L*(s_L - vel_L(dir_idx(1))) - &
                                          xi_P*rho_R*(s_R - vel_R(dir_idx(1))) )
                             END DO
+
+                            IF (hypoelasticity) THEN
+                                DO i = 1, (num_dims*(num_dims+1)) / 2
+                                    flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) =  &
+                                        ( s_M*( rho_R*vel_R(dir_idx(1))         &
+                                                     *tau_e_R(i))               &
+                                        - s_P*( rho_L*vel_L(dir_idx(1))         &
+                                                     *tau_e_L(i))               &
+                                        + s_M*s_P*( rho_L*tau_e_L(i)            &
+                                                  - rho_R*tau_e_R(i) ) )        &
+                                        / (s_M - s_P)
+                                END DO 
+                            END IF
+
                         END IF
                     END DO
                 END DO
@@ -2345,7 +2388,14 @@ MODULE m_riemann_solvers
             
             H_L = (E_L + pres_L)/rho_L
             H_R = (E_R + pres_R)/rho_R
-            
+
+            IF (hypoelasticity) THEN
+                DO i = 1, (num_dims*(num_dims+1)) / 2
+                    tau_e_L(i) = qL_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                    tau_e_R(i) = qR_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                END DO
+            END IF
+
             IF (tvd_riemann_flux) THEN
                 DO i = 1, cont_idx%end
                     lo_alpha_rho_L(i) = q_prim_rs_vf(i)%sf( j ,k,l)
@@ -2374,6 +2424,14 @@ MODULE m_riemann_solvers
                 
                 lo_H_L = (lo_E_L + lo_pres_L)/lo_rho_L
                 lo_H_R = (lo_E_R + lo_pres_R)/lo_rho_R
+
+                IF (hypoelasticity) THEN
+                    DO i = 1, (num_dims*(num_dims+1)) / 2
+                        lo_tau_e_L(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                        lo_tau_e_R(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                    END DO
+                END IF
+    
             END IF
             
             CALL s_compute_mixture_sound_speeds(j,k,l)
@@ -2487,6 +2545,13 @@ MODULE m_riemann_solvers
             H_L = (E_L + pres_L)/rho_L
             H_R = (E_R + pres_R)/rho_R
 
+            IF (hypoelasticity) THEN
+                DO i = 1, (num_dims*(num_dims+1)) / 2
+                    tau_e_L(i) = qL_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                    tau_e_R(i) = qR_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                END DO
+            END IF
+
             ! Compute left/right states for bubble number density
             IF (bubbles) THEN
                 DO i = 1,num_fluids
@@ -2574,6 +2639,14 @@ MODULE m_riemann_solvers
             
                 lo_H_L = (lo_E_L + lo_pres_L)/lo_rho_L
                 lo_H_R = (lo_E_R + lo_pres_R)/lo_rho_R
+
+                IF (hypoelasticity) THEN
+                    DO i = 1, (num_dims*(num_dims+1)) / 2
+                        lo_tau_e_L(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                        lo_tau_e_R(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                    END DO
+                END IF
+
             END IF
 
 
@@ -2912,7 +2985,21 @@ MODULE m_riemann_solvers
                     allocate( P0_L(nb), P0_R(nb) )
                 END IF 
             END IF
-            
+           
+            IF (hypoelasticity) THEN
+                ALLOCATE(tau_e_L(1:(num_dims*(num_dims+1)/2)) &
+                       , tau_e_R(1:(num_dims*(num_dims+1)/2)))
+
+                IF (tvd_riemann_flux) THEN
+                    ALLOCATE(lo_tau_e_L(1:(num_dims*(num_dims+1)/2)) &
+                           , lo_tau_e_R(1:(num_dims*(num_dims+1)/2)))
+                END IF
+
+                IF (riemann_solver == 3) THEN
+                    ALLOCATE(tau_e_IC(1:(num_dims*(num_dims+1)/2)))
+                END IF
+            END IF
+
             ! Associating the procedural pointers to the procedures that will be
             ! utilized to compute the average state and estimate the wave speeds
             IF(riemann_solver /= 3) THEN

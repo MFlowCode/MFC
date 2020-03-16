@@ -120,6 +120,7 @@ MODULE m_global_parameters
     LOGICAL :: mpp_lim         !< Alpha limiter
     INTEGER :: sys_size        !< Number of unknowns in the system of equations
     INTEGER :: weno_order      !< Order of accuracy for the WENO reconstruction
+    LOGICAL :: hypoelasticity  !< Hypoelasticity (True or False)
     
     ! Annotations of the structure, i.e. the organization, of the state vectors
     TYPE(int_bounds_info) :: cont_idx                   !< Indexes of first & last continuity eqns.
@@ -131,6 +132,7 @@ MODULE m_global_parameters
     TYPE(bub_bounds_info) :: bub_idx                    !< Indexes of first & last bubble variable eqns.
     INTEGER               :: gamma_idx                  !< Index of specific heat ratio func. eqn.
     INTEGER               :: pi_inf_idx                 !< Index of liquid stiffness func. eqn.
+    TYPE(int_bounds_info) :: stress_idx                 !< Indexes of elastic shear stress eqns.
     
 
     TYPE(bounds_info) :: bc_x, bc_y, bc_z !<
@@ -266,7 +268,8 @@ MODULE m_global_parameters
             num_fluids = dflt_int
             adv_alphan = .FALSE.
             weno_order = dflt_int
-            
+            hypoelasticity = .FALSE.
+ 
             bc_x%beg = dflt_real
             bc_x%end = dflt_real
             bc_y%beg = dflt_real
@@ -311,6 +314,7 @@ MODULE m_global_parameters
                 patch_icpp(i)%alpha           = dflt_real
                 patch_icpp(i)%gamma           = dflt_real
                 patch_icpp(i)%pi_inf          = dflt_real
+                patch_icpp(i)%tau_e           = dflt_real
                 !should get all of r0's and v0's
                 patch_icpp(i)%r0              = dflt_real
                 patch_icpp(i)%v0              = dflt_real
@@ -352,6 +356,7 @@ MODULE m_global_parameters
                 fluid_pp(i)%M_v     = dflt_real
                 fluid_pp(i)%mu_v    = dflt_real
                 fluid_pp(i)%k_v     = dflt_real
+                fluid_pp(i)%G       = dflt_real
             END DO
             
             
@@ -406,9 +411,9 @@ MODULE m_global_parameters
 
                 IF( (adv_alphan .NEQV. .TRUE.) .and. &
                         (num_fluids > 1)) adv_idx%end = adv_idx%end - 1
- 
-                sys_size = adv_idx%end
 
+                sys_size = adv_idx%end
+                
                 IF (bubbles) THEN
                     alf_idx  = adv_idx%end
                 ELSE
@@ -461,6 +466,15 @@ MODULE m_global_parameters
                         pref    = 1.d0
                     END IF
                 END IF                    
+
+                IF (hypoelasticity) THEN
+                    stress_idx%beg = sys_size + 1
+                    stress_idx%end = sys_size + (num_dims*(num_dims+1)) / 2
+                    ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+
+                    sys_size = stress_idx%end
+                END IF
+               
             ! ==================================================================
 
 
@@ -597,7 +611,7 @@ MODULE m_global_parameters
 
 
             ! liquid physical properties
-            REAL(KIND(0.D0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
+            REAL(KIND(0.D0)) :: mul0, ss, pv, gamma_v, M_v, mu_v, G
 
             ! gas physical properties
             REAL(KIND(0.D0)) :: gamma_m, gamma_n, M_n, mu_n
@@ -622,6 +636,7 @@ MODULE m_global_parameters
             M_v     = fluid_pp(1)%M_v
             mu_v    = fluid_pp(1)%mu_v
             k_v(:)  = fluid_pp(1)%k_v
+            G       = fluid_pp(1)%G
 
             gamma_n = fluid_pp(2)%gamma_v
             M_n     = fluid_pp(2)%M_v

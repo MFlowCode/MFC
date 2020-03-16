@@ -113,6 +113,7 @@ pre_process_dict =                                                             \
                     'bc_y%end'                      : None,                    \
                     'bc_z%beg'                      : None,                    \
                     'bc_z%end'                      : None,                    \
+                    'hypoelasticity'                : None,                    \
                     'num_patches'                   : None,                    \
                     'patch_icpp(1)%geometry'        : None,                    \
                     'patch_icpp(1)%x_centroid'      : None,                    \
@@ -165,6 +166,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(1)%alpha(10)'       : None,                    \
                     'patch_icpp(1)%gamma'           : None,                    \
                     'patch_icpp(1)%pi_inf'          : None,                    \
+                    'patch_icpp(1)%tau_e(1)'        : None,                    \
+                    'patch_icpp(1)%tau_e(2)'        : None,                    \
+                    'patch_icpp(1)%tau_e(3)'        : None,                    \
+                    'patch_icpp(1)%tau_e(4)'        : None,                    \
+                    'patch_icpp(1)%tau_e(5)'        : None,                    \
+                    'patch_icpp(1)%tau_e(6)'        : None,                    \
                     'patch_icpp(2)%geometry'        : None,                    \
                     'patch_icpp(2)%x_centroid'      : None,                    \
                     'patch_icpp(2)%y_centroid'      : None,                    \
@@ -218,6 +225,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(2)%alpha(10)'       : None,                    \
                     'patch_icpp(2)%gamma'           : None,                    \
                     'patch_icpp(2)%pi_inf'          : None,                    \
+                    'patch_icpp(2)%tau_e(1)'        : None,                    \
+                    'patch_icpp(2)%tau_e(2)'        : None,                    \
+                    'patch_icpp(2)%tau_e(3)'        : None,                    \
+                    'patch_icpp(2)%tau_e(4)'        : None,                    \
+                    'patch_icpp(2)%tau_e(5)'        : None,                    \
+                    'patch_icpp(2)%tau_e(6)'        : None,                    \
                     'patch_icpp(3)%geometry'        : None,                    \
                     'patch_icpp(3)%x_centroid'      : None,                    \
                     'patch_icpp(3)%y_centroid'      : None,                    \
@@ -272,6 +285,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(3)%alpha(10)'       : None,                    \
                     'patch_icpp(3)%gamma'           : None,                    \
                     'patch_icpp(3)%pi_inf'          : None,                    \
+                    'patch_icpp(3)%tau_e(1)'        : None,                    \
+                    'patch_icpp(3)%tau_e(2)'        : None,                    \
+                    'patch_icpp(3)%tau_e(3)'        : None,                    \
+                    'patch_icpp(3)%tau_e(4)'        : None,                    \
+                    'patch_icpp(3)%tau_e(5)'        : None,                    \
+                    'patch_icpp(3)%tau_e(6)'        : None,                    \
                     'patch_icpp(4)%geometry'        : None,                    \
                     'patch_icpp(4)%x_centroid'      : None,                    \
                     'patch_icpp(4)%y_centroid'      : None,                    \
@@ -327,6 +346,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(4)%alpha(10)'       : None,                    \
                     'patch_icpp(4)%gamma'           : None,                    \
                     'patch_icpp(4)%pi_inf'          : None,                    \
+                    'patch_icpp(4)%tau_e(1)'        : None,                    \
+                    'patch_icpp(4)%tau_e(2)'        : None,                    \
+                    'patch_icpp(4)%tau_e(3)'        : None,                    \
+                    'patch_icpp(4)%tau_e(4)'        : None,                    \
+                    'patch_icpp(4)%tau_e(5)'        : None,                    \
+                    'patch_icpp(4)%tau_e(6)'        : None,                    \
                     'patch_icpp(5)%geometry'        : None,                    \
                     'patch_icpp(5)%x_centroid'      : None,                    \
                     'patch_icpp(5)%y_centroid'      : None,                    \
@@ -383,6 +408,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(5)%alpha(10)'       : None,                    \
                     'patch_icpp(5)%gamma'           : None,                    \
                     'patch_icpp(5)%pi_inf'          : None,                    \
+                    'patch_icpp(5)%tau_e(1)'        : None,                    \
+                    'patch_icpp(5)%tau_e(2)'        : None,                    \
+                    'patch_icpp(5)%tau_e(3)'        : None,                    \
+                    'patch_icpp(5)%tau_e(4)'        : None,                    \
+                    'patch_icpp(5)%tau_e(5)'        : None,                    \
+                    'patch_icpp(5)%tau_e(6)'        : None,                    \
                     'patch_icpp(6)%geometry'        : None,                    \
                     'patch_icpp(6)%x_centroid'      : None,                    \
                     'patch_icpp(6)%y_centroid'      : None,                    \
@@ -440,6 +471,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(6)%alpha(10)'       : None,                    \
                     'patch_icpp(6)%gamma'           : None,                    \
                     'patch_icpp(6)%pi_inf'          : None,                    \
+                    'patch_icpp(6)%tau_e(1)'        : None,                    \
+                    'patch_icpp(6)%tau_e(2)'        : None,                    \
+                    'patch_icpp(6)%tau_e(3)'        : None,                    \
+                    'patch_icpp(6)%tau_e(4)'        : None,                    \
+                    'patch_icpp(6)%tau_e(5)'        : None,                    \
+                    'patch_icpp(6)%tau_e(6)'        : None,                    \
                     'patch_icpp(7)%geometry'        : None,                    \
                     'patch_icpp(7)%x_centroid'      : None,                    \
                     'patch_icpp(7)%y_centroid'      : None,                    \
@@ -498,6 +535,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(7)%alpha(10)'       : None,                    \
                     'patch_icpp(7)%gamma'           : None,                    \
                     'patch_icpp(7)%pi_inf'          : None,                    \
+                    'patch_icpp(7)%tau_e(1)'        : None,                    \
+                    'patch_icpp(7)%tau_e(2)'        : None,                    \
+                    'patch_icpp(7)%tau_e(3)'        : None,                    \
+                    'patch_icpp(7)%tau_e(4)'        : None,                    \
+                    'patch_icpp(7)%tau_e(5)'        : None,                    \
+                    'patch_icpp(7)%tau_e(6)'        : None,                    \
                     'patch_icpp(8)%geometry'        : None,                    \
                     'patch_icpp(8)%x_centroid'      : None,                    \
                     'patch_icpp(8)%y_centroid'      : None,                    \
@@ -557,6 +600,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(8)%alpha(10)'       : None,                    \
                     'patch_icpp(8)%gamma'           : None,                    \
                     'patch_icpp(8)%pi_inf'          : None,                    \
+                    'patch_icpp(8)%tau_e(1)'        : None,                    \
+                    'patch_icpp(8)%tau_e(2)'        : None,                    \
+                    'patch_icpp(8)%tau_e(3)'        : None,                    \
+                    'patch_icpp(8)%tau_e(4)'        : None,                    \
+                    'patch_icpp(8)%tau_e(5)'        : None,                    \
+                    'patch_icpp(8)%tau_e(6)'        : None,                    \
                     'patch_icpp(9)%geometry'        : None,                    \
                     'patch_icpp(9)%x_centroid'      : None,                    \
                     'patch_icpp(9)%y_centroid'      : None,                    \
@@ -617,6 +666,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(9)%alpha(10)'       : None,                    \
                     'patch_icpp(9)%gamma'           : None,                    \
                     'patch_icpp(9)%pi_inf'          : None,                    \
+                    'patch_icpp(9)%tau_e(1)'        : None,                    \
+                    'patch_icpp(9)%tau_e(2)'        : None,                    \
+                    'patch_icpp(9)%tau_e(3)'        : None,                    \
+                    'patch_icpp(9)%tau_e(4)'        : None,                    \
+                    'patch_icpp(9)%tau_e(5)'        : None,                    \
+                    'patch_icpp(9)%tau_e(6)'        : None,                    \
                     'patch_icpp(10)%geometry'       : None,                    \
                     'patch_icpp(10)%x_centroid'     : None,                    \
                     'patch_icpp(10)%y_centroid'     : None,                    \
@@ -678,6 +733,12 @@ pre_process_dict =                                                             \
                     'patch_icpp(10)%alpha(10)'      : None,                    \
                     'patch_icpp(10)%gamma'          : None,                    \
                     'patch_icpp(10)%pi_inf'         : None,                    \
+                    'patch_icpp(10)%tau_e(1)'       : None,                    \
+                    'patch_icpp(10)%tau_e(2)'       : None,                    \
+                    'patch_icpp(10)%tau_e(3)'       : None,                    \
+                    'patch_icpp(10)%tau_e(4)'       : None,                    \
+                    'patch_icpp(10)%tau_e(5)'       : None,                    \
+                    'patch_icpp(10)%tau_e(6)'       : None,                    \
                     'fluid_pp(1)%gamma'             : None,                    \
                     'fluid_pp(1)%pi_inf'            : None,                    \
                     'fluid_pp(2)%gamma'             : None,                    \
@@ -768,6 +829,16 @@ pre_process_dict =                                                             \
                     'fluid_pp(10)%M_v'              : None,                     \
                     'fluid_pp(10)%mu_v'             : None,                     \
                     'fluid_pp(10)%k_v'              : None,                     \
+                    'fluid_pp(1)%G'                 : None,                     \
+                    'fluid_pp(2)%G'                 : None,                     \
+                    'fluid_pp(3)%G'                 : None,                     \
+                    'fluid_pp(4)%G'                 : None,                     \
+                    'fluid_pp(5)%G'                 : None,                     \
+                    'fluid_pp(6)%G'                 : None,                     \
+                    'fluid_pp(7)%G'                 : None,                     \
+                    'fluid_pp(8)%G'                 : None,                     \
+                    'fluid_pp(9)%G'                 : None,                     \
+                    'fluid_pp(10)%G'                : None,                     \
                     'Ca'                            : None,                     \
                     'Web'                           : None,                     \
                     'Re_inv'                        : None,                     \
@@ -859,6 +930,7 @@ simulation_dict =                                                              \
                     'bc_y%end'                      : None,                    \
                     'bc_z%beg'                      : None,                    \
                     'bc_z%end'                      : None,                    \
+                    'hypoelasticity'                : None,                    \
                     'fd_order'                      : None,                    \
                     'com_wrt'                       : None,                    \
                     'com_wrt(1)'                    : None,                    \
@@ -1134,7 +1206,17 @@ simulation_dict =                                                              \
                     'fluid_pp(10)%gamma_v'           : None,                     \
                     'fluid_pp(10)%M_v'               : None,                     \
                     'fluid_pp(10)%mu_v'              : None,                     \
-                    'fluid_pp(10)%k_v'               : None,                     \
+                    'fluid_pp(10)%k_v'              : None,                     \
+                    'fluid_pp(1)%G'                 : None,                     \
+                    'fluid_pp(2)%G'                 : None,                     \
+                    'fluid_pp(3)%G'                 : None,                     \
+                    'fluid_pp(4)%G'                 : None,                     \
+                    'fluid_pp(5)%G'                 : None,                     \
+                    'fluid_pp(6)%G'                 : None,                     \
+                    'fluid_pp(7)%G'                 : None,                     \
+                    'fluid_pp(8)%G'                 : None,                     \
+                    'fluid_pp(9)%G'                 : None,                     \
+                    'fluid_pp(10)%G'                : None,                     \
                     'pref'                          : None,                     \
                     'rhoref'                        : None,                     \
                     'polydisperse'                  : None,                     \
@@ -1247,6 +1329,7 @@ post_process_dict =                                                            \
                     'bc_y%end'                      : None,                    \
                     'bc_z%beg'                      : None,                    \
                     'bc_z%end'                      : None,                    \
+                    'hypoelasticity'                : None,                    \
                     'fluid_pp(1)%gamma'             : None,                    \
                     'fluid_pp(1)%pi_inf'            : None,                    \
                     'fluid_pp(2)%gamma'             : None,                    \
@@ -1415,6 +1498,16 @@ post_process_dict =                                                            \
                     'fluid_pp(10)%M_v'              : None,                     \
                     'fluid_pp(10)%mu_v'             : None,                     \
                     'fluid_pp(10)%k_v'              : None,                     \
+                    'fluid_pp(1)%G'                 : None,                     \
+                    'fluid_pp(2)%G'                 : None,                     \
+                    'fluid_pp(3)%G'                 : None,                     \
+                    'fluid_pp(4)%G'                 : None,                     \
+                    'fluid_pp(5)%G'                 : None,                     \
+                    'fluid_pp(6)%G'                 : None,                     \
+                    'fluid_pp(7)%G'                 : None,                     \
+                    'fluid_pp(8)%G'                 : None,                     \
+                    'fluid_pp(9)%G'                 : None,                     \
+                    'fluid_pp(10)%G'                : None,                     \
                     'polydisperse'                  : None,                     \
                     'poly_sigma'                    : None,                     \
                     'polytropic'                    : None,                     \
@@ -1549,11 +1642,9 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
         #output, errors = cmd_status.communicate()
     else:
         f_create_batch_file(comp_name, case_dict, mfc_dir)
-        # Submit job to queue (Hooke/Thomson/Darter/Gordon)
+        # Submit job to queue (qsub)
         # cmd_status = Popen('qsub ' + comp_name + '.sh', shell=True, stdout=PIPE)
-        # cmd_status = Popen('qsub -W depend=afterany:442190 ' + comp_name + '.sh', shell=True, stdout=PIPE)
-        # cmd_status = Popen('qsub -W depend=afterok:442883 ' + comp_name + '.sh', shell=True, stdout=PIPE)
-        # submit job to queue (Comet/Stampede)
+        # submit job to queue (sbatch)
         cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE)
         output, errors = cmd_status.communicate()
         print( '\n' + output)
@@ -1646,92 +1737,66 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
         '#!/bin/sh'                                                     + '\n' \
                                                                                \
         # Account to be charged for the job:
-        # (Darter)
-        # '#PBS -A TG-CTS120005'                                          + '\n' \
-        # (Stampede)
-        # '#SBATCH -A TG-CTS120005'                                       + '\n' \
-        # (Comet)
-        #'#SBATCH -A cit129'                                             + '\n' \
+        # (PBS)
+        # '#PBS -A xxx'                                          + '\n' \
+        # (Slurm)
+        # '#SBATCH -A xxx'                                       + '\n' \
                                                                                \
         # Name of the queue to which the job should be submitted:
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # '#PBS -q ' + str(pbs_dict['queue'])                             + '\n' \
-        # (Comet/Stampede)
+        # (Slurm)
         '#SBATCH -p ' + str(pbs_dict['queue'])                          + '\n' \
                                                                                \
         # Name of the job to be submitted to the scheduler:
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # '#PBS -N ' + comp_name                                          + '\n' \
-        # (Comet/Stampede)
+        # (Slurm)
         '#SBATCH -J ' + comp_name                                       + '\n' \
                                                                                \
         # Node(s) and processor(s) per node (ppn) for job:
-        # (Thomson)
-        # '#PBS -l nodes=' + str(pbs_dict['nodes'])                              \
-        #        + ':ppn=' + str(pbs_dict[ 'ppn' ])                       + '\n' \
-        # (Hooke)
+        # (PBS)
         # '#PBS -l nodes=0' + str(pbs_dict['nodes'])                             \
         #        + ':ppn=' + str(pbs_dict[ 'ppn' ])                       + '\n' \
-        # (Darter)
-        # '#PBS -l size=' + str( pbs_dict['nodes']*pbs_dict['ppn']               \
-        #                      + min(1,( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16)                 \
-        #                      * (16 - ( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16) )        + '\n' \
-        # (Gordon)
-        # '#PBS -l nodes=' + str(pbs_dict['nodes'])                              \
-        #        + ':ppn=' + str(pbs_dict[ 'ppn' ]) + ':native'           + '\n' \
-        # (Stampede)
-        # '#SBATCH -n ' + str( pbs_dict['nodes']*pbs_dict['ppn']                 \
-        #                      + min(1,( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16)                 \
-        #                      * (16 - ( pbs_dict['nodes']                       \
-        #                              * pbs_dict[ 'ppn' ] )%16) )        + '\n' \
-        #                                                                        \
-        # '#SBATCH -N ' + str( pbs_dict['nodes'] )                        + '\n' \
-        # (Comet)
+        # (Slurm)
         '#SBATCH --nodes=' + str(pbs_dict['nodes'])                     + '\n' \
         '#SBATCH --ntasks-per-node=' + str(pbs_dict['ppn'])             + '\n' \
                                                                                \
-        # Constrain allocated nodes to single rack for best code efficiency:
-        # (Comet)
-        '#SBATCH --switches=1'                                          + '\n' \
-                                                                               \
         # Maximum amount of time to commit to the execution of the job:
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # '#PBS -l walltime=' + str(pbs_dict['walltime'])                 + '\n' \
-        # (Comet/Stampede)
+        # (Slurm)
         '#SBATCH -t ' + str(pbs_dict['walltime'])                       + '\n' \
                                                                                \
         # Declare the job rerunable (y) or non-rerunable (n)
-        # (Hooke/Thomson)
+        # (PBS)
         # '#PBS -r n'                                                     + '\n' \
         #                                                                        \
         # Output standard output and error in a single file
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # '#PBS -j oe'                                                    + '\n' \
-        # (Comet/Stampede)
+        # (Slurm)
         '#SBATCH -o ' + comp_name + '.o%j'                              + '\n' \
         '#SBATCH -e ' + comp_name + '.o%j'                              + '\n' \
                                                                                \
         # Notify by email when job begins (b), aborts (a), and/or ends (e):
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # '#PBS -m bae'                                                   + '\n' \
         # '#PBS -M ' + str(pbs_dict['mail_list'])                         + '\n' \
-        # (Comet/Stampede)
+        # (Slurm)
         '#SBATCH --mail-type=all'                                       + '\n' \
         '#SBATCH --mail-user=' + str(pbs_dict['mail_list'])             + '\n' \
                                                                                \
         #'sleep 30s'                                                     + '\n' \
         # Total number of processor(s) allocated for job execution
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # 'num_procs=$(cat $PBS_NODEFILE | wc -l)'                        + '\n' \
                                                                                \
         # Moving to the case directory
-        # (Hooke/Thomson/Darter/Gordon)
+        # (PBS)
         # 'cd $PBS_O_WORKDIR'                                             + '\n' \
                                                                                \
-        # Setting up environment variables for MPI I/O on Cray systems (Darter)
+        # Setting up environment variables for MPI I/O on Cray systems
         # 'export MPICH_PTL_UNEX_EVENTS=400000'                           + '\n' \
         #                                                                        \
         # 'export MPICH_PTL_OTHER_EVENTS=100000'                          + '\n' \
@@ -1741,19 +1806,18 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
         # 'export MPICH_MPIIO_HINTS=*:romio_ds_write=disable'             + '\n' \
         #                                                                        \
         # Setting up the output file's header information:
-        # (Hooke/Thomson/Darter/Gordon)
-        # 'echo MFC v3.0 - Cases - ' + basename(getcwd())                        \
+        # (PBS)
+        # 'echo MFC - Cases - ' + basename(getcwd())                        \
         #                            + ': $PBS_JOBNAME.o${PBS_JOBID:0:7}' + '\n' \
         # 'echo Description: $PBS_JOBID executed on $num_procs '                 \
-        # (Comet/Stampede)
-        'echo MFC v3.0 - Cases - ' + basename(getcwd())                        \
+        # (Slurm)
+        'echo MFC - Cases - ' + basename(getcwd())                        \
                               + ': $SLURM_JOB_NAME.o$SLURM_JOB_ID'      + '\n' \
         'echo Description: $SLURM_JOB_ID executed on $SLURM_NTASKS '           \
 
                          + 'processor\'(s)\'. The' + '\n' + 'echo '            \
                          + '\'            \' command-line output '             \
                          + 'information may be found below.'            + '\n' \
-        'echo Author: Vedran Coralic'                                   + '\n' \
         'echo Start-date: `date +%D`'                                   + '\n' \
         'echo Start-time: `date +%T`'                                   + '\n' \
         'echo' + '\n' + 'echo'                                          + '\n' \
@@ -1764,31 +1828,6 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
          't_start=$(date +%s)'                                          + '\n' \
                                                                                \
         # Executing job:
-        # (Hooke)
-        # '/opt/mvapich2/ch3_mrail_gen2-intel12/bin/mpirun '                     \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        # (Darter)
-        # 'aprun -n ' + str(pbs_dict['nodes']*pbs_dict['ppn']) + ' '             \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        # (Thomson)
-        # '/share/apps/openmpi-1.4.3/nag_fort/bin/mpirun '                       \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        # (Comet)
-        #'ibrun '                                                               \
-        # (Stampede)
-        # 'ibrun tacc_affinity '                                                 \
-        #                               + mfc_dir + '/' + comp_name             \
-        #                               + '_code' + '/' + comp_name      + '\n' \
-        # (Gordon)
-        # 'mpirun_rsh -np ' + str(pbs_dict['nodes']*pbs_dict['ppn']) + ' '       \
-        #                                + '-hostfile $PBS_NODEFILE '            \
-        #                                + mfc_dir + '/' + comp_name             \
-        #                                + '_code' + '/' + comp_name      + '\n' \
-        #                                                                        \
-        # (Richardson)
         'mpirun '                                                               \
                                        + mfc_dir + '/' + comp_name             \
                                        + '_code' + '/' + comp_name      + '\n' \

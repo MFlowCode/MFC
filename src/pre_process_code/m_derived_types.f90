@@ -129,6 +129,9 @@ MODULE m_derived_types
         !! Primitive variables associated with the patch. In order, these include
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
+
+        REAL(KIND(0d0)), DIMENSION(6)              :: tau_e
+        !! Elastic stresses added to primitive variables if hypoelasticity = True
         
         REAL(KIND(0d0))    :: R0 !< Bubble size
         REAL(KIND(0d0))    :: V0 !< Bubble velocity
@@ -148,6 +151,7 @@ MODULE m_derived_types
         REAL(KIND(0d0)) :: M_v
         REAL(KIND(0d0)) :: mu_v
         REAL(KIND(0d0)) :: k_v
+        REAL(KIND(0d0)) :: G
     END TYPE physical_parameters
     
     

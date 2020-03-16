@@ -122,7 +122,7 @@ MODULE m_start_up
                                    model_eqns, num_fluids,                    &
                                    adv_alphan, mpp_lim,                       &
                                    weno_order, bc_x, bc_y, bc_z, num_patches, &
-                                   patch_icpp, fluid_pp,                      &
+                                   hypoelasticity, patch_icpp, fluid_pp,      &
                                    precision, parallel_io,                    &
                                    perturb_flow, perturb_flow_fluid,          &
                                    perturb_sph, perturb_sph_fluid, fluid_rho, &
@@ -2018,7 +2018,7 @@ MODULE m_start_up
             
             
             ! Reading the Conservative Variables Data Files ====================
-            DO i = 1, adv_idx%end
+            DO i = 1, sys_size
                 
                 ! Checking whether data file associated with variable position
                 ! of the currently manipulated conservative variable exists

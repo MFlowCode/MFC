@@ -184,6 +184,14 @@ MODULE m_time_steppers
                 END DO
             END IF
 
+            IF (hypoelasticity) THEN
+                DO i = stress_idx%beg, stress_idx%end
+                    ALLOCATE(q_prim_vf(i)%sf( ix%beg:ix%end, &
+                                              iy%beg:iy%end, &
+                                              iz%beg:iz%end ))
+                END DO
+            END IF
+
             IF (model_eqns == 3) THEN
                 DO i = internalEnergies_idx%beg, internalEnergies_idx%end
                     ALLOCATE(q_prim_vf(i)%sf( ix%beg:ix%end, &
