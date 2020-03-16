@@ -639,7 +639,13 @@ MODULE m_variables_conversion
                             END DO
 
                         END IF
-                        
+
+                        IF (hypoelasticity) THEN
+                            DO i = stress_idx%beg, stress_idx%end
+                                qK_prim_vf(i)%sf(j,k,l) = qK_cons_vf(i)%sf(j,k,l) &
+                                                        / MAX(rho_K,sgm_eps)
+                            END DO
+                        END IF                        
                     END DO
                 END DO
             END DO

@@ -117,7 +117,7 @@ PROGRAM p_main
     CALL s_initialize_data_output_module()
     CALL s_initialize_derived_variables_module()
     CALL s_initialize_time_steppers_module()    
-
+    
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
         s_read_data_files => s_read_serial_data_files

@@ -198,6 +198,8 @@ MODULE m_data_output
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
                                 ELSE IF (i.eq.mom_idx%beg) THEN !u
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
+                                ELSE IF (i.eq.stress_idx%beg) THEN !tau_e
+                                    WRITE(2,FMT) x_cb(j),q_cons_vf(stress_idx%beg)%sf(j,0,0)/rho
                                 ELSE IF (i.eq.E_idx) THEN !p
                                     IF (model_eqns == 4) THEN
                                         !Tait pressure from density

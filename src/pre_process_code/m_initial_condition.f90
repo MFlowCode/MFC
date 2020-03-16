@@ -630,8 +630,17 @@ MODULE m_initial_condition
             ! Pressure
             q_prim_vf(E_idx)%sf(j,k,l) = &
                     (eta * patch_icpp(patch_id)%pres  &
-                     + (1d0 - eta) * orig_prim_vf(E_idx))            
-            
+                     + (1d0 - eta) * orig_prim_vf(E_idx))
+
+            ! Elastic Shear Stress
+            IF (hypoelasticity) THEN
+                DO i = 1, (stress_idx%end - stress_idx%beg) + 1
+                    q_prim_vf(i+stress_idx%beg - 1)%sf(j,k,l) = &
+                        (eta * patch_icpp(patch_id)%tau_e(i) &
+                         + (1d0-eta)*orig_prim_vf(i+stress_idx%beg -1))
+                END DO            
+            END IF
+
             ! Set partial pressures to mixture pressure
             IF(model_eqns == 3) THEN
                 DO i = internalEnergies_idx%beg, internalEnergies_idx%end
@@ -643,7 +652,7 @@ MODULE m_initial_condition
             IF(1d0 - eta < 1d-16) patch_id_fp(j,k,l) = patch_id
            
             
-        END SUBROUTINE s_assign_patch_species_primitive_variables ! ------------
+        END SUBROUTINE s_assign_patch_species_primitive_variables ! ------------  
         
         !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module

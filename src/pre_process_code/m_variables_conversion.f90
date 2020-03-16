@@ -393,6 +393,12 @@ MODULE m_variables_conversion
                                 q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l)/nbub
                             END DO
                         END IF
+
+                        IF (hypoelasticity) THEN
+                            DO i = stress_idx%beg, stress_idx%end
+                                q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l)/rho
+                            END DO
+                        END IF
                     END DO
                 END DO
             END DO
@@ -491,7 +497,13 @@ MODULE m_variables_conversion
                                 q_cons_vf(i)%sf(j,k,l) = q_prim_vf(i)%sf(j,k,l)*nbub
                             END DO
                         END IF
-                        
+
+                        IF (hypoelasticity) THEN
+                            DO i = stress_idx%beg, stress_idx%end
+                                q_cons_vf(i)%sf(j,k,l) = rho*q_prim_vf(i)%sf(j,k,l)
+                            END DO
+                        END IF
+
                     END DO
                 END DO
             END DO

@@ -150,6 +150,7 @@ MODULE m_global_parameters
     LOGICAL         :: We_src         !< Account for capillary effects in non-conservative formulation in RHS
     LOGICAL         :: We_wave_speeds !< Account for capillary effects when computing the contact wave speed
     LOGICAL         :: lsq_deriv      !< Use linear least squares to calculate normals and curvatures
+    LOGICAL         :: hypoelasticity !< Hypoelastic modeling
 
     INTEGER         :: cpu_start, cpu_end, cpu_rate
     
@@ -192,6 +193,7 @@ MODULE m_global_parameters
     INTEGER               :: alf_idx               !< Index of void fraction
     INTEGER           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     INTEGER           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    TYPE(bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     !> @}
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
@@ -301,7 +303,7 @@ MODULE m_global_parameters
     REAL(KIND(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
-    REAL(KIND(0.D0)) :: mul0, ss, gamma_v, mu_v
+    REAL(KIND(0.D0)) :: mul0, ss, gamma_v, mu_v, G
     REAL(KIND(0.D0)) :: gamma_m, gamma_n, mu_n
     !> @}
 
@@ -385,6 +387,7 @@ MODULE m_global_parameters
             lsq_deriv        = .FALSE.
             parallel_io      = .FALSE.
             precision        = 2
+            hypoelasticity   = .FALSE.
             
             bc_x%beg = dflt_int; bc_x%end = dflt_int
             bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -405,6 +408,7 @@ MODULE m_global_parameters
                 fluid_pp(i)%M_v     = dflt_real
                 fluid_pp(i)%mu_v    = dflt_real
                 fluid_pp(i)%k_v     = dflt_real
+                fluid_pp(i)%G       = dflt_real
             END DO
 
             ! Tait EOS
@@ -593,6 +597,15 @@ MODULE m_global_parameters
                             pref    = 1.d0
                         END IF
                     END IF
+
+                    IF (hypoelasticity) THEN
+                        stress_idx%beg = sys_size + 1
+                        stress_idx%end = sys_size + (num_dims*(num_dims+1)) / 2
+                        ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
+
+                        sys_size = stress_idx%end
+                    END IF
+
                 ELSE IF(model_eqns == 3) THEN
                     cont_idx%beg = 1
                     cont_idx%end = num_fluids
@@ -881,6 +894,7 @@ MODULE m_global_parameters
             M_v     = fluid_pp(1)%M_v
             mu_v    = fluid_pp(1)%mu_v
             k_v(:)  = fluid_pp(1)%k_v
+            G       = fluid_pp(1)%G
 
             gamma_n = fluid_pp(2)%gamma_v
             M_n     = fluid_pp(2)%M_v

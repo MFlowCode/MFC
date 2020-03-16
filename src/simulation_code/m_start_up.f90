@@ -115,6 +115,7 @@ MODULE m_start_up
                                    mapped_weno, mp_weno, weno_avg,           &
                                    riemann_solver, wave_speeds, avg_state,   &
                                    commute_err, split_err, bc_x, bc_y, bc_z, &
+                                   hypoelasticity,                           &
                                    fluid_pp, com_wrt, cb_wrt, probe_wrt,     &
                                    fd_order, probe, num_probes, t_step_old,  &
                                    threshold_mf, moment_order, alt_crv,      &
@@ -937,7 +938,7 @@ MODULE m_start_up
             
             
             ! Cell-average Conservative Variables ==============================
-            IF (bubbles .NEQV. .True. ) THEN
+            IF ((bubbles .NEQV. .True.) .AND. (hypoelasticity .NEQV. .TRUE.)) THEN
                 DO i = 1, adv_idx%end
                     WRITE(file_path, '(A,I0,A)') &
                            TRIM(t_step_dir) // '/q_cons_vf', i, '.dat'
@@ -1096,7 +1097,7 @@ MODULE m_start_up
                 NVARS_MOK = INT(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                IF (bubbles) THEN
+                IF ((bubbles .EQV. .TRUE.) .OR. (hypoelasticity .EQV. .TRUE.)) THEN
                     DO i = 1, sys_size!adv_idx%end
                         var_MOK = INT(i, MPI_OFFSET_KIND)
 
