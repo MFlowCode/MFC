@@ -2063,7 +2063,7 @@ MODULE m_rhs
 
                             j = stress_idx%beg
                              
-                            rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
+                            rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + &
                            (q_prim_qp(0,0,0)%vf( j )%sf(k,0:n,0:p)*dq_prim_dx_qp(0,0,0)%vf( mom_idx%beg )%sf(k,0:n,0:p))
                                  
                             IF (n > 0) THEN
