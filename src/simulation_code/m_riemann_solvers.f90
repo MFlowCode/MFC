@@ -793,7 +793,7 @@ MODULE m_riemann_solvers
             
             
             ! Computing the viscous and capillary source flux
-            IF(ANY(Re_size > 0)) THEN
+            IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
                 IF (weno_Re_flux) THEN
                     CALL s_compute_viscous_source_flux( &
                                    qL_prim_vf(mom_idx%beg:mom_idx%end), &
@@ -3116,7 +3116,7 @@ MODULE m_riemann_solvers
                         qR_prim_vf(i)%sf( 0,iy%beg:iy%end,iz%beg:iz%end)
                     END DO
                 
-                    IF(ANY(Re_size > 0)) THEN
+                    IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
                   
                         DO i = mom_idx%beg, mom_idx%end
                             dqL_prim_dx_vf(i)%sf(      -1      , &
@@ -3202,7 +3202,7 @@ MODULE m_riemann_solvers
                         qL_prim_vf(i)%sf( m ,iy%beg:iy%end,iz%beg:iz%end)
                     END DO
                 
-                    IF(ANY(Re_size > 0)) THEN
+                    IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
                   
                         DO i = mom_idx%beg, mom_idx%end
                             dqR_prim_dx_vf(i)%sf(      m+1     , &
@@ -3749,7 +3749,7 @@ MODULE m_riemann_solvers
                
             END IF
             
-            IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+            IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                 DO i = mom_idx%beg, E_idx
                     flux_src_vf(i)%sf = 0d0
                 END DO
