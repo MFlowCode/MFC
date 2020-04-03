@@ -74,7 +74,8 @@ MODULE m_rhs
                        s_populate_variables_buffers, &
                        s_finalize_rhs_module, &
                        s_get_crv, &
-                       s_get_viscous
+                       s_get_viscous, &
+                       s_apply_scalar_divergence_theorem
     
     
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: q_cons_qp !<
@@ -258,6 +259,7 @@ MODULE m_rhs
     TYPE(scalar_field) :: alf_sum
     !> @}
 
+    
     character(50) :: file_path !< Local file path for saving debug files
     
     CONTAINS
@@ -520,6 +522,16 @@ MODULE m_rhs
                                                             iy%beg:iy%end, &
                                                             iz%beg:iz%end ))
                                     END DO
+                                    DO l = mom_idx%beg, mom_idx%end
+                                        ALLOCATE(qL_prim_ndqp(i,j,k)%vf(l)%sf( &
+                                                            ix%beg:ix%end, &
+                                                            iy%beg:iy%end, &
+                                                            iz%beg:iz%end ))
+                                        ALLOCATE(qR_prim_ndqp(i,j,k)%vf(l)%sf( &
+                                                            ix%beg:ix%end, &
+                                                            iy%beg:iy%end, &
+                                                            iz%beg:iz%end ))
+                                    END DO
                                 END IF 
                             ELSE
                               
@@ -746,7 +758,7 @@ MODULE m_rhs
                                        ichi%beg:ichi%end, &
                                        ipsi%beg:ipsi%end ))
             
-            IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+            IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                 DO k = ipsi%beg, ipsi%end
                     DO j = ichi%beg, ichi%end
                         DO i = 1, num_dims
@@ -760,7 +772,7 @@ MODULE m_rhs
                             
                             IF(ABS(j) >= ABS(k)) THEN
                                
-                                IF(ANY(Re_size > 0)) THEN
+                                IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
 
                                     DO l = mom_idx%beg, mom_idx%end
                                         ALLOCATE(dqL_prim_dx_ndqp(i,j,k)%vf(l)%sf( &
@@ -1232,7 +1244,7 @@ MODULE m_rhs
                                                               iz%beg:iz%end ))
                                 END DO
                               
-                                IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+                                IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                                     DO l = mom_idx%beg, E_idx
                                         ALLOCATE(flux_src_ndqp(i,j,k)%vf(l)%sf(     &
                                                                  ix%beg:ix%end,     &
@@ -1240,7 +1252,7 @@ MODULE m_rhs
                                                                  iz%beg:iz%end ))
                                     END DO
                                 END IF
-                            
+                                                            
                                 ALLOCATE(flux_src_ndqp(i,j,k)%vf(adv_idx%beg)%sf(       &
                                                                    ix%beg:ix%end,   &
                                                                    iy%beg:iy%end,   &
@@ -1312,7 +1324,7 @@ MODULE m_rhs
                                                                      iz%beg:iz%end ))
                                     END DO
     
-                                    IF (ANY(Re_size > 0) .OR. We_size > 0) THEN
+                                    IF (ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                                         DO l = mom_idx%beg, E_idx
                                             ALLOCATE(lo_flux_src_ndqp(i,j,k)%vf(l)%sf( &
                                                                         ix%beg:ix%end, &
@@ -1418,6 +1430,8 @@ MODULE m_rhs
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_prim_vf
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
             INTEGER, INTENT(IN) :: t_step
+
+           
 
             REAL(KIND(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
             
@@ -1540,9 +1554,10 @@ MODULE m_rhs
             IF(t_step == t_step_stop) RETURN
             ! ==================================================================
             
-            ! Computing Velocity Gradients =====================================
-            IF (any(Re_size > 0)) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
+            ! Computing Velocity Gradients =
 
+
+            IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
             
             ! Dimensional Splitting Loop =======================================
             DO i = 1, num_dims
@@ -1714,11 +1729,11 @@ MODULE m_rhs
                 ! ===============================================================
                 
                 ! Reconstructing First-Order Spatial Derivatives of Velocity ====
-                IF(ANY(Re_size > 0)) THEN
+                IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
 
                     iv%beg = mom_idx%beg; iv%end = mom_idx%end
 
-                    IF (weno_Re_flux) THEN
+                    IF (weno_Re_flux .OR. hypoelasticity) THEN
 
                         CALL s_reconstruct_cell_boundary_values(         &
                                  dq_prim_dx_qp(0,0,0)%vf(iv%beg:iv%end), &
@@ -1857,7 +1872,7 @@ MODULE m_rhs
        
                     CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
                    
-                    IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+                    IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                         iv%beg = mom_idx%beg
                     ELSE
                         iv%beg = adv_idx%beg
@@ -2028,11 +2043,29 @@ MODULE m_rhs
 
                     ! Hypoelastic rhs terms
                     IF (hypoelasticity) THEN
-                        DO k = 0, m 
+                        
+                        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+                
+                        IF(n > 0) iy%beg = -buff_size; IF(p > 0) iz%beg = -buff_size
+                
+                        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+                        
+                        iv%beg = mom_idx%beg; iv%end = mom_idx%end
+
+                        CALL s_apply_scalar_divergence_theorem(qL_prim_ndqp(1,0,0)%vf(iv%beg:iv%end), &
+                                                                   qR_prim_ndqp(1,0,0)%vf(iv%beg:iv%end),  &
+                                                                   dq_prim_dx_qp(0,0,0)%vf(iv%beg:iv%end), 1)
+                       
+                        CALL s_reconstruct_cell_interior_values(dq_prim_dx_qp)
+
+                       
+                            DO k = 0,m
+
                             j = stress_idx%beg
+                             
                             rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
                            (q_prim_qp(0,0,0)%vf( j )%sf(k,0:n,0:p)*dq_prim_dx_qp(0,0,0)%vf( mom_idx%beg )%sf(k,0:n,0:p))
-
+                                 
                             IF (n > 0) THEN
                                 j = stress_idx%beg
                                 rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
@@ -2116,6 +2149,7 @@ MODULE m_rhs
                                 END IF
                             END IF
                         END DO
+                        
                     END IF
  
                     ! Applying source terms to the RHS of the internal energy equations
@@ -2133,7 +2167,7 @@ MODULE m_rhs
                     END IF
 
                     ! Applying the viscous and capillary source fluxes from the Riemann solver
-                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux)) THEN
+                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux) .OR. hypoelasticity) THEN
                         DO j = mom_idx%beg, E_idx
                             DO k = 0, m
                                 rhs_vf(j)%sf(k,:,:) = &
@@ -2452,7 +2486,7 @@ MODULE m_rhs
                     END IF
 
                     ! Applying the viscous and capillary source fluxes from the Riemann solver
-                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux)) THEN
+                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux) .OR. hypoelasticity) THEN
                         DO j = mom_idx%beg, E_idx
                             IF (cyl_coord .AND. ((bc_y%beg == -2) .OR. (bc_y%beg == -13))) THEN
                                 IF (p > 0) THEN
@@ -2858,7 +2892,7 @@ MODULE m_rhs
                     END IF
 
                     ! Applying the viscous and capillary source fluxes from the Riemann solver
-                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux)) THEN
+                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux) .OR. hypoelasticity) THEN
                         DO j = mom_idx%beg, E_idx
                             DO k = 0, p
                                 rhs_vf(j)%sf(:,:,k) = &
@@ -4242,7 +4276,7 @@ MODULE m_rhs
                          lo_flux_ndqp(i,j,k)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     END DO
 
-                    IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+                    IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                         DO l = mom_idx%beg, E_idx
                             flux_src_ndqp(i,j,k)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end) = &
                          lo_flux_src_ndqp(i,j,k)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end) + &
@@ -4274,7 +4308,7 @@ MODULE m_rhs
         
             CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
             
-            IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+            IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                iv%beg = mom_idx%beg
             ELSE
                iv%beg = adv_idx%beg
@@ -4349,7 +4383,7 @@ MODULE m_rhs
                                                           dflt_int, i  )
                      
                     END IF
-                  
+
                     iv%beg = mom_idx%beg; iv%end = mom_idx%end
                   
                     CALL s_average_cell_boundary_values(qL_prim_ndqp(i,:,:))
@@ -4385,13 +4419,14 @@ MODULE m_rhs
                     iv%beg = mom_idx%beg; iv%end = mom_idx%end
 
                     DO k = iv%beg, iv%end
-
+                                            
                         DO j = ix%beg+1, ix%end
                             dqL_prim_dx_ndqp(1,0,0)%vf(k)%sf( j ,:,:) = &
                                   (q_prim_qp(0,0,0)%vf(k)%sf( j ,:,:) - &
                                    q_prim_qp(0,0,0)%vf(k)%sf(j-1,:,:))/ &
                                                     (x_cc(j) - x_cc(j-1))
                         END DO
+
                         DO j = ix%beg, ix%end-1
                             dqR_prim_dx_ndqp(1,0,0)%vf(k)%sf( j ,:,:) = &
                                   (q_prim_qp(0,0,0)%vf(k)%sf(j+1,:,:) - &
@@ -4400,7 +4435,6 @@ MODULE m_rhs
                         END DO
 
                         IF (n > 0) THEN
-
                             DO j = iy%beg+1, iy%end
                                 dqL_prim_dy_ndqp(2,0,0)%vf(k)%sf(:, j ,:) = &
                                       (q_prim_qp(0,0,0)%vf(k)%sf(:, j ,:) - &
@@ -4555,13 +4589,13 @@ MODULE m_rhs
                             END IF
 
                         ELSE
-
                             CALL s_compute_fd_gradient(    q_prim_qp(0,0,0)%vf(k), &
                                                        dq_prim_dx_qp(0,0,0)%vf(k), &
                                                        dq_prim_dx_qp(0,0,0)%vf(k), &
                                                        dq_prim_dx_qp(0,0,0)%vf(k), &
                                                            gm_vel_qp(0,0,0)%vf(k)  )
 
+                            
                         END IF
 
                     END DO
@@ -5860,7 +5894,7 @@ MODULE m_rhs
         SUBROUTINE s_apply_scalar_divergence_theorem( vL_vf, vR_vf, & ! --------
                                                           dv_ds_vf, &
                                                           norm_dir  )
-
+           
             TYPE(scalar_field),       &
             DIMENSION(iv%beg:iv%end), &
             INTENT(IN) :: vL_vf, vR_vf
@@ -5872,10 +5906,10 @@ MODULE m_rhs
             INTEGER, INTENT(IN) :: norm_dir
             
             INTEGER :: i,j,k,l !< Generic loop iterators
-            
+                        
             ! First-Order Spatial Derivatives in x-direction ===================
             IF(norm_dir == 1) THEN
-                
+
                 ! A general application of the scalar divergence theorem that
                 ! utilizes the left and right cell-boundary integral-averages,
                 ! inside each cell, or an arithmetic mean of these two at the
@@ -6042,7 +6076,7 @@ MODULE m_rhs
             END IF
             ! END: First-Order Spatial Derivatives in z-direction ==============
             
-            
+           
         END SUBROUTINE s_apply_scalar_divergence_theorem ! ---------------------
         
         
@@ -6516,13 +6550,13 @@ MODULE m_rhs
             
             
             ! Deallocation of dq_prim_ds_qp ====================================
-            IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+            IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                
                 DO k = itau%beg, itau%end
                     DO j = iksi%beg, iksi%end
                         DO i = ieta%beg, ieta%end
                         
-                            IF(ALL((/i,j,k/) == 0) .AND. ANY(Re_size > 0)) THEN
+                            IF(ALL((/i,j,k/) == 0) .AND. (ANY(Re_size > 0) .OR. hypoelasticity)) THEN
                            
                                 DO l = mom_idx%beg, mom_idx%end
                                     DEALLOCATE(dq_prim_dx_qp(i,j,k)%vf(l)%sf)

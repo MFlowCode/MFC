@@ -805,6 +805,8 @@ MODULE m_global_parameters
                 buff_size = 3*weno_polyn + 2
             ELSEIF(ANY(Re_size > 0)) THEN
                 buff_size = 2*weno_polyn + 2
+            ELSEIF(hypoelasticity) THEN
+                buff_size = 2*weno_polyn + 2
             ELSEIF(commute_err) THEN
                 buff_size = 2*weno_polyn + 1
             ELSE
