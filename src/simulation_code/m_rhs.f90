@@ -1438,7 +1438,7 @@ MODULE m_rhs
             REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm !<
             !! terms  for K div(u)
             
-            INTEGER :: i,j,k,l,r !< Generic loop iterators
+            INTEGER :: i,j,k,l,r,ii !< Generic loop iterators
             
             
             ! Configuring Coordinate Direction Indexes =========================
@@ -2048,24 +2048,31 @@ MODULE m_rhs
                 
                         IF(n > 0) iy%beg = -buff_size; IF(p > 0) iz%beg = -buff_size
                 
-                        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-                        
-                        iv%beg = mom_idx%beg; iv%end = mom_idx%end
+                        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg 
 
-                        CALL s_apply_scalar_divergence_theorem(qL_prim_ndqp(1,0,0)%vf(iv%beg:iv%end), &
+                           iv%beg = mom_idx%beg; iv%end = mom_idx%end
+
+                            CALL s_apply_scalar_divergence_theorem(qL_prim_ndqp(1,0,0)%vf(iv%beg:iv%end), &
                                                                    qR_prim_ndqp(1,0,0)%vf(iv%beg:iv%end),  &
                                                                    dq_prim_dx_qp(0,0,0)%vf(iv%beg:iv%end), 1)
-                       
-                        CALL s_reconstruct_cell_interior_values(dq_prim_dx_qp)
+                           
+                            CALL s_reconstruct_cell_interior_values(dq_prim_dx_qp)
 
-                       
                             DO k = 0,m
 
                             j = stress_idx%beg
-                             
-                            rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + &
-                           (q_prim_qp(0,0,0)%vf( j )%sf(k,0:n,0:p)*dq_prim_dx_qp(0,0,0)%vf( mom_idx%beg )%sf(k,0:n,0:p))
-                                 
+                            
+                            rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) - q_prim_qp(0,0,0)%vf(cont_idx%beg)%sf(k,0:n,0:p) * &
+                            (q_prim_qp(0,0,0)%vf( j )%sf(k,0:n,0:p)*dq_prim_dx_qp(0,0,0)%vf( mom_idx%beg )%sf(k,0:n,0:p))
+
+                                ! Add shear modulus term (2 * G * deviatoric strain rate)
+                                DO ii = 1,num_fluids
+                                    rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + &
+                                    q_cons_qp(0,0,0)%vf(cont_idx%beg+ii-1)%sf(k,0:n,0:p) * &
+                                    ((4/3)*q_prim_qp(0,0,0)%vf(adv_idx%beg+ii-1)%sf(k,0:n,0:p)*fluid_pp(ii)%G * &
+                                    dq_prim_dx_qp(0,0,0)%vf(mom_idx%beg)%sf(k,0:n,0:p))
+                                END DO
+
                             IF (n > 0) THEN
                                 j = stress_idx%beg
                                 rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
@@ -2149,7 +2156,7 @@ MODULE m_rhs
                                 END IF
                             END IF
                         END DO
-                        
+                        !DEALLOCATE(var%sf,grad_x%sf,grad_y%sf,grad_z%sf,norm%sf)
                     END IF
  
                     ! Applying source terms to the RHS of the internal energy equations
@@ -2167,7 +2174,7 @@ MODULE m_rhs
                     END IF
 
                     ! Applying the viscous and capillary source fluxes from the Riemann solver
-                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux) .OR. hypoelasticity) THEN
+                    IF(ANY(Re_size > 0) .OR. (We_size > 0 .AND. We_riemann_flux)) THEN
                         DO j = mom_idx%beg, E_idx
                             DO k = 0, m
                                 rhs_vf(j)%sf(k,:,:) = &
