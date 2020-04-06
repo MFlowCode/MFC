@@ -74,8 +74,7 @@ MODULE m_rhs
                        s_populate_variables_buffers, &
                        s_finalize_rhs_module, &
                        s_get_crv, &
-                       s_get_viscous, &
-                       s_apply_scalar_divergence_theorem
+                       s_get_viscous
     
     
     TYPE(vector_field), ALLOCATABLE, DIMENSION(:,:,:) :: q_cons_qp !<
@@ -499,7 +498,7 @@ MODULE m_rhs
                                 END DO
 
                                 IF (bubbles) THEN
-                                    DO l = bub_idx%beg, sys_size
+                                    DO l = bub_idx%beg, bub_idx%end
                                         ALLOCATE(qL_prim_ndqp(i,j,k)%vf(l)%sf( &
                                                             ix%beg:ix%end, &
                                                             iy%beg:iy%end, &
