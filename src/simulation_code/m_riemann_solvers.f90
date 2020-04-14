@@ -592,10 +592,20 @@ MODULE m_riemann_solvers
                                  lo_cons   = lo_rho_L*lo_vel_L(dir_idx(i)) - lo_rho_R*lo_vel_R(dir_idx(i))
                                  hi_cons   = rho_L * vel_L(dir_idx(i)) - rho_R * vel_R(dir_idx(i))
                                 tvd_cons   = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                                 lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_L
-                                 lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_R
-                                 hi_flux_L = rho_L * vel_L(dir_idx(1)) * vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_L
-                                 hi_flux_R = rho_R * vel_R(dir_idx(1)) * vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_R
+                                lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_L
+                                lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_R
+                                hi_flux_L = rho_L * vel_L(dir_idx(1)) * vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_L
+                                hi_flux_R = rho_R * vel_R(dir_idx(1)) * vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_R
+
+                                ! added elastic shear stress term if hypoelastic modeling is on
+                               ! IF (hypoelasticity) THEN
+                               !     tau_idx = 
+                               !     lo_flux_L = lo_flux_L - lo_tau_e_L(dir_idx(1))
+                               !     lo_flux_R = lo_flux_R - lo_tau_e_R(dix_idx(1))
+                               !     hi_flux_L = hi_flux_L - tau_e_L(dir_idx(1))
+                               !     hi_flux_R = hi_flux_R - tau_e_R(dir_idx(1))
+                               ! END IF
+ 
                                 tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
                                 tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
                 
