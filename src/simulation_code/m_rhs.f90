@@ -1440,6 +1440,9 @@ MODULE m_rhs
             !! For shear modulus term calculation in stress eq when hypoelastic = true :
             REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_K, alpha_rho_K
             REAL(KIND(0d0)) :: rho_K, G_K
+            REAL(KIND(0d0)) :: gamma_K, pi_inf_K
+            REAL(KIND(0d0)), DIMENSION(2) :: Re_K
+            REAL(KIND(0d0)), DIMENSION(1:num_fluids,1:num_fluids) :: We_K
  
             INTEGER :: i,j,k,l,r,ii !< Generic loop iterators
             
@@ -2061,29 +2064,28 @@ MODULE m_rhs
                            
                             CALL s_reconstruct_cell_interior_values(dq_prim_dx_qp) 
 
+                            
+
                             DO k = 0,m
 
                             j = stress_idx%beg
-                            
-                            
+                           
+                            ! This will need to be changed to work in 2&3D, with %sf(k,0:n,0:p) rather than %sf(k,0,0) 
+                            CALL s_convert_to_mixture_variables(q_prim_qp(0,0,0)%vf, rho_K, gamma_K, pi_inf_K, &
+                                                                Re_K, We_K, k, 0, 0, G_K, fluid_pp(:)%G)
 
                                 ! This will need to be changed to work in 2&3D, with %sf(k,0:n,0:p) rather than %sf(k,0,0)
-                                rho_K = 0d0; G_K = 0d0;
-                                DO ii = 1,num_fluids
-                                    alpha_K(ii) = q_prim_qp(0,0,0)%vf(adv_idx%beg+ii-1)%sf(k,0,0)
-                                    alpha_rho_K(ii) = q_prim_qp(0,0,0)%vf(cont_idx%beg+ii-1)%sf(k,0,0)
-                                    rho_K = rho_K + alpha_rho_K(ii)
-                                    G_K = G_K + alpha_K(ii)*fluid_pp(ii)%G
-                                END DO
+!                                rho_K = 0d0; G_K = 0d0;
+!                                DO ii = 1,num_fluids
+!                                    alpha_K(ii) = q_prim_qp(0,0,0)%vf(adv_idx%beg+ii-1)%sf(k,0,0)
+!                                    alpha_rho_K(ii) = q_prim_qp(0,0,0)%vf(cont_idx%beg+ii-1)%sf(k,0,0)
+!                                    rho_K = rho_K + alpha_rho_K(ii)
+!                                    G_K = G_K + alpha_K(ii)*fluid_pp(ii)%G
+!                                END DO
 
-                                !rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) - q_prim_qp(0,0,0)%vf(cont_idx%beg)%sf(k,0:n,0:p) * &
                                 rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + rho_K * &
                                 (- q_prim_qp(0,0,0)%vf( j )%sf(k,0:n,0:p)*dq_prim_dx_qp(0,0,0)%vf( mom_idx%beg )%sf(k,0:n,0:p) + &
                                 (4/3) * G_K * dq_prim_dx_qp(0,0,0)%vf(mom_idx%beg)%sf(k,0:n,0:p))
-
-                                ! Add shear modulus term (2 * G * deviatoric strain rate)
-                                !rhs_vf(j)%sf(k,:,:) = rhs_vf(j)%sf(k,:,:) + ((4/3) * rho_K * G_K * &
-                                !                      dq_prim_dx_qp(0,0,0)%vf(mom_idx%beg)%sf(k,0:n,0:p))
 
 
                             IF (n > 0) THEN
