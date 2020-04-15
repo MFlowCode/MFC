@@ -94,7 +94,7 @@ MODULE m_variables_conversion
         !! @param k Cell location third index
         SUBROUTINE s_convert_abstract_to_mixture_variables( qK_vf, rho_K,      &
                                                             gamma_K, pi_inf_K, &
-                                                            Re_K, We_K, i,j,k  )
+                                                            Re_K, We_K, i,j,k, G_K, G )
             
             IMPORT :: scalar_field, sys_size, num_fluids
             
@@ -108,6 +108,9 @@ MODULE m_variables_conversion
                                         num_fluids  ), INTENT(OUT) :: We_K
             
             INTEGER, INTENT(IN) :: i,j,k
+
+            REAL(KIND(0d0)), optional, INTENT(OUT) :: G_K
+            REAL(KIND(0d0)), optional, DIMENSION(num_fluids), INTENT(IN) :: G
             
         END SUBROUTINE s_convert_abstract_to_mixture_variables
         
@@ -184,7 +187,7 @@ MODULE m_variables_conversion
         !! @param We_K Weber number
         SUBROUTINE s_convert_mixture_to_mixture_variables( qK_vf, rho_K,      &
                                                            gamma_K, pi_inf_K, &
-                                                           Re_K, We_K, i,j,k  )
+                                                           Re_K, We_K, i,j,k, G_K, G  )
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
             
@@ -196,6 +199,9 @@ MODULE m_variables_conversion
                                         num_fluids  ), INTENT(OUT) :: We_K
             
             INTEGER, INTENT(IN) :: i,j,k
+
+            REAL(KIND(0d0)), optional, INTENT(OUT) :: G_K
+            REAL(KIND(0d0)), optional, DIMENSION(num_fluids), INTENT(IN) :: G
             
             ! Performing the transfer of the density, the specific heat ratio
             ! function as well as the liquid stiffness function, respectively
@@ -222,7 +228,7 @@ MODULE m_variables_conversion
         !! @param k Cell index
         SUBROUTINE s_convert_species_to_mixture_variables_bubbles ( qK_vf, rho_K,      &
                                                            gamma_K, pi_inf_K, &
-                                                           Re_K, We_K, i,j,k  )
+                                                           Re_K, We_K, i,j,k, G_K, G )
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
             
@@ -239,6 +245,9 @@ MODULE m_variables_conversion
             
             INTEGER, INTENT(IN) :: i,j,k
             INTEGER :: l
+
+            REAL(KIND(0d0)), optional, INTENT(OUT) :: G_K
+            REAL(KIND(0d0)), optional, DIMENSION(num_fluids), INTENT(IN) :: G
 
             ! Constraining the partial densities and the volume fractions within
             ! their physical bounds to make sure that any mixture variables that
@@ -280,7 +289,7 @@ MODULE m_variables_conversion
                     gamma_K  = fluid_pp(1)%gamma
                     pi_inf_K = fluid_pp(1)%pi_inf
                 END IF
-            END IF
+            END IF 
             
         END SUBROUTINE s_convert_species_to_mixture_variables_bubbles ! ----------------
  
@@ -302,7 +311,7 @@ MODULE m_variables_conversion
         !! @param r Cell index        
         SUBROUTINE s_convert_species_to_mixture_variables( qK_vf, rho_K,      &
                                                            gamma_K, pi_inf_K, &
-                                                           Re_K, We_K, k,l,r  )
+                                                           Re_K, We_K, k,l,r, G_K,G )
             
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: qK_vf
 
@@ -317,6 +326,9 @@ MODULE m_variables_conversion
 
             REAL(KIND(0d0)), DIMENSION(num_fluids) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
+
+            REAL(KIND(0d0)), optional, INTENT(OUT) :: G_K
+            REAL(KIND(0d0)), optional, DIMENSION(num_fluids), INTENT(IN) :: G
             
             INTEGER, INTENT(IN) :: k,l,r
             
@@ -329,7 +341,7 @@ MODULE m_variables_conversion
 
             DO i = 1, num_fluids
                 alpha_rho_K(i) = qK_vf(i)%sf(k,l,r)
-                alpha_K(i)     = qK_vf(E_idx+i)%sf(k,l,r)
+                alpha_K(i)     = qK_vf(adv_idx%beg+i-1)%sf(k,l,r)
             END DO
             
             IF(mpp_lim) THEN
@@ -380,7 +392,15 @@ MODULE m_variables_conversion
                                                                sgm_eps   )
                 We_K(We_idx(i,2),We_idx(i,1)) = dflt_real
             END DO
-            
+
+
+            IF (present(G_K)) THEN
+                G_K = 0d0
+                DO i = 1, num_fluids
+                    G_K = G_K + alpha_K(i)*G(i)
+                END DO
+            END IF
+ 
         END SUBROUTINE s_convert_species_to_mixture_variables ! ----------------
         
         
