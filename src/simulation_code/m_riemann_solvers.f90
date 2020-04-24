@@ -742,6 +742,9 @@ MODULE m_riemann_solvers
                                 END IF
                             END DO
                         ELSE
+                            ! No TVD Riemann fluxes
+                            
+                            ! Mass
                             DO i = 1, cont_idx%end
                                 flux_rs_vf(i)%sf(j,k,l) = &
                                       ( s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
@@ -751,6 +754,7 @@ MODULE m_riemann_solvers
                                       / (s_M - s_P)
                             END DO
                             
+                            ! Momentum
                             DO i = 1, num_dims
                                 flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
                                         ( s_M*( rho_R*vel_R(dir_idx(1))         &
@@ -764,12 +768,14 @@ MODULE m_riemann_solvers
                                         / (s_M - s_P)
                             END DO
                             
+                            ! Energy
                             flux_rs_vf(E_idx)%sf(j,k,l) = &
                                     ( s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
                                     - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
                                     + s_M*s_P*(E_L - E_R) )                &
                                     / (s_M - s_P)
                             
+                            ! Advection
                             DO i = adv_idx%beg, adv_idx%end
                                 flux_rs_vf(i)%sf(j,k,l) = &
                                          ( qL_prim_rs_vf(i)%sf( j ,k,l)   &
@@ -781,6 +787,7 @@ MODULE m_riemann_solvers
                                        / (s_M - s_P)
                             END DO
                             
+                            ! Div(U)?
                             DO i = 1, num_dims
                                 vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = &
                                              ( xi_M*(rho_L*vel_L(dir_idx(i))  * &
@@ -805,6 +812,12 @@ MODULE m_riemann_solvers
                                         / (s_M - s_P)
                                 END DO 
                             END IF
+
+                            ! IF (bubbles) THEN
+                            !     DO 
+
+                            !     END DO
+                            ! END IF
 
                         END IF
                     END DO
