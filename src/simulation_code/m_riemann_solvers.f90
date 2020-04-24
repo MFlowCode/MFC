@@ -598,13 +598,12 @@ MODULE m_riemann_solvers
                                 hi_flux_R = rho_R * vel_R(dir_idx(1)) * vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_R
 
                                 ! added elastic shear stress term if hypoelastic modeling is on
-                               ! IF (hypoelasticity) THEN
-                               !     tau_idx = 
-                               !     lo_flux_L = lo_flux_L - lo_tau_e_L(dir_idx(1))
-                               !     lo_flux_R = lo_flux_R - lo_tau_e_R(dix_idx(1))
-                               !     hi_flux_L = hi_flux_L - tau_e_L(dir_idx(1))
-                               !     hi_flux_R = hi_flux_R - tau_e_R(dir_idx(1))
-                               ! END IF
+                                IF (hypoelasticity) THEN                                    
+                                    lo_flux_L = lo_flux_L - lo_tau_e_L(dir_idx_tau(i))
+                                    lo_flux_R = lo_flux_R - lo_tau_e_R(dir_idx_tau(i))
+                                    hi_flux_L = hi_flux_L - tau_e_L(dir_idx_tau(i))
+                                    hi_flux_R = hi_flux_R - tau_e_R(dir_idx_tau(i))
+                                END IF
  
                                 tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
                                 tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
@@ -628,8 +627,19 @@ MODULE m_riemann_solvers
                              lo_flux_R = lo_vel_R(dir_idx(1))*(lo_E_R + lo_pres_R)
                              hi_flux_L = vel_L(dir_idx(1))*(E_L + pres_L)
                              hi_flux_R = vel_R(dir_idx(1))*(E_R + pres_R)
+
+                            ! added elastic shear stress term if hypoelastic modeling is on
+                            IF (hypoelasticity) THEN
+                                DO i = 1, num_dims
+                                        lo_flux_L = lo_flux_L - (lo_tau_e_L(dir_idx_tau(i)) * lo_vel_L(i))
+                                        lo_flux_R = lo_flux_R - (lo_tau_e_R(dir_idx_tau(i)) * lo_vel_R(i))
+                                        hi_flux_L = hi_flux_L - (tau_e_L(dir_idx_tau(i)) * vel_L(i))
+                                        hi_flux_R = hi_flux_R - (tau_e_L(dir_idx_tau(i)) * vel_L(i))
+                                END DO
+                            END IF
+
                             tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
+                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R) 
                 
                             IF (tvd_wave_speeds) THEN
                                 flux_rs_vf(E_idx)%sf(j,k,l) = &
@@ -3660,7 +3670,18 @@ MODULE m_riemann_solvers
                is1 = iz; is2 = iy; is3 = ix
                dir_idx = (/3,1,2/); dir_flg = (/0d0,0d0,1d0/)
             END IF
-            
+           
+            ! Extra indexes needed for hypoelasticity
+            IF(hypoelasticity) THEN
+                IF(norm_dir == 1) THEN
+                    dir_idx_tau = (/1,2,4/)
+                ELSEIF(norm_dir == 2) THEN
+                    dir_idx_tau = (/2,3,5/)
+                ELSE
+                    dir_idx_tau = (/4,5,6/)
+                END IF
+            END IF
+ 
             ! Setting up special bounds for cell-average values
             xbeg = -buff_size; ybeg = 0; zbeg = 0
             IF (n > 0) ybeg = -buff_size; IF (p > 0) zbeg = -buff_size
