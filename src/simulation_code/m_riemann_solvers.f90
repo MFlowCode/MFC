@@ -800,6 +800,7 @@ MODULE m_riemann_solvers
                                          xi_P*rho_R*(s_R - vel_R(dir_idx(1))) )
                             END DO
 
+                            ! SHB: Does this need to be ammended?
                             IF (hypoelasticity) THEN
                                 DO i = 1, (num_dims*(num_dims+1)) / 2
                                     flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) =  &
@@ -814,9 +815,35 @@ MODULE m_riemann_solvers
                             END IF
 
                             ! IF (bubbles) THEN
-                            !     DO 
 
-                            !     END DO
+                                ! Momentum: check signs on this
+                                ! DO i = 1, num_dims
+                                !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
+                                !             ( s_M*( rho_R*vel_R(dir_idx(1))         &
+                                !                          *vel_R(dir_idx(i))         &
+                                !                   + dir_flg(dir_idx(i))*ptilde_R )    &
+                                !             - s_P*( rho_L*vel_L(dir_idx(1))         &
+                                !                          *vel_L(dir_idx(i))         &
+                                !                   + dir_flg(dir_idx(i))*ptilde_L )    &
+                                !             + s_M*s_P*( rho_L*vel_L(dir_idx(i))     &
+                                !                       - rho_R*vel_R(dir_idx(i)) ) ) &
+                                !             / (s_M - s_P)
+                                ! END DO
+
+
+                                ! Advection: does this need to be changed? 
+                                !   perhaps set bub_idx advection to zero? 
+                                ! DO i = adv_idx%beg, adv_idx%end
+                                !     flux_rs_vf(i)%sf(j,k,l) = &
+                                !              ( qL_prim_rs_vf(i)%sf( j ,k,l)   &
+                                !              - qR_prim_rs_vf(i)%sf(j+1,k,l) ) &
+                                !              * s_M*s_P/(s_M - s_P)
+                                !     flux_src_rs_vf(i)%sf(j,k,l) = &
+                                !            ( s_M*qR_prim_rs_vf(i)%sf(j+1,k,l)   &
+                                !            - s_P*qL_prim_rs_vf(i)%sf( j ,k,l) ) &
+                                !            / (s_M - s_P)
+                                ! END DO
+
                             ! END IF
 
                         END IF
