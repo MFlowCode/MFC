@@ -229,6 +229,9 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(3) :: dir_flg
     !> @}
 
+    !! extra coordinate direction index used if hypoelasticity = true
+    INTEGER        , DIMENSION(3) :: dir_idx_tau
+
     REAL(KIND(0d0)) :: wa_flg !<
     !! The WENO average (WA) flag regulates whether the calculation of any cell-
     !! average spatial derivatives is carried out in each cell by utilizing the
