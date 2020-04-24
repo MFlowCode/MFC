@@ -819,16 +819,25 @@ MODULE m_riemann_solvers
                                 ! Momentum: check signs on this
                                 ! DO i = 1, num_dims
                                 !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
+                                !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) - 
                                 !             ( s_M*( rho_R*vel_R(dir_idx(1))         &
                                 !                          *vel_R(dir_idx(i))         &
                                 !                   + dir_flg(dir_idx(i))*ptilde_R )    &
                                 !             - s_P*( rho_L*vel_L(dir_idx(1))         &
                                 !                          *vel_L(dir_idx(i))         &
                                 !                   + dir_flg(dir_idx(i))*ptilde_L )    &
-                                !             + s_M*s_P*( rho_L*vel_L(dir_idx(i))     &
-                                !                       - rho_R*vel_R(dir_idx(i)) ) ) &
+                                !               ) &
                                 !             / (s_M - s_P)
                                 ! END DO
+
+
+                                ! Energy: check signs on this
+                                ! flux_rs_vf(E_idx)%sf(j,k,l) = &
+                                ! flux_rs_vf(E_idx)%sf(j,k,l) - &
+                                !         ( s_M*vel_R(dir_idx(1))*(E_R + ptilde_R) &
+                                !         - s_P*vel_L(dir_idx(1))*(E_L + ptilde_L) &
+                                !         )                                         &
+                                !         / (s_M - s_P)
 
 
                                 ! Advection: does this need to be changed? 
@@ -842,6 +851,20 @@ MODULE m_riemann_solvers
                                 !            ( s_M*qR_prim_rs_vf(i)%sf(j+1,k,l)   &
                                 !            - s_P*qL_prim_rs_vf(i)%sf( j ,k,l) ) &
                                 !            / (s_M - s_P)
+                                ! END DO
+
+                                ! From HLLC: Kills mass transport @ bubble gas density
+                                ! IF ( num_fluids > 1 ) THEN
+                                !     flux_rs_vf(cont_idx%end)%sf(j,k,l) = 0d0
+                                ! END IF
+
+                                ! Advection of bubble sources (from HLLC)
+                                ! DO i = bub_idx%beg,sys_size
+                                !     flux_rs_vf(i)%sf(j,k,l) =   &
+                                !             xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j,k,l)      &
+                                !             * (vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                !             + xi_P*nbub_R*qR_prim_rs_vf(i)%sf(j+1,k,l)      &
+                                !             * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 ! END DO
 
                             ! END IF
