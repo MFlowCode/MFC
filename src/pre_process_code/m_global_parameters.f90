@@ -611,7 +611,7 @@ MODULE m_global_parameters
 
 
             ! liquid physical properties
-            REAL(KIND(0.D0)) :: mul0, ss, pv, gamma_v, M_v, mu_v, G
+            REAL(KIND(0.D0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
 
             ! gas physical properties
             REAL(KIND(0.D0)) :: gamma_m, gamma_n, M_n, mu_n
@@ -636,7 +636,6 @@ MODULE m_global_parameters
             M_v     = fluid_pp(1)%M_v
             mu_v    = fluid_pp(1)%mu_v
             k_v(:)  = fluid_pp(1)%k_v
-            G       = fluid_pp(1)%G
 
             gamma_n = fluid_pp(2)%gamma_v
             M_n     = fluid_pp(2)%M_v
