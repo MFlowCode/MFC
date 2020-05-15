@@ -1945,13 +1945,23 @@ MODULE m_rhs
     
                     ! Applying source terms to the RHS of the advection equations
                     IF(riemann_solver == 1) THEN
+                        !HLL, no K \div(u) so this just adds (subtracts?)
+                        ! \alpha_i \div(u) to RHS of \alpha_i transport equation
                         DO j = adv_idx%beg, adv_idx%end
                             DO k = 0, m
+                                ! shouldn't cont_idx%end+adv_idx be out of bounds?
                                 rhs_vf(j)%sf(k,:,:) = &
                                 rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
                                 q_prim_qp(0,0,0)%vf(cont_idx%end+i)%sf(k,0:n,0:p) * &
                                 ( flux_src_ndqp(i,0,0)%vf(j)%sf(k-1,0:n,0:p) &
                                 - flux_src_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) )
+    
+                            ! HLLC Version: different in strang ways. sign on div u seems correct here, not above
+                            !     rhs_vf(j)%sf(k,:,:) = &
+                            !     rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
+                            !     q_cons_qp(0,0,0)%vf(j)%sf(k,0:n,0:p) * &
+                            !     ( flux_src_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) &
+                            !     - flux_src_ndqp(i,0,0)%vf(j)%sf(k-1,0:n,0:p) )
                             END DO
                         END DO
                     ELSE
