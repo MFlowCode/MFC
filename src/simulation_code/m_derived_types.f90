@@ -74,6 +74,8 @@ MODULE m_derived_types
         INTEGER, DIMENSION(:), ALLOCATABLE :: vs !< Bubble radial velocities
         INTEGER, DIMENSION(:), ALLOCATABLE :: ps !< Bubble pressures
         INTEGER, DIMENSION(:), ALLOCATABLE :: ms !< Bubble mass fluxes
+
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: moms !< Moment indices for qbmm
     END TYPE bub_bounds_info    
     
     !> Derived type annexing the physical parameters (PP) of fluids. 

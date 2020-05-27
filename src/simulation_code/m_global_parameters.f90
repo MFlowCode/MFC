@@ -295,10 +295,15 @@ MODULE m_global_parameters
     LOGICAL         :: bubbles      !< Bubbles on/off
     LOGICAL         :: polytropic   !< Polytropic  switch
     LOGICAL         :: polydisperse !< Polydisperse bubbles 
+
     INTEGER         :: bubble_model !< Gilmore or Keller--Miksis bubble model
     INTEGER         :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ptil  !< Pressure modification
     REAL(KIND(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
+
+    LOGICAL         :: qbmm !< Quadrature moment method
+    INTEGER         :: nmom !< Number of carried moments
+    INTEGER         :: nnode !< Number of QBMM nodes
     !> @}
     
     !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
@@ -426,6 +431,10 @@ MODULE m_global_parameters
             thermal     = dflt_int
             R0ref       = dflt_real
             nb          = dflt_int
+
+            qbmm        = .FALSE.
+            nmom        = 1
+            nnode       = 1
             
             Ca      = dflt_real
             Re_inv  = dflt_real
@@ -556,32 +565,47 @@ MODULE m_global_parameters
                     
                     IF (bubbles) THEN
                         bub_idx%beg = sys_size+1
-                        bub_idx%end = sys_size+2*nb
+                        bub_idx%end = sys_size+2*nb*nmom
                         IF (polytropic .NEQV. .TRUE.) THEN
-                            bub_idx%end = sys_size+4*nb
+                            bub_idx%end = sys_size+4*nb*nmom
                         END IF
                         sys_size = bub_idx%end
 
-                        ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
-                        ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                         ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                        DO i = 1, nb
-                            IF (polytropic .NEQV. .TRUE.) THEN
-                                fac = 4
-                            ELSE
-                                fac = 2
+                        IF (qbmm) THEN
+                            IF( nnode == 4) THEN
+                                nmom = 6
                             END IF
 
-                            bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
-                            bub_idx%vs(i) = bub_idx%rs(i)+1
-                            
-                            IF (polytropic .NEQV. .TRUE.) THEN
-                                bub_idx%ps(i) = bub_idx%vs(i)+1
-                                bub_idx%ms(i) = bub_idx%ps(i)+1
-                            END IF
-                        END DO
+                            ALLOCATE( bub_idx%moms(nb,nmom) )
 
+                            DO i = 1, nb
+                                DO j = 1, nmom
+                                    bub_idx%moms(i,j) = bub_idx%beg+j+(i-1)*nmom
+                                END DO 
+                            END DO
+                        ELSE
+                            ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                            ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
+
+                            DO i = 1, nb
+                                IF (polytropic .NEQV. .TRUE.) THEN
+                                    fac = 4
+                                ELSE
+                                    fac = 2
+                                END IF
+
+                                bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
+                                bub_idx%vs(i) = bub_idx%rs(i)+1
+                                
+                                IF (polytropic .NEQV. .TRUE.) THEN
+                                    bub_idx%ps(i) = bub_idx%vs(i)+1
+                                    bub_idx%ms(i) = bub_idx%ps(i)+1
+                                END IF
+                            END DO
+                        END IF
+                        
                         IF (nb == 1) THEN
                             weight(:)   = 1d0
                             R0(:)       = 1d0
@@ -605,7 +629,6 @@ MODULE m_global_parameters
                         stress_idx%beg = sys_size + 1
                         stress_idx%end = sys_size + (num_dims*(num_dims+1)) / 2
                         ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
-
                         sys_size = stress_idx%end
                     END IF
 
