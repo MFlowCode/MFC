@@ -131,7 +131,7 @@ MODULE m_start_up
                                    monopole, mono, num_mono,                 &
                                    polytropic, thermal,                      &
                                    integral, integral_wrt, num_integrals,    &
-                                   polydisperse, poly_sigma
+                                   polydisperse, poly_sigma, qbmm, nmom, nnode
             
             
             ! Checking that an input file has been provided by the user. If it
@@ -242,6 +242,9 @@ MODULE m_start_up
             ELSEIF( model_eqns == 2 .AND. bubbles .AND. bubble_model == 1  ) THEN
                 PRINT '(A)', 'The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)'
                 CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. bubble_model == 3 .AND. (polytropic .NEQV. .TRUE.)  ) THEN
+                PRINT '(A)', 'RP bubbles require polytropic compression'
+                CALL s_mpi_abort()
             ELSEIF( cyl_coord .AND. bubbles ) THEN
                 PRINT '(A)', 'Bubble models untested in cylindrical coordinates'
                 CALL s_mpi_abort()
@@ -277,6 +280,12 @@ MODULE m_start_up
                 CALL s_mpi_abort()
             ELSEIF( polydisperse .and. (poly_sigma == dflt_real) ) THEN
                 PRINT '(A)', 'Polydisperse bubble modeling requires poly_sigma > 0'
+                CALL s_mpi_abort()
+            ELSEIF( qbmm.AND. (bubbles .NEQV. .TRUE.) ) THEN
+                PRINT '(A)', 'QBMM requires bubbles'
+                CALL s_mpi_abort()
+            ELSEIF( qbmm .AND. (nnode .NE. 4) ) THEN
+                PRINT '(A)', 'nnode not supported'
                 CALL s_mpi_abort()
             ELSEIF(model_eqns == 3 .AND. riemann_solver /= 2) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &

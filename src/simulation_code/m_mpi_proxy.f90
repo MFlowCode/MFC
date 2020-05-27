@@ -403,6 +403,16 @@ MODULE m_mpi_proxy
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
 
+            CALL MPI_BCAST( qbmm,1,          &
+                        MPI_LOGICAL,0,          &
+                        MPI_COMM_WORLD,ierr  )
+            CALL MPI_BCAST( nnode,1,            &
+                        MPI_INTEGER,0, &
+                        MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( nmom,1,            &
+                        MPI_INTEGER,0, &
+                        MPI_COMM_WORLD,ierr)
+
             !Acoustic monopole
             CALL MPI_BCAST( monopole,1,          &
                         MPI_LOGICAL,0,          &

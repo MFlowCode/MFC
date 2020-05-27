@@ -172,6 +172,9 @@ MODULE m_bubbles
                         Cpbw        = f_cpbw_KM( R0(q), myR, myV, gamma_gas, pb )
                         c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
                         rddot       = f_rddot_KM( pbdot, gamma_gas, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_gas )
+                    ELSE IF (bubble_model == 3) THEN
+                        ! Rayleigh-Plesset bubbles
+                        rddot       = f_rddot_RP( gamma_gas, myP, myRho, myR, myV, R0(q) )
                     END IF
 
                     bub_v_src(q,j,k,l) = nbub(j,k,l) * rddot
@@ -324,6 +327,30 @@ MODULE m_bubbles
         END FUNCTION f_Hdot
 
 
+        !>  Function that computes the bubble radial acceleration for Rayleigh-Plesset bubbles
+        !!  @param fgamma_gas Polytropic gas constant
+        !!  @param fCp Driving pressure
+        !!  @param fRho Current density
+        !!  @param fR Current bubble radius
+        !!  @param fV Current bubble velocity
+        !!  @param fR0 Equilibrium bubble radius
+        FUNCTION f_rddot_RP( fgamma_gas, fCp, fRho, fR, fV, fR0 )
+
+            REAL(KIND(0d0)), INTENT(IN) :: fgamma_gas, fCp, fRho, fR, fV, fR0
+            REAL(KIND(0d0))             :: tmp1, tmp2
+            REAL(KIND(0d0))             :: f_rddot_RP
+
+            !! rddot = (1/r) (  -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho )
+            !! rddot = (1/r) (  -3/2 rdot^2 + (tmp1 - Cp)/rho )
+            !! rddot = (1/r) (  tmp2 )
+
+            tmp1 = ( fR0/fR )**( 3.d0*fgamma_gas )
+            tmp2 =  -1.5D0*fV**2d0 + (tmp1 - fCp)/fRho 
+            f_rddot_RP = tmp2/fR
+
+        END FUNCTION f_rddot_RP
+
+
         !>  Function that computes the bubble radial acceleration
         !!  @param fCpbw Bubble wall pressure
         !!  @param fR Current bubble radius
@@ -352,6 +379,7 @@ MODULE m_bubbles
         END FUNCTION f_rddot
 
 
+
         !>  Function that computes the bubble wall pressure for Keller--Miksis bubbles
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fR Current bubble radius
@@ -371,6 +399,7 @@ MODULE m_bubbles
             END IF
 
         END FUNCTION f_cpbw_KM
+
 
 
 
