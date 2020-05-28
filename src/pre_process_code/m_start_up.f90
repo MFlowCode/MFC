@@ -129,7 +129,8 @@ MODULE m_start_up
                                    cyl_coord, loops_x, loops_y, loops_z,      &
                                    rhoref, pref, bubbles, R0ref, nb,          &
                                    polytropic, thermal, Ca, Web, Re_inv,      &
-                                   polydisperse, poly_sigma, qbmm, nmom, nnode
+                                   polydisperse, poly_sigma, qbmm, nmom,      &
+                                   nnode, sigR, sigV
  
 
             ! Inquiring the status of the pre_process.inp file

@@ -851,6 +851,10 @@ pre_process_dict =                                                             \
                     'thermal'                       : None,                     \
                     'nb'                            : None,                     \
                     'R0ref'                         : None,                     \
+                    'qbmm'                          : None,                     \
+                    'nnode'                         : None,                     \
+                    'sigR'                          : None,                     \
+                    'sigV'                          : None,                     \
                     'patch_icpp(1)%r0'              : None,                     \
                     'patch_icpp(2)%r0'              : None,                     \
                     'patch_icpp(3)%r0'              : None,                     \
@@ -1232,6 +1236,8 @@ simulation_dict =                                                              \
                     'nb'                            : None,                     \
                     'Monopole'                      : None,                     \
                     'num_mono'                      : None,                     \
+                    'qbmm'                          : None,                     \
+                    'nnode'                         : None,                     \
                     'Mono(1)%loc(1)'                : None,                     \
                     'Mono(1)%loc(2)'                : None,                     \
                     'Mono(1)%loc(3)'                : None,                     \

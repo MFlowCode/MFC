@@ -74,6 +74,7 @@ MODULE m_derived_types
         INTEGER, DIMENSION(:), ALLOCATABLE :: ps
         INTEGER, DIMENSION(:), ALLOCATABLE :: ms
         INTEGER, DIMENSION(:,:), ALLOCATABLE :: moms !< Moment indices for qbmm
+        INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: fullmom !< Moment indices for qbmm
     END TYPE bub_bounds_info
     
     !> Derived type adding initial condition (ic) patch parameters as attributes

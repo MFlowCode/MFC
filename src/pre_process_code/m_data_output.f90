@@ -227,7 +227,7 @@ MODULE m_data_output
                                             pi_inf &
                                             ) / gamma
                                     END IF
-                                ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
+                                ELSE IF ((i .GE. bub_idx%beg) .AND. (i .LE. bub_idx%end) .AND. bubbles) THEN
                                     DO k = 1,nb
                                         nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
                                     END DO
