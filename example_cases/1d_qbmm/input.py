@@ -44,7 +44,7 @@ We = rho0*(uu**2.)*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 0.00004
+vf0     = 1.E-4
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -54,7 +54,7 @@ nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
-Nx      = 1000
+Nx      = 50
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)
@@ -125,7 +125,7 @@ case_dict =                                                                     
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
-                    'num_patches'                  : 2,                        \
+                    'num_patches'                  : 1,                        \
                     'model_eqns'                   : 2,                        \
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 1,                        \
@@ -162,28 +162,29 @@ case_dict =                                                                     
 		    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
-                    'patch_icpp(1)%geometry'       : 1,                         \
-                    'patch_icpp(1)%x_centroid'     : 0.,                        \
-                    'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
-                    'patch_icpp(1)%vel(1)'         : 0.0,                       \
-                    'patch_icpp(1)%pres'           : patm,                      \
-                    'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0, \
-                    'patch_icpp(1)%alpha(1)'       : 1.E-12,                    \
-                    'patch_icpp(1)%r0'             : 1.,                        \
-                    'patch_icpp(1)%v0'             : 0.0E+00,                   \
+                    # 'patch_icpp(1)%geometry'       : 1,                         \
+                    # 'patch_icpp(1)%x_centroid'     : 0.,                        \
+                    # 'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
+                    # 'patch_icpp(1)%vel(1)'         : 0.0,                       \
+                    # 'patch_icpp(1)%pres'           : patm,                      \
+                    # 'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0, \
+                    # 'patch_icpp(1)%alpha(1)'       : 1.E-12,                    \
+                    # 'patch_icpp(1)%r0'             : 1.,                        \
+                    # 'patch_icpp(1)%v0'             : 0.0E+00,                   \
                     # ==========================================================
 
                     # Patch 2 Screen ===========================================
-                    'patch_icpp(2)%geometry'       : 1,                         \
-                    'patch_icpp(2)%x_centroid'     : 0.,                        \
-                    'patch_icpp(2)%length_x'       : 5.E-03/x0,                 \
-                    'patch_icpp(2)%alter_patch(1)' : 'T',                       \
-                    'patch_icpp(2)%vel(1)'         : 0.0,                       \
-                    'patch_icpp(2)%pres'           : patm,                      \
-                    'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,   \
-                    'patch_icpp(2)%alpha(1)'       : vf0,                       \
-                    'patch_icpp(2)%r0'             : 1.,                        \
-                    'patch_icpp(2)%v0'             : 0.0E+00,                   \
+                    'patch_icpp(1)%geometry'       : 1,                         \
+                    'patch_icpp(1)%x_centroid'     : 0.,                        \
+                    # 'patch_icpp(1)%length_x'       : 5.E-03/x0,                 \
+                    'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
+                    # 'patch_icpp(2)%alter_patch(1)' : 'T',                       \
+                    'patch_icpp(1)%vel(1)'         : 0.0,                       \
+                    'patch_icpp(1)%pres'           : patm,                      \
+                    'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,   \
+                    'patch_icpp(1)%alpha(1)'       : vf0,                       \
+                    'patch_icpp(1)%r0'             : 1.,                        \
+                    'patch_icpp(1)%v0'             : 0.0E+00,                   \
                     # ==========================================================
 
                     # Fluids Physical Parameters ===============================
