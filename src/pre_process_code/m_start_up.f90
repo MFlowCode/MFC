@@ -129,7 +129,7 @@ MODULE m_start_up
                                    cyl_coord, loops_x, loops_y, loops_z,      &
                                    rhoref, pref, bubbles, R0ref, nb,          &
                                    polytropic, thermal, Ca, Web, Re_inv,      &
-                                   polydisperse, poly_sigma, qbmm, nmom,      &
+                                   polydisperse, poly_sigma, qbmm,      &
                                    nnode, sigR, sigV
  
 

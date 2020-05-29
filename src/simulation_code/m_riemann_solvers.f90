@@ -283,6 +283,7 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         V0_L,       V0_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         P0_L,       P0_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::        pbw_L,      pbw_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::       moms_L,     moms_R
     REAL(KIND(0d0))                              ::     ptilde_L,   ptilde_R
     !> @}
 
@@ -1461,7 +1462,6 @@ MODULE m_riemann_solvers
                                         s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1))) * &
                                         (rho_R*s_S + pres_R /                        &
                                         (s_R - vel_R(dir_idx(1))))) - E_R))
- 
                                 ELSE
                                     ! Tait EOS, no energy equation
                                     flux_rs_vf(E_idx)%sf(j,k,l) = 0.d0
@@ -1504,7 +1504,7 @@ MODULE m_riemann_solvers
 
                                 ! Add advection flux for bubble variables
                                 IF (bubbles) THEN
-                                    DO i = bub_idx%beg,sys_size
+                                    DO i = bub_idx%beg,bub_idx%end
                                         flux_rs_vf(i)%sf(j,k,l) =   &
                                                 xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j,k,l)      &
                                                 * (vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
@@ -1946,7 +1946,7 @@ MODULE m_riemann_solvers
                 END DO
                 c_L = c_L/rho_L
                 c_R = c_R/rho_R
-            ELSEIF ( (model_eqns == 4) .or. (model_eqns == 2 .AND. bubbles) ) THEN 
+            ELSEIF ( (model_eqns == 4) .OR. (model_eqns == 2 .AND. bubbles) ) THEN 
                 ! Sound speed for bubble mmixture to order O(\alpha)
                 DO i = 1,num_fluids
                     alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
@@ -2605,7 +2605,7 @@ MODULE m_riemann_solvers
            
             INTEGER, INTENT(IN) :: j,k,l
             
-            INTEGER :: i !< Generic loop iterator
+            INTEGER :: i,q !< Generic loop iterator
 
             REAL(KIND(0d0)) :: gamma_gas
 
@@ -2666,12 +2666,18 @@ MODULE m_riemann_solvers
                 DO i = 1,nb
                     R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j,k,l)
                     R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j+1,k,l)
-                
-                    V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
-                    V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
-                    IF (polytropic .NEQV. .TRUE.) THEN
-                        P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
-                        P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
+                    IF( qbmm ) THEN
+                        DO q = 1,nmom
+                            moms_L(i,q) = qL_prim_rs_vf(bub_idx%moms(i,q))%sf(j,k,l)
+                            moms_R(i,q) = qR_prim_rs_vf(bub_idx%moms(i,q))%sf(j+1,k,l)
+                        END DO
+                    ELSE
+                        V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
+                        V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
+                        IF (polytropic .NEQV. .TRUE.) THEN
+                            P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
+                            P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
+                        END IF
                     END IF
                 END DO
                 
@@ -2684,19 +2690,24 @@ MODULE m_riemann_solvers
                 DO i = 1,nb
                     !pbw_L(i) = (R0(i)/R0_L(i))**(3d0*gamma_gas)
                     !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
-
-                    IF (polytropic) THEN
-                        pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
-                            - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
-
-                        pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
-                            - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                    IF ( qbmm ) THEN
+                        pbw_L(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_L^(-3\gamma) computed from weights/abscissas
+                        pbw_R(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_R^(-3\gamma) computed from weights/abscissas
                     ELSE
-                        pbw_L(i) = P0_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
-                        pbw_R(i) = P0_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                        IF (polytropic) THEN
+                            pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
+                                - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
+
+                            pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
+                                - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                        ELSE
+                            pbw_L(i) = P0_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
+                            pbw_R(i) = P0_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                        END IF
                     END IF
                 END DO
 
+                ! TODO: these quadratures now need to be computed with abscissas/weights
                 CALL s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
                 CALL s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
                 
@@ -3083,10 +3094,15 @@ MODULE m_riemann_solvers
             END IF
            
             IF (bubbles) THEN
-                allocate( R0_L(nb), V0_L(nb), pbw_L(nb) )
-                allocate( R0_R(nb), V0_R(nb), pbw_R(nb) )
-                IF (polytropic .NEQV. .TRUE.) THEN
-                    allocate( P0_L(nb), P0_R(nb) )
+                allocate( R0_L(nb),R0_R(nb) )
+                allocate( pbw_L(nb), pbw_R(nb) )
+                IF (qbmm) THEN
+                    allocate( moms_L(nb,nmom), moms_R(nb,nmom) )
+                ELSE
+                    allocate( V0_L(nb), V0_R(nb))
+                    IF (polytropic .NEQV. .TRUE.) THEN
+                        allocate( P0_L(nb), P0_R(nb) )
+                    END IF 
                 END IF 
             END IF
            
@@ -5644,7 +5660,12 @@ MODULE m_riemann_solvers
             END IF
             
             IF (bubbles) THEN
-                deallocate(R0_L, V0_L, pbw_L, R0_R, V0_R, pbw_R)
+                IF (qbmm) THEN
+                    deallocate(moms_L, moms_R)
+                ELSE
+                    deallocate(V0_L,V0_R)
+                END IF
+                deallocate( R0_L,R0_R,pbw_L,pbw_R)
             END IF
 
             ! Disassociating procedural pointer to the subroutine which was

@@ -63,6 +63,8 @@ MODULE m_rhs
     USE m_cbc                  !< Characteristic boundary conditions (CBC)
 
     USE m_bubbles              !< Bubble dynamic routines
+
+    USE m_qbmm                 !< Moment inversion
     ! ==========================================================================
     
     
@@ -241,6 +243,8 @@ MODULE m_rhs
     !> @{
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: bub_adv_src
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: bub_mom_src
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: quad_wght, quad_abscX, quad_abscY
     TYPE(scalar_field) :: divu !< matrix for div(u)
     !> @}
 
@@ -1163,10 +1167,17 @@ MODULE m_rhs
 
             IF (bubbles) THEN
                 ALLOCATE( bub_adv_src(0:m,0:n,0:p) )
-                ALLOCATE( bub_r_src(1:nb,0:m,0:n,0:p) )
-                ALLOCATE( bub_v_src(1:nb,0:m,0:n,0:p) )
-                ALLOCATE( bub_p_src(1:nb,0:m,0:n,0:p) )
-                ALLOCATE( bub_m_src(1:nb,0:m,0:n,0:p) )
+                IF ( qbmm ) THEN
+                    ALLOCATE( bub_mom_src(1:nb,1:nmom,0:m,0:n,0:p) )
+                    ALLOCATE( quad_wght(1:nb,1:nnode,0:m,0:n,0:p) )
+                    ALLOCATE( quad_abscX(1:nb,1:nnode,0:m,0:n,0:p) )
+                    ALLOCATE( quad_abscY(1:nb,1:nnode,0:m,0:n,0:p) )
+                ELSE
+                    ALLOCATE( bub_r_src(1:nb,0:m,0:n,0:p) )
+                    ALLOCATE( bub_v_src(1:nb,0:m,0:n,0:p) )
+                    ALLOCATE( bub_p_src(1:nb,0:m,0:n,0:p) )
+                    ALLOCATE( bub_m_src(1:nb,0:m,0:n,0:p) )
+                END IF
             END IF
 
             IF (monopole) THEN
@@ -1456,6 +1467,7 @@ MODULE m_rhs
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ==================================================================
           
+            print*, 'start rhs'
             
             ! Association/Population of Working Variables ======================
             DO i = 1, sys_size
@@ -1465,6 +1477,7 @@ MODULE m_rhs
             
             CALL s_populate_conservative_variables_buffers()
            
+            print*, 'pop cons vars'
             IF((model_eqns == 2 .OR. model_eqns == 3) .AND. (adv_alphan .NEQV. .TRUE.)) THEN
                 q_cons_qp(0,0,0)%vf(sys_size)%sf = 1d0
                 
@@ -1554,10 +1567,13 @@ MODULE m_rhs
                 END DO
             END DO
 
+            print*, 'conv to prim vars'
+
             iv%beg = mom_idx%beg; iv%end = E_idx 
            
             CALL s_average_cell_interior_values(q_prim_qp)
-           
+          
+            print*, 'got cell interior values'
             IF(t_step == t_step_stop) RETURN
             ! ==================================================================
             
@@ -1565,6 +1581,10 @@ MODULE m_rhs
 
 
             IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
+            print*, 'before qbmm'
+
+            ! compute weights and abscissas
+            IF (qbmm) CALL s_mom_inv(q_prim_vf,quad_wght,quad_abscX,quad_abscY)
             
             ! Dimensional Splitting Loop =======================================
             DO i = 1, num_dims
@@ -1915,6 +1935,7 @@ MODULE m_rhs
                         END DO
                     END DO
                 END IF
+
 
                 ! RHS Contribution in x-direction ===============================
                 IF(i == 1) THEN
