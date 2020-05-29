@@ -565,32 +565,42 @@ MODULE m_global_parameters
                     
                     IF (bubbles) THEN
                         bub_idx%beg = sys_size+1
-                        bub_idx%end = sys_size+2*nb*nmom
-                        IF (polytropic .NEQV. .TRUE.) THEN
-                            bub_idx%end = sys_size+4*nb*nmom
+                        IF (qbmm) THEN
+                            IF( nnode == 4) THEN
+                                nmom = 5
+                            END IF
+                            bub_idx%end = adv_idx%end+nb*nmom
+                        ELSE
+                            IF (polytropic .NEQV. .TRUE.) THEN
+                                bub_idx%end = sys_size+4*nb
+                            ELSE
+                                bub_idx%end = sys_size+2*nb
+                            END IF
                         END IF
                         sys_size = bub_idx%end
 
                         ALLOCATE( weight(nb),R0(nb),V0(nb) )
+                        ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
 
                         IF (qbmm) THEN
-                            IF( nnode == 4) THEN
-                                nmom = 6
-                            END IF
-
                             ALLOCATE( bub_idx%moms(nb,nmom) )
+                            ALLOCATE( bub_idx%fullmom(nb,0:nmom,0:nmom) )
 
                             DO i = 1, nb
                                 DO j = 1, nmom
-                                    bub_idx%moms(i,j) = bub_idx%beg+j+(i-1)*nmom
+                                    bub_idx%moms(i,j) = bub_idx%beg+(j-1)+(i-1)*nmom
                                 END DO 
+                                bub_idx%fullmom(i,1,0) = bub_idx%moms(i,1)
+                                bub_idx%fullmom(i,0,1) = bub_idx%moms(i,2)
+                                bub_idx%fullmom(i,2,0) = bub_idx%moms(i,3)
+                                bub_idx%fullmom(i,0,2) = bub_idx%moms(i,4)
+                                bub_idx%fullmom(i,1,1) = bub_idx%moms(i,5)
+                                bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
                             END DO
                         ELSE
-                            ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
-                            ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
-
                             DO i = 1, nb
                                 IF (polytropic .NEQV. .TRUE.) THEN
+                                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                                     fac = 4
                                 ELSE
                                     fac = 2
@@ -605,7 +615,7 @@ MODULE m_global_parameters
                                 END IF
                             END DO
                         END IF
-                        
+
                         IF (nb == 1) THEN
                             weight(:)   = 1d0
                             R0(:)       = 1d0

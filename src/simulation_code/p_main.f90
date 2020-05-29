@@ -96,6 +96,7 @@ PROGRAM p_main
         CALL s_read_input_file()
         CALL s_check_input_file()
     END IF
+    print*, 'Read input file'
    
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -103,6 +104,7 @@ PROGRAM p_main
     CALL s_mpi_bcast_user_inputs()
     CALL s_initialize_parallel_io()
     CALL s_mpi_decompose_computational_domain()
+    print*, 'Broadcast'
     
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -117,6 +119,7 @@ PROGRAM p_main
     CALL s_initialize_data_output_module()
     CALL s_initialize_derived_variables_module()
     CALL s_initialize_time_steppers_module()    
+    print*, 'Initialize'
     
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
@@ -130,6 +133,7 @@ PROGRAM p_main
     ! Reading in the user provided initial condition and grid data
     CALL s_read_data_files(q_cons_ts(1)%vf)
     IF (model_eqns == 3) CALL s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+    print*, 'Read data files'
 
     ! Populating the buffers of the grid variables using the boundary conditions
     CALL s_populate_grid_variables_buffers()
@@ -176,6 +180,7 @@ PROGRAM p_main
             t_step = t_step + 1
         END IF
        
+        print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         IF(MOD(t_step-t_step_start, t_step_save) == 0) THEN
             CALL s_write_data_files(q_cons_ts(1)%vf, t_step)

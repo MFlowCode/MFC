@@ -120,8 +120,8 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : Nt,                        \
-                    't_step_save'                  : Nout,   \
+                    't_step_stop'                  : 1,                        \
+                    't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -132,7 +132,7 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 3,                        \
+		    'time_stepper'                 : 1,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
