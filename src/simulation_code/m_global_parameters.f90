@@ -302,10 +302,14 @@ MODULE m_global_parameters
     REAL(KIND(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     LOGICAL         :: qbmm !< Quadrature moment method
-    INTEGER         :: nmom !< Number of carried moments
-    INTEGER         :: nmomsp !< Number of moments required by ensemble-averaging
-    INTEGER         :: nmomrhs !< Number of moments required by ensemble-averaging
+    INTEGER         :: nmom !< Number of carried moments per R0 location
     INTEGER         :: nnode !< Number of QBMM nodes
+    INTEGER         :: nmomsp !< Number of moments required by ensemble-averaging
+    INTEGER         :: nmomtot !< Total number of carried moments moments/transport equations
+    INTEGER         :: nterms !< Number of rhs terms in each moment transport equations
+
+    TYPE(qbmm_ptr), ALLOCATABLE, DIMENSION(:,:,:)  :: momrhs
+    TYPE(qbmm_ptr), ALLOCATABLE, DIMENSION(:)      :: momidx 
     !> @}
     
     !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
@@ -434,9 +438,8 @@ MODULE m_global_parameters
             R0ref       = dflt_real
             nb          = dflt_int
 
+            ! User inputs for qbmm for simulation code
             qbmm        = .FALSE.
-            nmom        = 5 !number of carried moments
-            nmomsp      = 4 !number of special moments
             nnode       = 1
             
             Ca      = dflt_real
@@ -501,6 +504,9 @@ MODULE m_global_parameters
             INTEGER :: i,j !< Generic loop iterators
             INTEGER :: k !< Generic counter
             INTEGER :: fac
+            INTEGER :: i1,i2,i3
+
+            REAL(KIND(0d0)) :: gam
             
             TYPE(bounds_info) :: ix,iy,iz
             
@@ -515,7 +521,6 @@ MODULE m_global_parameters
             ! of fluids for which the physical and geometric curvatures of the
             ! interfaces will be computed
             Re_size = 0; We_size = 0; crv_size = 0
-            
             
             ! Gamma/Pi_inf Model ===============================================
             IF(model_eqns == 1) THEN
@@ -569,9 +574,11 @@ MODULE m_global_parameters
                     IF (bubbles) THEN
                         bub_idx%beg = sys_size+1
                         IF (qbmm) THEN
+                            nmomsp = 4 !number of special moments
+                            nterms = 4 !number of rhs terms per transport equation
                             IF( nnode == 4) THEN
                                 nmom = 5
-                                nmomrhs = nmom*4*nb
+                                nmomtot = nmom*nb
                             END IF
                             bub_idx%end = adv_idx%end+nb*nmom
                         ELSE
@@ -587,6 +594,38 @@ MODULE m_global_parameters
                         ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
 
                         IF (qbmm) THEN
+                            IF (num_fluids == 1) THEN
+                                gam  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
+                            ELSE 
+                                gam  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+                            END IF
+
+                            ALLOCATE( momrhs(0:2,0:2,0:2) )
+                            ALLOCATE( momidx(nmomtot) )
+
+                            ! Assigns the required RHS moments for moment transport equations
+                            ! Careful: the rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
+                            ! Note: this computes more momrhs(:,:,i) than necessary, but we will only call the ones we need,
+                            !       (1,0), (0,1), (2,0), (1,1), (0,2)
+                            DO i1 = 0,2; DO i2 = 0,2; DO i3 = 1,nb
+                                !mexp = {{-1 + i1, -1 + i2, i3}, {-1 + i1, 1 + i2, i3}, {-1 + i1 - 3 \[Gamma], -1 + i2, i3 + 3 \[Gamma]}, {-1 + i1, 1 + i2, i3}}
+                                momrhs(i1,i2,i3)%rhs(1,1) = -1 + i1
+                                momrhs(i1,i2,i3)%rhs(1,2) = -1 + i2
+                                momrhs(i1,i2,i3)%rhs(1,3) = i3
+
+                                momrhs(i1,i2,i3)%rhs(2,1) = -1 + i1
+                                momrhs(i1,i2,i3)%rhs(2,2) =  1 + i2 
+                                momrhs(i1,i2,i3)%rhs(2,3) = i3
+
+                                momrhs(i1,i2,i3)%rhs(3,1) = -1 + i1 - 3*gam
+                                momrhs(i1,i2,i3)%rhs(3,2) = -1 + i2
+                                momrhs(i1,i2,i3)%rhs(3,3) = i3 + 3*gam
+
+                                momrhs(i1,i2,i3)%rhs(4,1) = -1 + i1
+                                momrhs(i1,i2,i3)%rhs(4,2) =  1 + i2
+                                momrhs(i1,i2,i3)%rhs(4,3) = i3
+                            END DO; END DO; END DO
+
                             ALLOCATE( bub_idx%moms(nb,nmom) )
                             ALLOCATE( bub_idx%fullmom(nb,0:nmom,0:nmom) )
 
