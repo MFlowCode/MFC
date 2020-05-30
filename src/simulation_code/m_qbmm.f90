@@ -50,7 +50,42 @@ MODULE m_qbmm
 
     REAL(KIND(0.D0)) :: chi_vw  !< Bubble wall properties (Ando 2010)
 
+
     CONTAINS
+
+
+        SUBROUTINE s_get_momsp( wght, abscX, abscY, momsp, gam ) 
+
+            REAL(KIND(0d0)), DIMENSION(nb,nnode), INTENT(IN) :: wght, abscX, abscY
+            REAL(KIND(0d0)), DIMENSION(nmomsp), INTENT(INOUT) :: momsp
+            REAL(KIND(0d0)), INTENT(IN) :: gam
+
+            momsp(1) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
+            momsp(2) = f_quad(abscX,abscY,wght,2d0,1d0,0d0)
+            momsp(3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
+            momsp(4) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3*gam)
+
+        END SUBROUTINE s_get_momsp
+
+
+        SUBROUTINE s_get_momrhs( wght, abscX, abscY, momrhs, gam ) 
+
+            REAL(KIND(0d0)), DIMENSION(nb,nnode), INTENT(IN) :: wght, abscX, abscY
+            REAL(KIND(0d0)), DIMENSION(nmomrhs), INTENT(INOUT) :: momrhs
+            REAL(KIND(0d0)), DIMENSION(nmomrhs,3) :: idx
+            REAL(KIND(0d0)), INTENT(IN) :: gam
+            INTEGER :: i, j
+                
+            ! TODO: define these indices that are rquire dfor RHS, get from matrhematica library
+            !idx(i,j) = 
+
+
+            DO i = 1, nmomrhs 
+                momrhs(i) = f_quad(abscX,abscY,wght,idx(i,1),idx(i,2),idx(i,3))
+            END DO
+
+        END SUBROUTINE s_get_momrhs
+
 
         SUBROUTINE s_mom_inv( q_prim_vf, weights, abscX, abscY ) 
             
@@ -59,7 +94,16 @@ MODULE m_qbmm
 
             REAL(KIND(0d0)) :: pres
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
+            REAL(KIND(0d0)), DIMENSION(nmomsp,0:m,0:n,0:p) :: momsp
+            REAL(KIND(0d0)), DIMENSION(nmomrhs,0:m,0:n,0:p) :: momrhs
+            REAL(KIND(0d0)) :: gam
             INTEGER :: j,k,l,q,r,s !< Loop variables
+
+            IF (num_fluids == 1) THEN
+                gam  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
+            ELSE 
+                gam  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+            END IF
 
             ! TODO: should these loops be over ix%beg,ix%end or is current form sufficient?
             DO j = 0,m; DO k = 0,n; DO l = 0,p
@@ -69,16 +113,24 @@ MODULE m_qbmm
                         moms(r) = q_prim_vf(bub_idx%moms(q,r))%sf(j,k,l)
                     END DO
                     CALL s_chyqmom(pres,moms,weights(q,:,j,k,l),abscX(q,:,j,k,l),abscY(q,:,j,k,l))
-
-                    ! print*, weights(q,:,j,k,l)
-                    ! print*, abscX(q,:,j,k,l)
-                    ! print*, abscY(q,:,j,k,l)
-
                 END DO
+                CALL s_get_momsp ( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momsp(:,j,k,l),gam )
+                CALL s_get_momrhs( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momrhs(:,j,k,l),gam )
             END DO; END DO; END DO
-            print*, 'got all weights for step 1'
-            
+
+            print*, 'momsp1'
+            print*, momsp(1,:,:,:)
+            print*, 'momsp2'
+            print*, momsp(2,:,:,:)
+            print*, 'momsp3'
+            print*, momsp(3,:,:,:)
+            print*, 'momsp4'
+            print*, momsp(4,:,:,:)
+
+            CALL s_mpi_abort()
+
         END SUBROUTINE s_mom_inv
+
 
         SUBROUTINE s_chyqmom(pres,momin,wght,abscX,abscY)
             
@@ -158,11 +210,28 @@ MODULE m_qbmm
 
         END SUBROUTINE s_hyqmom
 
-        ! FUNCTION f_bpres_dot( fvflux,iR0 )
-        !     REAL(KIND(0.D0)), INTENT(IN) :: fvflux
-        !     INTEGER, INTENT(IN) :: iR0
-        !     REAL(KIND(0.D0)) :: f_bpres_dot
-        !     f_bpres_dot = -3.D0
-        ! END FUNCTION f_bpres_dot
+
+        FUNCTION f_quad( abscX,abscY,wght,q,r,s )
+            REAL(KIND(0.D0)), DIMENSION(nb,nnode), INTENT(IN) :: abscX, abscY, wght
+            REAL(KIND(0.D0)), INTENT(IN) :: q,r,s
+            REAL(KIND(0.D0)) :: f_quad_RV, f_quad
+            INTEGER :: i,j,k
+
+            f_quad = 0d0
+            DO i = 1,nb
+                f_quad_RV = sum( wght(i,:)*(abscX(i,:)**q)*(abscY(i,:)**r) )
+                ! if (f_quad_rv .ne. f_quad_rv) then
+                !     print*, 'found nan'
+                !     print*, 'wght', wght(i,:)
+                !     print*, 'x', abscx(i,:)
+                !     print*, 'y', abscy(i,:)
+                !     print*, q, r
+                !     stop
+                ! end if
+                f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
+            END DO
+
+        END FUNCTION f_quad
+
 
 END MODULE m_qbmm
