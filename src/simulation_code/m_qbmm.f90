@@ -68,20 +68,38 @@ MODULE m_qbmm
         END SUBROUTINE s_get_momsp
 
 
-        SUBROUTINE s_get_momrhs( wght, abscX, abscY, momrhs, gam ) 
+        SUBROUTINE s_get_momrhs( wght, abscX, abscY, moms3d, gam ) 
 
             REAL(KIND(0d0)), DIMENSION(nb,nnode), INTENT(IN) :: wght, abscX, abscY
-            REAL(KIND(0d0)), DIMENSION(nmomrhs), INTENT(INOUT) :: momrhs
-            REAL(KIND(0d0)), DIMENSION(nmomrhs,3) :: idx
+            REAL(KIND(0d0)), DIMENSION(nmomtot,nterms), INTENT(INOUT) :: moms3d
+            REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2,nb) :: moms_cond
             REAL(KIND(0d0)), INTENT(IN) :: gam
-            INTEGER :: i, j
+            INTEGER :: i,j,k,i1,i2
+
+            ! m_exp = {{-1 + i1, -1 + i2, 0}, {-1 + i1 - 3. \[Gamma], -1 + i2, 0}, {-1 + i1, 1 + i2, 0}, {-1 + i1, 1 + i2, 0}} 
+            ! m_cof = {-1. i2 p, 1. i2, -1.5 i2, i1} 
+            ! in the above i1 -> ks[[1]], i2 -> ks[[2]], i3 -> ks[[3]]
+            ! though, note that i3/ks[[3]] indicate an R0 index (and associated weights/abscissas), not a power/moment 
+
+            ! so the ks = {1,0,i}, {0,1,i}, {2,0,i}, {1,1,i}, {0,2,i} where i \in {1,...,nb}
+
+            DO j = 1,nterms
+                DO k = 1,nb
+                    i1 = 1; i2 = 0
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
+                    i1 = 0; i2 = 1
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
+                    i1 = 2; i2 = 0
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
+                    i1 = 1; i2 = 1
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
+                    i1 = 0; i2 = 2
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
+                END DO
+                i = 0
                 
-            ! TODO: define these indices that are rquire dfor RHS, get from matrhematica library
-            !idx(i,j) = 
+                moms3d(i,j) = f_quad3D()
 
-
-            DO i = 1, nmomrhs 
-                momrhs(i) = f_quad(abscX,abscY,wght,idx(i,1),idx(i,2),idx(i,3))
             END DO
 
         END SUBROUTINE s_get_momrhs
@@ -95,7 +113,7 @@ MODULE m_qbmm
             REAL(KIND(0d0)) :: pres
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
             REAL(KIND(0d0)), DIMENSION(nmomsp,0:m,0:n,0:p) :: momsp
-            REAL(KIND(0d0)), DIMENSION(nmomrhs,0:m,0:n,0:p) :: momrhs
+            REAL(KIND(0d0)), DIMENSION(nmomtot,nterms,0:m,0:n,0:p) :: momrhsout
             REAL(KIND(0d0)) :: gam
             INTEGER :: j,k,l,q,r,s !< Loop variables
 
@@ -115,7 +133,7 @@ MODULE m_qbmm
                     CALL s_chyqmom(pres,moms,weights(q,:,j,k,l),abscX(q,:,j,k,l),abscY(q,:,j,k,l))
                 END DO
                 CALL s_get_momsp ( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momsp(:,j,k,l),gam )
-                CALL s_get_momrhs( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momrhs(:,j,k,l),gam )
+                CALL s_get_momrhs( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momrhsout(:,:,j,k,l),gam )
             END DO; END DO; END DO
 
             print*, 'momsp1'
@@ -220,18 +238,29 @@ MODULE m_qbmm
             f_quad = 0d0
             DO i = 1,nb
                 f_quad_RV = sum( wght(i,:)*(abscX(i,:)**q)*(abscY(i,:)**r) )
-                ! if (f_quad_rv .ne. f_quad_rv) then
-                !     print*, 'found nan'
-                !     print*, 'wght', wght(i,:)
-                !     print*, 'x', abscx(i,:)
-                !     print*, 'y', abscy(i,:)
-                !     print*, q, r
-                !     stop
-                ! end if
                 f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
             END DO
-
         END FUNCTION f_quad
+
+
+        FUNCTION f_quad2D( abscX,abscY,wght,q,r)
+            REAL(KIND(0.D0)), DIMENSION(nnode), INTENT(IN) :: abscX, abscY, wght
+            REAL(KIND(0.D0)), INTENT(IN) :: q,r
+            REAL(KIND(0.D0)) :: f_quad_RV, f_quad2D
+            INTEGER :: i,j,k
+
+            f_quad2D = sum( wght(:)*(abscX(:)**q)*(abscY(:)**r) )
+        END FUNCTION f_quad2D
+
+        FUNCTION f_quad2Dp1( abscX,abscY,wght,q,r)
+            REAL(KIND(0.D0)), DIMENSION(nnode), INTENT(IN) :: abscX, abscY, wght
+            REAL(KIND(0.D0)), INTENT(IN) :: q,r
+            REAL(KIND(0.D0)) :: f_quad_RV, f_quad2Dp1
+            INTEGER :: i,j,k
+
+            f_quad2Dp1 = sum( wght(:)*(abscX(:)**q)*(abscY(:)**r) )
+        END FUNCTION f_quad2Dp1
+
 
 
 END MODULE m_qbmm
