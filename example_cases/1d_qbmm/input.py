@@ -54,7 +54,7 @@ nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
-Nx      = 50
+Nx      = 30
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)

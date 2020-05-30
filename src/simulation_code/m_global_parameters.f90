@@ -303,6 +303,8 @@ MODULE m_global_parameters
 
     LOGICAL         :: qbmm !< Quadrature moment method
     INTEGER         :: nmom !< Number of carried moments
+    INTEGER         :: nmomsp !< Number of moments required by ensemble-averaging
+    INTEGER         :: nmomrhs !< Number of moments required by ensemble-averaging
     INTEGER         :: nnode !< Number of QBMM nodes
     !> @}
     
@@ -433,7 +435,8 @@ MODULE m_global_parameters
             nb          = dflt_int
 
             qbmm        = .FALSE.
-            nmom        = 1
+            nmom        = 5 !number of carried moments
+            nmomsp      = 4 !number of special moments
             nnode       = 1
             
             Ca      = dflt_real
@@ -568,6 +571,7 @@ MODULE m_global_parameters
                         IF (qbmm) THEN
                             IF( nnode == 4) THEN
                                 nmom = 5
+                                nmomrhs = nmom*4*nb
                             END IF
                             bub_idx%end = adv_idx%end+nb*nmom
                         ELSE
