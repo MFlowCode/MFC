@@ -68,12 +68,13 @@ MODULE m_qbmm
         END SUBROUTINE s_get_momsp
 
 
-        SUBROUTINE s_get_momrhs( wght, abscX, abscY, moms3d, gam ) 
+        SUBROUTINE s_get_momrhs( wght, abscX, abscY, moms3d, gam, pres ) 
 
             REAL(KIND(0d0)), DIMENSION(nb,nnode), INTENT(IN) :: wght, abscX, abscY
-            REAL(KIND(0d0)), DIMENSION(nmomtot,nterms), INTENT(INOUT) :: moms3d
+            REAL(KIND(0d0)), DIMENSION(nmom,nmom,nmom), INTENT(INOUT) :: moms3d
+            REAL(KIND(0d0)), DIMENSION(nterms,nmom,nmom,nmom) :: mom3d_terms
             REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2,nb) :: moms_cond
-            REAL(KIND(0d0)), INTENT(IN) :: gam
+            REAL(KIND(0d0)), INTENT(IN) :: gam, pres
             INTEGER :: i,j,k,i1,i2
 
             ! m_exp = {{-1 + i1, -1 + i2, 0}, {-1 + i1 - 3. \[Gamma], -1 + i2, 0}, {-1 + i1, 1 + i2, 0}, {-1 + i1, 1 + i2, 0}} 
@@ -83,24 +84,79 @@ MODULE m_qbmm
 
             ! so the ks = {1,0,i}, {0,1,i}, {2,0,i}, {1,1,i}, {0,2,i} where i \in {1,...,nb}
 
-            DO j = 1,nterms
-                DO k = 1,nb
-                    i1 = 1; i2 = 0
-                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
-                    i1 = 0; i2 = 1
-                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
-                    i1 = 2; i2 = 0
-                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
-                    i1 = 1; i2 = 1
-                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
-                    i1 = 0; i2 = 2
-                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k)%rhs(j,1),momrhs(i1,i2,k)%rhs(j,2))
-                END DO
-                i = 0
-                
-                moms3d(i,j) = f_quad3D()
+            ! this gets all the moments required, you still have to multiply the moments by 
+            ! their coefficients and sum the nterms for each moment equation
 
+            DO k = 1,nb
+                DO j = 1,nterms
+                    i1 = 1; i2 = 0
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
+                    mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
+                    i1 = 0; i2 = 1
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
+                    mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
+                    i1 = 2; i2 = 0
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
+                    mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
+                    i1 = 1; i2 = 1
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
+                    mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
+                    i1 = 0; i2 = 2
+                    moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
+                    mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
+                    if (j==3) then
+                        print*, 'term = ', j
+                        print*, 'R0 = ', R0(k)
+                        print*, 'full: ', mom3d_terms(j,1,0,1)
+                        print*, 'full: ', mom3d_terms(j,0,1,1)
+                        print*, 'full: ', mom3d_terms(j,2,0,1)
+                        print*, 'full: ', mom3d_terms(j,1,1,1)
+                        print*, 'full: ', mom3d_terms(j,0,2,1)
+
+                        print*, 'coeffs: ', f_get_coeff(j,1,0,1,pres)
+                        print*, 'coeffs: ', f_get_coeff(j,0,1,1,pres)
+                        print*, 'coeffs: ', f_get_coeff(j,2,0,1,pres)
+                        print*, 'coeffs: ', f_get_coeff(j,1,1,1,pres)
+                        print*, 'coeffs: ', f_get_coeff(j,0,2,1,pres)
+
+
+                        print*, '2D moments: ', moms_cond(j,1,0,1)
+                        print*, '2D moments: ', moms_cond(j,0,1,1)
+                        print*, '2D moments: ', moms_cond(j,2,0,1)
+                        print*, '2D moments: ', moms_cond(j,1,1,1)
+                        print*, '2D moments: ', moms_cond(j,0,2,1)
+
+                    end if
+                    ! print*, 'moms3d', mom3d_terms(j,1,0,1)
+                    ! print*, 'moms3d', mom3d_terms(j,0,1,1)
+                    ! print*, 'moms3d', mom3d_terms(j,2,0,1)
+                    ! print*, 'moms3d', mom3d_terms(j,1,1,1)
+                    ! print*, 'moms3d', mom3d_terms(j,0,2,1)
+                END DO
+                i1=1;i2=0;
+                moms3d(i1,i2,k) = SUM( mom3d_terms(:,i1,i2,k) )
+                i1=0;i2=1;
+                moms3d(i1,i2,k) = SUM( mom3d_terms(:,i1,i2,k) )
+                i1=2;i2=0;
+                moms3d(i1,i2,k) = SUM( mom3d_terms(:,i1,i2,k) )
+                i1=1;i2=1;
+                moms3d(i1,i2,k) = SUM( mom3d_terms(:,i1,i2,k) )
+                i1=0;i2=2;
+                moms3d(i1,i2,k) = SUM( mom3d_terms(:,i1,i2,k) )
+
+                ! print*, 'moms3d', moms3d(1,0,1)
+                ! print*, 'moms3d', moms3d(0,1,1)
+                ! print*, 'moms3d', moms3d(2,0,1)
+                ! print*, 'moms3d', moms3d(1,1,1)
+                ! print*, 'moms3d', moms3d(0,2,1)
             END DO
+
+
+            call s_mpi_abort()
+
+            ! rhs = Sum[ 
+            !     mycoefs[[i]] Ros[[indx[[3]] + 1]]^(myexps[[i, 3]] - indx[[3]])*mom[myexps[[i, 1]], myexps[[i, 2]], 1 + indx[[3]]],
+            ! {i,1,4}]
 
         END SUBROUTINE s_get_momrhs
 
@@ -113,7 +169,7 @@ MODULE m_qbmm
             REAL(KIND(0d0)) :: pres
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
             REAL(KIND(0d0)), DIMENSION(nmomsp,0:m,0:n,0:p) :: momsp
-            REAL(KIND(0d0)), DIMENSION(nmomtot,nterms,0:m,0:n,0:p) :: momrhsout
+            REAL(KIND(0d0)), DIMENSION(nmom,nmom,nmom,0:m,0:n,0:p) :: mom3d
             REAL(KIND(0d0)) :: gam
             INTEGER :: j,k,l,q,r,s !< Loop variables
 
@@ -132,18 +188,18 @@ MODULE m_qbmm
                     END DO
                     CALL s_chyqmom(pres,moms,weights(q,:,j,k,l),abscX(q,:,j,k,l),abscY(q,:,j,k,l))
                 END DO
-                CALL s_get_momsp ( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momsp(:,j,k,l),gam )
-                CALL s_get_momrhs( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),momrhsout(:,:,j,k,l),gam )
+                CALL s_get_momsp ( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),     momsp(:,j,k,l), gam )
+                CALL s_get_momrhs( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l), mom3d(:,:,:,j,k,l), gam, pres )
             END DO; END DO; END DO
 
-            print*, 'momsp1'
-            print*, momsp(1,:,:,:)
-            print*, 'momsp2'
-            print*, momsp(2,:,:,:)
-            print*, 'momsp3'
-            print*, momsp(3,:,:,:)
-            print*, 'momsp4'
-            print*, momsp(4,:,:,:)
+            ! print*, 'momsp1'
+            ! print*, momsp(1,:,:,:)
+            ! print*, 'momsp2'
+            ! print*, momsp(2,:,:,:)
+            ! print*, 'momsp3'
+            ! print*, momsp(3,:,:,:)
+            ! print*, 'momsp4'
+            ! print*, momsp(4,:,:,:)
 
             CALL s_mpi_abort()
 
@@ -162,7 +218,7 @@ MODULE m_qbmm
             REAL(KIND(0d0)) :: bu, bv, d20, d11, d02, c20, c11, c02
             REAL(KIND(0d0)) :: mu2avg, mu2, vp21, vp22, rho21, rho22
 
-            ! print*, 'moms: ', momin(:)
+            print*, 'moms: ', momin(:)
 
             moms(1,0) = momin(1)
             moms(0,1) = momin(2)
@@ -252,14 +308,22 @@ MODULE m_qbmm
             f_quad2D = sum( wght(:)*(abscX(:)**q)*(abscY(:)**r) )
         END FUNCTION f_quad2D
 
-        FUNCTION f_quad2Dp1( abscX,abscY,wght,q,r)
-            REAL(KIND(0.D0)), DIMENSION(nnode), INTENT(IN) :: abscX, abscY, wght
-            REAL(KIND(0.D0)), INTENT(IN) :: q,r
-            REAL(KIND(0.D0)) :: f_quad_RV, f_quad2Dp1
-            INTEGER :: i,j,k
+        FUNCTION f_get_coeff( term,i1,i2,i3,pres)
+            INTEGER, INTENT(IN) :: term,i1,i2,i3
+            REAL(KIND(0.D0)), INTENT(IN) :: pres
+            REAL(KIND(0.D0)) :: f_get_coeff
 
-            f_quad2Dp1 = sum( wght(:)*(abscX(:)**q)*(abscY(:)**r) )
-        END FUNCTION f_quad2Dp1
+            IF (term == 1) THEN
+                f_get_coeff = -i2*pres
+            ELSEIF (term == 2) THEN
+                f_get_coeff = -3d0*i2/2d0
+            ELSEIF (term == 3) THEN
+                f_get_coeff = i2
+            ELSEIF (term == 4) THEN
+                f_get_coeff = i1
+            END IF
+
+        END FUNCTION f_get_coeff
 
 
 

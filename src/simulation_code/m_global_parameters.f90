@@ -308,8 +308,8 @@ MODULE m_global_parameters
     INTEGER         :: nmomtot !< Total number of carried moments moments/transport equations
     INTEGER         :: nterms !< Number of rhs terms in each moment transport equations
 
-    TYPE(qbmm_ptr), ALLOCATABLE, DIMENSION(:,:,:)  :: momrhs
-    TYPE(qbmm_ptr), ALLOCATABLE, DIMENSION(:)      :: momidx 
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:)  :: momrhs
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)      :: momidx 
     !> @}
     
     !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
@@ -317,8 +317,8 @@ MODULE m_global_parameters
     REAL(KIND(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
-    REAL(KIND(0.D0)) :: mul0, ss, gamma_v, mu_v, G
-    REAL(KIND(0.D0)) :: gamma_m, gamma_n, mu_n
+    REAL(KIND(0d0)) :: mul0, ss, gamma_v, mu_v, G
+    REAL(KIND(0d0)) :: gamma_m, gamma_n, mu_n
     !> @}
 
 
@@ -600,7 +600,7 @@ MODULE m_global_parameters
                                 gam  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
                             END IF
 
-                            ALLOCATE( momrhs(0:2,0:2,0:2) )
+                            ALLOCATE( momrhs(0:2,0:2,0:2,nterms,3) )
                             ALLOCATE( momidx(nmomtot) )
 
                             ! Assigns the required RHS moments for moment transport equations
@@ -609,21 +609,18 @@ MODULE m_global_parameters
                             !       (1,0), (0,1), (2,0), (1,1), (0,2)
                             DO i1 = 0,2; DO i2 = 0,2; DO i3 = 1,nb
                                 !mexp = {{-1 + i1, -1 + i2, i3}, {-1 + i1, 1 + i2, i3}, {-1 + i1 - 3 \[Gamma], -1 + i2, i3 + 3 \[Gamma]}, {-1 + i1, 1 + i2, i3}}
-                                momrhs(i1,i2,i3)%rhs(1,1) = -1 + i1
-                                momrhs(i1,i2,i3)%rhs(1,2) = -1 + i2
-                                momrhs(i1,i2,i3)%rhs(1,3) = i3
-
-                                momrhs(i1,i2,i3)%rhs(2,1) = -1 + i1
-                                momrhs(i1,i2,i3)%rhs(2,2) =  1 + i2 
-                                momrhs(i1,i2,i3)%rhs(2,3) = i3
-
-                                momrhs(i1,i2,i3)%rhs(3,1) = -1 + i1 - 3*gam
-                                momrhs(i1,i2,i3)%rhs(3,2) = -1 + i2
-                                momrhs(i1,i2,i3)%rhs(3,3) = i3 + 3*gam
-
-                                momrhs(i1,i2,i3)%rhs(4,1) = -1 + i1
-                                momrhs(i1,i2,i3)%rhs(4,2) =  1 + i2
-                                momrhs(i1,i2,i3)%rhs(4,3) = i3
+                                momrhs(i1,i2,i3,1,1) = -1 + i1
+                                momrhs(i1,i2,i3,1,2) = -1 + i2
+                                momrhs(i1,i2,i3,1,3) = i3
+                                momrhs(i1,i2,i3,2,1) = -1 + i1
+                                momrhs(i1,i2,i3,2,2) =  1 + i2 
+                                momrhs(i1,i2,i3,2,3) = i3
+                                momrhs(i1,i2,i3,3,1) = -1 + i1 - 3*gam
+                                momrhs(i1,i2,i3,3,2) = -1 + i2
+                                momrhs(i1,i2,i3,3,3) = i3 + 3*gam
+                                momrhs(i1,i2,i3,4,1) = -1 + i1
+                                momrhs(i1,i2,i3,4,2) =  1 + i2
+                                momrhs(i1,i2,i3,4,3) = i3
                             END DO; END DO; END DO
 
                             ALLOCATE( bub_idx%moms(nb,nmom) )
