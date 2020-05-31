@@ -79,10 +79,10 @@ MODULE m_derived_types
         INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: fullmom !< Moment indices for qbmm
     END TYPE bub_bounds_info    
     
-    TYPE qbmm_ptr
-        REAL(KIND(0d0)), DIMENSION(4,3) :: rhs
-        INTEGER, DIMENSION(3) :: idx
-    END TYPE qbmm_ptr
+    ! TYPE qbmm_ptr
+    !     REAL(KIND(0d0)), DIMENSION(4,3) :: rhs
+    !     INTEGER, DIMENSION(3) :: idx
+    ! END TYPE qbmm_ptr
 
     !> Derived type annexing the physical parameters (PP) of fluids. 
     TYPE physical_parameters
