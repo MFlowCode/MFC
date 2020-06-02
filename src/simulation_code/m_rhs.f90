@@ -244,7 +244,9 @@ MODULE m_rhs
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: bub_adv_src
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: bub_mom_src
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: quad_wght, quad_abscX, quad_abscY
+    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: mom_sp
+    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:,:) :: mom_3d
+
     TYPE(scalar_field) :: divu !< matrix for div(u)
     !> @}
 
@@ -388,6 +390,23 @@ MODULE m_rhs
                 END DO
             END DO
             ! ==================================================================
+
+            IF (qbmm) THEN
+                ALLOCATE( mom_sp(1:nmomsp), mom_3d(0:nnode,0:nnode,1:nb) )
+                DO i = 0,nnode; DO j = 0,nnode; DO k = 1,nb
+                    ALLOCATE( mom_3d(i,j,k)%sf( &
+                                        ix%beg:ix%end, &
+                                        iy%beg:iy%end, &
+                                        iz%beg:iz%end ))
+                END DO; END DO; END DO
+                DO i = 1,nmomsp
+                    ALLOCATE( mom_sp(i)%sf( &
+                                        ix%beg:ix%end, &
+                                        iy%beg:iy%end, &
+                                        iz%beg:iz%end ))
+                END DO
+            END IF
+
             
             
             ! Allocation/Association of qK_cons_ndqp and qK_prim_ndqp ==========
@@ -1169,9 +1188,6 @@ MODULE m_rhs
                 ALLOCATE( bub_adv_src(0:m,0:n,0:p) )
                 IF ( qbmm ) THEN
                     ALLOCATE( bub_mom_src(1:nb,1:nmom,0:m,0:n,0:p) )
-                    ALLOCATE( quad_wght(1:nb,1:nnode,0:m,0:n,0:p) )
-                    ALLOCATE( quad_abscX(1:nb,1:nnode,0:m,0:n,0:p) )
-                    ALLOCATE( quad_abscY(1:nb,1:nnode,0:m,0:n,0:p) )
                 ELSE
                     ALLOCATE( bub_r_src(1:nb,0:m,0:n,0:p) )
                     ALLOCATE( bub_v_src(1:nb,0:m,0:n,0:p) )
@@ -1583,8 +1599,10 @@ MODULE m_rhs
             IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
             print*, 'before qbmm'
 
-            ! compute weights and abscissas
-            IF (qbmm) CALL s_mom_inv(q_prim_vf,quad_wght,quad_abscX,quad_abscY)
+            ! compute required moments
+            IF (qbmm) CALL s_mom_inv(q_prim_vf,mom_sp,mom_3d,ix,iy,iz)
+            ! call s_mpi_abort
+            ! IF (qbmm) CALL s_mom_inv(q_prim_vf,quad_wght,quad_abscX,quad_abscY)
             
             ! Dimensional Splitting Loop =======================================
             DO i = 1, num_dims
@@ -1873,6 +1891,7 @@ MODULE m_rhs
                     END DO
                 ELSE
                     ! Computing Riemann Solver Flux and Source Flux =================
+                    print*, 'about to call s_riemann_solver'
                     DO k = ipsi%beg, ipsi%end, 2
                         DO j = ichi%beg, ichi%end, 2
                             CALL s_riemann_solver(     qR_prim_ndqp(i,j,k)%vf, &
@@ -1894,6 +1913,13 @@ MODULE m_rhs
                                                                   i, ix,iy,iz  )
                         END DO
                     END DO
+                    print*, 'done with s_riemann_solver'
+
+                    ! do j = 1,sys_size
+                    !     print*, 'fluxes ', flux_ndqp(i,0,0)%vf(j)%sf(:,0,0)
+                    ! end do
+                    ! call s_mpi_abort()
+    
                   
                     iv%beg = 1; iv%end = adv_idx%end
        
@@ -1963,7 +1989,7 @@ MODULE m_rhs
                             - flux_ndqp(i,0,0)%vf(j)%sf( k ,0:n,0:p) )
                         END DO
                     END DO
-    
+
                     ! Applying source terms to the RHS of the advection equations
                     IF(riemann_solver == 1) THEN
                         !HLL, no K \div(u) so this just adds (subtracts?)
@@ -2047,23 +2073,27 @@ MODULE m_rhs
                         END DO
                     END IF
 
-                    IF (bubbles) THEN
-                        CALL s_get_divergence(i,q_prim_vf,divu)
-                        CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
-                                bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
+                    ! print*, 'after k div u type stuff'
+                    ! do j = 1, sys_size
+                    !     print*, 'rhs = ', rhs_vf(j)%sf(:,:,:)
+                    ! end do
+                    ! IF (bubbles) THEN
+                    !     CALL s_get_divergence(i,q_prim_vf,divu)
+                    !     CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
+                    !             bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
                         
-                                              rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
-                        IF ( num_fluids >1 )  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
+                    !                           rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
+                    !     IF ( num_fluids >1 )  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
 
-                        DO k = 1,nb
-                            rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
-                            rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
-                            IF (polytropic .NEQV. .TRUE.) THEN
-                                rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
-                                rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
-                            END IF
-                        END DO
-                   END IF
+                    !     DO k = 1,nb
+                    !         rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
+                    !         rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
+                    !         IF (polytropic .NEQV. .TRUE.) THEN
+                    !             rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
+                    !             rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
+                    !         END IF
+                    !     END DO
+                   ! END IF
 
                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
@@ -2293,11 +2323,13 @@ MODULE m_rhs
                     END IF
                     
 
+                print*, 'end dir 1 split'
                     
                ! ===============================================================
                
                ! RHS Contribution in y-direction ===============================
                 ELSEIF(i == 2) THEN
+                        print*, 'get dir 2'
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
                     
@@ -2699,6 +2731,7 @@ MODULE m_rhs
                
                ! RHS Contribution in z-direction ===============================
                 ELSE
+                    print*, 'dir = 3'
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
                     IF (tvd_rhs_flux) CALL s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)

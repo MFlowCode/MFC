@@ -172,6 +172,7 @@ PROGRAM p_main
         END IF
 
         CALL s_compute_derived_variables(t_step)
+        print*, 'computed derived vars'
 
         ! Time-stepping loop controls
         IF(t_step == t_step_stop) THEN

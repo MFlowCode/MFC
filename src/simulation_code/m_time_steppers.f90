@@ -245,10 +245,12 @@ MODULE m_time_steppers
             END IF
 
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
-           
+            print*, 'got rhs'
+
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
             END IF
+            print*, 'wrote runtime info'
 
             IF (ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) THEN
                 CALL s_time_step_cycling(t_step)
@@ -262,11 +264,11 @@ MODULE m_time_steppers
                                q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
                              + dt*rhs_vf(i)%sf
             END DO
+            print*, 'stepped'
 
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
 
             IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-
             
             DO i = 1, cont_idx%end
                 q_prim_vf(i)%sf => NULL()
@@ -282,6 +284,7 @@ MODULE m_time_steppers
                 END DO 
             END IF
             ! ==================================================================
+            print*, 'end of TS'
            
         END SUBROUTINE s_1st_order_tvd_rk ! ------------------------------------
         
@@ -307,6 +310,7 @@ MODULE m_time_steppers
             END DO
             
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
+
             
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
