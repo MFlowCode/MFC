@@ -1052,13 +1052,22 @@ MODULE m_riemann_solvers
                                                  norm_dir, ix,iy,iz  )
 
             ! Computing HLLC flux and source flux for Euler system of equations
+
+            print*, 'xbounds are: ', is1%beg, is1%end
+            print*, 'ybounds are: ', is2%beg, is2%end
+            print*, 'zbounds are: ', is3%beg, is3%end
             DO l = is3%beg, is3%end
                 DO k = is2%beg, is2%end
                     DO j = is1%beg, is1%end
 
+
+
+                        ! print*, 'about to get average state'
                         CALL s_compute_average_state(j,k,l)
+                        ! print*, 'got average state'
 
                         CALL s_compute_wave_speeds(j,k,l)
+                        ! print*, 'got wave speeds'
 
                         IF(model_eqns == 3) THEN
 
@@ -1420,6 +1429,7 @@ MODULE m_riemann_solvers
                                             (1d0 - dir_flg(dir_idx(i))) *               &
                                             vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) +  &
                                             dir_flg(dir_idx(i))*(pres_R))
+                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                     END DO
                                 ELSE
                                     ! Include p_tilde
@@ -1437,8 +1447,17 @@ MODULE m_riemann_solvers
                                             (1d0 - dir_flg(dir_idx(i))) *               &
                                             vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) +  &
                                             dir_flg(dir_idx(i))*(pres_R-ptilde_R))
+                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                     END DO
+
                                 END IF
+                                ! print*, xi_P, xi_M
+                                ! print*, s_M, s_P, s_S
+                                ! print*, ptilde_R, ptilde_L
+                                ! print*, rho_R, rho_L
+                                ! print*, vel_R(1), vel_L(1)
+                                ! print*, pres_R, pres_L
+                                ! print*, '              '
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
@@ -1512,6 +1531,12 @@ MODULE m_riemann_solvers
                                                 * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                     END DO
                                 END IF
+
+                            
+                                ! print*, 'mom idx', cont_idx%end+dir_idx(i)
+                                ! DO i = 1,sys_size
+                                !     print*, 'flux_rs_vf', i, flux_rs_vf(i)%sf(j,k,l)
+                                ! END DO
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 IF(norm_dir == 2 .AND. cyl_coord) THEN
@@ -2667,10 +2692,10 @@ MODULE m_riemann_solvers
                     R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j,k,l)
                     R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j+1,k,l)
                     IF( qbmm ) THEN
-                        DO q = 1,nmom
-                            moms_L(i,q) = qL_prim_rs_vf(bub_idx%moms(i,q))%sf(j,k,l)
-                            moms_R(i,q) = qR_prim_rs_vf(bub_idx%moms(i,q))%sf(j+1,k,l)
-                        END DO
+                        ! DO q = 1,nmom
+                        !     moms_L(i,q) = qL_prim_rs_vf(bub_idx%moms(i,q))%sf(j,k,l)
+                        !     moms_R(i,q) = qR_prim_rs_vf(bub_idx%moms(i,q))%sf(j+1,k,l)
+                        ! END DO
                     ELSE
                         V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
                         V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
@@ -2691,8 +2716,8 @@ MODULE m_riemann_solvers
                     !pbw_L(i) = (R0(i)/R0_L(i))**(3d0*gamma_gas)
                     !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
                     IF ( qbmm ) THEN
-                        pbw_L(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_L^(-3\gamma) computed from weights/abscissas
-                        pbw_R(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_R^(-3\gamma) computed from weights/abscissas
+                        ! pbw_L(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_L^(-3\gamma) computed from weights/abscissas
+                        ! pbw_R(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_R^(-3\gamma) computed from weights/abscissas
                     ELSE
                         IF (polytropic) THEN
                             pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
@@ -2708,15 +2733,26 @@ MODULE m_riemann_solvers
                 END DO
 
                 ! TODO: these quadratures now need to be computed with abscissas/weights
-                CALL s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
-                CALL s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
+                ! print*, 'get bubble moments in compute arithmetic mean'
+                IF (qbmm) THEN
+                    PbwR3Lbar = mom_sp(4)%sf(j  ,k,l)
+                    PbwR3Rbar = mom_sp(4)%sf(j+1,k,l)
+
+                    R3Lbar = mom_sp(1)%sf(j  ,k,l)
+                    R3Rbar = mom_sp(1)%sf(j+1,k,l)
+
+                    R3V2Lbar = mom_sp(3)%sf(j  ,k,l)
+                    R3V2Rbar = mom_sp(3)%sf(j+1,k,l)
+                ELSE
+                    CALL s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
+                    CALL s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
+
+                    CALL s_quad(R0_L**3.d0, R3Lbar)
+                    CALL s_quad(R0_R**3.d0, R3Rbar)
                 
-                CALL s_quad(R0_L**3.d0, R3Lbar)
-                CALL s_quad(R0_R**3.d0, R3Rbar)
-                
-                CALL s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
-                CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
-                
+                    CALL s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
+                    CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
+                END IF 
                 !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} ) 
                 ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
                     rho_L*R3V2Lbar/R3Lbar )

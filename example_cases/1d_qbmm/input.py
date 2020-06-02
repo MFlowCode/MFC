@@ -145,8 +145,8 @@ case_dict =                                                                     
                     'avg_state'                    : 2,                        \
                     'commute_err'                  : 'F',                      \
                     'split_err'                    : 'F',                      \
-                    'bc_x%beg'                     : -8,                       \
-                    'bc_x%end'                     : -8,                       \
+                    'bc_x%beg'                     : -1,                       \
+                    'bc_x%end'                     : -1,                       \
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
@@ -219,14 +219,13 @@ case_dict =                                                                     
                     'bubble_model'          : 3,                  \
                     'polytropic'            : 'T',                  \
                     'polydisperse'          : 'F',                  \
-                    #'poly_sigma'            : 0.3,                  \
+                    # 'poly_sigma'            : 0.1,                  \
                     'thermal'               : 3,           \
                     'R0ref'                 : myr0,                 \
                     'nb'                    : 1,             \
                     'Ca'                    : Ca,                   \
                     'Web'                   : We,                   \
                     'Re_inv'                : Re_inv,               \
-                    # ==== QBMM Stuff ==========================================
                     'qbmm'               : 'T',                  \
                     'nnode'              : 4,                    \
                     'sigR'               : 0.01,                 \
@@ -234,14 +233,14 @@ case_dict =                                                                     
                     # ==========================================================
 
                     # Acoustic source ==========================================
-                    'Monopole'                  : 'T',                  \
-                    'num_mono'                  : 1,                  \
-                    'Mono(1)%loc(1)'            : -5.E-03/x0,  \
-                    'Mono(1)%npulse'            : 1, \
-                    'Mono(1)%dir'               : 1., \
-                    'Mono(1)%pulse'             : 1, \
-                    'Mono(1)%mag'               : pa, \
-                    'Mono(1)%length'            : (1./(300000.))*cact/x0, \
+                    # 'Monopole'                  : 'T',                  \
+                    # 'num_mono'                  : 1,                  \
+                    # 'Mono(1)%loc(1)'            : -5.E-03/x0,  \
+                    # 'Mono(1)%npulse'            : 1, \
+                    # 'Mono(1)%dir'               : 1., \
+                    # 'Mono(1)%pulse'             : 1, \
+                    # 'Mono(1)%mag'               : pa, \
+                    # 'Mono(1)%length'            : (1./(300000.))*cact/x0, \
                     # ==========================================================
     }
 

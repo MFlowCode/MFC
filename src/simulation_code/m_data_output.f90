@@ -1907,23 +1907,23 @@ MODULE m_data_output
                                 ) / gamma
                         end IF
 
-                        IF (bubbles) THEN
-                            alf = q_cons_vf(alf_idx)%sf(j-2,k,l)
-                            IF (num_fluids == 3) THEN
-                                alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
-                            end IF
-                            DO s = 1,nb
-                                nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
-                                nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
-                            END DO
-                            CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
+                        ! IF (bubbles) THEN
+                        !     alf = q_cons_vf(alf_idx)%sf(j-2,k,l)
+                        !     IF (num_fluids == 3) THEN
+                        !         alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
+                        !     end IF
+                        !     DO s = 1,nb
+                        !         nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
+                        !         nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
+                        !     END DO
+                        !     CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
                                 
-                            R(:) = nR(:)/nbub                        
-                            Rdot(:) = nRdot(:)/nbub                        
+                        !     R(:) = nR(:)/nbub                        
+                        !     Rdot(:) = nRdot(:)/nbub                        
                         
-                            ptilde = ptil(j-2,k,l)
-                            ptot = pres - ptilde
-                        end IF
+                        !     ptilde = ptil(j-2,k,l)
+                        !     ptot = pres - ptilde
+                        ! END IF
 
                         ! Compute mixture sound speed
                         IF (alt_soundspeed .OR. regularization) THEN

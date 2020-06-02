@@ -310,6 +310,13 @@ MODULE m_global_parameters
 
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:)  :: momrhs
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)      :: momidx 
+
+
+    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: mom_sp
+    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:,:) :: mom_3d
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: mom_sp
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:,:,:) :: mom_3d
+
     !> @}
     
     !> @name Physical bubble parameters (see  Ando 2010, Preston 2007)
