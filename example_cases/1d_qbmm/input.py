@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import math
 
@@ -64,6 +64,9 @@ Tpulse  = Lpulse/cact
 Tfinal  = 0.25*10.*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
+dt = dt * 0.1
+print('dt: ',dt)
+
 Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
@@ -120,8 +123,8 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 1,                        \
-                    't_step_save'                  : 1,   \
+                    't_step_stop'                  : 100,                        \
+                    't_step_save'                  : 10,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -132,7 +135,7 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 1,                        \
+		    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \

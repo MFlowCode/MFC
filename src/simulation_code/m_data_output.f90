@@ -1907,23 +1907,30 @@ MODULE m_data_output
                                 ) / gamma
                         end IF
 
-                        ! IF (bubbles) THEN
-                        !     alf = q_cons_vf(alf_idx)%sf(j-2,k,l)
-                        !     IF (num_fluids == 3) THEN
-                        !         alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
-                        !     end IF
-                        !     DO s = 1,nb
-                        !         nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
-                        !         nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
-                        !     END DO
-                        !     CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
+                        IF (bubbles) THEN
+                            alf = q_cons_vf(alf_idx)%sf(j-2,k,l)
+                            IF (num_fluids == 3) THEN
+                                alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
+                            END IF
+                            IF (qbmm) THEN
+                                DO s = 1,nb
+                                    nR(s)   = q_cons_vf(bub_idx%moms(s,1))%sf(j-2,k,l)
+                                    nRdot(s)= q_cons_vf(bub_idx%moms(s,2))%sf(j-2,k,l)
+                                END DO
+                            ELSE
+                                DO s = 1,nb
+                                    nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
+                                    nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
+                                END DO
+                            END IF
+                            CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
                                 
-                        !     R(:) = nR(:)/nbub                        
-                        !     Rdot(:) = nRdot(:)/nbub                        
+                            R(:) = nR(:)/nbub                        
+                            Rdot(:) = nRdot(:)/nbub                        
                         
-                        !     ptilde = ptil(j-2,k,l)
-                        !     ptot = pres - ptilde
-                        ! END IF
+                            ptilde = ptil(j-2,k,l)
+                            ptot = pres - ptilde
+                        END IF
 
                         ! Compute mixture sound speed
                         IF (alt_soundspeed .OR. regularization) THEN
@@ -2112,42 +2119,52 @@ MODULE m_data_output
                     tmp = accel
                     CALL s_mpi_allreduce_sum(tmp,accel)
 
-                    tmp = alf
-                    CALL s_mpi_allreduce_sum(tmp,alf)
-                    tmp = alfgr
-                    CALL s_mpi_allreduce_sum(tmp,alfgr)
-                    tmp = nR(1)
-                    CALL s_mpi_allreduce_sum(tmp,nR(1))
-                    tmp = nRdot(1)
-                    CALL s_mpi_allreduce_sum(tmp,nRdot(1))
-                    tmp = R(1)
-                    CALL s_mpi_allreduce_sum(tmp,R(1))
-                    tmp = Rdot(1)
-                    CALL s_mpi_allreduce_sum(tmp,Rdot(1))
-
                     IF (bubbles) THEN
+                        tmp = alf
+                        CALL s_mpi_allreduce_sum(tmp,alf)
+                        tmp = alfgr
+                        CALL s_mpi_allreduce_sum(tmp,alfgr)
+                        tmp = nR(1)
+                        CALL s_mpi_allreduce_sum(tmp,nR(1))
+                        tmp = nRdot(1)
+                        CALL s_mpi_allreduce_sum(tmp,nRdot(1))
+                        tmp = R(1)
+                        CALL s_mpi_allreduce_sum(tmp,R(1))
+                        tmp = Rdot(1)
+                        CALL s_mpi_allreduce_sum(tmp,Rdot(1))
                         tmp = ptilde
                         CALL s_mpi_allreduce_sum(tmp,ptilde)
                         tmp = ptot
                         CALL s_mpi_allreduce_sum(tmp,ptot)
-                    end IF
+                    END IF
                 END IF
 
                 IF (proc_rank == 0) THEN
                     IF (n == 0) THEN
                         IF (bubbles .AND. (num_fluids <= 2)) THEN
-                            WRITE(i+30,'(6x,f12.6,10f24.8)') &
-                                nondim_time, &
-                                rho, &
-                                vel(1), &
-                                pres, &
-                                alf, &
-                                nR(1), &
-                                nRdot(1), &
-                                R(1), &
-                                Rdot(1), &
-                                ptilde, &
-                                ptot
+                            IF (qbmm) THEN
+                                WRITE(i+30,'(6x,f12.6,10f24.8)') &
+                                    nondim_time, &
+                                    rho, &
+                                    vel(1), &
+                                    pres, &
+                                    alf, &
+                                    R(1), &
+                                    Rdot(1)
+                            ELSE
+                                WRITE(i+30,'(6x,f12.6,10f24.8)') &
+                                    nondim_time, &
+                                    rho, &
+                                    vel(1), &
+                                    pres, &
+                                    alf, &
+                                    nR(1), &
+                                    nRdot(1), &
+                                    R(1), &
+                                    Rdot(1), &
+                                    ptilde, &
+                                    ptot
+                            END IF
                         ELSE IF (bubbles .AND. (num_fluids ==3)) THEN
                             WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // &
                                            'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
@@ -2186,17 +2203,7 @@ MODULE m_data_output
                                 rho, &
                                 vel(1), &
                                 pres
-                        end IF
-                        !WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
-                        !                   'F24.8,F24.8,F24.8)') &
-                        !    nondim_time, &
-                        !    rho, &
-                        !    vel(1), &
-                        !    pres, &
-                        !    gamma, &
-                        !    pi_inf, &
-                        !    c, &
-                        !    accel
+                        END IF
                     ELSEIF (p == 0) THEN
                         IF (bubbles) THEN
                             WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
@@ -2217,7 +2224,7 @@ MODULE m_data_output
                                 rho, &
                                 vel(1), &
                                 pres
-                        end IF
+                        END IF
                     ELSE
                         WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
                                            'F24.8,F24.8,F24.8,F24.8,' // &

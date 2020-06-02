@@ -1490,6 +1490,11 @@ MODULE m_rhs
                 q_cons_qp(0,0,0)%vf(i)%sf => q_cons_vf(i)%sf
                 q_prim_qp(0,0,0)%vf(i)%sf => q_prim_vf(i)%sf
             END DO
+
+            ! print*, 'cons vars: '
+            ! do i = 1,sys_size
+            !     print*, 'cons var: ', i, q_cons_qp(0,0,0)%vf(i)%sf(1,0,0)
+            ! end do
             
             CALL s_populate_conservative_variables_buffers()
            
@@ -1990,6 +1995,12 @@ MODULE m_rhs
                         END DO
                     END DO
 
+
+                    ! print*, 'before k div u type stuff'
+                    ! do j = 1, sys_size
+                    !     print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                    ! end do
+
                     ! Applying source terms to the RHS of the advection equations
                     IF(riemann_solver == 1) THEN
                         !HLL, no K \div(u) so this just adds (subtracts?)
@@ -2073,27 +2084,42 @@ MODULE m_rhs
                         END DO
                     END IF
 
+
+                    IF (bubbles) THEN
+                        IF (qbmm) THEN
+                            j = bub_idx%beg
+                            DO k=1,nb
+                                rhs_vf( j )%sf = rhs_vf( j )%sf + mom_3d(1,0,k)%sf
+                                rhs_vf(j+1)%sf = rhs_vf(j+1)%sf + mom_3d(0,1,k)%sf
+                                rhs_vf(j+2)%sf = rhs_vf(j+2)%sf + mom_3d(2,0,k)%sf
+                                rhs_vf(j+3)%sf = rhs_vf(j+3)%sf + mom_3d(1,1,k)%sf
+                                rhs_vf(j+4)%sf = rhs_vf(j+4)%sf + mom_3d(0,2,k)%sf
+                                j = j + 5
+                            END DO
+                        ELSE
+                            CALL s_get_divergence(i,q_prim_vf,divu)
+                            CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
+                                    bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
+                            
+                                                  rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
+                            IF ( num_fluids >1 )  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
+
+                            DO k = 1,nb
+                                rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
+                                rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
+                                IF (polytropic .NEQV. .TRUE.) THEN
+                                    rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
+                                    rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
+                                END IF
+                            END DO
+                        END IF
+                   END IF
+
+
                     ! print*, 'after k div u type stuff'
                     ! do j = 1, sys_size
-                    !     print*, 'rhs = ', rhs_vf(j)%sf(:,:,:)
+                    !     print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
                     ! end do
-                    ! IF (bubbles) THEN
-                    !     CALL s_get_divergence(i,q_prim_vf,divu)
-                    !     CALL s_compute_bubble_source(i,q_prim_vf,q_cons_vf,divu, &
-                    !             bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
-                        
-                    !                           rhs_vf( alf_idx )%sf(:,:,:) = rhs_vf( alf_idx )%sf(:,:,:) + bub_adv_src(:,:,:)
-                    !     IF ( num_fluids >1 )  rhs_vf(adv_idx%beg)%sf(:,:,:) = rhs_vf(adv_idx%beg)%sf(:,:,:) - bub_adv_src(:,:,:)
-
-                    !     DO k = 1,nb
-                    !         rhs_vf(bub_idx%rs(k))%sf(:,:,:) = rhs_vf(bub_idx%rs(k))%sf(:,:,:) + bub_r_src(k,:,:,:)
-                    !         rhs_vf(bub_idx%vs(k))%sf(:,:,:) = rhs_vf(bub_idx%vs(k))%sf(:,:,:) + bub_v_src(k,:,:,:)
-                    !         IF (polytropic .NEQV. .TRUE.) THEN
-                    !             rhs_vf(bub_idx%ps(k))%sf(:,:,:) = rhs_vf(bub_idx%ps(k))%sf(:,:,:) + bub_p_src(k,:,:,:)
-                    !             rhs_vf(bub_idx%ms(k))%sf(:,:,:) = rhs_vf(bub_idx%ms(k))%sf(:,:,:) + bub_m_src(k,:,:,:)
-                    !         END IF
-                    !     END DO
-                   ! END IF
 
                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
