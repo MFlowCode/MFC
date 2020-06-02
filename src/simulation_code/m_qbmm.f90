@@ -59,10 +59,11 @@ MODULE m_qbmm
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
 
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
+            REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
             REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2,nb) :: mom3d_terms
 
-            REAL(KIND(0d0)) :: pres, gam, moms_cond
+            REAL(KIND(0d0)) :: pres, gam, moms_cond, nbub
 
             INTEGER :: j,k,l,q,r,s !< Loop variables
             INTEGER :: id1,id2,id3
@@ -77,11 +78,21 @@ MODULE m_qbmm
 
             ! TODO: should these loops be over ix%beg,ix%end or is current form sufficient?
             DO id3 = is3%beg, is3%end; DO id2 = is2%beg, is2%end; DO id1 = is1%beg, is1%end
+
                 pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
+
+                DO q = 1,nb
+                    Rvec(q) = q_prim_vf(bub_idx%moms(q,1))%sf(id1,id2,id3)
+                END DO
+                CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(id1,id2,id3), Rvec, nbub )
+
                 DO q = 1,nb
                     DO r = 1,nmom
                         moms(r) = q_prim_vf(bub_idx%moms(q,r))%sf(id1,id2,id3)
                     END DO
+                    IF(id1==0) PRINT*, 'moment vec: ', moms(:)
+                    IF(id1==0) PRINT*, 'nbub: ', nbub
+
                     CALL s_chyqmom(pres,moms,wght(q,:),abscX(q,:),abscY(q,:))
 
                     DO j = 1,nterms
@@ -102,15 +113,26 @@ MODULE m_qbmm
                         mom3d_terms(j,i1,i2,q) = f_get_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) * moms_cond
                     END DO
                     i1=1; i2=0;
-                    moms3d(i1,i2,q)%sf(id1,id2,id3) = SUM( mom3d_terms(:,i1,i2,q) )
+                    moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
+                    ! IF(id1==0) PRINT*, 'mom3d: ', i1,i2,moms3d(i1,i2,q)%sf(id1,id2,id3)
+
                     i1=0; i2=1;
-                    moms3d(i1,i2,q)%sf(id1,id2,id3) = SUM( mom3d_terms(:,i1,i2,q) )
+                    moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
+                    ! IF(id1==0) PRINT*, 'mom3d: ', i1,i2,moms3d(i1,i2,q)%sf(id1,id2,id3)
+
                     i1=2; i2=0;
-                    moms3d(i1,i2,q)%sf(id1,id2,id3) = SUM( mom3d_terms(:,i1,i2,q) )
+                    moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
+                    ! IF(id1==0) PRINT*, 'mom3d: ', i1,i2,moms3d(i1,i2,q)%sf(id1,id2,id3)
+
                     i1=1; i2=1;
-                    moms3d(i1,i2,q)%sf(id1,id2,id3) = SUM( mom3d_terms(:,i1,i2,q) )
+                    moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
+                    ! IF(id1==0) PRINT*, 'mom3d: ', i1,i2,moms3d(i1,i2,q)%sf(id1,id2,id3)
+
                     i1=0; i2=2;
-                    moms3d(i1,i2,q)%sf(id1,id2,id3) = SUM( mom3d_terms(:,i1,i2,q) )
+                    moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
+                    ! IF(id1==0) PRINT*, 'mom3d: ', i1,i2,moms3d(i1,i2,q)%sf(id1,id2,id3)
+
+
 
                     ! print*, 'mom3d (1,0,', q,')', moms3d(1,0,q)%sf(id1,id2,id3)
                     ! print*, 'mom3d (0,1,', q,')', moms3d(0,1,q)%sf(id1,id2,id3)

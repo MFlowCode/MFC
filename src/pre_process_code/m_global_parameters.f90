@@ -490,12 +490,14 @@ MODULE m_global_parameters
                         V0(:)       = 0d0
                     ELSE IF (nb > 1) THEN
                         CALL s_simpson(nb)
-                        print*, 'R0 weights: ', weight(:)
-                        print*, 'R0 abscissas: ', R0(:)
+
                         V0(:)       = 0d0
                     ELSE
                         STOP 'Invalid value of nb'
                     END IF
+
+                    print*, 'R0 weights: ', weight(:)
+                    print*, 'R0 abscissas: ', R0(:)
 
 
                     IF (polytropic .NEQV. .TRUE.) THEN

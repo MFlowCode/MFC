@@ -1053,14 +1053,12 @@ MODULE m_riemann_solvers
 
             ! Computing HLLC flux and source flux for Euler system of equations
 
-            print*, 'xbounds are: ', is1%beg, is1%end
-            print*, 'ybounds are: ', is2%beg, is2%end
-            print*, 'zbounds are: ', is3%beg, is3%end
+            ! print*, 'xbounds are: ', is1%beg, is1%end
+            ! print*, 'ybounds are: ', is2%beg, is2%end
+            ! print*, 'zbounds are: ', is3%beg, is3%end
             DO l = is3%beg, is3%end
                 DO k = is2%beg, is2%end
                     DO j = is1%beg, is1%end
-
-
 
                         ! print*, 'about to get average state'
                         CALL s_compute_average_state(j,k,l)
