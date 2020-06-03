@@ -2087,6 +2087,9 @@ MODULE m_rhs
 
                     IF (bubbles) THEN
                         IF (qbmm) THEN
+                            ! advection source
+                            ! rhs_vf(alf_idx)%sf = rhs_vf(alf_idx)%sf + mom_sp(2)%sf
+                            ! bubble sources
                             j = bub_idx%beg
                             DO k=1,nb
                                 rhs_vf( j )%sf = rhs_vf( j )%sf + mom_3d(1,0,k)%sf
@@ -2117,9 +2120,9 @@ MODULE m_rhs
 
 
                     ! print*, 'after k div u type stuff'
-                    ! do j = 1, sys_size
-                    !     print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
-                    ! end do
+                    do j = 1, sys_size
+                        print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                    end do
 
                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;

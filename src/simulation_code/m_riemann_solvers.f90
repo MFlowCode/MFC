@@ -2706,6 +2706,7 @@ MODULE m_riemann_solvers
                 
                 !nbub_L = (3.d0/(4.d0*pi)) * alpha_L(1)/(R0_L**3.d0)
                 !nbub_R = (3.d0/(4.d0*pi)) * alpha_R(1)/(R0_R**3.d0)
+                
                 CALL s_comp_n_from_prim(alpha_L(num_fluids),R0_L,nbub_L)
                 CALL s_comp_n_from_prim(alpha_R(num_fluids),R0_R,nbub_R)
                 

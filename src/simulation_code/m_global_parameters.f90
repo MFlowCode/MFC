@@ -1157,6 +1157,7 @@ MODULE m_global_parameters
             IF (vftmp < 0.d0) STOP 'vf negative'
 
             ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
+            ! ntmp = 1d0
 
         END SUBROUTINE s_comp_n_from_cons
 
@@ -1174,6 +1175,7 @@ MODULE m_global_parameters
 
             CALL s_quad( Rtmp**3,R3 ) 
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
+            ! ntmp = 1d0
 
         END SUBROUTINE s_comp_n_from_prim
 

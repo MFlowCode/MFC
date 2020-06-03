@@ -487,10 +487,9 @@ MODULE m_global_parameters
                     IF (nb == 1) THEN
                         weight(:)   = 1d0
                         R0(:)       = 1d0
-                        V0(:)       = 0d0
+                        V0(:)       = 1d0
                     ELSE IF (nb > 1) THEN
                         CALL s_simpson(nb)
-
                         V0(:)       = 0d0
                     ELSE
                         STOP 'Invalid value of nb'
@@ -839,6 +838,7 @@ MODULE m_global_parameters
 
             CALL s_quad( nRtmp**3,nR3 )  !returns itself if NR0 = 1
             ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
+            ! ntmp = 1d0
 
         END SUBROUTINE s_comp_n_from_cons
 
@@ -854,6 +854,7 @@ MODULE m_global_parameters
 
             CALL s_quad( Rtmp**3,R3 )  !returns itself if NR0 = 1
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
+            ! ntmp = 1d0
 
         END SUBROUTINE s_comp_n_from_prim
 

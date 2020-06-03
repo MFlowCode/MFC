@@ -44,7 +44,7 @@ We = rho0*(uu**2.)*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 1.E-4
+vf0     = 1.E-1
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -123,8 +123,8 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 100,                        \
-                    't_step_save'                  : 10,   \
+                    't_step_stop'                  : 10,                        \
+                    't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -135,14 +135,14 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 3,                        \
+		    'time_stepper'                 : 1,                        \
                     'weno_vars'                    : 2,                        \
-                    'weno_order'                   : 5,                        \
+                    'weno_order'                   : 3,                        \
                     'weno_eps'                     : 1.E-16,                   \
                     'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
-                    'mp_weno'                      : 'T',                      \
+                    'mp_weno'                      : 'F',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
@@ -187,7 +187,7 @@ case_dict =                                                                     
                     'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,   \
                     'patch_icpp(1)%alpha(1)'       : vf0,                       \
                     'patch_icpp(1)%r0'             : 1.,                        \
-                    'patch_icpp(1)%v0'             : 0.0E+00,                   \
+                    'patch_icpp(1)%v0'             : -1.E-10,                   \
                     # ==========================================================
 
                     # Fluids Physical Parameters ===============================
