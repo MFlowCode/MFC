@@ -142,9 +142,10 @@ MODULE m_qbmm
                 END DO
 
                 momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
-                momsp(2)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,2d0,1d0,0d0)
+                momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
                 momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
                 momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3*gam)
+
 
                 ! print*, 'momsp(1) ', momsp(1)%sf(id1,id2,id3)
                 ! print*, 'momsp(2) ', momsp(2)%sf(id1,id2,id3)
