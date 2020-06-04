@@ -27,7 +27,8 @@ mu_n    = 1.8E-05
 k_n     = 0.02556
 
 #air props
-gamma_gas = gamma_n
+# gamma_gas = gamma_n
+gamma_gas = 1.4
 
 #reference bubble size
 R0ref   = 10.E-06
@@ -123,7 +124,7 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 10,                        \
+                    't_step_stop'                  : 1,                        \
                     't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
@@ -135,7 +136,7 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 1,                        \
+		    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 3,                        \
                     'weno_eps'                     : 1.E-16,                   \
