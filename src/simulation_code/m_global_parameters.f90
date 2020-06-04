@@ -582,7 +582,7 @@ MODULE m_global_parameters
                             nmomsp = 4 !number of special moments
                             nterms = 4 !number of rhs terms per transport equation
                             IF( nnode == 4) THEN
-                                nmom = 5
+                                nmom = 6
                                 nmomtot = nmom*nb
                             END IF
                             bub_idx%end = adv_idx%end+nb*nmom
@@ -635,12 +635,14 @@ MODULE m_global_parameters
                                 DO j = 1, nmom
                                     bub_idx%moms(i,j) = bub_idx%beg+(j-1)+(i-1)*nmom
                                 END DO 
-                                bub_idx%fullmom(i,1,0) = bub_idx%moms(i,1)
-                                bub_idx%fullmom(i,0,1) = bub_idx%moms(i,2)
-                                bub_idx%fullmom(i,2,0) = bub_idx%moms(i,3)
-                                bub_idx%fullmom(i,0,2) = bub_idx%moms(i,4)
+                                bub_idx%fullmom(i,0,0) = bub_idx%moms(i,1)
+                                bub_idx%fullmom(i,1,0) = bub_idx%moms(i,2)
+                                bub_idx%fullmom(i,0,1) = bub_idx%moms(i,3)
+                                bub_idx%fullmom(i,2,0) = bub_idx%moms(i,4)
                                 bub_idx%fullmom(i,1,1) = bub_idx%moms(i,5)
+                                bub_idx%fullmom(i,0,2) = bub_idx%moms(i,6)
                                 bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
+                                bub_idx%vs(i) = bub_idx%fullmom(i,0,1)
                             END DO
                         ELSE
                             DO i = 1, nb

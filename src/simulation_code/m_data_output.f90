@@ -1912,17 +1912,17 @@ MODULE m_data_output
                             IF (num_fluids == 3) THEN
                                 alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
                             END IF
-                            IF (qbmm) THEN
-                                DO s = 1,nb
-                                    nR(s)   = q_cons_vf(bub_idx%moms(s,1))%sf(j-2,k,l)
-                                    nRdot(s)= q_cons_vf(bub_idx%moms(s,2))%sf(j-2,k,l)
-                                END DO
-                            ELSE
-                                DO s = 1,nb
-                                    nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
-                                    nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
-                                END DO
-                            END IF
+                            ! IF (qbmm) THEN
+                            !     DO s = 1,nb
+                            !         nR(s)   = q_cons_vf(bub_idx%moms(s,2))%sf(j-2,k,l)
+                            !         nRdot(s)= q_cons_vf(bub_idx%moms(s,2))%sf(j-2,k,l)
+                            !     END DO
+                            ! ELSE
+                            DO s = 1,nb
+                                nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
+                                nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
+                            END DO
+                            ! END IF
                             CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
                                 
                             R(:) = nR(:)/nbub                        

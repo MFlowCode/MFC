@@ -435,7 +435,7 @@ MODULE m_global_parameters
                     bub_idx%beg = sys_size+1
                     IF (qbmm) THEN
                         IF( nnode == 4) THEN
-                            nmom = 5
+                            nmom = 6
                         END IF
                         bub_idx%end = adv_idx%end+nb*nmom
                     ELSE
@@ -458,11 +458,12 @@ MODULE m_global_parameters
                             DO j = 1, nmom
                                 bub_idx%moms(i,j) = bub_idx%beg+(j-1)+(i-1)*nmom
                             END DO 
-                            bub_idx%fullmom(i,1,0) = bub_idx%moms(i,1)
-                            bub_idx%fullmom(i,0,1) = bub_idx%moms(i,2)
-                            bub_idx%fullmom(i,2,0) = bub_idx%moms(i,3)
-                            bub_idx%fullmom(i,0,2) = bub_idx%moms(i,4)
+                            bub_idx%fullmom(i,0,0) = bub_idx%moms(i,1)
+                            bub_idx%fullmom(i,1,0) = bub_idx%moms(i,2)
+                            bub_idx%fullmom(i,0,1) = bub_idx%moms(i,3)
+                            bub_idx%fullmom(i,2,0) = bub_idx%moms(i,4)
                             bub_idx%fullmom(i,1,1) = bub_idx%moms(i,5)
+                            bub_idx%fullmom(i,0,2) = bub_idx%moms(i,6)
                             bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
                         END DO
                     ELSE

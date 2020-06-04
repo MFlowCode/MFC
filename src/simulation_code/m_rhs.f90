@@ -1606,8 +1606,6 @@ MODULE m_rhs
 
             ! compute required moments
             IF (qbmm) CALL s_mom_inv(q_prim_vf,mom_sp,mom_3d,ix,iy,iz)
-            ! call s_mpi_abort
-            ! IF (qbmm) CALL s_mom_inv(q_prim_vf,quad_wght,quad_abscX,quad_abscY)
             
             ! Dimensional Splitting Loop =======================================
             DO i = 1, num_dims
@@ -2092,12 +2090,13 @@ MODULE m_rhs
                             ! bubble sources
                             j = bub_idx%beg
                             DO k=1,nb
-                                rhs_vf( j )%sf = rhs_vf( j )%sf + mom_3d(1,0,k)%sf
-                                rhs_vf(j+1)%sf = rhs_vf(j+1)%sf + mom_3d(0,1,k)%sf
-                                rhs_vf(j+2)%sf = rhs_vf(j+2)%sf + mom_3d(2,0,k)%sf
-                                rhs_vf(j+3)%sf = rhs_vf(j+3)%sf + mom_3d(1,1,k)%sf
-                                rhs_vf(j+4)%sf = rhs_vf(j+4)%sf + mom_3d(0,2,k)%sf
-                                j = j + 5
+                                rhs_vf( j )%sf = rhs_vf( j )%sf + mom_3d(0,0,k)%sf
+                                rhs_vf(j+1)%sf = rhs_vf(j+1)%sf + mom_3d(1,0,k)%sf
+                                rhs_vf(j+2)%sf = rhs_vf(j+2)%sf + mom_3d(0,1,k)%sf
+                                rhs_vf(j+3)%sf = rhs_vf(j+3)%sf + mom_3d(2,0,k)%sf
+                                rhs_vf(j+4)%sf = rhs_vf(j+4)%sf + mom_3d(1,1,k)%sf
+                                rhs_vf(j+5)%sf = rhs_vf(j+5)%sf + mom_3d(0,2,k)%sf
+                                j = j + 6
                             END DO
                         ELSE
                             CALL s_get_divergence(i,q_prim_vf,divu)

@@ -49,6 +49,8 @@ MODULE m_qbmm
     IMPLICIT NONE
 
 
+    REAL(KIND(0d0)), PARAMETER :: verysmall = 1.d-12
+
     CONTAINS
 
         SUBROUTINE s_mom_inv( q_prim_vf, momsp, moms3d, is1, is2, is3 ) 
@@ -62,7 +64,6 @@ MODULE m_qbmm
             REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
             REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2,nb) :: mom3d_terms
-
             REAL(KIND(0d0)) :: pres, gam, moms_cond, nbub
 
             INTEGER :: j,k,l,q,r,s !< Loop variables
@@ -82,7 +83,7 @@ MODULE m_qbmm
                 pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
 
                 DO q = 1,nb
-                    Rvec(q) = q_prim_vf(bub_idx%moms(q,1))%sf(id1,id2,id3)
+                    Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
                 END DO
                 CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(id1,id2,id3), Rvec, nbub )
 
@@ -96,6 +97,9 @@ MODULE m_qbmm
                     CALL s_chyqmom(pres,moms,wght(q,:),abscX(q,:),abscY(q,:))
 
                     DO j = 1,nterms
+                        i1 = 0; i2 = 0
+                        moms_cond = f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,1),momrhs(i1,i2,q,j,2))
+                        mom3d_terms(j,i1,i2,q) = f_get_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) * moms_cond
                         i1 = 1; i2 = 0
                         moms_cond = f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,1),momrhs(i1,i2,q,j,2))
                         mom3d_terms(j,i1,i2,q) = f_get_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) * moms_cond
@@ -112,6 +116,9 @@ MODULE m_qbmm
                         moms_cond = f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,1),momrhs(i1,i2,q,j,2))
                         mom3d_terms(j,i1,i2,q) = f_get_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) * moms_cond
                     END DO
+                    i1=0; i2=0;
+                    moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
+
                     i1=1; i2=0;
                     moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2,q) )
                     ! IF(id1==0) PRINT*, 'mom3d: ', i1,i2,moms3d(i1,i2,q)%sf(id1,id2,id3)
@@ -144,7 +151,7 @@ MODULE m_qbmm
                 momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
                 momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
                 momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
-                momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3*gam)
+                momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
 
 
                 ! print*, 'momsp(1) ', momsp(1)%sf(id1,id2,id3)
@@ -155,68 +162,9 @@ MODULE m_qbmm
 
             END DO; END DO; END DO
 
-
             print*, 'finished qbmm'
 
-
-            ! CALL s_get_moms( weights, abscX, abscY, momsp, mom3d, pres, is1, is2, is3)
-            ! CALL s_get_momsp ( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l),     momsp(1:4)%sf(j,k,l) )
-            ! CALL s_get_momrhs( weights(:,:,j,k,l),abscX(:,:,j,k,l),abscY(:,:,j,k,l), mom3d(:,:,:)%sf(j,k,l), pres )
-
         END SUBROUTINE s_mom_inv
-
-        ! SUBROUTINE s_get_moms( wght, abscX, abscY, moms3d, momsp, pres, is1, is2, is3) 
-
-        !     REAL(KIND(0d0)), DIMENSION(nb,nnode), INTENT(IN) :: wght, abscX, abscY
-        !     TYPE(scalar_field), DIMENSION(nmom,nmom,nb), INTENT(OUT) :: moms3d
-        !     TYPE(scalar_field), DIMENSION(nmomsp), INTENT(OUT) :: momsp
-        !     REAL(KIND(0d0)), INTENT(IN) :: pres
-        !     TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
-
-        !     REAL(KIND(0d0)), DIMENSION(nterms,nmom,nmom,nb) :: mom3d_terms
-        !     REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2,nb) :: moms_cond
-
-        !     INTEGER :: i,j,k,i1,i2
-
-        !     DO id3 = is3%beg, is3%end; DO id2 = is2%beg, is2%end; DO id1 = is1%beg, is1%end
-
-        !         DO k = 1,nb
-        !             DO j = 1,nterms
-        !                 i1 = 1; i2 = 0
-        !                 moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
-        !                 mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
-        !                 i1 = 0; i2 = 1
-        !                 moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
-        !                 mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
-        !                 i1 = 2; i2 = 0
-        !                 moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
-        !                 mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
-        !                 i1 = 1; i2 = 1
-        !                 moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
-        !                 mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
-        !                 i1 = 0; i2 = 2
-        !                 moms_cond(j,i1,i2,k) = f_quad2D(abscX(k,:),abscY(k,:),wght(k,:),momrhs(i1,i2,k,j,1),momrhs(i1,i2,k,j,2))
-        !                 mom3d_terms(j,i1,i2,k) = f_get_coeff(j,i1,i2,k,pres) * (R0(k)**(momrhs(i1,i2,k,j,3)-k)) * moms_cond(j,i1,i2,k)
-        !             END DO
-        !             i1=1;i2=0;
-        !             moms3d(i1,i2,k)%sf(id1,id3,id3) = SUM( mom3d_terms(:,i1,i2,k) )
-        !             i1=0;i2=1;
-        !             moms3d(i1,i2,k)%sf(id1,id3,id3) = SUM( mom3d_terms(:,i1,i2,k) )
-        !             i1=2;i2=0;
-        !             moms3d(i1,i2,k)%sf(id1,id3,id3) = SUM( mom3d_terms(:,i1,i2,k) )
-        !             i1=1;i2=1;
-        !             moms3d(i1,i2,k)%sf(id1,id3,id3) = SUM( mom3d_terms(:,i1,i2,k) )
-        !             i1=0;i2=2;
-        !             moms3d(i1,i2,k)%sf(id1,id3,id3) = SUM( mom3d_terms(:,i1,i2,k) )
-        !         END DO
-
-        !         momsp(1)%sf(id1,id3,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
-        !         momsp(2)%sf(id1,id3,id3) = f_quad(abscX,abscY,wght,2d0,1d0,0d0)
-        !         momsp(3)%sf(id1,id3,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
-        !         momsp(4)%sf(id1,id3,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3*gam)
-        !     END DO; END DO; END DO
-
-        ! END SUBROUTINE s_get_momrhs
 
 
         SUBROUTINE s_chyqmom(pres,momin,wght,abscX,abscY)
@@ -233,17 +181,18 @@ MODULE m_qbmm
 
             ! print*, 'moms: ', momin(:)
 
-            moms(1,0) = momin(1)
-            moms(0,1) = momin(2)
-            moms(2,0) = momin(3)
-            moms(1,1) = momin(4)
-            moms(0,2) = momin(5)
+            moms(0,0) = momin(1)
+            moms(1,0) = momin(2)
+            moms(0,1) = momin(3)
+            moms(2,0) = momin(4)
+            moms(1,1) = momin(5)
+            moms(0,2) = momin(6)
 
-            bu  = moms(1,0) 
-            bv  = moms(0,1) 
-            d20 = moms(2,0) 
-            d11 = moms(1,1) 
-            d02 = moms(0,2) 
+            bu  = moms(1,0)/moms(0,0)
+            bv  = moms(0,1)/moms(0,0)
+            d20 = moms(2,0)/moms(0,0)
+            d11 = moms(1,1)/moms(0,0)
+            d02 = moms(0,2)/moms(0,0)
             c20 = d20 - bu**2d0; 
             c11 = d11 - bu*bv;
             c02 = d02 - bv**2d0; 
@@ -284,7 +233,6 @@ MODULE m_qbmm
             
             REAL(KIND(0d0)), DIMENSION(2), INTENT(INOUT) :: frho, fup
             REAL(KIND(0d0)), DIMENSION(3), INTENT(IN) :: fmom
-
             REAL(KIND(0d0)) :: bu, d2, c2
 
             bu = fmom(2)/fmom(1)
@@ -292,6 +240,11 @@ MODULE m_qbmm
             c2 = d2 - bu**2d0 
             frho(1) = fmom(1)/2d0; 
             frho(2) = fmom(1)/2d0; 
+            IF (c2 < verysmall) THEN
+                ! PRINT*, 'c2 negative, stopping. c2 = ', c2
+                ! CALL s_mpi_abort()
+                c2 = verysmall
+            END IF
             fup(1) = bu - dsqrt(c2)
             fup(2) = bu + dsqrt(c2) 
 
