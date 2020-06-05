@@ -108,7 +108,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'T',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 1,                         \
+                    'ppn'                          : 1,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -125,8 +125,9 @@ case_dict =                                                                     
                     'dt'                           : 0.001,                      \
                     # 'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 15000,                        \
-                    't_step_save'                  : 100,   \
+                    # 't_step_stop'                  : 100,                        \
+                    't_step_stop'                  : 5000,                        \
+                    't_step_save'                  : 1000,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================

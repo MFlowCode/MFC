@@ -324,6 +324,7 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     REAL(KIND(0d0)) :: mul0, ss, gamma_v, mu_v, G
     REAL(KIND(0d0)) :: gamma_m, gamma_n, mu_n
+    REAL(KIND(0d0)) :: gam
     !> @}
 
 
@@ -512,8 +513,6 @@ MODULE m_global_parameters
             INTEGER :: fac
             INTEGER :: i1,i2,i3
 
-            REAL(KIND(0d0)) :: gam
-            
             TYPE(bounds_info) :: ix,iy,iz
             
             
@@ -601,12 +600,14 @@ MODULE m_global_parameters
                         ALLOCATE( weight(nb),R0(nb),V0(nb) )
                         ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
 
+
+                        IF (num_fluids == 1) THEN
+                            gam  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
+                        ELSE 
+                            gam  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+                        END IF
+
                         IF (qbmm) THEN
-                            IF (num_fluids == 1) THEN
-                                gam  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
-                            ELSE 
-                                gam  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
-                            END IF
 
                             ALLOCATE( momrhs(0:2,0:2,0:2,nterms,3) )
                             ALLOCATE( momidx(nmomtot) )
