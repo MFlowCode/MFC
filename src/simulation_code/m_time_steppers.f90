@@ -245,12 +245,12 @@ MODULE m_time_steppers
             END IF
 
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
-            print*, 'got rhs'
+            ! print*, 'got rhs'
 
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
             END IF
-            print*, 'wrote runtime info'
+            ! print*, 'wrote runtime info'
 
             IF (ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) THEN
                 CALL s_time_step_cycling(t_step)
@@ -259,12 +259,15 @@ MODULE m_time_steppers
             
             IF(t_step == t_step_stop) RETURN
            
+            ! print*, 'alpha = ', q_cons_ts(1)%vf(alf_idx)%sf(0,0,0) 
             DO i = 1, sys_size
                 ! print*, 'cons, rhs: ', i, q_cons_ts(1)%vf(i)%sf(1,0,0), rhs_vf(i)%sf(1,0,0)
                 q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) = &
                                q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
                              + dt*rhs_vf(i)%sf
             END DO
+            ! print*, 'rhs alf = ', rhs_vf(alf_idx)%sf(0,0,0)
+            ! print*, ' post rhs alf = ', q_cons_ts(1)%vf(alf_idx)%sf(0,0,0) 
 
 
 
@@ -286,7 +289,7 @@ MODULE m_time_steppers
                 END DO 
             END IF
             ! ==================================================================
-            print*, 'end of TS'
+            ! print*, 'end of TS'
            
         END SUBROUTINE s_1st_order_tvd_rk ! ------------------------------------
         

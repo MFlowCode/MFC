@@ -338,7 +338,8 @@ MODULE m_global_parameters
     ! ======================================================================
 
     ! Mathematical and Physical Constants ======================================
-    REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
+    ! REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
+    REAL(KIND(0d0)), PARAMETER :: pi = 3.14159265358979311599796 !< Pi
     ! ==========================================================================
   
     
@@ -594,6 +595,8 @@ MODULE m_global_parameters
                             END IF
                         END IF
                         sys_size = bub_idx%end
+                        ! print*, 'alf idx', alf_idx
+                        ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
                         ALLOCATE( weight(nb),R0(nb),V0(nb) )
                         ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
@@ -614,18 +617,18 @@ MODULE m_global_parameters
                             !       (1,0), (0,1), (2,0), (1,1), (0,2)
                             DO i1 = 0,2; DO i2 = 0,2; DO i3 = 1,nb
                                 !mexp = {{-1 + i1, -1 + i2, i3}, {-1 + i1, 1 + i2, i3}, {-1 + i1 - 3 \[Gamma], -1 + i2, i3 + 3 \[Gamma]}, {-1 + i1, 1 + i2, i3}}
-                                momrhs(i1,i2,i3,1,1) = -1 + i1
-                                momrhs(i1,i2,i3,1,2) = -1 + i2
-                                momrhs(i1,i2,i3,1,3) = i3
-                                momrhs(i1,i2,i3,2,1) = -1 + i1
-                                momrhs(i1,i2,i3,2,2) =  1 + i2 
-                                momrhs(i1,i2,i3,2,3) = i3
-                                momrhs(i1,i2,i3,3,1) = -1 + i1 - 3*gam
-                                momrhs(i1,i2,i3,3,2) = -1 + i2
-                                momrhs(i1,i2,i3,3,3) = i3 + 3*gam
-                                momrhs(i1,i2,i3,4,1) = -1 + i1
-                                momrhs(i1,i2,i3,4,2) =  1 + i2
-                                momrhs(i1,i2,i3,4,3) = i3
+                                momrhs(i1,i2,i3,1,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                momrhs(i1,i2,i3,1,2) = -1.d0 + REAL(i2,KIND(0d0))
+                                momrhs(i1,i2,i3,1,3) = REAL(i3,KIND(0d0))
+                                momrhs(i1,i2,i3,2,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                momrhs(i1,i2,i3,2,2) =  1.d0 + REAL(i2,KIND(0d0))
+                                momrhs(i1,i2,i3,2,3) = REAL(i3,KIND(0d0))
+                                momrhs(i1,i2,i3,3,1) = -1.d0 + REAL(i1,KIND(0d0)) - 3.d0*gam
+                                momrhs(i1,i2,i3,3,2) = -1.d0 + REAL(i2,KIND(0d0))
+                                momrhs(i1,i2,i3,3,3) = REAL(i3,KIND(0d0)) + 3.d0*gam
+                                momrhs(i1,i2,i3,4,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                momrhs(i1,i2,i3,4,2) =  1.d0 + REAL(i2,KIND(0d0))
+                                momrhs(i1,i2,i3,4,3) = REAL(i3,KIND(0d0))
                             END DO; END DO; END DO
 
                             ALLOCATE( bub_idx%moms(nb,nmom) )
@@ -644,6 +647,7 @@ MODULE m_global_parameters
                                 bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
                                 bub_idx%vs(i) = bub_idx%fullmom(i,0,1)
                             END DO
+                            ! print*, 'bub idx moms', bub_idx%moms(1,1:6)
                         ELSE
                             DO i = 1, nb
                                 IF (polytropic .NEQV. .TRUE.) THEN
@@ -1153,7 +1157,7 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: nR3
 
-            CALL s_quad( nRtmp**3,nR3 )
+            CALL s_quad( nRtmp**3d0,nR3 )
             
             IF ( nR3 < 0.d0 ) STOP 'nR3 is negative'
             IF (vftmp < 0.d0) STOP 'vf negative'
@@ -1175,7 +1179,7 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: R3
 
-            CALL s_quad( Rtmp**3,R3 ) 
+            CALL s_quad( Rtmp**3d0,R3 ) 
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
             ! ntmp = 1d0
 

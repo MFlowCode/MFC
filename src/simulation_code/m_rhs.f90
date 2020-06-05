@@ -1916,7 +1916,6 @@ MODULE m_rhs
                                                                   i, ix,iy,iz  )
                         END DO
                     END DO
-                    print*, 'done with s_riemann_solver'
 
                     ! do j = 1,sys_size
                     !     print*, 'fluxes ', flux_ndqp(i,0,0)%vf(j)%sf(:,0,0)
@@ -2086,7 +2085,7 @@ MODULE m_rhs
                     IF (bubbles) THEN
                         IF (qbmm) THEN
                             ! advection source
-                            ! rhs_vf(alf_idx)%sf = rhs_vf(alf_idx)%sf + mom_sp(2)%sf
+                            rhs_vf(alf_idx)%sf = rhs_vf(alf_idx)%sf + mom_sp(2)%sf
                             ! bubble sources
                             j = bub_idx%beg
                             DO k=1,nb
@@ -2119,6 +2118,7 @@ MODULE m_rhs
 
 
                     ! print*, 'after k div u type stuff'
+                    ! do j = alf_idx, sys_size
                     do j = 1, sys_size
                         print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
                     end do
@@ -2351,7 +2351,6 @@ MODULE m_rhs
                     END IF
                     
 
-                print*, 'end dir 1 split'
                     
                ! ===============================================================
                

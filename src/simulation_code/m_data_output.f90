@@ -375,8 +375,8 @@ MODULE m_data_output
                 ! structure
                 OPEN(i+30, FILE = TRIM(file_path), &
                     FORM = 'formatted', &
-                    POSITION = 'append', &
                     STATUS   = 'unknown')
+                    ! POSITION = 'append', &
                 !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
                 !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
                 !WRITE(i+30,'(A,F10.6)') 'y = ',probe(i)%y
