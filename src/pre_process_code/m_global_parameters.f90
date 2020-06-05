@@ -837,7 +837,7 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: nR3
 
-            CALL s_quad( nRtmp**3,nR3 )  !returns itself if NR0 = 1
+            CALL s_quad( nRtmp**3.d0,nR3 )  !returns itself if NR0 = 1
             ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
             ! ntmp = 1d0
 
@@ -853,7 +853,7 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: R3
 
-            CALL s_quad( Rtmp**3,R3 )  !returns itself if NR0 = 1
+            CALL s_quad( Rtmp**3.d0,R3 )  !returns itself if NR0 = 1
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
             ! ntmp = 1d0
 

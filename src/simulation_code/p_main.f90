@@ -154,6 +154,7 @@ PROGRAM p_main
 
     ! Time-stepping Loop =======================================================
     DO
+        PRINT*, '------------------------------------------------------------'
         IF (proc_rank==0 .AND. MOD(t_step,t_step_save)==0 ) THEN
             PRINT*, 'Time step ', t_step, ' of ', t_step_stop
         END IF
@@ -172,7 +173,7 @@ PROGRAM p_main
         END IF
 
         CALL s_compute_derived_variables(t_step)
-        print*, 'computed derived vars'
+        ! print*, 'computed derived vars'
 
         ! Time-stepping loop controls
         IF(t_step == t_step_stop) THEN
@@ -181,7 +182,7 @@ PROGRAM p_main
             t_step = t_step + 1
         END IF
        
-        print*, 'Write data files'
+        ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         IF(MOD(t_step-t_step_start, t_step_save) == 0) THEN
             CALL s_write_data_files(q_cons_ts(1)%vf, t_step)

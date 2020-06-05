@@ -365,6 +365,17 @@ MODULE m_initial_condition
                         q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
                         q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+
+
+                        if (j==0 .and. k==0 .and. l==0) then
+                            print*, 'moments @ (0,0,0): ', 1d0, &
+                            dexp((sigR**2d0)/2d0)*muR, &
+                            muV, &
+                            dexp((sigR**2d0)*2d0)*(muR**2d0), &
+                            dexp((sigR**2d0)/2d0)*muR*muV, &
+                            muV**2d0 + sigV**2d0
+                        end if
+
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
