@@ -63,25 +63,18 @@ MODULE m_qbmm
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
             REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
-            REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2) :: mom3d_terms
-            REAL(KIND(0d0)) :: pres, gam, moms_cond, nbub
+            REAL(KIND(0d0)), DIMENSION(nterms,0:nnode,0:nnode) :: mom3d_terms
+            REAL(KIND(0d0)) :: pres, nbub
 
             INTEGER :: j,k,l,q,r,s !< Loop variables
             INTEGER :: id1,id2,id3
             INTEGER :: i1,i2
 
-
-            IF (num_fluids == 1) THEN
-                gam  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
-            ELSE 
-                gam  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
-            END IF
-
             DO id3 = is3%beg, is3%end; DO id2 = is2%beg, is2%end; DO id1 = is1%beg, is1%end
 
                 pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
                 ! SHB: Manually adjusted pressure here for no-coupling case comparison to Mathematica
-                ! pres = 1d0/0.3d0
+                pres = 1d0/0.3d0
 
                 DO q = 1,nb
                     Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
@@ -92,27 +85,20 @@ MODULE m_qbmm
                     DO r = 1,nmom
                         moms(r) = q_prim_vf(bub_idx%moms(q,r))%sf(id1,id2,id3)
                     END DO
-                    IF(id1==0) THEN
-                        PRINT*, 'nb : ', nbub
-                        PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
-                        DO s = 1,nmom
-                            PRINT*, 'mom: ', moms(s)
-                        END DO
-                    END IF
 
-                    CALL s_chyqmom(pres,moms,wght(q,:),abscX(q,:),abscY(q,:))
+                    CALL s_chyqmom(moms,wght(q,:),abscX(q,:),abscY(q,:))
 
                     DO j = 1,nterms
-                        DO i1 = 0,2; DO i2 = 0,2
-                            IF ( (i1+i2)<=2 ) THEN
-                                moms_cond = f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
-                                mom3d_terms(j,i1,i2) = f_get_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) * moms_cond
+                        DO i1 = 0,nnode; DO i2 = 0,nnode
+                            IF ( (i1+i2)<=nnode ) THEN
+                                mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) &
+                                    * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
                             END IF
                         END DO; END DO
                     END DO
 
-                    DO i1 = 0,2; DO i2 = 0,2
-                        IF ( (i1+i2)<=2 ) THEN
+                    DO i1 = 0,nnode; DO i2 = 0,nnode
+                        IF ( (i1+i2)<=nnode ) THEN
                             moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2) )
                         END IF
                     END DO; END DO
@@ -125,14 +111,21 @@ MODULE m_qbmm
 
             END DO; END DO; END DO
 
+                    ! IF(id1==0) THEN
+                    !     PRINT*, 'nb : ', nbub
+                    !     PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                    !     DO s = 1,nmom
+                    !         PRINT*, 'mom: ', moms(s)
+                    !     END DO
+                    ! END IF
+
         END SUBROUTINE s_mom_inv
 
 
-        SUBROUTINE s_chyqmom(pres,momin,wght,abscX,abscY)
+        SUBROUTINE s_chyqmom(momin,wght,abscX,abscY)
             
             REAL(KIND(0d0)), DIMENSION(nnode), INTENT(INOUT) :: wght,abscX,abscY
             REAL(KIND(0d0)), DIMENSION(nmom), INTENT(IN) :: momin
-            REAL(KIND(0d0)), INTENT(IN) :: pres
     
             REAL(KIND(0d0)), DIMENSION(0:nmom,0:nmom) :: moms
             REAL(KIND(0d0)), DIMENSION(3) :: M1, M3
@@ -209,22 +202,22 @@ MODULE m_qbmm
         END SUBROUTINE s_hyqmom
 
 
-        FUNCTION f_get_coeff( term,i1,i2,i3,pres )
+        FUNCTION f_coeff( term,i1,i2,i3,pres )
             INTEGER, INTENT(IN) :: term,i1,i2,i3
             REAL(KIND(0.D0)), INTENT(IN) :: pres
-            REAL(KIND(0.D0)) :: f_get_coeff
+            REAL(KIND(0.D0)) :: f_coeff
 
             IF (term == 1) THEN
-                f_get_coeff = -1d0*REAL(i2,KIND(0d0))*pres
+                f_coeff = -1d0*REAL(i2,KIND(0d0))*pres
             ELSEIF (term == 2) THEN
-                f_get_coeff = -3d0*REAL(i2,KIND(0d0))/2d0
+                f_coeff = -3d0*REAL(i2,KIND(0d0))/2d0
             ELSEIF (term == 3) THEN
-                f_get_coeff = REAL(i2,KIND(0d0))
+                f_coeff = REAL(i2,KIND(0d0))
             ELSEIF (term == 4) THEN
-                f_get_coeff = REAL(i1,KIND(0d0))
+                f_coeff = REAL(i1,KIND(0d0))
             END IF
 
-        END FUNCTION f_get_coeff
+        END FUNCTION f_coeff
 
 
         FUNCTION f_quad( abscX,abscY,wght,q,r,s )
