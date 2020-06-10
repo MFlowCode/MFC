@@ -145,7 +145,8 @@ MODULE m_derived_variables
 
             INTEGER :: i,j,k !< Generic loop iterators
 
-            IF ((ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) .AND. (t_step > t_step_start + 2)) THEN
+            ! IF ((ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) .AND. (t_step > t_step_start + 2)) THEN
+            IF ((ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) ) THEN
                 IF (ANY(com_wrt)) THEN
                     CALL s_derive_center_of_mass(q_prim_ts(0)%vf, &
                                                  q_prim_ts(1)%vf, &

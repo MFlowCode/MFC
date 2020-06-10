@@ -357,25 +357,31 @@ MODULE m_initial_condition
                     muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
                     muV = V0(i)*patch_icpp(patch_id)%v0 ! = 0
                     IF (qbmm) THEN
-                        ! Initialize the moment set
-                        ! R-dir = Log-normal, V-dir = Normal
-                        q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
-                        q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
-                        q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
-                        q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
-
+                        IF (dist_type == 1) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = muR**2d0 + sigR**2d0
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = muR*muV + rhoRV*sigR*sigV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        ELSE IF (dist_type == 2) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        END IF
 
                         if (j==0 .and. k==0 .and. l==0) then
-                            print*, 'moments @ (0,0,0): ', 1d0, &
-                            dexp((sigR**2d0)/2d0)*muR, &
-                            muV, &
-                            dexp((sigR**2d0)*2d0)*(muR**2d0), &
-                            dexp((sigR**2d0)/2d0)*muR*muV, &
-                            muV**2d0 + sigV**2d0
+                            print*, 'moments @ (0,0,0): ', &
+                                q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l)
                         end if
-
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
@@ -427,13 +433,21 @@ MODULE m_initial_condition
                     muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
                     IF (qbmm) THEN
                         ! Initialize the moment set
-                        ! R-dir = Log-normal, V-dir = Normal
-                        q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
-                        q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
-                        q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
-                        q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        IF (dist_type == 1) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = muR**2d0 + sigR**2d0
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = muR*muV + rhoRV*sigR*sigV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        ELSE IF (dist_type == 2) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        END IF
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
@@ -511,17 +525,25 @@ MODULE m_initial_condition
             ! Smoothed bubble variables
             IF (bubbles) THEN
                 DO i = 1,nb
-                    muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
-                    muV = V0(i)*patch_icpp(patch_id)%v0 ! = 0
+                    muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
+                    muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
                     IF (qbmm) THEN
                         ! Initialize the moment set
-                        ! R-dir = Log-normal, V-dir = Normal
-                        q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
-                        q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
-                        q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
-                        q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        IF (dist_type == 1) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = muR**2d0 + sigR**2d0
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = muR*muV + rhoRV*sigR*sigV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        ELSE IF (dist_type == 2) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        END IF
                     ELSE
                         ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
                         !     (eta * R0(i)*patch_icpp(patch_id)%r0 & 

@@ -45,7 +45,7 @@ We = rho0*(uu**2.)*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 1.E-4
+vf0     = 1.E-1
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -123,11 +123,11 @@ case_dict =                                                                     
                     'n'                            : 0,                         \
                     'p'                            : 0,                         \
                     'dt'                           : 0.001,                      \
-                    # 'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    # 't_step_stop'                  : 100,                        \
-                    't_step_stop'                  : 5000,                        \
+                    't_step_stop'                  : 15000,                        \
+                    # 't_step_stop'                  : 4,                        \
                     't_step_save'                  : 1000,   \
+                    # 't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -193,7 +193,7 @@ case_dict =                                                                     
                     'patch_icpp(1)%alpha(1)'       : vf0,                       \
                     'patch_icpp(1)%r0'             : 1.,                        \
                     # 'patch_icpp(1)%v0'             : 0.,                   \
-                    'patch_icpp(1)%v0'             : -1.E-12,                   \
+                    'patch_icpp(1)%v0'             : -0.5,                   \
                     # ==========================================================
 
                     # Fluids Physical Parameters ===============================
@@ -225,20 +225,23 @@ case_dict =                                                                     
 
                     # Bubbles ==================================================
                     'bubbles'               : 'T',                  \
-                    'bubble_model'          : 3,                  \
+                    'bubble_model'          : 3,                    \
                     'polytropic'            : 'T',                  \
                     'polydisperse'          : 'F',                  \
-                    # 'poly_sigma'            : 0.1,                  \
-                    'thermal'               : 3,           \
+                    # 'poly_sigma'            : 0.1,                \
+                    'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
-                    'nb'                    : 1,             \
+                    # 'nb'                    : 3,                  \
+                    'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     'Web'                   : We,                   \
                     'Re_inv'                : Re_inv,               \
-                    'qbmm'               : 'T',                  \
-                    'nnode'              : 4,                    \
+                    'qbmm'               : 'T',                 \
+                    'nnode'              : 4,                   \
+                    'dist_type'          : 1,                   \
                     'sigR'               : 0.1,                 \
-                    'sigV'               : 0.1,                 \
+                    'sigV'               : 0.05,                 \
+                    'rhoRV'              : 0.3,                 \
                     # ==========================================================
 
                     # Acoustic source ==========================================

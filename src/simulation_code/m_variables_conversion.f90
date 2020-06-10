@@ -626,6 +626,7 @@ MODULE m_variables_conversion
                                                 - dyn_pres_K) / (1.d0 - qK_cons_vf(alf_idx)%sf(j,k,l)) &
                                                 - pi_inf_K &
                                                 - E_We_K ) / gamma_K
+                            qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.3d0
                         ELSE IF (model_eqns .NE. 4) THEN
                             ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                             qK_prim_vf(E_idx)%sf(j,k,l) = &
@@ -651,7 +652,10 @@ MODULE m_variables_conversion
                                 nRtmp(i) = qK_cons_vf(bub_idx%rs(i))%sf(j,k,l)
                                 !IF (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
                             END DO
+                            
+                            ! PRINT*, 'alf1: ', qK_cons_vf(alf_idx)%sf(j,k,l)
                             CALL s_comp_n_from_cons( qK_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)                            
+                            IF (j==0 .and. k==0 .and. l==0) PRINT*, 'nbub1: ', nbub
                            
                             IF ( nbub < 0.d0) STOP 'nbub is negative'
                             DO i = bub_idx%beg, bub_idx%end

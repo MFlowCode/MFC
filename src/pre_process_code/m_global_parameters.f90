@@ -199,7 +199,7 @@ MODULE m_global_parameters
     LOGICAL         :: qbmm !< Quadrature moment method
     INTEGER         :: nmom !< Number of carried moments
     INTEGER         :: nnode !< Number of QBMM nodes
-    REAL(KIND(0d0)) :: sigR, sigV !< standard deviations in R/V
+    REAL(KIND(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -211,6 +211,7 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     REAL(KIND(0d0)) :: poly_sigma
+    INTEGER         :: dist_type !1 = binormal, 2=lognormal-normal
     !> @}
 
     INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: logic_grid
@@ -347,6 +348,8 @@ MODULE m_global_parameters
             nnode   = 1
             sigR    = dflt_real
             sigV    = dflt_real
+            rhoRV   = 0d0
+            dist_type = dflt_int
 
             R_n     = dflt_real
             R_v     = dflt_real
@@ -491,7 +494,7 @@ MODULE m_global_parameters
                         V0(:)       = 1d0
                     ELSE IF (nb > 1) THEN
                         CALL s_simpson(nb)
-                        V0(:)       = 0d0
+                        V0(:)       = 1d0
                     ELSE
                         STOP 'Invalid value of nb'
                     END IF

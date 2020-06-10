@@ -130,7 +130,7 @@ MODULE m_start_up
                                    rhoref, pref, bubbles, R0ref, nb,          &
                                    polytropic, thermal, Ca, Web, Re_inv,      &
                                    polydisperse, poly_sigma, qbmm,      &
-                                   nnode, sigR, sigV
+                                   nnode, sigR, sigV, dist_type, rhoRV
  
 
             ! Inquiring the status of the pre_process.inp file
@@ -311,6 +311,12 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported choice of the combination of '    // &
                              'values for old_grid, x_domain%beg and '       // &
                              'x_domain%end. Exiting ...'
+                CALL s_mpi_abort()
+            ELSE IF (qbmm .and. dist_type == dflt_int) THEN
+                PRINT '(A)', 'Dist type must be set if using QBMM. Exiting ...'
+                CALL s_mpi_abort()
+            ELSE IF (qbmm .and. (dist_type .NE. 1) .and. rhoRV > 0d0) THEN
+                PRINT '(A)', 'rhoRV cannot be used with dist_type \ne 1. Exiting ...'
                 CALL s_mpi_abort()
             END IF
                 
