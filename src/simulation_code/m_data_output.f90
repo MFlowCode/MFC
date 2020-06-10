@@ -698,6 +698,8 @@ MODULE m_data_output
 
                 IF (icfl_max_glb /= icfl_max_glb) THEN
                     PRINT '(A)', 'ICFL is NaN. Exiting ...'
+                    ! print*, (dt/dx(:)),ABS(vel(1)),c
+
                     CALL s_mpi_abort()
                 ELSEIF (icfl_max_glb > 1d0) THEN
                     PRINT '(A)', 'ICFL is greater than 1.0. Exiting ...'
@@ -1819,6 +1821,7 @@ MODULE m_data_output
             REAL(KIND(0d0))                                   :: gamma
             REAL(KIND(0d0))                                   :: pi_inf
             REAL(KIND(0d0))                                   :: c
+            REAL(KIND(0d0))                                   :: M00
             REAL(KIND(0d0)), DIMENSION(Nb)                    :: nR, R, nRdot, Rdot
             REAL(KIND(0d0))                                   :: accel
             REAL(KIND(0d0))                                   :: int_pres
@@ -1860,6 +1863,8 @@ MODULE m_data_output
                 accel = 0d0
                 nR = 0d0; R = 0d0
                 nRdot = 0d0; Rdot = 0d0
+                nbub = 0d0
+                M00 = 0d0
 
                 ! Find probe location in terms of indices on a
                 ! specific processor
@@ -1918,7 +1923,9 @@ MODULE m_data_output
                                 nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
                             END DO
                             CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
- 
+                            print*, 'In probe, nbub: ', nbub
+
+                            M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
                             R(:) = nR(:)/nbub                        
                             Rdot(:) = nRdot(:)/nbub                        
                         
@@ -2118,10 +2125,14 @@ MODULE m_data_output
                         CALL s_mpi_allreduce_sum(tmp,alf)
                         tmp = alfgr
                         CALL s_mpi_allreduce_sum(tmp,alfgr)
+                        tmp = nbub
+                        CALL s_mpi_allreduce_sum(tmp,nbub)
                         tmp = nR(1)
                         CALL s_mpi_allreduce_sum(tmp,nR(1))
                         tmp = nRdot(1)
                         CALL s_mpi_allreduce_sum(tmp,nRdot(1))
+                        tmp = M00
+                        CALL s_mpi_allreduce_sum(tmp,M00)
                         tmp = R(1)
                         CALL s_mpi_allreduce_sum(tmp,R(1))
                         tmp = Rdot(1)
@@ -2137,14 +2148,18 @@ MODULE m_data_output
                     IF (n == 0) THEN
                         IF (bubbles .AND. (num_fluids <= 2)) THEN
                             IF (qbmm) THEN
-                                WRITE(i+30,'(6x,f12.6,6f24.8)') &
+                                WRITE(i+30,'(6x,f12.6,10f28.16)') &
                                     nondim_time, &
                                     rho, &
                                     vel(1), &
                                     pres, &
                                     alf, &
+                                    M00, &
                                     R(1), &
-                                    Rdot(1)
+                                    Rdot(1), &
+                                    nbub, &
+                                    nR(1), &
+                                    nRdot(1)
                             ELSE
                                 WRITE(i+30,'(6x,f12.6,10f24.8)') &
                                     nondim_time, &

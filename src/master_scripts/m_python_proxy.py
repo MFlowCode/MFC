@@ -852,9 +852,11 @@ pre_process_dict =                                                             \
                     'nb'                            : None,                     \
                     'R0ref'                         : None,                     \
                     'qbmm'                          : None,                     \
+                    'dist_type'                     : None,                     \
                     'nnode'                         : None,                     \
                     'sigR'                          : None,                     \
                     'sigV'                          : None,                     \
+                    'rhoRV'                         : None,                     \
                     'patch_icpp(1)%r0'              : None,                     \
                     'patch_icpp(2)%r0'              : None,                     \
                     'patch_icpp(3)%r0'              : None,                     \

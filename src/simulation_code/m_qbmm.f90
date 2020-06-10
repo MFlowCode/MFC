@@ -57,13 +57,13 @@ MODULE m_qbmm
             
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
             TYPE(scalar_field), DIMENSION(nmomsp), INTENT(INOUT) :: momsp
-            TYPE(scalar_field), DIMENSION(0:nnode,0:nnode,nb), INTENT(INOUT) :: moms3d
+            TYPE(scalar_field), DIMENSION(0:2,0:2,nb), INTENT(INOUT) :: moms3d
             TYPE(bounds_info), INTENT(IN) :: is1,is2,is3
 
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
             REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
-            REAL(KIND(0d0)), DIMENSION(nterms,0:nnode,0:nnode) :: mom3d_terms
+            REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2) :: mom3d_terms
             REAL(KIND(0d0)) :: pres, nbub
 
             INTEGER :: j,k,l,q,r,s !< Loop variables
@@ -74,7 +74,8 @@ MODULE m_qbmm
 
                 pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
                 ! SHB: Manually adjusted pressure here for no-coupling case comparison to Mathematica
-                pres = 1d0/0.3d0
+                ! pres = 1d0/0.3d0
+                ! pres = 1d0/0.3d0
 
                 DO q = 1,nb
                     Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
@@ -86,23 +87,46 @@ MODULE m_qbmm
                         moms(r) = q_prim_vf(bub_idx%moms(q,r))%sf(id1,id2,id3)
                     END DO
 
+                    IF(id1==0) THEN
+                        ! moms(:) = (/ 1.0007504690235915d0,1.0002500937890797d0,-0.50060096798106690d0,&
+                        ! 1.0097602254962108d0,-0.49888700196331892d0,0.25291019195438436d0 /)
+                        PRINT*, 'pres: ', pres
+                        PRINT*, 'nb : ', nbub
+                        PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                        DO s = 1,nmom
+                            PRINT*, 'mom: ', moms(s)
+                        END DO
+                    END IF
+
                     CALL s_chyqmom(moms,wght(q,:),abscX(q,:),abscY(q,:))
 
+                    ! IF (id1==0) THEN
+                    !     PRINT*, 'wght', wght(q,:)
+                    !     PRINT*, 'abscX', abscX(q,:)
+                    !     PRINT*, 'abscY', abscY(q,:)
+                    !     call s_mpi_abort()
+                    ! END IF
+
                     DO j = 1,nterms
-                        DO i1 = 0,nnode; DO i2 = 0,nnode
-                            IF ( (i1+i2)<=nnode ) THEN
-                                mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,q,pres) * (R0(q)**(momrhs(i1,i2,q,j,3)-q)) &
+                        DO i1 = 0,2; DO i2 = 0,2
+                            IF ( (i1+i2)<=2 ) THEN
+                                mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres) * (R0(q)**momrhs(i1,i2,q,j,3)) &
                                     * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
                             END IF
                         END DO; END DO
                     END DO
 
-                    DO i1 = 0,nnode; DO i2 = 0,nnode
-                        IF ( (i1+i2)<=nnode ) THEN
+                    DO i1 = 0,2; DO i2 = 0,2
+                        IF ( (i1+i2)<=2 ) THEN
                             moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2) )
                         END IF
                     END DO; END DO
                 END DO
+
+                ! IF (id1==0) THEN
+                !     PRINT*, 'moms3d', moms3d(0,0,1)%sf(id1,0,0), f_coeff(1,0,0,pres), f_coeff(2,0,0,pres),&
+                !         f_coeff(3,0,0,pres),f_coeff(4,0,0,pres)
+                ! END IF  
 
                 momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
                 momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
@@ -111,13 +135,6 @@ MODULE m_qbmm
 
             END DO; END DO; END DO
 
-                    ! IF(id1==0) THEN
-                    !     PRINT*, 'nb : ', nbub
-                    !     PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
-                    !     DO s = 1,nmom
-                    !         PRINT*, 'mom: ', moms(s)
-                    !     END DO
-                    ! END IF
 
         END SUBROUTINE s_mom_inv
 
@@ -168,6 +185,7 @@ MODULE m_qbmm
             wght(2) = myrho(1)*rho22 
             wght(3) = myrho(2)*rho21 
             wght(4) = myrho(2)*rho22 
+            wght = moms(0,0)*wght
 
             abscX(1) = up(1) 
             abscX(2) = up(1) 
@@ -202,8 +220,8 @@ MODULE m_qbmm
         END SUBROUTINE s_hyqmom
 
 
-        FUNCTION f_coeff( term,i1,i2,i3,pres )
-            INTEGER, INTENT(IN) :: term,i1,i2,i3
+        FUNCTION f_coeff( term,i1,i2,pres )
+            INTEGER, INTENT(IN) :: term,i1,i2
             REAL(KIND(0.D0)), INTENT(IN) :: pres
             REAL(KIND(0.D0)) :: f_coeff
 
@@ -231,6 +249,7 @@ MODULE m_qbmm
                 f_quad_RV = SUM( wght(i,:)*(abscX(i,:)**q)*(abscY(i,:)**r) )
                 f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
             END DO
+
         END FUNCTION f_quad
 
 

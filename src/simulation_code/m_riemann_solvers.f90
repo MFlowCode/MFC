@@ -2689,23 +2689,14 @@ MODULE m_riemann_solvers
                 DO i = 1,nb
                     R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j,k,l)
                     R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j+1,k,l)
-                    IF( qbmm ) THEN
-                        ! DO q = 1,nmom
-                        !     moms_L(i,q) = qL_prim_rs_vf(bub_idx%moms(i,q))%sf(j,k,l)
-                        !     moms_R(i,q) = qR_prim_rs_vf(bub_idx%moms(i,q))%sf(j+1,k,l)
-                        ! END DO
-                    ELSE
-                        V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
-                        V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
-                        IF (polytropic .NEQV. .TRUE.) THEN
-                            P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
-                            P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
-                        END IF
+
+                    V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
+                    V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
+                    IF (polytropic .NEQV. .TRUE.) THEN
+                        P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
+                        P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
                     END IF
                 END DO
-                
-                !nbub_L = (3.d0/(4.d0*pi)) * alpha_L(1)/(R0_L**3.d0)
-                !nbub_R = (3.d0/(4.d0*pi)) * alpha_R(1)/(R0_R**3.d0)
                 
                 CALL s_comp_n_from_prim(alpha_L(num_fluids),R0_L,nbub_L)
                 CALL s_comp_n_from_prim(alpha_R(num_fluids),R0_R,nbub_R)
@@ -2714,10 +2705,7 @@ MODULE m_riemann_solvers
                 DO i = 1,nb
                     !pbw_L(i) = (R0(i)/R0_L(i))**(3d0*gamma_gas)
                     !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
-                    IF ( qbmm ) THEN
-                        ! pbw_L(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_L^(-3\gamma) computed from weights/abscissas
-                        ! pbw_R(i) = R0(i)**(3d0*gamma_gas) ! * place holder for R0_R^(-3\gamma) computed from weights/abscissas
-                    ELSE
+                    IF ( .NOT. qbmm ) THEN
                         IF (polytropic) THEN
                             pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
                                 - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
@@ -2731,8 +2719,6 @@ MODULE m_riemann_solvers
                     END IF
                 END DO
 
-                ! TODO: these quadratures now need to be computed with abscissas/weights
-                ! print*, 'get bubble moments in compute arithmetic mean'
                 IF (qbmm) THEN
                     PbwR3Lbar = mom_sp(4)%sf(j  ,k,l)
                     PbwR3Rbar = mom_sp(4)%sf(j+1,k,l)
@@ -3129,14 +3115,14 @@ MODULE m_riemann_solvers
             END IF
            
             IF (bubbles) THEN
-                allocate( R0_L(nb),R0_R(nb) )
-                allocate( pbw_L(nb), pbw_R(nb) )
+                ALLOCATE( R0_L(nb),R0_R(nb) )
+                ALLOCATE( V0_L(nb), V0_R(nb))
+                ALLOCATE( pbw_L(nb), pbw_R(nb) )
                 IF (qbmm) THEN
-                    allocate( moms_L(nb,nmom), moms_R(nb,nmom) )
+                    ALLOCATE( moms_L(nb,nmom), moms_R(nb,nmom) )
                 ELSE
-                    allocate( V0_L(nb), V0_R(nb))
                     IF (polytropic .NEQV. .TRUE.) THEN
-                        allocate( P0_L(nb), P0_R(nb) )
+                        ALLOCATE( P0_L(nb), P0_R(nb) )
                     END IF 
                 END IF 
             END IF
@@ -5696,11 +5682,10 @@ MODULE m_riemann_solvers
             
             IF (bubbles) THEN
                 IF (qbmm) THEN
-                    deallocate(moms_L, moms_R)
-                ELSE
-                    deallocate(V0_L,V0_R)
+                    DEALLOCATE(moms_L, moms_R)
                 END IF
-                deallocate( R0_L,R0_R,pbw_L,pbw_R)
+                DEALLOCATE( R0_L,R0_R,pbw_L,pbw_R)
+                DEALLOCATE(V0_L,V0_R)
             END IF
 
             ! Disassociating procedural pointer to the subroutine which was

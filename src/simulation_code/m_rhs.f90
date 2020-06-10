@@ -392,8 +392,8 @@ MODULE m_rhs
             ! ==================================================================
 
             IF (qbmm) THEN
-                ALLOCATE( mom_sp(1:nmomsp), mom_3d(0:nnode,0:nnode,1:nb) )
-                DO i = 0,nnode; DO j = 0,nnode; DO k = 1,nb
+                ALLOCATE( mom_sp(1:nmomsp), mom_3d(0:2,0:2,nb) )
+                DO i = 0,2; DO j = 0,2; DO k = 1,nb
                     ALLOCATE( mom_3d(i,j,k)%sf( &
                                         ix%beg:ix%end, &
                                         iy%beg:iy%end, &
@@ -1602,8 +1602,8 @@ MODULE m_rhs
 
 
             IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
-            print*, 'before qbmm'
 
+            print*, 'Before qbmm'
             ! compute required moments
             IF (qbmm) CALL s_mom_inv(q_prim_vf,mom_sp,mom_3d,ix,iy,iz)
             
@@ -1921,7 +1921,6 @@ MODULE m_rhs
                     !     print*, 'fluxes ', flux_ndqp(i,0,0)%vf(j)%sf(:,0,0)
                     ! end do
                     ! call s_mpi_abort()
-    
                   
                     iv%beg = 1; iv%end = adv_idx%end
        
@@ -1993,18 +1992,12 @@ MODULE m_rhs
                     END DO
 
 
-                    ! print*, 'before k div u type stuff'
-                    ! do j = 1, sys_size
-                    !     print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
-                    ! end do
-
                     ! Applying source terms to the RHS of the advection equations
                     IF(riemann_solver == 1) THEN
                         !HLL, no K \div(u) so this just adds (subtracts?)
                         ! \alpha_i \div(u) to RHS of \alpha_i transport equation
                         DO j = adv_idx%beg, adv_idx%end
                             DO k = 0, m
-                                ! shouldn't cont_idx%end+adv_idx be out of bounds?
                                 rhs_vf(j)%sf(k,:,:) = &
                                 rhs_vf(j)%sf(k,:,:) + 1d0/dx(k) * &
                                 q_prim_qp(0,0,0)%vf(cont_idx%end+i)%sf(k,0:n,0:p) * &
@@ -2081,20 +2074,32 @@ MODULE m_rhs
                         END DO
                     END IF
 
+                    ! print*, 'pre-QBMM rhs'
+                    DO j = 1, sys_size
+                        DO k = 0,m             
+                            IF ( ABS(rhs_vf(j)%sf(k,0,0)) > 1.d-12 ) THEN
+                                PRINT*, 'large RHS pre QBMM:', rhs_vf(j)%sf(k,0,0)
+                                CALL s_mpi_abort()
+                            END IF
+                        END DO
+                        ! print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                    END DO
+
+
 
                     IF (bubbles) THEN
                         IF (qbmm) THEN
                             ! advection source
-                            rhs_vf(alf_idx)%sf = rhs_vf(alf_idx)%sf + mom_sp(2)%sf
+                            rhs_vf(alf_idx)%sf(0:m,0:n,0:p) = rhs_vf(alf_idx)%sf(0:m,0:n,0:p) + mom_sp(2)%sf(0:m,0:n,0:p)
                             ! bubble sources
                             j = bub_idx%beg
                             DO k=1,nb
-                                rhs_vf( j )%sf = rhs_vf( j )%sf + mom_3d(0,0,k)%sf
-                                rhs_vf(j+1)%sf = rhs_vf(j+1)%sf + mom_3d(1,0,k)%sf
-                                rhs_vf(j+2)%sf = rhs_vf(j+2)%sf + mom_3d(0,1,k)%sf
-                                rhs_vf(j+3)%sf = rhs_vf(j+3)%sf + mom_3d(2,0,k)%sf
-                                rhs_vf(j+4)%sf = rhs_vf(j+4)%sf + mom_3d(1,1,k)%sf
-                                rhs_vf(j+5)%sf = rhs_vf(j+5)%sf + mom_3d(0,2,k)%sf
+                                rhs_vf( j )%sf(0:m,0:n,0:p) = rhs_vf( j )%sf(0:m,0:n,0:p) + mom_3d(0,0,k)%sf(0:m,0:n,0:p)
+                                rhs_vf(j+1)%sf(0:m,0:n,0:p) = rhs_vf(j+1)%sf(0:m,0:n,0:p) + mom_3d(1,0,k)%sf(0:m,0:n,0:p)
+                                rhs_vf(j+2)%sf(0:m,0:n,0:p) = rhs_vf(j+2)%sf(0:m,0:n,0:p) + mom_3d(0,1,k)%sf(0:m,0:n,0:p)
+                                rhs_vf(j+3)%sf(0:m,0:n,0:p) = rhs_vf(j+3)%sf(0:m,0:n,0:p) + mom_3d(2,0,k)%sf(0:m,0:n,0:p)
+                                rhs_vf(j+4)%sf(0:m,0:n,0:p) = rhs_vf(j+4)%sf(0:m,0:n,0:p) + mom_3d(1,1,k)%sf(0:m,0:n,0:p)
+                                rhs_vf(j+5)%sf(0:m,0:n,0:p) = rhs_vf(j+5)%sf(0:m,0:n,0:p) + mom_3d(0,2,k)%sf(0:m,0:n,0:p)
                                 j = j + 6
                             END DO
                         ELSE
@@ -2118,9 +2123,20 @@ MODULE m_rhs
 
 
                     ! print*, 'after k div u type stuff'
-                    ! do j = alf_idx, sys_size
-                    do j = 1, sys_size
+                    do j = alf_idx, sys_size
+                    ! do j = 1, sys_size
                         print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                    end do
+
+    
+                    do j = 1,sys_size
+                    do k = 1,m
+                        IF ( ABS(rhs_vf(j)%sf(k,0,0) - rhs_vf(j)%sf(k-1,0,0)) > 1.d-14) THEN
+                            print*, 'detected discontinuity in rhs at equation ', j
+                            print*, 'rhs: ', rhs_vf(j)%sf(:,0,0)
+                            call s_mpi_abort()
+                        END IF
+                    end do  
                     end do
 
                    IF (monopole) THEN

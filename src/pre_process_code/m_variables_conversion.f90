@@ -494,10 +494,14 @@ MODULE m_variables_conversion
                                 Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j,k,l)
                             END DO
                             CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(j,k,l), Rtmp, nbub)
-
+                            IF( j==0 .and. k==0 .and. l==0) print*, 'In convert, nbub:', nbub
                             DO i = bub_idx%beg, bub_idx%end
                                 q_cons_vf(i)%sf(j,k,l) = q_prim_vf(i)%sf(j,k,l)*nbub
+                                IF( j==0 .and. k==0 .and. l==0) THEN
+                                    PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
+                                END IF
                             END DO
+
                         END IF
 
                         IF (hypoelasticity) THEN

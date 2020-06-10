@@ -608,28 +608,40 @@ MODULE m_global_parameters
                         END IF
 
                         IF (qbmm) THEN
-
-                            ALLOCATE( momrhs(0:2,0:2,0:2,nterms,3) )
+                            ALLOCATE( momrhs(0:2,0:2,nb,nterms,3) )
                             ALLOCATE( momidx(nmomtot) )
 
                             ! Assigns the required RHS moments for moment transport equations
-                            ! Careful: the rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
-                            ! Note: this computes more momrhs(:,:,i) than necessary, but we will only call the ones we need,
-                            !       (1,0), (0,1), (2,0), (1,1), (0,2)
+                            ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
                             DO i1 = 0,2; DO i2 = 0,2; DO i3 = 1,nb
                                 !mexp = {{-1 + i1, -1 + i2, i3}, {-1 + i1, 1 + i2, i3}, {-1 + i1 - 3 \[Gamma], -1 + i2, i3 + 3 \[Gamma]}, {-1 + i1, 1 + i2, i3}}
-                                momrhs(i1,i2,i3,1,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                momrhs(i1,i2,i3,1,2) = -1.d0 + REAL(i2,KIND(0d0))
-                                momrhs(i1,i2,i3,1,3) = REAL(i3,KIND(0d0))
-                                momrhs(i1,i2,i3,2,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                momrhs(i1,i2,i3,2,2) =  1.d0 + REAL(i2,KIND(0d0))
-                                momrhs(i1,i2,i3,2,3) = REAL(i3,KIND(0d0))
-                                momrhs(i1,i2,i3,3,1) = -1.d0 + REAL(i1,KIND(0d0)) - 3.d0*gam
-                                momrhs(i1,i2,i3,3,2) = -1.d0 + REAL(i2,KIND(0d0))
-                                momrhs(i1,i2,i3,3,3) = REAL(i3,KIND(0d0)) + 3.d0*gam
-                                momrhs(i1,i2,i3,4,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                momrhs(i1,i2,i3,4,2) =  1.d0 + REAL(i2,KIND(0d0))
-                                momrhs(i1,i2,i3,4,3) = REAL(i3,KIND(0d0))
+                                IF ( (i1+i2)<=2 ) THEN
+                                    momrhs(i1,i2,i3,1,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                    momrhs(i1,i2,i3,1,2) = -1.d0 + REAL(i2,KIND(0d0))
+                                    momrhs(i1,i2,i3,1,3) = 0d0
+                                    momrhs(i1,i2,i3,2,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                    momrhs(i1,i2,i3,2,2) =  1.d0 + REAL(i2,KIND(0d0))
+                                    momrhs(i1,i2,i3,2,3) = 0d0
+                                    momrhs(i1,i2,i3,3,1) = -1.d0 + REAL(i1,KIND(0d0)) - 3.d0*gam
+                                    momrhs(i1,i2,i3,3,2) = -1.d0 + REAL(i2,KIND(0d0))
+                                    momrhs(i1,i2,i3,3,3) = 3.d0*gam
+                                    momrhs(i1,i2,i3,4,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                    momrhs(i1,i2,i3,4,2) =  1.d0 + REAL(i2,KIND(0d0))
+                                    momrhs(i1,i2,i3,4,3) = 0d0
+
+                                    ! momrhs(i1,i2,i3,1,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,1,2) = -1.d0 + REAL(i2,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,1,3) = REAL(i3,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,2,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,2,2) =  1.d0 + REAL(i2,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,2,3) = REAL(i3,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,3,1) = -1.d0 + REAL(i1,KIND(0d0)) - 3.d0*gam
+                                    ! momrhs(i1,i2,i3,3,2) = -1.d0 + REAL(i2,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,3,3) = REAL(i3,KIND(0d0)) + 3.d0*gam
+                                    ! momrhs(i1,i2,i3,4,1) = -1.d0 + REAL(i1,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,4,2) =  1.d0 + REAL(i2,KIND(0d0))
+                                    ! momrhs(i1,i2,i3,4,3) = REAL(i3,KIND(0d0))
+                                END IF
                             END DO; END DO; END DO
 
                             ALLOCATE( bub_idx%moms(nb,nmom) )
@@ -671,10 +683,10 @@ MODULE m_global_parameters
                         IF (nb == 1) THEN
                             weight(:)   = 1d0
                             R0(:)       = 1d0
-                            V0(:)       = 0d0
+                            V0(:)       = 1d0
                         ELSE IF (nb > 1) THEN
                             CALL s_simpson(nb)
-                            V0(:)       = 0d0
+                            V0(:)       = 1d0
                         ELSE
                             STOP 'Invalid value of nb'
                         END IF
@@ -1161,7 +1173,10 @@ MODULE m_global_parameters
             CALL s_quad( nRtmp**3d0,nR3 )
             
             IF ( nR3 < 0.d0 ) STOP 'nR3 is negative'
-            IF (vftmp < 0.d0) STOP 'vf negative'
+            IF (vftmp < 0.d0) THEN
+                PRINT*, vftmp, nR3, nRtmp(:)
+                STOP 'vf negative'
+            END IF
 
             ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
             ! ntmp = 1d0
