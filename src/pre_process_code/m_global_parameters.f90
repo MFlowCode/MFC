@@ -931,5 +931,75 @@ MODULE m_global_parameters
         END SUBROUTINE s_simpson
 
 
+        SUBROUTINE s_wheeler
+            
+            REAL(KIND(0d0)), DIMENSION(2*nb,2*nb) :: sig, Ja
+            REAL(KIND(0d0)), DIMENSION(2*nb) :: momRo
+            REAL(KIND(0d0)), DIMENSION(nb) :: a, b
+            REAL(KIND(0d0)) :: muRo
+            INTEGER :: i,j,nn
+
+            muRo = 1d0
+
+            a = 0d0; b = 0d0
+            sig = 0d0; Ja = 0d0
+
+            ! first get moments
+            DO i = 1,2*nb
+                momRo(i) = DEXP( (i-1d0)*LOG(muRo) + 0.5d0*((i-1d0)*poly_sigma)**2d0 )
+            END DO
+
+            DO i = 0,2*nb-1
+                sig(2,i+1) = momRo(i+1)
+            END DO
+
+            a(1) = momRo(2)/momRo(1)
+            DO i = 1,nb-1
+                DO j = i,2*nb-i-1
+                    sig(i+2,j+1) = sig(i+1,j+2) - a(i)*sig(i+1,j+1) - b(i)*sig(i,j+1)
+                    a(i+1) = -1d0*(sig(i+1,i+1)/sig(i+1,i)) + sig(i+2,i+2)/sig(i+2,i+1)
+                    b(i+1) = sig(i+2,i+1)/sig(i+1,i)
+                END DO
+            END DO
+           
+            DO i = 1,nb
+                Ja(i,i) = a(i)
+            END DO
+            DO i = 1,nb-1
+                Ja(i,i+1) = -DSQRT(ABS(b(i+1)))
+                Ja(i+1,i) = -DSQRT(ABS(b(i+1)))
+            END DO
+
+            ! eigensystem stuff here
+
+        END SUBROUTINE s_wheeler
+
+
+! wheeler[mom_] := Module[{mm = mom, nn, sig, a, b, Ja, w, xi, eval, evec, esys}, 
+    ! nn=Length[mm]/2;
+    ! sig = Table[0., {i, 2 nn}, {j, 2 nn}]; 
+
+    ! Do[sig[[2, i + 1]] = mm[[i + 1]], {i, 0, 2 nn - 1}]; 
+    ! a = Table[0., {i, nn}]; b = a; a[[1]] = mm[[2]]/mm[[1]]; 
+    ! b[[1]] = 0; 
+    ! Do[
+    !     Do[
+    !         sig[[i + 2, j + 1]] = sig[[i + 1, j + 2]] - a[[i]] sig[[i + 1, j + 1]] - b[[i]] sig[[i, j + 1]];
+    !         a[[i + 1]] = -(sig[[i + 1, i + 1]]/sig[[i + 1, i]]) + sig[[i + 2, i + 2]]/sig[[i + 2, i + 1]]; 
+    !         b[[i + 1]] = sig[[i + 2, i + 1]]/sig[[i + 1, i]];
+    !     ,{j,i, 2 nn - i - 1}];
+    ! ,{i,nn - 1}];
+    ! Ja = DiagonalMatrix[a]; 
+    ! Do[
+    !     Ja[[i, i + 1]] = -Sqrt[Abs[b[[i + 1]]]]; 
+    !     Ja[[i + 1, i]] = -Sqrt[Abs[b[[i + 1]]]];
+    ! ,{i,nn-1}]; 
+    ! esys = Eigensystem[Ja]; 
+    ! eval = esys[[1]]; 
+    ! evec = esys[[2]]; 
+    ! w = Table[evec[[i,1]]^2 mm[[1]],{i,nn}]; 
+    ! Return[{eval, w}, Module];
+! ];
+
 
 END MODULE m_global_parameters

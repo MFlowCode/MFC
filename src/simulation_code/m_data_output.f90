@@ -1925,7 +1925,7 @@ MODULE m_data_output
                             CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
                             print*, 'In probe, nbub: ', nbub
 
-                            M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
+                            IF (qbmm) M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
                             R(:) = nR(:)/nbub                        
                             Rdot(:) = nRdot(:)/nbub                        
                         
@@ -2161,7 +2161,7 @@ MODULE m_data_output
                                     nR(1), &
                                     nRdot(1)
                             ELSE
-                                WRITE(i+30,'(6x,f12.6,10f24.8)') &
+                                WRITE(i+30,'(6x,f12.6,8f24.8)') &
                                     nondim_time, &
                                     rho, &
                                     vel(1), &
@@ -2170,9 +2170,9 @@ MODULE m_data_output
                                     nR(1), &
                                     nRdot(1), &
                                     R(1), &
-                                    Rdot(1), &
-                                    ptilde, &
-                                    ptot
+                                    Rdot(1)
+                                    ! ptilde, &
+                                    ! ptot
                             END IF
                         ELSE IF (bubbles .AND. (num_fluids ==3)) THEN
                             WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // &

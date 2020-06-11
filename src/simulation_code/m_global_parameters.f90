@@ -63,6 +63,7 @@ MODULE m_global_parameters
     CHARACTER(LEN = path_len)  :: case_dir              !< Case folder location
     LOGICAL                    :: run_time_info         !< Run-time output flag
     INTEGER                    :: t_step_old            !< Existing IC/grid folder
+    REAL(KIND(0d0)), PARAMETER :: small_alf     = 1d-7 !< Small alf tolerance
     ! ==========================================================================
     
     
@@ -1169,12 +1170,22 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), DIMENSION(nb), INTENT(IN) :: nRtmp
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: nR3
+            INTEGER :: i 
 
             CALL s_quad( nRtmp**3d0,nR3 )
             
-            IF ( nR3 < 0.d0 ) STOP 'nR3 is negative'
-            IF (vftmp < 0.d0) THEN
+            IF ( nR3 < 0d0 ) THEN
                 PRINT*, vftmp, nR3, nRtmp(:)
+                ! DO i = 1,nb
+                    ! IF (nRtmp(i) < small_alf) THEN
+                        ! nRtmp(i) = small_alf
+                    ! END IF
+                ! END DO
+                STOP 'nR3 is negative'
+            END IF
+            IF (vftmp < 0d0) THEN
+                PRINT*, vftmp, nR3, nRtmp(:)
+                ! vftmp = small_alf
                 STOP 'vf negative'
             END IF
 
