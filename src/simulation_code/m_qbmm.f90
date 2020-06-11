@@ -72,66 +72,108 @@ MODULE m_qbmm
 
             DO id3 = is3%beg, is3%end; DO id2 = is2%beg, is2%end; DO id1 = is1%beg, is1%end
 
-                pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
-                ! SHB: Manually adjusted pressure here for no-coupling case comparison to Mathematica
-                ! pres = 1d0/0.3d0
-                ! pres = 1d0/0.3d0
+                IF (q_prim_vf(alf_idx)%sf(id1,id2,id3) > small_alf) THEN
 
-                DO q = 1,nb
-                    Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
-                END DO
-                CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(id1,id2,id3), Rvec, nbub )
+                    pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
+                    ! SHB: Manually adjusted pressure here for no-coupling case
+                    ! pres = 1d0/0.3d0
 
-                DO q = 1,nb
-                    DO r = 1,nmom
-                        moms(r) = q_prim_vf(bub_idx%moms(q,r))%sf(id1,id2,id3)
+                    DO q = 1,nb
+                        Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
                     END DO
+                    CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(id1,id2,id3), Rvec, nbub )
 
-                    IF(id1==0) THEN
-                        ! moms(:) = (/ 1.0007504690235915d0,1.0002500937890797d0,-0.50060096798106690d0,&
-                        ! 1.0097602254962108d0,-0.49888700196331892d0,0.25291019195438436d0 /)
-                        PRINT*, 'pres: ', pres
-                        PRINT*, 'nb : ', nbub
-                        PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
-                        DO s = 1,nmom
-                            PRINT*, 'mom: ', moms(s)
+                    DO q = 1,nb
+                        DO r = 1,nmom
+                            moms(r) = q_prim_vf(bub_idx%moms(q,r))%sf(id1,id2,id3)
                         END DO
-                    END IF
 
-                    CALL s_chyqmom(moms,wght(q,:),abscX(q,:),abscY(q,:))
+                        IF(id1==0) THEN
+                            ! moms(:) = (/ 1.0007504690235915d0,1.0002500937890797d0,
+                            ! -0.50060096798106690d0,&
+                            ! 1.0097602254962108d0,-0.49888700196331892d0,0.25291019195438436d0 /)
+                            PRINT*, 'pres: ', pres
+                            PRINT*, 'nb : ', nbub
+                            PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                            DO s = 1,nmom
+                                PRINT*, 'mom: ', moms(s)
+                            END DO
+                        END IF
 
-                    ! IF (id1==0) THEN
-                    !     PRINT*, 'wght', wght(q,:)
-                    !     PRINT*, 'abscX', abscX(q,:)
-                    !     PRINT*, 'abscY', abscY(q,:)
-                    !     call s_mpi_abort()
-                    ! END IF
+                        CALL s_chyqmom(moms,wght(q,:),abscX(q,:),abscY(q,:))
 
-                    DO j = 1,nterms
+                        ! IF (id1==0) THEN
+                        !     PRINT*, 'wght', wght(q,:)
+                        !     PRINT*, 'abscX', abscX(q,:)
+                        !     PRINT*, 'abscY', abscY(q,:)
+                        !     call s_mpi_abort()
+                        ! END IF
+
+                        DO j = 1,nterms
+                            DO i1 = 0,2; DO i2 = 0,2
+                                IF ( (i1+i2)<=2 ) THEN
+                                    mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres)    & 
+                                    * (R0(q)**momrhs(i1,i2,q,j,3))              &
+                                    * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
+                                END IF
+                            END DO; END DO
+                        END DO
+
                         DO i1 = 0,2; DO i2 = 0,2
                             IF ( (i1+i2)<=2 ) THEN
-                                mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres) * (R0(q)**momrhs(i1,i2,q,j,3)) &
-                                    * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
+                                moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2) )
+                                IF (moms3d(i1,i2,q)%sf(id1,id2,id3) .NE. moms3d(i1,i2,q)%sf(id1,id2,id3)) THEN
+                                    PRINT*, 'nan in mom3d', i1,i2,id1
+                                    PRINT*, 'nbu: ', nbub
+                                    PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                                    PRINT*, 'moms: ', moms(:)
+                                    call s_mpi_abort()
+                                END IF
                             END IF
                         END DO; END DO
                     END DO
 
-                    DO i1 = 0,2; DO i2 = 0,2
-                        IF ( (i1+i2)<=2 ) THEN
-                            moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2) )
+
+                    ! IF (id1==0) THEN
+                    !     PRINT*, 'moms3d', moms3d(0,0,1)%sf(id1,0,0), &
+                    !         f_coeff(1,0,0,pres), f_coeff(2,0,0,pres),&
+                    !         f_coeff(3,0,0,pres),f_coeff(4,0,0,pres)
+                    ! END IF  
+
+                    momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
+                    momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
+                    momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
+                    momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
+
+                    DO i1 = 1,4
+                        IF (momsp(i1)%sf(id1,id2,id3) .NE. momsp(i1)%sf(id1,id2,id3)) THEN
+                            PRINT*, 'nan in momsp', i1,id1
+                            PRINT*, 'moms: ', moms(:)
+                            call s_mpi_abort()
                         END IF
-                    END DO; END DO
-                END DO
+                    END DO
 
-                ! IF (id1==0) THEN
-                !     PRINT*, 'moms3d', moms3d(0,0,1)%sf(id1,0,0), f_coeff(1,0,0,pres), f_coeff(2,0,0,pres),&
-                !         f_coeff(3,0,0,pres),f_coeff(4,0,0,pres)
-                ! END IF  
+                ELSE
 
-                momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
-                momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
-                momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
-                momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
+                    DO q = 1,nb
+                        IF(id1==0) THEN
+                            PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                            DO s = 1,nmom
+                                PRINT*, 'mom: ', q_prim_vf(bub_idx%moms(q,s))%sf(id1,id2,id3)
+                            END DO
+                        END IF
+
+                        DO i1 = 0,2; DO i2 = 0,2
+                            moms3d(i1,i2,q)%sf(id1,id2,id3) = 0d0
+                        END DO; END DO
+                    END DO
+
+                    momsp(1)%sf(id1,id2,id3) = 0d0 
+                    momsp(2)%sf(id1,id2,id3) = 0d0 
+                    momsp(3)%sf(id1,id2,id3) = 0d0 
+                    momsp(4)%sf(id1,id2,id3) = 0d0 
+
+                END IF
 
             END DO; END DO; END DO
 

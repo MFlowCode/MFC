@@ -2739,10 +2739,26 @@ MODULE m_riemann_solvers
                     CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
                 END IF 
                 !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} ) 
-                ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
-                    rho_L*R3V2Lbar/R3Lbar )
-                ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
-                    rho_R*R3V2Rbar/R3Rbar )
+                IF (alpha_L(num_fluids) < small_alf .OR. R3Lbar < small_alf) THEN
+                    ptilde_L = alpha_L(num_fluids)*pres_L
+                ELSE
+                    ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
+                        rho_L*R3V2Lbar/R3Lbar )
+                END IF
+
+                IF (alpha_R(num_fluids) < small_alf .OR. R3Rbar < small_alf) THEN
+                    ptilde_R = alpha_R(num_fluids)*pres_R
+                ELSE
+                    ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
+                        rho_R*R3V2Rbar/R3Rbar )
+                END IF
+                
+                IF ( (ptilde_L .ne. ptilde_L) .or. (ptilde_R .ne. ptilde_R) ) THEN
+                    PRINT*, 'Ptilde NaN'
+                    PRINT*, alpha_L, pres_L, PbwR3Lbar, R3Lbar, rho_L, R3V2Lbar, R3Lbar
+                    PRINT*, alpha_R, pres_R, PbwR3Rbar, R3Rbar, rho_R, R3V2Rbar, R3Rbar
+                    CALL s_mpi_abort()
+                END IF
 
                 ptil(j,k,l) = 0.5d0*(ptilde_L+ptilde_R)
             END IF

@@ -45,7 +45,7 @@ We = rho0*(uu**2.)*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 1.E-1
+vf0     = 4.E-5
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -55,7 +55,7 @@ nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
-Nx      = 30
+Nx      = 500
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)
@@ -108,7 +108,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'T',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 1,                      \
+                    'ppn'                          : 4,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -122,37 +122,37 @@ case_dict =                                                                     
                     'm'                            : Nx,                        \
                     'n'                            : 0,                         \
                     'p'                            : 0,                         \
-                    'dt'                           : 0.001,                      \
+                    'dt'                           : 0.002,                     \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 15000,                        \
+                    't_step_stop'                  : 10000,                        \
                     # 't_step_stop'                  : 4,                        \
-                    't_step_save'                  : 1000,   \
+                    't_step_save'                  : 500,   \
                     # 't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
-                    'num_patches'                  : 1,                        \
+                    'num_patches'                  : 2,                        \
                     'model_eqns'                   : 2,                        \
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 1,                        \
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 1,                        \
+		    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
-                    'weno_order'                   : 3,                        \
+                    'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
                     'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
-                    'mp_weno'                      : 'F',                      \
+                    'mp_weno'                      : 'T',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
                     'commute_err'                  : 'F',                      \
                     'split_err'                    : 'F',                      \
-                    'bc_x%beg'                     : -1,                       \
-                    'bc_x%end'                     : -1,                       \
+                    'bc_x%beg'                     : -8,                       \
+                    'bc_x%end'                     : -8,                       \
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
@@ -168,32 +168,29 @@ case_dict =                                                                     
 		    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
-                    # 'patch_icpp(1)%geometry'       : 1,                         \
-                    # 'patch_icpp(1)%x_centroid'     : 0.,                        \
-                    # 'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
-                    # 'patch_icpp(1)%vel(1)'         : 0.0,                       \
-                    # 'patch_icpp(1)%pres'           : patm,                      \
-                    # 'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0, \
-                    # 'patch_icpp(1)%alpha(1)'       : 1.E-12,                    \
-                    # 'patch_icpp(1)%r0'             : 1.,                        \
-                    # 'patch_icpp(1)%v0'             : 0.0E+00,                   \
+                    'patch_icpp(1)%geometry'       : 1,                         \
+                    'patch_icpp(1)%x_centroid'     : 0.,                        \
+                    'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
+                    'patch_icpp(1)%vel(1)'         : 0.0,                       \
+                    'patch_icpp(1)%pres'           : 1,                      \
+                    'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0, \
+                    'patch_icpp(1)%alpha(1)'       : 1.E-12,                    \
+                    'patch_icpp(1)%r0'             : 1.,                        \
+                    'patch_icpp(1)%v0'             : 0.0E+00,                   \
                     # ==========================================================
 
                     # Patch 2 Screen ===========================================
-                    'patch_icpp(1)%geometry'       : 1,                         \
-                    'patch_icpp(1)%x_centroid'     : 0.,                        \
-                    # 'patch_icpp(1)%length_x'       : 5.E-03/x0,                 \
-                    'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
-                    # 'patch_icpp(2)%alter_patch(1)' : 'T',                       \
-                    'patch_icpp(1)%vel(1)'         : 0.0,                       \
-                    # 'patch_icpp(1)%pres'           : 1/0.5,                      \
-                    'patch_icpp(1)%pres'           : 1,                      \
-                    # 'patch_icpp(1)%pres'           : patm,                      \
-                    'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,   \
-                    'patch_icpp(1)%alpha(1)'       : vf0,                       \
-                    'patch_icpp(1)%r0'             : 1.,                        \
-                    # 'patch_icpp(1)%v0'             : 0.,                   \
-                    'patch_icpp(1)%v0'             : -0.5,                   \
+                    'patch_icpp(2)%geometry'       : 1,                         \
+                    'patch_icpp(2)%x_centroid'     : 0.,                        \
+                    'patch_icpp(2)%length_x'       : 5.E-03/x0,                 \
+                    # 'patch_icpp(1)%length_x'       : 20.E-03/x0,                \
+                    'patch_icpp(2)%alter_patch(1)' : 'T',                       \
+                    'patch_icpp(2)%vel(1)'         : 0.0,                       \
+                    'patch_icpp(2)%pres'           : 1,                      \
+                    'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,   \
+                    'patch_icpp(2)%alpha(1)'       : vf0,                       \
+                    'patch_icpp(2)%r0'             : 1.,                        \
+                    'patch_icpp(2)%v0'             : 0.,                   \
                     # ==========================================================
 
                     # Fluids Physical Parameters ===============================
@@ -227,6 +224,7 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 3,                    \
                     'polytropic'            : 'T',                  \
+                    # 'polydisperse'          : 'T',                  \
                     'polydisperse'          : 'F',                  \
                     # 'poly_sigma'            : 0.1,                \
                     'thermal'               : 3,                    \
@@ -236,23 +234,23 @@ case_dict =                                                                     
                     'Ca'                    : Ca,                   \
                     'Web'                   : We,                   \
                     'Re_inv'                : Re_inv,               \
-                    'qbmm'               : 'T',                 \
-                    'nnode'              : 4,                   \
-                    'dist_type'          : 1,                   \
-                    'sigR'               : 0.1,                 \
-                    'sigV'               : 0.05,                 \
-                    'rhoRV'              : 0.3,                 \
+                    # 'qbmm'               : 'T',                 \
+                    # 'nnode'              : 4,                   \
+                    # 'dist_type'          : 1,                   \
+                    # 'sigR'               : 0.1,                 \
+                    # 'sigV'               : 0.1,                 \
+                    # 'rhoRV'              : 0.0,                 \
                     # ==========================================================
 
                     # Acoustic source ==========================================
-                    # 'Monopole'                  : 'T',                  \
-                    # 'num_mono'                  : 1,                  \
-                    # 'Mono(1)%loc(1)'            : -5.E-03/x0,  \
-                    # 'Mono(1)%npulse'            : 1, \
-                    # 'Mono(1)%dir'               : 1., \
-                    # 'Mono(1)%pulse'             : 1, \
-                    # 'Mono(1)%mag'               : pa, \
-                    # 'Mono(1)%length'            : (1./(300000.))*cact/x0, \
+                    'Monopole'                  : 'T',                  \
+                    'num_mono'                  : 1,                  \
+                    'Mono(1)%loc(1)'            : -5.E-03/x0,  \
+                    'Mono(1)%npulse'            : 1, \
+                    'Mono(1)%dir'               : 1., \
+                    'Mono(1)%pulse'             : 1, \
+                    'Mono(1)%mag'               : 1*pa, \
+                    'Mono(1)%length'            : (1./(300000.))*cact/x0, \
                     # ==========================================================
     }
 

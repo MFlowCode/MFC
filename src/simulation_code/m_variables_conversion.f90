@@ -626,7 +626,9 @@ MODULE m_variables_conversion
                                                 - dyn_pres_K) / (1.d0 - qK_cons_vf(alf_idx)%sf(j,k,l)) &
                                                 - pi_inf_K &
                                                 - E_We_K ) / gamma_K
-                            qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.3d0
+                            ! qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.3d0
+                            ! qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.7d0
+
                         ELSE IF (model_eqns .NE. 4) THEN
                             ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                             qK_prim_vf(E_idx)%sf(j,k,l) = &

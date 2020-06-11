@@ -2074,15 +2074,15 @@ MODULE m_rhs
                         END DO
                     END IF
 
-                    ! print*, 'pre-QBMM rhs'
+                    print*, 'pre-QBMM rhs'
                     DO j = 1, sys_size
-                        DO k = 0,m             
-                            IF ( ABS(rhs_vf(j)%sf(k,0,0)) > 1.d-12 ) THEN
-                                PRINT*, 'large RHS pre QBMM:', rhs_vf(j)%sf(k,0,0)
-                                CALL s_mpi_abort()
-                            END IF
-                        END DO
-                        ! print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                        ! DO k = 0,m             
+                        !     IF ( ABS(rhs_vf(j)%sf(k,0,0)) > 1.d-12 ) THEN
+                        !         PRINT*, 'large RHS pre QBMM:', rhs_vf(j)%sf(k,0,0)
+                        !         CALL s_mpi_abort()
+                        !     END IF
+                        ! END DO
+                        print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
                     END DO
 
 
@@ -2122,22 +2122,22 @@ MODULE m_rhs
                    END IF
 
 
-                    ! print*, 'after k div u type stuff'
+                    print*, 'after bub sources'
                     do j = alf_idx, sys_size
                     ! do j = 1, sys_size
                         print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
                     end do
 
     
-                    do j = 1,sys_size
-                    do k = 1,m
-                        IF ( ABS(rhs_vf(j)%sf(k,0,0) - rhs_vf(j)%sf(k-1,0,0)) > 1.d-14) THEN
-                            print*, 'detected discontinuity in rhs at equation ', j
-                            print*, 'rhs: ', rhs_vf(j)%sf(:,0,0)
-                            call s_mpi_abort()
-                        END IF
-                    end do  
-                    end do
+                    ! do j = 1,sys_size
+                    ! do k = 1,m
+                    !     IF ( ABS(rhs_vf(j)%sf(k,0,0) - rhs_vf(j)%sf(k-1,0,0)) > 1.d-14) THEN
+                    !         print*, 'detected discontinuity in rhs at equation ', j
+                    !         print*, 'rhs: ', rhs_vf(j)%sf(:,0,0)
+                    !         call s_mpi_abort()
+                    !     END IF
+                    ! end do  
+                    ! end do
 
                    IF (monopole) THEN
                         mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0;
