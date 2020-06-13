@@ -348,6 +348,14 @@ MODULE m_bubbles
             tmp2 =  -1.5D0*fV**2d0 + (tmp1 - fCp)/fRho 
             f_rddot_RP = tmp2/fR
 
+            IF (Re_inv .NE. dflt_real) THEN
+                f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
+            END IF
+
+            IF (Web .NE. dflt_real) THEN
+                f_rddot_RP = f_rddot_RP - 2d0/(Web*(fr**2d0))/fRho
+            END IF
+
         END FUNCTION f_rddot_RP
 
 
@@ -399,7 +407,6 @@ MODULE m_bubbles
             END IF
 
         END FUNCTION f_cpbw_KM
-
 
 
 

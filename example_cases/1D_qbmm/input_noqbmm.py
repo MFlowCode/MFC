@@ -40,7 +40,8 @@ uu = math.sqrt( p0/rho0 )
 #Cavitation number
 Ca = (p0 - pv)/(rho0*(uu**2.))
 #Weber number
-We = rho0*(uu**2.)*R0ref/ss
+# We = rho0*(uu**2.)*R0ref/ss
+We = p0*R0ref/ss
 #Inv. bubble Reynolds number
 Re_inv = mul0/(rho0*uu*R0ref)
 
@@ -71,6 +72,9 @@ dt = dt * 0.1
 Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
+
+print('Web', We)
+print('Re_inv', Re_inv)
 
 # Command to navigate between directories
 from os import chdir
@@ -106,7 +110,7 @@ case_dict =                                                                     
     {                                                                           \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                   \
-                    'run_time_info'                : 'T',                       \
+                    'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
                     'ppn'                          : 4,                      \
                     'queue'                        : 'normal',                  \
