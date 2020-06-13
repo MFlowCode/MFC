@@ -570,7 +570,7 @@ MODULE m_initial_condition
                 END DO
             END IF
 
-            IF (bubbles .AND. (polytropic .NEQV. .TRUE.) ) THEN
+            IF (bubbles .AND. (.NOT. polytropic) ) THEN
                 DO i = 1,nb
                     q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
                     q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)

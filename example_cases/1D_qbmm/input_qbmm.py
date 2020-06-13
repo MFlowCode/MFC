@@ -72,6 +72,9 @@ Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
 
+print('Web', We)
+print('Re_inv', Re_inv)
+
 # Command to navigate between directories
 from os import chdir
 
@@ -108,7 +111,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'T',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 4,                      \
+                    'ppn'                          : 1,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \

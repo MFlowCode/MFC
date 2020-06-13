@@ -2692,7 +2692,7 @@ MODULE m_riemann_solvers
 
                     V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
                     V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
                         P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
                     END IF
@@ -3137,7 +3137,7 @@ MODULE m_riemann_solvers
                 IF (qbmm) THEN
                     ALLOCATE( moms_L(nb,nmom), moms_R(nb,nmom) )
                 ELSE
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         ALLOCATE( P0_L(nb), P0_R(nb) )
                     END IF 
                 END IF 

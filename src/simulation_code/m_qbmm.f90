@@ -50,8 +50,59 @@ MODULE m_qbmm
 
 
     REAL(KIND(0d0)), PARAMETER :: verysmall = 1.D-12
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:)  :: momrhs
+
 
     CONTAINS
+
+
+        SUBROUTINE s_initialize_qbmm_module()
+
+            INTEGER :: i1,i2,q
+
+            ALLOCATE( momrhs(0:2,0:2,nb,nterms,3) )
+
+            ! Assigns the required RHS moments for moment transport equations
+            ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
+            DO q = 1,nb
+                DO i1 = 0,2; DO i2 = 0,2
+                    IF ( (i1+i2)<=2 ) THEN
+                        momrhs(i1,i2,q,1,1) = -1.d0 + i1
+                        momrhs(i1,i2,q,1,2) = -1.d0 + i2
+                        momrhs(i1,i2,q,1,3) = 0d0
+
+                        momrhs(i1,i2,q,2,1) = -1.d0 + i1
+                        momrhs(i1,i2,q,2,2) =  1.d0 + i2
+                        momrhs(i1,i2,q,2,3) = 0d0
+
+                        momrhs(i1,i2,q,3,1) = -1.d0 + i1 - 3.d0*gam
+                        momrhs(i1,i2,q,3,2) = -1.d0 + i2
+                        momrhs(i1,i2,q,3,3) = 3.d0*gam
+
+                        momrhs(i1,i2,q,4,1) = -1.d0 + i1
+                        momrhs(i1,i2,q,4,2) =  1.d0 + i2
+                        momrhs(i1,i2,q,4,3) = 0d0
+
+                        IF (Re_inv .NE. dflt_real) THEN
+                            ! add viscosity
+                            momrhs(i1,i2,q,5,1) = -2.d0 + i1
+                            momrhs(i1,i2,q,5,2) = i2
+                            momrhs(i1,i2,q,5,3) = 0d0
+                        END IF
+
+                        IF (Web .NE. dflt_real) THEN
+                            ! add surface tension
+                            momrhs(i1,i2,q,6,1) = -2.d0 + i1
+                            momrhs(i1,i2,q,6,2) = -1d0 + i2
+                            momrhs(i1,i2,q,6,3) = 0d0
+                        END IF
+
+                    END IF
+                END DO; END DO 
+            END DO
+
+        END SUBROUTINE s_initialize_qbmm_module
+
 
         SUBROUTINE s_mom_inv( q_prim_vf, momsp, moms3d, is1, is2, is3 ) 
             
@@ -89,9 +140,6 @@ MODULE m_qbmm
                         END DO
 
                         IF(id1==0) THEN
-                            ! moms(:) = (/ 1.0007504690235915d0,1.0002500937890797d0,
-                            ! -0.50060096798106690d0,&
-                            ! 1.0097602254962108d0,-0.49888700196331892d0,0.25291019195438436d0 /)
                             PRINT*, 'pres: ', pres
                             PRINT*, 'nb : ', nbub
                             PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
@@ -113,7 +161,7 @@ MODULE m_qbmm
                             DO i1 = 0,2; DO i2 = 0,2
                                 IF ( (i1+i2)<=2 ) THEN
                                     mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres)    & 
-                                    * (R0(q)**momrhs(i1,i2,q,j,3))              &
+                                    * (R0(q)**momrhs(i1,i2,q,j,3))                  &
                                     * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
                                 END IF
                             END DO; END DO
@@ -127,25 +175,18 @@ MODULE m_qbmm
                                     PRINT*, 'nbu: ', nbub
                                     PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
                                     PRINT*, 'moms: ', moms(:)
-                                    call s_mpi_abort()
+                                    CALL s_mpi_abort()
                                 END IF
                             END IF
                         END DO; END DO
                     END DO
-
-
-                    ! IF (id1==0) THEN
-                    !     PRINT*, 'moms3d', moms3d(0,0,1)%sf(id1,0,0), &
-                    !         f_coeff(1,0,0,pres), f_coeff(2,0,0,pres),&
-                    !         f_coeff(3,0,0,pres),f_coeff(4,0,0,pres)
-                    ! END IF  
 
                     momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
                     momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
                     momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
                     momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
 
-                    DO i1 = 1,4
+                    DO i1 = 1,nterms
                         IF (momsp(i1)%sf(id1,id2,id3) .NE. momsp(i1)%sf(id1,id2,id3)) THEN
                             PRINT*, 'nan in momsp', i1,id1
                             PRINT*, 'moms: ', moms(:)
@@ -176,7 +217,6 @@ MODULE m_qbmm
                 END IF
 
             END DO; END DO; END DO
-
 
         END SUBROUTINE s_mom_inv
 
@@ -268,13 +308,17 @@ MODULE m_qbmm
             REAL(KIND(0.D0)) :: f_coeff
 
             IF (term == 1) THEN
-                f_coeff = -1d0*REAL(i2,KIND(0d0))*pres
+                f_coeff = -1d0*i2*pres
             ELSEIF (term == 2) THEN
-                f_coeff = -3d0*REAL(i2,KIND(0d0))/2d0
+                f_coeff = -3d0*i2/2d0
             ELSEIF (term == 3) THEN
-                f_coeff = REAL(i2,KIND(0d0))
+                f_coeff = i2
             ELSEIF (term == 4) THEN
-                f_coeff = REAL(i1,KIND(0d0))
+                f_coeff = i1
+            ELSEIF (term == 5) THEN
+                f_coeff = 4d0*i2*Re_inv
+            ELSEIF (term == 6) THEN
+                f_coeff = 2*i2*Web
             END IF
 
         END FUNCTION f_coeff
