@@ -61,6 +61,7 @@ MODULE m_qbmm
             INTEGER :: i1,i2,q
 
             ALLOCATE( momrhs(0:2,0:2,nb,nterms,3) )
+            momrhs = 0d0
 
             ! Assigns the required RHS moments for moment transport equations
             ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
@@ -93,10 +94,9 @@ MODULE m_qbmm
                         IF (Web .NE. dflt_real) THEN
                             ! add surface tension
                             momrhs(i1,i2,q,6,1) = -2.d0 + i1
-                            momrhs(i1,i2,q,6,2) = -1d0 + i2
+                            momrhs(i1,i2,q,6,2) = -1.d0 + i2
                             momrhs(i1,i2,q,6,3) = 0d0
                         END IF
-
                     END IF
                 END DO; END DO 
             END DO
@@ -115,7 +115,7 @@ MODULE m_qbmm
             REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
             REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2) :: mom3d_terms
-            REAL(KIND(0d0)) :: pres, nbub
+            REAL(KIND(0d0)) :: pres, rho, nbub
 
             INTEGER :: j,k,l,q,r,s !< Loop variables
             INTEGER :: id1,id2,id3
@@ -126,6 +126,7 @@ MODULE m_qbmm
                 IF (q_prim_vf(alf_idx)%sf(id1,id2,id3) > small_alf) THEN
 
                     pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
+                    rho  = q_prim_vf(cont_idx%beg)%sf(id1,id2,id3)
                     ! SHB: Manually adjusted pressure here for no-coupling case
                     ! pres = 1d0/0.3d0
 
@@ -160,7 +161,7 @@ MODULE m_qbmm
                         DO j = 1,nterms
                             DO i1 = 0,2; DO i2 = 0,2
                                 IF ( (i1+i2)<=2 ) THEN
-                                    mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres)    & 
+                                    mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres,rho)    & 
                                     * (R0(q)**momrhs(i1,i2,q,j,3))                  &
                                     * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
                                 END IF
@@ -302,23 +303,31 @@ MODULE m_qbmm
         END SUBROUTINE s_hyqmom
 
 
-        FUNCTION f_coeff( term,i1,i2,pres )
+        FUNCTION f_coeff( term,i1,i2,pres,rho )
             INTEGER, INTENT(IN) :: term,i1,i2
-            REAL(KIND(0.D0)), INTENT(IN) :: pres
+            REAL(KIND(0.D0)), INTENT(IN) :: pres, rho
             REAL(KIND(0.D0)) :: f_coeff
 
             IF (term == 1) THEN
-                f_coeff = -1d0*i2*pres
+                f_coeff = -1d0*i2*pres/rho
             ELSEIF (term == 2) THEN
                 f_coeff = -3d0*i2/2d0
             ELSEIF (term == 3) THEN
-                f_coeff = i2
+                f_coeff = i2/rho
             ELSEIF (term == 4) THEN
                 f_coeff = i1
             ELSEIF (term == 5) THEN
-                f_coeff = 4d0*i2*Re_inv
+                IF (Re_inv .NE. dflt_real) THEN
+                    f_coeff = 4d0*i2*Re_inv/rho
+                ELSE
+                    f_coeff = 0d0
+                END IF
             ELSEIF (term == 6) THEN
-                f_coeff = 2*i2*Web
+                IF (Web .NE. dflt_real) THEN
+                    f_coeff = 2*i2/Web/rho
+                ELSE
+                    f_coeff = 0d0
+                END IF
             END IF
 
         END FUNCTION f_coeff
