@@ -309,11 +309,6 @@ MODULE m_global_parameters
     INTEGER         :: nmomtot !< Total number of carried moments moments/transport equations
     INTEGER         :: nterms !< Number of rhs terms in each moment transport equations
 
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:)  :: momrhs
-    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)      :: momidx 
-
-    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: mom_sp
-    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:,:) :: mom_3d
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: mom_sp
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:,:,:) :: mom_3d
     !> @}
@@ -581,14 +576,21 @@ MODULE m_global_parameters
                         bub_idx%beg = sys_size+1
                         IF (qbmm) THEN
                             nmomsp = 4 !number of special moments
-                            nterms = 4 !number of rhs terms per transport equation
+                            nterms = 6 !number of rhs terms per transport equation
+                            ! IF (Re_inv .NE. dflt_real) THEN
+                            !     nterms = nterms + 1
+                            ! END IF
+                            ! IF (Web .NE. dflt_real) THEN
+                            !     nterms = nterms + 1
+                            ! END IF
+
                             IF( nnode == 4) THEN
                                 nmom = 6
                                 nmomtot = nmom*nb
                             END IF
                             bub_idx%end = adv_idx%end+nb*nmom
                         ELSE
-                            IF (polytropic .NEQV. .TRUE.) THEN
+                            IF (.NOT. polytropic) THEN
                                 bub_idx%end = sys_size+4*nb
                             ELSE
                                 bub_idx%end = sys_size+2*nb
@@ -609,62 +611,18 @@ MODULE m_global_parameters
                         END IF
 
                         IF (qbmm) THEN
-                            ALLOCATE( momrhs(0:2,0:2,nb,nterms,3) )
-                            ALLOCATE( momidx(nmomtot) )
-
-                            ! Assigns the required RHS moments for moment transport equations
-                            ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
-                            DO i1 = 0,2; DO i2 = 0,2; DO i3 = 1,nb
-                                !mexp = {{-1 + i1, -1 + i2, i3}, {-1 + i1, 1 + i2, i3}, {-1 + i1 - 3 \[Gamma], -1 + i2, i3 + 3 \[Gamma]}, {-1 + i1, 1 + i2, i3}}
-                                IF ( (i1+i2)<=2 ) THEN
-                                    momrhs(i1,i2,i3,1,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                    momrhs(i1,i2,i3,1,2) = -1.d0 + REAL(i2,KIND(0d0))
-                                    momrhs(i1,i2,i3,1,3) = 0d0
-                                    momrhs(i1,i2,i3,2,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                    momrhs(i1,i2,i3,2,2) =  1.d0 + REAL(i2,KIND(0d0))
-                                    momrhs(i1,i2,i3,2,3) = 0d0
-                                    momrhs(i1,i2,i3,3,1) = -1.d0 + REAL(i1,KIND(0d0)) - 3.d0*gam
-                                    momrhs(i1,i2,i3,3,2) = -1.d0 + REAL(i2,KIND(0d0))
-                                    momrhs(i1,i2,i3,3,3) = 3.d0*gam
-                                    momrhs(i1,i2,i3,4,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                    momrhs(i1,i2,i3,4,2) =  1.d0 + REAL(i2,KIND(0d0))
-                                    momrhs(i1,i2,i3,4,3) = 0d0
-
-                                    ! momrhs(i1,i2,i3,1,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,1,2) = -1.d0 + REAL(i2,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,1,3) = REAL(i3,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,2,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,2,2) =  1.d0 + REAL(i2,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,2,3) = REAL(i3,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,3,1) = -1.d0 + REAL(i1,KIND(0d0)) - 3.d0*gam
-                                    ! momrhs(i1,i2,i3,3,2) = -1.d0 + REAL(i2,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,3,3) = REAL(i3,KIND(0d0)) + 3.d0*gam
-                                    ! momrhs(i1,i2,i3,4,1) = -1.d0 + REAL(i1,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,4,2) =  1.d0 + REAL(i2,KIND(0d0))
-                                    ! momrhs(i1,i2,i3,4,3) = REAL(i3,KIND(0d0))
-                                END IF
-                            END DO; END DO; END DO
-
                             ALLOCATE( bub_idx%moms(nb,nmom) )
-                            ALLOCATE( bub_idx%fullmom(nb,0:nmom,0:nmom) )
 
                             DO i = 1, nb
                                 DO j = 1, nmom
                                     bub_idx%moms(i,j) = bub_idx%beg+(j-1)+(i-1)*nmom
                                 END DO 
-                                bub_idx%fullmom(i,0,0) = bub_idx%moms(i,1)
-                                bub_idx%fullmom(i,1,0) = bub_idx%moms(i,2)
-                                bub_idx%fullmom(i,0,1) = bub_idx%moms(i,3)
-                                bub_idx%fullmom(i,2,0) = bub_idx%moms(i,4)
-                                bub_idx%fullmom(i,1,1) = bub_idx%moms(i,5)
-                                bub_idx%fullmom(i,0,2) = bub_idx%moms(i,6)
-                                bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
-                                bub_idx%vs(i) = bub_idx%fullmom(i,0,1)
+                                bub_idx%rs(i) = bub_idx%moms(i,1)
+                                bub_idx%vs(i) = bub_idx%moms(i,2)
                             END DO
-                            ! print*, 'bub idx moms', bub_idx%moms(1,1:6)
                         ELSE
                             DO i = 1, nb
-                                IF (polytropic .NEQV. .TRUE.) THEN
+                                IF (.NOT. polytropic) THEN
                                     ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                                     fac = 4
                                 ELSE
@@ -674,7 +632,7 @@ MODULE m_global_parameters
                                 bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                                 bub_idx%vs(i) = bub_idx%rs(i)+1
                                 
-                                IF (polytropic .NEQV. .TRUE.) THEN
+                                IF (.NOT. polytropic) THEN
                                     bub_idx%ps(i) = bub_idx%vs(i)+1
                                     bub_idx%ms(i) = bub_idx%ps(i)+1
                                 END IF
@@ -692,7 +650,7 @@ MODULE m_global_parameters
                             STOP 'Invalid value of nb'
                         END IF
 
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             CALL s_initialize_nonpoly
                         ELSE
                             rhoref  = 1.d0
@@ -732,7 +690,7 @@ MODULE m_global_parameters
                     IF (bubbles) THEN
                         bub_idx%beg = sys_size+1
                         bub_idx%end = sys_size+2*nb
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             bub_idx%end = sys_size+4*nb
                         END IF
                         sys_size = bub_idx%end
@@ -743,16 +701,16 @@ MODULE m_global_parameters
                         ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                         DO i = 1, nb
-                            IF (polytropic .NEQV. .TRUE.) THEN
-                                fac = 4
-                            ELSE
+                            IF (polytropic) THEN
                                 fac = 2
+                            ELSE
+                                fac = 4
                             END IF
 
                             bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                             bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                            IF (polytropic .NEQV. .TRUE.) THEN
+                            IF (.NOT. polytropic) THEN
                                 bub_idx%ps(i) = bub_idx%vs(i)+1
                                 bub_idx%ms(i) = bub_idx%ps(i)+1
                             END IF
@@ -769,7 +727,7 @@ MODULE m_global_parameters
                             STOP 'Invalid value of nb'
                         END IF
 
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             CALL s_initialize_nonpoly
                         ELSE
                             rhoref  = 1.d0

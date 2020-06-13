@@ -144,7 +144,7 @@ MODULE m_bubbles
                     myR  = q_prim_vf(bub_idx%rs(q))%sf(j,k,l)
                     myV  = q_prim_vf(bub_idx%vs(q))%sf(j,k,l)
 
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         pb = q_prim_vf(bub_idx%ps(q))%sf(j,k,l)
                         mv = q_prim_vf(bub_idx%ms(q))%sf(j,k,l)
                         CALL s_bwproperty( pb, q )
@@ -183,7 +183,7 @@ MODULE m_bubbles
                         bub_adv_src(j,k,l) = 0d0
                         bub_r_src(q,j,k,l) = 0d0
                         bub_v_src(q,j,k,l) = 0d0
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                            bub_p_src(q,j,k,l) = 0d0
                            bub_m_src(q,j,k,l) = 0d0
                         END IF

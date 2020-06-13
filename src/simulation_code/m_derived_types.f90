@@ -76,7 +76,6 @@ MODULE m_derived_types
         INTEGER, DIMENSION(:), ALLOCATABLE :: ms !< Bubble mass fluxes
 
         INTEGER, DIMENSION(:,:), ALLOCATABLE :: moms !< Moment indices for qbmm
-        INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: fullmom !< Moment indices for qbmm
     END TYPE bub_bounds_info    
     
 

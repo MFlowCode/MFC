@@ -72,6 +72,9 @@ PROGRAM p_main
     USE m_derived_variables    !< Derived variables evaluation procedures
     
     USE m_time_steppers        !< Time-stepping algorithms
+
+    USE m_qbmm                 !< Quadrature MOM
+
     ! ==========================================================================
     
     IMPLICIT NONE
@@ -119,6 +122,8 @@ PROGRAM p_main
     CALL s_initialize_data_output_module()
     CALL s_initialize_derived_variables_module()
     CALL s_initialize_time_steppers_module()    
+    IF (qbmm) CALL s_initialize_qbmm_module()
+
     print*, 'Initialize'
     
     ! Associate pointers for serial or parallel I/O
@@ -133,7 +138,6 @@ PROGRAM p_main
     ! Reading in the user provided initial condition and grid data
     CALL s_read_data_files(q_cons_ts(1)%vf)
     IF (model_eqns == 3) CALL s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
-    print*, 'Read data files'
 
     ! Populating the buffers of the grid variables using the boundary conditions
     CALL s_populate_grid_variables_buffers()

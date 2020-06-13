@@ -442,7 +442,7 @@ MODULE m_global_parameters
                         END IF
                         bub_idx%end = adv_idx%end+nb*nmom
                     ELSE
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             bub_idx%end = sys_size+4*nb
                         ELSE
                             bub_idx%end = sys_size+2*nb
@@ -471,7 +471,7 @@ MODULE m_global_parameters
                         END DO
                     ELSE
                         DO i = 1, nb
-                            IF (polytropic .NEQV. .TRUE.) THEN
+                            IF (.NOT. polytropic) THEN
                                 ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                                 fac = 4
                             ELSE
@@ -481,7 +481,7 @@ MODULE m_global_parameters
                             bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                             bub_idx%vs(i) = bub_idx%rs(i)+1
                             
-                            IF (polytropic .NEQV. .TRUE.) THEN
+                            IF (.NOT. polytropic) THEN
                                 bub_idx%ps(i) = bub_idx%vs(i)+1
                                 bub_idx%ms(i) = bub_idx%ps(i)+1
                             END IF
@@ -503,7 +503,7 @@ MODULE m_global_parameters
                     print*, 'R0 abscissas: ', R0(:)
 
 
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         CALL s_initialize_nonpoly
                     ELSE
                         rhoref  = 1.d0
@@ -554,7 +554,7 @@ MODULE m_global_parameters
                 IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         bub_idx%end = sys_size+4*nb
                     END IF
                     sys_size = bub_idx%end
@@ -564,7 +564,7 @@ MODULE m_global_parameters
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                     DO i = 1, nb
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             fac = 4
                         ELSE
                             fac = 2
@@ -573,7 +573,7 @@ MODULE m_global_parameters
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
                         END IF
@@ -590,7 +590,7 @@ MODULE m_global_parameters
                         STOP 'Invalid value of nb'
                     END IF
 
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         CALL s_initialize_nonpoly
                     ELSE
                         rhoref  = 1.d0
