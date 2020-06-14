@@ -38,7 +38,8 @@ pa      = 0.1 * 1.E+06 / 101325.
 #Characteristic velocity
 uu = math.sqrt( p0/rho0 )
 #Cavitation number
-Ca = (p0 - pv)/(rho0*(uu**2.))
+# Ca = (p0 - pv)/(rho0*(uu**2.))
+Ca = 1.
 #Weber number
 # We = rho0*(uu**2.)*R0ref/ss
 We = p0*R0ref/ss
@@ -226,7 +227,7 @@ case_dict =                                                                     
 
                     # Bubbles ==================================================
                     'bubbles'               : 'T',                  \
-                    'bubble_model'          : 3,                    \
+                    'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
                     # 'polydisperse'          : 'T',                  \
                     'polydisperse'          : 'F',                  \
@@ -236,8 +237,8 @@ case_dict =                                                                     
                     # 'nb'                    : 3,                  \
                     'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
-                    'Web'                   : We,                   \
-                    'Re_inv'                : Re_inv,               \
+                    # 'Web'                   : We,                   \
+                    # 'Re_inv'                : Re_inv,               \
                     'qbmm'               : 'T',                 \
                     'nnode'              : 4,                   \
                     'dist_type'          : 1,                   \

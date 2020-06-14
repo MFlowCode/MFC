@@ -307,7 +307,6 @@ MODULE m_global_parameters
     INTEGER         :: nnode !< Number of QBMM nodes
     INTEGER         :: nmomsp !< Number of moments required by ensemble-averaging
     INTEGER         :: nmomtot !< Total number of carried moments moments/transport equations
-    INTEGER         :: nterms !< Number of rhs terms in each moment transport equations
 
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: mom_sp
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:,:,:) :: mom_3d
@@ -576,14 +575,6 @@ MODULE m_global_parameters
                         bub_idx%beg = sys_size+1
                         IF (qbmm) THEN
                             nmomsp = 4 !number of special moments
-                            nterms = 6 !number of rhs terms per transport equation
-                            ! IF (Re_inv .NE. dflt_real) THEN
-                            !     nterms = nterms + 1
-                            ! END IF
-                            ! IF (Web .NE. dflt_real) THEN
-                            !     nterms = nterms + 1
-                            ! END IF
-
                             IF( nnode == 4) THEN
                                 nmom = 6
                                 nmomtot = nmom*nb
