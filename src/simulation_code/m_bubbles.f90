@@ -81,7 +81,7 @@ MODULE m_bubbles
             REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p) :: nbub !< Bubble number density
             
             REAL(KIND(0d0)) ::  tmp1, tmp2, tmp3, tmp4, &
-                                c_gas, c2_liquid, &
+                                c_gas, c_liquid, &
                                 Cpbw, Cpinf,Cpinf_dot, &
                                 myH, myHdot, rddot, alf_gas
             
@@ -99,8 +99,6 @@ MODULE m_bubbles
            
             INTEGER :: j,k,l,q,s !< Loop variables
             INTEGER :: ndirs  !< Number of coordinate directions
-            
-
             
             ndirs = 1; IF (n > 0) ndirs = 2; IF (p > 0) ndirs = 3
 
@@ -125,7 +123,7 @@ MODULE m_bubbles
                 END DO; END DO; END DO
 
                 ! bubble radius and radial velocity source
-                DO q=1,nb; DO j = 0,m; DO k = 0,n; DO l = 0,p
+                DO q = 1,nb; DO j = 0,m; DO k = 0,n; DO l = 0,p
                     bub_r_src(q,j,k,l) = q_cons_vf(bub_idx%vs(q))%sf(j,k,l)
                 
                     CALL s_convert_to_mixture_variables( q_cons_vf, myRho, n_tait, B_tait, Re, We, j, k, l )
@@ -170,8 +168,9 @@ MODULE m_bubbles
                         ! Keller-Miksis bubbles
                         Cpinf       = myP
                         Cpbw        = f_cpbw_KM( R0(q), myR, myV, gamma_gas, pb )
-                        c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                        rddot       = f_rddot_KM( pbdot, gamma_gas, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_gas )
+                        ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
+                        c_liquid =  DSQRT(n_tait*(myP+B_tait)/(myRho*(1.d0-alf)))
+                        rddot       = f_rddot_KM( pbdot, gamma_gas, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid )
                     ELSE IF (bubble_model == 3) THEN
                         ! Rayleigh-Plesset bubbles
                         rddot       = f_rddot_RP( gamma_gas, myP, myRho, myR, myV, R0(q) )
@@ -401,7 +400,7 @@ MODULE m_bubbles
             
             IF (polytropic) THEN
                 f_cpbw_KM = (Ca + 2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas)) - &
-                    Ca - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
+                    4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
             ELSE
                 f_cpbw_KM = fpb - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
             END IF
@@ -437,7 +436,7 @@ MODULE m_bubbles
             cdot_star = tmp1 + ( 2.d0/Web + 4.d0*Re_inv*fV )*fV/(fR**2.d0)
             tmp1 = fV/fC
             tmp2 =  1.5D0*fV**2d0*( tmp1/3.D0-1.D0 ) +                      &
-                    (fCpbw - fCp)/fRho * (1.d0 - tmp1) +      &
+                    (fCpbw - fCp)/fRho * (1.d0 + tmp1) +      &
                     cdot_star * fR/fRho/fC
                   
             f_rddot_KM = tmp2/( fR*(1.d0-tmp1) + 4.d0*Re_inv/(fRho*fC) )

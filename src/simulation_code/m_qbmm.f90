@@ -51,14 +51,21 @@ MODULE m_qbmm
 
     REAL(KIND(0d0)), PARAMETER :: verysmall = 1.D-12
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:)  :: momrhs
-
+    INTEGER         :: nterms !< Number of rhs terms in each moment transport equations
 
     CONTAINS
-
 
         SUBROUTINE s_initialize_qbmm_module()
 
             INTEGER :: i1,i2,q
+
+            IF (bubble_model==2) THEN 
+                ! Keller-Miksis without viscosity/surface tension
+                nterms = 12
+            ELSE IF (bubble_model==3) THEN
+                ! Rayleigh-Plesset with viscosity/surface tension
+                nterms = 6
+            END IF
 
             ALLOCATE( momrhs(0:2,0:2,nb,nterms,3) )
             momrhs = 0d0
@@ -68,34 +75,85 @@ MODULE m_qbmm
             DO q = 1,nb
                 DO i1 = 0,2; DO i2 = 0,2
                     IF ( (i1+i2)<=2 ) THEN
-                        momrhs(i1,i2,q,1,1) = -1.d0 + i1
-                        momrhs(i1,i2,q,1,2) = -1.d0 + i2
-                        momrhs(i1,i2,q,1,3) = 0d0
+                        IF (bubble_model==3) THEN
+                            momrhs(i1,i2,q,1,1) = -1.d0 + i1
+                            momrhs(i1,i2,q,1,2) = -1.d0 + i2
+                            momrhs(i1,i2,q,1,3) = 0d0
 
-                        momrhs(i1,i2,q,2,1) = -1.d0 + i1
-                        momrhs(i1,i2,q,2,2) =  1.d0 + i2
-                        momrhs(i1,i2,q,2,3) = 0d0
+                            momrhs(i1,i2,q,2,1) = -1.d0 + i1
+                            momrhs(i1,i2,q,2,2) =  1.d0 + i2
+                            momrhs(i1,i2,q,2,3) = 0d0
 
-                        momrhs(i1,i2,q,3,1) = -1.d0 + i1 - 3.d0*gam
-                        momrhs(i1,i2,q,3,2) = -1.d0 + i2
-                        momrhs(i1,i2,q,3,3) = 3.d0*gam
+                            momrhs(i1,i2,q,3,1) = -1.d0 + i1 - 3.d0*gam
+                            momrhs(i1,i2,q,3,2) = -1.d0 + i2
+                            momrhs(i1,i2,q,3,3) = 3.d0*gam
 
-                        momrhs(i1,i2,q,4,1) = -1.d0 + i1
-                        momrhs(i1,i2,q,4,2) =  1.d0 + i2
-                        momrhs(i1,i2,q,4,3) = 0d0
+                            momrhs(i1,i2,q,4,1) = -1.d0 + i1
+                            momrhs(i1,i2,q,4,2) =  1.d0 + i2
+                            momrhs(i1,i2,q,4,3) = 0d0
 
-                        IF (Re_inv .NE. dflt_real) THEN
-                            ! add viscosity
-                            momrhs(i1,i2,q,5,1) = -2.d0 + i1
-                            momrhs(i1,i2,q,5,2) = i2
-                            momrhs(i1,i2,q,5,3) = 0d0
-                        END IF
+                            IF (Re_inv .NE. dflt_real) THEN
+                                ! add viscosity
+                                momrhs(i1,i2,q,5,1) = -2.d0 + i1
+                                momrhs(i1,i2,q,5,2) = i2
+                                momrhs(i1,i2,q,5,3) = 0d0
+                            END IF
 
-                        IF (Web .NE. dflt_real) THEN
-                            ! add surface tension
-                            momrhs(i1,i2,q,6,1) = -2.d0 + i1
-                            momrhs(i1,i2,q,6,2) = -1.d0 + i2
-                            momrhs(i1,i2,q,6,3) = 0d0
+                            IF (Web .NE. dflt_real) THEN
+                                ! add surface tension
+                                momrhs(i1,i2,q,6,1) = -2.d0 + i1
+                                momrhs(i1,i2,q,6,2) = -1.d0 + i2
+                                momrhs(i1,i2,q,6,3) = 0d0
+                            END IF
+                        ELSE IF (bubble_model==2) THEN
+                            ! KM with approximation of 1/(1-V/C) = 1+V/C
+                            momrhs(i1,i2,q,1,1) = -1d0 + i1
+                            momrhs(i1,i2,q,1,2) =  1d0 + i2
+                            momrhs(i1,i2,q,1,3) =  0d0
+
+                            momrhs(i1,i2,q,2,1) = -1d0 + i1
+                            momrhs(i1,i2,q,2,2) =  2d0 + i2
+                            momrhs(i1,i2,q,2,3) =  0d0
+
+                            momrhs(i1,i2,q,3,1) = -1d0 + i1
+                            momrhs(i1,i2,q,3,2) =  3d0 + i2
+                            momrhs(i1,i2,q,3,3) =  0d0
+
+                            momrhs(i1,i2,q,4,1) = -1d0 + i1
+                            momrhs(i1,i2,q,4,2) = -1d0 + i2
+                            momrhs(i1,i2,q,4,3) =  0d0
+
+                            momrhs(i1,i2,q,5,1) = -1d0 + i1
+                            momrhs(i1,i2,q,5,2) =  i2
+                            momrhs(i1,i2,q,5,3) =  0d0
+
+                            momrhs(i1,i2,q,6,1) = -1d0 + i1
+                            momrhs(i1,i2,q,6,2) =  1d0 + i2
+                            momrhs(i1,i2,q,6,3) =  0d0
+
+                            momrhs(i1,i2,q,7,1) = -1d0 + i1 - 3d0*gam
+                            momrhs(i1,i2,q,7,2) = -1d0 + i2
+                            momrhs(i1,i2,q,7,3) =  3d0*gam
+
+                            momrhs(i1,i2,q,8,1) = -1d0 + i1 - 3d0*gam
+                            momrhs(i1,i2,q,8,2) =  i2
+                            momrhs(i1,i2,q,8,3) =  3d0*gam
+
+                            momrhs(i1,i2,q,9,1) = -1d0 + i1 - 3d0*gam
+                            momrhs(i1,i2,q,9,2) =  1d0 + i2
+                            momrhs(i1,i2,q,9,3) =  3d0*gam
+
+                            momrhs(i1,i2,q,10,1) = -1d0 + i1 - 3d0*gam
+                            momrhs(i1,i2,q,10,2) =  i2
+                            momrhs(i1,i2,q,10,3) =  3d0*gam
+
+                            momrhs(i1,i2,q,11,1) = -1d0 + i1 - 3d0*gam
+                            momrhs(i1,i2,q,11,2) =  1d0 + i2
+                            momrhs(i1,i2,q,11,3) =  3d0*gam
+
+                            momrhs(i1,i2,q,12,1) = -1d0 + i1
+                            momrhs(i1,i2,q,12,2) =  1d0 + i2
+                            momrhs(i1,i2,q,12,3) =  0d0
                         END IF
                     END IF
                 END DO; END DO 
@@ -115,7 +173,8 @@ MODULE m_qbmm
             REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
             REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2) :: mom3d_terms
-            REAL(KIND(0d0)) :: pres, rho, nbub
+            REAL(KIND(0d0)) :: pres, rho, nbub, c, alf
+            REAL(KIND(0d0)) :: n_tait, B_tait
 
             INTEGER :: j,k,l,q,r,s !< Loop variables
             INTEGER :: id1,id2,id3
@@ -123,17 +182,25 @@ MODULE m_qbmm
 
             DO id3 = is3%beg, is3%end; DO id2 = is2%beg, is2%end; DO id1 = is1%beg, is1%end
 
-                IF (q_prim_vf(alf_idx)%sf(id1,id2,id3) > small_alf) THEN
+                alf = q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
+                rho  = q_prim_vf(cont_idx%beg)%sf(id1,id2,id3)
+                IF (bubble_model==2) THEN
+                    n_tait = fluid_pp(1)%gamma
+                    n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                    B_tait = fluid_pp(1)%pi_inf
+                    c =  DSQRT(n_tait*(pres+B_tait)/(rho*(1.d0-alf)))
+                END IF
 
-                    pres = q_prim_vf(E_idx)%sf(id1,id2,id3)
-                    rho  = q_prim_vf(cont_idx%beg)%sf(id1,id2,id3)
-                    ! SHB: Manually adjusted pressure here for no-coupling case
-                    ! pres = 1d0/0.3d0
+                ! SHB: Manually adjusted pressure here for no-coupling case
+                ! pres = 1d0/0.3d0
+
+                IF (alf > small_alf) THEN
 
                     DO q = 1,nb
                         Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
                     END DO
-                    CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(id1,id2,id3), Rvec, nbub )
+                    CALL s_comp_n_from_prim( alf, Rvec, nbub )
 
                     DO q = 1,nb
                         DO r = 1,nmom
@@ -143,7 +210,7 @@ MODULE m_qbmm
                         IF(id1==0) THEN
                             PRINT*, 'pres: ', pres
                             PRINT*, 'nb : ', nbub
-                            PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                            PRINT*, 'alf: ', alf
                             DO s = 1,nmom
                                 PRINT*, 'mom: ', moms(s)
                             END DO
@@ -161,7 +228,7 @@ MODULE m_qbmm
                         DO j = 1,nterms
                             DO i1 = 0,2; DO i2 = 0,2
                                 IF ( (i1+i2)<=2 ) THEN
-                                    mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres,rho)    & 
+                                    mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres,rho,c)    & 
                                     * (R0(q)**momrhs(i1,i2,q,j,3))                  &
                                     * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
                                 END IF
@@ -174,7 +241,7 @@ MODULE m_qbmm
                                 IF (moms3d(i1,i2,q)%sf(id1,id2,id3) .NE. moms3d(i1,i2,q)%sf(id1,id2,id3)) THEN
                                     PRINT*, 'nan in mom3d', i1,i2,id1
                                     PRINT*, 'nbu: ', nbub
-                                    PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                                    PRINT*, 'alf: ', alf
                                     PRINT*, 'moms: ', moms(:)
                                     CALL s_mpi_abort()
                                 END IF
@@ -199,7 +266,7 @@ MODULE m_qbmm
 
                     DO q = 1,nb
                         IF(id1==0) THEN
-                            PRINT*, 'alf: ', q_prim_vf(alf_idx)%sf(id1,id2,id3)
+                            PRINT*, 'alf: ', alf
                             DO s = 1,nmom
                                 PRINT*, 'mom: ', q_prim_vf(bub_idx%moms(q,s))%sf(id1,id2,id3)
                             END DO
@@ -303,30 +370,60 @@ MODULE m_qbmm
         END SUBROUTINE s_hyqmom
 
 
-        FUNCTION f_coeff( term,i1,i2,pres,rho )
+        FUNCTION f_coeff( term,i1,i2,pres,rho,c )
             INTEGER, INTENT(IN) :: term,i1,i2
-            REAL(KIND(0.D0)), INTENT(IN) :: pres, rho
+            REAL(KIND(0.D0)), INTENT(IN) :: pres, rho, c
             REAL(KIND(0.D0)) :: f_coeff
 
-            IF (term == 1) THEN
-                f_coeff = -1d0*i2*pres/rho
-            ELSEIF (term == 2) THEN
-                f_coeff = -3d0*i2/2d0
-            ELSEIF (term == 3) THEN
-                f_coeff = i2/rho
-            ELSEIF (term == 4) THEN
-                f_coeff = i1
-            ELSEIF (term == 5) THEN
-                IF (Re_inv .NE. dflt_real) THEN
-                    f_coeff = 4d0*i2*Re_inv/rho
-                ELSE
-                    f_coeff = 0d0
+            IF (bubble_model==3) THEN
+                ! RPE with potential for Re and Web
+                IF (term == 1) THEN
+                    f_coeff = -1d0*i2*pres/rho
+                ELSEIF (term == 2) THEN
+                    f_coeff = -3d0*i2/2d0
+                ELSEIF (term == 3) THEN
+                    f_coeff = i2/rho
+                ELSEIF (term == 4) THEN
+                    f_coeff = i1
+                ELSEIF (term == 5) THEN
+                    IF (Re_inv .NE. dflt_real) THEN
+                        f_coeff = 4d0*i2*Re_inv/rho
+                    ELSE
+                        f_coeff = 0d0
+                    END IF
+                ELSEIF (term == 6) THEN
+                    IF (Web .NE. dflt_real) THEN
+                        f_coeff = 2*i2/Web/rho
+                    ELSE
+                        f_coeff = 0d0
+                    END IF
                 END IF
-            ELSEIF (term == 6) THEN
-                IF (Web .NE. dflt_real) THEN
-                    f_coeff = 2*i2/Web/rho
-                ELSE
-                    f_coeff = 0d0
+            ELSE IF (bubble_model==2) THEN
+                ! KM with approximation of 1/(1-V/C) = 1+V/C
+                IF (term == 1) THEN
+                    f_coeff = -3d0*i2/2d0
+                ELSE IF (term == 2) THEN
+                    f_coeff = -i2/c
+                ELSE IF (term == 3) THEN
+                    f_coeff = i2/(2d0*c*c)
+                ELSE IF (term == 4) THEN
+                    f_coeff = -i2*pres/rho
+                ELSE IF (term == 5) THEN
+                    f_coeff = -2d0*i2*pres/(c*rho)
+                ELSE IF (term == 6) THEN
+                    f_coeff = -i2*pres/(c*c*rho)
+                ELSE IF (term == 7) THEN
+                    f_coeff = i2/rho
+                ELSE IF (term == 8) THEN
+                    f_coeff = 2d0*i2/(c*rho)
+                ELSE IF (term == 9) THEN
+                    f_coeff = i2/(c*c*rho)
+                ELSE IF (term == 10) THEN
+                    f_coeff = -3d0*i2*gam/(c*rho)
+                ELSE IF (term == 11) THEN
+                    f_coeff = -3d0*i2*gam/(c*c*rho)
+                ELSE IF (term == 12) THEN
+                    f_coeff = i1
                 END IF
             END IF
 
