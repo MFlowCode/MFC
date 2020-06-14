@@ -344,16 +344,11 @@ MODULE m_bubbles
             !! rddot = (1/r) (  tmp2 )
 
             tmp1 = ( fR0/fR )**( 3.d0*fgamma_gas )
-            tmp2 =  -1.5D0*fV**2d0 + (tmp1 - fCp)/fRho 
+            tmp2 =  -1.5d0*(fV**2d0) + (tmp1 - fCp)/fRho 
             f_rddot_RP = tmp2/fR
 
-            IF (Re_inv .NE. dflt_real) THEN
-                f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
-            END IF
-
-            IF (Web .NE. dflt_real) THEN
-                f_rddot_RP = f_rddot_RP - 2d0/(Web*(fr**2d0))/fRho
-            END IF
+            IF (Re_inv /= dflt_real) f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
+            IF (Web /= dflt_real) f_rddot_RP = f_rddot_RP - 2d0/(Web*(fr**2d0))/fRho
 
         END FUNCTION f_rddot_RP
 
@@ -399,11 +394,15 @@ MODULE m_bubbles
             REAL(KIND(0d0))             :: f_cpbw_KM
             
             IF (polytropic) THEN
-                f_cpbw_KM = (Ca + 2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas)) - &
-                    4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
+                f_cpbw_KM = Ca*((fR0/fR)**(3.d0*fgamma_gas))
+                IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web) + &
+                    (2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas))
             ELSE
-                f_cpbw_KM = fpb - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
+                f_cpbw_KM = fpb 
+                IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web)
             END IF
+
+            IF (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.D0*Re_inv*fV/fR
 
         END FUNCTION f_cpbw_KM
 
@@ -428,18 +427,26 @@ MODULE m_bubbles
             REAL(KIND(0d0))             :: f_rddot_KM
 
             IF (polytropic) THEN
-                tmp1 = ( fR0/fR )**( 3.d0*fgamma_gas )
-                tmp1 = -3.D0*fgamma_gas*( Ca+2d0/Web/fR0 )*tmp1*fV/fR
+                tmp1 = -3d0*fgamma_gas*Ca*((fR0/fR)**(3d0*fgamma_gas))*fV/fR
+                IF (Web/=dflt_real) tmp1 = tmp1 -3d0*fgamma_gas*(2d0/Web/fR0)*((fR0/fR)**(3d0*fgamma_gas))*fV/fR
             ELSE
                 tmp1 = fpbdot
             END IF
-            cdot_star = tmp1 + ( 2.d0/Web + 4.d0*Re_inv*fV )*fV/(fR**2.d0)
+
+            cdot_star = tmp1 
+            IF ( Web  /=dflt_real) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
+            IF (Re_inv/=dflt_real) cdot_star = cdot_star + 4d0*Re_inv*fV*fV/(fR**2d0)
+
             tmp1 = fV/fC
-            tmp2 =  1.5D0*fV**2d0*( tmp1/3.D0-1.D0 ) +                      &
-                    (fCpbw - fCp)/fRho * (1.d0 + tmp1) +      &
+            tmp2 =  1.5D0*fV**2d0*( tmp1/3d0-1d0 ) +                      &
+                    (fCpbw - fCp)/fRho * (1d0 + tmp1) +      &
                     cdot_star * fR/fRho/fC
-                  
-            f_rddot_KM = tmp2/( fR*(1.d0-tmp1) + 4.d0*Re_inv/(fRho*fC) )
+                 
+            IF (Re_inv==dflt_real) THEN
+                f_rddot_KM = tmp2/( fR*(1d0-tmp1) ) 
+            ELSE
+                f_rddot_KM = tmp2/( fR*(1d0-tmp1) + 4d0*Re_inv/(fRho*fC) )
+            END IF
 
         END FUNCTION f_rddot_KM
 
