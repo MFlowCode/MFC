@@ -2707,15 +2707,23 @@ MODULE m_riemann_solvers
                     !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
                     IF ( .NOT. qbmm ) THEN
                         IF (polytropic) THEN
-                            pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
-                                - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
-
-                            pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
-                                - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                            pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0
+                            pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0
                         ELSE
-                            pbw_L(i) = P0_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
-                            pbw_R(i) = P0_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                            pbw_L(i) = P0_L(i)
+                            pbw_R(i) = P0_R(i)
                         END IF
+                        IF (Re_inv /= dflt_real) THEN
+                            pbw_L(i) = pbw_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i)
+                            pbw_R(i) = pbw_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i)
+                        END IF
+                        IF (Web /= dflt_real) THEN
+                            pbw_L(i) = pbw_L(i) - 2.d0/(Web*R0_L(i))
+                            pbw_R(i) = pbw_R(i) - 2.d0/(Web*R0_R(i))
+                        END IF
+
+                        ! pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),gamma_gas,P0_L(i))
+                        ! pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),gamma_gas,P0_L(i))
                     END IF
                 END DO
 

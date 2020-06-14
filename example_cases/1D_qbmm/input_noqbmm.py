@@ -38,8 +38,8 @@ pa      = 0.1 * 1.E+06 / 101325.
 #Characteristic velocity
 uu = math.sqrt( p0/rho0 )
 #Cavitation number
-# Ca = (p0 - pv)/(rho0*(uu**2.))
-Ca = 1.
+Ca = (p0 - pv)/(rho0*(uu**2.))
+# Ca = 1.
 #Weber number
 # We = rho0*(uu**2.)*R0ref/ss
 We = p0*R0ref/ss
@@ -113,7 +113,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 4,                      \
+                    'ppn'                          : 1,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -131,7 +131,7 @@ case_dict =                                                                     
                     't_step_start'                 : 0,                         \
                     't_step_stop'                  : 10000,                        \
                     # 't_step_stop'                  : 4,                        \
-                    't_step_save'                  : 500,   \
+                    't_step_save'                  : 1000,   \
                     # 't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
