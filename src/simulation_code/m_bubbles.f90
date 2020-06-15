@@ -87,7 +87,7 @@ MODULE m_bubbles
             
             REAL(KIND(0d0))   :: pb, mv, vflux, pldot, pbdot
             
-            REAL(KIND(0d0)) :: n_tait, B_tait, gamma_gas !< EOS parameters
+            REAL(KIND(0d0)) :: n_tait, B_tait
             
             REAL(KIND(0d0)), DIMENSION(nb)  :: Rtmp, Vtmp 
             REAL(KIND(0d0))   :: myR, myV, alf, myP, myRho, R2Vav 
@@ -130,11 +130,6 @@ MODULE m_bubbles
                     
                     n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
-                    IF (num_fluids == 1) THEN
-                        gamma_gas  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
-                    ELSE 
-                        gamma_gas  = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
-                    END IF
 
                     myRho= q_prim_vf(1)%sf(j,k,l)
                     myP  = q_prim_vf(E_idx)%sf(j,k,l)
@@ -158,22 +153,23 @@ MODULE m_bubbles
                    IF (bubble_model == 1) THEN
                         ! Gilmore bubbles
                         Cpinf       = myP - pref
-                        Cpbw        = f_cpbw( R0(q), myR, myV, gamma_gas, pb )
+                        Cpbw        = f_cpbw( R0(q), myR, myV,  pb )
                         myH         = f_H       ( Cpbw, Cpinf, n_tait, B_tait )
                         c_gas       = f_cgas    ( Cpinf, n_tait, B_tait, myH )
                         Cpinf_dot   = f_cpinfdot( myRho, myP, alf, n_tait, B_tait, bub_adv_src(j,k,l), mydivu%sf(j,k,l) )
-                        myHdot      = f_Hdot    ( Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, gamma_gas, myR, myV, R0(q), pbdot )
+                        myHdot      = f_Hdot    ( Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait,  myR, myV, R0(q), pbdot )
                         rddot       = f_rddot   ( Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait )
                     ELSE IF (bubble_model == 2) THEN
                         ! Keller-Miksis bubbles
                         Cpinf       = myP
-                        Cpbw        = f_cpbw_KM( R0(q), myR, myV, gamma_gas, pb )
+                        Cpbw        = f_cpbw_KM( R0(q), myR, myV,  pb )
                         ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
                         c_liquid =  DSQRT(n_tait*(myP+B_tait)/(myRho*(1.d0-alf)))
-                        rddot       = f_rddot_KM( pbdot, gamma_gas, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid )
+                        rddot       = f_rddot_KM( pbdot,  Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid )
                     ELSE IF (bubble_model == 3) THEN
                         ! Rayleigh-Plesset bubbles
-                        rddot       = f_rddot_RP( gamma_gas, myP, myRho, myR, myV, R0(q) )
+                        Cpbw        = f_cpbw_KM( R0(q), myR, myV,  pb )
+                        rddot       = f_rddot_RP(  myP, myRho, myR, myV, R0(q), Cpbw )
                     END IF
 
                     bub_v_src(q,j,k,l) = nbub(j,k,l) * rddot
@@ -197,22 +193,20 @@ MODULE m_bubbles
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
-        !!  @param fgamma_gas Polytropic gas constant
         !!  @param fpb Internal bubble pressure
-        FUNCTION f_cpbw( fR0, fR, fV, fgamma_gas, fpb )
+        FUNCTION f_cpbw( fR0, fR, fV, fpb )
 
-            REAL(KIND(0d0)), INTENT(IN) :: fR0, fR, fV, fgamma_gas, fpb
+            REAL(KIND(0d0)), INTENT(IN) :: fR0, fR, fV, fpb
             
             REAL(KIND(0d0))             :: f_cpbw
 
             IF (polytropic) THEN
-                f_cpbw = (Ca + 2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas)) - Ca - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
+                f_cpbw = (Ca + 2.D0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
             ELSE
                 f_cpbw = fpb - 1.d0 - 4.D0*Re_inv*fV/fR - 2.D0/(fR*Web)
             END IF
 
         END FUNCTION f_cpbw
-
 
         !>  Function that computes the bubble enthalpy
         !!  @param fCpbw Bubble wall pressure
@@ -291,22 +285,21 @@ MODULE m_bubbles
         !!  @param fCpinf_dot Time derivative of the driving pressure
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-        !!  @param fgamma_gas Polytropic gas constant
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpbdot Time derivative of the internal bubble pressure
-        FUNCTION f_Hdot( fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fgamma_gas, fR, fV, fR0, fpbdot )
+        FUNCTION f_Hdot( fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot )
 
             REAL(KIND(0d0)), INTENT(IN) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
-            REAL(KIND(0d0)), INTENT(IN) :: fgamma_gas, fR, fV, fR0, fpbdot
+            REAL(KIND(0d0)), INTENT(IN) :: fR, fV, fR0, fpbdot
             
             REAL(KIND(0d0))             :: tmp1, tmp2
             REAL(KIND(0d0))             :: f_Hdot
 
             IF (polytropic) THEN
-                tmp1 = ( fR0/fR )**( 3.d0*fgamma_gas )
-                tmp1 = -3.D0*fgamma_gas*( Ca+2d0/Web/fR0 )*tmp1*fV/fR
+                tmp1 = ( fR0/fR )**( 3.d0*gam )
+                tmp1 = -3.D0*gam*( Ca+2d0/Web/fR0 )*tmp1*fV/fR
             ELSE
                 tmp1 = fpbdot
             END IF
@@ -317,8 +310,8 @@ MODULE m_bubbles
               - ( fCpinf/(1.D0+fBtait)+1.D0 )**( -1.D0/fntait )*fCpinf_dot
 
             ! Hdot = (Cpbw/(1+B) + 1)^(-1/n_tait)*(-3 gam)*(R0/R)^(3gam) V/R
-            !f_Hdot = ((fCpbw/(1d0+fBtait)+1.d0)**(-1.d0/fntait))*(-3.d0)*fgamma_gas * &
-            !            ( (fR0/fR)**(3.d0*fgamma_gas ))*(fV/fR)
+            !f_Hdot = ((fCpbw/(1d0+fBtait)+1.d0)**(-1.d0/fntait))*(-3.d0)*gam * &
+            !            ( (fR0/fR)**(3.d0*gam ))*(fV/fR)
 
             ! Hdot = Hdot - (Cpinf/(1+B) + 1)^(-1/n_tait) Cpinfdot
             !f_Hdot = f_Hdot - ((fCpinf/(1.d0+fBtait)+1.d0)**(-1.d0/fntait))*fCpinf_dot
@@ -327,25 +320,22 @@ MODULE m_bubbles
 
 
         !>  Function that computes the bubble radial acceleration for Rayleigh-Plesset bubbles
-        !!  @param fgamma_gas Polytropic gas constant
         !!  @param fCp Driving pressure
         !!  @param fRho Current density
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
-        FUNCTION f_rddot_RP( fgamma_gas, fCp, fRho, fR, fV, fR0 )
+        !!  @param fCpbw Boundary wall pressure
+        FUNCTION f_rddot_RP( fCp, fRho, fR, fV, fR0, fCpbw )
 
-            REAL(KIND(0d0)), INTENT(IN) :: fgamma_gas, fCp, fRho, fR, fV, fR0
-            REAL(KIND(0d0))             :: tmp1, tmp2
+            REAL(KIND(0d0)), INTENT(IN) :: fCp, fRho, fR, fV, fR0, fCpbw
             REAL(KIND(0d0))             :: f_rddot_RP
 
             !! rddot = (1/r) (  -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho )
             !! rddot = (1/r) (  -3/2 rdot^2 + (tmp1 - Cp)/rho )
             !! rddot = (1/r) (  tmp2 )
 
-            tmp1 = ( fR0/fR )**( 3.d0*fgamma_gas )
-            tmp2 =  -1.5d0*(fV**2d0) + (tmp1 - fCp)/fRho 
-            f_rddot_RP = tmp2/fR
+            f_rddot_RP = (-1.5d0*(fV**2d0) + (fCpbw - fCp)/fRho)/fR
 
             IF (Re_inv /= dflt_real) f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
             IF (Web /= dflt_real) f_rddot_RP = f_rddot_RP - 2d0/(Web*(fr**2d0))/fRho
@@ -381,36 +371,32 @@ MODULE m_bubbles
         END FUNCTION f_rddot
 
 
-
         !>  Function that computes the bubble wall pressure for Keller--Miksis bubbles
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
-        !!  @param fgamma_gas Polytropic gas constant
         !!  @param fpb Internal bubble pressure
-        FUNCTION f_cpbw_KM( fR0, fR, fV, fgamma_gas, fpb )
+        FUNCTION f_cpbw_KM( fR0, fR, fV, fpb )
 
-            REAL(KIND(0d0)), INTENT(IN) :: fR0, fR, fV, fgamma_gas, fpb
+            REAL(KIND(0d0)), INTENT(IN) :: fR0, fR, fV, fpb
             REAL(KIND(0d0))             :: f_cpbw_KM
             
             IF (polytropic) THEN
-                f_cpbw_KM = Ca*((fR0/fR)**(3.d0*fgamma_gas))
-                IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web) + &
-                    (2.D0/Web/fR0)*((fR0/fR)**(3.d0*fgamma_gas))
+                f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
+                IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM + &
+                    (2.D0/Web/fR0)*((fR0/fR)**(3.d0*gam))
             ELSE
                 f_cpbw_KM = fpb 
-                IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web)
             END IF
 
-            IF (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.D0*Re_inv*fV/fR
+            IF (  Web /=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web)
+            IF (Re_inv/=dflt_real) f_cpbw_KM = f_cpbw_KM - 4.D0*Re_inv*fV/fR
 
         END FUNCTION f_cpbw_KM
 
 
-
         !>  Function that computes the bubble radial acceleration for Keller--Miksis bubbles
         !!  @param fpbdot Time-derivative of internal bubble pressure
-        !!  @param fgamma_gas Polytropic gas constant
         !!  @param fCp Driving pressure
         !!  @param fCpbw Bubble wall pressure
         !!  @param fRho Current density
@@ -418,17 +404,17 @@ MODULE m_bubbles
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fC Current sound speed
-        FUNCTION f_rddot_KM( fpbdot, fgamma_gas, fCp, fCpbw, fRho, fR, fV, fR0, fC )
+        FUNCTION f_rddot_KM( fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC )
 
-            REAL(KIND(0d0)), INTENT(IN) :: fpbdot, fgamma_gas, fCp, fCpbw
+            REAL(KIND(0d0)), INTENT(IN) :: fpbdot, fCp, fCpbw
             REAL(KIND(0d0)), INTENT(IN) :: fRho, fR, fV, fR0, fC
 
             REAL(KIND(0d0))             :: tmp1, tmp2, cdot_star
             REAL(KIND(0d0))             :: f_rddot_KM
 
             IF (polytropic) THEN
-                tmp1 = -3d0*fgamma_gas*Ca*((fR0/fR)**(3d0*fgamma_gas))*fV/fR
-                IF (Web/=dflt_real) tmp1 = tmp1 -3d0*fgamma_gas*(2d0/Web/fR0)*((fR0/fR)**(3d0*fgamma_gas))*fV/fR
+                tmp1 = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
+                IF (Web/=dflt_real) tmp1 = tmp1 -3d0*gam*(2d0/Web/fR0)*((fR0/fR)**(3d0*gam))*fV/fR
             ELSE
                 tmp1 = fpbdot
             END IF
@@ -438,9 +424,9 @@ MODULE m_bubbles
             IF (Re_inv/=dflt_real) cdot_star = cdot_star + 4d0*Re_inv*fV*fV/(fR**2d0)
 
             tmp1 = fV/fC
-            tmp2 =  1.5D0*fV**2d0*( tmp1/3d0-1d0 ) +                      &
-                    (fCpbw - fCp)/fRho * (1d0 + tmp1) +      &
-                    cdot_star * fR/fRho/fC
+            tmp2 = 1.5D0*fV**2d0*( tmp1/3d0-1d0 ) +        &
+                   (fCpbw - fCp)/fRho * (1d0 + tmp1) +     &
+                   cdot_star * fR/fRho/fC
                  
             IF (Re_inv==dflt_real) THEN
                 f_rddot_KM = tmp2/( fR*(1d0-tmp1) ) 
@@ -471,7 +457,6 @@ MODULE m_bubbles
             rho_mw = pv/( chi_vw*R_v*Tw )
 
         END SUBROUTINE s_bwproperty
-
 
 
         !>  Function that computes the vapour flux 

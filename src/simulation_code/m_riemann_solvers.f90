@@ -57,6 +57,8 @@ MODULE m_riemann_solvers
     USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
     USE m_variables_conversion !< State variables type conversion procedures
+
+    USE m_bubbles              !< To get the bubble wall pressure function
     ! ==========================================================================
     
     IMPLICIT NONE
@@ -2630,19 +2632,11 @@ MODULE m_riemann_solvers
             
             INTEGER :: i,q !< Generic loop iterator
 
-            REAL(KIND(0d0)) :: gamma_gas
-
             !ensemble-averaged bubble variables
             REAL(KIND(0d0)) :: PbwR3Lbar, Pbwr3Rbar
             REAL(KIND(0d0)) :: R3Lbar, R3Rbar
             REAL(KIND(0d0)) :: R3V2Lbar, R3V2Rbar
 
-            IF (bubbles .AND. num_fluids == 1) THEN
-                gamma_gas = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
-            ELSE IF (bubbles .AND. num_fluids > 1) THEN
-                gamma_gas = 1.d0/fluid_pp(num_fluids  )%gamma + 1.d0
-            END IF
-            
             ! Left and Right Riemann Problem States ============================
             DO i = 1, cont_idx%end
                alpha_rho_L(i) = qL_prim_rs_vf(i)%sf( j ,k,l)
@@ -2701,29 +2695,15 @@ MODULE m_riemann_solvers
                 CALL s_comp_n_from_prim(alpha_L(num_fluids),R0_L,nbub_L)
                 CALL s_comp_n_from_prim(alpha_R(num_fluids),R0_R,nbub_R)
                 
-                !pbw = p_g0*(R0/R)^(3\gamma_gas)
                 DO i = 1,nb
-                    !pbw_L(i) = (R0(i)/R0_L(i))**(3d0*gamma_gas)
-                    !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
                     IF ( .NOT. qbmm ) THEN
                         IF (polytropic) THEN
-                            pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0
-                            pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0
+                            pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),0d0)
+                            pbw_R(i) = f_cpbw_KM(R0(i),R0_R(i),V0_R(i),0d0)
                         ELSE
-                            pbw_L(i) = P0_L(i)
-                            pbw_R(i) = P0_R(i)
+                            pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),P0_L(i))
+                            pbw_R(i) = f_cpbw_KM(R0(i),R0_R(i),V0_R(i),P0_R(i))
                         END IF
-                        IF (Re_inv /= dflt_real) THEN
-                            pbw_L(i) = pbw_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i)
-                            pbw_R(i) = pbw_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i)
-                        END IF
-                        IF (Web /= dflt_real) THEN
-                            pbw_L(i) = pbw_L(i) - 2.d0/(Web*R0_L(i))
-                            pbw_R(i) = pbw_R(i) - 2.d0/(Web*R0_R(i))
-                        END IF
-
-                        ! pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),gamma_gas,P0_L(i))
-                        ! pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),gamma_gas,P0_L(i))
                     END IF
                 END DO
 
@@ -2746,6 +2726,7 @@ MODULE m_riemann_solvers
                     CALL s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
                     CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
                 END IF 
+
                 !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} ) 
                 IF (alpha_L(num_fluids) < small_alf .OR. R3Lbar < small_alf) THEN
                     ptilde_L = alpha_L(num_fluids)*pres_L
