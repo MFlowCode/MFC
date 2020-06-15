@@ -162,6 +162,45 @@ MODULE m_qbmm
         END SUBROUTINE s_initialize_qbmm_module
 
 
+        SUBROUTINE s_coeff( pres,rho,c,coeffs )
+
+            REAL(KIND(0.D0)), INTENT(IN) :: pres, rho, c
+            REAL(KIND(0.D0)), DIMENSION(nterms,0:2,0:2), INTENT(OUT) :: coeffs
+            INTEGER :: i1,i2
+
+            coeffs = 0d0
+
+            DO i1 = 0,2; DO i2 = 0,2
+                IF ((i1+i2)<=2) THEN
+                    IF (bubble_model==3) THEN
+                        ! RPE
+                        coeffs(1,i1,i2) = -1d0*i2*pres/rho
+                        coeffs(2,i1,i2) = -3d0*i2/2d0
+                        coeffs(3,i1,i2) = i2/rho
+                        coeffs(4,i1,i2) = i1
+                        IF (Re_inv/=dflt_real) coeffs(5,i1,i2) = 4d0*i2*Re_inv/rho
+                        IF (  Web /=dflt_real) coeffs(6,i1,i2) = 2*i2/Web/rho
+                    ELSE IF (bubble_model==2) THEN
+                        ! KM with approximation of 1/(1-V/C) = 1+V/C
+                        coeffs(1,i1,i2)  = -3d0*i2/2d0
+                        coeffs(2,i1,i2)  = -i2/c
+                        coeffs(3,i1,i2)  = i2/(2d0*c*c)
+                        coeffs(4,i1,i2)  = -i2*pres/rho
+                        coeffs(5,i1,i2)  = -2d0*i2*pres/(c*rho)
+                        coeffs(6,i1,i2)  = -i2*pres/(c*c*rho)
+                        coeffs(7,i1,i2)  = i2/rho
+                        coeffs(8,i1,i2)  = 2d0*i2/(c*rho)
+                        coeffs(9,i1,i2)  = i2/(c*c*rho)
+                        coeffs(10,i1,i2) = -3d0*i2*gam/(c*rho)
+                        coeffs(11,i1,i2) = -3d0*i2*gam/(c*c*rho)
+                        coeffs(12,i1,i2) = i1
+                    END IF
+                END IF
+            END DO; END DO
+
+        END SUBROUTINE s_coeff
+
+
         SUBROUTINE s_mom_inv( q_prim_vf, momsp, moms3d, is1, is2, is3 ) 
             
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
@@ -172,7 +211,7 @@ MODULE m_qbmm
             REAL(KIND(0d0)), DIMENSION(nmom) :: moms
             REAL(KIND(0d0)), DIMENSION(nb) :: Rvec
             REAL(KIND(0d0)), DIMENSION(nb,nnode) :: wght, abscX, abscY
-            REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2) :: mom3d_terms
+            REAL(KIND(0d0)), DIMENSION(nterms,0:2,0:2) :: mom3d_terms, coeff
             REAL(KIND(0d0)) :: pres, rho, nbub, c, alf
             REAL(KIND(0d0)) :: n_tait, B_tait
 
@@ -192,11 +231,12 @@ MODULE m_qbmm
                     c =  DSQRT(n_tait*(pres+B_tait)/(rho*(1.d0-alf)))
                 END IF
 
+                CALL s_coeff(pres,rho,c,coeff)
+
                 ! SHB: Manually adjusted pressure here for no-coupling case
                 ! pres = 1d0/0.3d0
 
                 IF (alf > small_alf) THEN
-
                     DO q = 1,nb
                         Rvec(q) = q_prim_vf(bub_idx%rs(q))%sf(id1,id2,id3)
                     END DO
@@ -218,19 +258,11 @@ MODULE m_qbmm
 
                         CALL s_chyqmom(moms,wght(q,:),abscX(q,:),abscY(q,:))
 
-                        ! IF (id1==0) THEN
-                        !     PRINT*, 'wght', wght(q,:)
-                        !     PRINT*, 'abscX', abscX(q,:)
-                        !     PRINT*, 'abscY', abscY(q,:)
-                        !     call s_mpi_abort()
-                        ! END IF
-
                         DO j = 1,nterms
                             DO i1 = 0,2; DO i2 = 0,2
                                 IF ( (i1+i2)<=2 ) THEN
-                                    mom3d_terms(j,i1,i2) = f_coeff(j,i1,i2,pres,rho,c)    & 
-                                    * (R0(q)**momrhs(i1,i2,q,j,3))                  &
-                                    * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
+                                    mom3d_terms(j,i1,i2) = coeff(j,i1,i2)*(R0(q)**momrhs(i1,i2,q,j,3))  &
+                                       * f_quad2D(abscX(q,:),abscY(q,:),wght(q,:),momrhs(i1,i2,q,j,:))
                                 END IF
                             END DO; END DO
                         END DO
@@ -238,13 +270,13 @@ MODULE m_qbmm
                         DO i1 = 0,2; DO i2 = 0,2
                             IF ( (i1+i2)<=2 ) THEN
                                 moms3d(i1,i2,q)%sf(id1,id2,id3) = nbub*SUM( mom3d_terms(:,i1,i2) )
-                                IF (moms3d(i1,i2,q)%sf(id1,id2,id3) .NE. moms3d(i1,i2,q)%sf(id1,id2,id3)) THEN
-                                    PRINT*, 'nan in mom3d', i1,i2,id1
-                                    PRINT*, 'nbu: ', nbub
-                                    PRINT*, 'alf: ', alf
-                                    PRINT*, 'moms: ', moms(:)
-                                    CALL s_mpi_abort()
-                                END IF
+                                ! IF (moms3d(i1,i2,q)%sf(id1,id2,id3) .NE. moms3d(i1,i2,q)%sf(id1,id2,id3)) THEN
+                                !     PRINT*, 'nan in mom3d', i1,i2,id1
+                                !     PRINT*, 'nbu: ', nbub
+                                !     PRINT*, 'alf: ', alf
+                                !     PRINT*, 'moms: ', moms(:)
+                                !     CALL s_mpi_abort()
+                                ! END IF
                             END IF
                         END DO; END DO
                     END DO
@@ -254,34 +286,23 @@ MODULE m_qbmm
                     momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
                     momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
 
-                    DO i1 = 1,nterms
-                        IF (momsp(i1)%sf(id1,id2,id3) .NE. momsp(i1)%sf(id1,id2,id3)) THEN
-                            PRINT*, 'nan in momsp', i1,id1
-                            PRINT*, 'moms: ', moms(:)
-                            call s_mpi_abort()
-                        END IF
-                    END DO
-
+                    ! DO i1 = 1,nterms
+                    !     IF (momsp(i1)%sf(id1,id2,id3)/=momsp(i1)%sf(id1,id2,id3)) THEN
+                    !         PRINT*, 'nan in momsp', i1,id1
+                    !         PRINT*, 'moms: ', moms(:)
+                    !         CALL s_mpi_abort()
+                    !     END IF
+                    ! END DO
                 ELSE
-
                     DO q = 1,nb
-                        IF(id1==0) THEN
-                            PRINT*, 'alf: ', alf
-                            DO s = 1,nmom
-                                PRINT*, 'mom: ', q_prim_vf(bub_idx%moms(q,s))%sf(id1,id2,id3)
-                            END DO
-                        END IF
-
                         DO i1 = 0,2; DO i2 = 0,2
                             moms3d(i1,i2,q)%sf(id1,id2,id3) = 0d0
                         END DO; END DO
                     END DO
-
                     momsp(1)%sf(id1,id2,id3) = 0d0 
                     momsp(2)%sf(id1,id2,id3) = 0d0 
                     momsp(3)%sf(id1,id2,id3) = 0d0 
                     momsp(4)%sf(id1,id2,id3) = 0d0 
-
                 END IF
 
             END DO; END DO; END DO
@@ -368,67 +389,6 @@ MODULE m_qbmm
             fup(2) = bu + DSQRT(c2) 
 
         END SUBROUTINE s_hyqmom
-
-
-        FUNCTION f_coeff( term,i1,i2,pres,rho,c )
-            INTEGER, INTENT(IN) :: term,i1,i2
-            REAL(KIND(0.D0)), INTENT(IN) :: pres, rho, c
-            REAL(KIND(0.D0)) :: f_coeff
-
-            IF (bubble_model==3) THEN
-                ! RPE with potential for Re and Web
-                IF (term == 1) THEN
-                    f_coeff = -1d0*i2*pres/rho
-                ELSEIF (term == 2) THEN
-                    f_coeff = -3d0*i2/2d0
-                ELSEIF (term == 3) THEN
-                    f_coeff = i2/rho
-                ELSEIF (term == 4) THEN
-                    f_coeff = i1
-                ELSEIF (term == 5) THEN
-                    IF (Re_inv .NE. dflt_real) THEN
-                        f_coeff = 4d0*i2*Re_inv/rho
-                    ELSE
-                        f_coeff = 0d0
-                    END IF
-                ELSEIF (term == 6) THEN
-                    IF (Web .NE. dflt_real) THEN
-                        f_coeff = 2*i2/Web/rho
-                    ELSE
-                        f_coeff = 0d0
-                    END IF
-                END IF
-            ELSE IF (bubble_model==2) THEN
-                ! KM with approximation of 1/(1-V/C) = 1+V/C
-                IF (term == 1) THEN
-                    f_coeff = -3d0*i2/2d0
-                ELSE IF (term == 2) THEN
-                    f_coeff = -i2/c
-                ELSE IF (term == 3) THEN
-                    f_coeff = i2/(2d0*c*c)
-                ELSE IF (term == 4) THEN
-                    f_coeff = -i2*pres/rho
-                ELSE IF (term == 5) THEN
-                    f_coeff = -2d0*i2*pres/(c*rho)
-                ELSE IF (term == 6) THEN
-                    f_coeff = -i2*pres/(c*c*rho)
-                ELSE IF (term == 7) THEN
-                    f_coeff = i2/rho
-                ELSE IF (term == 8) THEN
-                    f_coeff = 2d0*i2/(c*rho)
-                ELSE IF (term == 9) THEN
-                    f_coeff = i2/(c*c*rho)
-                ELSE IF (term == 10) THEN
-                    f_coeff = -3d0*i2*gam/(c*rho)
-                ELSE IF (term == 11) THEN
-                    f_coeff = -3d0*i2*gam/(c*c*rho)
-                ELSE IF (term == 12) THEN
-                    f_coeff = i1
-                END IF
-            END IF
-
-        END FUNCTION f_coeff
-
 
         FUNCTION f_quad( abscX,abscY,wght,q,r,s )
             REAL(KIND(0.D0)), DIMENSION(nb,nnode), INTENT(IN) :: abscX, abscY, wght
