@@ -113,7 +113,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 1,                      \
+                    'ppn'                          : 4,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -229,14 +229,14 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
-                    'polydisperse'          : 'T',                  \
-                    'R0_type'               : 2,                    \
-                    # 'polydisperse'          : 'F',                  \
-                    'poly_sigma'            : 0.3,                  \
+                    # 'polydisperse'          : 'T',                  \
+                    # 'R0_type'               : 2,                    \
+                    'polydisperse'          : 'F',                  \
+                    # 'poly_sigma'            : 0.3,                  \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
-                    'nb'                    : 3,                    \
-                    # 'nb'                    : 1,                    \
+                    # 'nb'                    : 3,                    \
+                    'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     # 'Web'                   : We,                   \
                     # 'Re_inv'                : Re_inv,               \
