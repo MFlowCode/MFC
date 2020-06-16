@@ -38,8 +38,8 @@ pa      = 0.1 * 1.E+06 / 101325.
 #Characteristic velocity
 uu = math.sqrt( p0/rho0 )
 #Cavitation number
-Ca = (p0 - pv)/(rho0*(uu**2.))
-# Ca = 1.
+# Ca = (p0 - pv)/(rho0*(uu**2.))
+Ca = 1.
 #Weber number
 # We = rho0*(uu**2.)*R0ref/ss
 We = p0*R0ref/ss
@@ -57,7 +57,7 @@ nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
-Nx      = 500
+Nx      = 400
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)
@@ -129,9 +129,9 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : 0.002,                     \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 10000,                        \
+                    't_step_stop'                  : 8000,                        \
                     # 't_step_stop'                  : 4,                        \
-                    't_step_save'                  : 1000,   \
+                    't_step_save'                  : 8000,   \
                     # 't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
@@ -229,13 +229,13 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
-                    # 'polydisperse'          : 'T',                  \
-                    'polydisperse'          : 'F',                  \
-                    # 'poly_sigma'            : 0.1,                \
+                    'polydisperse'          : 'T',                  \
+                    # 'polydisperse'          : 'F',                  \
+                    'poly_sigma'            : 0.3,                \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
-                    # 'nb'                    : 3,                  \
-                    'nb'                    : 1,                    \
+                    'nb'                    : 3,                  \
+                    # 'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     # 'Web'                   : We,                   \
                     # 'Re_inv'                : Re_inv,               \
@@ -254,7 +254,7 @@ case_dict =                                                                     
                     'Mono(1)%npulse'            : 1, \
                     'Mono(1)%dir'               : 1., \
                     'Mono(1)%pulse'             : 1, \
-                    'Mono(1)%mag'               : 10*pa, \
+                    'Mono(1)%mag'               : pa, \
                     'Mono(1)%length'            : (1./(300000.))*cact/x0, \
                     # ==========================================================
     }

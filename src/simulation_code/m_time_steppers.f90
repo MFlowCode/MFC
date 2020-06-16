@@ -259,16 +259,11 @@ MODULE m_time_steppers
             
             IF(t_step == t_step_stop) RETURN
            
-            ! print*, 'alpha = ', q_cons_ts(1)%vf(alf_idx)%sf(0,0,0) 
             DO i = 1, sys_size
-                ! print*, 'cons, rhs: ', i, q_cons_ts(1)%vf(i)%sf(1,0,0), rhs_vf(i)%sf(1,0,0)
                 q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) = &
                                q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
                              + dt*rhs_vf(i)%sf
             END DO
-            ! print*, 'rhs alf = ', rhs_vf(alf_idx)%sf(0,0,0)
-            ! print*, ' post rhs alf = ', q_cons_ts(1)%vf(alf_idx)%sf(0,0,0) 
-
 
 
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
@@ -289,7 +284,6 @@ MODULE m_time_steppers
                 END DO 
             END IF
             ! ==================================================================
-            ! print*, 'end of TS'
            
         END SUBROUTINE s_1st_order_tvd_rk ! ------------------------------------
         

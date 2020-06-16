@@ -1457,8 +1457,6 @@ MODULE m_rhs
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: rhs_vf
             INTEGER, INTENT(IN) :: t_step
 
-           
-
             REAL(KIND(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
             
             REAL(KIND(0d0)), DIMENSION(0:m,0:n,0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm !<
@@ -2082,7 +2080,7 @@ MODULE m_rhs
                         !         CALL s_mpi_abort()
                         !     END IF
                         ! END DO
-                        print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                        ! print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
                     END DO
 
 
@@ -2125,7 +2123,7 @@ MODULE m_rhs
                     print*, 'after bub sources'
                     do j = alf_idx, sys_size
                     ! do j = 1, sys_size
-                        print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
+                        ! print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
                     end do
 
     
