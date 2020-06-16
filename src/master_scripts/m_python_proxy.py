@@ -853,6 +853,7 @@ pre_process_dict =                                                             \
                     'R0ref'                         : None,                     \
                     'qbmm'                          : None,                     \
                     'dist_type'                     : None,                     \
+                    'R0_type'                       : None,                     \
                     'nnode'                         : None,                     \
                     'sigR'                          : None,                     \
                     'sigV'                          : None,                     \
@@ -1239,6 +1240,7 @@ simulation_dict =                                                              \
                     'Monopole'                      : None,                     \
                     'num_mono'                      : None,                     \
                     'qbmm'                          : None,                     \
+                    'R0_type'                       : None,                     \
                     'nnode'                         : None,                     \
                     'Mono(1)%loc(1)'                : None,                     \
                     'Mono(1)%loc(2)'                : None,                     \
