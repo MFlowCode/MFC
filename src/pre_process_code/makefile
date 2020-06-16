@@ -9,7 +9,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-FLFLAGS = -g
+FLFLAGS = -g $(ld_pre_flags)
 FCFLAGS = -g $(f90_flags)
 EXEC = pre_process
 PROGRAM = p_main
@@ -39,7 +39,7 @@ $(PRG_OBJ) : $(MOD_OBJS)
 # Modules depend on each other
 m_data_output.o m_start_up.o : m_compile_specific.o
 m_start_up.o : m_data_output.o
-m_data_output.o m_global_parameters.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_start_up.o m_variables_conversion.o : m_derived_types.o
-m_data_output.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_variables_conversion.o m_start_up.o : m_global_parameters.o
-m_data_output.o m_grid.o m_start_up.o : m_mpi_proxy.o
+m_data_output.o m_global_parameters.o m_eigen.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_start_up.o m_variables_conversion.o : m_derived_types.o
+m_data_output.o m_eigen.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_variables_conversion.o m_start_up.o : m_global_parameters.o
+m_data_output.o m_eigen.o m_grid.o m_start_up.o : m_mpi_proxy.o
 m_data_output.o m_initial_condition.o : m_variables_conversion.o

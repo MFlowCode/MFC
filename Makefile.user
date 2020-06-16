@@ -12,6 +12,10 @@ FC = mpif90
 FFLAGS = -cpp -c -w -freal-4-real-8
 #NOTE: Cray compilers require: -eZ
 
+
+######### LAPACK library location #########
+lapack_lib_dir = $(MFC_DIR)/lib/lapack-3.4.2/
+
 ######### FFTW library and include locations #########
 ######### Set these to the location of FFTW  #########
 

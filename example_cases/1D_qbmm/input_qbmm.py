@@ -129,9 +129,9 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : 0.002,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 10000,                        \
+                    't_step_stop'                  : 8000,                        \
                     # 't_step_stop'                  : 4,                        \
-                    't_step_save'                  : 500,   \
+                    't_step_save'                  : 8000,   \
                     # 't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
@@ -229,19 +229,19 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
-                    # 'polydisperse'          : 'T',                  \
-                    'polydisperse'          : 'F',                  \
-                    # 'poly_sigma'            : 0.1,                \
+                    'polydisperse'          : 'T',                  \
+                    # 'polydisperse'          : 'F',                  \
+                    'poly_sigma'            : 0.3,                \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
-                    # 'nb'                    : 3,                  \
-                    'nb'                    : 1,                    \
+                    'nb'                    : 3,                  \
+                    # 'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     # 'Web'                   : We,                   \
                     # 'Re_inv'                : Re_inv,               \
                     'qbmm'               : 'T',                 \
                     'nnode'              : 4,                   \
-                    'dist_type'          : 1,                   \
+                    'dist_type'          : 2,                   \
                     'sigR'               : 0.1,                 \
                     'sigV'               : 0.1,                 \
                     'rhoRV'              : 0.0,                 \

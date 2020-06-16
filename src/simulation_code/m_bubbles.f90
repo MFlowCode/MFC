@@ -384,7 +384,7 @@ MODULE m_bubbles
             IF (polytropic) THEN
                 f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
                 IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                    (2.D0/Web/fR0)*((fR0/fR)**(3.d0*gam))
+                    (2.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
             ELSE
                 f_cpbw_KM = fpb 
             END IF
@@ -413,20 +413,20 @@ MODULE m_bubbles
             REAL(KIND(0d0))             :: f_rddot_KM
 
             IF (polytropic) THEN
-                tmp1 = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
-                IF (Web/=dflt_real) tmp1 = tmp1 -3d0*gam*(2d0/Web/fR0)*((fR0/fR)**(3d0*gam))*fV/fR
+                cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
+                IF (Web/=dflt_real) cdot_star = cdot_star - &
+                    3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
             ELSE
-                tmp1 = fpbdot
+                cdot_star = fpbdot
             END IF
 
-            cdot_star = tmp1 
             IF ( Web  /=dflt_real) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
-            IF (Re_inv/=dflt_real) cdot_star = cdot_star + 4d0*Re_inv*fV*fV/(fR**2d0)
+            IF (Re_inv/=dflt_real) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
 
             tmp1 = fV/fC
-            tmp2 = 1.5D0*fV**2d0*( tmp1/3d0-1d0 ) +        &
-                   (fCpbw - fCp)/fRho * (1d0 + tmp1) +     &
-                   cdot_star * fR/fRho/fC
+            tmp2 = 1.5D0*(fV**2d0)*( tmp1/2d0-1d0 ) +   &
+                   (1d0 + tmp1)*(fCpbw - fCp)/fRho  +   &
+                   cdot_star * fR/(fRho*fC)
                  
             IF (Re_inv==dflt_real) THEN
                 f_rddot_KM = tmp2/( fR*(1d0-tmp1) ) 
