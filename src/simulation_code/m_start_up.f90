@@ -354,8 +354,10 @@ MODULE m_start_up
                              'num_fluids and mpp_lim. Exiting ...'
                 CALL s_mpi_abort()
             ELSEIF(time_stepper < 1 .OR. time_stepper > 5) THEN
-                PRINT '(A)', 'Unsupported value of time_stepper. Exiting ...'
-                CALL s_mpi_abort()
+                IF (time_stepper /= 23 ) THEN
+                    PRINT '(A)', 'Unsupported value of time_stepper. Exiting ...'
+                    CALL s_mpi_abort()
+                END IF
             ELSEIF(ALL(weno_vars /= (/1,2/))) THEN
                 PRINT '(A)', 'Unsupported value of weno_vars. Exiting ...'
                 CALL s_mpi_abort()

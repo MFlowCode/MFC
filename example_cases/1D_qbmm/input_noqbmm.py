@@ -113,7 +113,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 1,                      \
+                    'ppn'                          : 3,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -131,8 +131,8 @@ case_dict =                                                                     
                     't_step_start'                 : 0,                         \
                     't_step_stop'                  : 8000,                        \
                     # 't_step_stop'                  : 4,                        \
-                    't_step_save'                  : 8000,   \
-                    # 't_step_save'                  : 1,   \
+                    # 't_step_save'                  : 8000,   \
+                    't_step_save'                  : 100,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -143,7 +143,7 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 3,                        \
+		    'time_stepper'                 : 23,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
@@ -229,13 +229,13 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
-                    'polydisperse'          : 'T',                  \
-                    # 'polydisperse'          : 'F',                  \
-                    'poly_sigma'            : 0.3,                \
+                    # 'polydisperse'          : 'T',                  \
+                    'polydisperse'          : 'F',                  \
+                    # 'poly_sigma'            : 0.3,                \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
-                    'nb'                    : 3,                  \
-                    # 'nb'                    : 1,                    \
+                    # 'nb'                    : 3,                  \
+                    'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     # 'Web'                   : We,                   \
                     # 'Re_inv'                : Re_inv,               \
@@ -254,7 +254,7 @@ case_dict =                                                                     
                     'Mono(1)%npulse'            : 1, \
                     'Mono(1)%dir'               : 1., \
                     'Mono(1)%pulse'             : 1, \
-                    'Mono(1)%mag'               : pa, \
+                    'Mono(1)%mag'               : 10.*pa, \
                     'Mono(1)%length'            : (1./(300000.))*cact/x0, \
                     # ==========================================================
     }

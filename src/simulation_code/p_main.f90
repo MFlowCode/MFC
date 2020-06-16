@@ -172,6 +172,8 @@ PROGRAM p_main
             CALL s_3rd_order_tvd_rk(t_step)
         ELSEIF(time_stepper == 4) THEN
             CALL s_4th_order_rk(t_step)
+        ELSEIF(time_stepper == 23) THEN
+            CALL s_23_order_tvd_rk(t_step)
         ELSE
             CALL s_5th_order_rk(t_step)
         END IF

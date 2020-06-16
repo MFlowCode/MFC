@@ -2154,10 +2154,8 @@ MODULE m_data_output
                                     vel(1), &
                                     pres, &
                                     alf, &
-                                    M00, &
                                     R(1), &
                                     Rdot(1), &
-                                    nbub, &
                                     nR(1), &
                                     nRdot(1)
                             ELSE
@@ -2167,10 +2165,10 @@ MODULE m_data_output
                                     vel(1), &
                                     pres, &
                                     alf, &
-                                    nR(1), &
-                                    nRdot(1), &
                                     R(1), &
-                                    Rdot(1)
+                                    Rdot(1), &
+                                    nR(1), &
+                                    nRdot(1)
                                     ! ptilde, &
                                     ! ptot
                             END IF
