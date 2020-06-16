@@ -17,6 +17,10 @@ else
 ld_sim_flags = 
 endif
 
+ifdef lapack_lib_dir
+ld_sim_flags += -L$(lapack_lib_dir) -llapack -lblas
+endif
+
 # Header flags
 ifdef fftw_include_dir
 hd_flags = -I$(fftw_include_dir)

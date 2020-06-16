@@ -426,6 +426,10 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST( dist_type,1,            &
                         MPI_INTEGER,0, &
                         MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( R0_type,1,            &
+                        MPI_INTEGER,0, &
+                        MPI_COMM_WORLD,ierr)
+
 
 
         END SUBROUTINE s_mpi_bcast_user_inputs ! -------------------------------

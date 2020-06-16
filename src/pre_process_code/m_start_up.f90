@@ -130,7 +130,7 @@ MODULE m_start_up
                                    rhoref, pref, bubbles, R0ref, nb,          &
                                    polytropic, thermal, Ca, Web, Re_inv,      &
                                    polydisperse, poly_sigma, qbmm,      &
-                                   nnode, sigR, sigV, dist_type, rhoRV
+                                   nnode, sigR, sigV, dist_type, rhoRV, R0_type
  
 
             ! Inquiring the status of the pre_process.inp file
@@ -317,6 +317,9 @@ MODULE m_start_up
                 CALL s_mpi_abort()
             ELSE IF (qbmm .and. (dist_type .NE. 1) .and. rhoRV > 0d0) THEN
                 PRINT '(A)', 'rhoRV cannot be used with dist_type \ne 1. Exiting ...'
+                CALL s_mpi_abort()
+            ELSE IF (polydisperse .and. R0_type == dflt_int) THEN
+                PRINT '(A)', 'R0 type must be set if using Polydisperse. Exiting ...'
                 CALL s_mpi_abort()
             END IF
                 

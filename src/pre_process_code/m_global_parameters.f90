@@ -40,7 +40,9 @@ MODULE m_global_parameters
     ! Dependencies =============================================================
     USE mpi                     ! Message passing interface (MPI) module
     
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types         ! Definitions of the derived types
+
+    USE m_eigen                 ! Eigenvalues
     ! ==========================================================================
     
     
@@ -212,6 +214,7 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     REAL(KIND(0d0)) :: poly_sigma
     INTEGER         :: dist_type !1 = binormal, 2=lognormal-normal
+    INTEGER         :: R0_type !1 = simpson, 2 = wheeler
     !> @}
 
     INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: logic_grid
@@ -350,6 +353,7 @@ MODULE m_global_parameters
             sigV    = dflt_real
             rhoRV   = 0d0
             dist_type = dflt_int
+            R0_type   = dflt_int
 
             R_n     = dflt_real
             R_v     = dflt_real
@@ -493,7 +497,11 @@ MODULE m_global_parameters
                         R0(:)       = 1d0
                         V0(:)       = 1d0
                     ELSE IF (nb > 1) THEN
-                        CALL s_simpson(nb)
+                        IF (R0_type == 1) THEN
+                            CALL s_simpson
+                        ELSE IF (R0_type == 2) THEN
+                            CALL s_wheeler
+                        END IF
                         V0(:)       = 1d0
                     ELSE
                         STOP 'Invalid value of nb'
@@ -584,8 +592,12 @@ MODULE m_global_parameters
                         R0(:)       = 1d0
                         V0(:)       = 0d0
                     ELSE IF (nb > 1) THEN
-                        CALL s_simpson(nb)
-                        V0(:)       = 0d0
+                        IF (R0_type == 1) THEN
+                            CALL s_simpson
+                        ELSE IF (R0_type == 2) THEN
+                            CALL s_wheeler
+                        END IF
+                        V0(:)       = 1d0
                     ELSE
                         STOP 'Invalid value of nb'
                     END IF
@@ -875,17 +887,15 @@ MODULE m_global_parameters
         END SUBROUTINE s_quad
 
         !> Computes the Simpson weights for quadrature
-        !! @param Npt is the number of bins that represent the polydisperse bubble population
-        SUBROUTINE s_simpson( Npt )
+        SUBROUTINE s_simpson
 
-            INTEGER, INTENT(IN) :: Npt
             INTEGER :: ir
             REAL(KIND(0.D0)) :: R0mn
             REAL(KIND(0.D0)) :: R0mx
             REAL(KIND(0.D0)) :: dphi
             REAL(KIND(0.D0)) :: tmp
             REAL(KIND(0.D0)) :: sd
-            REAL(KIND(0.D0)), DIMENSION(Npt) :: phi
+            REAL(KIND(0.D0)), DIMENSION(nb) :: phi
 
             ! nondiml. min. & max. initial radii for numerical quadrature
             !sd   = 0.05D0
@@ -905,15 +915,15 @@ MODULE m_global_parameters
             R0mx = 0.2D0*DEXP( 9.5D0 * sd) + 1.D0
             
             ! phi = ln( R0 ) & return R0
-            DO ir = 1,Npt
+            DO ir = 1,nb
                 phi(ir) = DLOG( R0mn ) &
-                    + DBLE( ir-1 )*DLOG( R0mx/R0mn )/DBLE( Npt-1 )
+                    + DBLE( ir-1 )*DLOG( R0mx/R0mn )/DBLE( nb-1 )
                 R0(ir) = DEXP( phi(ir) )
             END DO
             dphi = phi(2) - phi(1)
 
             ! weights for quadrature using Simpson's rule
-            DO ir = 2,Npt-1
+            DO ir = 2,nb-1
                 ! Gaussian
                 tmp = DEXP( -0.5D0*(phi(ir)/sd)**2 )/DSQRT( 2.D0*pi )/sd
                 IF ( MOD(ir,2)==0 ) THEN
@@ -925,28 +935,28 @@ MODULE m_global_parameters
             
             tmp = DEXP( -0.5D0*(phi(1)/sd)**2 )/DSQRT( 2.D0*pi )/sd
             weight(1) = tmp*dphi/3.D0
-            tmp = DEXP( -0.5D0*(phi(Npt)/sd)**2 )/DSQRT( 2.D0*pi )/sd
-            weight(Npt) = tmp*dphi/3.D0
+            tmp = DEXP( -0.5D0*(phi(nb)/sd)**2 )/DSQRT( 2.D0*pi )/sd
+            weight(nb) = tmp*dphi/3.D0
 
         END SUBROUTINE s_simpson
 
 
         SUBROUTINE s_wheeler
             
-            REAL(KIND(0d0)), DIMENSION(2*nb,2*nb) :: sig, Ja
+            REAL(KIND(0d0)), DIMENSION(2*nb,2*nb) :: sig
+            REAL(KIND(0d0)), DIMENSION(nb,nb) :: Ja
             REAL(KIND(0d0)), DIMENSION(2*nb) :: momRo
-            REAL(KIND(0d0)), DIMENSION(nb) :: a, b
+            REAL(KIND(0d0)), DIMENSION(nb) :: evec, eigs, a, b
             REAL(KIND(0d0)) :: muRo
-            INTEGER :: i,j,nn
+            INTEGER :: i,j
 
             muRo = 1d0
 
             a = 0d0; b = 0d0
             sig = 0d0; Ja = 0d0
 
-            ! first get moments
-            DO i = 1,2*nb
-                momRo(i) = DEXP( (i-1d0)*LOG(muRo) + 0.5d0*((i-1d0)*poly_sigma)**2d0 )
+            DO i = 0,2*nb-1
+                momRo(i+1) = DEXP( i*LOG(muRo) + 0.5d0*(i*poly_sigma)**2d0 )
             END DO
 
             DO i = 0,2*nb-1
@@ -970,36 +980,18 @@ MODULE m_global_parameters
                 Ja(i+1,i) = -DSQRT(ABS(b(i+1)))
             END DO
 
-            ! eigensystem stuff here
+            CALL s_eigs(Ja,eigs,evec,nb)
+
+            weight(1:nb) = (evec(nb:1:-1)**2d0)*momRo(1)
+            R0(1:nb) = eigs(nb:1:-1)
+
+            IF (MINVAL(R0) < 0d0) THEN
+                PRINT*, 'Minimum R0 is negative. nb might be too large for Wheeler'
+                PRINT*, 'Aborting...'
+                STOP
+            END IF
 
         END SUBROUTINE s_wheeler
-
-
-! wheeler[mom_] := Module[{mm = mom, nn, sig, a, b, Ja, w, xi, eval, evec, esys}, 
-    ! nn=Length[mm]/2;
-    ! sig = Table[0., {i, 2 nn}, {j, 2 nn}]; 
-
-    ! Do[sig[[2, i + 1]] = mm[[i + 1]], {i, 0, 2 nn - 1}]; 
-    ! a = Table[0., {i, nn}]; b = a; a[[1]] = mm[[2]]/mm[[1]]; 
-    ! b[[1]] = 0; 
-    ! Do[
-    !     Do[
-    !         sig[[i + 2, j + 1]] = sig[[i + 1, j + 2]] - a[[i]] sig[[i + 1, j + 1]] - b[[i]] sig[[i, j + 1]];
-    !         a[[i + 1]] = -(sig[[i + 1, i + 1]]/sig[[i + 1, i]]) + sig[[i + 2, i + 2]]/sig[[i + 2, i + 1]]; 
-    !         b[[i + 1]] = sig[[i + 2, i + 1]]/sig[[i + 1, i]];
-    !     ,{j,i, 2 nn - i - 1}];
-    ! ,{i,nn - 1}];
-    ! Ja = DiagonalMatrix[a]; 
-    ! Do[
-    !     Ja[[i, i + 1]] = -Sqrt[Abs[b[[i + 1]]]]; 
-    !     Ja[[i + 1, i]] = -Sqrt[Abs[b[[i + 1]]]];
-    ! ,{i,nn-1}]; 
-    ! esys = Eigensystem[Ja]; 
-    ! eval = esys[[1]]; 
-    ! evec = esys[[2]]; 
-    ! w = Table[evec[[i,1]]^2 mm[[1]],{i,nn}]; 
-    ! Return[{eval, w}, Module];
-! ];
 
 
 END MODULE m_global_parameters

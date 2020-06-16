@@ -131,7 +131,8 @@ MODULE m_start_up
                                    monopole, mono, num_mono,                 &
                                    polytropic, thermal,                      &
                                    integral, integral_wrt, num_integrals,    &
-                                   polydisperse, poly_sigma, qbmm, nnode
+                                   polydisperse, poly_sigma, qbmm, nnode,    &
+                                   R0_type
             
             
             ! Checking that an input file has been provided by the user. If it
