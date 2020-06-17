@@ -1844,10 +1844,14 @@ MODULE m_data_output
             LOGICAL :: trigger !< For integral quantities
 
             ! Non-dimensional time calculation
-            IF (t_step_old /= dflt_int) THEN
-                nondim_time = REAL(t_step + t_step_old,KIND(0d0))*dt
+            IF (time_stepper /= 23) THEN
+                IF (t_step_old /= dflt_int) THEN
+                    nondim_time = REAL(t_step + t_step_old,KIND(0d0))*dt
+                ELSE
+                    nondim_time = REAL(t_step,KIND(0d0))*dt !*1.d-5/10.0761131451d0
+                END IF
             ELSE
-                nondim_time = REAL(t_step,KIND(0d0))*dt !*1.d-5/10.0761131451d0
+                nondim_time = mytime
             END IF
 
             DO i = 1, num_probes
@@ -1865,6 +1869,7 @@ MODULE m_data_output
                 nRdot = 0d0; Rdot = 0d0
                 nbub = 0d0
                 M00 = 0d0
+                alf = 0d0
 
                 ! Find probe location in terms of indices on a
                 ! specific processor
@@ -1922,8 +1927,8 @@ MODULE m_data_output
                                 nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
                                 nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
                             END DO
-                            CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
-                            print*, 'In probe, nbub: ', nbub
+                            CALL s_comp_n_from_cons( alf, nR, nbub)
+                            IF (DEBUG) print*, 'In probe, nbub: ', nbub
 
                             IF (qbmm) M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
                             R(:) = nR(:)/nbub                        
@@ -2009,12 +2014,12 @@ MODULE m_data_output
                             end IF
 
                             IF (bubbles) THEN
-                                alf = q_cons_vf(alf_idx)%sf(j-2,k-2,0)
+                                alf = q_cons_vf(alf_idx)%sf(j-2,k-2,l)
                                 DO s = 1,nb
                                     nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k-2,l)
                                     nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k-2,l)
                                 END DO
-                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k-2,l), nR, nbub)
+                                CALL s_comp_n_from_cons( alf, nR, nbub)
                                 
                                 R(:) = nR(:)/nbub                        
                                 Rdot(:) = nRdot(:)/nbub                        

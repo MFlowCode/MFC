@@ -155,13 +155,22 @@ PROGRAM p_main
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
+    IF (t_step == 0) THEN
+        mytime = 0d0
+    ELSE
+        mytime = t_step*dt
+    END IF
+    finaltime = t_step_stop*dt
+    dt0 = dt
 
     ! Time-stepping Loop =======================================================
     DO
-        PRINT*, '------------------------------------------------------------'
-        IF (proc_rank==0 .AND. MOD(t_step,t_step_save)==0 ) THEN
+        IF (proc_rank==0) THEN
+            PRINT*, '------------------------------------------------------'
+        ! IF (proc_rank==0 .AND. MOD(t_step,t_step_save)==0 ) THEN
             PRINT*, 'Time step ', t_step, ' of ', t_step_stop
         END IF
+        mytime = mytime + dt
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         IF(time_stepper == 1) THEN
@@ -182,10 +191,18 @@ PROGRAM p_main
         ! print*, 'computed derived vars'
 
         ! Time-stepping loop controls
-        IF(t_step == t_step_stop) THEN
-            EXIT 
+        IF (time_stepper /= 23) THEN
+            IF(t_step == t_step_stop) THEN
+                EXIT 
+            ELSE
+                t_step = t_step + 1
+            END IF
         ELSE
-            t_step = t_step + 1
+            IF(mytime >= finaltime) THEN
+                EXIT 
+            ELSE
+                t_step = t_step + 1
+            END IF
         END IF
        
         ! print*, 'Write data files'

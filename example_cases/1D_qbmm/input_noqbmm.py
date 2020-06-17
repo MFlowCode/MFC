@@ -113,10 +113,11 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 3,                      \
+                    'ppn'                          : 4,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
+                    'debug'                        : 'F',                       \
                     # ==========================================================
                                                                                 \
                     # Computational Domain Parameters ==========================
@@ -127,12 +128,13 @@ case_dict =                                                                     
                     'm'                            : Nx,                        \
                     'n'                            : 0,                         \
                     'p'                            : 0,                         \
-                    'dt'                           : 0.002,                     \
+                    'dt'                           : 0.002/4,                     \
+                    # 't_tol'                        : 0.001,                     \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 8000,                        \
+                    't_step_stop'                  : 8000*4,                        \
                     # 't_step_stop'                  : 4,                        \
                     # 't_step_save'                  : 8000,   \
-                    't_step_save'                  : 100,   \
+                    't_step_save'                  : 8000,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -143,7 +145,7 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 23,                        \
+		    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
@@ -254,7 +256,7 @@ case_dict =                                                                     
                     'Mono(1)%npulse'            : 1, \
                     'Mono(1)%dir'               : 1., \
                     'Mono(1)%pulse'             : 1, \
-                    'Mono(1)%mag'               : 10.*pa, \
+                    'Mono(1)%mag'               : 1.*pa, \
                     'Mono(1)%length'            : (1./(300000.))*cact/x0, \
                     # ==========================================================
     }

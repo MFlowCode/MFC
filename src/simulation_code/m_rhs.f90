@@ -1481,7 +1481,7 @@ MODULE m_rhs
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ==================================================================
           
-            print*, 'start rhs'
+            IF (DEBUG) PRINT*, 'start rhs'
             
             ! Association/Population of Working Variables ======================
             DO i = 1, sys_size
@@ -1496,7 +1496,7 @@ MODULE m_rhs
             
             CALL s_populate_conservative_variables_buffers()
            
-            print*, 'pop cons vars'
+            IF (DEBUG) PRINT*, 'pop cons vars'
             IF((model_eqns == 2 .OR. model_eqns == 3) .AND. (adv_alphan .NEQV. .TRUE.)) THEN
                 q_cons_qp(0,0,0)%vf(sys_size)%sf = 1d0
                 
@@ -1586,13 +1586,13 @@ MODULE m_rhs
                 END DO
             END DO
 
-            print*, 'conv to prim vars'
+            IF (DEBUG) PRINT*, 'conv to prim vars'
 
             iv%beg = mom_idx%beg; iv%end = E_idx 
            
             CALL s_average_cell_interior_values(q_prim_qp)
           
-            print*, 'got cell interior values'
+            IF (DEBUG) print*, 'got cell interior values'
             IF(t_step == t_step_stop) RETURN
             ! ==================================================================
             
@@ -1601,7 +1601,7 @@ MODULE m_rhs
 
             IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
 
-            print*, 'Before qbmm'
+            IF (DEBUG) print*, 'Before qbmm'
             ! compute required moments
             IF (qbmm) CALL s_mom_inv(q_prim_vf,mom_sp,mom_3d,ix,iy,iz)
             
@@ -1892,7 +1892,7 @@ MODULE m_rhs
                     END DO
                 ELSE
                     ! Computing Riemann Solver Flux and Source Flux =================
-                    print*, 'about to call s_riemann_solver'
+                    IF (DEBUG) print*, 'about to call s_riemann_solver'
                     DO k = ipsi%beg, ipsi%end, 2
                         DO j = ichi%beg, ichi%end, 2
                             CALL s_riemann_solver(     qR_prim_ndqp(i,j,k)%vf, &
@@ -2072,7 +2072,7 @@ MODULE m_rhs
                         END DO
                     END IF
 
-                    print*, 'pre-QBMM rhs'
+                    IF (DEBUG) print*, 'pre-QBMM rhs'
                     DO j = 1, sys_size
                         ! DO k = 0,m             
                         !     IF ( ABS(rhs_vf(j)%sf(k,0,0)) > 1.d-12 ) THEN
@@ -2120,7 +2120,7 @@ MODULE m_rhs
                    END IF
 
 
-                    print*, 'after bub sources'
+                    IF (DEBUG) print*, 'after bub sources'
                     do j = alf_idx, sys_size
                     ! do j = 1, sys_size
                         ! print*, 'rhs = ', rhs_vf(j)%sf(1,0,0)
@@ -2370,7 +2370,7 @@ MODULE m_rhs
                
                ! RHS Contribution in y-direction ===============================
                 ELSEIF(i == 2) THEN
-                        print*, 'get dir 2'
+                    IF (DEBUG) print*, 'get dir 2'
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
                     
@@ -2772,7 +2772,7 @@ MODULE m_rhs
                
                ! RHS Contribution in z-direction ===============================
                 ELSE
-                    print*, 'dir = 3'
+                    IF (DEBUG) print*, 'dir = 3'
                     ! Compute upwind slope and flux limiter function value if TVD
                     ! flux limiter is chosen
                     IF (tvd_rhs_flux) CALL s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf,i)

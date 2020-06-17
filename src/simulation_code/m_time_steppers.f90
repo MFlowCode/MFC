@@ -245,12 +245,12 @@ MODULE m_time_steppers
             END IF
 
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
-            ! print*, 'got rhs'
+            IF (DEBUG) PRINT*, 'got rhs'
 
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
             END IF
-            ! print*, 'wrote runtime info'
+            IF (DEBUG) print*, 'wrote runtime info'
 
             IF (ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) THEN
                 CALL s_time_step_cycling(t_step)
@@ -584,9 +584,12 @@ MODULE m_time_steppers
                 tmp = relerr
                 CALL s_mpi_allreduce_max(tmp,relerr)
             END IF
-            ! PRINT*, 'relerr collect: ', relerr
-            ! CALL s_mpi_abort()
 
+            dt = dt*Min( Max( Sqrt(t_tol/(2d0*relerr)) , 0.3d0 ), 2d0 )
+
+            IF (proc_rank==0) PRINT*, 'RELERR:', relerr
+            IF (proc_rank==0) PRINT*, 'dt/dt0:', dt/dt0
+            IF (proc_rank==0) PRINT*, '---t/T:', mytime/finaltime
 
             ! ==================================================================
       

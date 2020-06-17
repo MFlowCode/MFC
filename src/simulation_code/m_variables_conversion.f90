@@ -657,7 +657,9 @@ MODULE m_variables_conversion
                             
                             ! PRINT*, 'alf1: ', qK_cons_vf(alf_idx)%sf(j,k,l)
                             CALL s_comp_n_from_cons( qK_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)                            
-                            IF (j==0 .and. k==0 .and. l==0) PRINT*, 'nbub1: ', nbub
+                            IF (DEBUG) THEN
+                                IF (j==0 .and. k==0 .and. l==0) PRINT*, 'nbub1: ', nbub
+                            END IF
                            
                             IF ( nbub < 0.d0) STOP 'nbub is negative'
                             DO i = bub_idx%beg, bub_idx%end
