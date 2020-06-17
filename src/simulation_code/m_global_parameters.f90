@@ -64,6 +64,7 @@ MODULE m_global_parameters
     INTEGER        , PARAMETER :: fourier_rings = 5     !< Fourier filter ring limit
     CHARACTER(LEN = path_len)  :: case_dir              !< Case folder location
     LOGICAL                    :: run_time_info         !< Run-time output flag
+    LOGICAL                    :: debug                 !< Debug mode print statements
     INTEGER                    :: t_step_old            !< Existing IC/grid folder
     REAL(KIND(0d0)), PARAMETER :: small_alf     = 1d-7 !< Small alf tolerance
     ! ==========================================================================
@@ -333,6 +334,10 @@ MODULE m_global_parameters
     INTEGER         :: num_mono !< Number of monopoles
     !> @}
 
+    REAL(KIND(0d0)) :: mytime       !< Current simulation time
+    REAL(KIND(0d0)) :: finaltime    !< Final simulation time
+    REAL(KIND(0d0)) :: t_tol        !< Tolerance
+    REAL(KIND(0d0)) :: dt0          !< Initial time step size 
 
     ! ======================================================================
 
@@ -356,6 +361,9 @@ MODULE m_global_parameters
             case_dir      = dflt_char
             run_time_info = .FALSE.
             t_step_old = dflt_int
+
+
+            debug  = .FALSE.
             
             
             ! Computational domain parameters
@@ -364,6 +372,7 @@ MODULE m_global_parameters
             cyl_coord = .FALSE.
 
             dt = dflt_real
+            t_tol = dflt_real
             
             t_step_start = dflt_int
             t_step_stop  = dflt_int

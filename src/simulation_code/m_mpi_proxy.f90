@@ -228,6 +228,13 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST(t_step_start, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST(t_step_stop , 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST(t_step_save , 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
+
+
+            CALL MPI_BCAST( t_tol  ,        1      , &
+                                MPI_DOUBLE_PRECISION,        0      , &
+                                MPI_COMM_WORLD, ierr                  )
+            CALL MPI_BCAST(debug, 1, MPI_LOGICAL         , &
+                                           0, MPI_COMM_WORLD, ierr  )
             
             
             ! Simulation algorithm parameters

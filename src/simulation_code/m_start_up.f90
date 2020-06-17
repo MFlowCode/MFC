@@ -132,7 +132,7 @@ MODULE m_start_up
                                    polytropic, thermal,                      &
                                    integral, integral_wrt, num_integrals,    &
                                    polydisperse, poly_sigma, qbmm, nnode,    &
-                                   R0_type
+                                   R0_type, DEBUG, t_tol
             
             
             ! Checking that an input file has been provided by the user. If it
@@ -358,6 +358,9 @@ MODULE m_start_up
                     PRINT '(A)', 'Unsupported value of time_stepper. Exiting ...'
                     CALL s_mpi_abort()
                 END IF
+            ELSEIF(t_tol == dflt_real .AND. time_stepper == 23 ) THEN
+                PRINT '(A)', 'Adaptive timestepping requires a tolerance t_tol'
+                CALL s_mpi_abort()
             ELSEIF(ALL(weno_vars /= (/1,2/))) THEN
                 PRINT '(A)', 'Unsupported value of weno_vars. Exiting ...'
                 CALL s_mpi_abort()
