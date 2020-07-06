@@ -774,9 +774,13 @@ MODULE m_weno
             
 
             REAL(KIND(0d0)), DIMENSION(0:weno_polyn) :: beta !< Smoothness indicators
+
+
+            REAL(KIND(0d0)), DIMENSION(-weno_polyn:weno_polyn) :: scaling_stencil, scaled_vars
+            REAL(KIND(0d0)) :: min_u, max_u 
             
 
-            INTEGER :: i,j,k,l !< Generic loop iterators
+            INTEGER :: i,j,k,l,q !< Generic loop iterators
             
             
             ! Reshaping and/or projecting onto characteristic fields inputted
@@ -812,26 +816,57 @@ MODULE m_weno
                     DO l = is3%beg, is3%end
                         DO k = is2%beg, is2%end
                             DO j = is1%beg, is1%end
+                                !! Scaling stuff here
+                                ! min_u = np.amin(u,1)
+                                ! max_u = np.amax(u,1)
+                                ! const_n = min_u==max_u
+                                ! u_tmp = np.zeros_like(u[:,2])
+                                ! u_tmp[:] = u[:,2]
+                                ! for i in range(0,5):
+                                !     u[:,i] = (u[:,i]-min_u)/(max_u-min_u)
+
+                                ! IF (neural_network) THEN
+
+                                ! ELSE
+
+                                ! END IF
+
+                                DO q = -weno_polyn, weno_polyn
+                                    scaling_stencil(q) = v_rs_wsL(q)%vf(i)%sf(j,k,l)
+                                END DO
+                                min_u = minval(scaling_stencil(:))
+                                max_u = maxval(scaling_stencil(:))
+                                IF ( abs(min_u - max_u) > 1.d-16 ) THEN
+                                    v_rs_wsL(q)%vf(i)%sf(j,k,l) = (v_rs_wsL(q)%vf(i)%sf(j,k,l) - min_u)/(max_u-min_u)
+                                END IF
+                                    ! scaled_vars(q) = v_rs_wsL(q)%vf(i)%sf(j,k,l)
+                                    ! scaled_vars(q) = (v_rs_wsL(q)%vf(i)%sf(j,k,l) - min_u)/(max_u-min_u)
                                 
                                 ! reconstruct from left side
 
                                 ! for i = -weno_polyn, weno_polyn
-                                ! v_rs_wsL(i)%vf(j)%sf(k,:,:) = v_vf(j)%sf(i+k,iy%beg:iy%end,iz%beg:iz%end)
+                                !    v_rs_wsL(i)%vf(j)%sf(k,:,:) = v_vf(j)%sf(i+k,iy%beg:iy%end,iz%beg:iz%end)
+                                ! !! if no char_decomp then v_rs_wsR => v_rs_wsL
+
                                 ! so: dvd[0]  = v[j+1]-v[j]
                                 ! so: dvd[-1] = v[j]-v[j-1]
+
+                                ! dvd( 0) = scaled_vars(1) - scaled_vars(0)
+                                ! dvd( -1) = scaled_vars(0) - scaled_vars(-1)
+
                                 dvd( 0) = v_rs_wsL( 1)%vf(i)%sf(j,k,l) &
                                         - v_rs_wsL( 0)%vf(i)%sf(j,k,l)
                                 dvd(-1) = v_rs_wsL( 0)%vf(i)%sf(j,k,l) &
                                         - v_rs_wsL(-1)%vf(i)%sf(j,k,l)
                                 
                                 ! poly_coef_R(0,0,i+1) = (s_cb( i )-s_cb(i+1)) / &
-                                !                        (s_cb( i )-s_cb(i+2))
+                                !                        (s_cb( i )-s_cb(i+2)) = 1/2
                                 ! poly_coef_R(1,0,i+1) = (s_cb( i )-s_cb(i+1)) / &
-                                !                        (s_cb(i-1)-s_cb(i+1))
+                                !                        (s_cb(i-1)-s_cb(i+1)) = 1/2
                                 
                                 ! poly_coef_L(0,0,i+1) = -poly_coef_R(0,0,i+1) = -1/2
                                 ! poly_coef_L(1,0,i+1) = -poly_coef_R(1,0,i+1) = -1/2
-                        
+ 
                                 ! so: poly_L[0] = v[j]-(1/2)(v[j+1]-v[j])
                                 ! so: poly_L[1] = v[j]-(1/2)(v[j]-v[j-1])
                                 poly_L(0) = v_rs_wsL(0)%vf(i)%sf(j,k,l) &
@@ -844,8 +879,8 @@ MODULE m_weno
                                 ! beta_coef(1,0,i+1) = 4d0*(s_cb( i )-s_cb(i+1))**2d0 / &
                                 !                          (s_cb(i-1)-s_cb(i+1))**2d0
 
-                                ! so for uniform mesh: beta_coef(0,0,j) = 4*(-dx)**2 / (-2dx)**2 = 1
-                                ! so for uniform mesh: beta_coef(1,0,j) = 4*(-dx)**2 / (-2dx)**2 = 1
+                                ! so for uniform mesh: beta_coef(0,0,j) = 4*((-dx)**2) / (-2dx)**2 = 1
+                                ! so for uniform mesh: beta_coef(1,0,j) = 4*((-dx)**2) / (-2dx)**2 = 1
 
                                 ! so: beta[0] = (v[j+1]-v[j])**2 + weno_eps
                                 ! so: beta[1] = (v[j]-v[j-1])**2 + weno_eps
@@ -856,29 +891,29 @@ MODULE m_weno
                                 
                                 ! d_L(0,i+1) = (s_cb(i-1)-s_cb( i )) / &
                                 !              (s_cb(i-1)-s_cb(i+2))
-                                !            = 2/3 
+                                !            = (-dx)/(-3dx) = 1/3
                                 ! d_L(1,i+1) = 1d0 - d_L(0,i+1)
-                                !            = 1-2/3 = 1/3
+                                !            = 1-1/3 = 2/3
 
-                                ! so: alpha_L[0] = (2/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
-                                ! so: alpha_L[1] = (1/3)/( (v[j]-v[j-1])^2 + weno_eps )^2
+                                ! so: alpha_L[0] = (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
+                                ! so: alpha_L[1] = (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2
                                 alpha_L = d_L(:,j)/(beta*beta)
                                 
-                                ! so: omega_L[0] = (2/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
+                                ! so: omega_L[0] = (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
                                 !                  --------------------------------------
-                                ! (1/3)/( (v[j]-v[j-1])^2 + weno_eps )^2 + (2/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
+                                ! (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2 + (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
 
-                                ! so: omega_L[1] = (1/3)/( (v[j]-v[j-1])^2 + weno_eps )^2
+                                ! so: omega_L[1] = (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2
                                 !                  --------------------------------------
-                                ! (1/3)/( (v[j]-v[j-1])^2 + weno_eps )^2 + (2/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
+                                ! (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2 + (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
                                 omega_L = alpha_L/SUM(alpha_L)
-                                
+
+
                                 ! reconstruct from right side
                                 dvd( 0) = v_rs_wsR( 1)%vf(i)%sf(j,k,l) &
                                         - v_rs_wsR( 0)%vf(i)%sf(j,k,l)
                                 dvd(-1) = v_rs_wsR( 0)%vf(i)%sf(j,k,l) &
                                         - v_rs_wsR(-1)%vf(i)%sf(j,k,l)
-                                
 
                                 ! poly_coef_R(0,0,j) = -dx/(-2 dx) = 1/2
                                 ! poly_coef_R(1,0,j) = -dx/(-2 dx) = 1/2
