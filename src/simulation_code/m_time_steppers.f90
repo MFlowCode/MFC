@@ -472,6 +472,7 @@ MODULE m_time_steppers
 
             INTEGER, INTENT(IN) :: t_step
             REAL(KIND(0d0)) :: relerr, absval, tmp
+            REAL(KIND(0d0)) :: dtmin,dtmax
             
             INTEGER :: i,j !< Generic loop iterator
             
@@ -552,6 +553,8 @@ MODULE m_time_steppers
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
             IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+            ! ==================================================================
+
 
             ! Approximate error =================================================
             ! err = (q_cons_ts(1)%vf(i)%sf - q_cons_ts(3)%vf(i)%sf) / &
@@ -579,17 +582,21 @@ MODULE m_time_steppers
                 END IF
             END DO
 
-            ! PRINT*, 'relerr uncollect: ', relerr
             IF (num_procs > 1) THEN
                 tmp = relerr
                 CALL s_mpi_allreduce_max(tmp,relerr)
             END IF
 
+            dtmin = 0.002d0 / 2d0
+            dtmax = 0.002d0 * 2d0
+
             dt = dt*Min( Max( Sqrt(t_tol/(2d0*relerr)) , 0.3d0 ), 2d0 )
+            dt = Max( Min( dtmax, dt ), dtmin )
+            ! dt = 0.0015d0
 
             IF (proc_rank==0) PRINT*, 'RELERR:', relerr
             IF (proc_rank==0) PRINT*, 'dt/dt0:', dt/dt0
-            IF (proc_rank==0) PRINT*, '---t/T:', mytime/finaltime
+            ! IF (proc_rank==0) PRINT*, '---t/T:', mytime/finaltime
 
             ! ==================================================================
       
