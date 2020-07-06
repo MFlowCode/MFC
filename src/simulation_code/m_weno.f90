@@ -363,6 +363,7 @@ MODULE m_weno
                     
                 ELSE                                ! Quadrature points
                     
+                    ! Only used for higher-order reconstruction
                     DO i = is%beg-1, is%end-1
                         
                         poly_coef_R(0,0,i+1) = (s_cb( i )-s_cb(i+1)) / &
@@ -529,6 +530,7 @@ MODULE m_weno
                     END DO
                     
                 ELSE                                ! Quadrature points
+                    ! Only used for higher-order reconstruction
                     
                     DO i = is%beg-1, is%end-1
                         
@@ -811,6 +813,11 @@ MODULE m_weno
                         DO k = is2%beg, is2%end
                             DO j = is1%beg, is1%end
                                 
+                                ! dvd[0]  = v[1]-v[0]
+                                ! dvd[-1] = v[0]-v[-1]
+
+
+                                ! v_rs_wsL(i)%vf(j)%sf(k,:,:) = v_vf(j)%sf(i+k,iy%beg:iy%end,iz%beg:iz%end)
                                 dvd( 0) = v_rs_wsL( 1)%vf(i)%sf(j,k,l) &
                                         - v_rs_wsL( 0)%vf(i)%sf(j,k,l)
                                 dvd(-1) = v_rs_wsL( 0)%vf(i)%sf(j,k,l) &
