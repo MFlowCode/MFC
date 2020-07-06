@@ -1844,14 +1844,14 @@ MODULE m_data_output
             LOGICAL :: trigger !< For integral quantities
 
             ! Non-dimensional time calculation
-            IF (time_stepper /= 23) THEN
+            IF (time_stepper == 23) THEN
+                nondim_time = mytime
+            ELSE
                 IF (t_step_old /= dflt_int) THEN
                     nondim_time = REAL(t_step + t_step_old,KIND(0d0))*dt
                 ELSE
                     nondim_time = REAL(t_step,KIND(0d0))*dt !*1.d-5/10.0761131451d0
                 END IF
-            ELSE
-                nondim_time = mytime
             END IF
 
             DO i = 1, num_probes

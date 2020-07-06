@@ -1481,7 +1481,7 @@ MODULE m_rhs
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ==================================================================
           
-            IF (DEBUG) PRINT*, 'start rhs'
+            IF (DEBUG) PRINT*, 'Start rhs'
             
             ! Association/Population of Working Variables ======================
             DO i = 1, sys_size
@@ -1597,7 +1597,6 @@ MODULE m_rhs
             ! ==================================================================
             
             ! Computing Velocity Gradients =
-
 
             IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
 

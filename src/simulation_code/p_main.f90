@@ -143,7 +143,8 @@ PROGRAM p_main
     CALL s_populate_grid_variables_buffers()
     
     CALL s_populate_variables_buffers(q_cons_ts(1)%vf)
-    IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
+    IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) &
+        CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
    
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure
@@ -166,11 +167,16 @@ PROGRAM p_main
     ! Time-stepping Loop =======================================================
     DO
         IF (proc_rank==0) THEN
-            PRINT*, '------------------------------------------------------'
-        ! IF (proc_rank==0 .AND. MOD(t_step,t_step_save)==0 ) THEN
-            PRINT*, 'Time step ', t_step, ' of ', t_step_stop
+            IF (time_stepper==23) THEN 
+                PRINT*, '------------', mytime/finaltime*100d0, 'percent done'
+            ELSE
+                PRINT*, '------ Time step ', t_step, 'of', t_step_stop, '----'
+            END IF
         END IF
         mytime = mytime + dt
+
+        CALL s_compute_derived_variables(t_step)
+        IF (DEBUG) PRINT*, 'Computed derived vars'
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         IF(time_stepper == 1) THEN
@@ -187,8 +193,7 @@ PROGRAM p_main
             CALL s_5th_order_rk(t_step)
         END IF
 
-        CALL s_compute_derived_variables(t_step)
-        ! print*, 'computed derived vars'
+
 
         ! Time-stepping loop controls
         IF (time_stepper /= 23) THEN
@@ -201,6 +206,7 @@ PROGRAM p_main
             IF(mytime >= finaltime) THEN
                 EXIT 
             ELSE
+                IF ( (mytime + dt) >= finaltime ) dt = finaltime - mytime
                 t_step = t_step + 1
             END IF
         END IF
