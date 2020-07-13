@@ -703,6 +703,7 @@ MODULE m_data_output
                     CALL s_mpi_abort()
                 ELSEIF (icfl_max_glb > 1d0) THEN
                     PRINT '(A)', 'ICFL is greater than 1.0. Exiting ...'
+                    PRINT*, 'icfl', icfl_max_glb
                     CALL s_mpi_abort()
                 END IF
             END IF
