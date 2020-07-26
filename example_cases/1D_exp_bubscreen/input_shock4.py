@@ -153,7 +153,7 @@ case_dict =                                                                     
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
                     'char_decomp'                  : 'F',                      \
-                    'mapped_weno'                  : 'T',                      \
+                    'mapped_weno'                  : 'F',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
 		    'riemann_solver'               : 2,                        \
