@@ -70,7 +70,7 @@ Nt      = int(Tfinal/dt)
 dt = dt * 0.1
 # print('dt: ',dt)
 
-Nt = 10
+Nt = 10000
 
 Nfiles = 2.
 Nout = int(math.ceil(Nt/Nfiles))
@@ -108,7 +108,7 @@ sub_name = 'XXNAME'
 comp_name = argv[1].strip()
 
 # Serial or parallel computational engine
-engine = 'serial'
+engine = 'parallel'
 if (comp_name=='pre_process'): engine = 'serial'
 
 # Configuring case dictionary
@@ -118,7 +118,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 1,                      \
+                    'ppn'                          : 12,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \

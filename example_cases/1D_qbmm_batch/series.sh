@@ -18,6 +18,7 @@ for vfrac in "${vfcs[@]}"; do
         sed -e s/XXNAME/$workdir/g -e s/XXVF/$vfrac/g > ./$workdir/input.py
     cd $workdir
         rm -f *.dummy
+        mkdir out D
         chmod +x input.py
         ./input.py pre_process  > out/pre_process.out
         sleep 1
