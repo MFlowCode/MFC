@@ -828,7 +828,7 @@ MODULE m_data_output
 
                 IF (model_eqns==2) THEN
                     DO i = 1, sys_size
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
 
                         OPEN(2,FILE= TRIM(file_path) )
                             DO j=0,m
@@ -885,7 +885,7 @@ MODULE m_data_output
                 END IF
 
                 DO i = 1, sys_size    
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
 
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
@@ -898,7 +898,7 @@ MODULE m_data_output
             ! 2D
             IF ( (n>0) .AND. (p==0) ) THEN
                 DO i = 1,sys_size
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
                         DO k=0,n
@@ -913,7 +913,7 @@ MODULE m_data_output
             ! 3D
             IF ( p > 0) THEN
                 DO i = 1,sys_size
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
                         DO k=0,n
