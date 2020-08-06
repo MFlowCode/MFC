@@ -9,6 +9,7 @@
         to your ~/.bash_profile  
         on your local computer
     * Add your private key to your Richardson keychain
+        * [Generate](https://docs.joyent.com/public-cloud/getting-started/ssh-keys/generating-an-ssh-key-manually/manually-generating-your-ssh-key-in-mac-os-x) your private key if you don't have one 
         * $ cat ~/.ssh/id_rsa.pub | ssh <your_userid>@richardson.caltech.edu 'cat >> ~/.ssh/authorized_keys'
 
 * Clone MFC, e.g.
