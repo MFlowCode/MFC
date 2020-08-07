@@ -251,6 +251,13 @@ MODULE m_data_output
                 END DO
             END IF
 
+
+            IF (precision==1) THEN
+                FMT="(3F30.7)"
+            ELSE
+                FMT="(3F40.14)"
+            END IF
+
             ! 2D
             IF ( (n>0) .AND. (p==0) ) THEN
                 DO i = 1,sys_size

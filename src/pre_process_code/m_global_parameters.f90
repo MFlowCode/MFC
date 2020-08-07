@@ -213,8 +213,8 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     REAL(KIND(0d0)) :: poly_sigma
-    INTEGER         :: dist_type !1 = binormal, 2=lognormal-normal
-    INTEGER         :: R0_type !1 = simpson, 2 = wheeler
+    INTEGER         :: dist_type !1 = binormal, 2 = lognormal-normal
+    INTEGER         :: R0_type   !1 = simpson,  2 = wheeler
     !> @}
 
     INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: logic_grid

@@ -389,6 +389,8 @@ MODULE m_bubbles
                 f_cpbw_KM = fpb 
             END IF
 
+            ! PRINT*, 'surface tension component', (2.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+
             IF (  Web /=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web)
             IF (Re_inv/=dflt_real) f_cpbw_KM = f_cpbw_KM - 4.D0*Re_inv*fV/fR
 
