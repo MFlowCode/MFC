@@ -703,6 +703,7 @@ MODULE m_data_output
                     CALL s_mpi_abort()
                 ELSEIF (icfl_max_glb > 1d0) THEN
                     PRINT '(A)', 'ICFL is greater than 1.0. Exiting ...'
+                    PRINT*, icfl_max_glb
                     CALL s_mpi_abort()
                 END IF
             END IF
@@ -895,6 +896,13 @@ MODULE m_data_output
                 END DO
             END IF
 
+
+            IF (precision==1) THEN
+                FMT="(3F30.7)"
+            ELSE
+                FMT="(3F40.14)"
+            END IF
+
             ! 2D
             IF ( (n>0) .AND. (p==0) ) THEN
                 DO i = 1,sys_size
@@ -908,6 +916,13 @@ MODULE m_data_output
                         END DO
                     CLOSE(2)
                 END DO
+            END IF
+
+
+            IF (precision==1) THEN
+                FMT="(4F30.7)"
+            ELSE
+                FMT="(4F40.14)"
             END IF
 
             ! 3D
