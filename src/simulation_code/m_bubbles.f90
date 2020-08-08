@@ -168,6 +168,7 @@ MODULE m_bubbles
                         rddot       = f_rddot_KM( pbdot,  Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid )
                     ELSE IF (bubble_model == 3) THEN
                         ! Rayleigh-Plesset bubbles
+                        print*, 'R0 index, x index:',q,j,R0(q)
                         Cpbw        = f_cpbw_KM( R0(q), myR, myV,  pb )
                         rddot       = f_rddot_RP(  myP, myRho, myR, myV, R0(q), Cpbw )
                     END IF
@@ -338,7 +339,6 @@ MODULE m_bubbles
             f_rddot_RP = (-1.5d0*(fV**2d0) + (fCpbw - fCp)/fRho)/fR
 
             IF (Re_inv /= dflt_real) f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
-            IF (Web /= dflt_real) f_rddot_RP = f_rddot_RP - 2d0/(Web*(fr**2d0))/fRho
 
         END FUNCTION f_rddot_RP
 
@@ -384,15 +384,22 @@ MODULE m_bubbles
             IF (polytropic) THEN
                 f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
                 IF (Web/=dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                    (2.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+                    (3.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
             ELSE
                 f_cpbw_KM = fpb 
             END IF
 
-            ! PRINT*, 'surface tension component', (2.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+            ! PRINT*, 'surface tension component', (3.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
 
-            IF (  Web /=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web)
+            IF (  Web /=dflt_real) f_cpbw_KM = f_cpbw_KM - 3.D0/(fR*Web)
             IF (Re_inv/=dflt_real) f_cpbw_KM = f_cpbw_KM - 4.D0*Re_inv*fV/fR
+
+            ! PRINT*, ((fR0/fR)**(3.d0*gam))*(3.D0/(Web*fR0))-3.D0/(fR*Web)
+            ! PRINT*, f_cpbw_KM
+
+            ! At t = 0, we have R0 = R
+            ! fcpbw = Ca - Ca + 1
+            ! Add surface tension: fcpbw = fcpbw + 2/(Web*fR0) - 2/(Web*fR)
 
         END FUNCTION f_cpbw_KM
 
