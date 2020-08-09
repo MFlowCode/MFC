@@ -1014,6 +1014,7 @@ MODULE m_variables_conversion
                             END DO
                         
                         ELSE
+                            ! Could be bubbles!
                             DO i = adv_idx%beg, adv_idx%end
                                 FK_vf(i)%sf(j,k,l) = vel_K(dir_idx(1))*adv_K(i-E_idx)
                             END DO
