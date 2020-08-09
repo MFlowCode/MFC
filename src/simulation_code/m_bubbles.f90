@@ -168,7 +168,6 @@ MODULE m_bubbles
                         rddot       = f_rddot_KM( pbdot,  Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid )
                     ELSE IF (bubble_model == 3) THEN
                         ! Rayleigh-Plesset bubbles
-                        print*, 'R0 index, x index:',q,j,R0(q)
                         Cpbw        = f_cpbw_KM( R0(q), myR, myV,  pb )
                         rddot       = f_rddot_RP(  myP, myRho, myR, myV, R0(q), Cpbw )
                     END IF
