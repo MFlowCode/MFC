@@ -326,6 +326,9 @@ MODULE m_global_parameters
                 !should get all of r0's and v0's
                 patch_icpp(i)%r0              = dflt_real
                 patch_icpp(i)%v0              = dflt_real
+
+                patch_icpp(i)%p0              = dflt_real
+                patch_icpp(i)%m0              = dflt_real
             END DO
            
             ! Tait EOS
