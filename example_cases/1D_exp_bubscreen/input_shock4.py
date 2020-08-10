@@ -23,16 +23,16 @@ pv      = 0    #vapor pressure
 # water 
 # These _v and _n parameters ONLY correspond to the bubble model of Preston (2010 maybe 2008)
 # (this model would replace the usual Rayleigh-plesset or Keller-miksis model (it's more compilcated))
-#gamma_v = 1.33
-#M_v     = 18.02
-#mu_v    = 0.8816E-05
-#k_v     = 0.019426
+gamma_v = 1.33
+M_v     = 18.02
+mu_v    = 0.8816E-05
+k_v     = 0.019426
 
 ##air props
-#gamma_n = 1.4
-#M_n     = 28.97
-#mu_n    = 1.8E-05
-#k_n     = 0.02556
+gamma_n = 1.4
+M_n     = 28.97
+mu_n    = 1.8E-05
+k_n     = 0.02556
 
 #air props
 gamma_gas = 1.09
@@ -75,7 +75,8 @@ dt      = 0.0131
 
 Lpulse  = 0.3*Ldomain
 Tpulse  = Lpulse/cphysical
-Tfinal  = 300
+Tfinal  = 100
+# Tfinal  = 300
 #Tfinal  = 0.3*0.25*120*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
@@ -178,50 +179,29 @@ case_dict =                                                                     
 		    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
-                    # this problem is 1D... so based on the dimension of the problem
-                    # you have different 'geometries' available to you
-                    # e.g. in 3D you might have spherical geometries
-                    # and rectangular ones
-                    # in 1D (like here)... there is only one option {#1}... which is a 
-                    # line
                     'patch_icpp(1)%geometry'       : 1,                         \
                     'patch_icpp(1)%x_centroid'     : 4173.75,                      \
                     'patch_icpp(1)%length_x'       : 8347.5,                      \
                     'patch_icpp(1)%vel(1)'         : 0.0,                       \
                     'patch_icpp(1)%pres'           : patm,                      \
-                    # \alpha stands for volume fraction of this phase
-                    # so if there are no bubbles, then it is all water (liquid)
-                    # and \alpha_1 = \alpha_liquid \approx 1 
                     'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*(1.E+03/rho0), \
-                    # \alpha_1 here is always (for num_fluids = 1 and bubbles=True)
-                    # \alpha is always the void fraction of bubbles (usually << 1)
                     'patch_icpp(1)%alpha(1)'       : 1.E-12,                    \
-                    # dimensionless initial bubble radius
                     'patch_icpp(1)%r0'             : 1.,                        \
-                    # dimensionless initial velocity
                     'patch_icpp(1)%v0'             : 0.0E+00,                   \
                     # ==========================================================
 
                     # Patch 2 Screen ===========================================
                     'patch_icpp(2)%geometry'       : 1,                         \
-                    #overwrite the part in the middle that was the
-                    #background (no bubble) area
                     'patch_icpp(2)%alter_patch(1)' : 'T',                       \
                     'patch_icpp(2)%x_centroid'     : 4770,                        \
                     'patch_icpp(2)%length_x'       : 7155,                 \
                     'patch_icpp(2)%vel(1)'         : -.14/c0,                       \
                     'patch_icpp(2)%pres'           : patm,                      \
-                    # \alpha stands for volume fraction of this phase
-                    # so if there are no bubbles, then it is all water (liquid)
-                    # and \alpha_1 = \alpha_liquid \approx 1 
-                    # in the screen case, you have \alpha_1 = 1 - \alpha_bubbles = 1 - vf0
                     'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,   \
-                    # void fraction of bubbles
                     'patch_icpp(2)%alpha(1)'       : vf0,                       \
                     'patch_icpp(2)%r0'             : 1.,                        \
                     'patch_icpp(2)%v0'             : 0.0E+00,                   \
                     # ==========================================================
-                    
                     
                     # Patch 3 Shock Wave
                     'patch_icpp(3)%geometry'       : 1,                         \
@@ -232,8 +212,10 @@ case_dict =                                                                     
                     'patch_icpp(3)%pres'           : 2.157*patm,                \
                     'patch_icpp(3)%alpha_rho(1)'   : (1.-.0011)*(1.E+03/rho0), \
                     'patch_icpp(3)%alpha(1)'       : .0011,                    \
-                    'patch_icpp(3)%r0'             : 1.,                        \
+                    'patch_icpp(3)%r0'             : 0.77401878091102305,       \
                     'patch_icpp(3)%v0'             : 0.0E+00,                   \
+                    'patch_icpp(3)%p0'             : 2.1577765821708557,        \
+                    'patch_icpp(3)%m0'             : 0.0E+00,                   \
                     # ==========================================================
                     
                     
@@ -241,31 +223,22 @@ case_dict =                                                                     
                     # Surrounding liquid
                     'fluid_pp(1)%gamma'             : 1.E+00/(n_tait-1.E+00),  \
                     'fluid_pp(1)%pi_inf'            : n_tait*B_tait/(n_tait-1.),   \
-                    # 'fluid_pp(1)%mul0'              : mul0,     \
-                    # 'fluid_pp(1)%ss'                : ss,       \
-                    # 'fluid_pp(1)%pv'                : pv,       \
-                    # 'fluid_pp(1)%gamma_v'           : gamma_v,  \
-                    # 'fluid_pp(1)%M_v'               : M_v,      \
-                    # 'fluid_pp(1)%mu_v'              : mu_v,     \
-                    # 'fluid_pp(1)%k_v'               : k_v,      \
+                    'fluid_pp(1)%mul0'              : mul0,     \
+                    'fluid_pp(1)%ss'                : ss,       \
+                    'fluid_pp(1)%pv'                : pv,       \
+                    'fluid_pp(1)%gamma_v'           : gamma_v,  \
+                    'fluid_pp(1)%M_v'               : M_v,      \
+                    'fluid_pp(1)%mu_v'              : mu_v,     \
+                    'fluid_pp(1)%k_v'               : k_v,      \
 
                     # Last fluid_pp is always reserved for bubble gas state ===
                     # if applicable  ==========================================
                     'fluid_pp(2)%gamma'             : 1./(gamma_gas-1.),      \
                     'fluid_pp(2)%pi_inf'            : 0.0E+00,      \
-                    # 'fluid_pp(2)%gamma_v'           : gamma_n,      \
-                    # 'fluid_pp(2)%M_v'               : M_n,          \
-                    # 'fluid_pp(2)%mu_v'              : mu_n,         \
-                    # 'fluid_pp(2)%k_v'               : k_n,          \
-                    # ==========================================================
-
-                    # ==========================================================
-                    #'fluid_pp(3)%gamma'             : 1./(gamma_gas-1.),      \
-                    #'fluid_pp(3)%pi_inf'            : 0.0E+00,      \
-                    # 'fluid_pp(2)%gamma_v'           : gamma_n,      \
-                    # 'fluid_pp(2)%M_v'               : M_n,          \
-                    # 'fluid_pp(2)%mu_v'              : mu_n,         \
-                    # 'fluid_pp(2)%k_v'               : k_n,          \
+                    'fluid_pp(2)%gamma_v'           : gamma_n,      \
+                    'fluid_pp(2)%M_v'               : M_n,          \
+                    'fluid_pp(2)%mu_v'              : mu_n,         \
+                    'fluid_pp(2)%k_v'               : k_n,          \
                     # ==========================================================
 
                     # Non-polytropic gas compression model AND/OR Tait EOS =====
@@ -275,41 +248,15 @@ case_dict =                                                                     
 
                     # Bubbles ==================================================
                     'bubbles'               : 'T',                  \
-                    # in user guide... 1 = gilbert 2 = keller-miksis
-                    # but gilbert won't work for the equations that you are using... (i think)
                     'bubble_model'          : 2,                  \
-                    # polytropic: this is where the different between Rayleigh--Plesset and 
-                    # Preston's model shows up. polytropic = False means complicated Preston model
-                   # = True means simpler Rayleigh--Plesset model
-                    # if polytropic == False then you will end up calling s_initialize_nonpoly in 
-                    # m_global_parameters.f90 in both the pre_process and simulation_code
-                    'polytropic'            : 'T',                  \
+                    'polytropic'            : 'F',                  \
                     'polydisperse'          : 'F',                  \
-                    #'poly_sigma'            : 0.3,                  \
-                    # only matters if polytropic = False (complicated model)
                     'thermal'               : 1,           \
-                    # only matters if polytropic = False (complicated model)
                     'R0ref'                 : myr0,                 \
                     'nb'                    : 1,             \
-                    # cavitation number (has something to do with the ratio of gas to vapour in the bubble)
-                    # this is usually near 1
-                    # can set = 1 for testing purposes
                     'Ca'                    : Ca,                   \
-                    # weber number (corresponds to surface tension) 
                     'Web'                   : We,                   \
-                    # inverse reynolds number (coresponds to viscosity)
                     'Re_inv'                : Re_inv,               \
-                    # ==========================================================
-
-                    # Acoustic source ==========================================
-                    #'Monopole'                  : 'T',                  \
-                    'num_mono'                  : 1,                  \
-                    'Mono(1)%loc(1)'            : -0.3/x0,  \
-                    'Mono(1)%npulse'            : 1, \
-                    'Mono(1)%dir'               : 1., \
-                    'Mono(1)%pulse'             : 1, \
-                    'Mono(1)%mag'               : 0.001, \
-                    'Mono(1)%length'            : (1./(10000.))*cphysical/x0, \
                     # ==========================================================
     }
 

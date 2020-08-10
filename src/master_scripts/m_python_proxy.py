@@ -877,7 +877,27 @@ pre_process_dict =                                                             \
                     'patch_icpp(7)%v0'              : None,                     \
                     'patch_icpp(8)%v0'              : None,                     \
                     'patch_icpp(9)%v0'              : None,                     \
-                    'patch_icpp(10)%v0'             : None                      \
+                    'patch_icpp(10)%v0'             : None,                      \
+                    'patch_icpp(1)%p0'              : None,                     \
+                    'patch_icpp(2)%p0'              : None,                     \
+                    'patch_icpp(3)%p0'              : None,                     \
+                    'patch_icpp(4)%p0'              : None,                     \
+                    'patch_icpp(5)%p0'              : None,                     \
+                    'patch_icpp(6)%p0'              : None,                     \
+                    'patch_icpp(7)%p0'              : None,                     \
+                    'patch_icpp(8)%p0'              : None,                     \
+                    'patch_icpp(9)%p0'              : None,                     \
+                    'patch_icpp(10)%p0'             : None,                      \
+                    'patch_icpp(1)%m0'              : None,                     \
+                    'patch_icpp(2)%m0'              : None,                     \
+                    'patch_icpp(3)%m0'              : None,                     \
+                    'patch_icpp(4)%m0'              : None,                     \
+                    'patch_icpp(5)%m0'              : None,                     \
+                    'patch_icpp(6)%m0'              : None,                     \
+                    'patch_icpp(7)%m0'              : None,                     \
+                    'patch_icpp(8)%m0'              : None,                     \
+                    'patch_icpp(9)%m0'              : None,                     \
+                    'patch_icpp(10)%m0'             : None                      \
 }
 # ==============================================================================
 

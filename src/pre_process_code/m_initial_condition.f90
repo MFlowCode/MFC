@@ -355,7 +355,8 @@ MODULE m_initial_condition
             IF (bubbles) THEN
                 DO i = 1,nb
                     muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
-                    muV = V0(i)*patch_icpp(patch_id)%v0 ! = 0
+                    muV = patch_icpp(patch_id)%v0 ! = 0
+
                     IF (qbmm) THEN
                         IF (dist_type == 1) THEN
                             q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
@@ -385,6 +386,10 @@ MODULE m_initial_condition
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
                     END IF
                 END DO
             END IF
@@ -451,6 +456,10 @@ MODULE m_initial_condition
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
                     END IF
                 END DO
             END IF
@@ -553,6 +562,12 @@ MODULE m_initial_condition
                         !     + (1d0-eta)*orig_prim_vf(bub_idx%vs(i)))
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
+
                     END IF
                 END DO
             END IF
@@ -572,8 +587,12 @@ MODULE m_initial_condition
 
             IF (bubbles .AND. (.NOT. polytropic) ) THEN
                 DO i = 1,nb
-                    q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
-                    q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
+                    IF( q_prim_vf(bub_idx%ps(i))%sf(j,k,l) == dflt_real ) THEN
+                        q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
+                    END IF
+                    IF( q_prim_vf(bub_idx%ms(i))%sf(j,k,l) == dflt_real ) THEN
+                        q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
+                    END IF
                 END DO
             END IF
             
