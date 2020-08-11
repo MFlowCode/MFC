@@ -589,6 +589,7 @@ MODULE m_initial_condition
                 DO i = 1,nb
                     IF( q_prim_vf(bub_idx%ps(i))%sf(j,k,l) == dflt_real ) THEN
                         q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
+                        print*, 'setting to pb0'
                     END IF
                     IF( q_prim_vf(bub_idx%ms(i))%sf(j,k,l) == dflt_real ) THEN
                         q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
