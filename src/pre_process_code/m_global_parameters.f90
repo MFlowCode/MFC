@@ -459,6 +459,7 @@ MODULE m_global_parameters
 
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
                     ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
+                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
 
                     IF (qbmm) THEN
                         ALLOCATE( bub_idx%moms(nb,nmom) )
@@ -479,7 +480,6 @@ MODULE m_global_parameters
                     ELSE
                         DO i = 1, nb
                             IF (.NOT. polytropic) THEN
-                                ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                                 fac = 4
                             ELSE
                                 fac = 2
