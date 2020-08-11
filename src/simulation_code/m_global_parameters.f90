@@ -606,7 +606,7 @@ MODULE m_global_parameters
 
                         ALLOCATE( weight(nb),R0(nb),V0(nb) )
                         ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
-
+                        ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
 
                         IF (num_fluids == 1) THEN
                             gam  = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
@@ -627,7 +627,6 @@ MODULE m_global_parameters
                         ELSE
                             DO i = 1, nb
                                 IF (.NOT. polytropic) THEN
-                                    ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
                                     fac = 4
                                 ELSE
                                     fac = 2
