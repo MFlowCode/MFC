@@ -748,6 +748,8 @@ MODULE m_global_parameters
             pb0 = pb0/pl0
             pv = pv/pl0
 
+            print*, 'pb0 nondim/final', pb0
+
             ! bubble wall temperature, normalized by T0, in the liquid
             ! keeps a constant (cold liquid assumption)
             Tw = 1.D0
