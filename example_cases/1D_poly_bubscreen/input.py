@@ -3,18 +3,20 @@
 import math
 
 x0      = 10.E-06
-p0      = 101325.
+p0      = 112.9E+03
 rho0    = 1.E+03
 c0      = math.sqrt( p0/rho0 )
 patm    = 1.
 
 #water props
-n_tait  = 7.1
+n_tait  = 7.15
 B_tait  = 306.E+06 / p0
 mul0    = 1.002E-03     #viscosity
+# ss      = 1.E-12       #surface tension
 ss      = 0.07275       #surface tension
 pv      = 2.3388E+03    #vapor pressure
 
+# Preston parameters
 gamma_v = 1.33
 M_v     = 18.02
 mu_v    = 0.8816E-05
@@ -47,7 +49,7 @@ We = p0*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 0.0001
+vf0     = 1.E-4
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -76,6 +78,7 @@ Nt = 1000
 Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
+
 
 print('Web', We)
 print('Re_inv', Re_inv)
@@ -134,7 +137,7 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 20,                        \
+                    't_step_stop'                  : 1,                        \
                     't_step_save'                  : 1,   \
 		    # ==========================================================
                                                                                 \
@@ -213,11 +216,22 @@ case_dict =                                                                     
                     # Surrounding liquid
                     'fluid_pp(1)%gamma'             : 1.E+00/(n_tait-1.E+00),  \
                     'fluid_pp(1)%pi_inf'            : n_tait*B_tait/(n_tait-1.),   \
+                    'fluid_pp(1)%mul0'              : mul0,     \
+                    'fluid_pp(1)%ss'                : ss,       \
+                    'fluid_pp(1)%pv'                : pv,       \
+                    'fluid_pp(1)%gamma_v'           : gamma_v,  \
+                    'fluid_pp(1)%M_v'               : M_v,      \
+                    'fluid_pp(1)%mu_v'              : mu_v,     \
+                    'fluid_pp(1)%k_v'               : k_v,      \
 
                     # Last fluid_pp is always reserved for bubble gas state ===
                     # if applicable  ==========================================
                     'fluid_pp(2)%gamma'             : 1./(gamma_gas-1.),      \
                     'fluid_pp(2)%pi_inf'            : 0.0E+00,      \
+                    'fluid_pp(2)%gamma_v'           : gamma_n,      \
+                    'fluid_pp(2)%M_v'               : M_n,          \
+                    'fluid_pp(2)%mu_v'              : mu_n,         \
+                    'fluid_pp(2)%k_v'               : k_n,          \
                     # ==========================================================
 
                     # Non-polytropic gas compression model AND/OR Tait EOS =====
@@ -227,7 +241,7 @@ case_dict =                                                                     
 
                     # Bubbles ==================================================
                     'bubbles'               : 'T',                  \
-                    'bubble_model'          : 3,                    \
+                    'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
                     # 'polydisperse'          : 'T',                  \
                     'R0_type'               : 1,                    \
@@ -239,7 +253,7 @@ case_dict =                                                                     
                     'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     'Web'                   : We,                   \
-                    # 'Re_inv'                : Re_inv,               \
+                    'Re_inv'                : Re_inv,               \
                     #'qbmm'               : 'T',                     \
                     #'nnode'              : 4,                       \
                     #'dist_type'          : 2,                       \
@@ -249,7 +263,7 @@ case_dict =                                                                     
                     # ==========================================================
 
                     # Acoustic source ==========================================
-                    'Monopole'                  : 'F',                  \
+                    # 'Monopole'                  : 'F',                  \
                     #'num_mono'                  : 1,                  \
                     #'Mono(1)%loc(1)'            : -8.E-03/x0,  \
                     #'Mono(1)%npulse'            : 1, \
