@@ -1300,6 +1300,10 @@ simulation_dict =                                                              \
                     'Mono(4)%npulse'                : None,                     \
                     'Mono(4)%pulse'                 : None,                     \
                     'Mono(4)%support'               : None,                     \
+                    'Mono(1)%delay'                 : None,                     \
+                    'Mono(2)%delay'                 : None,                     \
+                    'Mono(3)%delay'                 : None,                     \
+                    'Mono(4)%delay'                 : None,                     \
                     'integral_wrt'                  : None,                     \
                     'num_integrals'                 : None,                     \
                     'integral(1)%xmin'              : None,                     \

@@ -75,8 +75,8 @@ dt      = 0.0131
 
 Lpulse  = 0.3*Ldomain
 Tpulse  = Lpulse/cphysical
-Tfinal  = 100
-# Tfinal  = 300
+# Tfinal  = 100
+Tfinal  = 300
 #Tfinal  = 0.3*0.25*120*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
@@ -120,7 +120,6 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'T',                       \
                     'nodes'                        : 1,                         \
-                    # processes per node... > 1 indicates parallel (avoid this for now)
                     'ppn'                          : 1,                         \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
@@ -154,7 +153,7 @@ case_dict =                                                                     
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
                     'char_decomp'                  : 'F',                      \
-                    'mapped_weno'                  : 'F',                      \
+                    'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
 		    'riemann_solver'               : 2,                        \

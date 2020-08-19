@@ -121,6 +121,7 @@ MODULE m_derived_types
         REAL(KIND(0d0)) :: length !< Length of line source
         REAL(KIND(0d0)) :: npulse !< Number of cycles of pulse
         REAL(KIND(0d0)) :: dir !< Direction of pulse
+        REAL(KIND(0d0)) :: delay !< Time-delay of pulse start
         INTEGER :: pulse 
         INTEGER :: support
     END TYPE mono_parameters
