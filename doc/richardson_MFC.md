@@ -58,9 +58,16 @@
 * How to visualize using gnuplot on Richardson
     * You need XQuartz on your MacOS [or X11 on Linux]
         * Install at https://dl.bintray.com/xquartz/downloads/XQuartz-2.7.8.dmg
+            * I am aware this version is deprecated, but it appears that 2.7.11 does not work in some cases
         * Make sure you logged into Richardson using ssh -Y [or ssh -X] 
         * Check if your X server is working by logging into Richardson and issuing
             $ xclock
+        * IF YOU USE MacOS CATALINA!
+            * Permissions can be an issue
+            * Go to System preferences -> Security and Privacy -> Privacy -> Full Disk Access 
+            * Add your terminal (e.g. Terminal, iTerm2, etc.) via the + button
+            * Add XQuartz (launchd_startx) and the app (XQuartz)
+
     * Copy contents of https://raw.githubusercontent.com/sbryngelson/dotfiles/master/.gnuplotrc_x11
     into your ~/.bashrc
         * now you can use 
