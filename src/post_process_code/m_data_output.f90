@@ -63,7 +63,7 @@ MODULE m_data_output
     
     ! Including the Silo Fortran interface library that features the subroutines
     ! and parameters that are required to write in the Silo-HDF5 database format
-    !INCLUDE 'silo.inc'
+    ! INCLUDE 'silo.inc'
     INCLUDE 'silo_f9x.inc'
     
     
@@ -918,7 +918,6 @@ MODULE m_data_output
             
             ! Generic loop iterator
             INTEGER :: i,j,k
-            
             
             ! Silo-HDF5 Database Format ========================================
             

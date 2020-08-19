@@ -12,6 +12,9 @@
         * [Generate](https://docs.joyent.com/public-cloud/getting-started/ssh-keys/generating-an-ssh-key-manually/manually-generating-your-ssh-key-in-mac-os-x) your private key if you don't have one 
         * $ cat ~/.ssh/id_rsa.pub | ssh <your_userid>@richardson.caltech.edu 'cat >> ~/.ssh/authorized_keys'
 
+* Visit on Richardson
+    * http://visit.ilight.com/svn/visit/branches/2.9RC/src/svn_bin/bv_support/
+
 * Clone MFC, e.g.
     * $ git clone https://github.com/ComputationalFlowPhysics/MFC_private.git 
     * $ git status

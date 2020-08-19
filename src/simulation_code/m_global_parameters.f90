@@ -472,6 +472,7 @@ MODULE m_global_parameters
                 END DO
                 mono(j)%mag    = dflt_real
                 mono(j)%length = dflt_real
+                mono(j)%delay  = dflt_real
                 mono(j)%dir    = 1.d0
                 mono(j)%npulse = 1.d0
                 mono(j)%pulse = 1

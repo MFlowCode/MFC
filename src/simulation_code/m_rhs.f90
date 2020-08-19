@@ -3717,7 +3717,7 @@ MODULE m_rhs
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time-step
         !! @param mymono Monopole parameters
-        SUBROUTINE s_get_monopole(idir, q_prim_vf,t_step,mymono) ! ------------------------------
+        SUBROUTINE s_get_monopole(idir,q_prim_vf,t_step,mymono) ! ------------------------------
 
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
@@ -3739,6 +3739,9 @@ MODULE m_rhs
 
             IF (idir == ndirs) THEN
                 mytime = t_step*dt
+                print*, 'time', mytime, 'delay', mymono%delay
+                IF ( (mytime < mymono%delay) .AND. mymono%delay /= dflt_real ) RETURN
+                PRINT*, 'getting mono'
 
                 DO j = 0,m; DO k = 0,n; DO l=0,p
                     CALL s_convert_to_mixture_variables( q_prim_vf, myRho, n_tait, B_tait, Re, We, j, k, l )
@@ -3800,15 +3803,18 @@ MODULE m_rhs
             REAL(KIND(0d0)), INTENT(IN) :: mytime, sos, mysos
             TYPE(mono_parameters), INTENT(IN) :: mymono
             REAL(KIND(0d0)) :: period, t0, sigt, pa
+            REAL(KIND(0d0)) :: offset
             REAL(KIND(0d0)) :: f_g
+
+            offset = 0d0
+            IF (mymono%delay /= dflt_real) offset = mymono%delay
 
             IF (mymono%pulse == 1) THEN
                 ! Sine wave
                 period = mymono%length/sos
-                IF (mytime .le. mymono%npulse*period) THEN
-                    f_g = mymono%mag*sin(mytime*2.d0*pi/period)
-                ELSE
-                    f_g = 0d0
+                f_g = 0d0
+                IF (mytime <= (mymono%npulse*period + offset)) THEN
+                    f_g = mymono%mag*sin((mytime+offset)*2.d0*pi/period)
                 END IF
             ELSE IF (mymono%pulse == 2) THEN
                 ! Gaussian pulse
@@ -3819,11 +3825,9 @@ MODULE m_rhs
             ELSE IF (mymono%pulse == 3) THEN
                 ! Square wave
                 sigt = mymono%length/sos
-                t0 = 0d0
+                t0 = 0d0; f_g = 0d0
                 IF (mytime > t0 .AND. mytime < sigt) THEN
                     f_g = mymono%mag
-                ELSE 
-                    f_g = 0d0
                 END IF
             ELSE
                 PRINT '(A)', 'No pulse type detected. Exiting ...'
