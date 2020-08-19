@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
 import math
 
@@ -47,7 +47,8 @@ We = p0*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 4.E-5
+vf0     = 1.E-4
+# vf0     = 4.E-5
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -64,10 +65,10 @@ dx      = L/float(Nx)
 dt      = cfl*dx*c0/cact
 Lpulse  = 0.3*Ldomain
 Tpulse  = Lpulse/cact
-Tfinal  = 0.25*10.*Tpulse*c0/x0
+Tfinal  = 3*0.25*10.*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
-dt = dt * 0.1
+dt = dt * 0.5
 # print('dt: ',dt)
 
 Nfiles = 20.
@@ -113,7 +114,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 1,                      \
+                    'ppn'                          : 4,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -128,13 +129,13 @@ case_dict =                                                                     
                     'm'                            : Nx,                        \
                     'n'                            : 0,                         \
                     'p'                            : 0,                         \
-                    'dt'                           : 0.002,                     \
-                    't_tol'                        : 0.1,                     \
+                    'dt'                           : dt,                     \
+                    # 't_tol'                        : 0.1,                     \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 8000,                        \
+                    't_step_stop'                  : Nt,                        \
                     # 't_step_stop'                  : 4,                        \
                     # 't_step_save'                  : 8000,   \
-                    't_step_save'                  : 8000,   \
+                    't_step_save'                  : Nt,   \
 		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -145,7 +146,7 @@ case_dict =                                                                     
 		    'adv_alphan'                   : 'T',                      \
 		    'mpp_lim'                      : 'F',                      \
 		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 23,                        \
+		    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
@@ -158,8 +159,8 @@ case_dict =                                                                     
                     'avg_state'                    : 2,                        \
                     'commute_err'                  : 'F',                      \
                     'split_err'                    : 'F',                      \
-                    'bc_x%beg'                     : -1,                       \
-                    'bc_x%end'                     : -1,                       \
+                    'bc_x%beg'                     : -8,                       \
+                    'bc_x%end'                     : -8,                       \
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
