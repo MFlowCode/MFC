@@ -33,10 +33,25 @@ for multi-component, multi-phase, and bubbly flows.
 ## MFC paper
  
   The paper that describes the MFC's capabilities:
-* <a href="https://arxiv.org/pdf/1907.10512.pdf">
-        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2019) arXiv: 1907.10512
+* <a href="http://dx.doi.org/https://doi.org/10.1016/j.cpc.2020.107396">
+        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2020) Computer Physics Communications 4655, 107396
         </a>
-  
+
+### Cite me!
+
+```
+@article{Bryngelson_2020,
+	title = {MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
+	author = {Spencer H. Bryngelson and Kevin Schmidmayer and Vedran Coralic and Jomela C. Meng and Kazuki Maeda and Tim Colonius},
+	journal = {Computer Physics Communications},
+	doi = {10.1016/j.cpc.2020.107396},
+	year = 2020,
+	month = {may},
+	publisher = {Elsevier {BV}},
+	pages = {107396},
+}
+```
+
 ## Related publications
  
   Several publications have used the MFC in various stages of its 
@@ -98,14 +113,14 @@ Ph.D. Disserations:
  
 ### Main dependencies: MPI and Python 
   If you do not have Python, it can be installed via
-  <a href="https://brew.sh/">Homebrew on OSX</a> as:  
+  <a href="https://brew.sh/">Homebrew on MacOS</a> as:  
 `brew install python`
  
   or compiled via your favorite package manager on Unix systems.
  
   An MPI fortran compiler is required for all systems.
   If you do not have one, Homebrew can take care of this
-  on OSX:  
+  on MacOS:  
 `brew install open-mpi`  
  
   or compiled via another package manager on Unix systems.
@@ -129,7 +144,7 @@ If you do not have FFTW compiler, the library and
   but can indeed be handled with the MFC. For this, HDF5
   and Silo must be installed
  
-  On OSX, a custom Homebrew tap for Silo is included in the installers
+  On MacOS, a custom Homebrew tap for Silo is included in the installers
   directory. You can use it via  
 `cd installers`  
 `brew install silo.rb`  
