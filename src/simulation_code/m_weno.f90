@@ -816,43 +816,7 @@ MODULE m_weno
                     DO l = is3%beg, is3%end
                         DO k = is2%beg, is2%end
                             DO j = is1%beg, is1%end
-                                !! Scaling stuff here
-                                ! min_u = np.amin(u,1)
-                                ! max_u = np.amax(u,1)
-                                ! const_n = min_u==max_u
-                                ! u_tmp = np.zeros_like(u[:,2])
-                                ! u_tmp[:] = u[:,2]
-                                ! for i in range(0,5):
-                                !     u[:,i] = (u[:,i]-min_u)/(max_u-min_u)
-
-                                ! IF (neural_network) THEN
-
-                                ! ELSE
-
-                                ! END IF
-
-                                DO q = -weno_polyn, weno_polyn
-                                    scaling_stencil(q) = v_rs_wsL(q)%vf(i)%sf(j,k,l)
-                                END DO
-                                min_u = minval(scaling_stencil(:))
-                                max_u = maxval(scaling_stencil(:))
-                                IF ( abs(min_u - max_u) > 1.d-16 ) THEN
-                                    v_rs_wsL(q)%vf(i)%sf(j,k,l) = (v_rs_wsL(q)%vf(i)%sf(j,k,l) - min_u)/(max_u-min_u)
-                                END IF
-                                    ! scaled_vars(q) = v_rs_wsL(q)%vf(i)%sf(j,k,l)
-                                    ! scaled_vars(q) = (v_rs_wsL(q)%vf(i)%sf(j,k,l) - min_u)/(max_u-min_u)
-                                
                                 ! reconstruct from left side
-
-                                ! for i = -weno_polyn, weno_polyn
-                                !    v_rs_wsL(i)%vf(j)%sf(k,:,:) = v_vf(j)%sf(i+k,iy%beg:iy%end,iz%beg:iz%end)
-                                ! !! if no char_decomp then v_rs_wsR => v_rs_wsL
-
-                                ! so: dvd[0]  = v[j+1]-v[j]
-                                ! so: dvd[-1] = v[j]-v[j-1]
-
-                                ! dvd( 0) = scaled_vars(1) - scaled_vars(0)
-                                ! dvd( -1) = scaled_vars(0) - scaled_vars(-1)
 
                                 dvd( 0) = v_rs_wsL( 1)%vf(i)%sf(j,k,l) &
                                         - v_rs_wsL( 0)%vf(i)%sf(j,k,l)
