@@ -54,7 +54,7 @@ dy      = Ly/float(Ny)
 # Time stepping parameters
 cfl = 0.3
 dt  = cfl*dx/(c0/u0)
-T   = 20.
+T   = 15.
 Ntfinal   = int(T/dt)
 Ntrestart = int(Ntfinal/5.)
 
@@ -67,10 +67,10 @@ Ntrestart = int(Ntfinal/5.)
 # bc_y    = 8
 
 # if restart_name == 'run':
-    # Simulate
-# t_start = Ntrestart
+# Simulate
 t_start = 0
-Nfiles  = 1E2
+# t_start = Ntrestart
+Nfiles  = 5E2
 t_save  = int(math.ceil((Ntfinal-t_start)/float(Nfiles)))
 Nt      = t_save*Nfiles
 bc_y    = 5
@@ -86,8 +86,7 @@ vf0 = 1.E-12
 
 
 # Case Analysis Configuration ==================================================
-sub_name = 'dimless_mixing_layer'
-# sub_name = restart_name + '+' + 'dimless_mixing_layer'
+sub_name = restart_name + '+' + 'nobub_dimless_mixing_layer'
 
 nnode = 1
 np = 24
@@ -127,9 +126,9 @@ case_dict =                                                                     
                     'num_patches'                  : 2,                        \
                     'model_eqns'                   : 2,                        \
                     'alt_soundspeed'               : 'F',                      \
-                    'num_fluids'                   : 3,                        \
+                    'num_fluids'                   : 2,                        \
                     'adv_alphan'                   : 'T',                      \
-                    # 'mpp_lim'                      : 'T',                      \
+                    'mpp_lim'                      : 'T',                      \
                     'mixture_err'                  : 'T',                      \
                     'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
@@ -175,10 +174,10 @@ case_dict =                                                                     
                     'patch_icpp(1)%length_y'       : Ly,                        \
                     'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.,               \
                     'patch_icpp(1)%alpha_rho(2)'   : (1.-vf0)*1.E-12,           \
-                    'patch_icpp(1)%alpha_rho(3)'   : vf0*1.E-3,                 \
+                    # 'patch_icpp(1)%alpha_rho(3)'   : vf0*1.E-3,                 \
                     'patch_icpp(1)%alpha(1)'       : (1-vf0)*1.,                \
                     'patch_icpp(1)%alpha(2)'       : (1-vf0)*1.E-12,            \
-                    'patch_icpp(1)%alpha(3)'       : vf0,                       \
+                    # 'patch_icpp(1)%alpha(3)'       : vf0,                       \
                     'patch_icpp(1)%vel(1)'         : uu,                        \
                     'patch_icpp(1)%vel(2)'         : 0.00,                      \
                     'patch_icpp(1)%pres'           : 1.00,                      \
@@ -195,15 +194,15 @@ case_dict =                                                                     
                     'patch_icpp(2)%normal(2)'      : -math.cos(math.pi*ang/180.),     \
                     'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E-12,           \
                     'patch_icpp(2)%alpha_rho(2)'   : (1.-vf0)*1.,               \
-                    'patch_icpp(2)%alpha_rho(3)'   : vf0*1.E-3,               \
+                    # 'patch_icpp(2)%alpha_rho(3)'   : vf0*1.E-3,               \
                     'patch_icpp(2)%alpha(1)'       : (1-vf0)*1.E-12,            \
                     'patch_icpp(2)%alpha(2)'       : (1-vf0)*1.,                \
-                    'patch_icpp(2)%alpha(3)'       : vf0,                \
+                    # 'patch_icpp(2)%alpha(3)'       : vf0,                \
                     'patch_icpp(2)%vel(1)'         : -1.*uu,                    \
                     'patch_icpp(2)%vel(2)'         : 0.0,                    \
                     'patch_icpp(2)%pres'           : 1.0,                    \
-                    'patch_icpp(2)%r0'             : 1.E+00,                       \
-                    'patch_icpp(2)%v0'             : 0.0E+00,                       \
+                    # 'patch_icpp(2)%r0'             : 1.E+00,                       \
+                    # 'patch_icpp(2)%v0'             : 0.0E+00,                       \
                     # 'patch_icpp(2)%normal(1)'      : 0.00624987793326E+00,     \
                     # 'patch_icpp(2)%normal(2)'      :-0.99998046932219E+00,     \
                     # 'patch_icpp(2)%length_x'       : Lx,                   \
@@ -237,36 +236,37 @@ case_dict =                                                                     
                     'fluid_pp(1)%pi_inf'            : n_tait*B_tait/(n_tait-1.),   \
                     'fluid_pp(2)%gamma'             : 1.E+00/(n_tait-1.E+00),  \
                     'fluid_pp(2)%pi_inf'            : n_tait*B_tait/(n_tait-1.),   \
-                    'fluid_pp(3)%gamma'             : 1./(gamma_gas-1.),      \
-                    'fluid_pp(3)%pi_inf'            : 0.0E+00,      \
+                    # 'fluid_pp(3)%gamma'             : 1./(gamma_gas-1.),      \
+                    # 'fluid_pp(3)%pi_inf'            : 0.0E+00,      \
                     # ==========================================================
+
                     # SHB: Tait EOS ============================================
-                    'pref'                  : p0,                  \
-                    'rhoref'                : rho0,                \
+                    # 'pref'                  : p0,                  \
+                    # 'rhoref'                : rho0,                \
                     # ==========================================================
 
                     # Bubbles ==================================================
-                    'bubbles'               : 'T',                  \
-                    'bubble_model'          : 2,                    \
-                    'polytropic'            : 'T',                  \
-                    # 'polydisperse'          : 'T',                  \
-                    'R0_type'               : 1,                    \
-                    #'polydisperse'          : 'F',                  \
-                    # 'poly_sigma'            : 0.1,                  \
-                    'thermal'               : 3,                    \
-                    'R0ref'                 : myr0,                 \
-                    # 'nb'                    : 3,                    \
-                    'nb'                    : 1,                    \
-                    'Ca'                    : Ca,                   \
-                    # 'Web'                   : We,                   \
-                    # 'Re_inv'                : Re_inv,               \
-                    #'qbmm'               : 'T',                     \
-                    #'nnode'              : 4,                       \
-                    #'dist_type'          : 2,                       \
-                    #'sigR'               : 0.1,                     \
-                    #'sigV'               : 0.1,                     \
-                    #'rhoRV'              : 0.0,                     \
-                    # ==========================================================
+                    #'bubbles'               : 'T',                  \
+                    #'bubble_model'          : 2,                    \
+                    #'polytropic'            : 'T',                  \
+                    ## 'polydisperse'          : 'T',                  \
+                    #'R0_type'               : 1,                    \
+                    ##'polydisperse'          : 'F',                  \
+                    ## 'poly_sigma'            : 0.1,                  \
+                    #'thermal'               : 3,                    \
+                    #'R0ref'                 : myr0,                 \
+                    ## 'nb'                    : 3,                    \
+                    #'nb'                    : 1,                    \
+                    #'Ca'                    : Ca,                   \
+                    ## 'Web'                   : We,                   \
+                    ## 'Re_inv'                : Re_inv,               \
+                    ##'qbmm'               : 'T',                     \
+                    ##'nnode'              : 4,                       \
+                    ##'dist_type'          : 2,                       \
+                    ##'sigR'               : 0.1,                     \
+                    ##'sigV'               : 0.1,                     \
+                    ##'rhoRV'              : 0.0,                     \
+                    ## ==========================================================
 
     }
 

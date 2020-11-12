@@ -52,7 +52,7 @@ dx      = Lx/float(Nx)
 dy      = Ly/float(Ny)
 
 # Time stepping parameters
-cfl = 0.3
+cfl = 0.6
 dt  = cfl*dx/(c0/u0)
 T   = 20.
 Ntfinal   = int(T/dt)
@@ -129,7 +129,7 @@ case_dict =                                                                     
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 3,                        \
                     'adv_alphan'                   : 'T',                      \
-                    # 'mpp_lim'                      : 'T',                      \
+                    'mpp_lim'                      : 'T',                      \
                     'mixture_err'                  : 'T',                      \
                     'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \

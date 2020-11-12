@@ -21,13 +21,8 @@ mfc_dir = '../../src'; path[:0] = [mfc_dir + '/master_scripts']
 
 from m_python_proxy import f_execute_mfc_component_SHB
 
-# Selecting MFC component
-comp_name = argv[1].strip()
-# Select type of simulation
-# restart_name = argv[2].strip()
-
 # x0      = 10.E-06
-x0      = 1.
+x0      = 1.E-3
 p0      = 101325.
 rho0    = 1000.
 u0      = math.sqrt( p0/rho0 )
@@ -38,7 +33,9 @@ B_tait  = 306.E+06 / p0
 gamma_gas = 1.4
 
 # Velocity
-uu = 4. / u0
+#udim = 4. # (used when length scale x0 -> 1)
+udim = 4.*x0
+uu = udim / u0
 
 #Cavitation number
 Ca = 1.
@@ -48,36 +45,38 @@ Lx = Ly*2/x0
 
 Ny      = 79
 Nx      = Ny*2+1
-dx      = Lx/float(Nx)
-dy      = Ly/float(Ny)
+dx      = x0*Lx/float(Nx)
+dy      = x0*Ly/float(Ny)
+
+
+# Selecting MFC component
+comp_name = argv[1].strip()
+
+# Select type of simulation
+restart_name = argv[2].strip()
+
+Ntend   = 1E5
+if restart_name == 'init':
+    # Init
+    t_start = 0
+    Nt      = Ntend
+    Nfiles  = 1E1
+    bc_y    = 8
+elif restart_name == 'run':
+    # Simulate
+    t_start = Ntend
+    Nt      = 5E5
+    Nfiles  = 1E2
+    bc_y    = 5
+else:
+    sys.exit("incorrect restart parameter")
 
 # Time stepping parameters
-cfl = 0.3
-dt  = cfl*dx/(c0/u0)
-T   = 20.
-Ntfinal   = int(T/dt)
-Ntrestart = int(Ntfinal/5.)
+cfl     = 0.7
+mydt    = cfl*dx/(c0/u0)
+Ttot    = mydt*Nt
 
-# Init
-# t_start = 0
-# Nfiles  = 5E1
-# t_save  = int(math.ceil(Ntrestart/float(Nfiles)))
-# Nt      = t_save*Nfiles
-# Ntrestart = Nt
-# bc_y    = 8
-
-# if restart_name == 'run':
-    # Simulate
-# t_start = Ntrestart
-t_start = 0
-Nfiles  = 1E2
-t_save  = int(math.ceil((Ntfinal-t_start)/float(Nfiles)))
-Nt      = t_save*Nfiles
-bc_y    = 5
-# elif restart_name != 'init':
-#     sys.exit("incorrect restart parameter")
-
-ang = 1.
+ang = 91.
 
 myr0 = 1.E+00
 vf0 = 1.E-12
@@ -86,8 +85,7 @@ vf0 = 1.E-12
 
 
 # Case Analysis Configuration ==================================================
-sub_name = 'dimless_mixing_layer'
-# sub_name = restart_name + '+' + 'dimless_mixing_layer'
+sub_name = restart_name + '+' + 'dimless_mixing_layer'
 
 nnode = 1
 np = 24
@@ -117,10 +115,10 @@ case_dict =                                                                     
                     'm'                            : Nx,                        \
                     'n'                            : Ny,                        \
                     'p'                            : 0,                         \
-                    'dt'                           : dt,                      \
+                    'dt'                           : mydt,                      \
                     't_step_start'                 : t_start,                   \
                     't_step_stop'                  : Nt,                        \
-                    't_step_save'                  : t_save ,   \
+                    't_step_save'                  : int(math.ceil((Nt-t_start)/float(Nfiles))),   \
                     # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -129,16 +127,16 @@ case_dict =                                                                     
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 3,                        \
                     'adv_alphan'                   : 'T',                      \
-                    # 'mpp_lim'                      : 'T',                      \
-                    'mixture_err'                  : 'T',                      \
+                    'mpp_lim'                      : 'F',                      \
+                    'mixture_err'                  : 'F',                      \
                     'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 3,                        \
                     'weno_eps'                     : 1.E-16,                   \
                     'char_decomp'                  : 'F',                      \
-                    'mapped_weno'                  : 'T',                      \
+                    'mapped_weno'                  : 'F',                      \
                     'null_weights'                 : 'F',                      \
-                    # 'mp_weno'                      : 'T',                      \
+                    'mp_weno'                      : 'F',                      \
                     'weno_avg'                     : 'F',                      \
                     'weno_Re_flux'                 : 'F',                      \
                     'riemann_solver'               : 2,                        \
@@ -191,8 +189,8 @@ case_dict =                                                                     
                     'patch_icpp(2)%alter_patch(1)' : 'T',                     \
                     'patch_icpp(2)%x_centroid'     : 0.,                   \
                     'patch_icpp(2)%y_centroid'     : 0.,                   \
-                    'patch_icpp(2)%normal(1)'      :  math.sin(math.pi*ang/180.),     \
-                    'patch_icpp(2)%normal(2)'      : -math.cos(math.pi*ang/180.),     \
+                    'patch_icpp(2)%normal(1)'      : math.sin(math.pi*ang/180.),     \
+                    'patch_icpp(2)%normal(2)'      : math.cos(math.pi*ang/180.),     \
                     'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E-12,           \
                     'patch_icpp(2)%alpha_rho(2)'   : (1.-vf0)*1.,               \
                     'patch_icpp(2)%alpha_rho(3)'   : vf0*1.E-3,               \
