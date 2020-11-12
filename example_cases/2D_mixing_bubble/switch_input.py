@@ -24,7 +24,7 @@ from m_python_proxy import f_execute_mfc_component_SHB
 # Selecting MFC component
 comp_name = argv[1].strip()
 # Select type of simulation
-# restart_name = argv[2].strip()
+restart_name = argv[2].strip()
 
 # x0      = 10.E-06
 x0      = 1.
@@ -54,28 +54,27 @@ dy      = Ly/float(Ny)
 # Time stepping parameters
 cfl = 0.3
 dt  = cfl*dx/(c0/u0)
-T   = 20.
+T   = 15.
 Ntfinal   = int(T/dt)
 Ntrestart = int(Ntfinal/5.)
 
 # Init
-# t_start = 0
-# Nfiles  = 5E1
-# t_save  = int(math.ceil(Ntrestart/float(Nfiles)))
-# Nt      = t_save*Nfiles
-# Ntrestart = Nt
-# bc_y    = 8
-
-# if restart_name == 'run':
-    # Simulate
-# t_start = Ntrestart
 t_start = 0
-Nfiles  = 1E2
-t_save  = int(math.ceil((Ntfinal-t_start)/float(Nfiles)))
+Nfiles  = 5E1
+t_save  = int(math.ceil(Ntrestart/float(Nfiles)))
 Nt      = t_save*Nfiles
-bc_y    = 5
-# elif restart_name != 'init':
-#     sys.exit("incorrect restart parameter")
+Ntrestart = Nt
+bc_y    = 8
+
+if restart_name == 'run':
+    # Simulate
+    t_start = Ntrestart
+    Nfiles  = 5E2
+    t_save  = int(math.ceil((Ntfinal-t_start)/float(Nfiles)))
+    Nt      = t_save*Nfiles
+    bc_y    = 5
+elif restart_name != 'init':
+    sys.exit("incorrect restart parameter")
 
 ang = 1.
 
@@ -86,8 +85,7 @@ vf0 = 1.E-12
 
 
 # Case Analysis Configuration ==================================================
-sub_name = 'dimless_mixing_layer'
-# sub_name = restart_name + '+' + 'dimless_mixing_layer'
+sub_name = restart_name + '+' + 'dimless_mixing_layer'
 
 nnode = 1
 np = 24
@@ -129,7 +127,7 @@ case_dict =                                                                     
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 3,                        \
                     'adv_alphan'                   : 'T',                      \
-                    # 'mpp_lim'                      : 'T',                      \
+                    'mpp_lim'                      : 'T',                      \
                     'mixture_err'                  : 'T',                      \
                     'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \

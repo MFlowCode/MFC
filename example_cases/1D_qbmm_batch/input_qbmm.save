@@ -47,7 +47,7 @@ We = p0*R0ref/ss
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 4.E-5
+vf0     = XXVF
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -70,9 +70,12 @@ Nt      = int(Tfinal/dt)
 dt = dt * 0.1
 # print('dt: ',dt)
 
-Nfiles = 20.
+Nt = 10000
+
+Nfiles = 2.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
+
 
 print('Web', We)
 print('Re_inv', Re_inv)
@@ -90,10 +93,12 @@ from sys import argv, path
 if len(dirname(argv[0])) != 0: chdir(dirname(argv[0]))
 
 # Adding master_scripts directory to module search path
-mfc_dir = '../../src'; path[:0] = [mfc_dir + '/master_scripts']
+mfc_dir = '../../../src'; path[:0] = [mfc_dir + '/master_scripts']
 
 # Command to execute the MFC components
-from m_python_proxy import f_execute_mfc_component
+# from m_python_proxy import f_execute_mfc_component
+from m_python_proxy import f_execute_mfc_component_SHB
+sub_name = 'XXNAME'
 
 # ==============================================================================
 
@@ -103,7 +108,7 @@ from m_python_proxy import f_execute_mfc_component
 comp_name = argv[1].strip()
 
 # Serial or parallel computational engine
-engine = 'serial'
+engine = 'parallel'
 if (comp_name=='pre_process'): engine = 'serial'
 
 # Configuring case dictionary
@@ -113,7 +118,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 4,                      \
+                    'ppn'                          : 12,                      \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -127,13 +132,11 @@ case_dict =                                                                     
                     'm'                            : Nx,                        \
                     'n'                            : 0,                         \
                     'p'                            : 0,                         \
-                    'dt'                           : 0.002,                      \
+                    'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : 8000,                        \
-                    # 't_step_stop'                  : 4,                        \
-                    't_step_save'                  : 8000,   \
-                    # 't_step_save'                  : 1,   \
-                    # ==========================================================
+                    't_step_stop'                  : Nt,                        \
+                    't_step_save'                  : Nout,   \
+		    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
                     'num_patches'                  : 2,                        \
@@ -229,13 +232,14 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
-                    'polydisperse'          : 'T',                  \
-                    'R0_type'               : 1,                    \
-                    'poly_sigma'            : 0.3,                  \
+                    # 'polydisperse'          : 'T',                  \
+                    # 'R0_type'               : 2,                    \
+                    'polydisperse'          : 'F',                  \
+                    # 'poly_sigma'            : 0.3,                  \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
                     # 'nb'                    : 3,                    \
-                    'nb'                    : 3,                    \
+                    'nb'                    : 1,                    \
                     'Ca'                    : Ca,                   \
                     # 'Web'                   : We,                   \
                     # 'Re_inv'                : Re_inv,               \
@@ -260,6 +264,7 @@ case_dict =                                                                     
     }
 
 # Executing MFC component
-f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine)
+# f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine)
+f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
 
 # ==============================================================================
