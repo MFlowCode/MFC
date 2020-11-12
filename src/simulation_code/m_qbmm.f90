@@ -182,19 +182,6 @@ MODULE m_qbmm
                         IF (  Web /=dflt_real) coeffs(6,i1,i2) = 2*i2/Web/rho
                     ELSE IF (bubble_model==2) THEN
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
-                        ! coeffs(1,i1,i2)  = -3d0*i2/2d0
-                        ! coeffs(2,i1,i2)  = -i2/c
-                        ! coeffs(3,i1,i2)  = i2/(2d0*c*c)
-                        ! coeffs(4,i1,i2)  = -i2*pres/rho
-                        ! coeffs(5,i1,i2)  = -2d0*i2*pres/(c*rho)
-                        ! coeffs(6,i1,i2)  = -i2*pres/(c*c*rho)
-                        ! coeffs(7,i1,i2)  = i2/rho
-                        ! coeffs(8,i1,i2)  = 2d0*i2/(c*rho)
-                        ! coeffs(9,i1,i2)  = i2/(c*c*rho)
-                        ! coeffs(10,i1,i2) = -3d0*i2*gam/(c*rho)
-                        ! coeffs(11,i1,i2) = -3d0*i2*gam/(c*c*rho)
-                        ! coeffs(12,i1,i2) = i1
-
                         coeffs(1,i1,i2)  = -3d0*i2/2d0
                         coeffs(2,i1,i2)  = -i2/c
                         coeffs(3,i1,i2)  = i2/(2d0*c*c)
@@ -207,7 +194,6 @@ MODULE m_qbmm
                         coeffs(10,i1,i2) = -3d0*i2*gam/(c*rho)
                         coeffs(11,i1,i2) = -3d0*i2*gam/(c*c*rho)
                         coeffs(12,i1,i2) = i1
-
                     END IF
                 END IF
             END DO; END DO
