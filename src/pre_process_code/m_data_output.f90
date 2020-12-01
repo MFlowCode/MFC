@@ -198,6 +198,8 @@ MODULE m_data_output
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
                                 ELSE IF (i.eq.mom_idx%beg) THEN !u
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
+                                ELSE IF (i.eq.stress_idx%beg) THEN !tau_e
+                                    WRITE(2,FMT) x_cb(j),q_cons_vf(stress_idx%beg)%sf(j,0,0)/rho
                                 ELSE IF (i.eq.E_idx) THEN !p
                                     IF (model_eqns == 4) THEN
                                         !Tait pressure from density
@@ -225,7 +227,7 @@ MODULE m_data_output
                                             pi_inf &
                                             ) / gamma
                                     END IF
-                                ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
+                                ELSE IF ((i .GE. bub_idx%beg) .AND. (i .LE. bub_idx%end) .AND. bubbles) THEN
                                     DO k = 1,nb
                                         nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
                                     END DO
@@ -247,6 +249,13 @@ MODULE m_data_output
                         END DO
                     CLOSE(2)
                 END DO
+            END IF
+
+
+            IF (precision==1) THEN
+                FMT="(3F30.7)"
+            ELSE
+                FMT="(3F40.14)"
             END IF
 
             ! 2D

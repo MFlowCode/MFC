@@ -72,6 +72,9 @@ PROGRAM p_main
     USE m_derived_variables    !< Derived variables evaluation procedures
     
     USE m_time_steppers        !< Time-stepping algorithms
+
+    USE m_qbmm                 !< Quadrature MOM
+
     ! ==========================================================================
     
     IMPLICIT NONE
@@ -96,6 +99,7 @@ PROGRAM p_main
         CALL s_read_input_file()
         CALL s_check_input_file()
     END IF
+    print*, 'Read input file'
    
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -103,6 +107,7 @@ PROGRAM p_main
     CALL s_mpi_bcast_user_inputs()
     CALL s_initialize_parallel_io()
     CALL s_mpi_decompose_computational_domain()
+    print*, 'Broadcast'
     
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -117,7 +122,10 @@ PROGRAM p_main
     CALL s_initialize_data_output_module()
     CALL s_initialize_derived_variables_module()
     CALL s_initialize_time_steppers_module()    
+    IF (qbmm) CALL s_initialize_qbmm_module()
 
+    print*, 'Initialize'
+    
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
         s_read_data_files => s_read_serial_data_files
@@ -135,7 +143,8 @@ PROGRAM p_main
     CALL s_populate_grid_variables_buffers()
     
     CALL s_populate_variables_buffers(q_cons_ts(1)%vf)
-    IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
+    IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) &
+        CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
    
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure
@@ -147,12 +156,27 @@ PROGRAM p_main
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
+    IF (t_step == 0) THEN
+        mytime = 0d0
+    ELSE
+        mytime = t_step*dt
+    END IF
+    finaltime = t_step_stop*dt
+    dt0 = dt
 
     ! Time-stepping Loop =======================================================
     DO
-        IF (proc_rank==0 .AND. MOD(t_step,t_step_save)==0 ) THEN
-            PRINT*, 'Time step ', t_step, ' of ', t_step_stop
+        IF (proc_rank==0) THEN
+            IF (time_stepper==23) THEN 
+                PRINT*, '------------', mytime/finaltime*100d0, 'percent done'
+            ELSE
+                PRINT*, '------ Time step ', t_step, 'of', t_step_stop, '----'
+            END IF
         END IF
+        mytime = mytime + dt
+
+        CALL s_compute_derived_variables(t_step)
+        IF (DEBUG) PRINT*, 'Computed derived vars'
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         IF(time_stepper == 1) THEN
@@ -163,19 +187,31 @@ PROGRAM p_main
             CALL s_3rd_order_tvd_rk(t_step)
         ELSEIF(time_stepper == 4) THEN
             CALL s_4th_order_rk(t_step)
+        ELSEIF(time_stepper == 23) THEN
+            CALL s_23_order_tvd_rk(t_step)
         ELSE
             CALL s_5th_order_rk(t_step)
         END IF
 
-        CALL s_compute_derived_variables(t_step)
+
 
         ! Time-stepping loop controls
-        IF(t_step == t_step_stop) THEN
-            EXIT 
+        IF (time_stepper /= 23) THEN
+            IF(t_step == t_step_stop) THEN
+                EXIT 
+            ELSE
+                t_step = t_step + 1
+            END IF
         ELSE
-            t_step = t_step + 1
+            IF(mytime >= finaltime) THEN
+                EXIT 
+            ELSE
+                IF ( (mytime + dt) >= finaltime ) dt = finaltime - mytime
+                t_step = t_step + 1
+            END IF
         END IF
        
+        ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         IF(MOD(t_step-t_step_start, t_step_save) == 0) THEN
             CALL s_write_data_files(q_cons_ts(1)%vf, t_step)

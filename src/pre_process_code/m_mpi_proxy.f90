@@ -228,7 +228,8 @@ MODULE m_mpi_proxy
                                       0, MPI_COMM_WORLD, ierr  )
             CALL MPI_BCAST( bc_z%end, 1, MPI_DOUBLE_PRECISION, &
                                       0, MPI_COMM_WORLD, ierr  )
-            
+            CALL MPI_BCAST(hypoelasticity, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
             CALL MPI_BCAST(parallel_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(precision, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(perturb_flow, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -303,6 +304,9 @@ MODULE m_mpi_proxy
                 CALL MPI_BCAST( patch_icpp(i)%pi_inf         , 1, &
                                 MPI_DOUBLE_PRECISION         , 0, &
                                 MPI_COMM_WORLD, ierr              )
+                CALL MPI_BCAST( patch_icpp(i)%tau_e(1)       , 6, &
+                                MPI_DOUBLE_PRECISION         , 0, &
+                                MPI_COMM_WORLD, ierr              )
                 CALL MPI_BCAST( patch_icpp(i)%alter_patch(0)             , &
                                 num_patches_max , MPI_LOGICAL         , 0, &
                                 MPI_COMM_WORLD, ierr                       )
@@ -320,6 +324,15 @@ MODULE m_mpi_proxy
                 CALL MPI_BCAST( patch_icpp(i)%v0         , 1, &
                                 MPI_DOUBLE_PRECISION         , 0, &
                                 MPI_COMM_WORLD, ierr              )
+                CALL MPI_BCAST( patch_icpp(i)%p0         , 1, &
+                                MPI_DOUBLE_PRECISION         , 0, &
+                                MPI_COMM_WORLD, ierr              )
+                CALL MPI_BCAST( patch_icpp(i)%m0         , 1, &
+                                MPI_DOUBLE_PRECISION         , 0, &
+                                MPI_COMM_WORLD, ierr              )
+
+
+
                  
             END DO
             
@@ -354,6 +367,9 @@ MODULE m_mpi_proxy
                 CALL MPI_BCAST( fluid_pp(i)%k_v  , 1, &
                                 MPI_DOUBLE_PRECISION, 0, &
                                 MPI_COMM_WORLD, ierr     )
+                CALL MPI_BCAST( fluid_pp(i)%G   , 1, &
+                                MPI_DOUBLE_PRECISION, 0, &
+                                MPI_COMM_WORLD, ierr    )
             END DO
             
             ! Tait EOS
@@ -395,6 +411,29 @@ MODULE m_mpi_proxy
                         MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST( Re_inv,1,            &
                         MPI_DOUBLE_PRECISION,0, &
+                        MPI_COMM_WORLD,ierr)
+
+
+            CALL MPI_BCAST( qbmm,1,          &
+                        MPI_LOGICAL,0,          &
+                        MPI_COMM_WORLD,ierr  )
+            CALL MPI_BCAST( nnode,1,            &
+                        MPI_INTEGER,0, &
+                        MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( sigR,1,            &
+                        MPI_DOUBLE_PRECISION,0, &
+                        MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( sigV,1,            &
+                        MPI_DOUBLE_PRECISION,0, &
+                        MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( rhoRV,1,            &
+                        MPI_DOUBLE_PRECISION,0, &
+                        MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( dist_type,1,            &
+                        MPI_INTEGER,0, &
+                        MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( R0_type,1,            &
+                        MPI_INTEGER,0, &
                         MPI_COMM_WORLD,ierr)
 
 

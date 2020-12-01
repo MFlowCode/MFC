@@ -288,6 +288,7 @@ MODULE m_initial_condition
             REAL(KIND(0d0)) :: orig_rho     
             REAL(KIND(0d0)) :: orig_gamma
             REAL(KIND(0d0)) :: orig_pi_inf 
+            REAL(KIND(0d0)) :: muR, muV
 
             REAL(KIND(0d0)), DIMENSION(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
@@ -353,10 +354,46 @@ MODULE m_initial_condition
             ! Bubbles variables
             IF (bubbles) THEN
                 DO i = 1,nb
-                    q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = R0(i)*patch_icpp(patch_id)%r0
-                    q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = V0(i)*patch_icpp(patch_id)%v0
+                    muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
+                    muV = patch_icpp(patch_id)%v0 ! = 0
+
+                    IF (qbmm) THEN
+                        IF (dist_type == 1) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = muR**2d0 + sigR**2d0
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = muR*muV + rhoRV*sigR*sigV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        ELSE IF (dist_type == 2) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        END IF
+
+                        if (j==0 .and. k==0 .and. l==0) then
+                            print*, 'moments @ (0,0,0): ', &
+                                q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l), &
+                                q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l)
+                        end if
+                    ELSE
+                        q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
+                        q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
+                    END IF
                 END DO
             END IF
+
 
             ! Density and the specific heat ratio and liquid stiffness functions
             CALL s_convert_species_to_mixture_variables(    &
@@ -397,10 +434,36 @@ MODULE m_initial_condition
             ! Bubbles variables
             IF (bubbles) THEN
                 DO i = 1,nb
-                    q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = R0(i)*patch_icpp(smooth_patch_id)%r0
-                    q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = V0(i)*patch_icpp(smooth_patch_id)%v0
+                    muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
+                    muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
+                    IF (qbmm) THEN
+                        ! Initialize the moment set
+                        IF (dist_type == 1) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = muR**2d0 + sigR**2d0
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = muR*muV + rhoRV*sigR*sigV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        ELSE IF (dist_type == 2) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        END IF
+                    ELSE
+                        q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
+                        q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
+                    END IF
                 END DO
             END IF
+
            
             ! Density and the specific heat ratio and liquid stiffness functions
             CALL s_convert_species_to_mixture_variables(       &
@@ -471,15 +534,41 @@ MODULE m_initial_condition
             ! Smoothed bubble variables
             IF (bubbles) THEN
                 DO i = 1,nb
-                    q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
-                        (eta * R0(i)*patch_icpp(patch_id)%r0 & 
-                        + (1d0-eta)*orig_prim_vf(bub_idx%rs(i)))
-                    q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = &
-                        (eta * V0(i)*patch_icpp(patch_id)%v0 & 
-                        + (1d0-eta)*orig_prim_vf(bub_idx%vs(i)))
+                    muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
+                    muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
+                    IF (qbmm) THEN
+                        ! Initialize the moment set
+                        IF (dist_type == 1) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = muR**2d0 + sigR**2d0
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = muR*muV + rhoRV*sigR*sigV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        ELSE IF (dist_type == 2) THEN
+                            q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
+                            q_prim_vf(bub_idx%fullmom(i,1,0))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR
+                            q_prim_vf(bub_idx%fullmom(i,0,1))%sf(j,k,l) = muV
+                            q_prim_vf(bub_idx%fullmom(i,2,0))%sf(j,k,l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
+                            q_prim_vf(bub_idx%fullmom(i,1,1))%sf(j,k,l) = dexp((sigR**2d0)/2d0)*muR*muV
+                            q_prim_vf(bub_idx%fullmom(i,0,2))%sf(j,k,l) = muV**2d0 + sigV**2d0
+                        END IF
+                    ELSE
+                        ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
+                        !     (eta * R0(i)*patch_icpp(patch_id)%r0 & 
+                        !     + (1d0-eta)*orig_prim_vf(bub_idx%rs(i)))
+                        ! q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = &
+                        !     (eta * V0(i)*patch_icpp(patch_id)%v0 & 
+                        !     + (1d0-eta)*orig_prim_vf(bub_idx%vs(i)))
+                        q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
+                        q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
 
-                    q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = R0(i)*patch_icpp(patch_id)%r0
-                    q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = V0(i)*patch_icpp(patch_id)%v0
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
+
+                    END IF
                 END DO
             END IF
 
@@ -496,10 +585,15 @@ MODULE m_initial_condition
                 END DO
             END IF
 
-            IF (bubbles .AND. (polytropic .NEQV. .TRUE.) ) THEN
+            IF (bubbles .AND. (.NOT. polytropic) ) THEN
                 DO i = 1,nb
-                    q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
-                    q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
+                    IF( q_prim_vf(bub_idx%ps(i))%sf(j,k,l) == dflt_real ) THEN
+                        q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
+                        print*, 'setting to pb0'
+                    END IF
+                    IF( q_prim_vf(bub_idx%ms(i))%sf(j,k,l) == dflt_real ) THEN
+                        q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
+                    END IF
                 END DO
             END IF
             
@@ -630,8 +724,17 @@ MODULE m_initial_condition
             ! Pressure
             q_prim_vf(E_idx)%sf(j,k,l) = &
                     (eta * patch_icpp(patch_id)%pres  &
-                     + (1d0 - eta) * orig_prim_vf(E_idx))            
-            
+                     + (1d0 - eta) * orig_prim_vf(E_idx))
+
+            ! Elastic Shear Stress
+            IF (hypoelasticity) THEN
+                DO i = 1, (stress_idx%end - stress_idx%beg) + 1
+                    q_prim_vf(i+stress_idx%beg - 1)%sf(j,k,l) = &
+                        (eta * patch_icpp(patch_id)%tau_e(i) &
+                         + (1d0-eta)*orig_prim_vf(i+stress_idx%beg -1))
+                END DO            
+            END IF
+
             ! Set partial pressures to mixture pressure
             IF(model_eqns == 3) THEN
                 DO i = internalEnergies_idx%beg, internalEnergies_idx%end
@@ -643,7 +746,7 @@ MODULE m_initial_condition
             IF(1d0 - eta < 1d-16) patch_id_fp(j,k,l) = patch_id
            
             
-        END SUBROUTINE s_assign_patch_species_primitive_variables ! ------------
+        END SUBROUTINE s_assign_patch_species_primitive_variables ! ------------  
         
         !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
@@ -938,18 +1041,20 @@ MODULE m_initial_condition
                         ELSE
                             perturb_alpha = q_prim_vf(E_idx+perturb_flow_fluid)%sf(i,j,k)
                         END IF
-                        IF (perturb_alpha == 1d0) THEN
+                        ! IF (perturb_alpha == 1d0) THEN
                             ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
 !                            rand_real = rand_real / 1d2 / 1d3
 !                            q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
                             ! Perturb velocity
-                            DO l = mom_idx%beg+1, mom_idx%end
-                                CALL RANDOM_NUMBER(rand_real)
-                                rand_real = rand_real / 1d1 / 145d1
-                                q_prim_vf(l)%sf(i,j,k) = q_prim_vf(l)%sf(i,j,k) + rand_real
-                            END DO
-                        END IF
+                            CALL RANDOM_NUMBER(rand_real)
+                            rand_real = rand_real * 1.d-2
+                            q_prim_vf(mom_idx%beg)%sf(i,j,k) = (1.d0+rand_real)*q_prim_vf(mom_idx%beg)%sf(i,j,k)
+                            q_prim_vf(mom_idx%end)%sf(i,j,k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i,j,k)
+                            IF (bubbles) THEN
+                                q_prim_vf(alf_idx)%sf(i,j,k) = (1.d0+rand_real)*q_prim_vf(alf_idx)%sf(i,j,k)
+                            END IF
+                        ! END IF
                     END DO
                 END DO
             END DO

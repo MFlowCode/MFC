@@ -115,6 +115,7 @@ MODULE m_start_up
                                    mapped_weno, mp_weno, weno_avg,           &
                                    riemann_solver, wave_speeds, avg_state,   &
                                    commute_err, split_err, bc_x, bc_y, bc_z, &
+                                   hypoelasticity,                           &
                                    fluid_pp, com_wrt, cb_wrt, probe_wrt,     &
                                    fd_order, probe, num_probes, t_step_old,  &
                                    threshold_mf, moment_order, alt_crv,      &
@@ -130,7 +131,8 @@ MODULE m_start_up
                                    monopole, mono, num_mono,                 &
                                    polytropic, thermal,                      &
                                    integral, integral_wrt, num_integrals,    &
-                                   polydisperse, poly_sigma
+                                   polydisperse, poly_sigma, qbmm, nnode,    &
+                                   R0_type, DEBUG, t_tol
             
             
             ! Checking that an input file has been provided by the user. If it
@@ -241,6 +243,9 @@ MODULE m_start_up
             ELSEIF( model_eqns == 2 .AND. bubbles .AND. bubble_model == 1  ) THEN
                 PRINT '(A)', 'The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)'
                 CALL s_mpi_abort()
+            ELSEIF( bubbles .AND. bubble_model == 3 .AND. (polytropic .NEQV. .TRUE.)  ) THEN
+                PRINT '(A)', 'RP bubbles require polytropic compression'
+                CALL s_mpi_abort()
             ELSEIF( cyl_coord .AND. bubbles ) THEN
                 PRINT '(A)', 'Bubble models untested in cylindrical coordinates'
                 CALL s_mpi_abort()
@@ -276,6 +281,12 @@ MODULE m_start_up
                 CALL s_mpi_abort()
             ELSEIF( polydisperse .and. (poly_sigma == dflt_real) ) THEN
                 PRINT '(A)', 'Polydisperse bubble modeling requires poly_sigma > 0'
+                CALL s_mpi_abort()
+            ELSEIF( qbmm.AND. (bubbles .NEQV. .TRUE.) ) THEN
+                PRINT '(A)', 'QBMM requires bubbles'
+                CALL s_mpi_abort()
+            ELSEIF( qbmm .AND. (nnode .NE. 4) ) THEN
+                PRINT '(A)', 'nnode not supported'
                 CALL s_mpi_abort()
             ELSEIF(model_eqns == 3 .AND. riemann_solver /= 2) THEN
                 PRINT '(A)', 'Unsupported combination of values of ' // &
@@ -343,7 +354,12 @@ MODULE m_start_up
                              'num_fluids and mpp_lim. Exiting ...'
                 CALL s_mpi_abort()
             ELSEIF(time_stepper < 1 .OR. time_stepper > 5) THEN
-                PRINT '(A)', 'Unsupported value of time_stepper. Exiting ...'
+                IF (time_stepper /= 23 ) THEN
+                    PRINT '(A)', 'Unsupported value of time_stepper. Exiting ...'
+                    CALL s_mpi_abort()
+                END IF
+            ELSEIF(t_tol == dflt_real .AND. time_stepper == 23 ) THEN
+                PRINT '(A)', 'Adaptive timestepping requires a tolerance t_tol'
                 CALL s_mpi_abort()
             ELSEIF(ALL(weno_vars /= (/1,2/))) THEN
                 PRINT '(A)', 'Unsupported value of weno_vars. Exiting ...'
@@ -937,7 +953,7 @@ MODULE m_start_up
             
             
             ! Cell-average Conservative Variables ==============================
-            IF (bubbles .NEQV. .True. ) THEN
+            IF ((bubbles .NEQV. .True.) .AND. (hypoelasticity .NEQV. .TRUE.)) THEN
                 DO i = 1, adv_idx%end
                     WRITE(file_path, '(A,I0,A)') &
                            TRIM(t_step_dir) // '/q_cons_vf', i, '.dat'
@@ -1096,7 +1112,7 @@ MODULE m_start_up
                 NVARS_MOK = INT(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                IF (bubbles) THEN
+                IF ((bubbles .EQV. .TRUE.) .OR. (hypoelasticity .EQV. .TRUE.)) THEN
                     DO i = 1, sys_size!adv_idx%end
                         var_MOK = INT(i, MPI_OFFSET_KIND)
 

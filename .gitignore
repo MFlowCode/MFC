@@ -21,14 +21,26 @@ tests/*/silo*
 tests/*/restart*
 tests/*/*.out
 tests/*/binary
+<<<<<<< HEAD
+=======
+example_cases/*batch/*/
+>>>>>>> MFC_private/master
 example_cases/*/D/*
 example_cases/*/p*
 example_cases/*/D_*
 example_cases/*/*.inf
 example_cases/*/*.inp
 example_cases/*/*.dat
+<<<<<<< HEAD
+=======
+example_cases/*/*.o*
+>>>>>>> MFC_private/master
 example_cases/*/silo*
 example_cases/*/restart*
 example_cases/*/*.out
 example_cases/*/binary
 lib/fftw-3.3.8
+<<<<<<< HEAD
+=======
+lib/lapack-3.4.2
+>>>>>>> MFC_private/master

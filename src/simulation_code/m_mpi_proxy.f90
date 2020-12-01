@@ -66,6 +66,7 @@ MODULE m_mpi_proxy
     INTEGER, PRIVATE :: err_code, ierr
     !> @}
     
+
     CONTAINS
         
         
@@ -228,6 +229,13 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST(t_step_start, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST(t_step_stop , 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST(t_step_save , 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
+
+
+            CALL MPI_BCAST( t_tol  ,        1      , &
+                                MPI_DOUBLE_PRECISION,        0      , &
+                                MPI_COMM_WORLD, ierr                  )
+            CALL MPI_BCAST(debug, 1, MPI_LOGICAL         , &
+                                           0, MPI_COMM_WORLD, ierr  )
             
             
             ! Simulation algorithm parameters
@@ -301,6 +309,8 @@ MODULE m_mpi_proxy
                                            0, MPI_COMM_WORLD, ierr  )
             CALL MPI_BCAST(precision      , 1, MPI_INTEGER         , &
                                            0, MPI_COMM_WORLD, ierr  )
+            CALL MPI_BCAST(hypoelasticity, 1, MPI_LOGICAL         , &
+                                            0, MPI_COMM_WORLD,ierr   )
             
             CALL MPI_BCAST(bc_x%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_BCAST(bc_x%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -353,6 +363,9 @@ MODULE m_mpi_proxy
                 CALL MPI_BCAST( fluid_pp(i)%k_v  , 1, &
                                 MPI_DOUBLE_PRECISION, 0, &
                                 MPI_COMM_WORLD, ierr     )                            
+                Call MPI_BCAST( fluid_pp(i)%G   , 1, &
+                                MPI_DOUBLE_PRECISION, 0, &
+                                MPI_COMM_WORLD, ierr    )
             END DO
 
             !Tait EOS
@@ -382,6 +395,9 @@ MODULE m_mpi_proxy
             CALL MPI_BCAST( nb,1,            &
                         MPI_INTEGER,0, &
                         MPI_COMM_WORLD,ierr)
+            CALL MPI_BCAST( R0_type,1,            &
+                        MPI_INTEGER,0, &
+                        MPI_COMM_WORLD,ierr)
             CALL MPI_BCAST( Web,1,            &
                         MPI_DOUBLE_PRECISION,0, &
                         MPI_COMM_WORLD,ierr)
@@ -396,6 +412,13 @@ MODULE m_mpi_proxy
                         MPI_COMM_WORLD,ierr  )
             CALL MPI_BCAST( poly_sigma,1,            &
                         MPI_DOUBLE_PRECISION,0, &
+                        MPI_COMM_WORLD,ierr)
+
+            CALL MPI_BCAST( qbmm,1,          &
+                        MPI_LOGICAL,0,          &
+                        MPI_COMM_WORLD,ierr  )
+            CALL MPI_BCAST( nnode,1,            &
+                        MPI_INTEGER,0, &
                         MPI_COMM_WORLD,ierr)
 
             !Acoustic monopole
@@ -416,6 +439,9 @@ MODULE m_mpi_proxy
                     MPI_DOUBLE_PRECISION,        0      , &
                     MPI_COMM_WORLD, ierr                  )
                 CALL MPI_BCAST( mono(j)%length   ,              1      , &
+                    MPI_DOUBLE_PRECISION,        0      , &
+                    MPI_COMM_WORLD, ierr                  )
+                CALL MPI_BCAST( mono(j)%delay,              1      , &
                     MPI_DOUBLE_PRECISION,        0      , &
                     MPI_COMM_WORLD, ierr                  )
                 CALL MPI_BCAST( mono(j)%dir   ,              1      , &

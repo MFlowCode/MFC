@@ -21,11 +21,28 @@ If you already have FFTW compiled:
     include files in Makefile.user (fftw_lib_dir and
     fftw_include_dir)
 
+<<<<<<< HEAD
 If you do not have FFTW compiler, the library and 
+=======
+If you do not have FFTW compiled, the library and 
+>>>>>>> MFC_private/master
 installer are included in this package. Just:
     $$ cd installers
     $$ ./install_fftw.sh
 
+<<<<<<< HEAD
+=======
+## LAPACK ##
+If you already have LAPACK compiled:
+    - Specify the location of your LAPACK library and 
+    include files in Makefile.user (lapack_lib_dir) 
+
+If you do not have LAPACK compiled, the library and 
+installer are included in this package. Just:
+    $$ cd installers
+    $$ ./install_lapack.sh
+
+>>>>>>> MFC_private/master
 #> Post-processing of parallel data files is not required,
 #> but can indeed be handled with the MFC. For this, HDF5
 #> and Silo must be installed

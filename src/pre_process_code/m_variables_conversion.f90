@@ -385,12 +385,19 @@ MODULE m_variables_conversion
                         END DO
 
                         IF (bubbles) THEN
+                            ! From cons: ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
                             DO i = 1,nb
                                 nRtmp(i) = q_cons_vf(bub_idx%rs(i))%sf(j,k,l)
                             END DO
                             CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j,k,l), nRtmp, nbub)
-                            DO i = bub_idx%beg, sys_size
+                            DO i = bub_idx%beg, bub_idx%end
                                 q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l)/nbub
+                            END DO
+                        END IF
+
+                        IF (hypoelasticity) THEN
+                            DO i = stress_idx%beg, stress_idx%end
+                                q_prim_vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l)/rho
                             END DO
                         END IF
                     END DO
@@ -482,16 +489,27 @@ MODULE m_variables_conversion
                         END DO
 
                         IF (bubbles) THEN
+                            ! From prim: Compute nbub = (3/4pi) * \alpha / \bar{R^3}
                             DO i = 1,nb
                                 Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j,k,l)
                             END DO
                             CALL s_comp_n_from_prim( q_prim_vf(alf_idx)%sf(j,k,l), Rtmp, nbub)
-
-                            DO i = bub_idx%beg, sys_size
+                            IF( j==0 .and. k==0 .and. l==0) print*, 'In convert, nbub:', nbub
+                            DO i = bub_idx%beg, bub_idx%end
                                 q_cons_vf(i)%sf(j,k,l) = q_prim_vf(i)%sf(j,k,l)*nbub
+                                ! IF( j==0 .and. k==0 .and. l==0) THEN
+                                !     PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
+                                ! END IF
+                            END DO
+
+                        END IF
+
+                        IF (hypoelasticity) THEN
+                            DO i = stress_idx%beg, stress_idx%end
+                                q_cons_vf(i)%sf(j,k,l) = rho*q_prim_vf(i)%sf(j,k,l)
                             END DO
                         END IF
-                        
+
                     END DO
                 END DO
             END DO

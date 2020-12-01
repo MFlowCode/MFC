@@ -375,8 +375,8 @@ MODULE m_data_output
                 ! structure
                 OPEN(i+30, FILE = TRIM(file_path), &
                     FORM = 'formatted', &
-                    POSITION = 'append', &
                     STATUS   = 'unknown')
+                    ! POSITION = 'append', &
                 !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
                 !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
                 !WRITE(i+30,'(A,F10.6)') 'y = ',probe(i)%y
@@ -698,9 +698,12 @@ MODULE m_data_output
 
                 IF (icfl_max_glb /= icfl_max_glb) THEN
                     PRINT '(A)', 'ICFL is NaN. Exiting ...'
+                    ! print*, (dt/dx(:)),ABS(vel(1)),c
+
                     CALL s_mpi_abort()
                 ELSEIF (icfl_max_glb > 1d0) THEN
                     PRINT '(A)', 'ICFL is greater than 1.0. Exiting ...'
+                    PRINT*, 'icfl', icfl_max_glb
                     CALL s_mpi_abort()
                 END IF
             END IF
@@ -840,6 +843,8 @@ MODULE m_data_output
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(i)%sf(j,0,0)
                                 ELSE IF (i.eq.mom_idx%beg) THEN !u
                                     WRITE(2,FMT) x_cb(j),q_cons_vf(mom_idx%beg)%sf(j,0,0)/rho
+                                ELSE IF (i.eq.stress_idx%beg) THEN !tau_e
+                                    WRITE(2,FMT) x_cb(j),q_cons_vf(stress_idx%beg)%sf(j,0,0)/rho
                                 ELSE IF (i.eq.E_idx) THEN !p
                                     IF (model_eqns == 4) THEN
                                         !Tait pressure from density
@@ -867,7 +872,7 @@ MODULE m_data_output
                                             pi_inf &
                                             ) / gamma
                                     END IF
-                                ELSE IF ((i .GT. alf_idx) .AND. bubbles) THEN
+                                ELSE IF ((i >= bub_idx%beg) .AND. (i <= bub_idx%end) .AND. bubbles) THEN
                                     DO k = 1,nb
                                         nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j,0,0)
                                     END DO
@@ -891,6 +896,13 @@ MODULE m_data_output
                 END DO
             END IF
 
+
+            IF (precision==1) THEN
+                FMT="(3F30.7)"
+            ELSE
+                FMT="(3F40.14)"
+            END IF
+
             ! 2D
             IF ( (n>0) .AND. (p==0) ) THEN
                 DO i = 1,sys_size
@@ -904,6 +916,13 @@ MODULE m_data_output
                         END DO
                     CLOSE(2)
                 END DO
+            END IF
+
+
+            IF (precision==1) THEN
+                FMT="(4F30.7)"
+            ELSE
+                FMT="(4F40.14)"
             END IF
 
             ! 3D
@@ -1817,6 +1836,8 @@ MODULE m_data_output
             REAL(KIND(0d0))                                   :: gamma
             REAL(KIND(0d0))                                   :: pi_inf
             REAL(KIND(0d0))                                   :: c
+            REAL(KIND(0d0))                                   :: M00, M10, M01, M20, M11, M02
+            REAL(KIND(0d0))                                   :: varR, varV
             REAL(KIND(0d0)), DIMENSION(Nb)                    :: nR, R, nRdot, Rdot
             REAL(KIND(0d0))                                   :: accel
             REAL(KIND(0d0))                                   :: int_pres
@@ -1839,10 +1860,14 @@ MODULE m_data_output
             LOGICAL :: trigger !< For integral quantities
 
             ! Non-dimensional time calculation
-            IF (t_step_old /= dflt_int) THEN
-                nondim_time = REAL(t_step + t_step_old,KIND(0d0))*dt
+            IF (time_stepper == 23) THEN
+                nondim_time = mytime
             ELSE
-                nondim_time = REAL(t_step,KIND(0d0))*dt !*1.d-5/10.0761131451d0
+                IF (t_step_old /= dflt_int) THEN
+                    nondim_time = REAL(t_step + t_step_old,KIND(0d0))*dt
+                ELSE
+                    nondim_time = REAL(t_step,KIND(0d0))*dt !*1.d-5/10.0761131451d0
+                END IF
             END IF
 
             DO i = 1, num_probes
@@ -1856,6 +1881,17 @@ MODULE m_data_output
                 pi_inf = 0d0
                 c = 0d0
                 accel = 0d0
+                nR = 0d0; R = 0d0
+                nRdot = 0d0; Rdot = 0d0
+                nbub = 0d0
+                M00 = 0d0
+                M10 = 0d0
+                M01 = 0d0
+                M20 = 0d0
+                M11 = 0d0
+                M02 = 0d0
+                varR = 0d0; varV = 0d0
+                alf = 0d0
 
                 ! Find probe location in terms of indices on a
                 ! specific processor
@@ -1896,7 +1932,6 @@ MODULE m_data_output
                                 ) / gamma
                         ELSE
                             !Stiffened gas pressure from energy with bubbles
-
                             pres = (                                       & 
                                 (q_cons_vf(E_idx)%sf(j-2,k,l)  -            &
                                 0.5d0*(q_cons_vf(mom_idx%beg)%sf(j-2,k,l)**2.d0)/rho) / &
@@ -1909,19 +1944,37 @@ MODULE m_data_output
                             alf = q_cons_vf(alf_idx)%sf(j-2,k,l)
                             IF (num_fluids == 3) THEN
                                 alfgr = q_cons_vf(alf_idx-1)%sf(j-2,k,l)
-                            end IF
+                            END IF
                             DO s = 1,nb
                                 nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k,l)
                                 nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k,l)
                             END DO
-                            CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k,l), nR, nbub)
-                                
+                            CALL s_comp_n_from_cons( alf, nR, nbub)
+                            IF (DEBUG) print*, 'In probe, nbub: ', nbub
+
+                            IF (qbmm) THEN
+                                M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
+                                M10 = q_cons_vf(bub_idx%moms(1,2))%sf(j-2,k,l)/nbub
+                                M01 = q_cons_vf(bub_idx%moms(1,3))%sf(j-2,k,l)/nbub
+                                M20 = q_cons_vf(bub_idx%moms(1,4))%sf(j-2,k,l)/nbub
+                                M11 = q_cons_vf(bub_idx%moms(1,5))%sf(j-2,k,l)/nbub
+                                M02 = q_cons_vf(bub_idx%moms(1,6))%sf(j-2,k,l)/nbub
+
+                                M10 = M10/M00
+                                M01 = M01/M00
+                                M20 = M20/M00
+                                M11 = M11/M00
+                                M02 = M02/M00
+
+                                varR = M20 - M10**2d0
+                                varV = M02 - M01**2d0
+                            END IF
                             R(:) = nR(:)/nbub                        
                             Rdot(:) = nRdot(:)/nbub                        
                         
                             ptilde = ptil(j-2,k,l)
                             ptot = pres - ptilde
-                        end IF
+                        END IF
 
                         ! Compute mixture sound speed
                         IF (alt_soundspeed .OR. regularization) THEN
@@ -1999,12 +2052,12 @@ MODULE m_data_output
                             end IF
 
                             IF (bubbles) THEN
-                                alf = q_cons_vf(alf_idx)%sf(j-2,k-2,0)
+                                alf = q_cons_vf(alf_idx)%sf(j-2,k-2,l)
                                 DO s = 1,nb
                                     nR(s)   = q_cons_vf(bub_idx%rs(s))%sf(j-2,k-2,l)
                                     nRdot(s)= q_cons_vf(bub_idx%vs(s))%sf(j-2,k-2,l)
                                 END DO
-                                CALL s_comp_n_from_cons( q_cons_vf(alf_idx)%sf(j-2,k-2,l), nR, nbub)
+                                CALL s_comp_n_from_cons( alf, nR, nbub)
                                 
                                 R(:) = nR(:)/nbub                        
                                 Rdot(:) = nRdot(:)/nbub                        
@@ -2110,42 +2163,81 @@ MODULE m_data_output
                     tmp = accel
                     CALL s_mpi_allreduce_sum(tmp,accel)
 
-                    tmp = alf
-                    CALL s_mpi_allreduce_sum(tmp,alf)
-                    tmp = alfgr
-                    CALL s_mpi_allreduce_sum(tmp,alfgr)
-                    tmp = nR(1)
-                    CALL s_mpi_allreduce_sum(tmp,nR(1))
-                    tmp = nRdot(1)
-                    CALL s_mpi_allreduce_sum(tmp,nRdot(1))
-                    tmp = R(1)
-                    CALL s_mpi_allreduce_sum(tmp,R(1))
-                    tmp = Rdot(1)
-                    CALL s_mpi_allreduce_sum(tmp,Rdot(1))
-
                     IF (bubbles) THEN
+                        tmp = alf
+                        CALL s_mpi_allreduce_sum(tmp,alf)
+                        tmp = alfgr
+                        CALL s_mpi_allreduce_sum(tmp,alfgr)
+                        tmp = nbub
+                        CALL s_mpi_allreduce_sum(tmp,nbub)
+                        tmp = nR(1)
+                        CALL s_mpi_allreduce_sum(tmp,nR(1))
+                        tmp = nRdot(1)
+                        CALL s_mpi_allreduce_sum(tmp,nRdot(1))
+                        tmp = M00
+                        CALL s_mpi_allreduce_sum(tmp,M00)
+                        tmp = R(1)
+                        CALL s_mpi_allreduce_sum(tmp,R(1))
+                        tmp = Rdot(1)
+                        CALL s_mpi_allreduce_sum(tmp,Rdot(1))
                         tmp = ptilde
                         CALL s_mpi_allreduce_sum(tmp,ptilde)
                         tmp = ptot
                         CALL s_mpi_allreduce_sum(tmp,ptot)
-                    end IF
+
+                        IF (qbmm) THEN
+                            tmp = varR
+                            CALL s_mpi_allreduce_sum(tmp,varR)
+                            tmp = varV
+                            CALL s_mpi_allreduce_sum(tmp,varV)
+
+                            tmp = M10
+                            CALL s_mpi_allreduce_sum(tmp,M10)
+                            tmp = M01
+                            CALL s_mpi_allreduce_sum(tmp,M01)
+                            tmp = M20
+                            CALL s_mpi_allreduce_sum(tmp,M20)
+                            tmp = M02
+                            CALL s_mpi_allreduce_sum(tmp,M02)
+
+                        END IF
+                    END IF
                 END IF
 
                 IF (proc_rank == 0) THEN
                     IF (n == 0) THEN
                         IF (bubbles .AND. (num_fluids <= 2)) THEN
-                            WRITE(i+30,'(6x,f12.6,10f24.8)') &
-                                nondim_time, &
-                                rho, &
-                                vel(1), &
-                                pres, &
-                                alf, &
-                                nR(1), &
-                                nRdot(1), &
-                                R(1), &
-                                Rdot(1), &
-                                ptilde, &
-                                ptot
+                            IF (qbmm) THEN
+                                WRITE(i+30,'(6x,f12.6,14f28.16)') &
+                                    nondim_time, &
+                                    rho, &
+                                    vel(1), &
+                                    pres, &
+                                    alf, &
+                                    R(1), &
+                                    Rdot(1), &
+                                    nR(1), &
+                                    nRdot(1), &
+                                    varR, &
+                                    varV, &
+                                    M10, &
+                                    M01, &
+                                    M20, &
+                                    M02
+                            ELSE
+                                WRITE(i+30,'(6x,f12.6,8f24.8)') &
+                                    nondim_time, &
+                                    rho, &
+                                    vel(1), &
+                                    pres, &
+                                    alf, &
+                                    R(1), &
+                                    Rdot(1), &
+                                    nR(1), &
+                                    nRdot(1)
+                                    ! ptilde, &
+                                    ! ptot
+                            END IF
                         ELSE IF (bubbles .AND. (num_fluids ==3)) THEN
                             WRITE(i+30,'(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // &
                                            'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
@@ -2184,21 +2276,10 @@ MODULE m_data_output
                                 rho, &
                                 vel(1), &
                                 pres
-                        end IF
-                        !WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
-                        !                   'F24.8,F24.8,F24.8)') &
-                        !    nondim_time, &
-                        !    rho, &
-                        !    vel(1), &
-                        !    pres, &
-                        !    gamma, &
-                        !    pi_inf, &
-                        !    c, &
-                        !    accel
+                        END IF
                     ELSEIF (p == 0) THEN
                         IF (bubbles) THEN
-                            WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
-                                           'F24.8,F24.8,F24.8,F24.8)') &
+                            WRITE(i+30,'(6X,10F24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -2215,7 +2296,7 @@ MODULE m_data_output
                                 rho, &
                                 vel(1), &
                                 pres
-                        end IF
+                        END IF
                     ELSE
                         WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
                                            'F24.8,F24.8,F24.8,F24.8,' // &

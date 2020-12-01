@@ -40,7 +40,9 @@ MODULE m_global_parameters
     ! Dependencies =============================================================
     USE mpi                     ! Message passing interface (MPI) module
     
-    USE m_derived_types        ! Definitions of the derived types
+    USE m_derived_types         ! Definitions of the derived types
+
+    USE m_eigen                 ! Eigenvalues
     ! ==========================================================================
     
     
@@ -120,6 +122,7 @@ MODULE m_global_parameters
     LOGICAL :: mpp_lim         !< Alpha limiter
     INTEGER :: sys_size        !< Number of unknowns in the system of equations
     INTEGER :: weno_order      !< Order of accuracy for the WENO reconstruction
+    LOGICAL :: hypoelasticity  !< Hypoelasticity (True or False)
     
     ! Annotations of the structure, i.e. the organization, of the state vectors
     TYPE(int_bounds_info) :: cont_idx                   !< Indexes of first & last continuity eqns.
@@ -131,6 +134,7 @@ MODULE m_global_parameters
     TYPE(bub_bounds_info) :: bub_idx                    !< Indexes of first & last bubble variable eqns.
     INTEGER               :: gamma_idx                  !< Index of specific heat ratio func. eqn.
     INTEGER               :: pi_inf_idx                 !< Index of liquid stiffness func. eqn.
+    TYPE(int_bounds_info) :: stress_idx                 !< Indexes of elastic shear stress eqns.
     
 
     TYPE(bounds_info) :: bc_x, bc_y, bc_z !<
@@ -194,6 +198,10 @@ MODULE m_global_parameters
     REAL(KIND(0d0)) :: Ca, Web, Re_inv
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight, R0, V0
     LOGICAL         :: bubbles
+    LOGICAL         :: qbmm !< Quadrature moment method
+    INTEGER         :: nmom !< Number of carried moments
+    INTEGER         :: nnode !< Number of QBMM nodes
+    REAL(KIND(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -205,6 +213,8 @@ MODULE m_global_parameters
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T 
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN 
     REAL(KIND(0d0)) :: poly_sigma
+    INTEGER         :: dist_type !1 = binormal, 2 = lognormal-normal
+    INTEGER         :: R0_type   !1 = simpson,  2 = wheeler
     !> @}
 
     INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: logic_grid
@@ -266,7 +276,8 @@ MODULE m_global_parameters
             num_fluids = dflt_int
             adv_alphan = .FALSE.
             weno_order = dflt_int
-            
+            hypoelasticity = .FALSE.
+ 
             bc_x%beg = dflt_real
             bc_x%end = dflt_real
             bc_y%beg = dflt_real
@@ -311,9 +322,13 @@ MODULE m_global_parameters
                 patch_icpp(i)%alpha           = dflt_real
                 patch_icpp(i)%gamma           = dflt_real
                 patch_icpp(i)%pi_inf          = dflt_real
+                patch_icpp(i)%tau_e           = dflt_real
                 !should get all of r0's and v0's
                 patch_icpp(i)%r0              = dflt_real
                 patch_icpp(i)%v0              = dflt_real
+
+                patch_icpp(i)%p0              = dflt_real
+                patch_icpp(i)%m0              = dflt_real
             END DO
            
             ! Tait EOS
@@ -334,6 +349,15 @@ MODULE m_global_parameters
             Web     = dflt_real
             poly_sigma = dflt_real
 
+            qbmm    = .FALSE.
+            nmom    = 1
+            nnode   = 1
+            sigR    = dflt_real
+            sigV    = dflt_real
+            rhoRV   = 0d0
+            dist_type = dflt_int
+            R0_type   = dflt_int
+
             R_n     = dflt_real
             R_v     = dflt_real
             phi_vn  = dflt_real
@@ -352,6 +376,7 @@ MODULE m_global_parameters
                 fluid_pp(i)%M_v     = dflt_real
                 fluid_pp(i)%mu_v    = dflt_real
                 fluid_pp(i)%k_v     = dflt_real
+                fluid_pp(i)%G       = dflt_real
             END DO
             
             
@@ -361,7 +386,8 @@ MODULE m_global_parameters
         !! any other tasks needed to properly setup the module
         SUBROUTINE s_initialize_global_parameters_module() ! ----------------------
             
-            INTEGER :: i, fac
+            INTEGER :: i, j, fac
+
             
             ! Determining the layout of the state vectors and overall size of
             ! the system of equations, given the dimensionality and choice of
@@ -406,9 +432,9 @@ MODULE m_global_parameters
 
                 IF( (adv_alphan .NEQV. .TRUE.) .and. &
                         (num_fluids > 1)) adv_idx%end = adv_idx%end - 1
- 
-                sys_size = adv_idx%end
 
+                sys_size = adv_idx%end
+                
                 IF (bubbles) THEN
                     alf_idx  = adv_idx%end
                 ELSE
@@ -417,50 +443,92 @@ MODULE m_global_parameters
                 
                 IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
-                    bub_idx%end = sys_size+2*nb
-                    IF (polytropic .NEQV. .TRUE.) THEN
-                        bub_idx%end = sys_size+4*nb
+                    IF (qbmm) THEN
+                        IF( nnode == 4) THEN
+                            nmom = 6
+                        END IF
+                        bub_idx%end = adv_idx%end+nb*nmom
+                    ELSE
+                        IF (.NOT. polytropic) THEN
+                            bub_idx%end = sys_size+4*nb
+                        ELSE
+                            bub_idx%end = sys_size+2*nb
+                        END IF
                     END IF
                     sys_size = bub_idx%end
 
+                    ALLOCATE( weight(nb),R0(nb),V0(nb) )
                     ALLOCATE( bub_idx%rs(nb), bub_idx%vs(nb) )
                     ALLOCATE( bub_idx%ps(nb), bub_idx%ms(nb) )
-                    ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
-                    DO i = 1, nb
-                        IF (polytropic .NEQV. .TRUE.) THEN
-                            fac = 4
-                        ELSE
-                            fac = 2
-                        END IF
-                        
-                        bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
-                        bub_idx%vs(i) = bub_idx%rs(i)+1
+                    IF (qbmm) THEN
+                        ALLOCATE( bub_idx%moms(nb,nmom) )
+                        ALLOCATE( bub_idx%fullmom(nb,0:nmom,0:nmom) )
 
-                        IF (polytropic .NEQV. .TRUE.) THEN
-                            bub_idx%ps(i) = bub_idx%vs(i)+1
-                            bub_idx%ms(i) = bub_idx%ps(i)+1
-                        END IF
-                    END DO
+                        DO i = 1, nb
+                            DO j = 1, nmom
+                                bub_idx%moms(i,j) = bub_idx%beg+(j-1)+(i-1)*nmom
+                            END DO 
+                            bub_idx%fullmom(i,0,0) = bub_idx%moms(i,1)
+                            bub_idx%fullmom(i,1,0) = bub_idx%moms(i,2)
+                            bub_idx%fullmom(i,0,1) = bub_idx%moms(i,3)
+                            bub_idx%fullmom(i,2,0) = bub_idx%moms(i,4)
+                            bub_idx%fullmom(i,1,1) = bub_idx%moms(i,5)
+                            bub_idx%fullmom(i,0,2) = bub_idx%moms(i,6)
+                            bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
+                        END DO
+                    ELSE
+                        DO i = 1, nb
+                            IF (.NOT. polytropic) THEN
+                                fac = 4
+                            ELSE
+                                fac = 2
+                            END IF
+
+                            bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
+                            bub_idx%vs(i) = bub_idx%rs(i)+1
+                            
+                            IF (.NOT. polytropic) THEN
+                                bub_idx%ps(i) = bub_idx%vs(i)+1
+                                bub_idx%ms(i) = bub_idx%ps(i)+1
+                            END IF
+                        END DO
+                    END IF
 
                     IF (nb == 1) THEN
                         weight(:)   = 1d0
                         R0(:)       = 1d0
-                        V0(:)       = 0d0
+                        V0(:)       = 1d0
                     ELSE IF (nb > 1) THEN
-                        CALL s_simpson(nb)
-                        V0(:)       = 0d0
+                        IF (R0_type == 1) THEN
+                            CALL s_simpson
+                        ELSE IF (R0_type == 2) THEN
+                            CALL s_wheeler
+                        END IF
+                        V0(:)       = 1d0
                     ELSE
                         STOP 'Invalid value of nb'
                     END IF
 
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    print*, 'R0 weights: ', weight(:)
+                    print*, 'R0 abscissas: ', R0(:)
+
+
+                    IF (.NOT. polytropic) THEN
                         CALL s_initialize_nonpoly
                     ELSE
                         rhoref  = 1.d0
                         pref    = 1.d0
                     END IF
                 END IF                    
+
+                IF (hypoelasticity) THEN
+                    stress_idx%beg = sys_size + 1
+                    stress_idx%end = sys_size + (num_dims*(num_dims+1)) / 2
+                    ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                    sys_size = stress_idx%end
+                END IF
+               
             ! ==================================================================
 
 
@@ -497,7 +565,7 @@ MODULE m_global_parameters
                 IF (bubbles) THEN
                     bub_idx%beg = sys_size+1
                     bub_idx%end = sys_size+2*nb
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         bub_idx%end = sys_size+4*nb
                     END IF
                     sys_size = bub_idx%end
@@ -507,7 +575,7 @@ MODULE m_global_parameters
                     ALLOCATE( weight(nb),R0(nb),V0(nb) )
 
                     DO i = 1, nb
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             fac = 4
                         ELSE
                             fac = 2
@@ -516,7 +584,7 @@ MODULE m_global_parameters
                         bub_idx%rs(i) = bub_idx%beg+(i-1)*fac
                         bub_idx%vs(i) = bub_idx%rs(i)+1
 
-                        IF (polytropic .NEQV. .TRUE.) THEN
+                        IF (.NOT. polytropic) THEN
                             bub_idx%ps(i) = bub_idx%vs(i)+1
                             bub_idx%ms(i) = bub_idx%ps(i)+1
                         END IF
@@ -527,13 +595,17 @@ MODULE m_global_parameters
                         R0(:)       = 1d0
                         V0(:)       = 0d0
                     ELSE IF (nb > 1) THEN
-                        CALL s_simpson(nb)
-                        V0(:)       = 0d0
+                        IF (R0_type == 1) THEN
+                            CALL s_simpson
+                        ELSE IF (R0_type == 2) THEN
+                            CALL s_wheeler
+                        END IF
+                        V0(:)       = 1d0
                     ELSE
                         STOP 'Invalid value of nb'
                     END IF
 
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         CALL s_initialize_nonpoly
                     ELSE
                         rhoref  = 1.d0
@@ -676,6 +748,8 @@ MODULE m_global_parameters
             pb0 = pb0/pl0
             pv = pv/pl0
 
+            print*, 'pb0 nondim/final', pb0
+
             ! bubble wall temperature, normalized by T0, in the liquid
             ! keeps a constant (cold liquid assumption)
             Tw = 1.D0
@@ -783,8 +857,9 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: nR3
 
-            CALL s_quad( nRtmp**3,nR3 )  !returns itself if NR0 = 1
+            CALL s_quad( nRtmp**3.d0,nR3 )  !returns itself if NR0 = 1
             ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
+            ! ntmp = 1d0
 
         END SUBROUTINE s_comp_n_from_cons
 
@@ -798,8 +873,9 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)), INTENT(OUT) :: ntmp
             REAL(KIND(0.D0)) :: R3
 
-            CALL s_quad( Rtmp**3,R3 )  !returns itself if NR0 = 1
+            CALL s_quad( Rtmp**3.d0,R3 )  !returns itself if NR0 = 1
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
+            ! ntmp = 1d0
 
         END SUBROUTINE s_comp_n_from_prim
 
@@ -816,17 +892,15 @@ MODULE m_global_parameters
         END SUBROUTINE s_quad
 
         !> Computes the Simpson weights for quadrature
-        !! @param Npt is the number of bins that represent the polydisperse bubble population
-        SUBROUTINE s_simpson( Npt )
+        SUBROUTINE s_simpson
 
-            INTEGER, INTENT(IN) :: Npt
             INTEGER :: ir
             REAL(KIND(0.D0)) :: R0mn
             REAL(KIND(0.D0)) :: R0mx
             REAL(KIND(0.D0)) :: dphi
             REAL(KIND(0.D0)) :: tmp
             REAL(KIND(0.D0)) :: sd
-            REAL(KIND(0.D0)), DIMENSION(Npt) :: phi
+            REAL(KIND(0.D0)), DIMENSION(nb) :: phi
 
             ! nondiml. min. & max. initial radii for numerical quadrature
             !sd   = 0.05D0
@@ -846,15 +920,15 @@ MODULE m_global_parameters
             R0mx = 0.2D0*DEXP( 9.5D0 * sd) + 1.D0
             
             ! phi = ln( R0 ) & return R0
-            DO ir = 1,Npt
+            DO ir = 1,nb
                 phi(ir) = DLOG( R0mn ) &
-                    + DBLE( ir-1 )*DLOG( R0mx/R0mn )/DBLE( Npt-1 )
+                    + DBLE( ir-1 )*DLOG( R0mx/R0mn )/DBLE( nb-1 )
                 R0(ir) = DEXP( phi(ir) )
             END DO
             dphi = phi(2) - phi(1)
 
             ! weights for quadrature using Simpson's rule
-            DO ir = 2,Npt-1
+            DO ir = 2,nb-1
                 ! Gaussian
                 tmp = DEXP( -0.5D0*(phi(ir)/sd)**2 )/DSQRT( 2.D0*pi )/sd
                 IF ( MOD(ir,2)==0 ) THEN
@@ -866,11 +940,63 @@ MODULE m_global_parameters
             
             tmp = DEXP( -0.5D0*(phi(1)/sd)**2 )/DSQRT( 2.D0*pi )/sd
             weight(1) = tmp*dphi/3.D0
-            tmp = DEXP( -0.5D0*(phi(Npt)/sd)**2 )/DSQRT( 2.D0*pi )/sd
-            weight(Npt) = tmp*dphi/3.D0
+            tmp = DEXP( -0.5D0*(phi(nb)/sd)**2 )/DSQRT( 2.D0*pi )/sd
+            weight(nb) = tmp*dphi/3.D0
 
         END SUBROUTINE s_simpson
 
+
+        SUBROUTINE s_wheeler
+            
+            REAL(KIND(0d0)), DIMENSION(2*nb,2*nb) :: sig
+            REAL(KIND(0d0)), DIMENSION(nb,nb) :: Ja
+            REAL(KIND(0d0)), DIMENSION(2*nb) :: momRo
+            REAL(KIND(0d0)), DIMENSION(nb) :: evec, eigs, a, b
+            REAL(KIND(0d0)) :: muRo
+            INTEGER :: i,j
+
+            muRo = 1d0
+
+            a = 0d0; b = 0d0
+            sig = 0d0; Ja = 0d0
+
+            DO i = 0,2*nb-1
+                momRo(i+1) = DEXP( i*LOG(muRo) + 0.5d0*(i*poly_sigma)**2d0 )
+            END DO
+
+            DO i = 0,2*nb-1
+                sig(2,i+1) = momRo(i+1)
+            END DO
+
+            a(1) = momRo(2)/momRo(1)
+            DO i = 1,nb-1
+                DO j = i,2*nb-i-1
+                    sig(i+2,j+1) = sig(i+1,j+2) - a(i)*sig(i+1,j+1) - b(i)*sig(i,j+1)
+                    a(i+1) = -1d0*(sig(i+1,i+1)/sig(i+1,i)) + sig(i+2,i+2)/sig(i+2,i+1)
+                    b(i+1) = sig(i+2,i+1)/sig(i+1,i)
+                END DO
+            END DO
+           
+            DO i = 1,nb
+                Ja(i,i) = a(i)
+            END DO
+            DO i = 1,nb-1
+                Ja(i,i+1) = -DSQRT(ABS(b(i+1)))
+                Ja(i+1,i) = -DSQRT(ABS(b(i+1)))
+            END DO
+
+            CALL s_eigs(Ja,eigs,evec,nb)
+
+            weight(1:nb) = (evec(nb:1:-1)**2d0)*momRo(1)
+            R0(1:nb) = eigs(nb:1:-1)
+
+            IF (MINVAL(R0) < 0d0) THEN
+                PRINT*, 'Minimum R0 is negative. nb might be too large for Wheeler'
+                PRINT*, 'Aborting...'
+                STOP
+            END IF
+
+        END SUBROUTINE s_wheeler
 
 
 END MODULE m_global_parameters

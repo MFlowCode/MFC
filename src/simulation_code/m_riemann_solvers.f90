@@ -57,6 +57,8 @@ MODULE m_riemann_solvers
     USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
     
     USE m_variables_conversion !< State variables type conversion procedures
+
+    USE m_bubbles              !< To get the bubble wall pressure function
     ! ==========================================================================
     
     IMPLICIT NONE
@@ -269,6 +271,8 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              ::         c_L,         c_R
     REAL(KIND(0d0)),              DIMENSION(2)   ::        Re_L,        Re_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::        We_L,        We_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::     tau_e_L,     tau_e_R
+
     !> @}
 
     !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
@@ -281,6 +285,7 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         V0_L,       V0_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::         P0_L,       P0_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::        pbw_L,      pbw_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::       moms_L,     moms_R
     REAL(KIND(0d0))                              ::     ptilde_L,   ptilde_R
     !> @}
 
@@ -303,6 +308,7 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              ::         lo_c_L,         lo_c_R
     REAL(KIND(0d0)),              DIMENSION(2)   ::        lo_Re_L,        lo_Re_R
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::        lo_We_L,        lo_We_R
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   ::     lo_tau_e_L,     lo_tau_e_R
     !> @}
 
     !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
@@ -331,6 +337,7 @@ MODULE m_riemann_solvers
     REAL(KIND(0d0))                              :: pres_IC
     REAL(KIND(0d0))                              :: E_IC
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: alpha_IC
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: tau_e_IC
     !> @}
 
     !> @name Surface tension pressure contribution
@@ -588,10 +595,19 @@ MODULE m_riemann_solvers
                                  lo_cons   = lo_rho_L*lo_vel_L(dir_idx(i)) - lo_rho_R*lo_vel_R(dir_idx(i))
                                  hi_cons   = rho_L * vel_L(dir_idx(i)) - rho_R * vel_R(dir_idx(i))
                                 tvd_cons   = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                                 lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_L
-                                 lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_R
-                                 hi_flux_L = rho_L * vel_L(dir_idx(1)) * vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_L
-                                 hi_flux_R = rho_R * vel_R(dir_idx(1)) * vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_R
+                                lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_L
+                                lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_R
+                                hi_flux_L = rho_L * vel_L(dir_idx(1)) * vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_L
+                                hi_flux_R = rho_R * vel_R(dir_idx(1)) * vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) * pres_R
+
+                                ! added elastic shear stress term if hypoelastic modeling is on
+                                IF (hypoelasticity) THEN                                    
+                                    lo_flux_L = lo_flux_L - lo_tau_e_L(dir_idx_tau(i))
+                                    lo_flux_R = lo_flux_R - lo_tau_e_R(dir_idx_tau(i))
+                                    hi_flux_L = hi_flux_L - tau_e_L(dir_idx_tau(i))
+                                    hi_flux_R = hi_flux_R - tau_e_R(dir_idx_tau(i))
+                                END IF
+ 
                                 tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
                                 tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
                 
@@ -614,8 +630,19 @@ MODULE m_riemann_solvers
                              lo_flux_R = lo_vel_R(dir_idx(1))*(lo_E_R + lo_pres_R)
                              hi_flux_L = vel_L(dir_idx(1))*(E_L + pres_L)
                              hi_flux_R = vel_R(dir_idx(1))*(E_R + pres_R)
+
+                            ! added elastic shear stress term if hypoelastic modeling is on
+                            IF (hypoelasticity) THEN
+                                DO i = 1, num_dims
+                                        lo_flux_L = lo_flux_L - (lo_tau_e_L(dir_idx_tau(i)) * lo_vel_L(i))
+                                        lo_flux_R = lo_flux_R - (lo_tau_e_R(dir_idx_tau(i)) * lo_vel_R(i))
+                                        hi_flux_L = hi_flux_L - (tau_e_L(dir_idx_tau(i)) * vel_L(i))
+                                        hi_flux_R = hi_flux_R - (tau_e_L(dir_idx_tau(i)) * vel_L(i))
+                                END DO
+                            END IF
+
                             tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
+                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R) 
                 
                             IF (tvd_wave_speeds) THEN
                                 flux_rs_vf(E_idx)%sf(j,k,l) = &
@@ -648,6 +675,31 @@ MODULE m_riemann_solvers
                                     flux_src_rs_vf(i)%sf(j,k,l) = (s_M* tvd_flux_R - s_P* tvd_flux_L) / (s_M - s_P)
                                 END IF
                             END DO
+
+                            ! Stress eq
+                            IF (hypoelasticity) THEN
+                                DO i = 1, (num_dims*(num_dims+1))/2
+
+                                    lo_cons   = lo_rho_L*lo_tau_e_L(i) - lo_rho_R*lo_tau_e_L(i)
+                                    hi_cons   = rho_L * tau_e_L(i) - rho_R * tau_e_R(i)
+                                   tvd_cons   = lo_cons + flux_lim_func*(hi_cons - lo_cons)
+                                    lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_tau_e_L(i)
+                                    lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_tau_e_R(i)
+                                    hi_flux_L = rho_L * vel_L(dir_idx(1)) * tau_e_L(i)
+                                    hi_flux_R = rho_R * vel_R(dir_idx(1)) * tau_e_R(i)
+                                   tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
+                                   tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
+
+                                    IF (tvd_wave_speeds) THEN
+                                        flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) = &
+                                            ( tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L + tvd_s_M*tvd_s_P*tvd_cons) &
+                                            / (tvd_s_M - tvd_s_P)
+                                    ELSE
+                                        flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) = &
+                                            ( s_M * tvd_flux_R - s_P * tvd_flux_L + s_M*s_P * tvd_cons) / (s_M - s_P)
+                                    END IF
+                                END DO
+                            END IF
                 
                             ! Source terms
                             DO i = 1, num_dims
@@ -693,6 +745,9 @@ MODULE m_riemann_solvers
                                 END IF
                             END DO
                         ELSE
+                            ! No TVD Riemann fluxes
+                            
+                            ! Mass
                             DO i = 1, cont_idx%end
                                 flux_rs_vf(i)%sf(j,k,l) = &
                                       ( s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
@@ -702,25 +757,51 @@ MODULE m_riemann_solvers
                                       / (s_M - s_P)
                             END DO
                             
-                            DO i = 1, num_dims
-                                flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
-                                        ( s_M*( rho_R*vel_R(dir_idx(1))         &
-                                                     *vel_R(dir_idx(i))         &
-                                              + dir_flg(dir_idx(i))*pres_R )    &
-                                        - s_P*( rho_L*vel_L(dir_idx(1))         &
-                                                     *vel_L(dir_idx(i))         &
-                                              + dir_flg(dir_idx(i))*pres_L )    &
-                                        + s_M*s_P*( rho_L*vel_L(dir_idx(i))     &
-                                                  - rho_R*vel_R(dir_idx(i)) ) ) &
+                            ! Momentum
+                            IF (bubbles) THEN
+                                DO i = 1, num_dims
+                                    flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
+                                            ( s_M*( rho_R*vel_R(dir_idx(1))         &
+                                                         *vel_R(dir_idx(i))         &
+                                                  + dir_flg(dir_idx(i))*(pres_R-ptilde_R) )    &
+                                            - s_P*( rho_L*vel_L(dir_idx(1))         &
+                                                         *vel_L(dir_idx(i))         &
+                                                  + dir_flg(dir_idx(i))*(pres_L-ptilde_L) )    &
+                                            + s_M*s_P*( rho_L*vel_L(dir_idx(i))     &
+                                                      - rho_R*vel_R(dir_idx(i)) ) ) &
+                                            / (s_M - s_P)
+                                END DO
+                            ELSE
+                                DO i = 1, num_dims
+                                    flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
+                                            ( s_M*( rho_R*vel_R(dir_idx(1))         &
+                                                         *vel_R(dir_idx(i))         &
+                                                  + dir_flg(dir_idx(i))*pres_R )    &
+                                            - s_P*( rho_L*vel_L(dir_idx(1))         &
+                                                         *vel_L(dir_idx(i))         &
+                                                  + dir_flg(dir_idx(i))*pres_L )    &
+                                            + s_M*s_P*( rho_L*vel_L(dir_idx(i))     &
+                                                      - rho_R*vel_R(dir_idx(i)) ) ) &
+                                            / (s_M - s_P)
+                                END DO
+                            END IF
+
+                            ! Energy
+                            IF (bubbles) THEN
+                                flux_rs_vf(E_idx)%sf(j,k,l) = &
+                                        ( s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
+                                        - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
+                                        + s_M*s_P*(E_L - E_R) )                &
                                         / (s_M - s_P)
-                            END DO
-                            
-                            flux_rs_vf(E_idx)%sf(j,k,l) = &
-                                    ( s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
-                                    - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
-                                    + s_M*s_P*(E_L - E_R) )                &
-                                    / (s_M - s_P)
-                            
+                            ELSE 
+                                flux_rs_vf(E_idx)%sf(j,k,l) = &
+                                        ( s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
+                                        - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
+                                        + s_M*s_P*(E_L - E_R) )                &
+                                        / (s_M - s_P)
+                            END IF
+
+                            ! Advection
                             DO i = adv_idx%beg, adv_idx%end
                                 flux_rs_vf(i)%sf(j,k,l) = &
                                          ( qL_prim_rs_vf(i)%sf( j ,k,l)   &
@@ -732,6 +813,7 @@ MODULE m_riemann_solvers
                                        / (s_M - s_P)
                             END DO
                             
+                            ! Div(U)?
                             DO i = 1, num_dims
                                 vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = &
                                              ( xi_M*(rho_L*vel_L(dir_idx(i))  * &
@@ -743,6 +825,74 @@ MODULE m_riemann_solvers
                                      / ( xi_M*rho_L*(s_L - vel_L(dir_idx(1))) - &
                                          xi_P*rho_R*(s_R - vel_R(dir_idx(1))) )
                             END DO
+
+                            ! SHB: Does this need to be ammended?
+                            IF (hypoelasticity) THEN
+                                DO i = 1, (num_dims*(num_dims+1)) / 2
+                                    flux_rs_vf(stress_idx%beg-1+i)%sf(j,k,l) =  &
+                                        ( s_M*( rho_R*vel_R(dir_idx(1))         &
+                                                     *tau_e_R(i))               &
+                                        - s_P*( rho_L*vel_L(dir_idx(1))         &
+                                                     *tau_e_L(i))               &
+                                        + s_M*s_P*( rho_L*tau_e_L(i)            &
+                                                  - rho_R*tau_e_R(i) ) )        &
+                                        / (s_M - s_P)
+                                END DO 
+                            END IF
+
+                            IF (bubbles) THEN
+
+                                ! Momentum: check signs on this
+                                ! DO i = 1, num_dims
+                                !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
+                                !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) - 
+                                !             ( s_M*( rho_R*vel_R(dir_idx(1))         &
+                                !                          *vel_R(dir_idx(i))         &
+                                !                   + dir_flg(dir_idx(i))*ptilde_R )    &
+                                !             - s_P*( rho_L*vel_L(dir_idx(1))         &
+                                !                          *vel_L(dir_idx(i))         &
+                                !                   + dir_flg(dir_idx(i))*ptilde_L )    &
+                                !               ) &
+                                !             / (s_M - s_P)
+                                ! END DO
+                                ! Energy: check signs on this
+                                ! flux_rs_vf(E_idx)%sf(j,k,l) = &
+                                ! flux_rs_vf(E_idx)%sf(j,k,l) - &
+                                !         ( s_M*vel_R(dir_idx(1))*(E_R + ptilde_R) &
+                                !         - s_P*vel_L(dir_idx(1))*(E_L + ptilde_L) &
+                                !         )                                         &
+                                !         / (s_M - s_P)
+
+
+                                ! Advection: does this need to be changed? 
+                                !   perhaps set bub_idx advection to zero? 
+                                ! DO i = adv_idx%beg, adv_idx%end
+                                !     flux_rs_vf(i)%sf(j,k,l) = &
+                                !              ( qL_prim_rs_vf(i)%sf( j ,k,l)   &
+                                !              - qR_prim_rs_vf(i)%sf(j+1,k,l) ) &
+                                !              * s_M*s_P/(s_M - s_P)
+                                !     flux_src_rs_vf(i)%sf(j,k,l) = &
+                                !            ( s_M*qR_prim_rs_vf(i)%sf(j+1,k,l)   &
+                                !            - s_P*qL_prim_rs_vf(i)%sf( j ,k,l) ) &
+                                !            / (s_M - s_P)
+                                ! END DO
+
+                                ! From HLLC: Kills mass transport @ bubble gas density
+                                IF ( num_fluids > 1 ) THEN
+                                    flux_rs_vf(cont_idx%end)%sf(j,k,l) = 0d0
+                                END IF
+
+                                !Advection of bubble sources (from HLLC)
+                                ! DO i = bub_idx%beg,sys_size
+                                !     flux_rs_vf(i)%sf(j,k,l) =   &
+                                !             xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j,k,l)      &
+                                !             * (vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                !             + xi_P*nbub_R*qR_prim_rs_vf(i)%sf(j+1,k,l)      &
+                                !             * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                ! END DO
+
+                            END IF
+
                         END IF
                     END DO
                 END DO
@@ -750,7 +900,7 @@ MODULE m_riemann_solvers
             
             
             ! Computing the viscous and capillary source flux
-            IF(ANY(Re_size > 0)) THEN
+            IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
                 IF (weno_Re_flux) THEN
                     CALL s_compute_viscous_source_flux( &
                                    qL_prim_vf(mom_idx%beg:mom_idx%end), &
@@ -904,13 +1054,20 @@ MODULE m_riemann_solvers
                                                  norm_dir, ix,iy,iz  )
 
             ! Computing HLLC flux and source flux for Euler system of equations
+
+            ! print*, 'xbounds are: ', is1%beg, is1%end
+            ! print*, 'ybounds are: ', is2%beg, is2%end
+            ! print*, 'zbounds are: ', is3%beg, is3%end
             DO l = is3%beg, is3%end
                 DO k = is2%beg, is2%end
                     DO j = is1%beg, is1%end
 
+                        ! print*, 'about to get average state'
                         CALL s_compute_average_state(j,k,l)
+                        ! print*, 'got average state'
 
                         CALL s_compute_wave_speeds(j,k,l)
+                        ! print*, 'got wave speeds'
 
                         IF(model_eqns == 3) THEN
 
@@ -1272,6 +1429,7 @@ MODULE m_riemann_solvers
                                             (1d0 - dir_flg(dir_idx(i))) *               &
                                             vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) +  &
                                             dir_flg(dir_idx(i))*(pres_R))
+                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                     END DO
                                 ELSE
                                     ! Include p_tilde
@@ -1289,8 +1447,17 @@ MODULE m_riemann_solvers
                                             (1d0 - dir_flg(dir_idx(i))) *               &
                                             vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) +  &
                                             dir_flg(dir_idx(i))*(pres_R-ptilde_R))
+                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                     END DO
+
                                 END IF
+                                ! print*, xi_P, xi_M
+                                ! print*, s_M, s_P, s_S
+                                ! print*, ptilde_R, ptilde_L
+                                ! print*, rho_R, rho_L
+                                ! print*, vel_R(1), vel_L(1)
+                                ! print*, pres_R, pres_L
+                                ! print*, '              '
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
@@ -1314,7 +1481,6 @@ MODULE m_riemann_solvers
                                         s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1))) * &
                                         (rho_R*s_S + pres_R /                        &
                                         (s_R - vel_R(dir_idx(1))))) - E_R))
- 
                                 ELSE
                                     ! Tait EOS, no energy equation
                                     flux_rs_vf(E_idx)%sf(j,k,l) = 0.d0
@@ -1357,7 +1523,7 @@ MODULE m_riemann_solvers
 
                                 ! Add advection flux for bubble variables
                                 IF (bubbles) THEN
-                                    DO i = bub_idx%beg,sys_size
+                                    DO i = bub_idx%beg,bub_idx%end
                                         flux_rs_vf(i)%sf(j,k,l) =   &
                                                 xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j,k,l)      &
                                                 * (vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
@@ -1365,6 +1531,12 @@ MODULE m_riemann_solvers
                                                 * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                     END DO
                                 END IF
+
+                            
+                                ! print*, 'mom idx', cont_idx%end+dir_idx(i)
+                                ! DO i = 1,sys_size
+                                !     print*, 'flux_rs_vf', i, flux_rs_vf(i)%sf(j,k,l)
+                                ! END DO
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 IF(norm_dir == 2 .AND. cyl_coord) THEN
@@ -1799,7 +1971,7 @@ MODULE m_riemann_solvers
                 END DO
                 c_L = c_L/rho_L
                 c_R = c_R/rho_R
-            ELSEIF ( (model_eqns == 4) .or. (model_eqns == 2 .AND. bubbles) ) THEN 
+            ELSEIF ( (model_eqns == 4) .OR. (model_eqns == 2 .AND. bubbles) ) THEN 
                 ! Sound speed for bubble mmixture to order O(\alpha)
                 DO i = 1,num_fluids
                     alpha_L(i) = qL_prim_rs_vf(E_idx+i)%sf( j ,k,l)
@@ -2345,7 +2517,14 @@ MODULE m_riemann_solvers
             
             H_L = (E_L + pres_L)/rho_L
             H_R = (E_R + pres_R)/rho_R
-            
+
+            IF (hypoelasticity) THEN
+                DO i = 1, (num_dims*(num_dims+1)) / 2
+                    tau_e_L(i) = qL_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                    tau_e_R(i) = qR_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                END DO
+            END IF
+
             IF (tvd_riemann_flux) THEN
                 DO i = 1, cont_idx%end
                     lo_alpha_rho_L(i) = q_prim_rs_vf(i)%sf( j ,k,l)
@@ -2374,6 +2553,14 @@ MODULE m_riemann_solvers
                 
                 lo_H_L = (lo_E_L + lo_pres_L)/lo_rho_L
                 lo_H_R = (lo_E_R + lo_pres_R)/lo_rho_R
+
+                IF (hypoelasticity) THEN
+                    DO i = 1, (num_dims*(num_dims+1)) / 2
+                        lo_tau_e_L(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                        lo_tau_e_R(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                    END DO
+                END IF
+    
             END IF
             
             CALL s_compute_mixture_sound_speeds(j,k,l)
@@ -2443,21 +2630,13 @@ MODULE m_riemann_solvers
            
             INTEGER, INTENT(IN) :: j,k,l
             
-            INTEGER :: i !< Generic loop iterator
-
-            REAL(KIND(0d0)) :: gamma_gas
+            INTEGER :: i,q !< Generic loop iterator
 
             !ensemble-averaged bubble variables
             REAL(KIND(0d0)) :: PbwR3Lbar, Pbwr3Rbar
             REAL(KIND(0d0)) :: R3Lbar, R3Rbar
             REAL(KIND(0d0)) :: R3V2Lbar, R3V2Rbar
 
-            IF (bubbles .AND. num_fluids == 1) THEN
-                gamma_gas = 1.d0/fluid_pp(num_fluids+1)%gamma + 1.d0
-            ELSE IF (bubbles .AND. num_fluids > 1) THEN
-                gamma_gas = 1.d0/fluid_pp(num_fluids  )%gamma + 1.d0
-            END IF
-            
             ! Left and Right Riemann Problem States ============================
             DO i = 1, cont_idx%end
                alpha_rho_L(i) = qL_prim_rs_vf(i)%sf( j ,k,l)
@@ -2487,6 +2666,13 @@ MODULE m_riemann_solvers
             H_L = (E_L + pres_L)/rho_L
             H_R = (E_R + pres_R)/rho_R
 
+            IF (hypoelasticity) THEN
+                DO i = 1, (num_dims*(num_dims+1)) / 2
+                    tau_e_L(i) = qL_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                    tau_e_R(i) = qR_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                END DO
+            END IF
+
             ! Compute left/right states for bubble number density
             IF (bubbles) THEN
                 DO i = 1,num_fluids
@@ -2497,51 +2683,71 @@ MODULE m_riemann_solvers
                 DO i = 1,nb
                     R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j,k,l)
                     R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j+1,k,l)
-                
+
                     V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j,k,l)
                     V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j+1,k,l)
-                    IF (polytropic .NEQV. .TRUE.) THEN
+                    IF (.NOT. polytropic) THEN
                         P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j,k,l)
                         P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j+1,k,l)
                     END IF
                 END DO
                 
-                !nbub_L = (3.d0/(4.d0*pi)) * alpha_L(1)/(R0_L**3.d0)
-                !nbub_R = (3.d0/(4.d0*pi)) * alpha_R(1)/(R0_R**3.d0)
                 CALL s_comp_n_from_prim(alpha_L(num_fluids),R0_L,nbub_L)
                 CALL s_comp_n_from_prim(alpha_R(num_fluids),R0_R,nbub_R)
                 
-                !pbw = p_g0*(R0/R)^(3\gamma_gas)
                 DO i = 1,nb
-                    !pbw_L(i) = (R0(i)/R0_L(i))**(3d0*gamma_gas)
-                    !pbw_R(i) = (R0(i)/R0_R(i))**(3d0*gamma_gas)
-
-                    IF (polytropic) THEN
-                        pbw_L(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_L(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
-                            - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
-
-                        pbw_R(i) = (Ca+2.d0/Web/R0(i))*((R0(i)/R0_R(i))**(3.d0*gamma_gas)) - Ca + 1.D0 &
-                            - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
-                    ELSE
-                        pbw_L(i) = P0_L(i) - 4.d0*Re_inv*V0_L(i)/R0_L(i) - 2.d0/(Web*R0_L(i))
-                        pbw_R(i) = P0_R(i) - 4.d0*Re_inv*V0_R(i)/R0_R(i) - 2.d0/(Web*R0_R(i))
+                    IF ( .NOT. qbmm ) THEN
+                        IF (polytropic) THEN
+                            pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),0d0)
+                            pbw_R(i) = f_cpbw_KM(R0(i),R0_R(i),V0_R(i),0d0)
+                        ELSE
+                            pbw_L(i) = f_cpbw_KM(R0(i),R0_L(i),V0_L(i),P0_L(i))
+                            pbw_R(i) = f_cpbw_KM(R0(i),R0_R(i),V0_R(i),P0_R(i))
+                        END IF
                     END IF
                 END DO
 
-                CALL s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
-                CALL s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
+                IF (qbmm) THEN
+                    PbwR3Lbar = mom_sp(4)%sf(j  ,k,l)
+                    PbwR3Rbar = mom_sp(4)%sf(j+1,k,l)
+
+                    R3Lbar = mom_sp(1)%sf(j  ,k,l)
+                    R3Rbar = mom_sp(1)%sf(j+1,k,l)
+
+                    R3V2Lbar = mom_sp(3)%sf(j  ,k,l)
+                    R3V2Rbar = mom_sp(3)%sf(j+1,k,l)
+                ELSE
+                    CALL s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
+                    CALL s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
+
+                    CALL s_quad(R0_L**3.d0, R3Lbar)
+                    CALL s_quad(R0_R**3.d0, R3Rbar)
                 
-                CALL s_quad(R0_L**3.d0, R3Lbar)
-                CALL s_quad(R0_R**3.d0, R3Rbar)
-                
-                CALL s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
-                CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
-                
+                    CALL s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
+                    CALL s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
+                END IF 
+
                 !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} ) 
-                ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
-                    rho_L*R3V2Lbar/R3Lbar )
-                ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
-                    rho_R*R3V2Rbar/R3Rbar )
+                IF (alpha_L(num_fluids) < small_alf .OR. R3Lbar < small_alf) THEN
+                    ptilde_L = alpha_L(num_fluids)*pres_L
+                ELSE
+                    ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - & 
+                        rho_L*R3V2Lbar/R3Lbar )
+                END IF
+
+                IF (alpha_R(num_fluids) < small_alf .OR. R3Rbar < small_alf) THEN
+                    ptilde_R = alpha_R(num_fluids)*pres_R
+                ELSE
+                    ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - & 
+                        rho_R*R3V2Rbar/R3Rbar )
+                END IF
+                
+                IF ( (ptilde_L .ne. ptilde_L) .or. (ptilde_R .ne. ptilde_R) ) THEN
+                    PRINT*, 'Ptilde NaN at ',j,k,l,x_cb(j)
+                    PRINT*, nbub_L, alpha_L, pres_L, PbwR3Lbar, R3Lbar, rho_L, R3V2Lbar, R3Lbar
+                    PRINT*, nbub_R, alpha_R, pres_R, PbwR3Rbar, R3Rbar, rho_R, R3V2Rbar, R3Rbar
+                    CALL s_mpi_abort()
+                END IF
 
                 ptil(j,k,l) = 0.5d0*(ptilde_L+ptilde_R)
             END IF
@@ -2574,6 +2780,14 @@ MODULE m_riemann_solvers
             
                 lo_H_L = (lo_E_L + lo_pres_L)/lo_rho_L
                 lo_H_R = (lo_E_R + lo_pres_R)/lo_rho_R
+
+                IF (hypoelasticity) THEN
+                    DO i = 1, (num_dims*(num_dims+1)) / 2
+                        lo_tau_e_L(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf( j ,k,l)
+                        lo_tau_e_R(i) = q_prim_rs_vf(stress_idx%beg-1+i)%sf(j+1,k,l)
+                    END DO
+                END IF
+
             END IF
 
 
@@ -2906,13 +3120,32 @@ MODULE m_riemann_solvers
             END IF
            
             IF (bubbles) THEN
-                allocate( R0_L(nb), V0_L(nb), pbw_L(nb) )
-                allocate( R0_R(nb), V0_R(nb), pbw_R(nb) )
-                IF (polytropic .NEQV. .TRUE.) THEN
-                    allocate( P0_L(nb), P0_R(nb) )
+                ALLOCATE( R0_L(nb),R0_R(nb) )
+                ALLOCATE( V0_L(nb), V0_R(nb))
+                ALLOCATE( pbw_L(nb), pbw_R(nb) )
+                IF (qbmm) THEN
+                    ALLOCATE( moms_L(nb,nmom), moms_R(nb,nmom) )
+                ELSE
+                    IF (.NOT. polytropic) THEN
+                        ALLOCATE( P0_L(nb), P0_R(nb) )
+                    END IF 
                 END IF 
             END IF
-            
+           
+            IF (hypoelasticity) THEN
+                ALLOCATE(tau_e_L(1:(num_dims*(num_dims+1)/2)) &
+                       , tau_e_R(1:(num_dims*(num_dims+1)/2)))
+
+                IF (tvd_riemann_flux) THEN
+                    ALLOCATE(lo_tau_e_L(1:(num_dims*(num_dims+1)/2)) &
+                           , lo_tau_e_R(1:(num_dims*(num_dims+1)/2)))
+                END IF
+
+                IF (riemann_solver == 3) THEN
+                    ALLOCATE(tau_e_IC(1:(num_dims*(num_dims+1)/2)))
+                END IF
+            END IF
+
             ! Associating the procedural pointers to the procedures that will be
             ! utilized to compute the average state and estimate the wave speeds
             IF(riemann_solver /= 3) THEN
@@ -3029,7 +3262,7 @@ MODULE m_riemann_solvers
                         qR_prim_vf(i)%sf( 0,iy%beg:iy%end,iz%beg:iz%end)
                     END DO
                 
-                    IF(ANY(Re_size > 0)) THEN
+                    IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
                   
                         DO i = mom_idx%beg, mom_idx%end
                             dqL_prim_dx_vf(i)%sf(      -1      , &
@@ -3115,7 +3348,7 @@ MODULE m_riemann_solvers
                         qL_prim_vf(i)%sf( m ,iy%beg:iy%end,iz%beg:iz%end)
                     END DO
                 
-                    IF(ANY(Re_size > 0)) THEN
+                    IF(ANY(Re_size > 0) .OR. hypoelasticity) THEN
                   
                         DO i = mom_idx%beg, mom_idx%end
                             dqR_prim_dx_vf(i)%sf(      m+1     , &
@@ -3563,7 +3796,18 @@ MODULE m_riemann_solvers
                is1 = iz; is2 = iy; is3 = ix
                dir_idx = (/3,1,2/); dir_flg = (/0d0,0d0,1d0/)
             END IF
-            
+           
+            ! Extra indexes needed for hypoelasticity
+            IF(hypoelasticity) THEN
+                IF(norm_dir == 1) THEN
+                    dir_idx_tau = (/1,2,4/)
+                ELSEIF(norm_dir == 2) THEN
+                    dir_idx_tau = (/2,3,5/)
+                ELSE
+                    dir_idx_tau = (/4,5,6/)
+                END IF
+            END IF
+ 
             ! Setting up special bounds for cell-average values
             xbeg = -buff_size; ybeg = 0; zbeg = 0
             IF (n > 0) ybeg = -buff_size; IF (p > 0) zbeg = -buff_size
@@ -3662,7 +3906,7 @@ MODULE m_riemann_solvers
                
             END IF
             
-            IF(ANY(Re_size > 0) .OR. We_size > 0) THEN
+            IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                 DO i = mom_idx%beg, E_idx
                     flux_src_vf(i)%sf = 0d0
                 END DO
@@ -5442,7 +5686,11 @@ MODULE m_riemann_solvers
             END IF
             
             IF (bubbles) THEN
-                deallocate(R0_L, V0_L, pbw_L, R0_R, V0_R, pbw_R)
+                IF (qbmm) THEN
+                    DEALLOCATE(moms_L, moms_R)
+                END IF
+                DEALLOCATE( R0_L,R0_R,pbw_L,pbw_R)
+                DEALLOCATE(V0_L,V0_R)
             END IF
 
             ! Disassociating procedural pointer to the subroutine which was

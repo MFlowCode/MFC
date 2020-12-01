@@ -74,8 +74,11 @@ MODULE m_derived_types
         INTEGER, DIMENSION(:), ALLOCATABLE :: vs !< Bubble radial velocities
         INTEGER, DIMENSION(:), ALLOCATABLE :: ps !< Bubble pressures
         INTEGER, DIMENSION(:), ALLOCATABLE :: ms !< Bubble mass fluxes
+
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: moms !< Moment indices for qbmm
     END TYPE bub_bounds_info    
     
+
     !> Derived type annexing the physical parameters (PP) of fluids. 
     TYPE physical_parameters
         REAL(KIND(0d0))                            :: gamma  !< Sp. heat ratio
@@ -89,6 +92,7 @@ MODULE m_derived_types
         REAL(KIND(0d0)) :: M_v  !< Bubble constants (see Preston (2007), Ando (2010))
         REAL(KIND(0d0)) :: mu_v !< Bubble constants (see Preston (2007), Ando (2010))
         REAL(KIND(0d0)) :: k_v  !< Bubble constants (see Preston (2007), Ando (2010))
+        REAL(KIND(0d0)) :: G    !< Shear Modulus
     END TYPE physical_parameters
     
     
@@ -117,6 +121,7 @@ MODULE m_derived_types
         REAL(KIND(0d0)) :: length !< Length of line source
         REAL(KIND(0d0)) :: npulse !< Number of cycles of pulse
         REAL(KIND(0d0)) :: dir !< Direction of pulse
+        REAL(KIND(0d0)) :: delay !< Time-delay of pulse start
         INTEGER :: pulse 
         INTEGER :: support
     END TYPE mono_parameters

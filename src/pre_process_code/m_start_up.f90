@@ -122,14 +122,15 @@ MODULE m_start_up
                                    model_eqns, num_fluids,                    &
                                    adv_alphan, mpp_lim,                       &
                                    weno_order, bc_x, bc_y, bc_z, num_patches, &
-                                   patch_icpp, fluid_pp,                      &
+                                   hypoelasticity, patch_icpp, fluid_pp,      &
                                    precision, parallel_io,                    &
                                    perturb_flow, perturb_flow_fluid,          &
                                    perturb_sph, perturb_sph_fluid, fluid_rho, &
                                    cyl_coord, loops_x, loops_y, loops_z,      &
                                    rhoref, pref, bubbles, R0ref, nb,          &
                                    polytropic, thermal, Ca, Web, Re_inv,      &
-                                   polydisperse, poly_sigma
+                                   polydisperse, poly_sigma, qbmm,      &
+                                   nnode, sigR, sigV, dist_type, rhoRV, R0_type
  
 
             ! Inquiring the status of the pre_process.inp file
@@ -310,6 +311,15 @@ MODULE m_start_up
                 PRINT '(A)', 'Unsupported choice of the combination of '    // &
                              'values for old_grid, x_domain%beg and '       // &
                              'x_domain%end. Exiting ...'
+                CALL s_mpi_abort()
+            ELSE IF (qbmm .and. dist_type == dflt_int) THEN
+                PRINT '(A)', 'Dist type must be set if using QBMM. Exiting ...'
+                CALL s_mpi_abort()
+            ELSE IF (qbmm .and. (dist_type .NE. 1) .and. rhoRV > 0d0) THEN
+                PRINT '(A)', 'rhoRV cannot be used with dist_type \ne 1. Exiting ...'
+                CALL s_mpi_abort()
+            ELSE IF (polydisperse .and. R0_type == dflt_int) THEN
+                PRINT '(A)', 'R0 type must be set if using Polydisperse. Exiting ...'
                 CALL s_mpi_abort()
             END IF
                 
@@ -2018,7 +2028,7 @@ MODULE m_start_up
             
             
             ! Reading the Conservative Variables Data Files ====================
-            DO i = 1, adv_idx%end
+            DO i = 1, sys_size
                 
                 ! Checking whether data file associated with variable position
                 ! of the currently manipulated conservative variable exists
