@@ -5,15 +5,8 @@ for multi-component, multi-phase, and bubbly flows.
 
 # Authors
 
-<<<<<<< HEAD
-  MFC was developed at Caltech by a group
-  of post-doctoral scientists and graduate research students
-  under the supervision of Professor Tim Colonius. These contributors 
-  include:
-=======
   MFC was developed at Caltech by a group of post-doctoral scientists and graduate research students under the supervision of Professor Tim Colonius.
   These contributors include:
->>>>>>> MFC_private/master
 * Dr. Spencer Bryngelson
 * Dr. Kevin Schmidmayer
 * Dr. Vedran Coralic
@@ -38,32 +31,10 @@ for multi-component, multi-phase, and bubbly flows.
 ## MFC paper
  
   The paper that describes the MFC's capabilities:
-<<<<<<< HEAD
-* <a href="http://dx.doi.org/https://doi.org/10.1016/j.cpc.2020.107396">
-        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2020) Computer Physics Communications 4655, 107396
-        </a>
-
-### Cite me!
-
-```
-@article{Bryngelson_2020,
-	title = {MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
-	author = {Spencer H. Bryngelson and Kevin Schmidmayer and Vedran Coralic and Jomela C. Meng and Kazuki Maeda and Tim Colonius},
-	journal = {Computer Physics Communications},
-	doi = {10.1016/j.cpc.2020.107396},
-	year = 2020,
-	month = {may},
-	publisher = {Elsevier {BV}},
-	pages = {107396},
-}
-```
-
-=======
 * <a href="https://doi.org/10.1016/j.cpc.2020.107396">
         S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2020) Computer Physics Communications 4655, 107396
         </a>
   
->>>>>>> MFC_private/master
 ## Related publications
  
   Several publications have used the MFC in various stages of its 
@@ -125,22 +96,14 @@ Ph.D. Disserations:
  
 ### Main dependencies: MPI and Python 
   If you do not have Python, it can be installed via
-<<<<<<< HEAD
-  <a href="https://brew.sh/">Homebrew on MacOS</a> as:  
-=======
   <a href="https://brew.sh/">Homebrew on OSX</a> as:  
->>>>>>> MFC_private/master
 `brew install python`
  
   or compiled via your favorite package manager on Unix systems.
  
   An MPI fortran compiler is required for all systems.
   If you do not have one, Homebrew can take care of this
-<<<<<<< HEAD
-  on MacOS:  
-=======
   on OSX:  
->>>>>>> MFC_private/master
 `brew install open-mpi`  
  
   or compiled via another package manager on Unix systems.
@@ -164,11 +127,7 @@ If you do not have FFTW compiler, the library and
   but can indeed be handled with the MFC. For this, HDF5
   and Silo must be installed
  
-<<<<<<< HEAD
-  On MacOS, a custom Homebrew tap for Silo is included in the installers
-=======
   On OSX, a custom Homebrew tap for Silo is included in the installers
->>>>>>> MFC_private/master
   directory. You can use it via  
 `cd installers`  
 `brew install silo.rb`  
@@ -227,28 +186,16 @@ Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
 can also be found in `example_cases/3d_sphbubcollapse`.
 MFC can be executed as  
-<<<<<<< HEAD
-`python input.py pre_process`
-
-which will generate the restart and grid files that will be read 
-by the simulation code. Then  
-`python input.py simulation`
-=======
 `python pre_process`
 
 which will generate the restart and grid files that will be read 
 by the simulation code. Then  
 `python simulation`
->>>>>>> MFC_private/master
 
 will execute the flow solver. The last (optional) step
 is to post treat the data files and output HDF5 databases
 for the flow variables via  
-<<<<<<< HEAD
-`python input.py post_process`
-=======
 `python post_process`
->>>>>>> MFC_private/master
 
 Note that the post-processing step 
 requires installation of Silo and HDF5.
