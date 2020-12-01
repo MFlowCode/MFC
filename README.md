@@ -1,5 +1,8 @@
 # Multi-component Flow Code (MFC)
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![DOI](https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg)](http://dx.doi.org/10.1016/j.cpc.2020.107396)
+
 Welcome to the MFC! The MFC is a fully-documented parallel simulation software
 for multi-component, multi-phase, and bubbly flows.
 
