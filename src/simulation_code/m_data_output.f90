@@ -2185,7 +2185,7 @@ MODULE m_data_output
                         tmp = ptot
                         CALL s_mpi_allreduce_sum(tmp,ptot)
 
-                        IF (QBMM) THEN
+                        IF (qbmm) THEN
                             tmp = varR
                             CALL s_mpi_allreduce_sum(tmp,varR)
                             tmp = varV
@@ -2279,8 +2279,7 @@ MODULE m_data_output
                         END IF
                     ELSEIF (p == 0) THEN
                         IF (bubbles) THEN
-                            WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
-                                           'F24.8,F24.8,F24.8,F24.8)') &
+                            WRITE(i+30,'(6X,10F24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &

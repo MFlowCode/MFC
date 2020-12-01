@@ -1041,18 +1041,20 @@ MODULE m_initial_condition
                         ELSE
                             perturb_alpha = q_prim_vf(E_idx+perturb_flow_fluid)%sf(i,j,k)
                         END IF
-                        IF (perturb_alpha == 1d0) THEN
+                        ! IF (perturb_alpha == 1d0) THEN
                             ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
 !                            rand_real = rand_real / 1d2 / 1d3
 !                            q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
                             ! Perturb velocity
-                            DO l = mom_idx%beg+1, mom_idx%end
-                                CALL RANDOM_NUMBER(rand_real)
-                                rand_real = rand_real / 1d1 / 145d1
-                                q_prim_vf(l)%sf(i,j,k) = q_prim_vf(l)%sf(i,j,k) + rand_real
-                            END DO
-                        END IF
+                            CALL RANDOM_NUMBER(rand_real)
+                            rand_real = rand_real * 1.d-2
+                            q_prim_vf(mom_idx%beg)%sf(i,j,k) = (1.d0+rand_real)*q_prim_vf(mom_idx%beg)%sf(i,j,k)
+                            q_prim_vf(mom_idx%end)%sf(i,j,k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i,j,k)
+                            IF (bubbles) THEN
+                                q_prim_vf(alf_idx)%sf(i,j,k) = (1.d0+rand_real)*q_prim_vf(alf_idx)%sf(i,j,k)
+                            END IF
+                        ! END IF
                     END DO
                 END DO
             END DO

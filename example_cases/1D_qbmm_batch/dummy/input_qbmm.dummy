@@ -31,7 +31,7 @@ k_n     = 0.02556
 gamma_gas = 1.4
 
 #reference bubble size
-R0ref   = 10.E-06
+R0ref   = 1.E-06
 
 pa      = 0.1 * 1.E+06 / 101325.
 
@@ -44,7 +44,8 @@ Ca = 1.
 # We = rho0*(uu**2.)*R0ref/ss
 We = p0*R0ref/ss
 #Inv. bubble Reynolds number
-Re_inv = mul0/(rho0*uu*R0ref)
+# Re_inv = mul0/(rho0*uu*R0ref)
+Re_inv = 1./float(XXRE)
 
 #IC setup
 vf0     = XXVF
@@ -56,8 +57,8 @@ t0      = x0/c0
 nbubbles = 1 
 myr0    = R0ref
 
-cfl     = 0.1
-Nx      = 400
+cfl     = XXCFL
+Nx      = XXNX
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)
@@ -67,15 +68,13 @@ Tpulse  = Lpulse/cact
 Tfinal  = 0.25*10.*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
-dt = dt * 0.1
+# dt = dt * 0.1
 # print('dt: ',dt)
 
-Nt = 10000
-
-Nfiles = 2.
+# Nt = 10000
+Nfiles = XXNFILES.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
-
 
 print('Web', We)
 print('Re_inv', Re_inv)
@@ -118,7 +117,7 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'F',                       \
                     'nodes'                        : 1,                         \
-                    'ppn'                          : 12,                      \
+                    'ppn'                          : XXNP,                        \
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -132,21 +131,21 @@ case_dict =                                                                     
                     'm'                            : Nx,                        \
                     'n'                            : 0,                         \
                     'p'                            : 0,                         \
-                    'dt'                           : dt,                      \
+                    'dt'                           : dt,                        \
                     't_step_start'                 : 0,                         \
                     't_step_stop'                  : Nt,                        \
-                    't_step_save'                  : Nout,   \
-		    # ==========================================================
+                    't_step_save'                  : Nout,                      \
+                    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
                     'num_patches'                  : 2,                        \
                     'model_eqns'                   : 2,                        \
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 1,                        \
-		    'adv_alphan'                   : 'T',                      \
-		    'mpp_lim'                      : 'F',                      \
-		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 3,                        \
+                    'adv_alphan'                   : 'T',                      \
+                    'mpp_lim'                      : 'F',                      \
+                    'mixture_err'                  : 'F',                      \
+                    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
@@ -154,7 +153,7 @@ case_dict =                                                                     
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
-		    'riemann_solver'               : 2,                        \
+                    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
                     'commute_err'                  : 'F',                      \
@@ -167,13 +166,13 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'F',                       \
-	            'fd_order'                     : 1,                       \
+                    'parallel_io'                  :'T',                       \
+                    'fd_order'                     : 1,                       \
                     #'schlieren_wrt'                :'T',                      \
-		    'probe_wrt'                    :'T',                   \
-		    'num_probes'                   : 1,                    \
-		    'probe(1)%x'                   : 0.,             \
-		    # ==========================================================
+                    'probe_wrt'                    :'T',                   \
+                    'num_probes'                   : 1,                    \
+                    'probe(1)%x'                   : 0.,             \
+                    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
                     'patch_icpp(1)%geometry'       : 1,                         \
@@ -230,24 +229,23 @@ case_dict =                                                                     
 
                     # Bubbles ==================================================
                     'bubbles'               : 'T',                  \
-                    'bubble_model'          : 2,                    \
+                    'bubble_model'          : 3,                    \
                     'polytropic'            : 'T',                  \
-                    # 'polydisperse'          : 'T',                  \
-                    # 'R0_type'               : 2,                    \
-                    'polydisperse'          : 'F',                  \
-                    # 'poly_sigma'            : 0.3,                  \
+                    'polydisperse'          : 'T',                  \
+                    'R0_type'               : XXR0TYPE,             \
+                    'polydisperse'          : 'XXPOLY',                  \
+                    'poly_sigma'            : XXSIG0,               \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
-                    # 'nb'                    : 3,                    \
-                    'nb'                    : 1,                    \
+                    'nb'                    : XXNB,                 \
                     'Ca'                    : Ca,                   \
-                    # 'Web'                   : We,                   \
-                    # 'Re_inv'                : Re_inv,               \
+                    'Web'                   : We,                   \
+                    'Re_inv'                : Re_inv,               \
                     'qbmm'               : 'T',                     \
                     'nnode'              : 4,                       \
                     'dist_type'          : 2,                       \
-                    'sigR'               : 0.1,                     \
-                    'sigV'               : 0.1,                     \
+                    'sigR'               : XXSIGR,                  \
+                    'sigV'               : XXSIGV,                  \
                     'rhoRV'              : 0.0,                     \
                     # ==========================================================
 
@@ -258,7 +256,7 @@ case_dict =                                                                     
                     'Mono(1)%npulse'            : 1, \
                     'Mono(1)%dir'               : 1., \
                     'Mono(1)%pulse'             : 1, \
-                    'Mono(1)%mag'               : 1*pa, \
+                    'Mono(1)%mag'               : XXPFAC*pa, \
                     'Mono(1)%length'            : (1./(300000.))*cact/x0, \
                     # ==========================================================
     }

@@ -3739,9 +3739,8 @@ MODULE m_rhs
 
             IF (idir == ndirs) THEN
                 mytime = t_step*dt
-                print*, 'time', mytime, 'delay', mymono%delay
+                if (proc_rank == 0) print*, 'time', mytime, 'delay', mymono%delay, dflt_real
                 IF ( (mytime < mymono%delay) .AND. mymono%delay /= dflt_real ) RETURN
-                PRINT*, 'getting mono'
 
                 DO j = 0,m; DO k = 0,n; DO l=0,p
                     CALL s_convert_to_mixture_variables( q_prim_vf, myRho, n_tait, B_tait, Re, We, j, k, l )
