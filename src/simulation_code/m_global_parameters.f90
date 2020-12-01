@@ -1155,7 +1155,7 @@ MODULE m_global_parameters
                 ! END DO
                 ! nR3 = 1.d-12
                 PRINT*, vftmp, nR3, nRtmp(:)
-                STOP'nR3 is negative'
+                STOP 'nR3 is negative'
             END IF
             IF (vftmp < 0d0) THEN
                 ! vftmp = small_alf
