@@ -178,23 +178,10 @@ MODULE m_qbmm
                         coeffs(2,i1,i2) = -3d0*i2/2d0
                         coeffs(3,i1,i2) = i2/rho
                         coeffs(4,i1,i2) = i1
-                        IF (Re_inv/=dflt_real) coeffs(5,i1,i2) = 4d0*i2*Re_inv/rho
-                        IF (  Web /=dflt_real) coeffs(6,i1,i2) = 2*i2/Web/rho
+                        IF (Re_inv/=dflt_real) coeffs(5,i1,i2) = -4d0*i2*Re_inv/rho
+                        IF (  Web /=dflt_real) coeffs(6,i1,i2) = -2d0*i2/Web/rho
                     ELSE IF (bubble_model==2) THEN
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
-                        ! coeffs(1,i1,i2)  = -3d0*i2/2d0
-                        ! coeffs(2,i1,i2)  = -i2/c
-                        ! coeffs(3,i1,i2)  = i2/(2d0*c*c)
-                        ! coeffs(4,i1,i2)  = -i2*pres/rho
-                        ! coeffs(5,i1,i2)  = -2d0*i2*pres/(c*rho)
-                        ! coeffs(6,i1,i2)  = -i2*pres/(c*c*rho)
-                        ! coeffs(7,i1,i2)  = i2/rho
-                        ! coeffs(8,i1,i2)  = 2d0*i2/(c*rho)
-                        ! coeffs(9,i1,i2)  = i2/(c*c*rho)
-                        ! coeffs(10,i1,i2) = -3d0*i2*gam/(c*rho)
-                        ! coeffs(11,i1,i2) = -3d0*i2*gam/(c*c*rho)
-                        ! coeffs(12,i1,i2) = i1
-
                         coeffs(1,i1,i2)  = -3d0*i2/2d0
                         coeffs(2,i1,i2)  = -i2/c
                         coeffs(3,i1,i2)  = i2/(2d0*c*c)
@@ -207,7 +194,6 @@ MODULE m_qbmm
                         coeffs(10,i1,i2) = -3d0*i2*gam/(c*rho)
                         coeffs(11,i1,i2) = -3d0*i2*gam/(c*c*rho)
                         coeffs(12,i1,i2) = i1
-
                     END IF
                 END IF
             END DO; END DO
@@ -242,7 +228,12 @@ MODULE m_qbmm
                     n_tait = fluid_pp(1)%gamma
                     n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                     B_tait = fluid_pp(1)%pi_inf
-                    c =  DSQRT(n_tait*(pres+B_tait)/(rho*(1.d0-alf)))
+                    c = n_tait*(pres+B_tait)/(rho*(1.d0-alf))
+                    IF (c > 0.d0) THEN
+                        c = DSQRT(c)
+                    ELSE
+                        c = sgm_eps
+                    END IF                    
                 END IF
 
                 CALL s_coeff(pres,rho,c,coeff)
@@ -298,15 +289,25 @@ MODULE m_qbmm
                     momsp(1)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,0d0,0d0)
                     momsp(2)%sf(id1,id2,id3) = 4.d0*pi*nbub*f_quad(abscX,abscY,wght,2d0,1d0,0d0)
                     momsp(3)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0,2d0,0d0)
-                    momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
+                    IF (ABS(gam-1.d0) <= 1.d-4) THEN
+                        ! Gam \approx 1, don't risk imaginary quadrature
+                        momsp(4)%sf(id1,id2,id3) = 1.d0
+                    ELSE 
+                        momsp(4)%sf(id1,id2,id3) = f_quad(abscX,abscY,wght,3d0*(1d0-gam),0d0,3d0*gam)
+                    END IF
 
-                    ! DO i1 = 1,nterms
-                    !     IF (momsp(i1)%sf(id1,id2,id3)/=momsp(i1)%sf(id1,id2,id3)) THEN
-                    !         PRINT*, 'nan in momsp', i1,id1
-                    !         PRINT*, 'moms: ', moms(:)
-                    !         CALL s_mpi_abort()
-                    !     END IF
-                    ! END DO
+                    DO i1 = 1,4
+                        IF (momsp(i1)%sf(id1,id2,id3) /= momsp(i1)%sf(id1,id2,id3)) THEN
+                            PRINT*, 'NaN in sp moment', i1, 'location',id1,id2,id3
+                            PRINT*, 'Rs', Rvec(:)
+                            PRINT*, 'alpha', alf
+                            PRINT*, 'nbub', nbub
+                            PRINT*, 'abscX', abscX(:,:)
+                            PRINT*, 'abscY', abscY(:,:)
+                            PRINT*, 'wght' , wght(:,:)
+                            CALL s_mpi_abort()
+                        END IF
+                    END DO
                 ELSE
                     DO q = 1,nb
                         DO i1 = 0,2; DO i2 = 0,2
@@ -398,7 +399,7 @@ MODULE m_qbmm
             c2 = d2 - bu**2d0 
             frho(1) = fmom(1)/2d0; 
             frho(2) = fmom(1)/2d0; 
-            c2 = MAXVAL( (/ c2,verysmall /) )
+            c2 = MAXVAL( (/ c2, verysmall /) )
             fup(1) = bu - DSQRT(c2)
             fup(2) = bu + DSQRT(c2) 
 

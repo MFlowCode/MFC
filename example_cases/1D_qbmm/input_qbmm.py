@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
 import math
 
@@ -133,17 +133,17 @@ case_dict =                                                                     
                     # 't_step_stop'                  : 4,                        \
                     't_step_save'                  : 8000,   \
                     # 't_step_save'                  : 1,   \
-		    # ==========================================================
+                    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
                     'num_patches'                  : 2,                        \
                     'model_eqns'                   : 2,                        \
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 1,                        \
-		    'adv_alphan'                   : 'T',                      \
-		    'mpp_lim'                      : 'F',                      \
-		    'mixture_err'                  : 'F',                      \
-		    'time_stepper'                 : 3,                        \
+                    'adv_alphan'                   : 'T',                      \
+                    'mpp_lim'                      : 'F',                      \
+                    'mixture_err'                  : 'F',                      \
+                    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
@@ -151,7 +151,7 @@ case_dict =                                                                     
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
-		    'riemann_solver'               : 2,                        \
+                    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
                     'commute_err'                  : 'F',                      \
@@ -164,13 +164,13 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'F',                       \
-	            'fd_order'                     : 1,                       \
+                    'parallel_io'                  :'F',                       \
+                    'fd_order'                     : 1,                       \
                     #'schlieren_wrt'                :'T',                      \
-		    'probe_wrt'                    :'T',                   \
-		    'num_probes'                   : 1,                    \
-		    'probe(1)%x'                   : 0.,             \
-		    # ==========================================================
+                    'probe_wrt'                    :'T',                   \
+                    'num_probes'                   : 1,                    \
+                    'probe(1)%x'                   : 0.,             \
+                    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
                     'patch_icpp(1)%geometry'       : 1,                         \
@@ -229,14 +229,13 @@ case_dict =                                                                     
                     'bubbles'               : 'T',                  \
                     'bubble_model'          : 2,                    \
                     'polytropic'            : 'T',                  \
-                    # 'polydisperse'          : 'T',                  \
-                    # 'R0_type'               : 2,                    \
-                    'polydisperse'          : 'F',                  \
-                    # 'poly_sigma'            : 0.3,                  \
+                    'polydisperse'          : 'T',                  \
+                    'R0_type'               : 1,                    \
+                    'poly_sigma'            : 0.3,                  \
                     'thermal'               : 3,                    \
                     'R0ref'                 : myr0,                 \
                     # 'nb'                    : 3,                    \
-                    'nb'                    : 1,                    \
+                    'nb'                    : 3,                    \
                     'Ca'                    : Ca,                   \
                     # 'Web'                   : We,                   \
                     # 'Re_inv'                : Re_inv,               \

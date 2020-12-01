@@ -174,7 +174,7 @@ MODULE m_bubbles
 
                     bub_v_src(q,j,k,l) = nbub(j,k,l) * rddot
                     
-                    IF (alf < 1.d-10) THEN
+                    IF (alf < 1.d-11) THEN
                         bub_adv_src(j,k,l) = 0d0
                         bub_r_src(q,j,k,l) = 0d0
                         bub_v_src(q,j,k,l) = 0d0
@@ -183,7 +183,17 @@ MODULE m_bubbles
                            bub_m_src(q,j,k,l) = 0d0
                         END IF
                     END IF
+    
                 END DO; END DO; END DO; END DO
+
+                IF (DEBUG) THEN
+                    PRINT*, 'bub rhs'
+                    PRINT*, 'bub adv', bub_adv_src(:,0,0)
+                    PRINT*, 'bub r', bub_r_src(q,:,0,0)
+                    PRINT*, 'bub v', bub_v_src(q,:,0,0)
+                    PRINT*, 'bub p', bub_p_src(q,:,0,0)
+                    PRINT*, 'bub m', bub_m_src(q,:,0,0)
+                END IF
             END IF
             
         END SUBROUTINE s_compute_bubble_source
@@ -338,7 +348,6 @@ MODULE m_bubbles
             f_rddot_RP = (-1.5d0*(fV**2d0) + (fCpbw - fCp)/fRho)/fR
 
             IF (Re_inv /= dflt_real) f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
-            IF (Web /= dflt_real) f_rddot_RP = f_rddot_RP - 2d0/(Web*(fr**2d0))/fRho
 
         END FUNCTION f_rddot_RP
 
@@ -387,10 +396,22 @@ MODULE m_bubbles
                     (2.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
             ELSE
                 f_cpbw_KM = fpb 
+                ! @ t = 0, by default this is = pb0 = pl0[1] + 2*ss/(R0ref * R) computed by s_init_nonpoly 
             END IF
 
+            ! PRINT*, 'surface tension component', (3.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+
             IF (  Web /=dflt_real) f_cpbw_KM = f_cpbw_KM - 2.D0/(fR*Web)
+
+
             IF (Re_inv/=dflt_real) f_cpbw_KM = f_cpbw_KM - 4.D0*Re_inv*fV/fR
+
+            ! PRINT*, ((fR0/fR)**(3.d0*gam))*(3.D0/(Web*fR0))-3.D0/(fR*Web)
+            ! PRINT*, f_cpbw_KM
+
+            ! At t = 0, we have R0 = R
+            ! fcpbw = Ca - Ca + 1
+            ! Add surface tension: fcpbw = fcpbw + 2/(Web*fR0) - 2/(Web*fR)
 
         END FUNCTION f_cpbw_KM
 
@@ -427,6 +448,7 @@ MODULE m_bubbles
             tmp2 = 1.5D0*(fV**2d0)*( tmp1/2d0-1d0 ) +   &
                    (1d0 + tmp1)*(fCpbw - fCp)/fRho  +   &
                    cdot_star * fR/(fRho*fC)
+
                  
             IF (Re_inv==dflt_real) THEN
                 f_rddot_KM = tmp2/( fR*(1d0-tmp1) ) 

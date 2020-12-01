@@ -829,7 +829,7 @@ MODULE m_data_output
 
                 IF (model_eqns==2) THEN
                     DO i = 1, sys_size
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step,'.dat'
 
                         OPEN(2,FILE= TRIM(file_path) )
                             DO j=0,m
@@ -886,7 +886,7 @@ MODULE m_data_output
                 END IF
 
                 DO i = 1, sys_size    
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
 
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
@@ -896,10 +896,17 @@ MODULE m_data_output
                 END DO
             END IF
 
+
+            IF (precision==1) THEN
+                FMT="(3F30.7)"
+            ELSE
+                FMT="(3F40.14)"
+            END IF
+
             ! 2D
             IF ( (n>0) .AND. (p==0) ) THEN
                 DO i = 1,sys_size
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
                         DO k=0,n
@@ -911,10 +918,17 @@ MODULE m_data_output
                 END DO
             END IF
 
+
+            IF (precision==1) THEN
+                FMT="(4F30.7)"
+            ELSE
+                FMT="(4F40.14)"
+            END IF
+
             ! 3D
             IF ( p > 0) THEN
                 DO i = 1,sys_size
-        WRITE(file_path,'(A,I0,A,I2.2,A,I6.6,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
+        WRITE(file_path,'(A,I0,A,I2.2,A,I8.8,A)') TRIM(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step,'.dat'
                     OPEN(2,FILE= TRIM(file_path) )
                         DO j=0,m
                         DO k=0,n
@@ -1822,7 +1836,8 @@ MODULE m_data_output
             REAL(KIND(0d0))                                   :: gamma
             REAL(KIND(0d0))                                   :: pi_inf
             REAL(KIND(0d0))                                   :: c
-            REAL(KIND(0d0))                                   :: M00
+            REAL(KIND(0d0))                                   :: M00, M10, M01, M20, M11, M02
+            REAL(KIND(0d0))                                   :: varR, varV
             REAL(KIND(0d0)), DIMENSION(Nb)                    :: nR, R, nRdot, Rdot
             REAL(KIND(0d0))                                   :: accel
             REAL(KIND(0d0))                                   :: int_pres
@@ -1870,6 +1885,12 @@ MODULE m_data_output
                 nRdot = 0d0; Rdot = 0d0
                 nbub = 0d0
                 M00 = 0d0
+                M10 = 0d0
+                M01 = 0d0
+                M20 = 0d0
+                M11 = 0d0
+                M02 = 0d0
+                varR = 0d0; varV = 0d0
                 alf = 0d0
 
                 ! Find probe location in terms of indices on a
@@ -1931,7 +1952,23 @@ MODULE m_data_output
                             CALL s_comp_n_from_cons( alf, nR, nbub)
                             IF (DEBUG) print*, 'In probe, nbub: ', nbub
 
-                            IF (qbmm) M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
+                            IF (qbmm) THEN
+                                M00 = q_cons_vf(bub_idx%moms(1,1))%sf(j-2,k,l)/nbub
+                                M10 = q_cons_vf(bub_idx%moms(1,2))%sf(j-2,k,l)/nbub
+                                M01 = q_cons_vf(bub_idx%moms(1,3))%sf(j-2,k,l)/nbub
+                                M20 = q_cons_vf(bub_idx%moms(1,4))%sf(j-2,k,l)/nbub
+                                M11 = q_cons_vf(bub_idx%moms(1,5))%sf(j-2,k,l)/nbub
+                                M02 = q_cons_vf(bub_idx%moms(1,6))%sf(j-2,k,l)/nbub
+
+                                M10 = M10/M00
+                                M01 = M01/M00
+                                M20 = M20/M00
+                                M11 = M11/M00
+                                M02 = M02/M00
+
+                                varR = M20 - M10**2d0
+                                varV = M02 - M01**2d0
+                            END IF
                             R(:) = nR(:)/nbub                        
                             Rdot(:) = nRdot(:)/nbub                        
                         
@@ -2147,6 +2184,23 @@ MODULE m_data_output
                         CALL s_mpi_allreduce_sum(tmp,ptilde)
                         tmp = ptot
                         CALL s_mpi_allreduce_sum(tmp,ptot)
+
+                        IF (qbmm) THEN
+                            tmp = varR
+                            CALL s_mpi_allreduce_sum(tmp,varR)
+                            tmp = varV
+                            CALL s_mpi_allreduce_sum(tmp,varV)
+
+                            tmp = M10
+                            CALL s_mpi_allreduce_sum(tmp,M10)
+                            tmp = M01
+                            CALL s_mpi_allreduce_sum(tmp,M01)
+                            tmp = M20
+                            CALL s_mpi_allreduce_sum(tmp,M20)
+                            tmp = M02
+                            CALL s_mpi_allreduce_sum(tmp,M02)
+
+                        END IF
                     END IF
                 END IF
 
@@ -2154,7 +2208,7 @@ MODULE m_data_output
                     IF (n == 0) THEN
                         IF (bubbles .AND. (num_fluids <= 2)) THEN
                             IF (qbmm) THEN
-                                WRITE(i+30,'(6x,f12.6,10f28.16)') &
+                                WRITE(i+30,'(6x,f12.6,14f28.16)') &
                                     nondim_time, &
                                     rho, &
                                     vel(1), &
@@ -2163,7 +2217,13 @@ MODULE m_data_output
                                     R(1), &
                                     Rdot(1), &
                                     nR(1), &
-                                    nRdot(1)
+                                    nRdot(1), &
+                                    varR, &
+                                    varV, &
+                                    M10, &
+                                    M01, &
+                                    M20, &
+                                    M02
                             ELSE
                                 WRITE(i+30,'(6x,f12.6,8f24.8)') &
                                     nondim_time, &
@@ -2219,8 +2279,7 @@ MODULE m_data_output
                         END IF
                     ELSEIF (p == 0) THEN
                         IF (bubbles) THEN
-                            WRITE(i+30,'(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // &
-                                           'F24.8,F24.8,F24.8,F24.8)') &
+                            WRITE(i+30,'(6X,10F24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &

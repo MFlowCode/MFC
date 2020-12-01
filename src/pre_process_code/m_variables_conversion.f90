@@ -497,9 +497,9 @@ MODULE m_variables_conversion
                             IF( j==0 .and. k==0 .and. l==0) print*, 'In convert, nbub:', nbub
                             DO i = bub_idx%beg, bub_idx%end
                                 q_cons_vf(i)%sf(j,k,l) = q_prim_vf(i)%sf(j,k,l)*nbub
-                                IF( j==0 .and. k==0 .and. l==0) THEN
-                                    PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
-                                END IF
+                                ! IF( j==0 .and. k==0 .and. l==0) THEN
+                                !     PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
+                                ! END IF
                             END DO
 
                         END IF
