@@ -1148,26 +1148,23 @@ MODULE m_global_parameters
             CALL s_quad( nRtmp**3d0,nR3 )
             
             IF ( nR3 < 0d0 ) THEN
-                PRINT*, vftmp, nR3, nRtmp(:)
                 ! DO i = 1,nb
                     ! IF (nRtmp(i) < small_alf) THEN
                         ! nRtmp(i) = small_alf
                     ! END IF
                 ! END DO
-                STOP 'nR3 is negative'
-                nR3 = 1.d-12
+                ! nR3 = 1.d-12
+                PRINT*, vftmp, nR3, nRtmp(:)
+                STOP'nR3 is negative'
             END IF
             IF (vftmp < 0d0) THEN
-                PRINT*, vftmp, nR3, nRtmp(:)
                 ! vftmp = small_alf
+                ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
+                PRINT*, vftmp, nR3, nRtmp(:)
                 STOP 'vf negative'
-                ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
-            ELSE
-                ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
             END IF
 
-
-            ! ntmp = 1d0
+            ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/vftmp )
 
         END SUBROUTINE s_comp_n_from_cons
 
@@ -1184,6 +1181,16 @@ MODULE m_global_parameters
             REAL(KIND(0.D0)) :: R3
 
             CALL s_quad( Rtmp**3d0,R3 ) 
+
+            IF ( R3 < 0d0 ) THEN
+                PRINT*, vftmp, R3, Rtmp(:)
+                STOP 'R3 is negative'
+            END IF
+            IF (vftmp < 0d0) THEN
+                PRINT*, vftmp, R3, Rtmp(:)
+                STOP 'vf negative'
+            END IF
+
             ntmp = (3.d0/(4.d0*pi)) * vftmp/R3
             ! ntmp = 1d0
 
