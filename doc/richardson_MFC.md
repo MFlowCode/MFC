@@ -11,6 +11,15 @@
     * Add your private key to your Richardson keychain
         * $ cat ~/.ssh/id_rsa.pub | ssh <your_userid>@richardson.caltech.edu 'cat >> ~/.ssh/authorized_keys'
 
+=======
+        * [Generate](https://docs.joyent.com/public-cloud/getting-started/ssh-keys/generating-an-ssh-key-manually/manually-generating-your-ssh-key-in-mac-os-x) your private key if you don't have one 
+        * $ cat ~/.ssh/id_rsa.pub | ssh <your_userid>@richardson.caltech.edu 'cat >> ~/.ssh/authorized_keys'
+
+* Silo/HDF5, Visit, Paraview on Richardson
+    * Follow the `visit_paraview_richardson.pdf` document  
+    * Step 15. under 'visit on richardson' should use the following URL:  http://visit.ilight.com/svn/visit/branches/2.9RC/src/svn_bin/bv_support/
+
+>>>>>>> qbmm
 * Clone MFC, e.g.
     * $ git clone https://github.com/ComputationalFlowPhysics/MFC_private.git 
     * $ git status
@@ -56,6 +65,16 @@
         * Make sure you logged into Richardson using ssh -Y [or ssh -X] 
         * Check if your X server is working by logging into Richardson and issuing
             $ xclock
+            * I am aware this version is deprecated, but it appears that 2.7.11 does not work in some cases
+        * Make sure you logged into Richardson using ssh -Y [or ssh -X] 
+        * Check if your X server is working by logging into Richardson and issuing
+            $ xclock
+        * IF YOU USE MacOS CATALINA!
+            * Permissions can be an issue
+            * Go to System preferences -> Security and Privacy -> Privacy -> Full Disk Access 
+            * Add your terminal (e.g. Terminal, iTerm2, etc.) via the + button
+            * Add XQuartz (launchd_startx) and the app (XQuartz)
+
     * Copy contents of https://raw.githubusercontent.com/sbryngelson/dotfiles/master/.gnuplotrc_x11
     into your ~/.bashrc
         * now you can use 

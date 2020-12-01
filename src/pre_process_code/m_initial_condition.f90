@@ -355,7 +355,8 @@ MODULE m_initial_condition
             IF (bubbles) THEN
                 DO i = 1,nb
                     muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
-                    muV = V0(i)*patch_icpp(patch_id)%v0 ! = 0
+                    muV = patch_icpp(patch_id)%v0 ! = 0
+
                     IF (qbmm) THEN
                         IF (dist_type == 1) THEN
                             q_prim_vf(bub_idx%fullmom(i,0,0))%sf(j,k,l) = 1d0
@@ -385,6 +386,10 @@ MODULE m_initial_condition
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
                     END IF
                 END DO
             END IF
@@ -451,6 +456,10 @@ MODULE m_initial_condition
                     ELSE
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
                     END IF
                 END DO
             END IF
@@ -553,6 +562,12 @@ MODULE m_initial_condition
                         !     + (1d0-eta)*orig_prim_vf(bub_idx%vs(i)))
                         q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = muR
                         q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = muV
+
+                        IF ( .NOT. polytropic ) THEN
+                            q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = patch_icpp(patch_id)%p0
+                            q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = patch_icpp(patch_id)%m0
+                        END IF
+
                     END IF
                 END DO
             END IF
@@ -572,8 +587,13 @@ MODULE m_initial_condition
 
             IF (bubbles .AND. (.NOT. polytropic) ) THEN
                 DO i = 1,nb
-                    q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
-                    q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
+                    IF( q_prim_vf(bub_idx%ps(i))%sf(j,k,l) == dflt_real ) THEN
+                        q_prim_vf(bub_idx%ps(i))%sf(j,k,l) = pb0(i) 
+                        print*, 'setting to pb0'
+                    END IF
+                    IF( q_prim_vf(bub_idx%ms(i))%sf(j,k,l) == dflt_real ) THEN
+                        q_prim_vf(bub_idx%ms(i))%sf(j,k,l) = mass_v0(i)
+                    END IF
                 END DO
             END IF
             
@@ -1021,18 +1041,20 @@ MODULE m_initial_condition
                         ELSE
                             perturb_alpha = q_prim_vf(E_idx+perturb_flow_fluid)%sf(i,j,k)
                         END IF
-                        IF (perturb_alpha == 1d0) THEN
+                        ! IF (perturb_alpha == 1d0) THEN
                             ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
 !                            rand_real = rand_real / 1d2 / 1d3
 !                            q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
                             ! Perturb velocity
-                            DO l = mom_idx%beg+1, mom_idx%end
-                                CALL RANDOM_NUMBER(rand_real)
-                                rand_real = rand_real / 1d1 / 145d1
-                                q_prim_vf(l)%sf(i,j,k) = q_prim_vf(l)%sf(i,j,k) + rand_real
-                            END DO
-                        END IF
+                            CALL RANDOM_NUMBER(rand_real)
+                            rand_real = rand_real * 1.d-2
+                            q_prim_vf(mom_idx%beg)%sf(i,j,k) = (1.d0+rand_real)*q_prim_vf(mom_idx%beg)%sf(i,j,k)
+                            q_prim_vf(mom_idx%end)%sf(i,j,k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i,j,k)
+                            IF (bubbles) THEN
+                                q_prim_vf(alf_idx)%sf(i,j,k) = (1.d0+rand_real)*q_prim_vf(alf_idx)%sf(i,j,k)
+                            END IF
+                        ! END IF
                     END DO
                 END DO
             END DO

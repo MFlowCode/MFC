@@ -137,6 +137,9 @@ MODULE m_derived_types
         
         REAL(KIND(0d0))    :: R0 !< Bubble size
         REAL(KIND(0d0))    :: V0 !< Bubble velocity
+
+        REAL(KIND(0d0))    :: p0 !< Bubble size
+        REAL(KIND(0d0))    :: m0 !< Bubble velocity
         
         
     END TYPE ic_patch_parameters

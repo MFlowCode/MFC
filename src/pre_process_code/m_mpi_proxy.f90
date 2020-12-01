@@ -324,6 +324,12 @@ MODULE m_mpi_proxy
                 CALL MPI_BCAST( patch_icpp(i)%v0         , 1, &
                                 MPI_DOUBLE_PRECISION         , 0, &
                                 MPI_COMM_WORLD, ierr              )
+                CALL MPI_BCAST( patch_icpp(i)%p0         , 1, &
+                                MPI_DOUBLE_PRECISION         , 0, &
+                                MPI_COMM_WORLD, ierr              )
+                CALL MPI_BCAST( patch_icpp(i)%m0         , 1, &
+                                MPI_DOUBLE_PRECISION         , 0, &
+                                MPI_COMM_WORLD, ierr              )
 
 
 
