@@ -37,11 +37,13 @@ clean:
 $(PRG_OBJ) : $(MOD_OBJS)
 
 # Modules depend on each other
-m_rhs.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_weno.o m_riemann_solvers.o m_cbc.o m_bubbles.o
+m_rhs.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_weno.o m_riemann_solvers.o m_cbc.o m_bubbles.o m_qbmm.o
 m_start_up.o :             m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_compile_specific.o
 m_data_output.o :          m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_compile_specific.o
+m_riemann_solvers.o :      m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_bubbles.o
 m_bubbles.o :              m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o 
-m_riemann_solvers.o :      m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o
+m_qbmm.o :                 m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o 
+
 m_cbc.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o
 m_weno.o :                 m_derived_types.o m_global_parameters.o m_variables_conversion.o
 
@@ -51,4 +53,4 @@ m_fftw.o :                 m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 m_variables_conversion.o : m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 
 m_mpi_proxy.o :            m_derived_types.o m_global_parameters.o
-m_global_parameters.o :    m_derived_types.o
+m_global_parameters.o :    m_derived_types.o m_eigen.o

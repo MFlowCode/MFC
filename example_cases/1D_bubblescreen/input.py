@@ -68,6 +68,11 @@ Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
 
+<<<<<<< HEAD
+=======
+print 'dt: ', dt
+
+>>>>>>> MFC_private/master
 # Command to navigate between directories
 from os import chdir
 
@@ -104,7 +109,11 @@ case_dict =                                                                     
                     'case_dir'                     : '\'.\'',                   \
                     'run_time_info'                : 'T',                       \
                     'nodes'                        : 1,                         \
+<<<<<<< HEAD
                     'ppn'                          : 4,                         \
+=======
+                    'ppn'                          : 1,                         \
+>>>>>>> MFC_private/master
                     'queue'                        : 'normal',                  \
                     'walltime'                     : '24:00:00',                \
                     'mail_list'                    : '',                        \
@@ -215,8 +224,13 @@ case_dict =                                                                     
 
                     # Bubbles ==================================================
                     'bubbles'               : 'T',                  \
+<<<<<<< HEAD
                     'bubble_model'          : 2,                  \
                     'polytropic'            : 'F',                  \
+=======
+                    'bubble_model'          : 3,                  \
+                    'polytropic'            : 'T',                  \
+>>>>>>> MFC_private/master
                     'polydisperse'          : 'F',                  \
                     #'poly_sigma'            : 0.3,                  \
                     'thermal'               : 3,           \

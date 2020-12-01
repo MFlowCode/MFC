@@ -184,6 +184,14 @@ MODULE m_time_steppers
                 END DO
             END IF
 
+            IF (hypoelasticity) THEN
+                DO i = stress_idx%beg, stress_idx%end
+                    ALLOCATE(q_prim_vf(i)%sf( ix%beg:ix%end, &
+                                              iy%beg:iy%end, &
+                                              iz%beg:iz%end ))
+                END DO
+            END IF
+
             IF (model_eqns == 3) THEN
                 DO i = internalEnergies_idx%beg, internalEnergies_idx%end
                     ALLOCATE(q_prim_vf(i)%sf( ix%beg:ix%end, &
@@ -237,10 +245,12 @@ MODULE m_time_steppers
             END IF
 
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
-           
+            IF (DEBUG) PRINT*, 'got rhs'
+
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
             END IF
+            IF (DEBUG) print*, 'wrote runtime info'
 
             IF (ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) THEN
                 CALL s_time_step_cycling(t_step)
@@ -255,10 +265,10 @@ MODULE m_time_steppers
                              + dt*rhs_vf(i)%sf
             END DO
 
+
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
 
             IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-
             
             DO i = 1, cont_idx%end
                 q_prim_vf(i)%sf => NULL()
@@ -299,6 +309,7 @@ MODULE m_time_steppers
             END DO
             
             CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
+
             
             IF(run_time_info) THEN
                 CALL s_write_run_time_information(q_prim_vf, t_step)
@@ -453,6 +464,152 @@ MODULE m_time_steppers
             
         END SUBROUTINE s_3rd_order_tvd_rk ! ------------------------------------
         
+
+
+        !> Adaptive SSP RK23 time-stepping algorithm
+        !! @param t_step Current time-step
+        SUBROUTINE s_23_order_tvd_rk(t_step) ! --------------------------------
+
+            INTEGER, INTENT(IN) :: t_step
+            REAL(KIND(0d0)) :: relerr, absval, tmp
+            REAL(KIND(0d0)) :: dtmin,dtmax
+            
+            INTEGER :: i,j !< Generic loop iterator
+            
+            ! Stage 1 of 3 =====================================================
+            DO i = 1, cont_idx%end
+                q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+            END DO
+            DO i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+            END DO
+            
+            CALL s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
+            
+            IF(run_time_info) CALL s_write_run_time_information(q_prim_vf, t_step)
+            IF (ANY(com_wrt) .OR. ANY(cb_wrt) .OR. probe_wrt) &
+                CALL s_time_step_cycling(t_step)
+            
+            IF(t_step == t_step_stop) RETURN
+            
+            DO i = 1, sys_size
+                q_cons_ts(2)%vf(i)%sf(0:m,0:n,0:p) = &
+                               q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
+                             + dt*rhs_vf(i)%sf
+            END DO
+            
+            IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
+            IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+
+            ! ==================================================================
+            
+
+            ! Stage 2 of 3 =====================================================
+            DO i = 1, cont_idx%end
+                q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
+            END DO
+            DO i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
+            END DO
+            
+            CALL s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
+
+            ! RK2 estimate
+            DO i = 1, sys_size
+                q_cons_ts(3)%vf(i)%sf(0:m,0:n,0:p) = (              &
+                                q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p)  &
+                           +    q_cons_ts(2)%vf(i)%sf(0:m,0:n,0:p)  &
+                           +    dt*rhs_vf(i)%sf ) / 2d0
+            END DO
+
+            IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(3)%vf)
+            IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(3)%vf) 
+            
+            ! Stage 2 of RK3
+            DO i = 1, sys_size
+                q_cons_ts(2)%vf(i)%sf(0:m,0:n,0:p) = &
+                           ( 3d0*q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
+                           +     q_cons_ts(2)%vf(i)%sf(0:m,0:n,0:p) &
+                           +     dt*rhs_vf(i)%sf ) / 4d0
+            END DO
+            
+            IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
+            IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(2)%vf) 
+
+            ! ==================================================================
+            
+
+            ! Stage 3 of 3 =====================================================
+            CALL s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
+            
+            DO i = 1, sys_size
+                q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) = &
+                           (     q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) &
+                           + 2d0*q_cons_ts(2)%vf(i)%sf(0:m,0:n,0:p) &
+                           + 2d0*dt*rhs_vf(i)%sf ) / 3d0
+            END DO
+
+            
+            IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
+            IF (model_eqns == 3) CALL s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+
+            ! ==================================================================
+
+
+            ! Approximate error =================================================
+            ! err = (q_cons_ts(1)%vf(i)%sf - q_cons_ts(3)%vf(i)%sf) / &
+            !     q_cons_ts(1)%vf(i)
+
+            ! PRINT*, '          '
+            ! DO i = 1,sys_size
+            !     PRINT*, 'MAXVAL', i,  MAXVAL( ABS( q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p)  ), 1 )
+            ! END DO
+
+            ! DO i = 1,sys_size
+            !     PRINT*, 'ABSERR', i,  MAXVAL( ABS( q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) - &
+            !         q_cons_ts(3)%vf(i)%sf(0:m,0:n,0:p)  ), 1 )
+            ! END DO
+
+            relerr = 0d0
+            DO i = 1,sys_size
+                absval = MAXVAL( ABS( q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p)  ) )
+                IF ( absval >= 1D-10 ) THEN
+                    relerr =  MAX( relerr, MAXVAL( ABS(             &
+                       (q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) -        &
+                        q_cons_ts(3)%vf(i)%sf(0:m,0:n,0:p)) /       &
+                        q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p) ) )   &
+                        )
+                END IF
+            END DO
+
+            IF (num_procs > 1) THEN
+                tmp = relerr
+                CALL s_mpi_allreduce_max(tmp,relerr)
+            END IF
+
+            dtmin = 0.002d0 / 2d0
+            dtmax = 0.002d0 * 2d0
+
+            dt = dt*Min( Max( Sqrt(t_tol/(2d0*relerr)) , 0.3d0 ), 2d0 )
+            dt = Max( Min( dtmax, dt ), dtmin )
+            ! dt = 0.0015d0
+
+            IF (proc_rank==0) PRINT*, 'RELERR:', relerr
+            IF (proc_rank==0) PRINT*, 'dt/dt0:', dt/dt0
+            ! IF (proc_rank==0) PRINT*, '---t/T:', mytime/finaltime
+
+            ! ==================================================================
+      
+            DO i = 1, cont_idx%end
+                q_prim_vf(i)%sf => NULL()
+            END DO
+            DO i = adv_idx%beg, adv_idx%end
+                q_prim_vf(i)%sf => NULL()
+            END DO
+            ! ==================================================================
+            
+            
+        END SUBROUTINE s_23_order_tvd_rk ! ------------------------------------
         
         
         !> 4th order RK time-stepping algorithm

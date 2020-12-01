@@ -1,5 +1,17 @@
 include ../../Makefile.user
 
+<<<<<<< HEAD
+=======
+#######################  Lapack Flags ###########################
+
+# Linker flags 
+ifdef lapack_lib_dir
+ld_pre_flags = -L$(lapack_lib_dir) -llapack -lblas
+else
+ld_pre_flags =
+endif
+
+>>>>>>> MFC_private/master
 ########################## FFTW Flags ###########################
 # Linker flags 
 ifdef fftw_lib_dir
@@ -8,6 +20,13 @@ else
 ld_sim_flags = 
 endif
 
+<<<<<<< HEAD
+=======
+ifdef lapack_lib_dir
+ld_sim_flags += -L$(lapack_lib_dir) -llapack -lblas
+endif
+
+>>>>>>> MFC_private/master
 # Header flags
 ifdef fftw_include_dir
 hd_flags = -I$(fftw_include_dir)

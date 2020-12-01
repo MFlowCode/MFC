@@ -1,6 +1,10 @@
 The MFC is distributed under the GNU GPLv3 license (or later).
 
+<<<<<<< HEAD
 Contributors: S. H. Bryngelson, K. Schmidmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
+=======
+Contributors: S. H. Bryngelson, K. Schmidmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius, J.-S. Spratt, M. Rodriguez
+>>>>>>> MFC_private/master
 
 
 Spencer H. Bryngelson
@@ -10,6 +14,21 @@ California Institute of Technology
 Pasadena, California, USA 
 Email: spencer@caltech.edu
 
+<<<<<<< HEAD
+=======
+Jean-Sebastien Spratt
+--------------------------------------------
+Graduate Researcher
+California Institute of Technology 
+Pasadena, California, USA 
+
+Mauro Rodriguez 
+--------------------------------------------
+Postdoctoral Scholar
+California Institute of Technology 
+Pasadena, California, USA 
+
+>>>>>>> MFC_private/master
 Kevin Schmidmayer
 --------------------------------------------
 Postdoctoral Scholar

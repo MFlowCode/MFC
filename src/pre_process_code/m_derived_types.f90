@@ -73,6 +73,8 @@ MODULE m_derived_types
         INTEGER, DIMENSION(:), ALLOCATABLE :: vs
         INTEGER, DIMENSION(:), ALLOCATABLE :: ps
         INTEGER, DIMENSION(:), ALLOCATABLE :: ms
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: moms !< Moment indices for qbmm
+        INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: fullmom !< Moment indices for qbmm
     END TYPE bub_bounds_info
     
     !> Derived type adding initial condition (ic) patch parameters as attributes
@@ -129,9 +131,15 @@ MODULE m_derived_types
         !! Primitive variables associated with the patch. In order, these include
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
+
+        REAL(KIND(0d0)), DIMENSION(6)              :: tau_e
+        !! Elastic stresses added to primitive variables if hypoelasticity = True
         
         REAL(KIND(0d0))    :: R0 !< Bubble size
         REAL(KIND(0d0))    :: V0 !< Bubble velocity
+
+        REAL(KIND(0d0))    :: p0 !< Bubble size
+        REAL(KIND(0d0))    :: m0 !< Bubble velocity
         
         
     END TYPE ic_patch_parameters
@@ -148,6 +156,7 @@ MODULE m_derived_types
         REAL(KIND(0d0)) :: M_v
         REAL(KIND(0d0)) :: mu_v
         REAL(KIND(0d0)) :: k_v
+        REAL(KIND(0d0)) :: G
     END TYPE physical_parameters
     
     
