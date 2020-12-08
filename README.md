@@ -104,11 +104,10 @@ Ph.D. Disserations:
   An MPI fortran compiler is required for all systems.
   If you do not have one, Homebrew can take care of this
   on OSX:  
-`brew install open-mpi`  
-  or 
-`brew install mpich`  
 
-  if MPICH is used then the flag `-fallow-argument-mismatch` needs to be added to `FFLAGS` in `Makefile.user`.
+`brew install open-mpi` or `brew install mpich`    
+
+  If a gcc v10.1+ backend is used, then the additional flag `-fallow-argument-mismatch` must be added to `FFLAGS` in `Makefile.user`.
   MPICH and Open-MPI can be compiled via another package manager on *nix systems.
  
 ### Simulation code dependency: FFTW 
