@@ -105,8 +105,11 @@ Ph.D. Disserations:
   If you do not have one, Homebrew can take care of this
   on OSX:  
 `brew install open-mpi`  
- 
-  or compiled via another package manager on Unix systems.
+  or 
+`brew install mpich`  
+
+  if MPICH is used then the flag `-fallow-argument-mismatch` needs to be added to `FFLAGS` in `Makefile.user`.
+  MPICH and Open-MPI can be compiled via another package manager on *nix systems.
  
 ### Simulation code dependency: FFTW 
 
