@@ -11,5 +11,5 @@ cd $library
     cat ../make_lapack.inc | sed -e s+XXMAKEDIR+$homedir+g > make.inc
     make blaslib 
     make lapacklib 
-    make install
+    cp librefblas.a libblas.a
 cd ..
