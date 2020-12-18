@@ -48,4 +48,4 @@ hd_post_flags =
 endif
 
 # Compiler flags
-f90_post_flags = $(f90_flags) $(hd_post_flags)
+f90_post_flags = $(f90_flags) -O0 $(hd_post_flags)
