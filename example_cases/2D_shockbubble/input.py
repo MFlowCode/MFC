@@ -39,9 +39,6 @@ mfc_dir = '../../src'; path[:0] = [mfc_dir + '/master_scripts']
 
 # Command to execute the MFC components
 from m_python_proxy import f_execute_mfc_component
-
-# Serial or parallel computational engine
-engine = 'serial'
 # ==============================================================================
 
 # Case Analysis Configuration ==================================================
@@ -49,14 +46,18 @@ engine = 'serial'
 # Selecting MFC component
 comp_name = argv[1].strip()
 
+# Serial or parallel computational engine
+engine = 'parallel'
+if (comp_name=='pre_process'): engine = 'serial'
 # Configuring case dictionary
+
 case_dict =                                                                    \
     {                                                                          \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                  \
                     'run_time_info'                : 'T',                      \
                     'nodes'                        : 1,                        \
-                    'ppn'                          : 1,                        \
+                    'ppn'                          : 24,                        \
                     'queue'                        : 'normal',                 \
                     'walltime'                     : '24:00:00',               \
                     'mail_list'                    : '',                       \
@@ -115,11 +116,11 @@ case_dict =                                                                    \
                                                                                 
 		    # Patch 1: Background  ============================
                     'patch_icpp(1)%geometry'       : 3,                        \
-                    'patch_icpp(1)%x_centroid'     : 0.,                  \
+                    'patch_icpp(1)%x_centroid'     : leng,                  \
                     'patch_icpp(1)%y_centroid'     : 0.,          \
-                    'patch_icpp(1)%length_x'       : 10*leng,                   \
+                    'patch_icpp(1)%length_x'       : 3*leng,                   \
                     'patch_icpp(1)%length_y'       : leng,         \
-                    'patch_icpp(1)%vel(1)'         : vel,                   \
+                    'patch_icpp(1)%vel(1)'         : 0.E+00,                   \
                     'patch_icpp(1)%vel(2)'         : 0.E+00,                  \
                     'patch_icpp(1)%pres'           : 101325.,                   \
                     'patch_icpp(1)%alpha_rho(1)'   : 1.29,                \
@@ -131,9 +132,9 @@ case_dict =                                                                    \
 		    # Patch 2: Shocked state ============================
                     'patch_icpp(2)%geometry'       : 3,                        \
                     'patch_icpp(2)%alter_patch(1)' : 'T',                      \
-                    'patch_icpp(2)%x_centroid'     : -3*leng/8.,                  \
+                    'patch_icpp(2)%x_centroid'     : -33*leng/4.,                  \
                     'patch_icpp(2)%y_centroid'     : 0.,          \
-                    'patch_icpp(2)%length_x'       : leng/4.,                   \
+                    'patch_icpp(2)%length_x'       : 16*leng,                   \
                     'patch_icpp(2)%length_y'       : leng,         \
                     'patch_icpp(2)%vel(1)'         : vel,                   \
                     'patch_icpp(2)%vel(2)'         : 0.E+00,                  \
