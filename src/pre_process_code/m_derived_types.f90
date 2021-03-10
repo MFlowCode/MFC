@@ -132,9 +132,6 @@ module m_derived_types
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
 
-        real(kind(0d0)), dimension(6)              :: tau_e
-        !! Elastic stresses added to primitive variables if hypoelasticity = True
-
         real(kind(0d0))    :: R0 !< Bubble size
         real(kind(0d0))    :: V0 !< Bubble velocity
 
@@ -155,7 +152,6 @@ module m_derived_types
         real(kind(0d0)) :: M_v
         real(kind(0d0)) :: mu_v
         real(kind(0d0)) :: k_v
-        real(kind(0d0)) :: G
     end type physical_parameters
 
 end module m_derived_types

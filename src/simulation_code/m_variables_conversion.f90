@@ -89,7 +89,7 @@ module m_variables_conversion
         !! @param k Cell location third index
         subroutine s_convert_abstract_to_mixture_variables(qK_vf, rho_K, &
                                                            gamma_K, pi_inf_K, &
-                                                           Re_K, i, j, k, G_K, G)
+                                                           Re_K, i, j, k)
 
             import :: scalar_field, sys_size, num_fluids
 
@@ -100,9 +100,6 @@ module m_variables_conversion
             real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
 
             integer, intent(IN) :: i, j, k
-
-            real(kind(0d0)), optional, intent(OUT) :: G_K
-            real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
         end subroutine s_convert_abstract_to_mixture_variables
 
@@ -175,7 +172,7 @@ contains
         !! @param Re_k Reynolds number
     subroutine s_convert_mixture_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
-                                                      Re_K, i, j, k, G_K, G)
+                                                      Re_K, i, j, k)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -184,9 +181,6 @@ contains
         real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
 
         integer, intent(IN) :: i, j, k
-
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
         ! Performing the transfer of the density, the specific heat ratio
         ! function as well as the liquid stiffness function, respectively
@@ -212,7 +206,7 @@ contains
         !! @param k Cell index
     subroutine s_convert_species_to_mixture_variables_bubbles(qK_vf, rho_K, &
                                                               gamma_K, pi_inf_K, &
-                                                              Re_K, i, j, k, G_K, G)
+                                                              Re_K, i, j, k)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -225,9 +219,6 @@ contains
 
         integer, intent(IN) :: i, j, k
         integer :: l
-
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
@@ -288,7 +279,7 @@ contains
         !! @param r Cell index
     subroutine s_convert_species_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
-                                                      Re_K,  k, l, r, G_K, G)
+                                                      Re_K,  k, l, r)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -298,9 +289,6 @@ contains
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
-
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
         integer, intent(IN) :: k, l, r
 
@@ -350,14 +338,6 @@ contains
             Re_K(i) = 1d0/max(Re_K(i), sgm_eps)
 
         end do
-
-
-        if (present(G_K)) then
-            G_K = 0d0
-            do i = 1, num_fluids
-                G_K = G_K + alpha_K(i)*G(i)
-            end do
-        end if
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
 
@@ -598,13 +578,6 @@ contains
                             qk_prim_vf(i)%sf(j, k, l) = qk_cons_vf(i)%sf(j, k, l)/nbub
                         end do
 
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = stress_idx%beg, stress_idx%end
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /max(rho_K, sgm_eps)
-                        end do
                     end if
                 end do
             end do

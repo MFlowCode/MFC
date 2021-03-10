@@ -192,8 +192,6 @@ contains
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i .eq. mom_idx%beg) then !u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i .eq. stress_idx%beg) then !tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i .eq. E_idx) then !p
                             if (model_eqns == 4) then
                                 !Tait pressure from density
