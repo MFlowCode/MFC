@@ -4226,7 +4226,7 @@ contains
         call s_weno(v_vf(iv%beg:iv%end), &
                     vL_qp(0, 0)%vf(iv%beg:iv%end), &
                     vR_qp(0, 0)%vf(iv%beg:iv%end), &
-                    cd_vars, norm_dir, weno_dir, 1, &
+                    cd_vars, norm_dir, weno_dir,  &
                     is1, is2, is3)
         ! ==================================================================
 
@@ -4271,46 +4271,16 @@ contains
                     do k = iy%beg, iy%end
                         do j = ix%beg + 1, ix%end - 1
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/((1d0 + wa_flg)*dx(j)) &
-                                *(wa_flg*vL_vf(i)%sf(j + 1, k, l) &
+                                1d0/dx(j) &
+                                * ( &
                                   + vR_vf(i)%sf(j, k, l) &
                                   - vL_vf(i)%sf(j, k, l) &
-                                  - wa_flg*vR_vf(i)%sf(j - 1, k, l))
+                                  )
                         end do
                     end do
                 end do
             end do
 
-            ! Modifying the way the scalar divergence theorem is utilized
-            ! near beginning and end Riemann state extrapolation boundary
-            ! conditions, respectively, as to omit any contributions from
-            ! outside the physical computational domain in the calculated
-            ! cell-averaged first-order spatial derivatives
-            if (weno_avg .neqv. .true.) return
-
-            if (bc_x%beg == -4) then     ! Riemann state extrap. BC at beg.
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do k = iy%beg, iy%end
-                            dv_ds_vf(i)%sf(0, k, l) = 1d0/dx(0) &
-                                                      *(vR_vf(i)%sf(0, k, l) &
-                                                        - vL_vf(i)%sf(0, k, l))
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bc_x%end == -4) then     ! Riemann state extrap. BC at end
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do k = iy%beg, iy%end
-                            dv_ds_vf(i)%sf(m, k, l) = 1d0/dx(m) &
-                                                      *(vR_vf(i)%sf(m, k, l) &
-                                                        - vL_vf(i)%sf(m, k, l))
-                        end do
-                    end do
-                end do
-            end if
             ! END: First-Order Spatial Derivatives in x-direction ==============
 
             ! First-Order Spatial Derivatives in y-direction ===================
@@ -4326,46 +4296,16 @@ contains
                     do k = iy%beg + 1, iy%end - 1
                         do j = ix%beg, ix%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/((1d0 + wa_flg)*dy(k)) &
-                                *(wa_flg*vL_vf(i)%sf(j, k + 1, l) &
+                                1d0/dy(k) &
+                                * ( &
                                   + vR_vf(i)%sf(j, k, l) &
                                   - vL_vf(i)%sf(j, k, l) &
-                                  - wa_flg*vR_vf(i)%sf(j, k - 1, l))
+                                  )
                         end do
                     end do
                 end do
             end do
 
-            ! Modifying the way the scalar divergence theorem is utilized
-            ! near beginning and end Riemann state extrapolation boundary
-            ! conditions, respectively, as to omit any contributions from
-            ! outside the physical computational domain in the calculated
-            ! cell-averaged first-order spatial derivatives
-            if (weno_avg .neqv. .true.) return
-
-            if (bc_y%beg == -4) then     ! Riemann state extrap. BC at beg.
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do j = ix%beg, ix%end
-                            dv_ds_vf(i)%sf(j, 0, l) = 1d0/dy(0) &
-                                                      *(vR_vf(i)%sf(j, 0, l) &
-                                                        - vL_vf(i)%sf(j, 0, l))
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bc_y%end == -4) then     ! Riemann state extrap. BC at end
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do j = ix%beg, ix%end
-                            dv_ds_vf(i)%sf(j, n, l) = 1d0/dy(n) &
-                                                      *(vR_vf(i)%sf(j, n, l) &
-                                                        - vL_vf(i)%sf(j, n, l))
-                        end do
-                    end do
-                end do
-            end if
             ! END: First-Order Spatial Derivatives in y-direction ==============
 
             ! First-Order Spatial Derivatives in z-direction ===================
@@ -4381,46 +4321,15 @@ contains
                     do k = iy%beg, iy%end
                         do j = ix%beg, ix%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/((1d0 + wa_flg)*dz(l)) &
-                                *(wa_flg*vL_vf(i)%sf(j, k, l + 1) &
+                                1d0/dz(l) &
+                                * ( &
                                   + vR_vf(i)%sf(j, k, l) &
                                   - vL_vf(i)%sf(j, k, l) &
-                                  - wa_flg*vR_vf(i)%sf(j, k, l - 1))
+                                  )
                         end do
                     end do
                 end do
             end do
-
-            ! Modifying the way the scalar divergence theorem is utilized
-            ! near beginning and end Riemann state extrapolation boundary
-            ! conditions, respectively, as to omit any contributions from
-            ! outside the physical computational domain in the calculated
-            ! cell-averaged first-order spatial derivatives
-            if (weno_avg .neqv. .true.) return
-
-            if (bc_z%beg == -4) then     ! Riemann state extrap. BC at beg.
-                do i = iv%beg, iv%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-                            dv_ds_vf(i)%sf(j, k, 0) = 1d0/dz(0) &
-                                                      *(vR_vf(i)%sf(j, k, 0) &
-                                                        - vL_vf(i)%sf(j, k, 0))
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bc_z%end == -4) then     ! Riemann state extrap. BC at end
-                do i = iv%beg, iv%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-                            dv_ds_vf(i)%sf(j, k, p) = 1d0/dz(p) &
-                                                      *(vR_vf(i)%sf(j, k, p) &
-                                                        - vL_vf(i)%sf(j, k, p))
-                        end do
-                    end do
-                end do
-            end if
 
         end if
         ! END: First-Order Spatial Derivatives in z-direction ==============
@@ -4468,54 +4377,16 @@ contains
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg + 1, ix%end - 1
-                        div_v_vf(i)%sf(j, k, l) = 1d0/((1d0 + wa_flg)*dx(j)) &
-                                                  *(wa_flg*vL_x_ndqp(1, 0, 0)%vf(i)%sf(j + 1, k, l) &
+                        div_v_vf(i)%sf(j, k, l) = 1d0/dx(j) &
+                                                  * ( &
                                                     + vR_x_ndqp(1, 0, 0)%vf(i)%sf(j, k, l) &
                                                     - vL_x_ndqp(1, 0, 0)%vf(i)%sf(j, k, l) &
-                                                    - wa_flg*vR_x_ndqp(1, 0, 0)%vf(i)%sf(j - 1, k, l))
+                                                    )
                     end do
                 end do
             end do
         end do
 
-        ! Customizing the way the vector divergence theorem is applied near
-        ! beginning and end Riemann state extrapolation boundary conditions,
-        ! respectively, as to avoid contributions from outside the physical
-        ! computational domain in the computation of the cell-average first-
-        ! order spatial derivatives
-        if (weno_avg) then
-
-            if (bc_x%beg == -4) then     ! Riemann state extrap. BC at beg.
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do k = iy%beg, iy%end
-                            div_v_vf(i)%sf(0, k, l) = &
-                                div_v_vf(i)%sf(0, k, l) - 5d-1/dx(0) &
-                                *(vL_x_ndqp(1, 0, 0)%vf(i)%sf(1, k, l) &
-                                  - vR_x_ndqp(1, 0, 0)%vf(i)%sf(0, k, l) &
-                                  + vL_x_ndqp(1, 0, 0)%vf(i)%sf(0, k, l) &
-                                  - vR_x_ndqp(1, 0, 0)%vf(i)%sf(-1, k, l))
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bc_x%end == -4) then     ! Riemann state extrap. BC at end
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do k = iy%beg, iy%end
-                            div_v_vf(i)%sf(m, k, l) = &
-                                div_v_vf(i)%sf(m, k, l) - 5d-1/dx(m) &
-                                *(vL_x_ndqp(1, 0, 0)%vf(i)%sf(m + 1, k, l) &
-                                  - vR_x_ndqp(1, 0, 0)%vf(i)%sf(m, k, l) &
-                                  + vL_x_ndqp(1, 0, 0)%vf(i)%sf(m, k, l) &
-                                  - vR_x_ndqp(1, 0, 0)%vf(i)%sf(m - 1, k, l))
-                        end do
-                    end do
-                end do
-            end if
-
-        end if
 
         ! END: First-Order Spatial Derivatives in x-direction ==============
 
@@ -4533,54 +4404,15 @@ contains
                 do k = iy%beg + 1, iy%end - 1
                     do j = ix%beg, ix%end
                         div_v_vf(i)%sf(j, k, l) = div_v_vf(i)%sf(j, k, l) &
-                                                  + 1d0/((1d0 + wa_flg)*dy(k)) &
-                                                  *(wa_flg*vL_y_ndqp(2, 0, 0)%vf(i)%sf(j, k + 1, l) &
+                                                  + 1d0/dy(k) &
+                                                  * ( &
                                                     + vR_y_ndqp(2, 0, 0)%vf(i)%sf(j, k, l) &
                                                     - vL_y_ndqp(2, 0, 0)%vf(i)%sf(j, k, l) &
-                                                    - wa_flg*vR_y_ndqp(2, 0, 0)%vf(i)%sf(j, k - 1, l))
+                                                    )
                     end do
                 end do
             end do
         end do
-
-        ! Customizing the way the vector divergence theorem is applied near
-        ! beginning and end Riemann state extrapolation boundary conditions,
-        ! respectively, as to avoid contributions from outside the physical
-        ! computational domain in the computation of the cell-average first-
-        ! order spatial derivatives
-        if (weno_avg) then
-
-            if (bc_y%beg == -4) then     ! Riemann state extrap. BC at beg.
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do j = ix%beg, ix%end
-                            div_v_vf(i)%sf(j, 0, l) = &
-                                div_v_vf(i)%sf(j, 0, l) - 5d-1/dy(0) &
-                                *(vL_y_ndqp(2, 0, 0)%vf(i)%sf(j, 1, l) &
-                                  - vR_y_ndqp(2, 0, 0)%vf(i)%sf(j, 0, l) &
-                                  + vL_y_ndqp(2, 0, 0)%vf(i)%sf(j, 0, l) &
-                                  - vR_y_ndqp(2, 0, 0)%vf(i)%sf(j, -1, l))
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bc_y%end == -4) then     ! Riemann state extrap. BC at end
-                do i = iv%beg, iv%end
-                    do l = iz%beg, iz%end
-                        do j = ix%beg, ix%end
-                            div_v_vf(i)%sf(j, n, l) = &
-                                div_v_vf(i)%sf(j, n, l) - 5d-1/dy(n) &
-                                *(vL_y_ndqp(2, 0, 0)%vf(i)%sf(j, n + 1, l) &
-                                  - vR_y_ndqp(2, 0, 0)%vf(i)%sf(j, n, l) &
-                                  + vL_y_ndqp(2, 0, 0)%vf(i)%sf(j, n, l) &
-                                  - vR_y_ndqp(2, 0, 0)%vf(i)%sf(j, n - 1, l))
-                        end do
-                    end do
-                end do
-            end if
-
-        end if
 
         ! END: First-Order Spatial Derivatives in y-direction ==============
 
@@ -4598,54 +4430,15 @@ contains
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
                         div_v_vf(i)%sf(j, k, l) = div_v_vf(i)%sf(j, k, l) &
-                                                  + 1d0/((1d0 + wa_flg)*dz(l)) &
-                                                  *(wa_flg*vL_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, l + 1) &
+                                                  + 1d0/dz(l) &
+                                                  *( &
                                                     + vR_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, l) &
                                                     - vL_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, l) &
-                                                    - wa_flg*vR_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, l - 1))
+                                                    )
                     end do
                 end do
             end do
         end do
-
-        ! Customizing the way the vector divergence theorem is applied near
-        ! beginning and end Riemann state extrapolation boundary conditions,
-        ! respectively, as to avoid contributions from outside the physical
-        ! computational domain in the computation of the cell-average first-
-        ! order spatial derivatives
-        if (weno_avg) then
-
-            if (bc_z%beg == -4) then     ! Riemann state extrap. BC at beg.
-                do i = iv%beg, iv%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-                            div_v_vf(i)%sf(j, k, 0) = &
-                                div_v_vf(i)%sf(j, k, 0) - 5d-1/dz(0) &
-                                *(vL_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, 1) &
-                                  - vR_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, 0) &
-                                  + vL_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, 0) &
-                                  - vR_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, -1))
-                        end do
-                    end do
-                end do
-            end if
-
-            if (bc_z%end == -4) then     ! Riemann state extrap. BC at end
-                do i = iv%beg, iv%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-                            div_v_vf(i)%sf(j, k, p) = &
-                                div_v_vf(i)%sf(j, k, p) - 5d-1/dz(p) &
-                                *(vL_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, p + 1) &
-                                  - vR_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, p) &
-                                  + vL_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, p) &
-                                  - vR_z_ndqp(3, 0, 0)%vf(i)%sf(j, k, p - 1))
-                        end do
-                    end do
-                end do
-            end if
-
-        end if
 
         ! END: First-Order Spatial Derivatives in z-direction ==============
 

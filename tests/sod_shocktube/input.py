@@ -80,8 +80,6 @@ case_dict =                                                                     
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
-                    'commute_err'                  : 'F',                      \
-                    'split_err'                    : 'F',                      \
                     'bc_x%beg'                     : -3,                       \
                     'bc_x%end'                     : -3,                       \
                     # ==========================================================

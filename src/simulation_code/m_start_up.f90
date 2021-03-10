@@ -105,7 +105,7 @@ contains
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_vars, &
             weno_order, weno_eps, char_decomp, &
-            mapped_weno, mp_weno, weno_avg, &
+            mapped_weno, mp_weno, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
@@ -366,10 +366,6 @@ contains
             print '(A)', 'Unsupported combination of values of '// &
                 'weno_order and mp_weno. Exiting ...'
             call s_mpi_abort()
-        elseif ((model_eqns == 1 .and. weno_avg) .or. (model_eqns == 4 .and. weno_avg)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns and weno_avg. Exiting ...'
-            call s_mpi_abort()
         elseif (riemann_solver < 1 .or. riemann_solver > 3) then
             print '(A)', 'Unsupported value of riemann_solver. Exiting ...'
             call s_mpi_abort()
@@ -628,19 +624,6 @@ contains
                         'of values of num_fluids '// &
                         'and fluid_pp(', i, ')%'// &
                         'Re(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (weno_order == 1 &
-                    .and. &
-                    (weno_avg .neqv. .true.) &
-                    .and. &
-                    fluid_pp(i)%Re(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of weno_order, '// &
-                        'weno_avg and fluid_pp'// &
-                        '(', i, ')%Re(', j, '). '// &
-                        'Exiting ...'
                     call s_mpi_abort()
                 end if
 

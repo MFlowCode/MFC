@@ -233,8 +233,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(mp_weno, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(weno_avg, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(weno_Re_flux, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(riemann_solver, 1, MPI_INTEGER, &

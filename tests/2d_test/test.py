@@ -174,8 +174,6 @@ case_dict =                                                                     
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
-                    'commute_err'                  : 'F',                      \
-                    'split_err'                    : 'F',                      \
                     'regularization'               : 'F',                      \
                     'reg_eps'                      : 1.E+00,                   \
                     'We_riemann_flux'              : 'F',                      \
