@@ -403,31 +403,33 @@ contains
                         end if
                     end if
                 end if
+            end if
 
-                do l = 1, cont_idx%end
+            if (DEBUG) print*, 'pointing prim to cons!'
+            do l = 1, cont_idx%end
+                qL_prim_ndqp(i)%vf(l)%sf => &
+                    qL_cons_ndqp(i)%vf(l)%sf
+                qR_prim_ndqp(i)%vf(l)%sf => &
+                    qR_cons_ndqp(i)%vf(l)%sf
+            end do
+
+            if (adv_alphan) then
+                do l = adv_idx%beg, adv_idx%end
                     qL_prim_ndqp(i)%vf(l)%sf => &
                         qL_cons_ndqp(i)%vf(l)%sf
                     qR_prim_ndqp(i)%vf(l)%sf => &
                         qR_cons_ndqp(i)%vf(l)%sf
                 end do
-
-                if (adv_alphan) then
-                    do l = adv_idx%beg, adv_idx%end
-                        qL_prim_ndqp(i)%vf(l)%sf => &
-                            qL_cons_ndqp(i)%vf(l)%sf
-                        qR_prim_ndqp(i)%vf(l)%sf => &
-                            qR_cons_ndqp(i)%vf(l)%sf
-                    end do
-                else
-                    do l = adv_idx%beg, adv_idx%end + 1
-                        qL_prim_ndqp(i)%vf(l)%sf => &
-                            qL_cons_ndqp(i)%vf(l)%sf
-                        qR_prim_ndqp(i)%vf(l)%sf => &
-                            qR_cons_ndqp(i)%vf(l)%sf
-                    end do
-                end if
-
+            else
+                do l = adv_idx%beg, adv_idx%end + 1
+                    qL_prim_ndqp(i)%vf(l)%sf => &
+                        qL_cons_ndqp(i)%vf(l)%sf
+                    qR_prim_ndqp(i)%vf(l)%sf => &
+                        qR_cons_ndqp(i)%vf(l)%sf
+                end do
             end if
+
+
         end do
         ! END: Allocation/Association of qK_cons_ndqp and qK_prim_ndqp =====
 
@@ -784,11 +786,10 @@ contains
         if (t_step == t_step_stop) return
         ! ==================================================================
 
-        ! Computing Velocity Gradients =
-
         if (any(Re_size > 0)) call s_get_viscous(q_cons_vf, q_prim_vf, rhs_vf)
 
         if (DEBUG) print *, 'Before qbmm'
+
         ! compute required moments
         if (qbmm) call s_mom_inv(q_prim_vf, mom_sp, mom_3d, ix, iy, iz)
 
@@ -815,6 +816,15 @@ contains
                 end if
 
                 !reconstruct either primitive or conservative vars
+                if (DEBUG) then
+                    do j = 1,sys_size
+                        print*, 'j', j
+                        print*, 'q', q_cons_qp%vf(j)%sf(:,:,:)
+                        print*, 'qL', qL_prim_ndqp(i)%vf(j)%sf(:,:,:)
+                        print*, 'qR', qR_prim_ndqp(i)%vf(j)%sf(:,:,:)
+                    end do
+                end if
+                if (DEBUG) print*, 'get reconstruction'
                 if (weno_vars == 1) then
                     call s_reconstruct_cell_boundary_values( &
                         q_cons_qp%vf(iv%beg:iv%end), &
