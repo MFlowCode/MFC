@@ -243,10 +243,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(avg_state, 1, MPI_INTEGER, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(commute_err, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(split_err, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(alt_soundspeed, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(regularization, 1, MPI_LOGICAL, &

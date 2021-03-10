@@ -177,21 +177,6 @@ contains
 
         call s_compute_weno_coefficients(1, 1, ix)
 
-        if (commute_err .or. split_err) then
-
-            allocate (poly_coef_qpL_x(0:weno_polyn, &
-                                      0:weno_polyn - 1, &
-                                      ix%beg:ix%end))
-            allocate (poly_coef_qpR_x(0:weno_polyn, &
-                                      0:weno_polyn - 1, &
-                                      ix%beg:ix%end))
-
-            allocate (d_qpL_x(0:weno_polyn, ix%beg:ix%end))
-            allocate (d_qpR_x(0:weno_polyn, ix%beg:ix%end))
-
-            call s_compute_weno_coefficients(1, 2, ix)
-
-        end if
         ! ==================================================================
 
         ! Allocating/Computing WENO Coefficients in y-direction ============
@@ -215,21 +200,6 @@ contains
 
         call s_compute_weno_coefficients(2, 1, iy)
 
-        if (commute_err .or. split_err) then
-
-            allocate (poly_coef_qpL_y(0:weno_polyn, &
-                                      0:weno_polyn - 1, &
-                                      iy%beg:iy%end))
-            allocate (poly_coef_qpR_y(0:weno_polyn, &
-                                      0:weno_polyn - 1, &
-                                      iy%beg:iy%end))
-
-            allocate (d_qpL_y(0:weno_polyn, iy%beg:iy%end))
-            allocate (d_qpR_y(0:weno_polyn, iy%beg:iy%end))
-
-            call s_compute_weno_coefficients(2, 2, iy)
-
-        end if
         ! ==================================================================
 
         ! Allocating/Computing WENO Coefficients in z-direction ============
@@ -253,21 +223,6 @@ contains
 
         call s_compute_weno_coefficients(3, 1, iz)
 
-        if (commute_err .or. split_err) then
-
-            allocate (poly_coef_qpL_z(0:weno_polyn, &
-                                      0:weno_polyn - 1, &
-                                      iz%beg:iz%end))
-            allocate (poly_coef_qpR_z(0:weno_polyn, &
-                                      0:weno_polyn - 1, &
-                                      iz%beg:iz%end))
-
-            allocate (d_qpL_z(0:weno_polyn, iz%beg:iz%end))
-            allocate (d_qpR_z(0:weno_polyn, iz%beg:iz%end))
-
-            call s_compute_weno_coefficients(3, 2, iz)
-
-        end if
         ! ==================================================================
 
     end subroutine s_initialize_weno_module ! ------------------------------
@@ -1523,11 +1478,6 @@ contains
         deallocate (poly_coef_cbL_x, poly_coef_cbR_x)
         deallocate (d_cbL_x, d_cbR_x)
 
-        if (commute_err .or. split_err) then
-            deallocate (poly_coef_qpL_x, poly_coef_qpR_x)
-            deallocate (d_qpL_x, d_qpR_x)
-        end if
-
         deallocate (beta_coef_x)
         ! ==================================================================
 
@@ -1536,11 +1486,6 @@ contains
 
         deallocate (poly_coef_cbL_y, poly_coef_cbR_y)
         deallocate (d_cbL_y, d_cbR_y)
-
-        if (commute_err .or. split_err) then
-            deallocate (poly_coef_qpL_y, poly_coef_qpR_y)
-            deallocate (d_qpL_y, d_qpR_y)
-        end if
 
         deallocate (beta_coef_y)
         ! ==================================================================
@@ -1551,10 +1496,6 @@ contains
         deallocate (poly_coef_cbL_z, poly_coef_cbR_z)
         deallocate (d_cbL_z, d_cbR_z)
 
-        if (commute_err .or. split_err) then
-            deallocate (poly_coef_qpL_z, poly_coef_qpR_z)
-            deallocate (d_qpL_z, d_qpR_z)
-        end if
 
         deallocate (beta_coef_z)
         ! ==================================================================

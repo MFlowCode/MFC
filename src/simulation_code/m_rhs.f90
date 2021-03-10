@@ -242,19 +242,11 @@ contains
         ! Configuring Cell-Interior Quadrature Points ======================
         ieta%beg = 0; iksi%beg = 0; itau%beg = 0
 
-        if (commute_err) then
-            ieta%beg = -1; if (n > 0) iksi%beg = -1; if (p > 0) itau%beg = -1
-        end if
-
         ieta%end = -ieta%beg; iksi%end = -iksi%beg; itau%end = -itau%beg
         ! ==================================================================
 
         ! Configuring Cell-Boundary Quadrature Points ======================
         ichi%beg = 0; ipsi%beg = 0
-
-        if (split_err) then
-            ichi%beg = -1; if (p > 0) ipsi%beg = -1
-        end if
 
         ichi%end = -ichi%beg; ipsi%end = -ipsi%beg
         ! ==================================================================
@@ -987,13 +979,10 @@ contains
         ! Converting Conservative to Primitive Variables ===================
         iv%beg = 1; iv%end = adv_idx%end
 
-        call s_reconstruct_cell_interior_values(q_cons_qp)
-
         if ((model_eqns == 2 .or. model_eqns == 3) &
             .and. &
             (adv_alphan .neqv. .true.) &
-            .and. &
-            commute_err) then
+            ) then
             do k = itau%beg, itau%end, 2
                 do j = iksi%beg, iksi%end, 2
                     do i = ieta%beg, ieta%end, 2
@@ -1029,8 +1018,6 @@ contains
         if (DEBUG) print *, 'conv to prim vars'
 
         iv%beg = mom_idx%beg; iv%end = E_idx
-
-        call s_average_cell_interior_values(q_prim_qp)
 
         if (DEBUG) print *, 'got cell interior values'
         if (t_step == t_step_stop) return
@@ -1268,7 +1255,6 @@ contains
 
             iv%beg = 1; iv%end = adv_idx%end
 
-            call s_average_cell_boundary_values(flux_ndqp(i, :, :))
 
             if (any(Re_size > 0) .or. hypoelasticity) then
                 iv%beg = mom_idx%beg
@@ -1278,8 +1264,6 @@ contains
 
             if (riemann_solver /= 1) iv%end = adv_idx%beg
 
-            call s_average_cell_boundary_values(flux_src_ndqp(i, :, :))
-            call s_average_cell_boundary_values(flux_gsrc_ndqp(i, :, :))
             ! ===============================================================
 
             if (alt_soundspeed .or. regularization) then
@@ -1503,8 +1487,6 @@ contains
                                                            qR_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
                                                            dq_prim_dx_qp(0, 0, 0)%vf(iv%beg:iv%end), 1)
 
-                    call s_reconstruct_cell_interior_values(dq_prim_dx_qp)
-
                     ! Building shear modulus and viscosity mixture variable fields (dimension m*n*p)
                     do j = 0, m
                         do k = 0, n
@@ -1531,8 +1513,6 @@ contains
                             call s_apply_scalar_divergence_theorem(qL_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
                                                                    qR_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
                                                                    dq_prim_dy_qp(0, 0, 0)%vf(iv%beg:iv%end), 2)
-
-                            call s_reconstruct_cell_interior_values(dq_prim_dy_qp)
 
                             j = stress_idx%beg
                             rhs_vf(j)%sf(k, :, :) = rhs_vf(j)%sf(k, :, :) + rho_K_field(k, 0:n, 0:p)* &
@@ -1569,8 +1549,6 @@ contains
                                 call s_apply_scalar_divergence_theorem(qL_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
                                                                        qR_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
                                                                        dq_prim_dz_qp(0, 0, 0)%vf(iv%beg:iv%end), 3)
-
-                                call s_reconstruct_cell_interior_values(dq_prim_dz_qp)
 
                                 j = stress_idx%beg
                                 rhs_vf(j)%sf(k, :, :) = rhs_vf(j)%sf(k, :, :) + rho_K_field(k, 0:n, 0:p)* &
@@ -3320,8 +3298,6 @@ contains
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
 
-            call s_average_cell_boundary_values(qL_prim_ndqp(i, :, :))
-            call s_average_cell_boundary_values(qR_prim_ndqp(i, :, :))
         end do
 
         if (weno_Re_flux) then
@@ -3969,23 +3945,6 @@ contains
 
         end if
 
-        if (commute_err) then
-            do i = ieta%beg, ieta%end, 2
-                do j = iksi%beg, iksi%end, 2
-                    do k = itau%beg, itau%end, 2
-                        do l = 1, sys_size
-                            do r = 1, buff_size
-                                q_cons_qp(i, j, k)%vf(l)%sf(-r, 0:n, 0:p) = &
-                                    q_cons_qp(0, 0, 0)%vf(l)%sf(-r, 0:n, 0:p)
-                                q_cons_qp(i, j, k)%vf(l)%sf(m + r, 0:n, 0:p) = &
-                                    q_cons_qp(0, 0, 0)%vf(l)%sf(m + r, 0:n, 0:p)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
         ! END: Population of Buffers in x-direction ========================
 
         ! Population of Buffers in y-direction =============================
@@ -4122,23 +4081,6 @@ contains
 
         end if
 
-        if (commute_err) then
-            do i = ieta%beg, ieta%end, 2
-                do j = iksi%beg, iksi%end, 2
-                    do k = itau%beg, itau%end, 2
-                        do l = 1, sys_size
-                            do r = 1, buff_size
-                                q_cons_qp(i, j, k)%vf(l)%sf(:, -r, 0:p) = &
-                                    q_cons_qp(0, 0, 0)%vf(l)%sf(:, -r, 0:p)
-                                q_cons_qp(i, j, k)%vf(l)%sf(:, n + r, 0:p) = &
-                                    q_cons_qp(0, 0, 0)%vf(l)%sf(:, n + r, 0:p)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
         ! END: Population of Buffers in y-direction ========================
 
         ! Population of Buffers in z-direction =============================
@@ -4235,132 +4177,9 @@ contains
 
         end if
 
-        if (commute_err) then
-            do i = ieta%beg, ieta%end, 2
-                do j = iksi%beg, iksi%end, 2
-                    do k = itau%beg, itau%end, 2
-                        do l = 1, sys_size
-                            do r = 1, buff_size
-                                q_cons_qp(i, j, k)%vf(l)%sf(:, :, -r) = &
-                                    q_cons_qp(0, 0, 0)%vf(l)%sf(:, :, -r)
-                                q_cons_qp(i, j, k)%vf(l)%sf(:, :, p + r) = &
-                                    q_cons_qp(0, 0, 0)%vf(l)%sf(:, :, p + r)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-
         ! END: Population of Buffers in z-direction ========================
 
     end subroutine s_populate_conservative_variables_buffers ! -------------
-
-    !>  The goal of this procedure is to WENO-reconstruct the
-        !!      inputted cell-averaged variables at the cell-interior
-        !!      Gaussian quadrature points.
-        !!  @param v_qp Inputted cell-averaged variables and their WENO-reconstructed
-        !!          values at the chosen cell-interior Gaussian quadrature points
-    subroutine s_reconstruct_cell_interior_values(v_qp) ! ------------------
-
-        type(vector_field), &
-            dimension(ieta%beg:ieta%end, &
-                      iksi%beg:iksi%end, &
-                      itau%beg:itau%end), &
-            intent(INOUT) :: v_qp
-
-        type(bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
-
-        ! Reconstruction in x-direction ====================================
-        if (commute_err .neqv. .true.) return
-
-        is1 = ix; is2 = iy; is3 = iz
-
-        is1%beg = is1%beg + weno_polyn; is1%end = is1%end - weno_polyn
-
-        call s_weno(v_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                    v_qp(-1, 0, 0)%vf(iv%beg:iv%end), &
-                    v_qp(1, 0, 0)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 1, 2, is1, is2, is3)
-        ! ==================================================================
-
-        ! Reconstruction in y-direction ====================================
-        if (n == 0) return
-
-        is2%beg = is2%beg + weno_polyn; is2%end = is2%end - weno_polyn
-
-        call s_weno(v_qp(-1, 0, 0)%vf(iv%beg:iv%end), &
-                    v_qp(-1, -1, 0)%vf(iv%beg:iv%end), &
-                    v_qp(-1, 1, 0)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 2, 2, is1, is2, is3)
-        call s_weno(v_qp(1, 0, 0)%vf(iv%beg:iv%end), &
-                    v_qp(1, -1, 0)%vf(iv%beg:iv%end), &
-                    v_qp(1, 1, 0)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 2, 2, is1, is2, is3)
-        ! ==================================================================
-
-        ! Reconstruction in z-direction ====================================
-        if (p == 0) return
-
-        is3%beg = is3%beg + weno_polyn; is3%end = is3%end - weno_polyn
-
-        call s_weno(v_qp(-1, -1, 0)%vf(iv%beg:iv%end), &
-                    v_qp(-1, -1, -1)%vf(iv%beg:iv%end), &
-                    v_qp(-1, -1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 3, 2, is1, is2, is3)
-        call s_weno(v_qp(-1, 1, 0)%vf(iv%beg:iv%end), &
-                    v_qp(-1, 1, -1)%vf(iv%beg:iv%end), &
-                    v_qp(-1, 1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 3, 2, is1, is2, is3)
-        call s_weno(v_qp(1, -1, 0)%vf(iv%beg:iv%end), &
-                    v_qp(1, -1, -1)%vf(iv%beg:iv%end), &
-                    v_qp(1, -1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 3, 2, is1, is2, is3)
-        call s_weno(v_qp(1, 1, 0)%vf(iv%beg:iv%end), &
-                    v_qp(1, 1, -1)%vf(iv%beg:iv%end), &
-                    v_qp(1, 1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, 1, 3, 2, is1, is2, is3)
-        ! ==================================================================
-
-    end subroutine s_reconstruct_cell_interior_values ! --------------------
-
-    !>  The goal of this subroutine is to numerically approximate
-        !!      the cell-interior integral-average of the given variables
-        !!      by taking the arithmetic mean of their WENO-reconstructed
-        !!      values at the cell-interior Gaussian quadrature points.
-        !!  @param v_qp The inputted WENO-reconstructed values of cell-averaged variables
-        !!      at cell-interior Gaussian quadrature points and their numerically
-        !!      approximated cell-interior integral-average.
-    subroutine s_average_cell_interior_values(v_qp) ! ----------------------
-
-        type(vector_field), &
-            dimension(ieta%beg:ieta%end, &
-                      iksi%beg:iksi%end, &
-                      itau%beg:itau%end), &
-            intent(INOUT) :: v_qp
-
-        integer :: i, j, k, l !< Generic loop iterators
-
-        if (commute_err .neqv. .true.) return
-
-        do l = iv%beg, iv%end
-
-            v_qp(0, 0, 0)%vf(l)%sf = 0d0
-
-            do k = itau%beg, itau%end, 2
-                do j = iksi%beg, iksi%end, 2
-                    do i = ieta%beg, ieta%end, 2
-                        v_qp(0, 0, 0)%vf(l)%sf = v_qp(0, 0, 0)%vf(l)%sf &
-                                                 + v_qp(i, j, k)%vf(l)%sf
-                    end do
-                end do
-            end do
-
-            v_qp(0, 0, 0)%vf(l)%sf = v_qp(0, 0, 0)%vf(l)%sf/(2**num_dims)
-
-        end do
-
-    end subroutine s_average_cell_interior_values ! ------------------------
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
@@ -4411,99 +4230,8 @@ contains
                     is1, is2, is3)
         ! ==================================================================
 
-        ! Reconstruction in s2-direction ===================================
-        if (split_err .neqv. .true.) return
-
-        if (norm_dir /= 1) then
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-        else
-            weno_dir = 2; is2%beg = is2%beg + weno_polyn
-            is2%end = is2%end - weno_polyn
-        end if
-
-        call s_weno(vL_qp(0, 0)%vf(iv%beg:iv%end), &
-                    vL_qp(-1, 0)%vf(iv%beg:iv%end), &
-                    vL_qp(1, 0)%vf(iv%beg:iv%end), &
-                    dflt_int, norm_dir, weno_dir, 2, &
-                    is1, is2, is3)
-        call s_weno(vR_qp(0, 0)%vf(iv%beg:iv%end), &
-                    vR_qp(-1, 0)%vf(iv%beg:iv%end), &
-                    vR_qp(1, 0)%vf(iv%beg:iv%end), &
-                    dflt_int, norm_dir, weno_dir, 2, &
-                    is1, is2, is3)
-        ! ==================================================================
-
-        ! Reconstruction in s3-direction ===================================
-        if (p == 0) return
-
-        if (norm_dir /= 3) then
-            weno_dir = 3; is3%beg = is3%beg + weno_polyn
-            is3%end = is3%end - weno_polyn
-        else
-            weno_dir = 2; is2%beg = is2%beg + weno_polyn
-            is2%end = is2%end - weno_polyn
-        end if
-
-        call s_weno(vL_qp(-1, 0)%vf(iv%beg:iv%end), &
-                    vL_qp(-1, -1)%vf(iv%beg:iv%end), &
-                    vL_qp(-1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, norm_dir, weno_dir, 2, &
-                    is1, is2, is3)
-        call s_weno(vL_qp(1, 0)%vf(iv%beg:iv%end), &
-                    vL_qp(1, -1)%vf(iv%beg:iv%end), &
-                    vL_qp(1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, norm_dir, weno_dir, 2, &
-                    is1, is2, is3)
-        call s_weno(vR_qp(-1, 0)%vf(iv%beg:iv%end), &
-                    vR_qp(-1, -1)%vf(iv%beg:iv%end), &
-                    vR_qp(-1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, norm_dir, weno_dir, 2, &
-                    is1, is2, is3)
-        call s_weno(vR_qp(1, 0)%vf(iv%beg:iv%end), &
-                    vR_qp(1, -1)%vf(iv%beg:iv%end), &
-                    vR_qp(1, 1)%vf(iv%beg:iv%end), &
-                    dflt_int, norm_dir, weno_dir, 2, &
-                    is1, is2, is3)
-        ! ==================================================================
-
     end subroutine s_reconstruct_cell_boundary_values ! --------------------
 
-    !>  The goal of the procedure is to numerically approximate
-        !!      the left or right cell-boundary integral-average of the
-        !!      given variables by getting the arithmetic mean of their
-        !!      WENO-reconstructed values at the cell-boundary Gaussian
-        !!      quadrature points.
-        !!  @param vK_qp The inputted WENO-reconstructed values of cell-averaged variables
-        !!      at the left or right cell-boundary Gaussian quadrature points and
-        !!      their numerically approximated cell-boundary integral-average.
-    subroutine s_average_cell_boundary_values(vK_qp) ! ---------------------
-
-        type(vector_field), &
-            dimension(ichi%beg:ichi%end, &
-                      ipsi%beg:ipsi%end), &
-            intent(INOUT) :: vK_qp
-
-        integer :: i, j, k !< Generic loop iterators
-
-        if (split_err .neqv. .true.) return
-
-        do k = iv%beg, iv%end
-
-            vK_qp(0, 0)%vf(k)%sf = 0d0
-
-            do j = ipsi%beg, ipsi%end, 2
-                do i = ichi%beg, ichi%end, 2
-                    vK_qp(0, 0)%vf(k)%sf = vK_qp(0, 0)%vf(k)%sf &
-                                           + vK_qp(i, j)%vf(k)%sf
-                end do
-            end do
-
-            vK_qp(0, 0)%vf(k)%sf = vK_qp(0, 0)%vf(k)%sf/(2**(num_dims - 1))
-
-        end do
-
-    end subroutine s_average_cell_boundary_values ! ------------------------
 
     !>  The purpose of this subroutine is to employ the inputted
         !!      left and right cell-boundary integral-averaged variables
