@@ -247,8 +247,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(split_err, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alt_crv, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(alt_soundspeed, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(regularization, 1, MPI_LOGICAL, &
@@ -258,16 +256,6 @@ contains
         call MPI_BCAST(null_weights, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(mixture_err, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(We_riemann_flux, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(We_rhs_flux, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(We_src, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(We_wave_speeds, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(lsq_deriv, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(parallel_io, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
@@ -299,9 +287,6 @@ contains
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%We(1), num_fluids_max, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
 
@@ -1066,12 +1051,6 @@ contains
                             MPI_COMM_WORLD, ierr)
             call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, &
                             MPI_DOUBLE_PRECISION, MPI_MIN, 0, &
-                            MPI_COMM_WORLD, ierr)
-        end if
-
-        if (We_size > 0) then
-            call MPI_REDUCE(ccfl_max_loc, ccfl_max_glb, 1, &
-                            MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
                             MPI_COMM_WORLD, ierr)
         end if
 

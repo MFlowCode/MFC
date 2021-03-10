@@ -93,8 +93,6 @@ contains
         real(kind(0d0))   :: myR, myV, alf, myP, myRho, R2Vav
 
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
-        real(kind(0d0)), dimension(num_fluids, &
-                                   num_fluids) :: We !< Weber number
 
         integer :: j, k, l, q, s !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
@@ -125,7 +123,7 @@ contains
             do q = 1, nb; do j = 0, m; do k = 0, n; do l = 0, p
                     bub_r_src(q, j, k, l) = q_cons_vf(bub_idx%vs(q))%sf(j, k, l)
 
-                    call s_convert_to_mixture_variables(q_cons_vf, myRho, n_tait, B_tait, Re, We, j, k, l)
+                    call s_convert_to_mixture_variables(q_cons_vf, myRho, n_tait, B_tait, Re, j, k, l)
 
                     n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 

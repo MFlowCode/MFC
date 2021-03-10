@@ -94,8 +94,6 @@ module m_riemann_solvers
         !!      first-order z-dir spatial derivatives
         !!  @param gm_alphaL_vf  Left averaged gradient magnitude
         !!  @param gm_alphaR_vf Right averaged gradient magnitude
-        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
-        !!  @param kappaR_vf Right averaged vol. frac. curvatures
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf Intra-cell fluxes sources
         !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
@@ -108,12 +106,10 @@ module m_riemann_solvers
                                              dqL_prim_dy_vf, &
                                              dqL_prim_dz_vf, &
                                              gm_alphaL_vf, &
-                                             kappaL_vf, &
                                              qR_prim_vf, dqR_prim_dx_vf, &
                                              dqR_prim_dy_vf, &
                                              dqR_prim_dz_vf, &
                                              gm_alphaR_vf, &
-                                             kappaR_vf, &
                                              q_prim_vf, &
                                              flux_vf, flux_src_vf, &
                                              flux_gsrc_vf, &
@@ -131,8 +127,7 @@ module m_riemann_solvers
                 intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                                  dqL_prim_dy_vf, dqR_prim_dy_vf, &
                                  dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                                 gm_alphaL_vf, gm_alphaR_vf, &
-                                 kappaL_vf, kappaR_vf
+                                 gm_alphaL_vf, gm_alphaR_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
@@ -220,14 +215,6 @@ module m_riemann_solvers
     type(scalar_field), allocatable, dimension(:) :: q_prim_rs_vf
     !> @}
 
-    !> The left and right, WENO-reconstructed, cell-boundary values of the cell-
-    !! average curvatures of the volume fractions that define the left and right
-    !! states of the Riemann problem. The variables kappaK_rs_vf are obtained by
-    !! reshaping kappaK_vf in a coordinate direction that is normal to the cell-
-    !! boundaries on which the fluxes are to be determined.
-    !> @{
-    type(scalar_field), allocatable, dimension(:) :: kappaL_rs_vf, kappaR_rs_vf
-    !> @}
 
     !> The cell-boundary values of the fluxes (src - source) that are computed
     !! through the chosen Riemann problem solver, and the direct evaluation of
@@ -265,7 +252,6 @@ module m_riemann_solvers
     real(kind(0d0))                              ::    pi_inf_L, pi_inf_R
     real(kind(0d0))                              ::         c_L, c_R
     real(kind(0d0)), dimension(2)   ::        Re_L, Re_R
-    real(kind(0d0)), allocatable, dimension(:, :) ::        We_L, We_R
     real(kind(0d0)), allocatable, dimension(:)   ::     tau_e_L, tau_e_R
 
     !> @}
@@ -282,28 +268,6 @@ module m_riemann_solvers
     real(kind(0d0)), allocatable, dimension(:)   ::        pbw_L, pbw_R
     real(kind(0d0)), allocatable, dimension(:, :) ::       moms_L, moms_R
     real(kind(0d0))                              ::     ptilde_L, ptilde_R
-    !> @}
-
-    !> @name Left and right, WENO-reconstructed, cell-boundary, low-order values of cell-average
-    !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
-    !! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
-    !! of sound, shear and volume Reynolds numbers and the Weber numbers. These
-    !! variables are left and right states of the Riemann problem obtained from
-    !! qK_prim_rs_vf and kappaK_rs_vf.
-    !> @{
-    real(kind(0d0)), allocatable, dimension(:)   :: lo_alpha_rho_L, lo_alpha_rho_R
-    real(kind(0d0))                              ::       lo_rho_L, lo_rho_R
-    real(kind(0d0)), allocatable, dimension(:)   ::       lo_vel_L, lo_vel_R
-    real(kind(0d0))                              ::      lo_pres_L, lo_pres_R
-    real(kind(0d0))                              ::         lo_E_L, lo_E_R
-    real(kind(0d0))                              ::         lo_H_L, lo_H_R
-    real(kind(0d0)), allocatable, dimension(:)   ::     lo_alpha_L, lo_alpha_R
-    real(kind(0d0))                              ::     lo_gamma_L, lo_gamma_R
-    real(kind(0d0))                              ::    lo_pi_inf_L, lo_pi_inf_R
-    real(kind(0d0))                              ::         lo_c_L, lo_c_R
-    real(kind(0d0)), dimension(2)   ::        lo_Re_L, lo_Re_R
-    real(kind(0d0)), allocatable, dimension(:, :) ::        lo_We_L, lo_We_R
-    real(kind(0d0)), allocatable, dimension(:)   ::     lo_tau_e_L, lo_tau_e_R
     !> @}
 
     !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
@@ -337,7 +301,6 @@ module m_riemann_solvers
 
     !> @name Surface tension pressure contribution
     !> @{
-    real(kind(0d0)) :: dpres_We
     real(kind(0d0)) :: dpres_L, dpres_R
     !> @}
 
@@ -353,8 +316,6 @@ module m_riemann_solvers
     real(kind(0d0))                                 :: gamma_avg
     real(kind(0d0))                                 :: c_avg
     type(scalar_field), allocatable, dimension(:)   :: Re_avg_rs_vf
-    type(scalar_field), allocatable, dimension(:, :) :: We_avg_rs_vf
-    real(kind(0d0)), allocatable, dimension(:)   :: kappa_avg
     !> @}
 
     !> @name Left, right and star (S) region wave speeds
@@ -375,13 +336,6 @@ module m_riemann_solvers
     !> Minus and plus wave speeds functions
     !> @{
     real(kind(0d0)) :: xi_M, xi_P
-    !> @}
-
-    !> @name Additional variables for applying a flux limiter
-    !> @{
-    real(kind(0d0)) :: lo_s_L, lo_s_R, lo_s_S
-    real(kind(0d0)) :: lo_s_M, lo_s_P
-    real(kind(0d0)) :: lo_xi_M, lo_xi_P
     !> @}
 
     procedure(s_abstract_riemann_solver), &
@@ -435,8 +389,6 @@ contains
         !!      first-order z-dir spatial derivatives
         !!  @param gm_alphaL_vf  Left averaged gradient magnitude
         !!  @param gm_alphaR_vf Right averaged gradient magnitude
-        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
-        !!  @param kappaR_vf Right averaged vol. frac. curvatures
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf  Intra-cell fluxes sources
         !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
@@ -449,12 +401,10 @@ contains
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     gm_alphaL_vf, &
-                                    kappaL_vf, &
                                     qR_prim_vf, dqR_prim_dx_vf, &
                                     dqR_prim_dy_vf, &
                                     dqR_prim_dz_vf, &
                                     gm_alphaR_vf, &
-                                    kappaR_vf, &
                                     q_prim_vf, &
                                     flux_vf, flux_src_vf, &
                                     flux_gsrc_vf, &
@@ -470,8 +420,7 @@ contains
             intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                             gm_alphaL_vf, gm_alphaR_vf, &
-                             kappaL_vf, kappaR_vf
+                             gm_alphaL_vf, gm_alphaR_vf
 
         ! Intercell fluxes
         type(scalar_field), &
@@ -483,11 +432,6 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        ! Placeholders for high- and low-order fluxes
-        real(kind(0d0)) :: hi_cons, hi_cons_L, hi_cons_R
-        real(kind(0d0)) :: lo_cons, lo_cons_L, lo_cons_R
-        real(kind(0d0)) :: hi_flux_L, hi_flux_R, lo_flux_L, lo_flux_R
-
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers( &
@@ -495,17 +439,15 @@ contains
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
             gm_alphaL_vf, &
-            kappaL_vf, &
             qR_prim_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
             gm_alphaR_vf, &
-            kappaR_vf, &
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
-        call s_initialize_riemann_solver(qL_prim_vf, kappaL_vf, &
-                                         qR_prim_vf, kappaR_vf, &
+        call s_initialize_riemann_solver(qL_prim_vf,  &
+                                         qR_prim_vf,  &
                                          q_prim_vf, &
                                          flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
@@ -660,19 +602,6 @@ contains
             end if
         end if
 
-        if (We_size > 0 .and. We_riemann_flux) then
-            call s_compute_capillary_source_flux( &
-                dqL_prim_dx_vf(adv_idx%beg:adv_idx%end), &
-                dqL_prim_dy_vf(adv_idx%beg:adv_idx%end), &
-                dqL_prim_dz_vf(adv_idx%beg:adv_idx%end), &
-                gm_alphaL_vf, &
-                dqR_prim_dx_vf(adv_idx%beg:adv_idx%end), &
-                dqR_prim_dy_vf(adv_idx%beg:adv_idx%end), &
-                dqR_prim_dz_vf(adv_idx%beg:adv_idx%end), &
-                gm_alphaR_vf, &
-                flux_src_vf, norm_dir, ix, iy, iz)
-        end if
-
         ! Reshaping outputted data based on dimensional splitting direction
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
@@ -703,8 +632,6 @@ contains
         !!      first-order z-dir spatial derivatives
         !!  @param gm_alphaL_vf Left averaged gradient magnitude
         !!  @param gm_alphaR_vf Right averaged gradient magnitude
-        !!  @param kappaL_vf Left averaged vol. frac. curvatures
-        !!  @param kappaR_vf Right averaged vol. rac. curvatures
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf Intra-cell fluxes sources
         !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
@@ -717,12 +644,10 @@ contains
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
                                      gm_alphaL_vf, &
-                                     kappaL_vf, &
                                      qR_prim_vf, dqR_prim_dx_vf, &
                                      dqR_prim_dy_vf, &
                                      dqR_prim_dz_vf, &
                                      gm_alphaR_vf, &
-                                     kappaR_vf, &
                                      q_prim_vf, &
                                      flux_vf, flux_src_vf, &
                                      flux_gsrc_vf, &
@@ -738,8 +663,7 @@ contains
             intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                             gm_alphaL_vf, gm_alphaR_vf, &
-                             kappaL_vf, kappaR_vf
+                             gm_alphaL_vf, gm_alphaR_vf
 
         ! Intercell fluxes
         type(scalar_field), &
@@ -753,10 +677,6 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        ! Placeholders for high- and low-order fluxes
-        real(kind(0d0)) :: lo_xi_L, lo_xi_R
-        real(kind(0d0)) :: hi_flux_L, hi_flux_R, lo_flux_L, lo_flux_R
-
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers( &
@@ -764,17 +684,15 @@ contains
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
             gm_alphaL_vf, &
-            kappaL_vf, &
             qR_prim_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
             gm_alphaR_vf, &
-            kappaR_vf, &
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
-        call s_initialize_riemann_solver(qL_prim_vf, kappaL_vf, &
-                                         qR_prim_vf, kappaR_vf, &
+        call s_initialize_riemann_solver(qL_prim_vf, &
+                                         qR_prim_vf, &
                                          q_prim_vf, &
                                          flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
@@ -1159,19 +1077,6 @@ contains
             end if
         end if
 
-        if (We_size > 0 .and. We_riemann_flux) then
-            call s_compute_capillary_source_flux( &
-                dqL_prim_dx_vf(adv_idx%beg:adv_idx%end), &
-                dqL_prim_dy_vf(adv_idx%beg:adv_idx%end), &
-                dqL_prim_dz_vf(adv_idx%beg:adv_idx%end), &
-                gm_alphaL_vf, &
-                dqR_prim_dx_vf(adv_idx%beg:adv_idx%end), &
-                dqR_prim_dy_vf(adv_idx%beg:adv_idx%end), &
-                dqR_prim_dz_vf(adv_idx%beg:adv_idx%end), &
-                gm_alphaR_vf, &
-                flux_src_vf, norm_dir, ix, iy, iz)
-        end if
-
         ! Reshaping outputted data based on dimensional splitting direction
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
@@ -1201,8 +1106,6 @@ contains
         !!      first-order z-dir spatial derivatives
         !!  @param gm_alphaL_vf  Left averaged gradient magnitude
         !!  @param gm_alphaR_vf Right averaged gradient magnitude
-        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
-        !!  @param kappaR_vf Right averaged vol. frac. curvatures
         !!  @param q_prim_vf Cell-averaged primitive variables
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf  Intra-cell fluxes sources
@@ -1215,12 +1118,10 @@ contains
                                       dqL_prim_dy_vf, &
                                       dqL_prim_dz_vf, &
                                       gm_alphaL_vf, &
-                                      kappaL_vf, &
                                       qR_prim_vf, dqR_prim_dx_vf, &
                                       dqR_prim_dy_vf, &
                                       dqR_prim_dz_vf, &
                                       gm_alphaR_vf, &
-                                      kappaR_vf, &
                                       q_prim_vf, &
                                       flux_vf, flux_src_vf, &
                                       flux_gsrc_vf, &
@@ -1236,8 +1137,7 @@ contains
             intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                             gm_alphaL_vf, gm_alphaR_vf, &
-                             kappaL_vf, kappaR_vf
+                             gm_alphaL_vf, gm_alphaR_vf
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -1255,17 +1155,15 @@ contains
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
             gm_alphaL_vf, &
-            kappaL_vf, &
             qR_prim_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
             gm_alphaR_vf, &
-            kappaR_vf, &
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
-        call s_initialize_riemann_solver(qL_prim_vf, kappaL_vf, &
-                                         qR_prim_vf, kappaR_vf, &
+        call s_initialize_riemann_solver(qL_prim_vf, &
+                                         qR_prim_vf, &
                                          q_prim_vf, &
                                          flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
@@ -1337,19 +1235,6 @@ contains
             end if
         end if
 
-        if (We_size > 0 .and. We_riemann_flux) then
-            call s_compute_capillary_source_flux( &
-                dqL_prim_dx_vf(adv_idx%beg:adv_idx%end), &
-                dqL_prim_dy_vf(adv_idx%beg:adv_idx%end), &
-                dqL_prim_dz_vf(adv_idx%beg:adv_idx%end), &
-                gm_alphaL_vf, &
-                dqR_prim_dx_vf(adv_idx%beg:adv_idx%end), &
-                dqR_prim_dy_vf(adv_idx%beg:adv_idx%end), &
-                dqR_prim_dz_vf(adv_idx%beg:adv_idx%end), &
-                gm_alphaR_vf, &
-                flux_src_vf, norm_dir, ix, iy, iz)
-        end if
-
         ! Reshaping outputted data based on dimensional splitting direction
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
@@ -1385,11 +1270,11 @@ contains
         call s_convert_to_mixture_variables(qL_prim_rs_vf, &
                                             rho_L, gamma_L, &
                                             pi_inf_L, Re_L, &
-                                            We_L, j, k, l)
+                                            j, k, l)
         call s_convert_to_mixture_variables(qR_prim_rs_vf, &
                                             rho_R, gamma_R, &
                                             pi_inf_R, Re_R, &
-                                            We_R, j + 1, k, l)
+                                             j + 1, k, l)
 
         E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*sum(vel_L**2d0)
         E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*sum(vel_R**2d0)
@@ -1399,27 +1284,10 @@ contains
 
         call s_compute_mixture_sound_speeds(j, k, l)
 
-        do i = 1, crv_size
-            alpha_avg_rs_vf(crv_idx(i))%sf(j, k, l) = &
-                5d-1*(alpha_L(crv_idx(i)) + alpha_R(crv_idx(i)))
-        end do
-
         do i = 1, 2
             if (Re_size(i) > 0) then
                 Re_avg_rs_vf(i)%sf(j, k, l) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
             end if
-        end do
-
-        do i = 1, We_size
-            We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf(j, k, l) = &
-                5d-1*(We_L(We_idx(i, 1), We_idx(i, 2)) &
-                      + We_R(We_idx(i, 1), We_idx(i, 2)))
-        end do
-
-        do i = 1, crv_size
-            kappa_avg(crv_idx(i)) = &
-                5d-1*(kappaL_rs_vf(crv_idx(i))%sf(j, k, l) &
-                      + kappaR_rs_vf(crv_idx(i))%sf(j + 1, k, l))
         end do
 
         ! Compute gamma-related constants
@@ -1441,22 +1309,11 @@ contains
         G8_R = 1d0/gamma_R
 
         ! Surface tension pressure contribution
-        dpres_We = 0d0
         dpres_L = 0d0
         dpres_R = 0d0
 
-        if (We_size > 0 .and. We_riemann_flux) then
-            do i = 1, We_size
-                dpres_We = dpres_We &
-                           - 1d0/We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf(j, k, l)* &
-                           kappa_avg(We_idx(i, 2))* &
-                           (alpha_R(We_idx(i, 2)) &
-                            - alpha_L(We_idx(i, 2)))
-            end do
-        end if
-
-        dpres_L = 5d-1*dpres_We
-        dpres_R = -5d-1*dpres_We
+        dpres_L = 5d-1
+        dpres_R = -5d-1
 
     end subroutine s_compute_constant_states ! -----------------------------
 
@@ -1986,11 +1843,11 @@ contains
         call s_convert_to_mixture_variables(qL_prim_rs_vf, &
                                             rho_L, gamma_L, &
                                             pi_inf_L, Re_L, &
-                                            We_L, j, k, l)
+                                            j, k, l)
         call s_convert_to_mixture_variables(qR_prim_rs_vf, &
                                             rho_R, gamma_R, &
                                             pi_inf_R, Re_R, &
-                                            We_R, j + 1, k, l)
+                                            j + 1, k, l)
 
         E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*sum(vel_L**2d0)
         E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*sum(vel_R**2d0)
@@ -2018,11 +1875,6 @@ contains
         H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
                 (sqrt(rho_L) + sqrt(rho_R))
 
-        do i = 1, crv_size
-            alpha_avg_rs_vf(crv_idx(i))%sf(j, k, l) = &
-                5d-1*(alpha_L(crv_idx(i)) + alpha_R(crv_idx(i)))
-        end do
-
         gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
                     (sqrt(rho_L) + sqrt(rho_R))
 
@@ -2042,17 +1894,6 @@ contains
             end if
         end do
 
-        do i = 1, We_size
-            We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf(j, k, l) = &
-                5d-1*(We_L(We_idx(i, 1), We_idx(i, 2)) &
-                      + We_R(We_idx(i, 1), We_idx(i, 2)))
-        end do
-
-        do i = 1, crv_size
-            kappa_avg(crv_idx(i)) = &
-                5d-1*(kappaL_rs_vf(crv_idx(i))%sf(j, k, l) &
-                      + kappaR_rs_vf(crv_idx(i))%sf(j + 1, k, l))
-        end do
         ! ==================================================================
 
     end subroutine s_compute_roe_average_state ! ---------------------------
@@ -2090,11 +1931,11 @@ contains
         call s_convert_to_mixture_variables(qL_prim_rs_vf, &
                                             rho_L, gamma_L, &
                                             pi_inf_L, Re_L, &
-                                            We_L, j, k, l)
+                                            j, k, l)
         call s_convert_to_mixture_variables(qR_prim_rs_vf, &
                                             rho_R, gamma_R, &
                                             pi_inf_R, Re_R, &
-                                            We_R, j + 1, k, l)
+                                            j + 1, k, l)
 
         pres_L = qL_prim_rs_vf(E_idx)%sf(j, k, l)
         pres_R = qR_prim_rs_vf(E_idx)%sf(j + 1, k, l)
@@ -2202,11 +2043,6 @@ contains
 
         H_avg = 5d-1*(H_L + H_R)
 
-        do i = 1, crv_size
-            alpha_avg_rs_vf(crv_idx(i))%sf(j, k, l) = &
-                5d-1*(alpha_L(crv_idx(i)) + alpha_R(crv_idx(i)))
-        end do
-
         gamma_avg = 5d-1*(gamma_L + gamma_R)
 
         if (mixture_err) then
@@ -2225,17 +2061,6 @@ contains
             end if
         end do
 
-        do i = 1, We_size
-            We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf(j, k, l) = &
-                5d-1*(We_L(We_idx(i, 1), We_idx(i, 2)) &
-                      + We_R(We_idx(i, 1), We_idx(i, 2)))
-        end do
-
-        do i = 1, crv_size
-            kappa_avg(crv_idx(i)) = &
-                5d-1*(kappaL_rs_vf(crv_idx(i))%sf(j, k, l) &
-                      + kappaR_rs_vf(crv_idx(i))%sf(j + 1, k, l))
-        end do
         ! ==================================================================
 
     end subroutine s_compute_arithmetic_average_state ! --------------------
@@ -2250,27 +2075,15 @@ contains
 
         integer, intent(IN) :: j, k, l
 
-        real(kind(0d0)) :: denom, dpres_We !< Capillary pressure
+        real(kind(0d0)) :: denom
 
         integer :: i !< Generic loop iterator
 
-        dpres_We = 0d0
-
-        if (We_size > 0 .and. We_wave_speeds .and. We_riemann_flux) then
-            do i = 1, We_size
-                dpres_We = dpres_We &
-                           - 1d0/We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf(j, k, l)* &
-                           kappa_avg(We_idx(i, 2))* &
-                           (alpha_R(We_idx(i, 2)) &
-                            - alpha_L(We_idx(i, 2)))
-
-            end do
-        end if
 
         s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
         s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
 
-        s_S = (pres_R - pres_L - dpres_We + rho_L*vel_L(dir_idx(1))* &
+        s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
                (s_L - vel_L(dir_idx(1))) - &
                rho_R*vel_R(dir_idx(1))* &
                (s_R - vel_R(dir_idx(1)))) &
@@ -2296,33 +2109,18 @@ contains
 
         ! Left and right pressures in the star region
         real(kind(0d0)) :: pres_SL, pres_SR
-        real(kind(0d0)) :: lo_pres_SL, lo_pres_SR
 
-        real(kind(0d0)) :: dpres_We !< Capillary pressure
 
         ! Left and right shock Mach numbers
         real(kind(0d0)) :: Ms_L, Ms_R
-        real(kind(0d0)) :: lo_Ms_L, lo_Ms_R
 
         integer :: i !< Generic loop iterator
 
-        dpres_We = 0d0
 
-        if (We_size > 0 .and. We_wave_speeds .and. We_riemann_flux) then
-            do i = 1, We_size
-                dpres_We = dpres_We &
-                           - 1d0/We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf(j, k, l)* &
-                           kappa_avg(We_idx(i, 2))* &
-                           (alpha_R(We_idx(i, 2)) &
-                            - alpha_L(We_idx(i, 2)))
-
-            end do
-        end if
-
-        pres_SL = 5d-1*(pres_L + pres_R - dpres_We + rho_avg*c_avg* &
+        pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
                         (vel_L(dir_idx(1)) - &
                          vel_R(dir_idx(1))))
-        pres_SR = pres_SL + dpres_We
+        pres_SR = pres_SL
 
         Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L)/(1d0 + gamma_L))* &
                              (pres_SL/pres_L - 1d0)*pres_L/ &
@@ -2335,7 +2133,7 @@ contains
         s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
         s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
-                    (pres_L - pres_R + dpres_We)/ &
+                    (pres_L - pres_R)/ &
                     (rho_avg*c_avg))
 
     end subroutine s_compute_pressure_velocity_wave_speeds ! ---------------
@@ -2363,21 +2161,6 @@ contains
 
         allocate (alpha_L(1:num_fluids))
         allocate (alpha_R(1:num_fluids))
-
-        if (We_size > 0) then
-
-            allocate (alpha_avg_rs_vf(1:num_fluids))
-
-            allocate (kappaL_rs_vf(1:num_fluids))
-            allocate (kappaR_rs_vf(1:num_fluids))
-            allocate (kappa_avg(1:num_fluids))
-
-            allocate (We_avg_rs_vf(1:num_fluids, 1:num_fluids))
-
-        end if
-
-        allocate (We_L(1:num_fluids, 1:num_fluids))
-        allocate (We_R(1:num_fluids, 1:num_fluids))
 
         if (any(Re_size > 0)) allocate (Re_avg_rs_vf(1:2))
 
@@ -2483,8 +2266,6 @@ contains
         !!      first-order z-dir spatial derivatives
         !!  @param gm_alphaL_vf  Left averaged gradient magnitude
         !!  @param gm_alphaR_vf Right averaged gradient magnitude
-        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
-        !!  @param kappaR_vf Right averaged vol. frac. curvatures
         !!  @param norm_dir Dir. splitting direction
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
@@ -2494,12 +2275,10 @@ contains
         dqL_prim_dy_vf, &
         dqL_prim_dz_vf, &
         gm_alphaL_vf, &
-        kappaL_vf, &
         qR_prim_vf, dqR_prim_dx_vf, &
         dqR_prim_dy_vf, &
         dqR_prim_dz_vf, &
         gm_alphaR_vf, &
-        kappaR_vf, &
         norm_dir, ix, iy, iz)
 
         type(scalar_field), &
@@ -2511,8 +2290,7 @@ contains
             intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
-                             gm_alphaL_vf, gm_alphaR_vf, &
-                             kappaL_vf, kappaR_vf
+                             gm_alphaL_vf, gm_alphaR_vf
 
         integer, intent(IN) :: norm_dir
 
@@ -2567,46 +2345,6 @@ contains
 
                 end if
 
-                do i = 1, crv_size
-                    dqL_prim_dx_vf(E_idx + crv_idx(i))%sf(-1, &
-                                                          iy%beg:iy%end, &
-                                                          iz%beg:iz%end) = &
-                        dqR_prim_dx_vf(E_idx + crv_idx(i))%sf(0, &
-                                                              iy%beg:iy%end, &
-                                                              iz%beg:iz%end)
-                    gm_alphaL_vf(crv_idx(i))%sf(-1, &
-                                                iy%beg:iy%end, &
-                                                iz%beg:iz%end) = &
-                        gm_alphaR_vf(crv_idx(i))%sf(0, &
-                                                    iy%beg:iy%end, &
-                                                    iz%beg:iz%end)
-                    kappaL_vf(crv_idx(i))%sf(-1, &
-                                             iy%beg:iy%end, &
-                                             iz%beg:iz%end) = &
-                        kappaR_vf(crv_idx(i))%sf(0, &
-                                                 iy%beg:iy%end, &
-                                                 iz%beg:iz%end)
-                    if (n > 0) then
-                        dqL_prim_dy_vf(E_idx + crv_idx(i))%sf(-1, &
-                                                              iy%beg:iy%end, &
-                                                              iz%beg:iz%end) = &
-                            dqR_prim_dy_vf(E_idx + crv_idx(i))%sf(0, &
-                                                                  iy%beg:iy%end, &
-                                                                  iz%beg:iz%end)
-                    end if
-                end do
-
-                if (p > 0) then
-                    do i = 1, crv_size
-                        dqL_prim_dz_vf(E_idx + crv_idx(i))%sf(-1, &
-                                                              iy%beg:iy%end, &
-                                                              iz%beg:iz%end) = &
-                            dqR_prim_dz_vf(E_idx + crv_idx(i))%sf(0, &
-                                                                  iy%beg:iy%end, &
-                                                                  iz%beg:iz%end)
-                    end do
-                end if
-
             end if
 
             if (bc_x%end == -4) then    ! Riemann state extrap. BC at end
@@ -2649,46 +2387,6 @@ contains
                             end do
                         end if
 
-                    end if
-
-                    do i = 1, crv_size
-                        dqR_prim_dx_vf(E_idx + crv_idx(i))%sf(m + 1, &
-                                                              iy%beg:iy%end, &
-                                                              iz%beg:iz%end) = &
-                            dqL_prim_dx_vf(E_idx + crv_idx(i))%sf(m, &
-                                                                  iy%beg:iy%end, &
-                                                                  iz%beg:iz%end)
-                        gm_alphaR_vf(crv_idx(i))%sf(m + 1, &
-                                                    iy%beg:iy%end, &
-                                                    iz%beg:iz%end) = &
-                            gm_alphaL_vf(crv_idx(i))%sf(m, &
-                                                        iy%beg:iy%end, &
-                                                        iz%beg:iz%end)
-                        kappaR_vf(crv_idx(i))%sf(m + 1, &
-                                                 iy%beg:iy%end, &
-                                                 iz%beg:iz%end) = &
-                            kappaL_vf(crv_idx(i))%sf(m, &
-                                                     iy%beg:iy%end, &
-                                                     iz%beg:iz%end)
-                        if (n > 0) then
-                            dqR_prim_dy_vf(E_idx + crv_idx(i))%sf(m + 1, &
-                                                                  iy%beg:iy%end, &
-                                                                  iz%beg:iz%end) = &
-                                dqL_prim_dy_vf(E_idx + crv_idx(i))%sf(m, &
-                                                                      iy%beg:iy%end, &
-                                                                      iz%beg:iz%end)
-                        end if
-                    end do
-
-                    if (p > 0) then
-                        do i = 1, crv_size
-                            dqR_prim_dz_vf(E_idx + crv_idx(i))%sf(m + 1, &
-                                                                  iy%beg:iy%end, &
-                                                                  iz%beg:iz%end) = &
-                                dqL_prim_dz_vf(E_idx + crv_idx(i))%sf(m, &
-                                                                      iy%beg:iy%end, &
-                                                                      iz%beg:iz%end)
-                        end do
                     end if
 
                 end if
@@ -2738,46 +2436,6 @@ contains
 
                 end if
 
-                do i = 1, crv_size
-                    dqL_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          -1, &
-                                                          iz%beg:iz%end) = &
-                        dqR_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              0, &
-                                                              iz%beg:iz%end)
-                    gm_alphaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                -1, &
-                                                iz%beg:iz%end) = &
-                        gm_alphaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                    0, &
-                                                    iz%beg:iz%end)
-                    kappaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                             -1, &
-                                             iz%beg:iz%end) = &
-                        kappaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                 0, &
-                                                 iz%beg:iz%end)
-                    if (n > 0) then
-                        dqL_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              -1, &
-                                                              iz%beg:iz%end) = &
-                            dqR_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                  0, &
-                                                                  iz%beg:iz%end)
-                    end if
-                end do
-
-                if (p > 0) then
-                    do i = 1, crv_size
-                        dqL_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              -1, &
-                                                              iz%beg:iz%end) = &
-                            dqR_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                  0, &
-                                                                  iz%beg:iz%end)
-                    end do
-                end if
-
             end if
 
             if (bc_y%end == -4) then    ! Riemann state extrap. BC at end
@@ -2814,46 +2472,6 @@ contains
                                 dqL_prim_dz_vf(i)%sf(ix%beg:ix%end, &
                                                      n, &
                                                      iz%beg:iz%end)
-                        end do
-                    end if
-
-                    do i = 1, crv_size
-                        dqR_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              n + 1, &
-                                                              iz%beg:iz%end) = &
-                            dqL_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                  n, &
-                                                                  iz%beg:iz%end)
-                        gm_alphaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                    n + 1, &
-                                                    iz%beg:iz%end) = &
-                            gm_alphaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                        n, &
-                                                        iz%beg:iz%end)
-                        kappaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                 n + 1, &
-                                                 iz%beg:iz%end) = &
-                            kappaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                     n, &
-                                                     iz%beg:iz%end)
-                        if (n > 0) then
-                            dqR_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                  n + 1, &
-                                                                  iz%beg:iz%end) = &
-                                dqL_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                      n, &
-                                                                      iz%beg:iz%end)
-                        end if
-                    end do
-
-                    if (p > 0) then
-                        do i = 1, crv_size
-                            dqR_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                  n + 1, &
-                                                                  iz%beg:iz%end) = &
-                                dqL_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                                      n, &
-                                                                      iz%beg:iz%end)
                         end do
                     end if
 
@@ -2895,39 +2513,6 @@ contains
                     end do
                 end if
 
-                do i = 1, crv_size
-                    dqL_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          -1) = &
-                        dqR_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              iy%beg:iy%end, &
-                                                              0)
-                    dqL_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          -1) = &
-                        dqR_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              iy%beg:iy%end, &
-                                                              0)
-                    dqL_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          -1) = &
-                        dqR_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              iy%beg:iy%end, &
-                                                              0)
-                    gm_alphaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                iy%beg:iy%end, &
-                                                -1) = &
-                        gm_alphaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                    iy%beg:iy%end, &
-                                                    0)
-                    kappaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                             iy%beg:iy%end, &
-                                             -1) = &
-                        kappaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                 iy%beg:iy%end, &
-                                                 0)
-                end do
-
             end if
 
             if (bc_z%end == -4) then    ! Riemann state extrap. BC at end
@@ -2960,39 +2545,6 @@ contains
                     end do
                 end if
 
-                do i = 1, crv_size
-                    dqR_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          p + 1) = &
-                        dqL_prim_dx_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              iy%beg:iy%end, &
-                                                              p)
-                    dqR_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          p + 1) = &
-                        dqL_prim_dy_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              iy%beg:iy%end, &
-                                                              p)
-                    dqR_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          p + 1) = &
-                        dqL_prim_dz_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                              iy%beg:iy%end, &
-                                                              p)
-                    gm_alphaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                iy%beg:iy%end, &
-                                                p + 1) = &
-                        gm_alphaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                    iy%beg:iy%end, &
-                                                    p)
-                    kappaR_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                             iy%beg:iy%end, &
-                                             p + 1) = &
-                        kappaL_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                 iy%beg:iy%end, &
-                                                 p)
-                end do
-
             end if
 
         end if
@@ -3008,8 +2560,6 @@ contains
         !!      cell-average primitive variables
         !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
         !!      cell-average primitive variables
-        !!  @param kappaL_vf  Left averaged vol. frac. curvatures
-        !!  @param kappaR_vf Right averaged vol. frac. curvatures
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf Intra-cell fluxes sources
         !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
@@ -3018,8 +2568,8 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-    subroutine s_initialize_riemann_solver(qL_prim_vf, kappaL_vf, & ! -----
-                                           qR_prim_vf, kappaR_vf, &
+    subroutine s_initialize_riemann_solver(qL_prim_vf, &
+                                           qR_prim_vf, &
                                            q_prim_vf, &
                                            flux_vf, flux_src_vf, &
                                            flux_gsrc_vf, &
@@ -3029,10 +2579,6 @@ contains
             dimension(sys_size), &
             intent(IN) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
-        type(scalar_field), &
-            allocatable, dimension(:), &
-            intent(IN) :: kappaL_vf, kappaR_vf
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -3094,17 +2640,6 @@ contains
                                           is3%beg:is3%end))
         end do
 
-        do i = 1, crv_size
-            allocate (kappaL_rs_vf(crv_idx(i))%sf(is1%beg:is1%end, &
-                                                  is2%beg:is2%end, &
-                                                  is3%beg:is3%end))
-            allocate (kappaR_rs_vf(crv_idx(i))%sf(is1%beg + 1:is1%end + 1, &
-                                                  is2%beg:is2%end, &
-                                                  is3%beg:is3%end))
-            allocate (alpha_avg_rs_vf(crv_idx(i))%sf(is1%beg:is1%end, &
-                                                     is2%beg:is2%end, &
-                                                     is3%beg:is3%end))
-        end do
 
         do i = 1, 2
             if (Re_size(i) > 0) then
@@ -3112,13 +2647,6 @@ contains
                                              is2%beg:is2%end, &
                                              is3%beg:is3%end))
             end if
-        end do
-
-        do i = 1, We_size
-            allocate (We_avg_rs_vf(We_idx(i, 1), &
-                                   We_idx(i, 2))%sf(is1%beg:is1%end, &
-                                                    is2%beg:is2%end, &
-                                                    is3%beg:is3%end))
         end do
         ! ==================================================================
 
@@ -3162,7 +2690,7 @@ contains
 
         end if
 
-        if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+        if (any(Re_size > 0) .or. hypoelasticity) then
             do i = mom_idx%beg, E_idx
                 flux_src_vf(i)%sf = 0d0
             end do
@@ -3194,16 +2722,6 @@ contains
                                                        iy%beg:iy%end, &
                                                        iz%beg:iz%end)
             end do
-            do i = 1, crv_size
-                kappaL_rs_vf(crv_idx(i))%sf = kappaL_vf(crv_idx(i))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end)
-                kappaR_rs_vf(crv_idx(i))%sf = kappaR_vf(crv_idx(i))%sf( &
-                                              ix%beg + 1:ix%end + 1, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end)
-            end do
             ! ==================================================================
 
             ! Reshaping Inputted Data in y-direction ===========================
@@ -3219,17 +2737,6 @@ contains
                     end do
                 end do
             end do
-
-            do i = 1, crv_size
-                do j = ix%beg, ix%end
-                    do k = iy%beg, iy%end
-                        kappaL_rs_vf(crv_idx(i))%sf(k, j, :) = &
-                            kappaL_vf(crv_idx(i))%sf(j, k, iz%beg:iz%end)
-                        kappaR_rs_vf(crv_idx(i))%sf(k + 1, j, :) = &
-                            kappaR_vf(crv_idx(i))%sf(j, k + 1, iz%beg:iz%end)
-                    end do
-                end do
-            end do
             ! ==================================================================
 
             ! Reshaping Inputted Data in z-direction ===========================
@@ -3242,17 +2749,6 @@ contains
                             qL_prim_vf(i)%sf(j, iy%beg:iy%end, k)
                         qR_prim_rs_vf(i)%sf(k + 1, :, j) = &
                             qR_prim_vf(i)%sf(j, iy%beg:iy%end, k + 1)
-                    end do
-                end do
-            end do
-
-            do i = 1, crv_size
-                do j = ix%beg, ix%end
-                    do k = iz%beg, iz%end
-                        kappaL_rs_vf(crv_idx(i))%sf(k, :, j) = &
-                            kappaL_vf(crv_idx(i))%sf(j, iy%beg:iy%end, k)
-                        kappaR_rs_vf(crv_idx(i))%sf(k + 1, :, j) = &
-                            kappaR_vf(crv_idx(i))%sf(j, iy%beg:iy%end, k + 1)
                     end do
                 end do
             end do
@@ -4240,448 +3736,6 @@ contains
 
     end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
 
-    !>  The purpose of the subroutine is to evaluate and account
-        !!      for the contribution of capillary stresses in the source
-        !!      flux for the momentum and energy.
-        !! @param dalphaL_dx_vf  Left WENO-reconstructed cell-bndry value of cell-avg x-dir derivative of vol. frac.
-        !! @param dalphaL_dy_vf  Left WENO-reconstructed cell-bndry value of cell-avg y-dir derivative of vol. frac.
-        !! @param dalphaL_dz_vf  Left WENO-reconstructed cell-bndry value of cell-avg z-dir derivative of vol. frac.
-        !! @param dalphaR_dx_vf Right WENO-reconstructed cell-bndry value of cell-avg x-dir derivative of vol. frac.
-        !! @param dalphaR_dy_vf Right WENO-reconstructed cell-bndry value of cell-avg y-dir derivative of vol. frac.
-        !! @param dalphaR_dz_vf Right WENO-reconstructed cell-bndry value of cell-avg z-dir derivative of vol. frac.
-        !! @param gm_alphaL_vf   Left WENO-reconstructed cell-bndry value of the gradient magnitude
-        !! @param gm_alphaR_vf  Right WENO-reconstructed cell-bndry value of the gradient magnitude
-        !!  @param flux_src_vf Intercell flux
-        !!  @param norm_dir Dimensional splitting coordinate direction
-        !!  @param ix Index bounds in  first coordinate direction
-        !!  @param iy Index bounds in second coordinate direction
-        !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_capillary_source_flux(dalphaL_dx_vf, & ! ---------
-                                               dalphaL_dy_vf, &
-                                               dalphaL_dz_vf, &
-                                               gm_alphaL_vf, &
-                                               dalphaR_dx_vf, &
-                                               dalphaR_dy_vf, &
-                                               dalphaR_dz_vf, &
-                                               gm_alphaR_vf, &
-                                               flux_src_vf, &
-                                               norm_dir, &
-                                               ix, iy, iz)
-
-        type(scalar_field), &
-            dimension(num_fluids), &
-            intent(IN) :: dalphaL_dx_vf, dalphaR_dx_vf, &
-                          dalphaL_dy_vf, dalphaR_dy_vf, &
-                          dalphaL_dz_vf, dalphaR_dz_vf, &
-                          gm_alphaL_vf, gm_alphaR_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
-
-        integer, intent(IN) :: norm_dir
-
-        type(bounds_info), intent(IN) :: ix, iy, iz
-
-        ! Arithmetic average of the left and right, WENO-reconstructed,
-        ! cell-boundary values of the cell-average first-order spatial
-        ! derivative of the volume fractions and gradient magnitude of
-        ! the volume fractions
-        real(kind(0d0)), dimension(num_fluids) :: dalpha_avg_dx
-        real(kind(0d0)), dimension(num_fluids) :: dalpha_avg_dy
-        real(kind(0d0)), dimension(num_fluids) :: dalpha_avg_dz
-        real(kind(0d0)), dimension(num_fluids) ::  gm_alpha_avg
-
-        ! Capillary stress tensor
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_We
-
-        ! Generic loop iterators
-        integer :: i, j, k, l, r
-
-        ! Capillary Stresses in x-direction ================================
-        if (norm_dir == 1) then
-
-            do i = 1, We_size
-                do r = iz%beg, iz%end
-                    do l = iy%beg, iy%end
-                        do k = ix%beg, ix%end
-
-                            do j = 1, 2
-
-                                dalpha_avg_dx(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dx_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dx_vf(We_idx(i, j))%sf(k + 1, l, r))
-
-                                dalpha_avg_dy(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dy_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dy_vf(We_idx(i, j))%sf(k + 1, l, r))
-
-                                gm_alpha_avg(We_idx(i, j)) = &
-                                    5d-1*(gm_alphaL_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + gm_alphaR_vf(We_idx(i, j))%sf(k + 1, l, r))
-
-                            end do
-
-                            tau_We(1, 1) = &
-                                1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                 We_idx(i, 2))%sf(k, l, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(k, l, r)* &
-                                 (gm_alpha_avg(We_idx(i, 2)) - &
-                                  dalpha_avg_dx(We_idx(i, 2))* &
-                                  dalpha_avg_dx(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(k, l, r)* &
-                                 (gm_alpha_avg(We_idx(i, 1)) - &
-                                  dalpha_avg_dx(We_idx(i, 1))* &
-                                  dalpha_avg_dx(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            tau_We(1, 2) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(k, l, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(k, l, r)* &
-                                 (dalpha_avg_dx(We_idx(i, 2))* &
-                                  dalpha_avg_dy(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(k, l, r)* &
-                                 (dalpha_avg_dx(We_idx(i, 1))* &
-                                  dalpha_avg_dy(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            do j = 1, 2
-                                flux_src_vf(cont_idx%end + j)%sf(k, l, r) = &
-                                    flux_src_vf(cont_idx%end + j)%sf(k, l, r) - &
-                                    tau_We(1, j)
-                            end do
-
-                            tau_We(1, 1) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(k, l, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(k, l, r)* &
-                                 (dalpha_avg_dx(We_idx(i, 2))* &
-                                  dalpha_avg_dx(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(k, l, r)* &
-                                 (dalpha_avg_dx(We_idx(i, 1))* &
-                                  dalpha_avg_dx(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            do j = 1, 2
-                                flux_src_vf(E_idx)%sf(k, l, r) = &
-                                    flux_src_vf(E_idx)%sf(k, l, r) - &
-                                    vel_src_rs_vf(j)%sf(k, l, r)* &
-                                    tau_We(1, j)
-                            end do
-
-                        end do
-                    end do
-                end do
-            end do
-
-            if (p == 0) return
-
-            do i = 1, We_size
-                do r = iz%beg, iz%end
-                    do l = iy%beg, iy%end
-                        do k = ix%beg, ix%end
-
-                            do j = 1, 2
-
-                                dalpha_avg_dx(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dx_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dx_vf(We_idx(i, j))%sf(k + 1, l, r))
-
-                                dalpha_avg_dz(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dz_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dz_vf(We_idx(i, j))%sf(k + 1, l, r))
-
-                                gm_alpha_avg(We_idx(i, j)) = &
-                                    5d-1*(gm_alphaL_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + gm_alphaR_vf(We_idx(i, j))%sf(k + 1, l, r))
-
-                            end do
-
-                            tau_We(1, 3) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(k, l, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(k, l, r)* &
-                                 (dalpha_avg_dx(We_idx(i, 2))* &
-                                  dalpha_avg_dz(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(k, l, r)* &
-                                 (dalpha_avg_dx(We_idx(i, 1))* &
-                                  dalpha_avg_dz(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            flux_src_vf(mom_idx%end)%sf(k, l, r) = &
-                                flux_src_vf(mom_idx%end)%sf(k, l, r) - &
-                                tau_We(1, 3)
-
-                            flux_src_vf(E_idx)%sf(k, l, r) = &
-                                flux_src_vf(E_idx)%sf(k, l, r) - &
-                                vel_src_rs_vf(3)%sf(k, l, r)* &
-                                tau_We(1, 3)
-
-                        end do
-                    end do
-                end do
-            end do
-            ! END: Capillary Stresses in x-direction ===========================
-
-            ! Capillary Stresses in y-direction ================================
-        elseif (norm_dir == 2) then
-
-            do i = 1, We_size
-                do r = iz%beg, iz%end
-                    do l = iy%beg, iy%end
-                        do k = ix%beg, ix%end
-
-                            do j = 1, 2
-
-                                dalpha_avg_dx(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dx_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dx_vf(We_idx(i, j))%sf(k, l + 1, r))
-
-                                dalpha_avg_dy(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dy_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dy_vf(We_idx(i, j))%sf(k, l + 1, r))
-
-                                gm_alpha_avg(We_idx(i, j)) = &
-                                    5d-1*(gm_alphaL_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + gm_alphaR_vf(We_idx(i, j))%sf(k, l + 1, r))
-
-                            end do
-
-                            tau_We(2, 1) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(l, k, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(l, k, r)* &
-                                 (dalpha_avg_dy(We_idx(i, 2))* &
-                                  dalpha_avg_dx(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(l, k, r)* &
-                                 (dalpha_avg_dy(We_idx(i, 1))* &
-                                  dalpha_avg_dx(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            tau_We(2, 2) = &
-                                1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                 We_idx(i, 2))%sf(l, k, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(l, k, r)* &
-                                 (gm_alpha_avg(We_idx(i, 2)) - &
-                                  dalpha_avg_dy(We_idx(i, 2))* &
-                                  dalpha_avg_dy(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(l, k, r)* &
-                                 (gm_alpha_avg(We_idx(i, 1)) - &
-                                  dalpha_avg_dy(We_idx(i, 1))* &
-                                  dalpha_avg_dy(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            do j = 1, 2
-                                flux_src_vf(cont_idx%end + j)%sf(k, l, r) = &
-                                    flux_src_vf(cont_idx%end + j)%sf(k, l, r) - &
-                                    tau_We(2, j)
-                            end do
-
-                            tau_We(2, 2) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(l, k, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(l, k, r)* &
-                                 (dalpha_avg_dy(We_idx(i, 2))* &
-                                  dalpha_avg_dy(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(l, k, r)* &
-                                 (dalpha_avg_dy(We_idx(i, 1))* &
-                                  dalpha_avg_dy(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            do j = 1, 2
-                                flux_src_vf(E_idx)%sf(k, l, r) = &
-                                    flux_src_vf(E_idx)%sf(k, l, r) - &
-                                    vel_src_rs_vf(j)%sf(l, k, r)* &
-                                    tau_We(2, j)
-                            end do
-
-                        end do
-                    end do
-                end do
-            end do
-
-            if (p == 0) return
-
-            do i = 1, We_size
-                do r = iz%beg, iz%end
-                    do l = iy%beg, iy%end
-                        do k = ix%beg, ix%end
-
-                            do j = 1, 2
-
-                                dalpha_avg_dy(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dy_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dy_vf(We_idx(i, j))%sf(k, l + 1, r))
-
-                                dalpha_avg_dz(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dz_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dz_vf(We_idx(i, j))%sf(k, l + 1, r))
-
-                                gm_alpha_avg(We_idx(i, j)) = &
-                                    5d-1*(gm_alphaL_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + gm_alphaR_vf(We_idx(i, j))%sf(k, l + 1, r))
-
-                            end do
-
-                            tau_We(2, 3) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(l, k, r)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(l, k, r)* &
-                                 (dalpha_avg_dy(We_idx(i, 2))* &
-                                  dalpha_avg_dz(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(l, k, r)* &
-                                 (dalpha_avg_dy(We_idx(i, 1))* &
-                                  dalpha_avg_dz(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            flux_src_vf(mom_idx%end)%sf(k, l, r) = &
-                                flux_src_vf(mom_idx%end)%sf(k, l, r) - &
-                                tau_We(2, 3)
-
-                            flux_src_vf(E_idx)%sf(k, l, r) = &
-                                flux_src_vf(E_idx)%sf(k, l, r) - &
-                                vel_src_rs_vf(3)%sf(l, k, r)* &
-                                tau_We(2, 3)
-
-                        end do
-                    end do
-                end do
-            end do
-            ! END: Capillary Stresses in y-direction ===========================
-
-            ! Capillary Stresses in z-direction ================================
-        else
-
-            do i = 1, We_size
-                do r = iz%beg, iz%end
-                    do l = iy%beg, iy%end
-                        do k = ix%beg, ix%end
-
-                            do j = 1, 2
-
-                                dalpha_avg_dx(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dx_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dx_vf(We_idx(i, j))%sf(k, l, r + 1))
-
-                                dalpha_avg_dy(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dy_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dy_vf(We_idx(i, j))%sf(k, l, r + 1))
-
-                                dalpha_avg_dz(We_idx(i, j)) = &
-                                    5d-1*(dalphaL_dz_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + dalphaR_dz_vf(We_idx(i, j))%sf(k, l, r + 1))
-
-                                gm_alpha_avg(We_idx(i, j)) = &
-                                    5d-1*(gm_alphaL_vf(We_idx(i, j))%sf(k, l, r) &
-                                          + gm_alphaR_vf(We_idx(i, j))%sf(k, l, r + 1))
-
-                            end do
-
-                            tau_We(3, 1) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(r, l, k)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(r, l, k)* &
-                                 (dalpha_avg_dz(We_idx(i, 2))* &
-                                  dalpha_avg_dx(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(r, l, k)* &
-                                 (dalpha_avg_dz(We_idx(i, 1))* &
-                                  dalpha_avg_dx(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            tau_We(3, 2) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(r, l, k)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(r, l, k)* &
-                                 (dalpha_avg_dz(We_idx(i, 2))* &
-                                  dalpha_avg_dy(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(r, l, k)* &
-                                 (dalpha_avg_dz(We_idx(i, 1))* &
-                                  dalpha_avg_dy(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            tau_We(3, 3) = &
-                                1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                 We_idx(i, 2))%sf(r, l, k)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(r, l, k)* &
-                                 (gm_alpha_avg(We_idx(i, 2)) - &
-                                  dalpha_avg_dz(We_idx(i, 2))* &
-                                  dalpha_avg_dz(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(r, l, k)* &
-                                 (gm_alpha_avg(We_idx(i, 1)) - &
-                                  dalpha_avg_dz(We_idx(i, 1))* &
-                                  dalpha_avg_dz(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            do j = 1, 3
-                                flux_src_vf(cont_idx%end + j)%sf(k, l, r) = &
-                                    flux_src_vf(cont_idx%end + j)%sf(k, l, r) - &
-                                    tau_We(3, j)
-                            end do
-
-                            tau_We(3, 3) = &
-                                -1d0/We_avg_rs_vf(We_idx(i, 1), &
-                                                  We_idx(i, 2))%sf(r, l, k)* &
-                                (alpha_avg_rs_vf(We_idx(i, 1))%sf(r, l, k)* &
-                                 (dalpha_avg_dz(We_idx(i, 2))* &
-                                  dalpha_avg_dz(We_idx(i, 2))/ &
-                                  max(gm_alpha_avg(We_idx(i, 2)), &
-                                      sgm_eps)) &
-                                 + alpha_avg_rs_vf(We_idx(i, 2))%sf(r, l, k)* &
-                                 (dalpha_avg_dz(We_idx(i, 1))* &
-                                  dalpha_avg_dz(We_idx(i, 1))/ &
-                                  max(gm_alpha_avg(We_idx(i, 1)), &
-                                      sgm_eps)))
-
-                            do j = 1, 3
-                                flux_src_vf(E_idx)%sf(k, l, r) = &
-                                    flux_src_vf(E_idx)%sf(k, l, r) - &
-                                    vel_src_rs_vf(j)%sf(r, l, k)* &
-                                    tau_We(3, j)
-                            end do
-
-                        end do
-                    end do
-                end do
-            end do
-
-        end if
-        ! END: Capillary Stresses in z-direction ===========================
-
-    end subroutine s_compute_capillary_source_flux ! -----------------------
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
@@ -4783,11 +3837,6 @@ contains
             deallocate (qL_prim_rs_vf(i)%sf, qR_prim_rs_vf(i)%sf)
         end do
 
-        do i = 1, crv_size
-            deallocate (kappaL_rs_vf(crv_idx(i))%sf)
-            deallocate (kappaR_rs_vf(crv_idx(i))%sf)
-            deallocate (alpha_avg_rs_vf(crv_idx(i))%sf)
-        end do
 
         do i = 1, 2
             if (Re_size(i) > 0) then
@@ -4795,9 +3844,6 @@ contains
             end if
         end do
 
-        do i = 1, We_size
-            deallocate (We_avg_rs_vf(We_idx(i, 1), We_idx(i, 2))%sf)
-        end do
         ! ==================================================================
 
         ! Deallocating Intercell Fluxes and Velocity =======================
@@ -4857,15 +3903,6 @@ contains
         deallocate (vel_avg)
 
         deallocate (alpha_L, alpha_R)
-
-        if (We_size > 0) then
-
-            deallocate (kappaL_rs_vf, kappaR_rs_vf)
-            deallocate (alpha_avg_rs_vf, kappa_avg, We_avg_rs_vf)
-
-        end if
-
-        deallocate (We_L, We_R)
 
         if (any(Re_size > 0)) deallocate (Re_avg_rs_vf)
 

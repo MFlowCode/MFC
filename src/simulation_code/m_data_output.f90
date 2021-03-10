@@ -112,9 +112,8 @@ module m_data_output
     real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: bounds
     real(kind(0d0)), public, allocatable, dimension(:, :)    :: cntrline
     real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: x_accel, y_accel, z_accel
-    type(scalar_field), allocatable, dimension(:)           :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf, kappa_vf
-    real(kind(0d0)), target, allocatable, dimension(:, :, :)  :: energy !< Energy:
-    !! Used to write out correct E and p when We_size > 0
+    type(scalar_field), allocatable, dimension(:)           :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+    real(kind(0d0)), target, allocatable, dimension(:, :, :)  :: energy
     !> @}
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
@@ -193,16 +192,9 @@ contains
         write (1, '(A)') ''; write (1, '(A)') ''
 
         ! Generating table header for the stability criteria to be outputted
-        if (any(Re_size > 0) .and. We_size > 0) then
-            write (1, '(A)') '== Time-steps ==== Time ===== ICFL Max == '// &
-                'VCFL Max == CCFL Max ==== Rc Min ====='
-        elseif (any(Re_size > 0)) then
+        if (any(Re_size > 0)) then
             write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
                 'Max ==== VCFL Max ====== Rc Min ======='
-        elseif (We_size > 0) then
-            write (1, '(A)') '======= Time-steps ========= Time '// &
-                '========== ICFL Max ======= CCFL '// &
-                'Max ========='
         else
             write (1, '(A)') '=========== Time-steps ============== Time '// &
                 '============== ICFL Max ============='
@@ -405,7 +397,6 @@ contains
         real(kind(0d0))                                   :: pi_inf     !< Cell-avg. liquid stiffness function
         real(kind(0d0))                                   :: c          !< Cell-avg. sound speed
         real(kind(0d0)), dimension(2)                     :: Re         !< Cell-avg. Reynolds numbers
-        real(kind(0d0)), dimension(num_fluids, num_fluids) :: We         !< Cell-avg. Weber numbers
 
         ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
         ! time-step and located on both the local (loc) and the global (glb)
@@ -429,13 +420,9 @@ contains
             do k = 0, n
                 do j = 0, m
 
-                    do i = 1, crv_size
-                        alpha_rho(crv_idx(i)) = q_prim_vf(crv_idx(i))%sf(j, k, l)
-                    end do
-
                     call s_convert_to_mixture_variables(q_prim_vf, rho, &
                                                         gamma, pi_inf, &
-                                                        Re, We, j, k, l)
+                                                        Re, j, k, l)
 
                     do i = 1, num_dims
                         vel(i) = q_prim_vf(cont_idx%end + i)%sf(j, k, l)
@@ -460,9 +447,6 @@ contains
                                 (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma + 1d0))
                         end do
                     else
-                        do i = 1, crv_size
-                            alpha(crv_idx(i)) = q_prim_vf(E_idx + crv_idx(i))%sf(j, k, l)
-                        end do
                         c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
                     end if
 
@@ -517,37 +501,6 @@ contains
 
                         end if
 
-                        if (We_size > 0) then
-
-                            ccfl_sf(j, k, l) = 0d0
-
-                            do i = 1, We_size
-                                ccfl_sf(j, k, l) = max(ccfl_sf(j, k, l), &
-                                                       1d0/We(We_idx(i, 1), We_idx(i, 2))/ &
-                                                       (max(alpha_rho(We_idx(i, 1)), &
-                                                            0d0)/ &
-                                                        max(alpha(We_idx(i, 1)), &
-                                                            sgm_eps) &
-                                                        + max(alpha_rho(We_idx(i, 2)), &
-                                                              0d0)/ &
-                                                        max(alpha(We_idx(i, 2)), &
-                                                            sgm_eps)))
-                            end do
-
-                            if (grid_geometry == 3) then
-                                ccfl_sf(j, k, l) = sqrt(pi*ccfl_sf(j, k, l)*dt**2d0 &
-                                                        /min(dx(j), &
-                                                             dy(k), &
-                                                             fltr_dtheta)**3d0)
-                            else
-                                ccfl_sf(j, k, l) = sqrt(pi*ccfl_sf(j, k, l)*dt**2d0 &
-                                                        /min(dx(j), &
-                                                             dy(k), &
-                                                             dz(l))**3d0)
-                            end if
-
-                        end if
-
                     elseif (n > 0) then
                         !2D
                         icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
@@ -560,28 +513,6 @@ contains
                             Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                                  dy(k)*(abs(vel(2)) + c)) &
                                              /maxval(1d0/Re)
-
-                        end if
-
-                        if (We_size > 0) then
-
-                            ccfl_sf(j, k, l) = 0d0
-
-                            do i = 1, We_size
-                                ccfl_sf(j, k, l) = max(ccfl_sf(j, k, l), &
-                                                       1d0/We(We_idx(i, 1), We_idx(i, 2))/ &
-                                                       (max(alpha_rho(We_idx(i, 1)), &
-                                                            0d0)/ &
-                                                        max(alpha(We_idx(i, 1)), &
-                                                            sgm_eps) &
-                                                        + max(alpha_rho(We_idx(i, 2)), &
-                                                              0d0)/ &
-                                                        max(alpha(We_idx(i, 2)), &
-                                                            sgm_eps)))
-                            end do
-
-                            ccfl_sf(j, k, l) = sqrt(pi*ccfl_sf(j, k, l)*dt**2d0 &
-                                                    /min(dx(j), dy(k))**3d0)
 
                         end if
 
@@ -607,7 +538,6 @@ contains
         ! Determining local stability criteria extrema at current time-step
         icfl_max_loc = maxval(icfl_sf)
         if (any(Re_size > 0)) vcfl_max_loc = maxval(vcfl_sf)
-        if (We_size > 0) ccfl_max_loc = maxval(ccfl_sf)
         if (any(Re_size > 0)) Rc_min_loc = minval(Rc_sf)
 
         ! Determining global stability criteria extrema at current time-step
@@ -623,7 +553,6 @@ contains
         else
             icfl_max_glb = icfl_max_loc
             if (any(Re_size > 0)) vcfl_max_glb = vcfl_max_loc
-            if (We_size > 0) ccfl_max_glb = ccfl_max_loc
             if (any(Re_size > 0)) Rc_min_glb = Rc_min_loc
         end if
 
@@ -635,27 +564,13 @@ contains
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
 
-        if (We_size > 0) then
-            if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
-        end if
-
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
-            if (any(Re_size > 0) .and. We_size > 0) then
-                write (1, '(4X,I8,4X,F10.6,4X,F9.6,4X,F9.6,4X,F9.6,4X,F10.6)') &
-                    t_step, t_step*dt, icfl_max_glb, &
-                    vcfl_max_glb, &
-                    ccfl_max_glb, &
-                    Rc_min_glb
-            elseif (any(Re_size > 0)) then
+            if (any(Re_size > 0)) then
                 write (1, '(6X,I8,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
-            elseif (We_size > 0) then
-                write (1, '(9X,I8,9X,F10.6,9X,F9.6,9X,F9.6)') &
-                    t_step, t_step*dt, icfl_max_glb, &
-                    ccfl_max_glb
             else
                 write (1, '(13X,I8,14X,F10.6,13X,F9.6)') &
                     t_step, t_step*dt, icfl_max_glb
@@ -704,7 +619,6 @@ contains
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)), dimension(2)                   :: Re !< Temporary Reynolds number
-        real(kind(0d0)), allocatable, dimension(:, :)    :: We !< Temporary Weber number
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -758,12 +672,7 @@ contains
                   FORM='unformatted', &
                   STATUS='new')
 
-            if (i == E_idx .and. We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-                call s_remove_capillary_potential_energy(q_cons_vf)
-                write (2) energy(0:m, 0:n, 0:p); close (2)
-            else
-                write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
-            end if
+            write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
         gamma = fluid_pp(1)%gamma
@@ -793,7 +702,7 @@ contains
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
-                        call s_convert_to_mixture_variables(q_cons_vf, rho, gamma, pi_inf, Re, We, j, 0, 0)
+                        call s_convert_to_mixture_variables(q_cons_vf, rho, gamma, pi_inf, Re, j, 0, 0)
                         lit_gamma = 1d0/gamma + 1d0
 
                         if (((i .ge. cont_idx%beg) .and. (i .le. cont_idx%end)) &
@@ -903,59 +812,6 @@ contains
 
     end subroutine s_write_serial_data_files ! ------------------------------------
 
-    subroutine s_remove_capillary_potential_energy(v_vf)
-
-        type(scalar_field), dimension(sys_size), intent(IN) :: v_vf
-        real(kind(0d0)), allocatable, dimension(:, :, :) :: E_We
-        type(bounds_info) :: ix, iy, iz
-        type(bounds_info) :: iz1
-
-        ! Placeholders (_ph) for variables
-        real(kind(0d0)) :: rho_ph, gamma_ph, pi_inf_ph
-        real(kind(0d0)), dimension(2) :: Re_ph
-        real(kind(0d0)), dimension(num_fluids, num_fluids) :: We_ph
-
-        integer :: i, j, k, l
-
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        allocate (E_We(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-
-        if (p > 0) then
-            iz1%beg = iz%beg; iz1%end = iz%end
-        else
-            iz1%beg = -1; iz1%end = 1
-        end if
-
-        ! Compute volume fraction gradient magnitude for all fluids
-        call s_compute_lsq_gradient_curvature(v_vf, grad_x_vf, grad_y_vf, grad_z_vf, norm_vf, kappa_vf)
-
-        do k = iz1%beg + 1, iz1%end - 1
-            do j = iy%beg + 1, iy%end - 1
-                do i = ix%beg + 1, ix%end - 1
-                    E_We(i, j, k) = 0d0
-
-                    call s_convert_to_mixture_variables(v_vf, rho_ph, gamma_ph, &
-                                                        pi_inf_ph, Re_ph, We_ph, i, j, k)
-
-                    ! Compute capillary potential energy
-                    do l = 1, We_size
-                        E_We(i, j, k) = E_We(i, j, k) + &
-                                        v_vf(E_idx + We_idx(l, 1))%sf(i, j, k)* &
-                                        norm_vf(We_idx(l, 2))%sf(i, j, k)/We_ph(We_idx(l, 1), We_idx(l, 2)) + &
-                                        v_vf(E_idx + We_idx(l, 2))%sf(i, j, k)* &
-                                        norm_vf(We_idx(l, 1))%sf(i, j, k)/We_ph(We_idx(l, 1), We_idx(l, 2))
-                    end do
-                end do
-            end do
-        end do
-
-        ! Remove capillary potential energy from conservative variable
-        energy(:, :, :) = v_vf(E_idx)%sf(:, :, :) - E_We(:, :, :)
-
-    end subroutine s_remove_capillary_potential_energy
-
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
@@ -983,11 +839,6 @@ contains
 
         ! Initialize MPI data I/O
         call s_initialize_mpi_data(q_cons_vf)
-
-        if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-            call s_remove_capillary_potential_energy(q_cons_vf)
-            MPI_IO_DATA%var(E_idx)%sf => energy(0:m, 0:n, 0:p)
-        end if
 
         ! Open the file to write all flow variables
         write (file_loc, '(I0,A)') t_step, '.dat'
@@ -1791,7 +1642,6 @@ contains
         real(kind(0d0))                                   :: int_pres
         real(kind(0d0))                                   :: max_pres
         real(kind(0d0)), dimension(2)             :: Re
-        real(kind(0d0)), allocatable, dimension(:, :)      :: We
 
         integer :: i, j, k, l, s !< Generic loop iterator
 
@@ -1857,7 +1707,7 @@ contains
                     ! Computing/Sharing necessary state variables
                     call s_convert_to_mixture_variables(q_cons_vf, rho, &
                                                         gamma, pi_inf, &
-                                                        Re, We, j - 2, k, l)
+                                                        Re, j - 2, k, l)
                     do s = 1, num_dims
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
@@ -1966,7 +1816,7 @@ contains
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, rho, &
                                                             gamma, pi_inf, &
-                                                            Re, We, j - 2, k - 2, l)
+                                                            Re, j - 2, k - 2, l)
                         do s = 1, num_dims
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
@@ -2060,7 +1910,7 @@ contains
                             ! Computing/Sharing necessary state variables
                             call s_convert_to_mixture_variables(q_cons_vf, rho, &
                                                                 gamma, pi_inf, &
-                                                                Re, We, j - 2, k - 2, l - 2)
+                                                                Re, j - 2, k - 2, l - 2)
                             do s = 1, num_dims
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
@@ -2284,7 +2134,7 @@ contains
                             npts = npts + 1
                             call s_convert_to_mixture_variables(q_cons_vf, rho, &
                                                                 gamma, pi_inf, &
-                                                                Re, We, j, k, l)
+                                                                Re, j, k, l)
                             do s = 1, num_dims
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                             end do
@@ -2357,7 +2207,7 @@ contains
                                 npts = npts + 1
                                 call s_convert_to_mixture_variables(q_cons_vf, rho, &
                                                                     gamma, pi_inf, &
-                                                                    Re, We, j, k, l)
+                                                                    Re, j, k, l)
                                 do s = 1, num_dims
                                     vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                                 end do
@@ -2417,7 +2267,6 @@ contains
 
         write (1, '(A,F9.6)') 'ICFL Max: ', icfl_max
         if (any(Re_size > 0)) write (1, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (We_size > 0) write (1, '(A,F9.6)') 'CCFL Max: ', ccfl_max
         if (any(Re_size > 0)) write (1, '(A,F10.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
@@ -2479,7 +2328,6 @@ contains
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         allocate (icfl_sf(0:m, 0:n, 0:p)); icfl_max = 0d0
         if (any(Re_size > 0)) allocate (vcfl_sf(0:m, 0:n, 0:p)); vcfl_max = 0d0
-        if (We_size > 0) allocate (ccfl_sf(0:m, 0:n, 0:p)); ccfl_max = 0d0
         if (any(Re_size > 0)) allocate (Rc_sf(0:m, 0:n, 0:p)); Rc_min = 1d3
 
         ! Associating the procedural pointer to the appropriate subroutine
@@ -2525,38 +2373,6 @@ contains
             end if
         end if
 
-        if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-            ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-            ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-            allocate (grad_x_vf(sys_size))
-            allocate (grad_y_vf(sys_size))
-            allocate (grad_z_vf(sys_size))
-            allocate (norm_vf(1:num_fluids))
-            allocate (kappa_vf(1:num_fluids))
-
-            do i = 1, crv_size
-                allocate (grad_x_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                           iy%beg:iy%end, &
-                                                           iz%beg:iz%end))
-                allocate (grad_y_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                           iy%beg:iy%end, &
-                                                           iz%beg:iz%end))
-                allocate (grad_z_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                           iy%beg:iy%end, &
-                                                           iz%beg:iz%end))
-                allocate (norm_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                 iy%beg:iy%end, &
-                                                 iz%beg:iz%end))
-                allocate (kappa_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-            end do
-            allocate (energy(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-
-        end if
-
         if (parallel_io .neqv. .true.) then
             s_write_data_files => s_write_serial_data_files
         else
@@ -2573,7 +2389,6 @@ contains
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         deallocate (icfl_sf)
         if (any(Re_size > 0)) deallocate (vcfl_sf)
-        if (We_size > 0) deallocate (ccfl_sf)
         if (any(Re_size > 0)) deallocate (Rc_sf)
 
         ! Deallocating the storage employed for the flow variables that
@@ -2597,21 +2412,6 @@ contains
                     deallocate (z_accel)
                 end if
             end if
-        end if
-
-        if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-
-            do i = 1, crv_size
-                deallocate (grad_x_vf(E_idx + crv_idx(i))%sf)
-                deallocate (grad_y_vf(E_idx + crv_idx(i))%sf)
-                deallocate (grad_z_vf(E_idx + crv_idx(i))%sf)
-                deallocate (norm_vf(crv_idx(i))%sf)
-                deallocate (kappa_vf(crv_idx(i))%sf)
-            end do
-
-            deallocate (grad_x_vf, grad_y_vf, grad_z_vf)
-            deallocate (norm_vf, kappa_vf)
-            deallocate (energy)
         end if
 
         ! Disassociating the pointer to the procedure that was utilized to
