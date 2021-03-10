@@ -117,7 +117,7 @@ contains
             model_eqns, num_fluids, &
             adv_alphan, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, patch_icpp, fluid_pp, &
+            patch_icpp, fluid_pp, &
             precision, parallel_io, &
             perturb_flow, perturb_flow_fluid, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &

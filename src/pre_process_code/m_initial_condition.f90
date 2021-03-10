@@ -706,15 +706,6 @@ contains
             (eta*patch_icpp(patch_id)%pres &
              + (1d0 - eta)*orig_prim_vf(E_idx))
 
-        ! Elastic Shear Stress
-        if (hypoelasticity) then
-            do i = 1, (stress_idx%end - stress_idx%beg) + 1
-                q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
-                    (eta*patch_icpp(patch_id)%tau_e(i) &
-                     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
-            end do
-        end if
-
         ! Set partial pressures to mixture pressure
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end

@@ -134,7 +134,6 @@ module m_global_parameters
     real(kind(0d0)) :: reg_eps        !< User-defined interface thickness parameter for regularization terms
     logical         :: null_weights   !< Null undesired WENO weights
     logical         :: mixture_err    !< Mixture properties correction
-    logical         :: hypoelasticity !< Hypoelastic modeling
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
@@ -176,7 +175,6 @@ module m_global_parameters
     integer               :: alf_idx               !< Index of void fraction
     integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
-    type(bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     !> @}
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
@@ -196,8 +194,6 @@ module m_global_parameters
     real(kind(0d0)), dimension(3) :: dir_flg
     !> @}
 
-    !! extra coordinate direction index used if hypoelasticity = true
-    integer, dimension(3) :: dir_idx_tau
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
@@ -275,7 +271,7 @@ module m_global_parameters
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v, G
+    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
@@ -350,7 +346,6 @@ contains
         mixture_err = .false.
         parallel_io = .false.
         precision = 2
-        hypoelasticity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -368,7 +363,6 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%G = dflt_real
         end do
 
         ! Tait EOS
@@ -596,12 +590,6 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
-                    stress_idx%beg = sys_size + 1
-                    stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                    ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
-                    sys_size = stress_idx%end
-                end if
 
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
@@ -723,8 +711,6 @@ contains
         ! the next one
         if (any(Re_size > 0)) then
             buff_size = 2*weno_polyn + 2
-        elseif (hypoelasticity) then
-            buff_size = 2*weno_polyn + 2
         else
             buff_size = weno_polyn + 2
         end if
@@ -808,7 +794,6 @@ contains
         M_v = fluid_pp(1)%M_v
         mu_v = fluid_pp(1)%mu_v
         k_v(:) = fluid_pp(1)%k_v
-        G = fluid_pp(1)%G
 
         gamma_n = fluid_pp(2)%gamma_v
         M_n = fluid_pp(2)%M_v

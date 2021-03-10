@@ -84,16 +84,10 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_qpL_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_qpL_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_qpL_z
 
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_qpR_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_qpR_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_qpR_z
 
     real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
     real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
@@ -107,16 +101,10 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_z
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_qpL_x
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_qpL_y
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_qpL_z
 
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_qpR_x
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_qpR_y
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_qpR_z
 
     real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
     real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
@@ -581,53 +569,18 @@ contains
                             dvd(-1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
                                       - v_rs_wsL(-1)%vf(i)%sf(j, k, l)
 
-                            ! poly_coef_R(0,0,i+1) = (s_cb( i )-s_cb(i+1)) / &
-                            !                        (s_cb( i )-s_cb(i+2)) = 1/2
-                            ! poly_coef_R(1,0,i+1) = (s_cb( i )-s_cb(i+1)) / &
-                            !                        (s_cb(i-1)-s_cb(i+1)) = 1/2
-
-                            ! poly_coef_L(0,0,i+1) = -poly_coef_R(0,0,i+1) = -1/2
-                            ! poly_coef_L(1,0,i+1) = -poly_coef_R(1,0,i+1) = -1/2
-
-                            ! so: poly_L[0] = v[j]-(1/2)(v[j+1]-v[j])
-                            ! so: poly_L[1] = v[j]-(1/2)(v[j]-v[j-1])
                             poly_L(0) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
                                         + poly_coef_L(0, 0, j)*dvd(0)
                             poly_L(1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
                                         + poly_coef_L(1, 0, j)*dvd(-1)
 
-                            ! beta_coef(0,0,i+1) = 4d0*(s_cb( i )-s_cb(i+1))**2d0 / &
-                            !                          (s_cb( i )-s_cb(i+2))**2d0
-                            ! beta_coef(1,0,i+1) = 4d0*(s_cb( i )-s_cb(i+1))**2d0 / &
-                            !                          (s_cb(i-1)-s_cb(i+1))**2d0
-
-                            ! so for uniform mesh: beta_coef(0,0,j) = 4*((-dx)**2) / (-2dx)**2 = 1
-                            ! so for uniform mesh: beta_coef(1,0,j) = 4*((-dx)**2) / (-2dx)**2 = 1
-
-                            ! so: beta[0] = (v[j+1]-v[j])**2 + weno_eps
-                            ! so: beta[1] = (v[j]-v[j-1])**2 + weno_eps
                             beta(0) = beta_coef(0, 0, j)*dvd(0)*dvd(0) &
                                       + weno_eps
                             beta(1) = beta_coef(1, 0, j)*dvd(-1)*dvd(-1) &
                                       + weno_eps
 
-                            ! d_L(0,i+1) = (s_cb(i-1)-s_cb( i )) / &
-                            !              (s_cb(i-1)-s_cb(i+2))
-                            !            = (-dx)/(-3dx) = 1/3
-                            ! d_L(1,i+1) = 1d0 - d_L(0,i+1)
-                            !            = 1-1/3 = 2/3
-
-                            ! so: alpha_L[0] = (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
-                            ! so: alpha_L[1] = (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2
                             alpha_L = d_L(:, j)/(beta*beta)
 
-                            ! so: omega_L[0] = (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
-                            !                  --------------------------------------
-                            ! (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2 + (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
-
-                            ! so: omega_L[1] = (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2
-                            !                  --------------------------------------
-                            ! (2/3)/( (v[j]-v[j-1])^2 + weno_eps )^2 + (1/3)/( (v[j+1]-v[j])^2 + weno_eps )^2
                             omega_L = alpha_L/sum(alpha_L)
 
                             ! reconstruct from right side
@@ -635,9 +588,6 @@ contains
                                      - v_rs_wsR(0)%vf(i)%sf(j, k, l)
                             dvd(-1) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
                                       - v_rs_wsR(-1)%vf(i)%sf(j, k, l)
-
-                            ! poly_coef_R(0,0,j) = -dx/(-2 dx) = 1/2
-                            ! poly_coef_R(1,0,j) = -dx/(-2 dx) = 1/2
 
                             poly_R(0) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
                                         + poly_coef_R(0, 0, j)*dvd(0)
@@ -648,12 +598,6 @@ contains
                                       + weno_eps
                             beta(1) = beta_coef(1, 0, j)*dvd(-1)*dvd(-1) &
                                       + weno_eps
-
-                            ! d_R(0,i+1) = (s_cb(i-1)-s_cb(i+1)) / &
-                            !              (s_cb(i-1)-s_cb(i+2))
-                            !            = 2/3
-                            ! d_R(1,i+1) = 1d0 - d_R(0,i+1)
-                            !            = 1-2/3 = 1/3
 
                             alpha_R = d_R(:, j)/(beta*beta)
 
@@ -991,6 +935,7 @@ contains
         ! ==================================================================
 
     end subroutine s_initialize_weno ! -------------------------------------
+
 
     !>  The goal of this procedure is to map the nonlinear WENO
         !!      weights to the more accurate nonlinear WENOM weights in

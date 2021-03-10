@@ -551,20 +551,6 @@ contains
                               xi_P*rho_R*(s_R - vel_R(dir_idx(1))))
                     end do
 
-                    ! SHB: Does this need to be ammended?
-                    if (hypoelasticity) then
-                        do i = 1, (num_dims*(num_dims + 1))/2
-                            flux_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l) = &
-                                (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                      *tau_e_R(i)) &
-                                 - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                        *tau_e_L(i)) &
-                                 + s_M*s_P*(rho_L*tau_e_L(i) &
-                                            - rho_R*tau_e_R(i))) &
-                                /(s_M - s_P)
-                        end do
-                    end if
-
                     if (bubbles) then
                         ! From HLLC: Kills mass transport @ bubble gas density
                         if (num_fluids > 1) then
@@ -576,7 +562,7 @@ contains
         end do
 
         ! Computing the viscous and capillary source flux
-        if (any(Re_size > 0) .or. hypoelasticity) then
+        if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 call s_compute_viscous_source_flux( &
                     qL_prim_vf(mom_idx%beg:mom_idx%end), &
@@ -1855,13 +1841,6 @@ contains
         H_L = (E_L + pres_L)/rho_L
         H_R = (E_R + pres_R)/rho_R
 
-        if (hypoelasticity) then
-            do i = 1, (num_dims*(num_dims + 1))/2
-                tau_e_L(i) = qL_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l)
-                tau_e_R(i) = qR_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j + 1, k, l)
-            end do
-        end if
-
         call s_compute_mixture_sound_speeds(j, k, l)
 
         ! ==================================================================
@@ -1945,13 +1924,6 @@ contains
 
         H_L = (E_L + pres_L)/rho_L
         H_R = (E_R + pres_R)/rho_R
-
-        if (hypoelasticity) then
-            do i = 1, (num_dims*(num_dims + 1))/2
-                tau_e_L(i) = qL_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l)
-                tau_e_R(i) = qR_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j + 1, k, l)
-            end do
-        end if
 
         ! Compute left/right states for bubble number density
         if (bubbles) then
@@ -2193,16 +2165,6 @@ contains
             end if
         end if
 
-        if (hypoelasticity) then
-            allocate (tau_e_L(1:(num_dims*(num_dims + 1)/2)) &
-                      , tau_e_R(1:(num_dims*(num_dims + 1)/2)))
-
-
-            if (riemann_solver == 3) then
-                allocate (tau_e_IC(1:(num_dims*(num_dims + 1)/2)))
-            end if
-        end if
-
         ! Associating the procedural pointers to the procedures that will be
         ! utilized to compute the average state and estimate the wave speeds
         if (riemann_solver /= 3) then
@@ -2308,7 +2270,7 @@ contains
                         qR_prim_vf(i)%sf(0, iy%beg:iy%end, iz%beg:iz%end)
                 end do
 
-                if (any(Re_size > 0) .or. hypoelasticity) then
+                if (any(Re_size > 0)) then
 
                     do i = mom_idx%beg, mom_idx%end
                         dqL_prim_dx_vf(i)%sf(-1, &
@@ -2354,7 +2316,7 @@ contains
                         qL_prim_vf(i)%sf(m, iy%beg:iy%end, iz%beg:iz%end)
                 end do
 
-                if (any(Re_size > 0) .or. hypoelasticity) then
+                if (any(Re_size > 0)) then
 
                     do i = mom_idx%beg, mom_idx%end
                         dqR_prim_dx_vf(i)%sf(m + 1, &
@@ -2605,16 +2567,6 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
         end if
 
-        ! Extra indexes needed for hypoelasticity
-        if (hypoelasticity) then
-            if (norm_dir == 1) then
-                dir_idx_tau = (/1, 2, 4/)
-            elseif (norm_dir == 2) then
-                dir_idx_tau = (/2, 3, 5/)
-            else
-                dir_idx_tau = (/4, 5, 6/)
-            end if
-        end if
 
         ! Setting up special bounds for cell-average values
         xbeg = -buff_size; ybeg = 0; zbeg = 0
@@ -2690,7 +2642,7 @@ contains
 
         end if
 
-        if (any(Re_size > 0) .or. hypoelasticity) then
+        if (any(Re_size > 0)) then
             do i = mom_idx%beg, E_idx
                 flux_src_vf(i)%sf = 0d0
             end do

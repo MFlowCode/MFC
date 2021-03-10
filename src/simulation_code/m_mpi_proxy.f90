@@ -255,8 +255,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(precision, 1, MPI_INTEGER, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(hypoelasticity, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
 
         call MPI_BCAST(bc_x%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_x%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -303,9 +301,6 @@ contains
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%k_v, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%G, 1, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
         end do

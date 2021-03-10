@@ -110,7 +110,6 @@ module m_global_parameters
     logical :: mpp_lim         !< Alpha limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
-    logical :: hypoelasticity  !< Hypoelasticity (True or False)
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx                   !< Indexes of first & last continuity eqns.
@@ -122,7 +121,6 @@ module m_global_parameters
     type(bub_bounds_info) :: bub_idx                    !< Indexes of first & last bubble variable eqns.
     integer               :: gamma_idx                  !< Index of specific heat ratio func. eqn.
     integer               :: pi_inf_idx                 !< Index of liquid stiffness func. eqn.
-    type(int_bounds_info) :: stress_idx                 !< Indexes of elastic shear stress eqns.
 
     type(bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
@@ -255,7 +253,6 @@ contains
         num_fluids = dflt_int
         adv_alphan = .false.
         weno_order = dflt_int
-        hypoelasticity = .false.
 
         bc_x%beg = dflt_real
         bc_x%end = dflt_real
@@ -300,7 +297,6 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
-            patch_icpp(i)%tau_e = dflt_real
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real
@@ -354,7 +350,6 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%G = dflt_real
         end do
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
@@ -494,13 +489,6 @@ contains
                     rhoref = 1.d0
                     pref = 1.d0
                 end if
-            end if
-
-            if (hypoelasticity) then
-                stress_idx%beg = sys_size + 1
-                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
-                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
-                sys_size = stress_idx%end
             end if
 
             ! ==================================================================

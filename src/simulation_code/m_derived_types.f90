@@ -88,7 +88,6 @@ module m_derived_types
         real(kind(0d0)) :: M_v  !< Bubble constants (see Preston (2007), Ando (2010))
         real(kind(0d0)) :: mu_v !< Bubble constants (see Preston (2007), Ando (2010))
         real(kind(0d0)) :: k_v  !< Bubble constants (see Preston (2007), Ando (2010))
-        real(kind(0d0)) :: G    !< Shear Modulus
     end type physical_parameters
 
     !> Derived type annexing the flow probe location

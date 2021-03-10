@@ -166,13 +166,6 @@ contains
             end do
         end if
 
-        if (hypoelasticity) then
-            do i = stress_idx%beg, stress_idx%end
-                allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-            end do
-        end if
 
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end

@@ -377,11 +377,6 @@ contains
                         end do
                     end if
 
-                    if (hypoelasticity) then
-                        do i = stress_idx%beg, stress_idx%end
-                            q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/rho
-                        end do
-                    end if
                 end do
             end do
         end do
@@ -484,13 +479,6 @@ contains
                         end do
 
                     end if
-
-                    if (hypoelasticity) then
-                        do i = stress_idx%beg, stress_idx%end
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
-                        end do
-                    end if
-
                 end do
             end do
         end do
