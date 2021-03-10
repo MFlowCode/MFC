@@ -107,7 +107,7 @@ contains
             weno_order, weno_eps, char_decomp, &
             mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
-            commute_err, split_err, bc_x, bc_y, bc_z, &
+            bc_x, bc_y, bc_z, &
             hypoelasticity, &
             fluid_pp, com_wrt, cb_wrt, probe_wrt, &
             fd_order, probe, num_probes, t_step_old, &
@@ -250,12 +250,6 @@ contains
         elseif (bubbles .and. riemann_solver /= 2) then
             print '(A)', 'Bubble modeling requires riemann_solver = 2'
             call s_mpi_abort()
-        elseif (bubbles .and. commute_err) then
-            print '(A)', 'Bubble modeling is not compatible with commute_err'
-            call s_mpi_abort()
-        elseif (bubbles .and. split_err) then
-            print '(A)', 'Bubble modeling is not compatible with split_err'
-            call s_mpi_abort()
         elseif (bubbles .and. regularization) then
             print '(A)', 'Bubble modeling is not compatible with regularization'
             call s_mpi_abort()
@@ -297,11 +291,6 @@ contains
         elseif (model_eqns == 3 .and. (cyl_coord .and. p /= 0)) then
             print '(A)', 'Unsupported combination of values of '// &
                 'model_eqns (6-eq) and cylindrical coordinates. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. (commute_err .or. split_err)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and commute_err or split_err. '// &
                 'Exiting ...'
             call s_mpi_abort()
         elseif (num_fluids /= dflt_int &
@@ -406,19 +395,6 @@ contains
             print '(A)', 'Unsupported combination of values of '// &
                 'riemann_solver and avg_state. '// &
                 'Exiting ...'
-            call s_mpi_abort()
-        elseif (weno_order == 1 .and. commute_err) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'weno_order and commute_err. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (n == 0 .and. split_err) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'n and split_err. Exiting ...'
-            call s_mpi_abort()
-        elseif (weno_order == 1 .and. split_err) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'weno_order and split_err. Exiting ...'
             call s_mpi_abort()
         elseif (bc_x%beg < -12 .or. bc_x%beg > -1) then
             print '(A)', 'Unsupported value of bc_x%beg. Exiting ...'

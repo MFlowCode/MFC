@@ -130,8 +130,6 @@ module m_global_parameters
     integer         :: riemann_solver !< Riemann solver algorithm
     integer         :: wave_speeds    !< Wave speeds estimation method
     integer         :: avg_state      !< Average state evaluation method
-    logical         :: commute_err    !< Commutative error correction
-    logical         :: split_err      !< Dimensional splitting error correction
     logical         :: alt_soundspeed !< Alternate mixture sound speed
     logical         :: regularization !< Regularization terms of Tiwari (2013)
     real(kind(0d0)) :: reg_eps        !< User-defined interface thickness parameter for regularization terms
@@ -354,8 +352,6 @@ contains
         riemann_solver = dflt_int
         wave_speeds = dflt_int
         avg_state = dflt_int
-        commute_err = .false.
-        split_err = .false.
         alt_soundspeed = .false.
         regularization = .false.
         reg_eps = dflt_real
@@ -741,14 +737,10 @@ contains
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
-        if (commute_err .and. any(Re_size > 0)) then
-            buff_size = 3*weno_polyn + 2
-        elseif (any(Re_size > 0)) then
+        if (any(Re_size > 0)) then
             buff_size = 2*weno_polyn + 2
         elseif (hypoelasticity) then
             buff_size = 2*weno_polyn + 2
-        elseif (commute_err) then
-            buff_size = 2*weno_polyn + 1
         else
             buff_size = weno_polyn + 2
         end if
