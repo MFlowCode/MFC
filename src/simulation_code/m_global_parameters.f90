@@ -125,7 +125,6 @@ module m_global_parameters
     logical         :: char_decomp    !< Characteristic decomposition
     logical         :: mapped_weno    !< WENO with mapping of nonlinear weights
     logical         :: mp_weno        !< Monotonicity preserving (MP) WENO
-    logical         :: weno_avg       !< Average left/right cell-boundary states
     logical         :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
     integer         :: riemann_solver !< Riemann solver algorithm
     integer         :: wave_speeds    !< Wave speeds estimation method
@@ -199,13 +198,6 @@ module m_global_parameters
 
     !! extra coordinate direction index used if hypoelasticity = true
     integer, dimension(3) :: dir_idx_tau
-
-    real(kind(0d0)) :: wa_flg !<
-    !! The WENO average (WA) flag regulates whether the calculation of any cell-
-    !! average spatial derivatives is carried out in each cell by utilizing the
-    !! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
-    !! values or simply, the unaltered left and right, WENO-reconstructed, cell-
-    !! boundary values.
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
@@ -347,7 +339,6 @@ contains
         char_decomp = .false.
         mapped_weno = .false.
         mp_weno = .false.
-        weno_avg = .false.
         weno_Re_flux = .false.
         riemann_solver = dflt_int
         wave_speeds = dflt_int
@@ -725,13 +716,6 @@ contains
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
-
-        ! Configuring the WENO average flag that will be used to regulate
-        ! whether any spatial derivatives are to computed in each cell by
-        ! using the arithmetic mean of left and right, WENO-reconstructed,
-        ! cell-boundary values or otherwise, the unaltered left and right,
-        ! WENO-reconstructed, cell-boundary values
-        wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
 
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
