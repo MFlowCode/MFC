@@ -1,27 +1,27 @@
 !!       __  _______________
 !!      /  |/  / ____/ ____/
-!!     / /|_/ / /_  / /     
-!!    / /  / / __/ / /___   
-!!   /_/  /_/_/    \____/   
-!!                       
+!!     / /|_/ / /_  / /
+!!    / /  / / __/ / /___
+!!   /_/  /_/_/    \____/
+!!
 !!  This file is part of MFC.
 !!
-!!  MFC is the legal property of its developers, whose names 
-!!  are listed in the copyright file included with this source 
+!!  MFC is the legal property of its developers, whose names
+!!  are listed in the copyright file included with this source
 !!  distribution.
 !!
 !!  MFC is free software: you can redistribute it and/or modify
-!!  it under the terms of the GNU General Public License as published 
-!!  by the Free Software Foundation, either version 3 of the license 
+!!  it under the terms of the GNU General Public License as published
+!!  by the Free Software Foundation, either version 3 of the license
 !!  or any later version.
 !!
 !!  MFC is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
 !!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 !!  GNU General Public License for more details.
-!!  
+!!
 !!  You should have received a copy of the GNU General Public License
-!!  along with MFC (LICENSE).  
+!!  along with MFC (LICENSE).
 !!  If not, see <http://www.gnu.org/licenses/>.
 
 !>
@@ -32,25 +32,25 @@
 !! @date JUNE 06 2019
 
 !> @brief This module contains subroutines that are compiler specific
-MODULE m_compile_specific
+module m_compile_specific
 
-    IMPLICIT NONE
+    implicit none
 
-    CONTAINS
+contains
 
-        !>  Inquires on the existence of a directory
+    !>  Inquires on the existence of a directory
         !!  @param fileloc File directory location
         !!  @param dircheck Switch that indicates if directory exists
-        SUBROUTINE my_inquire(fileloc,dircheck)
-            CHARACTER(LEN=*), INTENT(IN) :: fileloc
-            LOGICAL, INTENT(INOUT) :: dircheck
+    subroutine my_inquire(fileloc, dircheck)
+        character(LEN=*), intent(IN) :: fileloc
+        logical, intent(INOUT) :: dircheck
 
 #ifdef __INTEL_COMPILER
-    INQUIRE(DIRECTORY=TRIM(fileloc),EXIST=dircheck)   !Intel
+        inquire (DIRECTORY=trim(fileloc), EXIST=dircheck)   !Intel
 #else
-    INQUIRE(FILE=TRIM(fileloc),EXIST=dircheck)        !GCC
+        inquire (FILE=trim(fileloc), EXIST=dircheck)        !GCC
 #endif
 
-        END SUBROUTINE my_inquire
+    end subroutine my_inquire
 
-END MODULE m_compile_specific
+end module m_compile_specific

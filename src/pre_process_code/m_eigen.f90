@@ -1,76 +1,74 @@
-MODULE m_eigen
+module m_eigen
 
     ! Dependencies =============================================================
-    USE mpi                     ! Message passing interface (MPI) module
+    use mpi                     ! Message passing interface (MPI) module
     ! ==========================================================================
 
-    IMPLICIT NONE
+    implicit none
 
-    CONTAINS 
+contains
 
-        SUBROUTINE s_eigs(Amat,Eigs,EVec,N)
+    subroutine s_eigs(Amat, Eigs, EVec, N)
 
-            REAL(KIND(0d0)), TARGET, DIMENSION(:,:), INTENT(IN) :: Amat
-            REAL(KIND(0d0)), TARGET, DIMENSION(:), INTENT(OUT)  :: EVec, Eigs
-            INTEGER, INTENT(IN) :: N
+        real(kind(0d0)), target, dimension(:, :), intent(IN) :: Amat
+        real(kind(0d0)), target, dimension(:), intent(OUT)  :: EVec, Eigs
+        integer, intent(IN) :: N
 
-            REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:) ::  VR, A
-            REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:)   :: WR, WI, Work
-            REAL(KIND(0d0)) ::  DUMMY(1,1), Eigmax
+        real(kind(0d0)), allocatable, dimension(:, :) ::  VR, A
+        real(kind(0d0)), allocatable, dimension(:)   :: WR, WI, Work
+        real(kind(0d0)) ::  DUMMY(1, 1), Eigmax
 
-            INTEGER ::  NB2, NMAX, LDA, LDVR, LWORK, INFO,LWKOPT
-            INTEGER :: i, j
-            INTEGER, PARAMETER :: LWMAX = 1000
+        integer ::  NB2, NMAX, LDA, LDVR, LWORK, INFO, LWKOPT
+        integer :: i, j
+        integer, parameter :: LWMAX = 1000
 
-            EXTERNAL         DGEEV
-            INTRINSIC        DCMPLX
+        external DGEEV
+        intrinsic DCMPLX
 
-            Nb2=64
-            LDA=N
-            LDVR=N
-            LWORK=LWMAX
+        Nb2 = 64
+        LDA = N
+        LDVR = N
+        LWORK = LWMAX
 
-            ALLOCATE( VR(LDVR,N), A(N,N) )
-            ALLOCATE( WORK(LWORK), WR(N), WI(N) )
+        allocate (VR(LDVR, N), A(N, N))
+        allocate (WORK(LWORK), WR(N), WI(N))
 
-            A = Amat
+        A = Amat
 
-            PRINT*, 'N', N
+        print *, 'N', N
 
-            CALL DGEEV('N','V',N,A,LDA,WR,WI,DUMMY,1,VR,LDVR,WORK,LWORK,INFO)
-            LWKOPT = WORK(1)
+        call DGEEV('N', 'V', N, A, LDA, WR, WI, DUMMY, 1, VR, LDVR, WORK, LWORK, INFO)
+        LWKOPT = WORK(1)
 
-            IF (INFO/=0) THEN
-                PRINT*, 'Failure in DGEEV.  INFO = ', INFO
-            END IF
+        if (INFO /= 0) then
+            print *, 'Failure in DGEEV.  INFO = ', INFO
+        end if
 
-            EVec(1:N) = VR(1,N:1:-1)
-            Eigs = WR(N:1:-1)
+        EVec(1:N) = VR(1, N:1:-1)
+        Eigs = WR(N:1:-1)
 
+        ! ELSE
+        ! EigMax = 0d0
+        ! DO j = 1,N
+        !     IF( WR(j) > EigMax ) THEN
+        !         EigMax = WR(j)
+        !         ! EVec(:) = VR(j,:)
+        !         EVec(:) = VR(:,j)
+        !     END IF
+        ! END DO
+        ! END IF
 
-            ! ELSE
-                ! EigMax = 0d0
-                ! DO j = 1,N
-                !     IF( WR(j) > EigMax ) THEN
-                !         EigMax = WR(j)
-                !         ! EVec(:) = VR(j,:)
-                !         EVec(:) = VR(:,j)
-                !     END IF
-                ! END DO
-            ! END IF
+        ! PRINT*, 'eigenvectors'
+        ! PRINT*, VR(1,:)
+        ! PRINT*, VR(2,:)
+        ! PRINT*, VR(3,:)
 
-            ! PRINT*, 'eigenvectors'
-            ! PRINT*, VR(1,:)
-            ! PRINT*, VR(2,:)
-            ! PRINT*, VR(3,:)
+        ! print*, 'in eigs'
+        ! print*, 'max eig', Eigmax
+        ! print*, 'max loc', MAXLOC(WR(:),DIM=1)
+        ! print*, 'real eigs: ', WR(:)
+        ! print*, 'eigvec associated with largeest eigenvalue', EVec(1:N)
 
+    end subroutine s_eigs
 
-            ! print*, 'in eigs'
-            ! print*, 'max eig', Eigmax
-            ! print*, 'max loc', MAXLOC(WR(:),DIM=1)
-            ! print*, 'real eigs: ', WR(:)
-            ! print*, 'eigvec associated with largeest eigenvalue', EVec(1:N)
-
-        END SUBROUTINE s_eigs
-
-END MODULE m_eigen
+end module m_eigen

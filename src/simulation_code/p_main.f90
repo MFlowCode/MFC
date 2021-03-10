@@ -1,27 +1,27 @@
 !!       __  _______________
 !!      /  |/  / ____/ ____/
-!!     / /|_/ / /_  / /     
-!!    / /  / / __/ / /___   
-!!   /_/  /_/_/    \____/   
-!!                       
+!!     / /|_/ / /_  / /
+!!    / /  / / __/ / /___
+!!   /_/  /_/_/    \____/
+!!
 !!  This file is part of MFC.
 !!
-!!  MFC is the legal property of its developers, whose names 
-!!  are listed in the copyright file included with this source 
+!!  MFC is the legal property of its developers, whose names
+!!  are listed in the copyright file included with this source
 !!  distribution.
 !!
 !!  MFC is free software: you can redistribute it and/or modify
-!!  it under the terms of the GNU General Public License as published 
-!!  by the Free Software Foundation, either version 3 of the license 
+!!  it under the terms of the GNU General Public License as published
+!!  by the Free Software Foundation, either version 3 of the license
 !!  or any later version.
 !!
 !!  MFC is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
 !!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 !!  GNU General Public License for more details.
-!!  
+!!
 !!  You should have received a copy of the GNU General Public License
-!!  along with MFC (LICENSE).  
+!!  along with MFC (LICENSE).
 !!  If not, see <http://www.gnu.org/licenses/>.
 
 !>
@@ -41,207 +41,198 @@
 !!              specifics of surface tension may be found in the work by Perigaud
 !!              and Saurel (2005). Note that both viscous and capillarity effects
 !!              are only available in the volume fraction model.
-PROGRAM p_main
-    
- 
+program p_main
+
     ! Dependencies =============================================================
-    USE m_derived_types        !< Definitions of the derived types
+    use m_derived_types        !< Definitions of the derived types
 
-    USE m_fftw                 !< Module for FFTW functions
-    
-    USE m_global_parameters    !< Definitions of the global parameters
-    
-    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    
-    USE m_start_up             !< Reading and checking procedures for the input
-                               !< and the initial condition and grid data files
-    
-    USE m_variables_conversion !< State variables type conversion procedures
-    
-    USE m_weno                 !< Weighted and essentially non-oscillatory (WENO)
+    use m_fftw                 !< Module for FFTW functions
+
+    use m_global_parameters    !< Definitions of the global parameters
+
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use m_start_up             !< Reading and checking procedures for the input
+    !< and the initial condition and grid data files
+
+    use m_variables_conversion !< State variables type conversion procedures
+
+    use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
                                !! schemes for spatial reconstruction of variables
-    
-    USE m_riemann_solvers      !< Exact and approximate Riemann problem solvers
-    
-    USE m_cbc                  !< Characteristic boundary conditions (CBC)
-    
-    USE m_rhs                  !< Right-hand-side (RHS) evaluation procedures
-    
-    USE m_data_output          !< Run-time info & solution data output procedures
 
-    USE m_derived_variables    !< Derived variables evaluation procedures
-    
-    USE m_time_steppers        !< Time-stepping algorithms
+    use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
 
-    USE m_qbmm                 !< Quadrature MOM
+    use m_cbc                  !< Characteristic boundary conditions (CBC)
+
+    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
+
+    use m_data_output          !< Run-time info & solution data output procedures
+
+    use m_derived_variables    !< Derived variables evaluation procedures
+
+    use m_time_steppers        !< Time-stepping algorithms
+
+    use m_qbmm                 !< Quadrature MOM
 
     ! ==========================================================================
-    
-    IMPLICIT NONE
 
+    implicit none
 
-    
-    INTEGER :: t_step !< Iterator for the time-stepping loop
+    integer :: t_step !< Iterator for the time-stepping loop
 
-    CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
-    
+    call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
+
     ! Initializing MPI execution environment
-    CALL s_mpi_initialize()
-
-
+    call s_mpi_initialize()
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
     ! their consistency is checked. The identification of any inconsistencies
     ! will result in the termination of the simulation.
-    IF(proc_rank == 0) THEN
-        CALL s_assign_default_values_to_user_inputs()
-        CALL s_read_input_file()
-        CALL s_check_input_file()
-    END IF
-    print*, 'Read input file'
-   
+    if (proc_rank == 0) then
+        call s_assign_default_values_to_user_inputs()
+        call s_read_input_file()
+        call s_check_input_file()
+    end if
+    print *, 'Read input file'
+
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
-    CALL s_mpi_bcast_user_inputs()
-    CALL s_initialize_parallel_io()
-    CALL s_mpi_decompose_computational_domain()
-    print*, 'Broadcast'
-    
+    call s_mpi_bcast_user_inputs()
+    call s_initialize_parallel_io()
+    call s_mpi_decompose_computational_domain()
+    print *, 'Broadcast'
+
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
-    CALL s_initialize_global_parameters_module()
-    CALL s_initialize_mpi_proxy_module()
-    IF (grid_geometry == 3) CALL s_initialize_fftw_module()
-    CALL s_initialize_variables_conversion_module()
-    CALL s_initialize_start_up_module()
-    CALL s_initialize_riemann_solvers_module()
-    CALL s_initialize_rhs_module()
-    CALL s_initialize_data_output_module()
-    CALL s_initialize_derived_variables_module()
-    CALL s_initialize_time_steppers_module()    
-    IF (qbmm) CALL s_initialize_qbmm_module()
+    call s_initialize_global_parameters_module()
+    call s_initialize_mpi_proxy_module()
+    if (grid_geometry == 3) call s_initialize_fftw_module()
+    call s_initialize_variables_conversion_module()
+    call s_initialize_start_up_module()
+    call s_initialize_riemann_solvers_module()
+    call s_initialize_rhs_module()
+    call s_initialize_data_output_module()
+    call s_initialize_derived_variables_module()
+    call s_initialize_time_steppers_module()
+    if (qbmm) call s_initialize_qbmm_module()
 
-    print*, 'Initialize'
-    
+    print *, 'Initialize'
+
     ! Associate pointers for serial or parallel I/O
-    IF (parallel_io .NEQV. .TRUE.) THEN
+    if (parallel_io .neqv. .true.) then
         s_read_data_files => s_read_serial_data_files
         s_write_data_files => s_write_serial_data_files
-    ELSE
+    else
         s_read_data_files => s_read_parallel_data_files
         s_write_data_files => s_write_parallel_data_files
-    END IF
+    end if
 
     ! Reading in the user provided initial condition and grid data
-    CALL s_read_data_files(q_cons_ts(1)%vf)
-    IF (model_eqns == 3) CALL s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+    call s_read_data_files(q_cons_ts(1)%vf)
+    if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
     ! Populating the buffers of the grid variables using the boundary conditions
-    CALL s_populate_grid_variables_buffers()
-    
-    CALL s_populate_variables_buffers(q_cons_ts(1)%vf)
-    IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) &
-        CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
-   
+    call s_populate_grid_variables_buffers()
+
+    call s_populate_variables_buffers(q_cons_ts(1)%vf)
+    if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) &
+        call s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
+
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure
     ! the modules. The preparations below DO DEPEND on the grid being complete.
-    CALL s_initialize_weno_module()
-    CALL s_initialize_cbc_module()
+    call s_initialize_weno_module()
+    call s_initialize_cbc_module()
 
-    CALL s_initialize_derived_variables()
+    call s_initialize_derived_variables()
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
-    IF (t_step == 0) THEN
+    if (t_step == 0) then
         mytime = 0d0
-    ELSE
+    else
         mytime = t_step*dt
-    END IF
+    end if
     finaltime = t_step_stop*dt
     dt0 = dt
 
     ! Time-stepping Loop =======================================================
-    DO
-        IF (proc_rank==0) THEN
-            IF (time_stepper==23) THEN 
-                PRINT*, '------------', mytime/finaltime*100d0, 'percent done'
-            ELSE
-                PRINT*, '------ Time step ', t_step, 'of', t_step_stop, '----'
-            END IF
-        END IF
+    do
+        if (proc_rank == 0) then
+            if (time_stepper == 23) then
+                print *, '------------', mytime/finaltime*100d0, 'percent done'
+            else
+                print *, '------ Time step ', t_step, 'of', t_step_stop, '----'
+            end if
+        end if
         mytime = mytime + dt
 
-        CALL s_compute_derived_variables(t_step)
-        IF (DEBUG) PRINT*, 'Computed derived vars'
+        call s_compute_derived_variables(t_step)
+        if (DEBUG) print *, 'Computed derived vars'
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        IF(time_stepper == 1) THEN
-            CALL s_1st_order_tvd_rk(t_step)
-        ELSEIF(time_stepper == 2) THEN
-            CALL s_2nd_order_tvd_rk(t_step)
-        ELSEIF(time_stepper == 3) THEN
-            CALL s_3rd_order_tvd_rk(t_step)
-        ELSEIF(time_stepper == 4) THEN
-            CALL s_4th_order_rk(t_step)
-        ELSEIF(time_stepper == 23) THEN
-            CALL s_23_order_tvd_rk(t_step)
-        ELSE
-            CALL s_5th_order_rk(t_step)
-        END IF
-
-
+        if (time_stepper == 1) then
+            call s_1st_order_tvd_rk(t_step)
+        elseif (time_stepper == 2) then
+            call s_2nd_order_tvd_rk(t_step)
+        elseif (time_stepper == 3) then
+            call s_3rd_order_tvd_rk(t_step)
+        elseif (time_stepper == 4) then
+            call s_4th_order_rk(t_step)
+        elseif (time_stepper == 23) then
+            call s_23_order_tvd_rk(t_step)
+        else
+            call s_5th_order_rk(t_step)
+        end if
 
         ! Time-stepping loop controls
-        IF (time_stepper /= 23) THEN
-            IF(t_step == t_step_stop) THEN
-                EXIT 
-            ELSE
+        if (time_stepper /= 23) then
+            if (t_step == t_step_stop) then
+                exit
+            else
                 t_step = t_step + 1
-            END IF
-        ELSE
-            IF(mytime >= finaltime) THEN
-                EXIT 
-            ELSE
-                IF ( (mytime + dt) >= finaltime ) dt = finaltime - mytime
+            end if
+        else
+            if (mytime >= finaltime) then
+                exit
+            else
+                if ((mytime + dt) >= finaltime) dt = finaltime - mytime
                 t_step = t_step + 1
-            END IF
-        END IF
-       
+            end if
+        end if
+
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
-        IF(MOD(t_step-t_step_start, t_step_save) == 0) THEN
-            CALL s_write_data_files(q_cons_ts(1)%vf, t_step)
-        END IF
+        if (mod(t_step - t_step_start, t_step_save) == 0) then
+            call s_write_data_files(q_cons_ts(1)%vf, t_step)
+        end if
 
-        CALL system_clock(cpu_end)
-    END DO
+        call system_clock(cpu_end)
+    end do
     ! ==========================================================================
-    
+
     ! Disassociate pointers for serial and parallel I/O
-    s_read_data_files => NULL()
-    s_write_data_files => NULL()
-    
+    s_read_data_files => null()
+    s_write_data_files => null()
+
     ! Deallocation and/or disassociation procedures for the modules
-    CALL s_finalize_time_steppers_module()
-    CALL s_finalize_derived_variables_module()
-    CALL s_finalize_data_output_module()
-    CALL s_finalize_rhs_module()
-    CALL s_finalize_cbc_module()
-    CALL s_finalize_riemann_solvers_module()
-    CALL s_finalize_weno_module()
-    CALL s_finalize_start_up_module()
-    CALL s_finalize_variables_conversion_module()
-    IF (grid_geometry == 3) CALL s_finalize_fftw_module()
-    CALL s_finalize_mpi_proxy_module()
-    CALL s_finalize_global_parameters_module()
-    
-    
+    call s_finalize_time_steppers_module()
+    call s_finalize_derived_variables_module()
+    call s_finalize_data_output_module()
+    call s_finalize_rhs_module()
+    call s_finalize_cbc_module()
+    call s_finalize_riemann_solvers_module()
+    call s_finalize_weno_module()
+    call s_finalize_start_up_module()
+    call s_finalize_variables_conversion_module()
+    if (grid_geometry == 3) call s_finalize_fftw_module()
+    call s_finalize_mpi_proxy_module()
+    call s_finalize_global_parameters_module()
+
     ! Terminating MPI execution environment
-    CALL s_mpi_finalize()
-    
-    
-END PROGRAM p_main
+    call s_mpi_finalize()
+
+end program p_main

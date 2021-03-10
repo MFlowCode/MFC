@@ -1,27 +1,27 @@
 !!       __  _______________
 !!      /  |/  / ____/ ____/
-!!     / /|_/ / /_  / /     
-!!    / /  / / __/ / /___   
-!!   /_/  /_/_/    \____/   
-!!                       
+!!     / /|_/ / /_  / /
+!!    / /  / / __/ / /___
+!!   /_/  /_/_/    \____/
+!!
 !!  This file is part of MFC.
 !!
-!!  MFC is the legal property of its developers, whose names 
-!!  are listed in the copyright file included with this source 
+!!  MFC is the legal property of its developers, whose names
+!!  are listed in the copyright file included with this source
 !!  distribution.
 !!
 !!  MFC is free software: you can redistribute it and/or modify
-!!  it under the terms of the GNU General Public License as published 
-!!  by the Free Software Foundation, either version 3 of the license 
+!!  it under the terms of the GNU General Public License as published
+!!  by the Free Software Foundation, either version 3 of the license
 !!  or any later version.
 !!
 !!  MFC is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
 !!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 !!  GNU General Public License for more details.
-!!  
+!!
 !!  You should have received a copy of the GNU General Public License
-!!  along with MFC (LICENSE).  
+!!  along with MFC (LICENSE).
 !!  If not, see <http://www.gnu.org/licenses/>.
 
 !>
@@ -33,97 +33,92 @@
 
 !> @brief This module features the definitions of all the custom-defined
 !!        derived types that are utilized throughout the simulation code.
-MODULE m_derived_types
-    
-    
-    IMPLICIT NONE
-    
-    INTEGER, PARAMETER :: num_fluids_max = 10 !<
+module m_derived_types
+
+    implicit none
+
+    integer, parameter :: num_fluids_max = 10 !<
     !! Maximum number of fluids in the simulation
-    
-    INTEGER, PARAMETER :: num_probes_max = 10 !<
+
+    integer, parameter :: num_probes_max = 10 !<
     !! Maximum number of flow probes in the simulation
 
     !> Derived type annexing a scalar field (SF)
-    TYPE scalar_field
-        REAL(KIND(0d0)), POINTER, DIMENSION(:,:,:) :: sf => NULL() !< Scalar field
-    END TYPE scalar_field
-    
-    TYPE mpi_io_var
-        INTEGER, ALLOCATABLE, DIMENSION(:) :: view
-        TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: var
-    END TYPE  mpi_io_var
-    
+    type scalar_field
+        real(kind(0d0)), pointer, dimension(:, :, :) :: sf => null() !< Scalar field
+    end type scalar_field
+
+    type mpi_io_var
+        integer, allocatable, dimension(:) :: view
+        type(scalar_field), allocatable, dimension(:) :: var
+    end type mpi_io_var
+
     !> Derived type annexing a vector field (VF)
-    TYPE vector_field
-        TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vf !< Vector field
-    END TYPE vector_field
-    
-    
+    type vector_field
+        type(scalar_field), allocatable, dimension(:) :: vf !< Vector field
+    end type vector_field
+
     !> Derived type annexing beginning and ending bounds information
-    TYPE bounds_info
-        INTEGER :: beg !< Begin boundary
-        INTEGER :: end !< End boundary
-    END TYPE bounds_info
-    
+    type bounds_info
+        integer :: beg !< Begin boundary
+        integer :: end !< End boundary
+    end type bounds_info
+
     !> Variables for bubble dynamic variables
-    TYPE bub_bounds_info
-        INTEGER :: beg !< Beginning of bub. variables
-        INTEGER :: end !< End of bub. variables
-        INTEGER, DIMENSION(:), ALLOCATABLE :: rs !< Bubble radii
-        INTEGER, DIMENSION(:), ALLOCATABLE :: vs !< Bubble radial velocities
-        INTEGER, DIMENSION(:), ALLOCATABLE :: ps !< Bubble pressures
-        INTEGER, DIMENSION(:), ALLOCATABLE :: ms !< Bubble mass fluxes
+    type bub_bounds_info
+        integer :: beg !< Beginning of bub. variables
+        integer :: end !< End of bub. variables
+        integer, dimension(:), allocatable :: rs !< Bubble radii
+        integer, dimension(:), allocatable :: vs !< Bubble radial velocities
+        integer, dimension(:), allocatable :: ps !< Bubble pressures
+        integer, dimension(:), allocatable :: ms !< Bubble mass fluxes
 
-        INTEGER, DIMENSION(:,:), ALLOCATABLE :: moms !< Moment indices for qbmm
-    END TYPE bub_bounds_info    
-    
+        integer, dimension(:, :), allocatable :: moms !< Moment indices for qbmm
+    end type bub_bounds_info
 
-    !> Derived type annexing the physical parameters (PP) of fluids. 
-    TYPE physical_parameters
-        REAL(KIND(0d0))                            :: gamma  !< Sp. heat ratio
-        REAL(KIND(0d0))                            :: pi_inf !< Liquid stiffness
-        REAL(KIND(0d0)), DIMENSION(2)              :: Re    !< Reynolds number
-        REAL(KIND(0d0)), DIMENSION(num_fluids_max) :: We    !< Weber number
-        REAL(KIND(0d0)) :: mul0 !< Bubble viscosity
-        REAL(KIND(0d0)) :: ss   !< Bubble surface tension 
-        REAL(KIND(0d0)) :: pv   !< Bubble vapour pressure 
-        REAL(KIND(0d0)) :: gamma_v !< Bubble constants (see Preston (2007), Ando (2010))
-        REAL(KIND(0d0)) :: M_v  !< Bubble constants (see Preston (2007), Ando (2010))
-        REAL(KIND(0d0)) :: mu_v !< Bubble constants (see Preston (2007), Ando (2010))
-        REAL(KIND(0d0)) :: k_v  !< Bubble constants (see Preston (2007), Ando (2010))
-        REAL(KIND(0d0)) :: G    !< Shear Modulus
-    END TYPE physical_parameters
-    
-    
+    !> Derived type annexing the physical parameters (PP) of fluids.
+    type physical_parameters
+        real(kind(0d0))                            :: gamma  !< Sp. heat ratio
+        real(kind(0d0))                            :: pi_inf !< Liquid stiffness
+        real(kind(0d0)), dimension(2)              :: Re    !< Reynolds number
+        real(kind(0d0)), dimension(num_fluids_max) :: We    !< Weber number
+        real(kind(0d0)) :: mul0 !< Bubble viscosity
+        real(kind(0d0)) :: ss   !< Bubble surface tension
+        real(kind(0d0)) :: pv   !< Bubble vapour pressure
+        real(kind(0d0)) :: gamma_v !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: M_v  !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: mu_v !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: k_v  !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: G    !< Shear Modulus
+    end type physical_parameters
+
     !> Derived type annexing the flow probe location
-    TYPE probe_parameters
-        REAL(KIND(0d0)) :: x !< First coordinate location
-        REAL(KIND(0d0)) :: y !< Second coordinate location
-        REAL(KIND(0d0)) :: z !< Third coordinate location
-    END TYPE probe_parameters
+    type probe_parameters
+        real(kind(0d0)) :: x !< First coordinate location
+        real(kind(0d0)) :: y !< Second coordinate location
+        real(kind(0d0)) :: z !< Third coordinate location
+    end type probe_parameters
 
     !> Derived type annexing integral regions
-    TYPE integral_parameters
-        REAL(KIND(0d0)) :: xmin !< Min. boundary first coordinate direction
-        REAL(KIND(0d0)) :: xmax !< Max. boundary first coordinate direction
-        REAL(KIND(0d0)) :: ymin !< Min. boundary second coordinate direction
-        REAL(KIND(0d0)) :: ymax !< Max. boundary second coordinate direction
-        REAL(KIND(0d0)) :: zmin !< Min. boundary third coordinate direction
-        REAL(KIND(0d0)) :: zmax !< Max. boundary third coordinate direction
-    END TYPE integral_parameters
-
+    type integral_parameters
+        real(kind(0d0)) :: xmin !< Min. boundary first coordinate direction
+        real(kind(0d0)) :: xmax !< Max. boundary first coordinate direction
+        real(kind(0d0)) :: ymin !< Min. boundary second coordinate direction
+        real(kind(0d0)) :: ymax !< Max. boundary second coordinate direction
+        real(kind(0d0)) :: zmin !< Min. boundary third coordinate direction
+        real(kind(0d0)) :: zmax !< Max. boundary third coordinate direction
+    end type integral_parameters
 
     !> Monopole acoustic source parameters
-    TYPE mono_parameters
-        REAL(KIND(0d0)), DIMENSION(3) :: loc !< Physical location of acoustic source
-        REAL(KIND(0d0)) :: mag !< Magnitude
-        REAL(KIND(0d0)) :: length !< Length of line source
-        REAL(KIND(0d0)) :: npulse !< Number of cycles of pulse
-        REAL(KIND(0d0)) :: dir !< Direction of pulse
-        REAL(KIND(0d0)) :: delay !< Time-delay of pulse start
-        INTEGER :: pulse 
-        INTEGER :: support
-    END TYPE mono_parameters
+    type mono_parameters
+        real(kind(0d0)), dimension(3) :: loc !< Physical location of acoustic source
+        real(kind(0d0)) :: mag !< Magnitude
+        real(kind(0d0)) :: length !< Length of line source
+        real(kind(0d0)) :: npulse !< Number of cycles of pulse
+        real(kind(0d0)) :: dir !< Direction of pulse
+        real(kind(0d0)) :: delay !< Time-delay of pulse start
+        integer :: pulse
+        integer :: support
+    end type mono_parameters
 
-END MODULE m_derived_types
+end module m_derived_types
