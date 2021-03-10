@@ -379,12 +379,9 @@ module m_riemann_solvers
 
     !> @name Additional variables for applying a flux limiter
     !> @{
-    real(kind(0d0)) :: flux_lim_func
     real(kind(0d0)) :: lo_s_L, lo_s_R, lo_s_S
     real(kind(0d0)) :: lo_s_M, lo_s_P
-    real(kind(0d0)) :: tvd_s_M, tvd_s_P
     real(kind(0d0)) :: lo_xi_M, lo_xi_P
-    real(kind(0d0)) :: tvd_xi_M, tvd_xi_P
     !> @}
 
     procedure(s_abstract_riemann_solver), &
@@ -489,9 +486,7 @@ contains
         ! Placeholders for high- and low-order fluxes
         real(kind(0d0)) :: hi_cons, hi_cons_L, hi_cons_R
         real(kind(0d0)) :: lo_cons, lo_cons_L, lo_cons_R
-        real(kind(0d0)) :: tvd_cons, tvd_cons_L, tvd_cons_R
         real(kind(0d0)) :: hi_flux_L, hi_flux_R, lo_flux_L, lo_flux_R
-        real(kind(0d0)) :: tvd_flux_L, tvd_flux_R
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -525,10 +520,6 @@ contains
 
                     call s_compute_wave_speeds(j, k, l)
 
-                    if (tvd_riemann_flux) then
-                        call s_compute_flux_limiter(j, k, l, flux_lim_func, norm_dir)
-                    end if
-
                     s_M = min(0d0, s_L); s_P = max(0d0, s_R)
 
                     xi_M = (5d-1 + sign(5d-1, s_L)) &
@@ -538,349 +529,105 @@ contains
                            + (5d-1 - sign(5d-1, s_L)) &
                            *(5d-1 + sign(5d-1, s_R))
 
-                    if (tvd_wave_speeds) then
-                        lo_s_M = min(0d0, lo_s_L); lo_s_P = max(0d0, lo_s_R)
 
-                        lo_xi_M = (5d-1 + sign(5d-1, lo_s_L)) &
-                                  + (5d-1 - sign(5d-1, lo_s_L)) &
-                                  *(5d-1 + sign(5d-1, lo_s_R))
-                        lo_xi_P = (5d-1 - sign(5d-1, lo_s_R)) &
-                                  + (5d-1 - sign(5d-1, lo_s_L)) &
-                                  *(5d-1 + sign(5d-1, lo_s_R))
+                    ! Mass
+                    do i = 1, cont_idx%end
+                        flux_rs_vf(i)%sf(j, k, l) = &
+                            (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
+                             - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
+                             + s_M*s_P*(alpha_rho_L(i) &
+                                        - alpha_rho_R(i))) &
+                            /(s_M - s_P)
+                    end do
 
-                        tvd_s_M = lo_s_M + flux_lim_func*(s_M - lo_s_M)
-                        tvd_s_P = lo_s_P + flux_lim_func*(s_P - lo_s_P)
-                        tvd_xi_M = lo_xi_M + flux_lim_func*(xi_M - lo_xi_M)
-                        tvd_xi_P = lo_xi_P + flux_lim_func*(xi_P - lo_xi_P)
-                    end if
-
-                    if (tvd_riemann_flux) then
-                        ! Mass
-                        do i = 1, cont_idx%end
-
-                            lo_cons = lo_alpha_rho_L(i) - lo_alpha_rho_R(i)
-                            hi_cons = alpha_rho_L(i) - alpha_rho_R(i)
-                            tvd_cons = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                            lo_flux_L = lo_alpha_rho_L(i)*lo_vel_L(dir_idx(1))
-                            lo_flux_R = lo_alpha_rho_R(i)*lo_vel_R(dir_idx(1))
-                            hi_flux_L = alpha_rho_L(i)*vel_L(dir_idx(1))
-                            hi_flux_R = alpha_rho_R(i)*vel_R(dir_idx(1))
-                            tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                            if (tvd_wave_speeds) then
-                                flux_rs_vf(i)%sf(j, k, l) = &
-                                    (tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L + tvd_s_M*tvd_s_P*tvd_cons) &
-                                    /(tvd_s_M - tvd_s_P)
-                            else
-                                flux_rs_vf(i)%sf(j, k, l) = &
-                                    (s_M*tvd_flux_R - s_P*tvd_flux_L + s_M*s_P*tvd_cons)/(s_M - s_P)
-                            end if
-                        end do
-
-                        ! Momentum
+                    ! Momentum
+                    if (bubbles) then
                         do i = 1, num_dims
-
-                            lo_cons = lo_rho_L*lo_vel_L(dir_idx(i)) - lo_rho_R*lo_vel_R(dir_idx(i))
-                            hi_cons = rho_L*vel_L(dir_idx(i)) - rho_R*vel_R(dir_idx(i))
-                            tvd_cons = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                            lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_L
-                            lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*lo_pres_R
-                            hi_flux_L = rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
-                            hi_flux_R = rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
-
-                            ! added elastic shear stress term if hypoelastic modeling is on
-                            if (hypoelasticity) then
-                                lo_flux_L = lo_flux_L - lo_tau_e_L(dir_idx_tau(i))
-                                lo_flux_R = lo_flux_R - lo_tau_e_R(dir_idx_tau(i))
-                                hi_flux_L = hi_flux_L - tau_e_L(dir_idx_tau(i))
-                                hi_flux_R = hi_flux_R - tau_e_R(dir_idx_tau(i))
-                            end if
-
-                            tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                            if (tvd_wave_speeds) then
-                                flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                                    (tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L + tvd_s_M*tvd_s_P*tvd_cons) &
-                                    /(tvd_s_M - tvd_s_P)
-                            else
-                                flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                                    (s_M*tvd_flux_R - s_P*tvd_flux_L + s_M*s_P*tvd_cons)/(s_M - s_P)
-                            end if
-                        end do
-
-                        ! Energy
-
-                        lo_cons = lo_E_L - lo_E_R
-                        hi_cons = E_L - E_R
-                        tvd_cons = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                        lo_flux_L = lo_vel_L(dir_idx(1))*(lo_E_L + lo_pres_L)
-                        lo_flux_R = lo_vel_R(dir_idx(1))*(lo_E_R + lo_pres_R)
-                        hi_flux_L = vel_L(dir_idx(1))*(E_L + pres_L)
-                        hi_flux_R = vel_R(dir_idx(1))*(E_R + pres_R)
-
-                        ! added elastic shear stress term if hypoelastic modeling is on
-                        if (hypoelasticity) then
-                            do i = 1, num_dims
-                                lo_flux_L = lo_flux_L - (lo_tau_e_L(dir_idx_tau(i))*lo_vel_L(i))
-                                lo_flux_R = lo_flux_R - (lo_tau_e_R(dir_idx_tau(i))*lo_vel_R(i))
-                                hi_flux_L = hi_flux_L - (tau_e_L(dir_idx_tau(i))*vel_L(i))
-                                hi_flux_R = hi_flux_R - (tau_e_L(dir_idx_tau(i))*vel_L(i))
-                            end do
-                        end if
-
-                        tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                        tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                        if (tvd_wave_speeds) then
-                            flux_rs_vf(E_idx)%sf(j, k, l) = &
-                                (tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L + tvd_s_M*tvd_s_P*tvd_cons) &
-                                /(tvd_s_M - tvd_s_P)
-                        else
-                            flux_rs_vf(E_idx)%sf(j, k, l) = &
-                                (s_M*tvd_flux_R - s_P*tvd_flux_L + s_M*s_P*tvd_cons)/(s_M - s_P)
-                        end if
-
-                        ! Volume fraction
-                        do i = adv_idx%beg, adv_idx%end
-
-                            lo_cons = q_prim_rs_vf(i)%sf(j, k, l) - q_prim_rs_vf(i)%sf(j + 1, k, l)
-                            hi_cons = qL_prim_rs_vf(i)%sf(j, k, l) - qR_prim_rs_vf(i)%sf(j + 1, k, l)
-                            tvd_cons = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                            lo_flux_L = q_prim_rs_vf(i)%sf(j, k, l)
-                            lo_flux_R = q_prim_rs_vf(i)%sf(j + 1, k, l)
-                            hi_flux_L = qL_prim_rs_vf(i)%sf(j, k, l)
-                            hi_flux_R = qR_prim_rs_vf(i)%sf(j + 1, k, l)
-                            tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                            if (tvd_wave_speeds) then
-                                flux_rs_vf(i)%sf(j, k, l) = (tvd_cons*tvd_s_M*tvd_s_P)/(tvd_s_M - tvd_s_P)
-                                flux_src_rs_vf(i)%sf(j, k, l) = (tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L) &
-                                                                /(tvd_s_M - tvd_s_P)
-                            else
-                                flux_rs_vf(i)%sf(j, k, l) = (tvd_cons*s_M*s_P)/(s_M - s_P)
-                                flux_src_rs_vf(i)%sf(j, k, l) = (s_M*tvd_flux_R - s_P*tvd_flux_L)/(s_M - s_P)
-                            end if
-                        end do
-
-                        ! Stress eq
-                        if (hypoelasticity) then
-                            do i = 1, (num_dims*(num_dims + 1))/2
-
-                                lo_cons = lo_rho_L*lo_tau_e_L(i) - lo_rho_R*lo_tau_e_L(i)
-                                hi_cons = rho_L*tau_e_L(i) - rho_R*tau_e_R(i)
-                                tvd_cons = lo_cons + flux_lim_func*(hi_cons - lo_cons)
-                                lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(1))*lo_tau_e_L(i)
-                                lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(1))*lo_tau_e_R(i)
-                                hi_flux_L = rho_L*vel_L(dir_idx(1))*tau_e_L(i)
-                                hi_flux_R = rho_R*vel_R(dir_idx(1))*tau_e_R(i)
-                                tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                                tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                                if (tvd_wave_speeds) then
-                                    flux_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l) = &
-                                        (tvd_s_M*tvd_flux_R - tvd_s_P*tvd_flux_L + tvd_s_M*tvd_s_P*tvd_cons) &
-                                        /(tvd_s_M - tvd_s_P)
-                                else
-                                    flux_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l) = &
-                                        (s_M*tvd_flux_R - s_P*tvd_flux_L + s_M*s_P*tvd_cons)/(s_M - s_P)
-                                end if
-                            end do
-                        end if
-
-                        ! Source terms
-                        do i = 1, num_dims
-                            if (tvd_wave_speeds) then
-                                lo_cons_L = lo_rho_L*(lo_s_L - lo_vel_L(dir_idx(1)))
-                                lo_cons_R = lo_rho_R*(lo_s_R - lo_vel_R(dir_idx(1)))
-                                hi_cons_L = rho_L*(s_L - vel_L(dir_idx(1)))
-                                hi_cons_R = rho_R*(s_R - vel_R(dir_idx(1)))
-                                lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(i))* &
-                                            (lo_s_L - lo_vel_L(dir_idx(1))) - lo_pres_L*dir_flg(dir_idx(i))
-                                lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(i))* &
-                                            (lo_s_R - lo_vel_R(dir_idx(1))) - lo_pres_R*dir_flg(dir_idx(i))
-                                hi_flux_L = rho_L*vel_L(dir_idx(i))* &
-                                            (s_L - vel_L(dir_idx(1))) - pres_L*dir_flg(dir_idx(i))
-                                hi_flux_R = rho_R*vel_R(dir_idx(i))* &
-                                            (s_R - vel_R(dir_idx(1))) - pres_R*dir_flg(dir_idx(i))
-                            else
-                                lo_cons_L = lo_rho_L*(s_L - lo_vel_L(dir_idx(1)))
-                                lo_cons_R = lo_rho_R*(s_R - lo_vel_R(dir_idx(1)))
-                                hi_cons_L = rho_L*(s_L - vel_L(dir_idx(1)))
-                                hi_cons_R = rho_R*(s_R - vel_R(dir_idx(1)))
-                                lo_flux_L = lo_rho_L*lo_vel_L(dir_idx(i))*(s_L - lo_vel_L(dir_idx(1))) - lo_pres_L* &
-                                            dir_flg(dir_idx(i))
-                                lo_flux_R = lo_rho_R*lo_vel_R(dir_idx(i))*(s_R - lo_vel_R(dir_idx(1))) - lo_pres_R* &
-                                            dir_flg(dir_idx(i))
-                                hi_flux_L = rho_L*vel_L(dir_idx(i))*(s_L - vel_L(dir_idx(1))) - &
-                                            pres_L*dir_flg(dir_idx(i))
-                                hi_flux_R = rho_R*vel_R(dir_idx(i))*(s_R - vel_R(dir_idx(1))) - &
-                                            pres_R*dir_flg(dir_idx(i))
-                            end if
-                            tvd_cons_L = lo_cons_L + flux_lim_func*(hi_cons_L - lo_cons_L)
-                            tvd_cons_R = lo_cons_R + flux_lim_func*(hi_cons_R - lo_cons_R)
-                            tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                            if (tvd_wave_speeds) then
-                                vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
-                                    (tvd_xi_M*tvd_flux_L - tvd_xi_P*tvd_flux_R) &
-                                    /(tvd_xi_M*tvd_cons_L - tvd_xi_P*tvd_cons_R)
-                            else
-                                vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
-                                    (xi_M*tvd_flux_L - xi_P*tvd_flux_R)/(xi_M*tvd_cons_L - xi_P*tvd_cons_R)
-                            end if
+                            flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
+                                (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                      *vel_R(dir_idx(i)) &
+                                      + dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
+                                 - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                        *vel_L(dir_idx(i)) &
+                                        + dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
+                                 + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
+                                            - rho_R*vel_R(dir_idx(i)))) &
+                                /(s_M - s_P)
                         end do
                     else
-                        ! No TVD Riemann fluxes
-
-                        ! Mass
-                        do i = 1, cont_idx%end
-                            flux_rs_vf(i)%sf(j, k, l) = &
-                                (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
-                                 - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
-                                 + s_M*s_P*(alpha_rho_L(i) &
-                                            - alpha_rho_R(i))) &
-                                /(s_M - s_P)
-                        end do
-
-                        ! Momentum
-                        if (bubbles) then
-                            do i = 1, num_dims
-                                flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                                    (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                          *vel_R(dir_idx(i)) &
-                                          + dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
-                                     - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                            *vel_L(dir_idx(i)) &
-                                            + dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
-                                     + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
-                                                - rho_R*vel_R(dir_idx(i)))) &
-                                    /(s_M - s_P)
-                            end do
-                        else
-                            do i = 1, num_dims
-                                flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                                    (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                          *vel_R(dir_idx(i)) &
-                                          + dir_flg(dir_idx(i))*pres_R) &
-                                     - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                            *vel_L(dir_idx(i)) &
-                                            + dir_flg(dir_idx(i))*pres_L) &
-                                     + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
-                                                - rho_R*vel_R(dir_idx(i)))) &
-                                    /(s_M - s_P)
-                            end do
-                        end if
-
-                        ! Energy
-                        if (bubbles) then
-                            flux_rs_vf(E_idx)%sf(j, k, l) = &
-                                (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
-                                 - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
-                                 + s_M*s_P*(E_L - E_R)) &
-                                /(s_M - s_P)
-                        else
-                            flux_rs_vf(E_idx)%sf(j, k, l) = &
-                                (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
-                                 - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
-                                 + s_M*s_P*(E_L - E_R)) &
-                                /(s_M - s_P)
-                        end if
-
-                        ! Advection
-                        do i = adv_idx%beg, adv_idx%end
-                            flux_rs_vf(i)%sf(j, k, l) = &
-                                (qL_prim_rs_vf(i)%sf(j, k, l) &
-                                 - qR_prim_rs_vf(i)%sf(j + 1, k, l)) &
-                                *s_M*s_P/(s_M - s_P)
-                            flux_src_rs_vf(i)%sf(j, k, l) = &
-                                (s_M*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
-                                 - s_P*qL_prim_rs_vf(i)%sf(j, k, l)) &
-                                /(s_M - s_P)
-                        end do
-
-                        ! Div(U)?
                         do i = 1, num_dims
-                            vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
-                                (xi_M*(rho_L*vel_L(dir_idx(i))* &
-                                       (s_L - vel_L(dir_idx(1))) - &
-                                       pres_L*dir_flg(dir_idx(i))) - &
-                                 xi_P*(rho_R*vel_R(dir_idx(i))* &
-                                       (s_R - vel_R(dir_idx(1))) - &
-                                       pres_R*dir_flg(dir_idx(i)))) &
-                                /(xi_M*rho_L*(s_L - vel_L(dir_idx(1))) - &
-                                  xi_P*rho_R*(s_R - vel_R(dir_idx(1))))
+                            flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
+                                (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                      *vel_R(dir_idx(i)) &
+                                      + dir_flg(dir_idx(i))*pres_R) &
+                                 - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                        *vel_L(dir_idx(i)) &
+                                        + dir_flg(dir_idx(i))*pres_L) &
+                                 + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
+                                            - rho_R*vel_R(dir_idx(i)))) &
+                                /(s_M - s_P)
                         end do
+                    end if
 
-                        ! SHB: Does this need to be ammended?
-                        if (hypoelasticity) then
-                            do i = 1, (num_dims*(num_dims + 1))/2
-                                flux_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l) = &
-                                    (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                          *tau_e_R(i)) &
-                                     - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                            *tau_e_L(i)) &
-                                     + s_M*s_P*(rho_L*tau_e_L(i) &
-                                                - rho_R*tau_e_R(i))) &
-                                    /(s_M - s_P)
-                            end do
+                    ! Energy
+                    if (bubbles) then
+                        flux_rs_vf(E_idx)%sf(j, k, l) = &
+                            (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
+                             - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
+                             + s_M*s_P*(E_L - E_R)) &
+                            /(s_M - s_P)
+                    else
+                        flux_rs_vf(E_idx)%sf(j, k, l) = &
+                            (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
+                             - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
+                             + s_M*s_P*(E_L - E_R)) &
+                            /(s_M - s_P)
+                    end if
+
+                    ! Advection
+                    do i = adv_idx%beg, adv_idx%end
+                        flux_rs_vf(i)%sf(j, k, l) = &
+                            (qL_prim_rs_vf(i)%sf(j, k, l) &
+                             - qR_prim_rs_vf(i)%sf(j + 1, k, l)) &
+                            *s_M*s_P/(s_M - s_P)
+                        flux_src_rs_vf(i)%sf(j, k, l) = &
+                            (s_M*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                             - s_P*qL_prim_rs_vf(i)%sf(j, k, l)) &
+                            /(s_M - s_P)
+                    end do
+
+                    ! Div(U)?
+                    do i = 1, num_dims
+                        vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
+                            (xi_M*(rho_L*vel_L(dir_idx(i))* &
+                                   (s_L - vel_L(dir_idx(1))) - &
+                                   pres_L*dir_flg(dir_idx(i))) - &
+                             xi_P*(rho_R*vel_R(dir_idx(i))* &
+                                   (s_R - vel_R(dir_idx(1))) - &
+                                   pres_R*dir_flg(dir_idx(i)))) &
+                            /(xi_M*rho_L*(s_L - vel_L(dir_idx(1))) - &
+                              xi_P*rho_R*(s_R - vel_R(dir_idx(1))))
+                    end do
+
+                    ! SHB: Does this need to be ammended?
+                    if (hypoelasticity) then
+                        do i = 1, (num_dims*(num_dims + 1))/2
+                            flux_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l) = &
+                                (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                      *tau_e_R(i)) &
+                                 - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                        *tau_e_L(i)) &
+                                 + s_M*s_P*(rho_L*tau_e_L(i) &
+                                            - rho_R*tau_e_R(i))) &
+                                /(s_M - s_P)
+                        end do
+                    end if
+
+                    if (bubbles) then
+                        ! From HLLC: Kills mass transport @ bubble gas density
+                        if (num_fluids > 1) then
+                            flux_rs_vf(cont_idx%end)%sf(j, k, l) = 0d0
                         end if
-
-                        if (bubbles) then
-
-                            ! Momentum: check signs on this
-                            ! DO i = 1, num_dims
-                            !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) = &
-                            !     flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l) -
-                            !             ( s_M*( rho_R*vel_R(dir_idx(1))         &
-                            !                          *vel_R(dir_idx(i))         &
-                            !                   + dir_flg(dir_idx(i))*ptilde_R )    &
-                            !             - s_P*( rho_L*vel_L(dir_idx(1))         &
-                            !                          *vel_L(dir_idx(i))         &
-                            !                   + dir_flg(dir_idx(i))*ptilde_L )    &
-                            !               ) &
-                            !             / (s_M - s_P)
-                            ! END DO
-                            ! Energy: check signs on this
-                            ! flux_rs_vf(E_idx)%sf(j,k,l) = &
-                            ! flux_rs_vf(E_idx)%sf(j,k,l) - &
-                            !         ( s_M*vel_R(dir_idx(1))*(E_R + ptilde_R) &
-                            !         - s_P*vel_L(dir_idx(1))*(E_L + ptilde_L) &
-                            !         )                                         &
-                            !         / (s_M - s_P)
-
-                            ! Advection: does this need to be changed?
-                            !   perhaps set bub_idx advection to zero?
-                            ! DO i = adv_idx%beg, adv_idx%end
-                            !     flux_rs_vf(i)%sf(j,k,l) = &
-                            !              ( qL_prim_rs_vf(i)%sf( j ,k,l)   &
-                            !              - qR_prim_rs_vf(i)%sf(j+1,k,l) ) &
-                            !              * s_M*s_P/(s_M - s_P)
-                            !     flux_src_rs_vf(i)%sf(j,k,l) = &
-                            !            ( s_M*qR_prim_rs_vf(i)%sf(j+1,k,l)   &
-                            !            - s_P*qL_prim_rs_vf(i)%sf( j ,k,l) ) &
-                            !            / (s_M - s_P)
-                            ! END DO
-
-                            ! From HLLC: Kills mass transport @ bubble gas density
-                            if (num_fluids > 1) then
-                                flux_rs_vf(cont_idx%end)%sf(j, k, l) = 0d0
-                            end if
-
-                            !Advection of bubble sources (from HLLC)
-                            ! DO i = bub_idx%beg,sys_size
-                            !     flux_rs_vf(i)%sf(j,k,l) =   &
-                            !             xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j,k,l)      &
-                            !             * (vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                            !             + xi_P*nbub_R*qR_prim_rs_vf(i)%sf(j+1,k,l)      &
-                            !             * (vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                            ! END DO
-
-                        end if
-
                     end if
                 end do
             end do
@@ -1009,7 +756,6 @@ contains
         ! Placeholders for high- and low-order fluxes
         real(kind(0d0)) :: lo_xi_L, lo_xi_R
         real(kind(0d0)) :: hi_flux_L, hi_flux_R, lo_flux_L, lo_flux_R
-        real(kind(0d0)) :: tvd_flux_L, tvd_flux_R
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -1197,10 +943,6 @@ contains
 
                     else
 
-                        if (tvd_riemann_flux) then
-                            call s_compute_flux_limiter(j, k, l, flux_lim_func, norm_dir)
-                        end if
-
                         ! follows Einfeldt et al.
                         ! s_M/P = min/max(0.,s_L/R)
                         s_M = min(0d0, s_L); s_P = max(0d0, s_R)
@@ -1215,351 +957,176 @@ contains
                         xi_M = (5d-1 + sign(5d-1, s_S))
                         xi_P = (5d-1 - sign(5d-1, s_S))
 
-                        if (tvd_wave_speeds) then
-                            lo_s_M = min(0d0, lo_s_L); lo_s_P = max(0d0, lo_s_R)
 
-                            lo_xi_L = (lo_s_L - lo_vel_L(dir_idx(1)))/(lo_s_L - lo_s_S)
-                            lo_xi_R = (lo_s_R - lo_vel_R(dir_idx(1)))/(lo_s_R - lo_s_S)
+                        do i = 1, cont_idx%end
+                            flux_rs_vf(i)%sf(j, k, l) = &
+                                xi_M*alpha_rho_L(i) &
+                                *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                + xi_P*alpha_rho_R(i) &
+                                *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                        end do
 
-                            lo_xi_M = (5d-1 + sign(5d-1, lo_s_S))
-                            lo_xi_P = (5d-1 - sign(5d-1, lo_s_S))
-
-                            tvd_xi_M = lo_xi_M + flux_lim_func*(xi_M - lo_xi_M)
-                            tvd_xi_P = lo_xi_P + flux_lim_func*(xi_P - lo_xi_P)
+                        if (bubbles .and. (model_eqns == 2) .and. (num_fluids > 1)) then
+                            ! Kill mass transport @ gas density
+                            flux_rs_vf(cont_idx%end)%sf(j, k, l) = 0.d0
                         end if
 
-                        if (tvd_riemann_flux) then
-                            ! Mass
-                            do i = 1, cont_idx%end
-                                if (tvd_wave_speeds) then
-                                    lo_flux_L = lo_alpha_rho_L(i)*(lo_vel_L(dir_idx(1)) + lo_s_M*(lo_xi_L - 1d0))
-                                    lo_flux_R = lo_alpha_rho_R(i)*(lo_vel_R(dir_idx(1)) + lo_s_P*(lo_xi_R - 1d0))
-                                    hi_flux_L = alpha_rho_L(i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0))
-                                    hi_flux_R = alpha_rho_R(i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                else
-                                    lo_flux_L = lo_alpha_rho_L(i)*(lo_vel_L(dir_idx(1)) + s_M*(xi_L - 1d0))
-                                    lo_flux_R = lo_alpha_rho_R(i)*(lo_vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                    hi_flux_L = alpha_rho_L(i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0))
-                                    hi_flux_R = alpha_rho_R(i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                end if
-                                tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                                tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                                if (tvd_wave_speeds) then
-                                    flux_rs_vf(i)%sf(j, k, l) = tvd_xi_M*tvd_flux_L + tvd_xi_P*tvd_flux_R
-                                else
-                                    flux_rs_vf(i)%sf(j, k, l) = xi_M*tvd_flux_L + xi_P*tvd_flux_R
-                                end if
-                            end do
-
-                            ! Momentum
+                        ! Momentum flux.
+                        ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
+                        if (bubbles .neqv. .true.) then
                             do i = 1, num_dims
-                                if (tvd_wave_speeds) then
-                                    lo_flux_L = lo_rho_L*(lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + &
-                                                          lo_s_M*(lo_xi_L*(dir_flg(dir_idx(i))*lo_s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                           lo_vel_L(dir_idx(i))) - lo_vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*lo_pres_L
-                                    lo_flux_R = lo_rho_R*(lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + &
-                                                          lo_s_P*(lo_xi_R*(dir_flg(dir_idx(i))*lo_s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                           lo_vel_R(dir_idx(i))) - lo_vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*lo_pres_R
-                                    hi_flux_L = rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(i)) + &
-                                                       s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                  vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*pres_L
-                                    hi_flux_R = rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) + &
-                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*pres_R
-                                else
-                                    lo_flux_L = lo_rho_L*(lo_vel_L(dir_idx(1))*lo_vel_L(dir_idx(i)) + &
-                                                          s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                     lo_vel_L(dir_idx(i))) - lo_vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*lo_pres_L
-                                    lo_flux_R = lo_rho_R*(lo_vel_R(dir_idx(1))*lo_vel_R(dir_idx(i)) + &
-                                                          s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                     lo_vel_R(dir_idx(i))) - lo_vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*lo_pres_R
-                                    hi_flux_L = rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(i)) + &
-                                                       s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                  vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*pres_L
-                                    hi_flux_R = rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) + &
-                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + (1d0 - dir_flg(dir_idx(i)))* &
-                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*pres_R
-                                end if
-                                tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                                tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                                if (tvd_wave_speeds) then
-                                    flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = tvd_xi_M*tvd_flux_L + tvd_xi_P*tvd_flux_R
-                                else
-                                    flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = xi_M*tvd_flux_L + xi_P*tvd_flux_R
-                                end if
-                            end do
-
-                            ! Energy
-
-                            if (tvd_wave_speeds) then
-                                lo_flux_L = lo_vel_L(dir_idx(1))*(lo_E_L + lo_pres_L) + &
-                                            lo_s_M*(lo_xi_L*(lo_E_L + (lo_s_S - &
-                                                                       lo_vel_L(dir_idx(1)))*(lo_rho_L*lo_s_S + &
-                                                                                              lo_pres_L/(lo_s_L - lo_vel_L(dir_idx(1))))) - lo_E_L)
-                                lo_flux_R = lo_vel_R(dir_idx(1))* &
-                                            (lo_E_R + lo_pres_R) + lo_s_P*(lo_xi_R*(lo_E_R + (lo_s_S - &
-                                                                                              lo_vel_R(dir_idx(1)))*(lo_rho_R*lo_s_S + &
-                                                                                                                     lo_pres_R/(lo_s_R - lo_vel_R(dir_idx(1))))) - lo_E_R)
-                                hi_flux_L = vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(xi_L*(E_L + (s_S - &
-                                                                                                 vel_L(dir_idx(1)))* &
-                                                                                          (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)
-                                hi_flux_R = vel_R(dir_idx(1))*(E_R + pres_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - &
-                                                              vel_R(dir_idx(1)))*(rho_R*s_S + &
-                                                                                  pres_R/(s_R - vel_R(dir_idx(1))))) - E_R)
-                            else
-                                lo_flux_L = lo_vel_L(dir_idx(1))*(lo_E_L + lo_pres_L) + s_M*(xi_L*(lo_E_L + (s_S - &
-                                                                                                             lo_vel_L(dir_idx(1)))*(lo_rho_L*s_S + lo_pres_L/ &
-                                                                                                                                    (s_L - lo_vel_L(dir_idx(1))))) - lo_E_L)
-                                lo_flux_R = lo_vel_R(dir_idx(1))*(lo_E_R + lo_pres_R) + s_P*(xi_R*(lo_E_R + (s_S - &
-                                                                                                             lo_vel_R(dir_idx(1)))*(lo_rho_R*s_S + lo_pres_R/ &
-                                                                                                                                    (s_R - lo_vel_R(dir_idx(1))))) - lo_E_R)
-                                hi_flux_L = vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(xi_L*(E_L + (s_S - &
-                                                                                                 vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/ &
-                                                                                                                     (s_L - vel_L(dir_idx(1))))) - E_L)
-                                hi_flux_R = vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(xi_R*(E_R + (s_S - &
-                                                                                                 vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/ &
-                                                                                                                     (s_R - vel_R(dir_idx(1))))) - E_R)
-                            end if
-                            tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                            tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                            if (tvd_wave_speeds) then
-                                flux_rs_vf(E_idx)%sf(j, k, l) = tvd_xi_M*tvd_flux_L + tvd_xi_P*tvd_flux_R
-                            else
-                                flux_rs_vf(E_idx)%sf(j, k, l) = xi_M*tvd_flux_L + xi_P*tvd_flux_R
-                            end if
-
-                            ! Volume fraction
-                            do i = adv_idx%beg, adv_idx%end
-                                if (tvd_wave_speeds) then
-                                    lo_flux_L = q_prim_rs_vf(i)%sf(j, k, l)*(lo_vel_L(dir_idx(1)) + lo_s_M*(lo_xi_L - 1d0))
-                                    lo_flux_R = q_prim_rs_vf(i)%sf(j + 1, k, l)*(lo_vel_R(dir_idx(1)) + lo_s_P*(lo_xi_R - 1d0))
-                                    hi_flux_L = qL_prim_rs_vf(i)%sf(j, k, l)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0))
-                                    hi_flux_R = qR_prim_rs_vf(i)%sf(j + 1, k, l)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                else
-                                    lo_flux_L = q_prim_rs_vf(i)%sf(j, k, l)*(lo_vel_L(dir_idx(1)) + s_M*(xi_L - 1d0))
-                                    lo_flux_R = q_prim_rs_vf(i)%sf(j + 1, k, l)*(lo_vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                    hi_flux_L = qL_prim_rs_vf(i)%sf(j, k, l)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0))
-                                    hi_flux_R = qR_prim_rs_vf(i)%sf(j + 1, k, l)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                end if
-                                tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                                tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                                if (tvd_wave_speeds) then
-                                    flux_rs_vf(i)%sf(j, k, l) = tvd_xi_M*tvd_flux_L + tvd_xi_P*tvd_flux_R
-                                else
-                                    flux_rs_vf(i)%sf(j, k, l) = xi_M*tvd_flux_L + xi_P*tvd_flux_R
-                                end if
-                            end do
-
-                            ! Source terms
-                            do i = 1, num_dims
-                                if (tvd_wave_speeds) then
-                                    lo_flux_L = lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*lo_s_M*(lo_xi_L - 1d0)
-                                    lo_flux_R = lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*lo_s_P*(lo_xi_R - 1d0)
-                                    hi_flux_L = vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*(xi_L - 1d0)
-                                    hi_flux_R = vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*(xi_R - 1d0)
-                                else
-                                    lo_flux_L = lo_vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*(xi_L - 1d0)
-                                    lo_flux_R = lo_vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*(xi_R - 1d0)
-                                    hi_flux_L = vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*(xi_L - 1d0)
-                                    hi_flux_R = vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*(xi_R - 1d0)
-                                end if
-                                tvd_flux_L = lo_flux_L + flux_lim_func*(hi_flux_L - lo_flux_L)
-                                tvd_flux_R = lo_flux_R + flux_lim_func*(hi_flux_R - lo_flux_R)
-
-                                if (tvd_wave_speeds) then
-                                    vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = tvd_xi_M*tvd_flux_L + tvd_xi_P*tvd_flux_R
-                                else
-                                    vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = xi_M*tvd_flux_L + xi_P*tvd_flux_R
-                                end if
+                                flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
+                                    xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                 vel_L(dir_idx(i)) + &
+                                                 s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                                            (1d0 - dir_flg(dir_idx(i)))* &
+                                                            vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                          dir_flg(dir_idx(i))*(pres_L)) &
+                                    + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                   vel_R(dir_idx(i)) + &
+                                                   s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                                              (1d0 - dir_flg(dir_idx(i)))* &
+                                                              vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                            dir_flg(dir_idx(i))*(pres_R))
+                                ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                             end do
                         else
-
-                            do i = 1, cont_idx%end
-                                flux_rs_vf(i)%sf(j, k, l) = &
-                                    xi_M*alpha_rho_L(i) &
-                                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                    + xi_P*alpha_rho_R(i) &
-                                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                            end do
-
-                            if (bubbles .and. (model_eqns == 2) .and. (num_fluids > 1)) then
-                                ! Kill mass transport @ gas density
-                                flux_rs_vf(cont_idx%end)%sf(j, k, l) = 0.d0
-                            end if
-
-                            ! Momentum flux.
-                            ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                            if (bubbles .neqv. .true.) then
-                                do i = 1, num_dims
-                                    flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                                        xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                     vel_L(dir_idx(i)) + &
-                                                     s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                                                (1d0 - dir_flg(dir_idx(i)))* &
-                                                                vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                              dir_flg(dir_idx(i))*(pres_L)) &
-                                        + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                       vel_R(dir_idx(i)) + &
-                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                                                  (1d0 - dir_flg(dir_idx(i)))* &
-                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                dir_flg(dir_idx(i))*(pres_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
-                                end do
-                            else
-                                ! Include p_tilde
-                                do i = 1, num_dims
-                                    flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                                        xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                     vel_L(dir_idx(i)) + &
-                                                     s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                                                (1d0 - dir_flg(dir_idx(i)))* &
-                                                                vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                              dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
-                                        + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                       vel_R(dir_idx(i)) + &
-                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                                                  (1d0 - dir_flg(dir_idx(i)))* &
-                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
-                                end do
-
-                            end if
-                            ! print*, xi_P, xi_M
-                            ! print*, s_M, s_P, s_S
-                            ! print*, ptilde_R, ptilde_L
-                            ! print*, rho_R, rho_L
-                            ! print*, vel_R(1), vel_L(1)
-                            ! print*, pres_R, pres_L
-                            ! print*, '              '
-
-                            ! Energy flux.
-                            ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-                            if ((model_eqns .ne. 4) .and. bubbles) then
-                                flux_rs_vf(E_idx)%sf(j, k, l) = &
-                                    xi_M*(vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + &
-                                          s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                                     (rho_L*s_S + (pres_L - ptilde_L)/ &
-                                                      (s_L - vel_L(dir_idx(1))))) - E_L)) &
-                                    + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                                       (rho_R*s_S + (pres_R - ptilde_R)/ &
-                                                        (s_R - vel_R(dir_idx(1))))) - E_R))
-                            else if (model_eqns .ne. 4) then
-                                flux_rs_vf(E_idx)%sf(j, k, l) = &
-                                    xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + &
-                                          s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                                     (rho_L*s_S + pres_L/ &
-                                                      (s_L - vel_L(dir_idx(1))))) - E_L)) &
-                                    + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                                       (rho_R*s_S + pres_R/ &
-                                                        (s_R - vel_R(dir_idx(1))))) - E_R))
-                            else
-                                ! Tait EOS, no energy equation
-                                flux_rs_vf(E_idx)%sf(j, k, l) = 0.d0
-                            end if
-
-                            ! Volume fraction flux
-                            if (model_eqns == 4) then
-                                do i = alf_idx, alf_idx !only advect the void fraction
-                                    flux_rs_vf(i)%sf(j, k, l) = &
-                                        xi_M*qL_prim_rs_vf(i)%sf(j, k, l) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                end do
-                            else
-                                do i = adv_idx%beg, adv_idx%end
-                                    flux_rs_vf(i)%sf(j, k, l) = &
-                                        xi_M*qL_prim_rs_vf(i)%sf(j, k, l) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                end do
-                            end if
-
-                            ! Source for volume fraction advection equation
+                            ! Include p_tilde
                             do i = 1, num_dims
-                                vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
-                                    xi_M*(vel_L(dir_idx(i)) + &
-                                          dir_flg(dir_idx(i))* &
-                                          s_M*(xi_L - 1d0)) &
-                                    + xi_P*(vel_R(dir_idx(i)) + &
-                                            dir_flg(dir_idx(i))* &
-                                            s_P*(xi_R - 1d0))
-
-                                if (model_eqns == 4) vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = 0d0
-                                !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
-                            end do
-
-                            ! Add advection flux for bubble variables
-                            if (bubbles) then
-                                do i = bub_idx%beg, bub_idx%end
-                                    flux_rs_vf(i)%sf(j, k, l) = &
-                                        xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j, k, l) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*nbub_R*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                end do
-                            end if
-
-                            ! print*, 'mom idx', cont_idx%end+dir_idx(i)
-                            ! DO i = 1,sys_size
-                            !     print*, 'flux_rs_vf', i, flux_rs_vf(i)%sf(j,k,l)
-                            ! END DO
-
-                            ! Geometrical source flux for cylindrical coordinates
-                            if (norm_dir == 2 .and. cyl_coord) then
-                                ! Substituting the advective flux into the inviscid geometrical source flux
-                                do i = 1, E_idx
-                                    flux_gsrc_rs_vf(i)%sf(j, k, l) = flux_rs_vf(i)%sf(j, k, l)
-                                end do
-                                ! Recalculating the radial momentum geometric source flux
-                                flux_gsrc_rs_vf(cont_idx%end + dir_idx(1))%sf(j, k, l) = &
+                                flux_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
                                     xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                 vel_L(dir_idx(1)) + &
-                                                 s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
-                                                            (1d0 - dir_flg(dir_idx(1)))* &
-                                                            vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                                 vel_L(dir_idx(i)) + &
+                                                 s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                                            (1d0 - dir_flg(dir_idx(i)))* &
+                                                            vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                          dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
                                     + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                   vel_R(dir_idx(1)) + &
-                                                   s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
-                                                              (1d0 - dir_flg(dir_idx(1)))* &
-                                                              vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                                ! Geometrical source of the void fraction(s) is zero
-                                do i = adv_idx%beg, adv_idx%end
-                                    flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
-                                end do
-                            elseif (norm_dir == 3 .and. grid_geometry == 3) then
-                                do i = 1, sys_size
-                                    flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
-                                end do
-                                flux_gsrc_rs_vf(mom_idx%beg + 1)%sf(j, k, l) = &
-                                    -xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                  vel_L(dir_idx(1)) + &
-                                                  s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
-                                                             (1d0 - dir_flg(dir_idx(1)))* &
-                                                             vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                    - xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                   vel_R(dir_idx(1)) + &
-                                                   s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
-                                                              (1d0 - dir_flg(dir_idx(1)))* &
-                                                              vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                                flux_gsrc_rs_vf(mom_idx%end)%sf(j, k, l) = flux_rs_vf(mom_idx%beg + 1)%sf(j, k, l)
-                            else
-                                do i = 1, sys_size
-                                    flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
-                                end do
-                            end if
+                                                   vel_R(dir_idx(i)) + &
+                                                   s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                                              (1d0 - dir_flg(dir_idx(i)))* &
+                                                              vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                            dir_flg(dir_idx(i))*(pres_R - ptilde_R))
+                                ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+                            end do
 
                         end if
+
+                        ! Energy flux.
+                        ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
+                        if ((model_eqns .ne. 4) .and. bubbles) then
+                            flux_rs_vf(E_idx)%sf(j, k, l) = &
+                                xi_M*(vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + &
+                                      s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                                 (rho_L*s_S + (pres_L - ptilde_L)/ &
+                                                  (s_L - vel_L(dir_idx(1))))) - E_L)) &
+                                + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) + &
+                                        s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                                   (rho_R*s_S + (pres_R - ptilde_R)/ &
+                                                    (s_R - vel_R(dir_idx(1))))) - E_R))
+                        else if (model_eqns .ne. 4) then
+                            flux_rs_vf(E_idx)%sf(j, k, l) = &
+                                xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + &
+                                      s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                                 (rho_L*s_S + pres_L/ &
+                                                  (s_L - vel_L(dir_idx(1))))) - E_L)) &
+                                + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + &
+                                        s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                                   (rho_R*s_S + pres_R/ &
+                                                    (s_R - vel_R(dir_idx(1))))) - E_R))
+                        else
+                            ! Tait EOS, no energy equation
+                            flux_rs_vf(E_idx)%sf(j, k, l) = 0.d0
+                        end if
+
+                        ! Volume fraction flux
+                        if (model_eqns == 4) then
+                            do i = alf_idx, alf_idx !only advect the void fraction
+                                flux_rs_vf(i)%sf(j, k, l) = &
+                                    xi_M*qL_prim_rs_vf(i)%sf(j, k, l) &
+                                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                    + xi_P*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                            end do
+                        else
+                            do i = adv_idx%beg, adv_idx%end
+                                flux_rs_vf(i)%sf(j, k, l) = &
+                                    xi_M*qL_prim_rs_vf(i)%sf(j, k, l) &
+                                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                    + xi_P*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                            end do
+                        end if
+
+                        ! Source for volume fraction advection equation
+                        do i = 1, num_dims
+                            vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
+                                xi_M*(vel_L(dir_idx(i)) + &
+                                      dir_flg(dir_idx(i))* &
+                                      s_M*(xi_L - 1d0)) &
+                                + xi_P*(vel_R(dir_idx(i)) + &
+                                        dir_flg(dir_idx(i))* &
+                                        s_P*(xi_R - 1d0))
+
+                            if (model_eqns == 4) vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = 0d0
+                            !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                        end do
+
+                        ! Add advection flux for bubble variables
+                        if (bubbles) then
+                            do i = bub_idx%beg, bub_idx%end
+                                flux_rs_vf(i)%sf(j, k, l) = &
+                                    xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j, k, l) &
+                                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                    + xi_P*nbub_R*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                            end do
+                        end if
+
+
+                        ! Geometrical source flux for cylindrical coordinates
+                        if (norm_dir == 2 .and. cyl_coord) then
+                            ! Substituting the advective flux into the inviscid geometrical source flux
+                            do i = 1, E_idx
+                                flux_gsrc_rs_vf(i)%sf(j, k, l) = flux_rs_vf(i)%sf(j, k, l)
+                            end do
+                            ! Recalculating the radial momentum geometric source flux
+                            flux_gsrc_rs_vf(cont_idx%end + dir_idx(1))%sf(j, k, l) = &
+                                xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                             vel_L(dir_idx(1)) + &
+                                             s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                                        (1d0 - dir_flg(dir_idx(1)))* &
+                                                        vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                               vel_R(dir_idx(1)) + &
+                                               s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                                          (1d0 - dir_flg(dir_idx(1)))* &
+                                                          vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                            ! Geometrical source of the void fraction(s) is zero
+                            do i = adv_idx%beg, adv_idx%end
+                                flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
+                            end do
+                        elseif (norm_dir == 3 .and. grid_geometry == 3) then
+                            do i = 1, sys_size
+                                flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
+                            end do
+                            flux_gsrc_rs_vf(mom_idx%beg + 1)%sf(j, k, l) = &
+                                -xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                              vel_L(dir_idx(1)) + &
+                                              s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                                         (1d0 - dir_flg(dir_idx(1)))* &
+                                                         vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                                - xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                               vel_R(dir_idx(1)) + &
+                                               s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                                          (1d0 - dir_flg(dir_idx(1)))* &
+                                                          vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                            flux_gsrc_rs_vf(mom_idx%end)%sf(j, k, l) = flux_rs_vf(mom_idx%beg + 1)%sf(j, k, l)
+                        else
+                            do i = 1, sys_size
+                                flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
+                            end do
+                        end if
+
                     end if
                 end do
             end do
@@ -1974,45 +1541,6 @@ contains
             c_R = 100.d0*sgm_eps
         else
             c_R = sqrt(c_R)
-        end if
-
-        if (tvd_riemann_flux) then
-            if (alt_soundspeed .or. regularization) then
-                do i = 1, num_fluids
-                    lo_alpha_L(i) = q_prim_rs_vf(E_idx + i)%sf(j, k, l)
-                    lo_alpha_R(i) = q_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
-                end do
-
-                blkmod1 = ((fluid_pp(1)%gamma + 1d0)*lo_pres_L + &
-                           fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                blkmod2 = ((fluid_pp(2)%gamma + 1d0)*lo_pres_L + &
-                           fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                lo_c_L = 1d0/(lo_rho_L*(lo_alpha_L(1)/blkmod1 + lo_alpha_L(2)/blkmod2))
-
-                blkmod1 = ((fluid_pp(1)%gamma + 1d0)*lo_pres_R + &
-                           fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                blkmod2 = ((fluid_pp(2)%gamma + 1d0)*lo_pres_R + &
-                           fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                lo_c_R = 1d0/(lo_rho_R*(lo_alpha_R(1)/blkmod1 + lo_alpha_R(2)/blkmod2))
-            else
-                do i = 1, num_fluids
-                    lo_alpha_L(i) = q_prim_rs_vf(E_idx + i)%sf(j, k, l)
-                    lo_alpha_R(i) = q_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
-                end do
-                lo_c_L = ((lo_H_L - 5d-1*sum(lo_vel_L**2d0))/lo_gamma_L)
-                lo_c_R = ((lo_H_R - 5d-1*sum(lo_vel_R**2d0))/lo_gamma_R)
-            end if
-
-            if (mixture_err .and. lo_c_L < 0d0) then
-                lo_c_L = sgm_eps
-            else
-                lo_c_L = sqrt(lo_c_L)
-            end if
-            if (mixture_err .and. lo_c_R < 0d0) then
-                lo_c_R = sgm_eps
-            else
-                lo_c_R = sqrt(lo_c_R)
-            end if
         end if
 
     end subroutine s_compute_mixture_sound_speeds ! ------------------------
@@ -2477,44 +2005,6 @@ contains
             end do
         end if
 
-        if (tvd_riemann_flux) then
-            do i = 1, cont_idx%end
-                lo_alpha_rho_L(i) = q_prim_rs_vf(i)%sf(j, k, l)
-                lo_alpha_rho_R(i) = q_prim_rs_vf(i)%sf(j + 1, k, l)
-            end do
-
-            do i = 1, num_dims
-                lo_vel_L(i) = q_prim_rs_vf(cont_idx%end + i)%sf(j, k, l)
-                lo_vel_R(i) = q_prim_rs_vf(cont_idx%end + i)%sf(j + 1, k, l)
-            end do
-
-            lo_pres_L = q_prim_rs_vf(E_idx)%sf(j, k, l)
-            lo_pres_R = q_prim_rs_vf(E_idx)%sf(j + 1, k, l)
-
-            call s_convert_to_mixture_variables(q_prim_rs_vf, &
-                                                lo_rho_L, lo_gamma_L, &
-                                                lo_pi_inf_L, lo_Re_L, &
-                                                lo_We_L, j, k, l)
-            call s_convert_to_mixture_variables(q_prim_rs_vf, &
-                                                lo_rho_R, lo_gamma_R, &
-                                                lo_pi_inf_R, lo_Re_R, &
-                                                lo_We_R, j + 1, k, l)
-
-            lo_E_L = lo_gamma_L*lo_pres_L + lo_pi_inf_L + 5d-1*lo_rho_L*sum(lo_vel_L**2d0)
-            lo_E_R = lo_gamma_R*lo_pres_R + lo_pi_inf_R + 5d-1*lo_rho_R*sum(lo_vel_R**2d0)
-
-            lo_H_L = (lo_E_L + lo_pres_L)/lo_rho_L
-            lo_H_R = (lo_E_R + lo_pres_R)/lo_rho_R
-
-            if (hypoelasticity) then
-                do i = 1, (num_dims*(num_dims + 1))/2
-                    lo_tau_e_L(i) = q_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l)
-                    lo_tau_e_R(i) = q_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j + 1, k, l)
-                end do
-            end if
-
-        end if
-
         call s_compute_mixture_sound_speeds(j, k, l)
 
         ! ==================================================================
@@ -2701,44 +2191,6 @@ contains
             ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
         end if
 
-        if (tvd_riemann_flux) then
-            do i = 1, cont_idx%end
-                lo_alpha_rho_L(i) = q_prim_rs_vf(i)%sf(j, k, l)
-                lo_alpha_rho_R(i) = q_prim_rs_vf(i)%sf(j + 1, k, l)
-            end do
-
-            do i = 1, num_dims
-                lo_vel_L(i) = q_prim_rs_vf(cont_idx%end + i)%sf(j, k, l)
-                lo_vel_R(i) = q_prim_rs_vf(cont_idx%end + i)%sf(j + 1, k, l)
-            end do
-
-            lo_pres_L = q_prim_rs_vf(E_idx)%sf(j, k, l)
-            lo_pres_R = q_prim_rs_vf(E_idx)%sf(j + 1, k, l)
-
-            call s_convert_to_mixture_variables(q_prim_rs_vf, &
-                                                lo_rho_L, lo_gamma_L, &
-                                                lo_pi_inf_L, lo_Re_L, &
-                                                lo_We_L, j, k, l)
-            call s_convert_to_mixture_variables(q_prim_rs_vf, &
-                                                lo_rho_R, lo_gamma_R, &
-                                                lo_pi_inf_R, lo_Re_R, &
-                                                lo_We_R, j + 1, k, l)
-
-            lo_E_L = lo_gamma_L*lo_pres_L + lo_pi_inf_L + 5d-1*lo_rho_L*sum(lo_vel_L**2d0)
-            lo_E_R = lo_gamma_R*lo_pres_R + lo_pi_inf_R + 5d-1*lo_rho_R*sum(lo_vel_R**2d0)
-
-            lo_H_L = (lo_E_L + lo_pres_L)/lo_rho_L
-            lo_H_R = (lo_E_R + lo_pres_R)/lo_rho_R
-
-            if (hypoelasticity) then
-                do i = 1, (num_dims*(num_dims + 1))/2
-                    lo_tau_e_L(i) = q_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j, k, l)
-                    lo_tau_e_R(i) = q_prim_rs_vf(stress_idx%beg - 1 + i)%sf(j + 1, k, l)
-                end do
-            end if
-
-        end if
-
         call s_compute_mixture_sound_speeds(j, k, l)
 
         ! ==================================================================
@@ -2826,17 +2278,6 @@ contains
                 rho_R*(s_R - vel_R(dir_idx(1))))
         denom = rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1)))
 
-        if (tvd_wave_speeds) then
-            lo_s_L = min(lo_vel_L(dir_idx(1)) - lo_c_L, vel_avg(dir_idx(1)) - c_avg)
-            lo_s_R = max(lo_vel_R(dir_idx(1)) + lo_c_R, vel_avg(dir_idx(1)) + c_avg)
-
-            lo_s_S = (lo_pres_R - lo_pres_L - dpres_We + lo_rho_L*lo_vel_L(dir_idx(1))* &
-                      (lo_s_L - lo_vel_L(dir_idx(1))) - &
-                      lo_rho_R*lo_vel_R(dir_idx(1))* &
-                      (lo_s_R - lo_vel_R(dir_idx(1)))) &
-                     /(lo_rho_L*(lo_s_L - lo_vel_L(dir_idx(1))) - &
-                       lo_rho_R*(lo_s_R - lo_vel_R(dir_idx(1))))
-        end if
 
     end subroutine s_compute_direct_wave_speeds ! --------------------------
 
@@ -2897,89 +2338,7 @@ contains
                     (pres_L - pres_R + dpres_We)/ &
                     (rho_avg*c_avg))
 
-        if (tvd_wave_speeds) then
-            lo_pres_SL = 5d-1*(lo_pres_L + lo_pres_R - dpres_We + rho_avg*c_avg* &
-                               (lo_vel_L(dir_idx(1)) - &
-                                lo_vel_R(dir_idx(1))))
-            lo_pres_SR = lo_pres_SL + dpres_We
-
-            lo_Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + lo_gamma_L)/(1d0 + lo_gamma_L))* &
-                                    (lo_pres_SL/lo_pres_L - 1d0)*lo_pres_L/ &
-                                    ((lo_pres_L + lo_pi_inf_L/(1d0 + lo_gamma_L)))))
-            lo_Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + lo_gamma_R)/(1d0 + lo_gamma_R))* &
-                                    (lo_pres_SR/lo_pres_R - 1d0)*lo_pres_R/ &
-                                    ((lo_pres_R + lo_pi_inf_R/(1d0 + lo_gamma_R)))))
-
-            lo_s_L = lo_vel_L(dir_idx(1)) - lo_c_L*lo_Ms_L
-            lo_s_R = lo_vel_R(dir_idx(1)) + lo_c_R*lo_Ms_R
-
-            lo_s_S = 5d-1*((lo_vel_L(dir_idx(1)) + lo_vel_R(dir_idx(1))) + &
-                           (lo_pres_L - lo_pres_R + dpres_We)/ &
-                           (rho_avg*c_avg))
-        end if
-
     end subroutine s_compute_pressure_velocity_wave_speeds ! ---------------
-
-    !>  This subroutine computes the flux limiter function value
-        !!      at the cell boundary
-        !!  @param j  First coordinate index
-        !!  @param k Second coordinate index
-        !!  @param l  Third coordinate index
-        !!  @param flux_lim_func The flux limiter
-        !!  @param norm_dir Directional splitting index
-    subroutine s_compute_flux_limiter(j, k, l, flux_lim_func, norm_dir) ! ------
-
-        integer, intent(IN) :: j, k, l, norm_dir
-        real(kind(0d0)), intent(OUT) :: flux_lim_func
-        real(kind(0d0)) :: top, bottom, slope
-
-        if (q_prim_rs_vf(cont_idx%end + norm_dir)%sf(j, k, l) >= 0d0) then
-            top = q_prim_rs_vf(adv_idx%beg)%sf(j, k, l) - &
-                  q_prim_rs_vf(adv_idx%beg)%sf(j - 1, k, l)
-            bottom = q_prim_rs_vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                     q_prim_rs_vf(adv_idx%beg)%sf(j, k, l)
-        else
-            top = q_prim_rs_vf(adv_idx%beg)%sf(j + 2, k, l) - &
-                  q_prim_rs_vf(adv_idx%beg)%sf(j + 1, k, l)
-            bottom = q_prim_rs_vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                     q_prim_rs_vf(adv_idx%beg)%sf(j, k, l)
-        end if
-
-        ! Limit the flux limiter to only be applied where the change in
-        ! volume fraction is greater than machine precision so that
-        ! insignificant fluctuations do not trip the limiter
-!           IF (ABS(top) < sgm_eps) top = 0d0
-!           IF (ABS(bottom) < sgm_eps) bottom = 0d0
-        if (abs(top) < 1d-8) top = 0d0
-        if (abs(bottom) < 1d-8) bottom = 0d0
-
-        ! If top = bottom, then cell boundary is in a smooth region of
-        ! the flow and the high order flux should be used. Also ensures
-        ! that areas of no change in volume fraction (0/0) use the high
-        ! order flux
-        if (top == bottom) then
-            slope = 1d0
-        else
-            slope = (top*bottom)/max(bottom**2d0, sgm_eps)
-        end if
-
-        ! Flux limiter function
-        if (flux_lim == 1) then ! MINMOD (MM)
-            flux_lim_func = max(0d0, min(1d0, slope))
-        elseif (flux_lim == 2) then ! MUSCL (MC)
-            flux_lim_func = max(0d0, min(2d0*slope, 5d-1*(1d0 + slope), 2d0))
-        elseif (flux_lim == 3) then ! OSPRE (OP)
-            flux_lim_func = (15d-1*(slope**2d0 + slope))/(slope**2d0 + slope + 1d0)
-        elseif (flux_lim == 4) then ! SUPERBEE (SB)
-            flux_lim_func = max(0d0, min(1d0, 2d0*slope), min(slope, 2d0))
-        elseif (flux_lim == 5) then ! SWEBY (SW) (beta = 1.5)
-            flux_lim_func = max(0d0, min(15d-1*slope, 1d0), min(slope, 15d-1))
-        elseif (flux_lim == 6) then ! VAN ALBADA (VA)
-            flux_lim_func = (slope**2d0 + slope)/(slope**2d0 + 1d0)
-        elseif (flux_lim == 7) then ! VAN LEER (VL)
-            flux_lim_func = (abs(slope) + slope)/(1d0 + abs(slope))
-        end if
-    end subroutine s_compute_flux_limiter ! --------------------------------
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -3022,15 +2381,6 @@ contains
 
         if (any(Re_size > 0)) allocate (Re_avg_rs_vf(1:2))
 
-        if (tvd_riemann_flux) then
-            allocate (q_prim_rs_vf(1:sys_size))
-            allocate (lo_alpha_rho_L(1:cont_idx%end), lo_vel_L(1:num_dims))
-            allocate (lo_alpha_rho_R(1:cont_idx%end), lo_vel_R(1:num_dims))
-            allocate (lo_alpha_L(1:num_fluids))
-            allocate (lo_alpha_R(1:num_fluids))
-            allocate (lo_We_L(1:num_fluids, 1:num_fluids))
-            allocate (lo_We_R(1:num_fluids, 1:num_fluids))
-        end if
 
         if (riemann_solver == 3) then
             allocate (alpha_rho_IC(1:cont_idx%end), vel_IC(1:num_dims))
@@ -3064,10 +2414,6 @@ contains
             allocate (tau_e_L(1:(num_dims*(num_dims + 1)/2)) &
                       , tau_e_R(1:(num_dims*(num_dims + 1)/2)))
 
-            if (tvd_riemann_flux) then
-                allocate (lo_tau_e_L(1:(num_dims*(num_dims + 1)/2)) &
-                          , lo_tau_e_R(1:(num_dims*(num_dims + 1)/2)))
-            end if
 
             if (riemann_solver == 3) then
                 allocate (tau_e_IC(1:(num_dims*(num_dims + 1)/2)))
@@ -3746,11 +3092,6 @@ contains
             allocate (qR_prim_rs_vf(i)%sf(is1%beg + 1:is1%end + 1, &
                                           is2%beg:is2%end, &
                                           is3%beg:is3%end))
-            if (tvd_riemann_flux) then
-                allocate (q_prim_rs_vf(i)%sf(s1beg:s1end, &
-                                             s2beg:s2end, &
-                                             s3beg:s3end))
-            end if
         end do
 
         do i = 1, crv_size
@@ -3852,11 +3193,6 @@ contains
                 qR_prim_rs_vf(i)%sf = qR_prim_vf(i)%sf(ix%beg + 1:ix%end + 1, &
                                                        iy%beg:iy%end, &
                                                        iz%beg:iz%end)
-                if (tvd_riemann_flux) then
-                    q_prim_rs_vf(i)%sf = q_prim_vf(i)%sf(xbeg:xend, &
-                                                         ybeg:yend, &
-                                                         zbeg:zend)
-                end if
             end do
             do i = 1, crv_size
                 kappaL_rs_vf(crv_idx(i))%sf = kappaL_vf(crv_idx(i))%sf( &
@@ -3882,14 +3218,6 @@ contains
                             qR_prim_vf(i)%sf(j, k + 1, iz%beg:iz%end)
                     end do
                 end do
-                if (tvd_riemann_flux) then
-                    do j = xbeg, xend
-                        do k = ybeg, yend
-                            q_prim_rs_vf(i)%sf(k, j, :) = &
-                                q_prim_vf(i)%sf(j, k, zbeg:zend)
-                        end do
-                    end do
-                end if
             end do
 
             do i = 1, crv_size
@@ -3916,14 +3244,6 @@ contains
                             qR_prim_vf(i)%sf(j, iy%beg:iy%end, k + 1)
                     end do
                 end do
-                if (tvd_riemann_flux) then
-                    do j = xbeg, xend
-                        do k = zbeg, zend
-                            q_prim_rs_vf(i)%sf(k, :, j) = &
-                                q_prim_vf(i)%sf(j, ybeg:yend, k)
-                        end do
-                    end do
-                end if
             end do
 
             do i = 1, crv_size
@@ -5461,7 +4781,6 @@ contains
         ! Deallocating Left, Right and Average Riemann Problem States ======
         do i = 1, sys_size
             deallocate (qL_prim_rs_vf(i)%sf, qR_prim_rs_vf(i)%sf)
-            if (tvd_riemann_flux) deallocate (q_prim_rs_vf(i)%sf)
         end do
 
         do i = 1, crv_size
@@ -5549,15 +4868,6 @@ contains
         deallocate (We_L, We_R)
 
         if (any(Re_size > 0)) deallocate (Re_avg_rs_vf)
-
-        if (tvd_riemann_flux) then
-            deallocate (q_prim_rs_vf)
-            deallocate (lo_alpha_rho_L, lo_vel_L)
-            deallocate (lo_alpha_rho_R, lo_vel_R)
-            deallocate (lo_alpha_L)
-            deallocate (lo_alpha_R)
-            deallocate (lo_We_L, lo_We_R)
-        end if
 
         if (riemann_solver == 3) then
             deallocate (alpha_rho_IC, vel_IC)

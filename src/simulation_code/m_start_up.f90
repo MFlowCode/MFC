@@ -114,8 +114,7 @@ contains
             fd_order, probe, num_probes, t_step_old, &
             threshold_mf, moment_order, alt_crv, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
-            tvd_riemann_flux, tvd_rhs_flux, &
-            tvd_wave_speeds, flux_lim, We_rhs_flux, &
+            We_rhs_flux, &
             We_riemann_flux, We_src, null_weights, &
             We_wave_speeds, lsq_deriv, precision, &
             parallel_io, &
@@ -285,11 +284,6 @@ contains
         elseif (model_eqns == 3 .and. (alt_soundspeed .or. regularization)) then
             print '(A)', 'Unsupported combination of values of '// &
                 'model_eqns (6-eq) and alt_soundspeed or regularization. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. (tvd_riemann_flux .or. tvd_wave_speeds)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and tvd_riemann_flux or tvd_wave_speeds. '// &
                 'Exiting ...'
             call s_mpi_abort()
         elseif (model_eqns == 3 .and. avg_state == 1) then
@@ -555,31 +549,6 @@ contains
         elseif (regularization .and. n == 0) then
             print '(A)', 'Unsupported combination of regularization '// &
                 'and value of n. Exiting ...'
-            call s_mpi_abort()
-        elseif (tvd_rhs_flux .and. tvd_riemann_flux) then
-            print '(A)', 'Unsupported combination of tvd_rhs_flux '// &
-                'and tvd_riemann_flux. Exiting ...'
-            call s_mpi_abort()
-        elseif (tvd_wave_speeds .and. (tvd_riemann_flux .neqv. .true.)) then
-            print '(A)', 'Unsupported combination of tvd_riemann_flux '// &
-                'and tvd_wave_speeds. Exiting ...'
-            call s_mpi_abort()
-        elseif ((tvd_rhs_flux .or. tvd_riemann_flux .or. tvd_wave_speeds) &
-                .and. &
-                (flux_lim == dflt_int)) then
-            print '(A)', 'Unsupported combination of tvd_rhs_flux/'// &
-                'tvd_riemann_flux/tvd_wave_speeds and flux_lim. Exiting ...'
-            call s_mpi_abort()
-        elseif ((flux_lim /= dflt_int) .and. (tvd_rhs_flux .neqv. .true.) .and. &
-                (tvd_riemann_flux .neqv. .true.) .and. (tvd_wave_speeds .neqv. .true.)) then
-            print '(A)', 'Unsupported combination of tvd_rhs_flux/'// &
-                'tvd_riemann_flux/tvd_wave_speeds and flux_lim. Exiting ...'
-            call s_mpi_abort()
-        elseif (tvd_riemann_flux .and. (riemann_solver == 3)) then
-            print '(A)', 'Unsupported combination of tvd_riemann_flux '// &
-                'and choice of riemann_solver. Exiting ...'
-        elseif (all(flux_lim /= (/dflt_int, 1, 2, 3, 4, 5, 6, 7/))) then
-            print '(A)', 'Unsupported value of flux_lim. Exiting ...'
             call s_mpi_abort()
         elseif ((We_riemann_flux .neqv. .true.) .and. We_wave_speeds) then
             print '(A)', 'Unsupported combination of We_riemann_flux and '// &

@@ -204,7 +204,6 @@ module m_rhs
 
     !> @name Additional variables for applying a flux limiter to the advection equation
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: flux_lim_func
     type(vector_field), allocatable, dimension(:, :, :) :: lo_flux_ndqp
     type(vector_field), allocatable, dimension(:, :, :) :: lo_flux_src_ndqp
     type(vector_field), allocatable, dimension(:, :, :) :: lo_flux_gsrc_ndqp
@@ -648,7 +647,7 @@ contains
 
         ! Allocation of dq_prim_ds_qp ======================================
 
-        if (any(Re_size > 0) .or. We_size > 0 .or. tvd_rhs_flux .or. hypoelasticity) then
+        if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
 
             allocate (dq_prim_dx_qp(ieta%beg:ieta%end, &
                                     iksi%beg:iksi%end, &
@@ -1203,28 +1202,6 @@ contains
                                  ipsi%beg:ipsi%end))
 
         ! Allocation of variables for flux limiter
-        if (tvd_rhs_flux) then
-            allocate (flux_lim_func(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-
-            allocate (lo_flux_ndqp(1:num_dims, &
-                                   ichi%beg:ichi%end, &
-                                   ipsi%beg:ipsi%end))
-            allocate (lo_flux_src_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (lo_flux_gsrc_ndqp(1:num_dims, &
-                                        ichi%beg:ichi%end, &
-                                        ipsi%beg:ipsi%end))
-            allocate (hi_flux_ndqp(1:num_dims, &
-                                   ichi%beg:ichi%end, &
-                                   ipsi%beg:ipsi%end))
-            allocate (hi_flux_src_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (hi_flux_gsrc_ndqp(1:num_dims, &
-                                        ichi%beg:ichi%end, &
-                                        ipsi%beg:ipsi%end))
-        end if
 
         do k = ipsi%beg, ipsi%end
             do j = ichi%beg, ichi%end
@@ -1295,100 +1272,6 @@ contains
             end do
         end do
 
-        if (tvd_rhs_flux) then
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-                    do i = 1, num_dims
-
-                        allocate (lo_flux_ndqp(i, j, k)%vf(1:sys_size))
-                        allocate (lo_flux_src_ndqp(i, j, k)%vf(1:sys_size))
-                        allocate (lo_flux_gsrc_ndqp(i, j, k)%vf(1:sys_size))
-                        allocate (hi_flux_ndqp(i, j, k)%vf(1:sys_size))
-                        allocate (hi_flux_src_ndqp(i, j, k)%vf(1:sys_size))
-                        allocate (hi_flux_gsrc_ndqp(i, j, k)%vf(1:sys_size))
-
-                        if (abs(j) >= abs(k)) then
-                            if (i == 1) then
-                                do l = 1, sys_size
-                                    allocate (lo_flux_ndqp(i, j, k)%vf(l)%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (hi_flux_ndqp(i, j, k)%vf(l)%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (lo_flux_gsrc_ndqp(i, j, k)%vf(l)%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (hi_flux_gsrc_ndqp(i, j, k)%vf(l)%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                end do
-
-                                if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
-                                    do l = mom_idx%beg, E_idx
-                                        allocate (lo_flux_src_ndqp(i, j, k)%vf(l)%sf( &
-                                                  ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-                                        allocate (hi_flux_src_ndqp(i, j, k)%vf(l)%sf( &
-                                                  ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-                                    end do
-                                end if
-
-                                allocate (lo_flux_src_ndqp(i, j, k)%vf(adv_idx%beg)%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                allocate (hi_flux_src_ndqp(i, j, k)%vf(adv_idx%beg)%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                if (riemann_solver == 1) then
-                                    do l = adv_idx%beg + 1, adv_idx%end
-                                        allocate (lo_flux_src_ndqp(i, j, k)%vf(l)%sf( &
-                                                  ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-                                        allocate (hi_flux_src_ndqp(i, j, k)%vf(l)%sf( &
-                                                  ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-                                    end do
-                                else
-                                    do l = adv_idx%beg + 1, adv_idx%end
-                                        lo_flux_src_ndqp(i, j, k)%vf(l)%sf => &
-                                            lo_flux_src_ndqp(i, j, k)%vf(adv_idx%beg)%sf
-                                        hi_flux_src_ndqp(i, j, k)%vf(l)%sf => &
-                                            hi_flux_src_ndqp(i, j, k)%vf(adv_idx%beg)%sf
-                                    end do
-                                end if
-                            else
-                                do l = 1, sys_size
-                                    lo_flux_ndqp(i, j, k)%vf(l)%sf => &
-                                        lo_flux_ndqp(1, j, k)%vf(l)%sf
-                                    hi_flux_ndqp(i, j, k)%vf(l)%sf => &
-                                        hi_flux_ndqp(1, j, k)%vf(l)%sf
-                                    lo_flux_src_ndqp(i, j, k)%vf(l)%sf => &
-                                        lo_flux_src_ndqp(1, j, k)%vf(l)%sf
-                                    hi_flux_src_ndqp(i, j, k)%vf(l)%sf => &
-                                        hi_flux_src_ndqp(1, j, k)%vf(l)%sf
-                                    lo_flux_gsrc_ndqp(i, j, k)%vf(l)%sf => &
-                                        lo_flux_gsrc_ndqp(1, j, k)%vf(l)%sf
-                                    hi_flux_gsrc_ndqp(i, j, k)%vf(l)%sf => &
-                                        hi_flux_gsrc_ndqp(1, j, k)%vf(l)%sf
-                                end do
-                            end if
-                        end if
-                    end do
-                end do
-            end do
-        end if
         ! END: Allocation/Association of flux_ndqp, flux_src_ndqp, and flux_gsrc_ndqp ===
 
         ! Associating procedural pointer to the subroutine that will be
@@ -1815,99 +1698,50 @@ contains
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
 
-            if (tvd_rhs_flux) then
-                ! Compute Riemann solver flux and source flux
-                do k = ipsi%beg, ipsi%end, 2
-                    do j = ichi%beg, ichi%end, 2
-                        call s_riemann_solver(qR_prim_ndqp(i, j, k)%vf, &
-                                              dqR_prim_dx_ndqp(i, j, k)%vf, &
-                                              dqR_prim_dy_ndqp(i, j, k)%vf, &
-                                              dqR_prim_dz_ndqp(i, j, k)%vf, &
-                                              gm_alphaR_ndqp(i, j, k)%vf, &
-                                              kappaR_ndqp(i, j, k)%vf, &
-                                              qL_prim_ndqp(i, j, k)%vf, &
-                                              dqL_prim_dx_ndqp(i, j, k)%vf, &
-                                              dqL_prim_dy_ndqp(i, j, k)%vf, &
-                                              dqL_prim_dz_ndqp(i, j, k)%vf, &
-                                              gm_alphaL_ndqp(i, j, k)%vf, &
-                                              kappaL_ndqp(i, j, k)%vf, &
-                                              q_prim_qp(0, 0, 0)%vf, &
-                                              hi_flux_ndqp(i, j, k)%vf, &
-                                              hi_flux_src_ndqp(i, j, k)%vf, &
-                                              hi_flux_gsrc_ndqp(i, j, k)%vf, &
-                                              i, ix, iy, iz)
-                    end do
+            ! Computing Riemann Solver Flux and Source Flux =================
+            if (DEBUG) print *, 'about to call s_riemann_solver'
+            do k = ipsi%beg, ipsi%end, 2
+                do j = ichi%beg, ichi%end, 2
+                    call s_riemann_solver(qR_prim_ndqp(i, j, k)%vf, &
+                                          dqR_prim_dx_ndqp(i, j, k)%vf, &
+                                          dqR_prim_dy_ndqp(i, j, k)%vf, &
+                                          dqR_prim_dz_ndqp(i, j, k)%vf, &
+                                          gm_alphaR_ndqp(i, j, k)%vf, &
+                                          kappaR_ndqp(i, j, k)%vf, &
+                                          qL_prim_ndqp(i, j, k)%vf, &
+                                          dqL_prim_dx_ndqp(i, j, k)%vf, &
+                                          dqL_prim_dy_ndqp(i, j, k)%vf, &
+                                          dqL_prim_dz_ndqp(i, j, k)%vf, &
+                                          gm_alphaL_ndqp(i, j, k)%vf, &
+                                          kappaL_ndqp(i, j, k)%vf, &
+                                          q_prim_qp(0, 0, 0)%vf, &
+                                          flux_ndqp(i, j, k)%vf, &
+                                          flux_src_ndqp(i, j, k)%vf, &
+                                          flux_gsrc_ndqp(i, j, k)%vf, &
+                                          i, ix, iy, iz)
                 end do
+            end do
 
-                do l = itau%beg, itau%end, 2
-                    do k = iksi%beg, iksi%end, 2
-                        do j = ieta%beg, ieta%end, 2
-                            call s_riemann_solver(q_prim_qp(j, k, l)%vf, &
-                                                  dq_prim_dx_qp(j, k, l)%vf, &
-                                                  dq_prim_dy_qp(j, k, l)%vf, &
-                                                  dq_prim_dz_qp(j, k, l)%vf, &
-                                                  gm_alpha_qp(j, k, l)%vf, &
-                                                  kappa_vf, &
-                                                  q_prim_qp(j, k, l)%vf, &
-                                                  dq_prim_dx_qp(j, k, l)%vf, &
-                                                  dq_prim_dy_qp(j, k, l)%vf, &
-                                                  dq_prim_dz_qp(j, k, l)%vf, &
-                                                  gm_alpha_qp(j, k, l)%vf, &
-                                                  kappa_vf, &
-                                                  q_prim_qp(0, 0, 0)%vf, &
-                                                  lo_flux_ndqp(i, k, l)%vf, &
-                                                  lo_flux_src_ndqp(i, k, l)%vf, &
-                                                  lo_flux_gsrc_ndqp(i, k, l)%vf, &
-                                                  i, ix, iy, iz)
-                        end do
-                    end do
-                end do
+            ! do j = 1,sys_size
+            !     print*, 'fluxes ', flux_ndqp(i,0,0)%vf(j)%sf(:,0,0)
+            ! end do
+            ! call s_mpi_abort()
+
+            iv%beg = 1; iv%end = adv_idx%end
+
+            call s_average_cell_boundary_values(flux_ndqp(i, :, :))
+
+            if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+                iv%beg = mom_idx%beg
             else
-                ! Computing Riemann Solver Flux and Source Flux =================
-                if (DEBUG) print *, 'about to call s_riemann_solver'
-                do k = ipsi%beg, ipsi%end, 2
-                    do j = ichi%beg, ichi%end, 2
-                        call s_riemann_solver(qR_prim_ndqp(i, j, k)%vf, &
-                                              dqR_prim_dx_ndqp(i, j, k)%vf, &
-                                              dqR_prim_dy_ndqp(i, j, k)%vf, &
-                                              dqR_prim_dz_ndqp(i, j, k)%vf, &
-                                              gm_alphaR_ndqp(i, j, k)%vf, &
-                                              kappaR_ndqp(i, j, k)%vf, &
-                                              qL_prim_ndqp(i, j, k)%vf, &
-                                              dqL_prim_dx_ndqp(i, j, k)%vf, &
-                                              dqL_prim_dy_ndqp(i, j, k)%vf, &
-                                              dqL_prim_dz_ndqp(i, j, k)%vf, &
-                                              gm_alphaL_ndqp(i, j, k)%vf, &
-                                              kappaL_ndqp(i, j, k)%vf, &
-                                              q_prim_qp(0, 0, 0)%vf, &
-                                              flux_ndqp(i, j, k)%vf, &
-                                              flux_src_ndqp(i, j, k)%vf, &
-                                              flux_gsrc_ndqp(i, j, k)%vf, &
-                                              i, ix, iy, iz)
-                    end do
-                end do
-
-                ! do j = 1,sys_size
-                !     print*, 'fluxes ', flux_ndqp(i,0,0)%vf(j)%sf(:,0,0)
-                ! end do
-                ! call s_mpi_abort()
-
-                iv%beg = 1; iv%end = adv_idx%end
-
-                call s_average_cell_boundary_values(flux_ndqp(i, :, :))
-
-                if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
-                    iv%beg = mom_idx%beg
-                else
-                    iv%beg = adv_idx%beg
-                end if
-
-                if (riemann_solver /= 1) iv%end = adv_idx%beg
-
-                call s_average_cell_boundary_values(flux_src_ndqp(i, :, :))
-                call s_average_cell_boundary_values(flux_gsrc_ndqp(i, :, :))
-                ! ===============================================================
+                iv%beg = adv_idx%beg
             end if
+
+            if (riemann_solver /= 1) iv%end = adv_idx%beg
+
+            call s_average_cell_boundary_values(flux_src_ndqp(i, :, :))
+            call s_average_cell_boundary_values(flux_gsrc_ndqp(i, :, :))
+            ! ===============================================================
 
             if (alt_soundspeed .or. regularization) then
                 do j = 0, m
@@ -1937,7 +1771,6 @@ contains
 
                 ! Compute upwind slope and flux limiter function value if TVD
                 ! flux limiter is chosen
-                if (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf, i)
 
                 ! Applying characteristic boundary conditions
                 if (bc_x%beg <= -5) then
@@ -2337,7 +2170,6 @@ contains
                 ! Compute upwind slope and flux limiter function value if TVD
                 ! flux limiter is chosen
 
-                if (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf, i)
 
                 ! Applying characteristic boundary conditions
                 if (bc_y%beg <= -5 .and. bc_y%beg /= -13) then
@@ -2735,7 +2567,6 @@ contains
                 if (DEBUG) print *, 'dir = 3'
                 ! Compute upwind slope and flux limiter function value if TVD
                 ! flux limiter is chosen
-                if (tvd_rhs_flux) call s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf, i)
 
                 ! Applying characteristic boundary conditions
                 if (bc_z%beg <= -5) then
@@ -3129,50 +2960,6 @@ contains
         ! ==================================================================
 
     end subroutine s_compute_rhs ! -----------------------------------------
-
-    !>  This subroutine takes the consecutive changes in volume fraction
-        !!  at a cell boundary and computes the desired slope and flux limiter
-        !!  function value at the cell boundary
-        !!  @param top The top flux limiter
-        !!  @param bottom The bottom flux limiter
-        !!  @param flux_lim_func The flux limiter
-    subroutine s_compute_flux_lim(top, bottom, flux_lim_func) ! ---------------
-
-        real(kind(0d0)), intent(INOUT) :: top, bottom
-        real(kind(0d0)) :: slope
-        real(kind(0d0)), intent(OUT) :: flux_lim_func
-
-        ! Limit the flux limiter to be applied only where the change in
-        ! volume fraction is greater than machine precision so that insignificant
-        ! fluctuations do not trip the limiter
-        if (abs(top) < 1d-8) top = 0d0
-        if (abs(bottom) < 1d-8) bottom = 0d0
-        ! If top = bottom, then cell is in a smooth region of the flow
-        ! and the high order flux should be used. Also ensures that areas
-        ! of no change in volume fraction (0/0) use the high order flux
-        if (top == bottom) then
-            slope = 1d0
-        else
-            slope = (top*bottom)/max(bottom**2d0, sgm_eps)
-        end if
-
-        ! Flux limiter function
-        if (flux_lim == 1) then ! MINMOD (MM)
-            flux_lim_func = max(0d0, min(1d0, slope))
-        elseif (flux_lim == 2) then ! MUSCL (MC)
-            flux_lim_func = max(0d0, min(2d0*slope, 5d-1*(1d0 + slope), 2d0))
-        elseif (flux_lim == 3) then ! OSPRE (OP)
-            flux_lim_func = (15d-1*(slope**2d0 + slope))/(slope**2d0 + slope + 1d0)
-        elseif (flux_lim == 4) then ! SUPERBEE (SB)
-            flux_lim_func = max(0d0, min(1d0, 2d0*slope), min(slope, 2d0))
-        elseif (flux_lim == 5) then ! SWEBY (SW) (beta = 1.5)
-            flux_lim_func = max(0d0, min(15d-1*slope, 1d0), min(slope, 15d-1))
-        elseif (flux_lim == 6) then ! VAN ALBADA (VA)
-            flux_lim_func = (slope**2d0 + slope)/(slope**2d0 + 1d0)
-        elseif (flux_lim == 7) then ! VAN LEER (VL)
-            flux_lim_func = (abs(slope) + slope)/(1d0 + abs(slope))
-        end if
-    end subroutine s_compute_flux_lim ! ------------------------------------
 
     !> The purpose of this subroutine is to compute the viscous
         !!      stress tensor for the cells directly next to the axis in
@@ -4346,94 +4133,6 @@ contains
         !!  @param q_prim_vf Cell-averaged primitive variables
         !!  @param rhs_vf Cell-averaged RHS variables
         !!  @param i Dimensional splitting index
-    subroutine s_get_tvd_flux(q_cons_vf, q_prim_vf, rhs_vf, i) ! -------
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        integer, intent(in) :: i
-
-        integer :: j, k, l, r !< Generic loop iterators
-
-        real(kind(0d0)) :: top, bottom
-
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
-                    ! Upwind direction for slope chosen based on contact velocity
-                    ! from Riemann solver (stored in adv_idx of flux_src). Slope
-                    ! is calculated using the first volume fraction.
-                    if (hi_flux_src_ndqp(i, 0, 0)%vf(adv_idx%beg)%sf(j, k, l) >= 0d0) then
-                        top = q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j, k, l) - &
-                              q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j - 1, k, l)
-                        bottom = q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                                 q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j, k, l)
-                    else
-                        top = q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j + 2, k, l) - &
-                              q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j + 1, k, l)
-                        bottom = q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                                 q_prim_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j, k, l)
-                    end if
-
-                    call s_compute_flux_lim(top, bottom, flux_lim_func(j, k, l))
-                end do
-            end do
-        end do
-
-        ! Compile final flux and flux source
-        do k = ipsi%beg, ipsi%end, 2
-            do j = ichi%beg, ichi%end, 2
-                do l = 1, sys_size
-                    flux_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) = &
-                        lo_flux_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) + &
-                        flux_lim_func(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end)* &
-                        (hi_flux_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) - &
-                         lo_flux_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                end do
-
-                if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
-                    do l = mom_idx%beg, E_idx
-                        flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) = &
-                            lo_flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) + &
-                            flux_lim_func(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end)* &
-                            (hi_flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) - &
-                             lo_flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                    end do
-                end if
-                do l = adv_idx%beg, adv_idx%end
-                    flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) = &
-                        lo_flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) + &
-                        flux_lim_func(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end)* &
-                        (hi_flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) - &
-                         lo_flux_src_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                end do
-                if (cyl_coord) then
-                    do l = 1, sys_size
-                        flux_gsrc_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) = &
-                            lo_flux_gsrc_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) + &
-                            flux_lim_func(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end)* &
-                            (hi_flux_gsrc_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end) - &
-                             lo_flux_gsrc_ndqp(i, j, k)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                    end do
-                end if
-            end do
-        end do
-
-        iv%beg = 1; iv%end = adv_idx%end
-
-        call s_average_cell_boundary_values(flux_ndqp(i, :, :))
-
-        if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
-            iv%beg = mom_idx%beg
-        else
-            iv%beg = adv_idx%beg
-        end if
-
-        if (riemann_solver /= 1) iv%end = adv_idx%beg
-
-        call s_average_cell_boundary_values(flux_src_ndqp(i, :, :))
-        call s_average_cell_boundary_values(flux_gsrc_ndqp(i, :, :))
-    end subroutine s_get_tvd_flux
 
     !>  Computes viscous terms
         !!  @param q_cons_vf Cell-averaged conservative variables
@@ -6955,65 +6654,6 @@ contains
                 deallocate (reg_src_vf(i)%sf)
             end do
             deallocate (reg_src_vf)
-        end if
-
-        if (tvd_rhs_flux) then
-            ! Deallocation of flux limiter variables
-            deallocate (flux_lim_func)
-
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-                    do i = num_dims, 1, -1
-                        if (abs(j) >= abs(k)) then
-                            if (i /= 1) then
-                                do l = 1, sys_size
-                                    nullify (lo_flux_ndqp(i, j, k)%vf(l)%sf)
-                                    nullify (hi_flux_ndqp(i, j, k)%vf(l)%sf)
-                                    nullify (lo_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                    nullify (hi_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                    nullify (lo_flux_gsrc_ndqp(i, j, k)%vf(l)%sf)
-                                    nullify (hi_flux_gsrc_ndqp(i, j, k)%vf(l)%sf)
-                                end do
-                            else
-                                do l = 1, sys_size
-                                    deallocate (lo_flux_ndqp(i, j, k)%vf(l)%sf)
-                                    deallocate (hi_flux_ndqp(i, j, k)%vf(l)%sf)
-                                    deallocate (lo_flux_gsrc_ndqp(i, j, k)%vf(l)%sf)
-                                    deallocate (hi_flux_gsrc_ndqp(i, j, k)%vf(l)%sf)
-                                end do
-
-                                if (any(Re_size > 0) .or. We_size > 0) then
-                                    do l = mom_idx%beg, E_idx
-                                        deallocate (lo_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                        deallocate (hi_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                    end do
-                                end if
-
-                                if (riemann_solver == 1) then
-                                    do l = adv_idx%beg + 1, adv_idx%end
-                                        deallocate (lo_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                        deallocate (hi_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                    end do
-                                else
-                                    do l = adv_idx%beg + 1, adv_idx%end
-                                        nullify (lo_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                        nullify (hi_flux_src_ndqp(i, j, k)%vf(l)%sf)
-                                    end do
-                                end if
-
-                                deallocate (lo_flux_src_ndqp(i, j, k)%vf(adv_idx%beg)%sf)
-                                deallocate (hi_flux_src_ndqp(i, j, k)%vf(adv_idx%beg)%sf)
-                            end if
-                        end if
-
-                        deallocate (lo_flux_ndqp(i, j, k)%vf, lo_flux_src_ndqp(i, j, k)%vf, lo_flux_gsrc_ndqp(i, j, k)%vf)
-                        deallocate (hi_flux_ndqp(i, j, k)%vf, hi_flux_src_ndqp(i, j, k)%vf, hi_flux_gsrc_ndqp(i, j, k)%vf)
-                    end do
-                end do
-            end do
-
-            deallocate (lo_flux_ndqp, lo_flux_src_ndqp, lo_flux_gsrc_ndqp)
-            deallocate (hi_flux_ndqp, hi_flux_src_ndqp, hi_flux_gsrc_ndqp)
         end if
 
         ! Deallocation/Disassociation of flux_ndqp, flux_src_ndqp, and flux_gsrc_ndqp ====

@@ -138,10 +138,6 @@ module m_global_parameters
     real(kind(0d0)) :: reg_eps        !< User-defined interface thickness parameter for regularization terms
     logical         :: null_weights   !< Null undesired WENO weights
     logical         :: mixture_err    !< Mixture properties correction
-    logical         :: tvd_riemann_flux !< Apply TVD flux limiter to left and right states inside Riemann solver
-    logical         :: tvd_rhs_flux   !< Apply TVD flux limiter to to intercell fluxes outside Riemann solver
-    logical         :: tvd_wave_speeds!< Use TVD wavespeeds when computing fluxes inside Riemann solver
-    integer         :: flux_lim       !< Choice of flux limiter
     logical         :: We_riemann_flux !< Account for capillary effects in the Riemann solver
     logical         :: We_rhs_flux    !< Account for capillary effects using the conservative formulation in RHS
     logical         :: We_src         !< Account for capillary effects in non-conservative formulation in RHS
@@ -388,10 +384,6 @@ contains
         reg_eps = dflt_real
         null_weights = .false.
         mixture_err = .false.
-        tvd_riemann_flux = .false.
-        tvd_rhs_flux = .false.
-        tvd_wave_speeds = .false.
-        flux_lim = dflt_int
         We_riemann_flux = .false.
         We_rhs_flux = .false.
         We_src = .false.
