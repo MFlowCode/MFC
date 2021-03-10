@@ -259,14 +259,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(mixture_err, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(tvd_riemann_flux, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(tvd_rhs_flux, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(tvd_wave_speeds, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(flux_lim, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(We_riemann_flux, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(We_rhs_flux, 1, MPI_LOGICAL, &
