@@ -70,7 +70,6 @@ module m_variables_conversion
  s_convert_primitive_to_flux_variables_bubbles, &
  s_convert_characteristic_to_conservative_variables, &
  s_convert_characteristic_to_primitive_variables, &
- s_compute_lsq_gradient_curvature, &
  s_finalize_variables_conversion_module
 
     abstract interface ! =======================================================
@@ -85,13 +84,12 @@ module m_variables_conversion
         !! @param gamma_K Mixture sp. heat ratio
         !! @param pi_inf_K Mixture stiffness function
         !! @param Re_K Reynolds number
-        !! @param We_K Weber number
         !! @param i Cell location first index
         !! @param j Cell location second index
         !! @param k Cell location third index
         subroutine s_convert_abstract_to_mixture_variables(qK_vf, rho_K, &
                                                            gamma_K, pi_inf_K, &
-                                                           Re_K, We_K, i, j, k, G_K, G)
+                                                           Re_K, i, j, k, G_K, G)
 
             import :: scalar_field, sys_size, num_fluids
 
@@ -100,9 +98,6 @@ module m_variables_conversion
             real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
 
             real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
-
-            real(kind(0d0)), dimension(num_fluids, &
-                                       num_fluids), intent(OUT) :: We_K
 
             integer, intent(IN) :: i, j, k
 
@@ -137,7 +132,6 @@ module m_variables_conversion
     real(kind(0d0))                              ::  gamma_L, gamma_R      !< left/right states specific heat ratio
     real(kind(0d0))                              :: pi_inf_L, pi_inf_R      !< left/right states liquid stiffness
     real(kind(0d0)), dimension(2)   ::     Re_L, Re_R      !< left/right states Reynolds number
-    real(kind(0d0)), allocatable, dimension(:, :) ::     We_L, We_R      !< left/right states Weber number
     real(kind(0d0))                              ::   alpha_L, alpha_R    !< left/right states void fraction
     !> @}
 
@@ -179,19 +173,15 @@ contains
         !! @param gamma_K  specific heat ratio function
         !! @param pi_inf_K liquid stiffness
         !! @param Re_k Reynolds number
-        !! @param We_K Weber number
     subroutine s_convert_mixture_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
-                                                      Re_K, We_K, i, j, k, G_K, G)
+                                                      Re_K, i, j, k, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
 
         real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
-
-        real(kind(0d0)), dimension(num_fluids, &
-                                   num_fluids), intent(OUT) :: We_K
 
         integer, intent(IN) :: i, j, k
 
@@ -217,22 +207,18 @@ contains
         !! @param gamma_K specific heat ratio
         !! @param pi_inf_K liquid stiffness
         !! @param Re_K mixture Reynolds number
-        !! @param We_K mixture Weber number
         !! @param i Cell index
         !! @param j Cell index
         !! @param k Cell index
     subroutine s_convert_species_to_mixture_variables_bubbles(qK_vf, rho_K, &
                                                               gamma_K, pi_inf_K, &
-                                                              Re_K, We_K, i, j, k, G_K, G)
+                                                              Re_K, i, j, k, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
 
         real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
-
-        real(kind(0d0)), dimension(num_fluids, &
-                                   num_fluids), intent(OUT) :: We_K
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K  !<
             !! Partial densities and volume fractions
@@ -297,23 +283,18 @@ contains
         !! @param gamma_K specific heat ratio
         !! @param pi_inf_K liquid stiffness
         !! @param Re_K mixture Reynolds number
-        !! @param We_K mixture Weber number
         !! @param k Cell index
         !! @param l Cell index
         !! @param r Cell index
     subroutine s_convert_species_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
-                                                      Re_K, We_K, k, l, r, G_K, G)
+                                                      Re_K,  k, l, r, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
 
         real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
-
-        ! Weber numbers
-        real(kind(0d0)), dimension(num_fluids, &
-                                   num_fluids), intent(OUT) :: We_K
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
@@ -370,17 +351,6 @@ contains
 
         end do
 
-        ! Computing the Weber numbers from species analogs
-        do i = 1, We_size
-            We_K(We_idx(i, 1), We_idx(i, 2)) = (alpha_K(We_idx(i, 1)) + &
-                                                alpha_K(We_idx(i, 2))) &
-                                               /(alpha_K(We_idx(i, 1))/ &
-                                                 fluid_pp(We_idx(i, 1))%We(We_idx(i, 2)) + &
-                                                 alpha_K(We_idx(i, 2))/ &
-                                                 fluid_pp(We_idx(i, 2))%We(We_idx(i, 1)) + &
-                                                 sgm_eps)
-            We_K(We_idx(i, 2), We_idx(i, 1)) = dflt_real
-        end do
 
         if (present(G_K)) then
             G_K = 0d0
@@ -492,9 +462,6 @@ contains
             allocate (vel_R(1:num_dims), mf_R(1:cont_idx%end))
             allocate (vel_avg(1:num_dims), mf_avg_vf(1:cont_idx%end))
 
-            allocate (We_L(1:num_fluids, 1:num_fluids))
-            allocate (We_R(1:num_fluids, 1:num_fluids))
-
             if (avg_state == 1) then
                 s_compute_average_state => s_compute_roe_average_state
             else
@@ -537,12 +504,10 @@ contains
         ! numbers and the Weber numbers
         real(kind(0d0))                                   ::      rho_K
         real(kind(0d0))                                   :: dyn_pres_K
-        real(kind(0d0))                                   ::     E_We_K
         real(kind(0d0))                                   ::    gamma_K
         real(kind(0d0))                                   ::   pi_inf_K
         real(kind(0d0))                                   ::       nbub
         real(kind(0d0)), dimension(2)                     ::       Re_K
-        real(kind(0d0)), dimension(num_fluids, num_fluids) ::       We_K
         real(kind(0d0)), dimension(nb) :: nRtmp
 
         integer :: i, j, k, l !< Generic loop iterators
@@ -552,12 +517,12 @@ contains
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
 
-                    dyn_pres_K = 0d0; E_We_K = 0d0
+                    dyn_pres_K = 0d0
 
                     if (model_eqns .ne. 4) then
                         call s_convert_to_mixture_variables(qK_cons_vf, rho_K, &
                                                             gamma_K, pi_inf_K, &
-                                                            Re_K, We_K, j, k, l)
+                                                            Re_K, j, k, l)
                         !no mixture variables if single bubble mixture
                     end if
 
@@ -577,17 +542,6 @@ contains
                         end if
                     end do
 
-                    if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-                        do i = 1, We_size
-                            E_We_K = E_We_K &
-                                     + qK_cons_vf(E_idx + We_idx(i, 1))%sf(j, k, l)* &
-                                     gm_alphaK_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                     We_K(We_idx(i, 1), We_idx(i, 2)) &
-                                     + qK_cons_vf(E_idx + We_idx(i, 2))%sf(j, k, l)* &
-                                     gm_alphaK_vf(We_idx(i, 1))%sf(j, k, l)/ &
-                                     We_K(We_idx(i, 1), We_idx(i, 2))
-                        end do
-                    end if
 
                     ! compute pressure
                     if ((model_eqns .ne. 4) .and. (bubbles .neqv. .true.)) then
@@ -596,14 +550,14 @@ contains
                             (qK_cons_vf(E_idx)%sf(j, k, l) &
                              - dyn_pres_K &
                              - pi_inf_K &
-                             - E_We_K)/gamma_K
+                             )/gamma_K
                     else if ((model_eqns .ne. 4) .and. (num_fluids == 1)) then
                         ! p_l = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                         qK_prim_vf(E_idx)%sf(j, k, l) = &
                             ((qK_cons_vf(E_idx)%sf(j, k, l) &
                               - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) &
                              - pi_inf_K &
-                             - E_We_K)/gamma_K
+                             )/gamma_K
                         ! qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.3d0
                         ! qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.7d0
 
@@ -613,7 +567,7 @@ contains
                             ((qK_cons_vf(E_idx)%sf(j, k, l) &
                               - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) &
                              - pi_inf_K &
-                             - E_We_K)/gamma_K
+                             )/gamma_K
                     else
                         ! Tait EOS
                         ! p_l = (pl0 + pi_infty)(rho/(rho_l0(1-alf)))^gamma - pi_infty
@@ -911,7 +865,6 @@ contains
         real(kind(0d0))                                   ::     gamma_K
         real(kind(0d0))                                   ::    pi_inf_K
         real(kind(0d0)), dimension(2)                     ::        Re_K
-        real(kind(0d0)), dimension(num_fluids, num_fluids) ::        We_K
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -933,7 +886,7 @@ contains
 
                     call s_convert_to_mixture_variables(qK_prim_vf, rho_K, &
                                                         gamma_K, pi_inf_K, &
-                                                        Re_K, We_K, j, k, l)
+                                                        Re_K, j, k, l)
 
                     ! Computing the energy from the pressure
                     E_K = gamma_K*pres_K + pi_inf_K &
@@ -1018,7 +971,6 @@ contains
         real(kind(0d0))                                   ::     gamma_K
         real(kind(0d0))                                   ::    pi_inf_K
         real(kind(0d0)), dimension(2)                     ::        Re_K
-        real(kind(0d0)), dimension(num_fluids, num_fluids) ::        We_K
 
         ! Generic loop iterators
         integer :: i, j, k, l
@@ -1043,7 +995,7 @@ contains
 
                     call s_convert_to_mixture_variables(qK_prim_vf, rho_K, &
                                                         gamma_K, pi_inf_K, &
-                                                        Re_K, We_K, j, k, l)
+                                                        Re_K, j, k, l)
 
                     ! mass flux, \rho u
                     do i = 1, cont_idx%end
@@ -1220,11 +1172,11 @@ contains
                         call s_convert_to_mixture_variables(q_rs_wsK(r)%vf, &
                                                             rho_L, gamma_L, &
                                                             pi_inf_L, Re_L, &
-                                                            We_L, j, k, l)
+                                                            j, k, l)
                         call s_convert_to_mixture_variables(q_rs_wsK(r + 1)%vf, &
                                                             rho_R, gamma_R, &
                                                             pi_inf_R, Re_R, &
-                                                            We_R, j, k, l)
+                                                            j, k, l)
 
                         do i = 1, num_dims
                             vel_L(i) = q_rs_wsK(r)%vf(cont_idx%end + i)%sf(j, k, l)
@@ -1289,132 +1241,6 @@ contains
 
     end subroutine s_finalize_characteristic_decomposition ! ---------------
 
-    subroutine s_compute_lsq_gradient_curvature(v_vf, grad_x_vf, grad_y_vf, grad_z_vf, norm_vf, kappa_vf)
-
-        type(scalar_field), dimension(sys_size), intent(IN)      :: v_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT)   :: grad_x_vf, grad_y_vf, grad_z_vf
-        type(scalar_field), dimension(num_fluids), intent(INOUT) :: norm_vf
-        type(scalar_field), dimension(num_fluids), intent(INOUT) :: kappa_vf
-        real(kind(0d0)), allocatable, dimension(:, :) :: A
-        real(kind(0d0)), allocatable, dimension(:) :: sol, b, AA
-        real(kind(0d0)) :: xloc, yloc, zloc
-        integer :: ndim
-        integer :: i, j, k, ii, jj, kk, i1, i2, l
-        integer :: stencil_i_min, stencil_i_max
-        integer :: stencil_j_min, stencil_j_max
-        integer :: stencil_k_min, stencil_k_max
-        type(bounds_info) :: ix, iy, iz
-        real(kind(0d0)) :: norm, kappa
-
-        if (p > 0) then ! 3D simulation
-            allocate (A(10, 10))
-            allocate (sol(10)); allocate (b(10)); allocate (AA(10))
-        else ! 2D simulation
-            allocate (A(6, 6))
-            allocate (sol(6)); allocate (b(6)); allocate (AA(6))
-        end if
-
-        ! Parabolic fitting
-        ndim = size(sol, 1)
-
-        ix%beg = -buff_size; iy%beg = -buff_size
-        ix%end = m + buff_size; iy%end = n + buff_size
-        if (p > 0) then
-            iz%beg = -buff_size; iz%end = p + buff_size
-        else
-            iz%beg = -1; iz%end = 1
-        end if
-
-        do l = 1, crv_size
-            do k = iz%beg + 1, iz%end - 1
-                do j = iy%beg + 1, iy%end - 1
-                    do i = ix%beg + 1, ix%end - 1
-                        A(:, :) = 0d0
-                        b(:) = 0d0
-                        sol(:) = 0d0
-                        AA(:) = 0d0
-
-                        stencil_i_min = i - 1; stencil_i_max = i + 1
-                        stencil_j_min = j - 1; stencil_j_max = j + 1
-                        if (p > 0) then
-                            stencil_k_min = k - 1; stencil_k_max = k + 1
-                        else
-                            stencil_k_min = 0; stencil_k_max = 0
-                        end if
-
-                        do kk = stencil_k_min, stencil_k_max
-                            do jj = stencil_j_min, stencil_j_max
-                                do ii = stencil_i_min, stencil_i_max
-
-                                    ! Ignore corner points in 3D stencil
-                                    if ((p > 0) .and. (abs(ii - i) == 1) .and. (abs(jj - j) == 1) .and. (abs(kk - k) == 1)) cycle
-
-                                    ! Find distance between cell centers
-                                    xloc = x_cc(ii) - x_cc(i)
-                                    yloc = y_cc(jj) - y_cc(j)
-                                    if (p > 0) zloc = z_cc(kk) - z_cc(k)
-
-                                    ! Compute operator
-                                    AA(1) = 1d0
-                                    AA(2) = xloc
-                                    AA(3) = yloc
-                                    AA(4) = 5d-1*xloc**2d0
-                                    AA(5) = 5d-1*yloc**2d0
-                                    AA(6) = xloc*yloc
-                                    if (p > 0) then
-                                        AA(7) = zloc
-                                        AA(8) = 5d-1*zloc**2d0
-                                        AA(9) = yloc*zloc
-                                        AA(10) = zloc*xloc
-                                    end if
-
-                                    do i1 = 1, ndim
-                                        do i2 = 1, ndim
-                                            A(i1, i2) = A(i1, i2) + AA(i1)*AA(i2)
-                                        end do
-                                    end do
-
-                                    ! Form RHS vector
-                                    do i1 = 1, ndim
-                                        b(i1) = b(i1) + v_vf(E_idx + crv_idx(l))%sf(ii, jj, kk)*AA(i1)
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        call s_solve_linear_system(A, b, sol, ndim)
-
-                        if (p > 0) then
-                            norm = sqrt(sol(2)**2d0 + sol(3)**2d0 + sol(7)**2d0)
-                        else
-                            norm = sqrt(sol(2)**2d0 + sol(3)**2d0)
-                        end if
-
-                        grad_x_vf(E_idx + crv_idx(l))%sf(i, j, k) = sol(2)
-                        grad_y_vf(E_idx + crv_idx(l))%sf(i, j, k) = sol(3)
-                        if (p > 0) then
-                            grad_z_vf(E_idx + crv_idx(l))%sf(i, j, k) = sol(7)
-                        end if
-
-                        if (p > 0) then
-                            kappa = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(2)**2d0*sol(8) + &
-                                      sol(3)**2d0*sol(8) - 2d0*sol(3)*sol(7)*sol(9) + sol(3)**2d0*sol(4) + &
-                                      sol(7)**2d0*sol(4) - 2d0*sol(7)*sol(2)*sol(10) + sol(7)**2d0*sol(5)) &
-                                    /max(norm, sgm_eps)**3d0
-                        else
-                            kappa = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(3)**2d0*sol(4)) &
-                                    /max(norm, sgm_eps)**3d0
-                        end if
-                        norm_vf(crv_idx(l))%sf(i, j, k) = norm
-                        kappa_vf(crv_idx(l))%sf(i, j, k) = kappa
-                    end do
-                end do
-            end do
-        end do
-
-        deallocate (A, sol, b, AA)
-
-    end subroutine s_compute_lsq_gradient_curvature
 
     subroutine s_solve_linear_system(A, b, sol, ndim)
 
@@ -1490,8 +1316,6 @@ contains
             deallocate (vel_L, mf_L)
             deallocate (vel_R, mf_R)
             deallocate (vel_avg, mf_avg_vf)
-
-            deallocate (We_L, We_R)
 
             s_compute_average_state => null()
 

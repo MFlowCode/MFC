@@ -81,7 +81,6 @@ module m_derived_types
         real(kind(0d0))                            :: gamma  !< Sp. heat ratio
         real(kind(0d0))                            :: pi_inf !< Liquid stiffness
         real(kind(0d0)), dimension(2)              :: Re    !< Reynolds number
-        real(kind(0d0)), dimension(num_fluids_max) :: We    !< Weber number
         real(kind(0d0)) :: mul0 !< Bubble viscosity
         real(kind(0d0)) :: ss   !< Bubble surface tension
         real(kind(0d0)) :: pv   !< Bubble vapour pressure

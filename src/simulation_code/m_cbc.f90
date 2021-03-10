@@ -108,7 +108,6 @@ module m_cbc
     real(kind(0d0))                              :: pi_inf      !< Cell averaged liquid stiffness
     real(kind(0d0))                              :: c           !< Cell averaged speed of sound
     real(kind(0d0)), dimension(2)   :: Re          !< Cell averaged Reynolds numbers
-    real(kind(0d0)), allocatable, dimension(:, :) :: We          !< Cell averaged Weber numbers
 
     real(kind(0d0)), allocatable, dimension(:) :: dalpha_rho_ds !< Spatial derivatives in s-dir of partial density
     real(kind(0d0)), allocatable, dimension(:) ::       dvel_ds !< Spatial derivatives in s-dir of velocity
@@ -172,8 +171,6 @@ contains
         allocate (vel(1:num_dims))
         allocate (adv(1:adv_idx%end - E_idx))
         allocate (mf(1:cont_idx%end))
-
-        allocate (We(1:num_fluids, 1:num_fluids))
 
         ! Allocating the first-order spatial derivatives in the s-direction
         ! of the partial densities, the velocity and the advected variables
@@ -613,7 +610,7 @@ contains
                 call s_convert_to_mixture_variables(q_prim_rs_vf, &
                                                     rho, gamma, &
                                                     pi_inf, Re, &
-                                                    We, 0, k, r)
+                                                    0, k, r)
 
                 E = gamma*pres + pi_inf + 5d-1*rho*sum(vel**2d0)
 
@@ -1690,7 +1687,7 @@ contains
 
         ! Deallocating the cell-average partial densities, the velocity, the
         ! advection variables, the mass fractions and also the Weber numbers
-        deallocate (alpha_rho, vel, adv, mf, We)
+        deallocate (alpha_rho, vel, adv, mf)
 
         ! Deallocating the first-order spatial derivatives, in s-direction,
         ! of the partial densities, the velocity and the advected variables

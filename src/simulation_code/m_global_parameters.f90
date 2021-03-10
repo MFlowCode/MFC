@@ -132,17 +132,11 @@ module m_global_parameters
     integer         :: avg_state      !< Average state evaluation method
     logical         :: commute_err    !< Commutative error correction
     logical         :: split_err      !< Dimensional splitting error correction
-    logical         :: alt_crv        !< Alternate curvature definition
     logical         :: alt_soundspeed !< Alternate mixture sound speed
     logical         :: regularization !< Regularization terms of Tiwari (2013)
     real(kind(0d0)) :: reg_eps        !< User-defined interface thickness parameter for regularization terms
     logical         :: null_weights   !< Null undesired WENO weights
     logical         :: mixture_err    !< Mixture properties correction
-    logical         :: We_riemann_flux !< Account for capillary effects in the Riemann solver
-    logical         :: We_rhs_flux    !< Account for capillary effects using the conservative formulation in RHS
-    logical         :: We_src         !< Account for capillary effects in non-conservative formulation in RHS
-    logical         :: We_wave_speeds !< Account for capillary effects when computing the contact wave speed
-    logical         :: lsq_deriv      !< Use linear least squares to calculate normals and curvatures
     logical         :: hypoelasticity !< Hypoelastic modeling
 
     integer         :: cpu_start, cpu_end, cpu_rate
@@ -194,22 +188,6 @@ module m_global_parameters
     !> @{
     integer, dimension(2)   :: Re_size
     integer, allocatable, dimension(:, :) :: Re_idx
-    !> @}
-
-    !> @name The number of idiosyncratic material interfaces, along with the indexes of
-    !! the fluids comprising them, respectively, for which the effects of surface
-    !! tension, e.g. the Weber (We) numbers, will be non-negligible.
-    !> @{
-    integer                              :: We_size
-    integer, allocatable, dimension(:, :) :: We_idx
-    !> @}
-
-    !> @name The number of fluids, along with their identifying indexes, respectively,
-    !! for which the physical and the geometric curvatures (crv) of the material
-    !! interfaces will be calculated.
-    !> @{
-    integer                            :: crv_size
-    integer, allocatable, dimension(:) :: crv_idx
     !> @}
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
@@ -378,17 +356,11 @@ contains
         avg_state = dflt_int
         commute_err = .false.
         split_err = .false.
-        alt_crv = .false.
         alt_soundspeed = .false.
         regularization = .false.
         reg_eps = dflt_real
         null_weights = .false.
         mixture_err = .false.
-        We_riemann_flux = .false.
-        We_rhs_flux = .false.
-        We_src = .false.
-        We_wave_speeds = .false.
-        lsq_deriv = .false.
         parallel_io = .false.
         precision = 2
         hypoelasticity = .false.
@@ -402,7 +374,6 @@ contains
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
             fluid_pp(i)%Re(:) = dflt_real
-            fluid_pp(i)%We(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real
             fluid_pp(i)%pv = dflt_real
@@ -504,7 +475,7 @@ contains
         ! for which surface tension will be important and also, the number
         ! of fluids for which the physical and geometric curvatures of the
         ! interfaces will be computed
-        Re_size = 0; We_size = 0; crv_size = 0
+        Re_size = 0
 
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
@@ -726,27 +697,6 @@ contains
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
             end do
 
-            ! Determining the number of distinct material interfaces for
-            ! which the Weber number, e.g. the capillarity, is important
-            do i = 1, num_fluids - 1
-                do j = i + 1, num_fluids
-                    if (fluid_pp(i)%We(j) > 0) We_size = We_size + 1
-                end do
-            end do
-
-            ! Constraining the utilization of WENO averaging so that it may
-            ! only be applied when the presence of viscous and/or capillary
-            ! effects requires that the cell-average spatial derivatives be
-            ! determined
-            if (proc_rank == 0 .and. weno_avg &
-                .and. &
-                all(Re_size == 0) .and. We_size == 0) then
-                print '(A)', 'Unsupported combination of values '// &
-                    'of weno_avg, fluid_pp(:)%Re(:) and '// &
-                    'fluid_pp(:)%We(:). Exiting ...'
-                stop
-            end if
-
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
             if (any(Re_size > 0)) then
@@ -765,53 +715,6 @@ contains
                     if (fluid_pp(i)%Re(2) > 0) then
                         k = k + 1; Re_idx(2, k) = i
                     end if
-                end do
-
-            end if
-
-            if (We_size > 0) then
-
-                allocate (We_idx(1:We_size, 1:2))
-
-                k = 0
-                do i = 1, num_fluids - 1
-                    do j = i + 1, num_fluids
-                        if (fluid_pp(i)%We(j) > 0) then
-                            k = k + 1; We_idx(k, :) = (/i, j/)
-                        end if
-                    end do
-                end do
-
-                crv_size = 2
-                do i = 2, We_size
-                    if (We_idx(i, 1) > We_idx(i - 1, 1)) then
-                        crv_size = crv_size + 1
-                    end if
-                    if (all(We_idx(i, 2) /= We_idx(1:i - 1, 2))) then
-                        crv_size = crv_size + 1
-                    end if
-                end do
-
-                allocate (crv_idx(1:crv_size))
-
-                k = 2; crv_idx(1:2) = We_idx(1, :)
-                do i = 2, We_size
-                    if (We_idx(i, 1) > We_idx(i - 1, 1)) then
-                        k = k + 1; crv_idx(k) = We_idx(i, 1)
-                    end if
-                    if (all(We_idx(i, 2) /= We_idx(1:i - 1, 2))) then
-                        k = k + 1; crv_idx(k) = We_idx(i, 2)
-                    end if
-                end do
-
-                do j = 1, crv_size
-                    do i = 1, crv_size - 1
-                        if (crv_idx(i) > crv_idx(i + 1)) then
-                            tmp_idx = crv_idx(i + 1)
-                            crv_idx(i + 1) = crv_idx(i)
-                            crv_idx(i) = tmp_idx
-                        end if
-                    end do
                 end do
 
             end if
@@ -838,11 +741,7 @@ contains
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
-        if (commute_err .and. any(Re_size > 0) .and. We_size > 0) then
-            buff_size = 4*weno_polyn + 3
-        elseif (We_size > 0) then
-            buff_size = 3*weno_polyn + 3
-        elseif (commute_err .and. any(Re_size > 0)) then
+        if (commute_err .and. any(Re_size > 0)) then
             buff_size = 3*weno_polyn + 2
         elseif (any(Re_size > 0)) then
             buff_size = 2*weno_polyn + 2
@@ -1067,7 +966,6 @@ contains
         ! fluids and any pairs of fluids whose interfaces supported effects
         ! of surface tension
         if (any(Re_size > 0)) deallocate (Re_idx)
-        if (We_size > 0) deallocate (We_idx, crv_idx)
 
         ! Deallocating grid variables for the x-, y- and z-directions
         deallocate (x_cb, x_cc, dx)

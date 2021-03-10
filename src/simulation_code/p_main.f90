@@ -138,8 +138,6 @@ program p_main
     call s_populate_grid_variables_buffers()
 
     call s_populate_variables_buffers(q_cons_ts(1)%vf)
-    if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) &
-        call s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
 
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure

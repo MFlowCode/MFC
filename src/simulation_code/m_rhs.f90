@@ -73,7 +73,6 @@ module m_rhs
  s_pressure_relaxation_procedure, &
  s_populate_variables_buffers, &
  s_finalize_rhs_module, &
- s_get_crv, &
  s_get_viscous
 
     type(vector_field), allocatable, dimension(:, :, :) :: q_cons_qp !<
@@ -152,19 +151,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:, :, :) :: un_alphaR_z_ndqp
     !> @}
 
-    type(scalar_field), allocatable, dimension(:) :: kappa_vf !<
-    !! The cell-average curvature of volume fractions. kappa_vf is calculated by
-    !! the divergence theorem using the integral-average cell-boundary values of
-    !! of the components of the unit normals, which are located in the variables
-    !! un_alphaK_s_ndqp.
-
-    !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
-    !! average curvature of the volume fractions. The cell-average quantities
-    !! are located in the variable kappa_vf.
-    !> @{
-    type(vector_field), allocatable, dimension(:, :, :) :: kappaL_ndqp
-    type(vector_field), allocatable, dimension(:, :, :) :: kappaR_ndqp
-    !> @}
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
     !! source). These are computed by applying the chosen Riemann problem solver
@@ -188,7 +174,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:, :, :) :: un_alpha_z_qp
 
     type(scalar_field), allocatable, dimension(:) :: laplacian_vf
-    type(scalar_field), allocatable, dimension(:) :: alt_kappa_vf
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: reg_src_vf !<
@@ -196,20 +181,7 @@ module m_rhs
 
     !> @name Additional field for capillary source terms
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: We_mtm_src
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: We_nrg_src
-    type(scalar_field), allocatable, dimension(:) :: tau_We_vf
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !> @}
-
-    !> @name Additional variables for applying a flux limiter to the advection equation
-    !> @{
-    type(vector_field), allocatable, dimension(:, :, :) :: lo_flux_ndqp
-    type(vector_field), allocatable, dimension(:, :, :) :: lo_flux_src_ndqp
-    type(vector_field), allocatable, dimension(:, :, :) :: lo_flux_gsrc_ndqp
-    type(vector_field), allocatable, dimension(:, :, :) :: hi_flux_ndqp
-    type(vector_field), allocatable, dimension(:, :, :) :: hi_flux_src_ndqp
-    type(vector_field), allocatable, dimension(:, :, :) :: hi_flux_gsrc_ndqp
     !> @}
 
     !> @name The indical bounds in the coordinate directions of the Gaussian numerical
@@ -294,18 +266,6 @@ contains
 
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
-
-        if (We_size > 0 .and. We_rhs_flux) then
-            allocate (tau_We_vf(1:sys_size))
-            do i = 1, num_dims
-                allocate (tau_We_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-                                                         iy%beg:iy%end, &
-                                                         iz%beg:iz%end))
-            end do
-            allocate (tau_We_vf(E_idx)%sf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-        end if
 
         if (any(Re_size > 0) .and. cyl_coord) then
             allocate (tau_Re_vf(1:sys_size))
@@ -593,19 +553,6 @@ contains
                                 end if
                             end if
 
-                            do l = 1, crv_size
-                                allocate (qL_cons_ndqp(i, j, k)%vf( &
-                                          E_idx + crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                allocate (qR_cons_ndqp(i, j, k)%vf( &
-                                          E_idx + crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                            end do
-
                         end if
 
                         do l = 1, cont_idx%end
@@ -647,7 +594,7 @@ contains
 
         ! Allocation of dq_prim_ds_qp ======================================
 
-        if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+        if (any(Re_size > 0) .or. hypoelasticity) then
 
             allocate (dq_prim_dx_qp(ieta%beg:ieta%end, &
                                     iksi%beg:iksi%end, &
@@ -706,37 +653,6 @@ contains
 
                         end if
 
-                        if ((i /= 0 .and. abs(j) >= abs(k)) &
-                            .or. &
-                            all((/i, j, k/) == 0)) then
-
-                            do l = 1, crv_size
-                                allocate (dq_prim_dx_qp(i, j, k)%vf( &
-                                          E_idx + crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                if (n > 0) then
-                                    allocate (dq_prim_dy_qp(i, j, k)%vf( &
-                                              E_idx + crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                end if
-                            end do
-
-                            if (p > 0) then
-                                do l = 1, crv_size
-                                    allocate (dq_prim_dz_qp(i, j, k)%vf( &
-                                              E_idx + crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                end do
-                            end if
-
-                        end if
-
                     end do
                 end do
             end do
@@ -764,7 +680,7 @@ contains
                                    ichi%beg:ichi%end, &
                                    ipsi%beg:ipsi%end))
 
-        if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+        if (any(Re_size > 0) .or. hypoelasticity) then
             do k = ipsi%beg, ipsi%end
                 do j = ichi%beg, ichi%end
                     do i = 1, num_dims
@@ -818,44 +734,6 @@ contains
                                 end if
 
                             end if
-
-                            do l = 1, crv_size
-                                allocate (dqL_prim_dx_ndqp(i, j, k)%vf( &
-                                          E_idx + crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                allocate (dqR_prim_dx_ndqp(i, j, k)%vf( &
-                                          E_idx + crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                if (n > 0) then
-                                    allocate (dqL_prim_dy_ndqp(i, j, k)%vf( &
-                                              E_idx + crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (dqR_prim_dy_ndqp(i, j, k)%vf( &
-                                              E_idx + crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    if (p > 0) then
-                                        allocate (dqL_prim_dz_ndqp(i, j, k)%vf( &
-                                                  E_idx + crv_idx(l))%sf( &
-                                                  ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-                                        allocate (dqR_prim_dz_ndqp(i, j, k)%vf( &
-                                                  E_idx + crv_idx(l))%sf( &
-                                                  ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-                                    end if
-                                end if
-                            end do
-
                         end if
 
                     end do
@@ -869,26 +747,6 @@ contains
                               iksi%beg:iksi%end, &
                               itau%beg:itau%end))
 
-        if (We_size > 0) then
-            do k = itau%beg, itau%end
-                do j = iksi%beg, iksi%end
-                    do i = ieta%beg, ieta%end
-
-                        allocate (gm_alpha_qp(i, j, k)%vf(1:num_fluids))
-
-                        if (any(sum(abs((/i, j, k/))) == (/0, num_dims/))) then
-                            do l = 1, crv_size
-                                allocate (gm_alpha_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                            end do
-                        end if
-
-                    end do
-                end do
-            end do
-        end if
         ! ==================================================================
 
         ! Allocation of gm_alphaK_ndqp =====================================
@@ -898,260 +756,8 @@ contains
         allocate (gm_alphaR_ndqp(1:num_dims, &
                                  ichi%beg:ichi%end, &
                                  ipsi%beg:ipsi%end))
-
-        if (We_size > 0) then
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-                    do i = 1, num_dims
-
-                        allocate (gm_alphaL_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (gm_alphaR_ndqp(i, j, k)%vf(1:num_fluids))
-
-                        if (abs(j) >= abs(k)) then
-                            do l = 1, crv_size
-                                allocate (gm_alphaL_ndqp(i, j, k)%vf( &
-                                          crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                allocate (gm_alphaR_ndqp(i, j, k)%vf( &
-                                          crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                            end do
-                        end if
-
-                    end do
-                end do
-            end do
-        end if
         ! ==================================================================
 
-        ! Allocation of un_alphaK_s_ndqp ===================================
-        if (We_size > 0) then
-
-            allocate (un_alphaL_x_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (un_alphaL_y_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (un_alphaL_z_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (un_alphaR_x_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (un_alphaR_y_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-            allocate (un_alphaR_z_ndqp(1:num_dims, &
-                                       ichi%beg:ichi%end, &
-                                       ipsi%beg:ipsi%end))
-
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-
-                    do i = 1, num_dims
-                        allocate (un_alphaL_x_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (un_alphaL_y_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (un_alphaL_z_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (un_alphaR_x_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (un_alphaR_y_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (un_alphaR_z_ndqp(i, j, k)%vf(1:num_fluids))
-                    end do
-
-                    if (abs(j) >= abs(k)) then
-
-                        do l = 1, crv_size
-                            allocate (un_alphaL_x_ndqp(1, j, k)%vf(crv_idx(l))%sf( &
-                                      ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-                            allocate (un_alphaR_x_ndqp(1, j, k)%vf(crv_idx(l))%sf( &
-                                      ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-                            if (n > 0) then
-                                allocate (un_alphaL_y_ndqp(2, j, k)%vf(crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                allocate (un_alphaR_y_ndqp(2, j, k)%vf(crv_idx(l))%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                if (p > 0) then
-                                    allocate (un_alphaL_z_ndqp(3, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (un_alphaR_z_ndqp(3, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                end if
-                            end if
-                        end do
-                    end if
-
-                end do
-            end do
-
-        end if
-        ! END: Allocation of un_alphaK_s_ndqp ==============================
-
-        ! Allocation of kappa_vf ===========================================
-        if (We_size > 0) then
-
-            allocate (kappa_vf(1:num_fluids))
-
-            do i = 1, crv_size
-                allocate (kappa_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-            end do
-
-        end if
-        ! ==================================================================
-
-        ! Allocation/Association of kappaK_ndqp ============================
-        allocate (kappaL_ndqp(1:num_dims, &
-                              ichi%beg:ichi%end, &
-                              ipsi%beg:ipsi%end))
-        allocate (kappaR_ndqp(1:num_dims, &
-                              ichi%beg:ichi%end, &
-                              ipsi%beg:ipsi%end))
-
-        if (We_size > 0) then
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-                    do i = 1, num_dims
-
-                        allocate (kappaL_ndqp(i, j, k)%vf(1:num_fluids))
-                        allocate (kappaR_ndqp(i, j, k)%vf(1:num_fluids))
-
-                        if (abs(j) >= abs(k)) then
-                            if (i == 1) then
-                                do l = 1, crv_size
-                                    allocate (kappaL_ndqp(i, j, k)%vf( &
-                                              crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (kappaR_ndqp(i, j, k)%vf( &
-                                              crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                end do
-                            else
-                                do l = 1, crv_size
-                                    kappaL_ndqp(i, j, k)%vf(crv_idx(l))%sf => &
-                                        kappaL_ndqp(1, j, k)%vf(crv_idx(l))%sf
-                                    kappaR_ndqp(i, j, k)%vf(crv_idx(l))%sf => &
-                                        kappaR_ndqp(1, j, k)%vf(crv_idx(l))%sf
-                                end do
-                            end if
-                        end if
-
-                    end do
-                end do
-            end do
-        end if
-        ! ==================================================================
-
-        if (alt_crv) then
-            ! Allocation of dgm_alpha_ds_qp & un_alpha_s_qp ================
-            allocate (dgm_alpha_dx_qp(ieta%beg:ieta%end, &
-                                      iksi%beg:iksi%end, &
-                                      itau%beg:itau%end))
-            allocate (dgm_alpha_dy_qp(ieta%beg:ieta%end, &
-                                      iksi%beg:iksi%end, &
-                                      itau%beg:itau%end))
-            allocate (dgm_alpha_dz_qp(ieta%beg:ieta%end, &
-                                      iksi%beg:iksi%end, &
-                                      itau%beg:itau%end))
-            allocate (un_alpha_x_qp(ieta%beg:ieta%end, &
-                                    iksi%beg:iksi%end, &
-                                    itau%beg:itau%end))
-            allocate (un_alpha_y_qp(ieta%beg:ieta%end, &
-                                    iksi%beg:iksi%end, &
-                                    itau%beg:itau%end))
-            allocate (un_alpha_z_qp(ieta%beg:ieta%end, &
-                                    iksi%beg:iksi%end, &
-                                    itau%beg:itau%end))
-
-            if (We_size > 0) then
-                do k = itau%beg, itau%end
-                    do j = iksi%beg, iksi%end
-                        do i = ieta%beg, ieta%end
-                            allocate (dgm_alpha_dx_qp(i, j, k)%vf(1:num_fluids))
-                            allocate (dgm_alpha_dy_qp(i, j, k)%vf(1:num_fluids))
-                            allocate (dgm_alpha_dz_qp(i, j, k)%vf(1:num_fluids))
-                            allocate (un_alpha_x_qp(i, j, k)%vf(1:num_fluids))
-                            allocate (un_alpha_y_qp(i, j, k)%vf(1:num_fluids))
-                            allocate (un_alpha_z_qp(i, j, k)%vf(1:num_fluids))
-
-                            if (any(sum(abs((/i, j, k/))) == (/0, num_dims/))) then
-                                do l = 1, crv_size
-                                    allocate (dgm_alpha_dx_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (dgm_alpha_dy_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (dgm_alpha_dz_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (un_alpha_x_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (un_alpha_y_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                    allocate (un_alpha_z_qp(i, j, k)%vf(crv_idx(l))%sf( &
-                                              ix%beg:ix%end, &
-                                              iy%beg:iy%end, &
-                                              iz%beg:iz%end))
-                                end do
-                            end if
-
-                        end do
-                    end do
-                end do
-            end if
-        end if
-        ! ==============================================================
-
-        ! Allocation of laplacian_vf and alt_kappa_vf
-        if (We_size > 0) then
-            if (alt_crv) then
-                allocate (laplacian_vf(1:num_fluids))
-                allocate (alt_kappa_vf(1:num_fluids))
-
-                do i = 1, crv_size
-                    allocate (laplacian_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          iz%beg:iz%end))
-                    allocate (alt_kappa_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                          iy%beg:iy%end, &
-                                                          iz%beg:iz%end))
-                end do
-            end if
-
-            if (We_src) then
-                allocate (We_mtm_src(0:m, 0:n, 0:p))
-                allocate (We_nrg_src(0:m, 0:n, 0:p))
-            end if
-
-        end if
 
         ! Allocation of regularization terms
         if (regularization) then
@@ -1225,7 +831,7 @@ contains
                                           iz%beg:iz%end))
                             end do
 
-                            if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+                            if (any(Re_size > 0) .or. hypoelasticity) then
                                 do l = mom_idx%beg, E_idx
                                     allocate (flux_src_ndqp(i, j, k)%vf(l)%sf( &
                                               ix%beg:ix%end, &
@@ -1326,7 +932,6 @@ contains
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: rho_K_field, G_K_field
         real(kind(0d0)) :: gamma_K, pi_inf_K
         real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)), dimension(1:num_fluids, 1:num_fluids) :: We_K
 
         integer :: i, j, k, l, r, ii !< Generic loop iterators
 
@@ -1378,27 +983,6 @@ contains
         end if
 
         ! ==================================================================
-
-        ! Computing Volume Fraction Gradients and Curvatures ===============
-        if (We_size > 0 .and. lsq_deriv) then
-            if (p > 0) then
-                call s_compute_lsq_gradient_curvature(q_prim_qp(0, 0, 0)%vf, &
-                                                      dq_prim_dx_qp(0, 0, 0)%vf, &
-                                                      dq_prim_dy_qp(0, 0, 0)%vf, &
-                                                      dq_prim_dz_qp(0, 0, 0)%vf, &
-                                                      gm_alpha_qp(0, 0, 0)%vf, &
-                                                      kappa_vf)
-            else
-                call s_compute_lsq_gradient_curvature(q_prim_qp(0, 0, 0)%vf, &
-                                                      dq_prim_dx_qp(0, 0, 0)%vf, &
-                                                      dq_prim_dy_qp(0, 0, 0)%vf, &
-                                                      dq_prim_dy_qp(0, 0, 0)%vf, &
-                                                      gm_alpha_qp(0, 0, 0)%vf, &
-                                                      kappa_vf)
-            end if
-        end if
-
-        if (crv_size > 0) call s_get_crv(q_cons_vf, q_prim_vf, rhs_vf)
 
         ! Converting Conservative to Primitive Variables ===================
         iv%beg = 1; iv%end = adv_idx%end
@@ -1472,7 +1056,7 @@ contains
             ! ===============================================================
 
             ! Reconstructing Primitive/Conservative Variables ===============
-            if (char_decomp .or. (all(Re_size == 0) .and. We_size == 0)) then
+            if (char_decomp .or. all(Re_size == 0)) then
 
                 iv%beg = 1; 
                 if (adv_alphan) then
@@ -1555,35 +1139,14 @@ contains
                 end if
                 ! ===============================================================
 
-                ! Reconstructing Volume Fraction Variables ======================
-                if (We_size == 0) then
+                iv%beg = adv_idx%beg; iv%end = adv_idx%end
 
-                    iv%beg = adv_idx%beg; iv%end = adv_idx%end
+                call s_reconstruct_cell_boundary_values( &
+                    q_cons_qp(0, 0, 0)%vf(iv%beg:iv%end), &
+                    qL_cons_ndqp(i, :, :), &
+                    qR_cons_ndqp(i, :, :), &
+                    dflt_int, i)
 
-                    call s_reconstruct_cell_boundary_values( &
-                        q_cons_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                        qL_cons_ndqp(i, :, :), &
-                        qR_cons_ndqp(i, :, :), &
-                        dflt_int, i)
-
-                else
-
-                    do l = adv_idx%beg, adv_idx%end
-                        if (all(crv_idx /= l - E_idx)) then
-
-                            iv%beg = l; iv%end = iv%beg
-
-                            call s_reconstruct_cell_boundary_values( &
-                                q_cons_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                                qL_cons_ndqp(i, :, :), &
-                                qR_cons_ndqp(i, :, :), &
-                                dflt_int, i)
-
-                        end if
-                    end do
-
-                end if
-                ! ===============================================================
 
             end if
 
@@ -1664,28 +1227,6 @@ contains
             end if
             ! ===============================================================
 
-            ! Reconstructing Curvatures =====================================
-            do l = 1, crv_size
-
-                iv%beg = crv_idx(l); iv%end = iv%beg
-
-                if (alt_crv .neqv. .true.) then
-                    call s_reconstruct_cell_boundary_values( &
-                        kappa_vf(iv%beg:iv%end), &
-                        kappaL_ndqp(i, :, :), &
-                        kappaR_ndqp(i, :, :), &
-                        dflt_int, i)
-                else
-                    call s_reconstruct_cell_boundary_values( &
-                        alt_kappa_vf(iv%beg:iv%end), &
-                        kappaL_ndqp(i, :, :), &
-                        kappaR_ndqp(i, :, :), &
-                        dflt_int, i)
-                end if
-
-            end do
-            ! ===============================================================
-
             ! Configuring Coordinate Direction Indexes ======================
             if (i == 1) then
                 ix%beg = -1; iy%beg = 0; iz%beg = 0
@@ -1707,13 +1248,11 @@ contains
                                           dqR_prim_dy_ndqp(i, j, k)%vf, &
                                           dqR_prim_dz_ndqp(i, j, k)%vf, &
                                           gm_alphaR_ndqp(i, j, k)%vf, &
-                                          kappaR_ndqp(i, j, k)%vf, &
                                           qL_prim_ndqp(i, j, k)%vf, &
                                           dqL_prim_dx_ndqp(i, j, k)%vf, &
                                           dqL_prim_dy_ndqp(i, j, k)%vf, &
                                           dqL_prim_dz_ndqp(i, j, k)%vf, &
                                           gm_alphaL_ndqp(i, j, k)%vf, &
-                                          kappaL_ndqp(i, j, k)%vf, &
                                           q_prim_qp(0, 0, 0)%vf, &
                                           flux_ndqp(i, j, k)%vf, &
                                           flux_src_ndqp(i, j, k)%vf, &
@@ -1731,7 +1270,7 @@ contains
 
             call s_average_cell_boundary_values(flux_ndqp(i, :, :))
 
-            if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+            if (any(Re_size > 0) .or. hypoelasticity) then
                 iv%beg = mom_idx%beg
             else
                 iv%beg = adv_idx%beg
@@ -1971,7 +1510,7 @@ contains
                         do k = 0, n
                             do l = 0, p
                                 call s_convert_to_mixture_variables(q_prim_qp(0, 0, 0)%vf, rho_K, gamma_K, &
-                                                                    pi_inf_K, Re_K, We_K, j, k, l, &
+                                                                    pi_inf_K, Re_K, j, k, l, &
                                                                     G_K, fluid_pp(:)%G)
                                 rho_K_field(j, k, l) = rho_K
                                 G_K_field(j, k, l) = G_K
@@ -2118,7 +1657,7 @@ contains
                 end if
 
                 ! Applying the viscous and capillary source fluxes from the Riemann solver
-                if (any(Re_size > 0) .or. (We_size > 0 .and. We_riemann_flux)) then
+                if (any(Re_size > 0)) then
                     do j = mom_idx%beg, E_idx
                         do k = 0, m
                             rhs_vf(j)%sf(k, :, :) = &
@@ -2127,39 +1666,6 @@ contains
                                  - flux_src_ndqp(i, 0, 0)%vf(j)%sf(k, 0:n, 0:p))
                         end do
                     end do
-                end if
-
-                ! Applying the capillary stress tensor calculated outside the Riemann solver
-                if (We_size > 0 .and. We_rhs_flux) then
-                    if (p > 0) then
-                        call s_compute_capillary_stress_tensor(i, q_prim_qp(0, 0, 0)%vf, &
-                                                               dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dz_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               gm_alpha_qp(0, 0, 0)%vf)
-                    else
-                        call s_compute_capillary_stress_tensor(i, q_prim_qp(0, 0, 0)%vf, &
-                                                               dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               gm_alpha_qp(0, 0, 0)%vf)
-                    end if
-                    ! Divergence of capillary stress tensor computed using finite differences
-                    do j = mom_idx%beg, E_idx
-                        do k = 0, m
-                            rhs_vf(j)%sf(k, :, :) = &
-                                rhs_vf(j)%sf(k, :, :) - 1d0/(x_cc(k + 1) - x_cc(k - 1))* &
-                                (tau_We_vf(j)%sf(k + 1, 0:n, 0:p) &
-                                 - tau_We_vf(j)%sf(k - 1, 0:n, 0:p))
-                        end do
-                    end do
-                end if
-
-                ! Applying capillary source terms in momentum and energy equations
-                if (We_size > 0 .and. We_src) then
-                    call s_compute_capillary_source(i, q_prim_vf)
-                    rhs_vf(cont_idx%end + i)%sf(:, :, :) = rhs_vf(cont_idx%end + i)%sf(:, :, :) + We_mtm_src(:, :, :)
-                    rhs_vf(E_idx)%sf(:, :, :) = rhs_vf(E_idx)%sf(:, :, :) + We_nrg_src(:, :, :)
                 end if
 
                 ! ===============================================================
@@ -2451,7 +1957,7 @@ contains
                 end if
 
                 ! Applying the viscous and capillary source fluxes from the Riemann solver
-                if (any(Re_size > 0) .or. (We_size > 0 .and. We_riemann_flux) .or. hypoelasticity) then
+                if (any(Re_size > 0) .or. hypoelasticity) then
                     do j = mom_idx%beg, E_idx
                         if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
                             if (p > 0) then
@@ -2508,48 +2014,6 @@ contains
                             end if
                         end do
                     end if
-                end if
-
-                ! Applying the capillary stress tensor calculated outside the Riemann solver
-                if (We_size > 0 .and. We_rhs_flux) then
-                    if (p > 0) then
-                        call s_compute_capillary_stress_tensor(i, q_prim_qp(0, 0, 0)%vf, &
-                                                               dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dz_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               gm_alpha_qp(0, 0, 0)%vf)
-                    else
-                        call s_compute_capillary_stress_tensor(i, q_prim_qp(0, 0, 0)%vf, &
-                                                               dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               gm_alpha_qp(0, 0, 0)%vf)
-                    end if
-                    ! Divergence of capillary stress tensor computed using finite differences
-                    do j = mom_idx%beg, E_idx
-                        do k = 0, n
-                            rhs_vf(j)%sf(:, k, :) = &
-                                rhs_vf(j)%sf(:, k, :) - 1d0/(y_cc(k + 1) - y_cc(k - 1))* &
-                                (tau_We_vf(j)%sf(0:m, k + 1, 0:p) &
-                                 - tau_We_vf(j)%sf(0:m, k - 1, 0:p))
-                        end do
-                    end do
-                    ! Applying the capillary contribution to geometric source term
-                    if (cyl_coord) then
-                        do j = mom_idx%beg, E_idx
-                            do k = 0, n
-                                rhs_vf(j)%sf(:, k, :) = &
-                                    rhs_vf(j)%sf(:, k, :) - tau_We_vf(j)%sf(0:m, k, 0:p)/y_cc(k)
-                            end do
-                        end do
-                    end if
-                end if
-
-                ! Applying capillary source terms in momentum and energy equations
-                if (We_size > 0 .and. We_src) then
-                    call s_compute_capillary_source(i, q_prim_vf)
-                    rhs_vf(cont_idx%end + i)%sf(:, :, :) = rhs_vf(cont_idx%end + i)%sf(:, :, :) + We_mtm_src(:, :, :)
-                    rhs_vf(E_idx)%sf(:, :, :) = rhs_vf(E_idx)%sf(:, :, :) + We_nrg_src(:, :, :)
                 end if
 
                 ! Applying interface sharpening regularization source terms
@@ -2870,7 +2334,7 @@ contains
                 end if
 
                 ! Applying the viscous and capillary source fluxes from the Riemann solver
-                if (any(Re_size > 0) .or. (We_size > 0 .and. We_riemann_flux) .or. hypoelasticity) then
+                if (any(Re_size > 0) .or. hypoelasticity) then
                     do j = mom_idx%beg, E_idx
                         do k = 0, p
                             rhs_vf(j)%sf(:, :, k) = &
@@ -2893,50 +2357,6 @@ contains
                                  + flux_src_ndqp(i, 0, 0)%vf(mom_idx%beg + 1)%sf(0:m, 0:n, k))
                         end do
                     end if
-                end if
-
-                ! Applying the capillary stress tensor calculated outside the Riemann solver
-                if (We_size > 0 .and. We_rhs_flux) then
-                    if (p > 0) then
-                        call s_compute_capillary_stress_tensor(i, q_prim_qp(0, 0, 0)%vf, &
-                                                               dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dz_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               gm_alpha_qp(0, 0, 0)%vf)
-                    else
-                        call s_compute_capillary_stress_tensor(i, q_prim_qp(0, 0, 0)%vf, &
-                                                               dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg:adv_idx%end), &
-                                                               gm_alpha_qp(0, 0, 0)%vf)
-                    end if
-                    ! Divergence of capillary stress tensor computed using finite differences
-                    do j = mom_idx%beg, E_idx
-                        if (grid_geometry == 3) then
-                            do l = 0, n
-                                do k = 0, p
-                                    rhs_vf(j)%sf(:, l, k) = &
-                                        rhs_vf(j)%sf(:, l, k) - 1d0/(z_cc(k + 1) - z_cc(k - 1))/y_cc(l)* &
-                                        (tau_We_vf(j)%sf(0:m, l, k + 1) &
-                                         - tau_We_vf(j)%sf(0:m, l, k - 1))
-                                end do
-                            end do
-                        else
-                            do k = 0, p
-                                rhs_vf(j)%sf(:, :, k) = &
-                                    rhs_vf(j)%sf(:, :, k) - 1d0/(z_cc(k + 1) - z_cc(k - 1))* &
-                                    (tau_We_vf(j)%sf(0:m, 0:n, k + 1) &
-                                     - tau_We_vf(j)%sf(0:m, 0:n, k - 1))
-                            end do
-                        end if
-                    end do
-                end if
-
-                ! Applying capillary source terms in momentum and energy equations
-                if (We_size > 0 .and. We_src) then
-                    call s_compute_capillary_source(i, q_prim_vf)
-                    rhs_vf(cont_idx%end + i)%sf(:, :, :) = rhs_vf(cont_idx%end + i)%sf(:, :, :) + We_mtm_src(:, :, :)
-                    rhs_vf(E_idx)%sf(:, :, :) = rhs_vf(E_idx)%sf(:, :, :) + We_nrg_src(:, :, :)
                 end if
 
                 ! Applying interface sharpening regularization source terms
@@ -2977,7 +2397,6 @@ contains
 
         real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc  !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_visc
-        real(kind(0d0)), dimension(1:num_fluids, 1:num_fluids) :: We_visc
 
         real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re !< Capillary stress tensor components
 
@@ -3000,7 +2419,7 @@ contains
 
                         call s_convert_to_mixture_variables(q_prim_vf, rho_visc, &
                                                             gamma_visc, pi_inf_visc, &
-                                                            Re_visc, We_visc, j, k, l)
+                                                            Re_visc,  j, k, l)
 
                         tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + &
                                         grad_x_vf(2)%sf(j, k, l))/ &
@@ -3033,7 +2452,7 @@ contains
 
                         call s_convert_to_mixture_variables(q_prim_vf, rho_visc, &
                                                             gamma_visc, pi_inf_visc, &
-                                                            Re_visc, We_visc, j, k, l)
+                                                            Re_visc, j, k, l)
 
                         tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + &
                                         grad_y_vf(2)%sf(j, k, l) + &
@@ -3062,7 +2481,7 @@ contains
 
                         call s_convert_to_mixture_variables(q_prim_vf, rho_visc, &
                                                             gamma_visc, pi_inf_visc, &
-                                                            Re_visc, We_visc, j, k, l)
+                                                            Re_visc, j, k, l)
 
                         tau_Re(2, 2) = -(2d0/3d0)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
                                        Re_visc(1)
@@ -3109,297 +2528,6 @@ contains
         end if
 
     end subroutine s_compute_viscous_stress_tensor ! ----------------------------------------
-
-    !>  The purpose of this procedure is to calculate the capillary
-        !!      stress tensor at the cell centers in the non-conservative
-        !!      formulation of the equations.
-        !!  @param norm_dir Dimensional split index
-        !!  @param q_prim_vf Cell-average primitive variables
-        !!  @param grad_x_vf Cell-average primitive variable derivatives, x-dir
-        !!  @param grad_y_vf Cell-average primitive variable derivatives, y-dir
-        !!  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
-        !!  @param norm_vf Normal-dir derivative
-    subroutine s_compute_capillary_stress_tensor(norm_dir, q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, norm_vf) ! -------
-
-        integer, intent(IN) :: norm_dir
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(num_fluids), intent(IN) :: norm_vf, grad_x_vf, grad_y_vf, grad_z_vf
-
-        real(kind(0d0)) :: rho_cap, gamma_cap, pi_inf_cap  !< Mixture variables
-        real(kind(0d0)), dimension(2) :: Re_cap
-        real(kind(0d0)), dimension(1:num_fluids, 1:num_fluids) :: We_cap
-
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_We !< Capillary stress tensor components
-
-        type(bounds_info) :: ix, iy, iz
-
-        integer :: i, j, k, l, r !< Generic loop iterator
-
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-        do i = mom_idx%beg, E_idx
-            tau_We_vf(i)%sf = 0d0
-        end do
-
-        ! Capillary stresses in x-direction =============================
-        if (norm_dir == 1) then
-            do i = 1, We_size
-                do l = iz%beg, iz%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-
-                            call s_convert_to_mixture_variables(q_prim_vf, rho_cap, &
-                                                                gamma_cap, pi_inf_cap, &
-                                                                Re_cap, We_cap, j, k, l)
-
-                            tau_We(1, 1) = 1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           (norm_vf(We_idx(i, 2))%sf(j, k, l) - &
-                                            grad_x_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                            grad_x_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                            max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps))
-
-                            tau_We(1, 2) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_x_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_y_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            do r = 1, 2
-                                tau_We_vf(cont_idx%end + r)%sf(j, k, l) = &
-                                    tau_We_vf(cont_idx%end + r)%sf(j, k, l) - &
-                                    tau_We(1, r)
-                            end do
-
-                            tau_We(1, 1) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_x_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_x_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            do r = 1, 2
-                                tau_We_vf(E_idx)%sf(j, k, l) = &
-                                    tau_We_vf(E_idx)%sf(j, k, l) - &
-                                    q_prim_vf(cont_idx%end + r)%sf(j, k, l)*tau_We(1, r)
-                            end do
-
-                        end do
-                    end do
-                end do
-            end do
-
-            if (p > 0) then
-                do i = 1, We_size
-                    do l = iz%beg, iz%end
-                        do k = iy%beg, iy%end
-                            do j = ix%beg, ix%end
-
-                                call s_convert_to_mixture_variables(q_prim_vf, rho_cap, &
-                                                                    gamma_cap, pi_inf_cap, &
-                                                                    Re_cap, We_cap, j, k, l)
-
-                                tau_We(1, 3) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                               grad_x_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                               grad_z_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                               max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                                tau_We_vf(mom_idx%end)%sf(j, k, l) = &
-                                    tau_We_vf(mom_idx%end)%sf(j, k, l) - &
-                                    tau_We(1, 3)
-
-                                tau_We_vf(E_idx)%sf(j, k, l) = &
-                                    tau_We_vf(E_idx)%sf(j, k, l) - &
-                                    q_prim_vf(mom_idx%end)%sf(j, k, l)*tau_We(1, 3)
-
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
-            ! End capillary stresses in x-direction =============================
-
-            ! Capillary stresses in y-direction =============================
-        elseif (norm_dir == 2) then
-            do i = 1, We_size
-                do l = iz%beg, iz%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-
-                            call s_convert_to_mixture_variables(q_prim_vf, rho_cap, &
-                                                                gamma_cap, pi_inf_cap, &
-                                                                Re_cap, We_cap, j, k, l)
-
-                            tau_We(2, 1) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_y_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_x_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            tau_We(2, 2) = 1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           (norm_vf(We_idx(i, 2))%sf(j, k, l) - &
-                                            grad_y_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                            grad_y_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                            max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps))
-
-                            do r = 1, 2
-                                tau_We_vf(cont_idx%end + r)%sf(j, k, l) = &
-                                    tau_We_vf(cont_idx%end + r)%sf(j, k, l) - &
-                                    tau_We(2, r)
-                            end do
-
-                            tau_We(2, 2) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_y_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_y_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            do r = 1, 2
-                                tau_We_vf(E_idx)%sf(j, k, l) = &
-                                    tau_We_vf(E_idx)%sf(j, k, l) - &
-                                    q_prim_vf(cont_idx%end + r)%sf(j, k, l)*tau_We(2, r)
-                            end do
-
-                        end do
-                    end do
-                end do
-            end do
-
-            if (p > 0) then
-                do i = 1, We_size
-                    do l = iz%beg, iz%end
-                        do k = iy%beg, iy%end
-                            do j = ix%beg, ix%end
-
-                                call s_convert_to_mixture_variables(q_prim_vf, rho_cap, &
-                                                                    gamma_cap, pi_inf_cap, &
-                                                                    Re_cap, We_cap, j, k, l)
-
-                                tau_We(2, 3) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                               grad_y_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                               grad_z_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                               max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                                tau_We_vf(mom_idx%end)%sf(j, k, l) = &
-                                    tau_We_vf(mom_idx%end)%sf(j, k, l) - &
-                                    tau_We(2, 3)
-
-                                tau_We_vf(E_idx)%sf(j, k, l) = &
-                                    tau_We_vf(E_idx)%sf(j, k, l) - &
-                                    q_prim_vf(mom_idx%end)%sf(j, k, l)*tau_We(2, 3)
-
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
-            ! End capillary stresses in y-direction =============================
-
-            ! Capillary stresses in z-direction =============================
-        else
-            do i = 1, We_size
-                do l = iz%beg, iz%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-
-                            tau_We(3, 1) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_z_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_x_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            tau_We(3, 2) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_z_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_y_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            tau_We(3, 3) = 1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           (norm_vf(We_idx(i, 2))%sf(j, k, l) - &
-                                            grad_z_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                            grad_z_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                            max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps))
-
-                            do r = 1, 3
-                                tau_We_vf(cont_idx%end + r)%sf(j, k, l) = &
-                                    tau_We_vf(cont_idx%end + r)%sf(j, k, l) - &
-                                    tau_We(3, r)
-                            end do
-
-                            tau_We(3, 3) = -1d0/We_cap(We_idx(i, 1), We_idx(i, 2))* &
-                                           grad_z_vf(We_idx(i, 2))%sf(j, k, l)* &
-                                           grad_z_vf(We_idx(i, 2))%sf(j, k, l)/ &
-                                           max(norm_vf(We_idx(i, 2))%sf(j, k, l), sgm_eps)
-
-                            do r = 1, 3
-                                tau_We_vf(E_idx)%sf(j, k, l) = &
-                                    tau_We_vf(E_idx)%sf(j, k, l) - &
-                                    q_prim_vf(cont_idx%end + r)%sf(j, k, l)*tau_We(3, r)
-                            end do
-
-                        end do
-                    end do
-                end do
-            end do
-
-        end if
-        ! End capillary stresses in z-direction =============================
-
-    end subroutine s_compute_capillary_stress_tensor ! ---------------------------------
-
-    !>  The purpose of this procedure is to compute the source term
-        !!      that accounts for capillary effects in the momentum equations
-        !!  @param i Dimensional split index
-        !!  @param q_prim_vf Cell-average primitive variables
-    subroutine s_compute_capillary_source(i, q_prim_vf) ! ------------------------------
-
-        integer, intent(IN) :: i
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
-        real(kind(0d0)) :: rho_cap, gamma_cap, pi_inf_cap !< Mixture variables
-        real(kind(0d0)), dimension(2) :: Re_cap
-        real(kind(0d0)), dimension(1:num_fluids, 1:num_fluids) :: We_cap
-        real(kind(0d0)), dimension(1:num_fluids) :: kappa_cap
-
-        real(kind(0d0)) :: F_sv
-
-        integer :: j, k, l, r !< Generic loop iterators
-
-        do j = 0, m
-            do k = 0, n
-                do l = 0, p
-                    do r = 1, crv_size
-                        if (alt_crv .neqv. .true.) then
-                            kappa_cap(crv_idx(r)) = kappa_vf(crv_idx(r))%sf(j, k, l)
-                        else
-                            kappa_cap(crv_idx(r)) = alt_kappa_vf(crv_idx(r))%sf(j, k, l)
-                        end if
-                    end do
-                    call s_convert_to_mixture_variables(q_prim_vf, rho_cap, &
-                                                        gamma_cap, pi_inf_cap, &
-                                                        Re_cap, We_cap, j, k, l)
-                    We_mtm_src(j, k, l) = 0d0
-                    We_nrg_src(j, k, l) = 0d0
-
-                    do r = 1, We_size
-                        if (i == 1) then
-                            F_sv = -1d0/We_cap(We_idx(r, 1), We_idx(r, 2))* &
-                                   kappa_cap(We_idx(r, 2))* &
-                                   dq_prim_dx_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j, k, l)
-                        elseif (i == 2) then
-                            F_sv = -1d0/We_cap(We_idx(r, 1), We_idx(r, 2))* &
-                                   kappa_cap(We_idx(r, 2))* &
-                                   dq_prim_dy_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j, k, l)
-                        elseif (i == 3) then
-                            F_sv = -1d0/We_cap(We_idx(r, 1), We_idx(r, 2))* &
-                                   kappa_cap(We_idx(r, 2))* &
-                                   dq_prim_dz_qp(0, 0, 0)%vf(adv_idx%beg)%sf(j, k, l)
-                        end if
-
-                        We_mtm_src(j, k, l) = We_mtm_src(j, k, l) + F_sv
-                        We_nrg_src(j, k, l) = We_nrg_src(j, k, l) + F_sv* &
-                                              q_prim_vf(cont_idx%end + i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-    end subroutine s_compute_capillary_source ! ----------------------------------
 
     !> Gets the divergence term for k div(U)
     !> @param idir Coordinate direction
@@ -3452,8 +2580,6 @@ contains
         real(kind(0d0)) :: s2, myRho, const_sos
 
         real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)), dimension(num_fluids, &
-                                   num_fluids) :: We
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
@@ -3463,7 +2589,7 @@ contains
             if ((mytime < mymono%delay) .and. mymono%delay /= dflt_real) return
 
             do j = 0, m; do k = 0, n; do l = 0, p
-                    call s_convert_to_mixture_variables(q_prim_vf, myRho, n_tait, B_tait, Re, We, j, k, l)
+                    call s_convert_to_mixture_variables(q_prim_vf, myRho, n_tait, B_tait, Re, j, k, l)
                     n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
                     sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
@@ -3973,14 +3099,11 @@ contains
         real(kind(0d0))                                   ::   sum_alpha
         real(kind(0d0))                                   ::         rho
         real(kind(0d0))                                   ::    dyn_pres
-        real(kind(0d0))                                   ::        E_We
         real(kind(0d0))                                   ::       gamma
         real(kind(0d0))                                   ::      pi_inf
         real(kind(0d0)), dimension(num_fluids)            ::   gamma_min
         real(kind(0d0)), dimension(num_fluids)            ::    pres_inf
         real(kind(0d0)), dimension(2)                     ::          Re
-        real(kind(0d0)), dimension(num_fluids, num_fluids) ::          We
-        !> @}
 
         integer :: i, j, k, l, iter !< Generic loop iterators
         integer :: relax !< Relaxation procedure determination variable
@@ -4104,7 +3227,7 @@ contains
 
                     call s_convert_to_mixture_variables(q_cons_vf, rho, &
                                                         gamma, pi_inf, &
-                                                        Re, We, j, k, l)
+                                                        Re, j, k, l)
 
                     dyn_pres = 0d0
                     do i = mom_idx%beg, mom_idx%end
@@ -4112,9 +3235,7 @@ contains
                                    q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
 
-                    E_We = 0d0
-
-                    pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf - E_We)/gamma
+                    pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
                     do i = 1, num_fluids
                         q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
@@ -4415,282 +3536,6 @@ contains
         end if
 
     end subroutine s_get_viscous
-
-    !>  Computes curvatures for surface tension terms
-        !!  @param q_cons_vf Cell-averaged conservative variables
-        !!  @param q_prim_vf Cell-averaged primitive variables
-        !!  @param rhs_vf Cell-averaged RHS variables
-    subroutine s_get_crv(q_cons_vf, q_prim_vf, rhs_vf) ! -------
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-
-        integer :: i, j, k, l, r !< Generic loop iterators
-
-        do l = 1, crv_size
-
-            iv%beg = E_idx + crv_idx(l); iv%end = iv%beg
-
-            ! ==================================================================
-            do i = 1, num_dims
-
-                ! Reconstruct the volume fraction at the cell boundaries
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                    qL_prim_ndqp(i, :, :), &
-                    qR_prim_ndqp(i, :, :), &
-                    dflt_int, i)
-                ! Average the quadrature points at the cell boundaries to
-                ! obtain higher-order estimate of the volume fraction
-                call s_average_cell_boundary_values(qL_prim_ndqp(i, :, :))
-                call s_average_cell_boundary_values(qR_prim_ndqp(i, :, :))
-
-            end do
-            ! ==================================================================
-
-            if (lsq_deriv) then
-                call s_reconstruct_cell_interior_values(dq_prim_dx_qp)
-                if (n > 0) then
-                    call s_reconstruct_cell_interior_values(dq_prim_dy_qp)
-                    if (p > 0) then
-                        call s_reconstruct_cell_interior_values(dq_prim_dz_qp)
-                    end if
-                end if
-            else
-                ! Apply the scalar divergence theorem to compute the volume
-                ! fraction gradient at the cell center
-                call s_apply_scalar_divergence_theorem( &
-                    qL_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
-                    qR_prim_ndqp(1, 0, 0)%vf(iv%beg:iv%end), &
-                    dq_prim_dx_qp(0, 0, 0)%vf(iv%beg:iv%end), 1)
-
-                call s_reconstruct_cell_interior_values(dq_prim_dx_qp)
-
-                if (n > 0) then
-                    call s_apply_scalar_divergence_theorem( &
-                        qL_prim_ndqp(2, 0, 0)%vf(iv%beg:iv%end), &
-                        qR_prim_ndqp(2, 0, 0)%vf(iv%beg:iv%end), &
-                        dq_prim_dy_qp(0, 0, 0)%vf(iv%beg:iv%end), 2)
-
-                    call s_reconstruct_cell_interior_values(dq_prim_dy_qp)
-
-                    if (p > 0) then
-                        call s_apply_scalar_divergence_theorem( &
-                            qL_prim_ndqp(3, 0, 0)%vf(iv%beg:iv%end), &
-                            qR_prim_ndqp(3, 0, 0)%vf(iv%beg:iv%end), &
-                            dq_prim_dz_qp(0, 0, 0)%vf(iv%beg:iv%end), 3)
-
-                        call s_reconstruct_cell_interior_values(dq_prim_dz_qp)
-                    end if
-                end if
-            end if
-
-            ! ==================================================================
-
-            ! Compute the gradient magnitude at the cell center
-            do k = itau%beg, itau%end, 2
-                do j = iksi%beg, iksi%end, 2
-                    do i = ieta%beg, ieta%end, 2
-                        call s_compute_gradient_magnitude( &
-                            dq_prim_dx_qp(i, j, k)%vf(iv%beg:iv%end), &
-                            dq_prim_dy_qp(i, j, k)%vf(iv%beg:iv%end), &
-                            dq_prim_dz_qp(i, j, k)%vf(iv%beg:iv%end), &
-                            gm_alpha_qp(i, j, k)%vf(crv_idx(l): &
-                                                    crv_idx(l)))
-                    end do
-                end do
-            end do
-
-            ! ==================================================================
-
-            ! Reconstruct the volume fraction gradient at the cell
-            ! boundaries
-            do i = 1, num_dims
-
-                call s_reconstruct_cell_boundary_values( &
-                    dq_prim_dx_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                    dqL_prim_dx_ndqp(i, :, :), &
-                    dqR_prim_dx_ndqp(i, :, :), &
-                    dflt_int, i)
-                if (n > 0) then
-                    call s_reconstruct_cell_boundary_values( &
-                        dq_prim_dy_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                        dqL_prim_dy_ndqp(i, :, :), &
-                        dqR_prim_dy_ndqp(i, :, :), &
-                        dflt_int, i)
-                    if (p > 0) then
-                        call s_reconstruct_cell_boundary_values( &
-                            dq_prim_dz_qp(0, 0, 0)%vf(iv%beg:iv%end), &
-                            dqL_prim_dz_ndqp(i, :, :), &
-                            dqR_prim_dz_ndqp(i, :, :), &
-                            dflt_int, i)
-                    end if
-                end if
-
-            end do
-            ! ==================================================================
-
-            ! Compute the gradient magnitude at the cell boundaries
-            do k = ipsi%beg, ipsi%end, 2
-                do j = ichi%beg, ichi%end, 2
-                    do i = 1, num_dims
-                        call s_compute_gradient_magnitude( &
-                            dqL_prim_dx_ndqp(i, j, k)%vf(iv%beg:iv%end), &
-                            dqL_prim_dy_ndqp(i, j, k)%vf(iv%beg:iv%end), &
-                            dqL_prim_dz_ndqp(i, j, k)%vf(iv%beg:iv%end), &
-                            gm_alphaL_ndqp(i, j, k)%vf(crv_idx(l): &
-                                                       crv_idx(l)))
-                        call s_compute_gradient_magnitude( &
-                            dqR_prim_dx_ndqp(i, j, k)%vf(iv%beg:iv%end), &
-                            dqR_prim_dy_ndqp(i, j, k)%vf(iv%beg:iv%end), &
-                            dqR_prim_dz_ndqp(i, j, k)%vf(iv%beg:iv%end), &
-                            gm_alphaR_ndqp(i, j, k)%vf(crv_idx(l): &
-                                                       crv_idx(l)))
-                    end do
-                end do
-            end do
-            ! ==================================================================
-            if (alt_crv) then
-                ! ==================================================================
-
-                ! Compute the normalized volume fraction gradient at the
-                ! cell center
-                do k = itau%beg, itau%end, 2
-                    do j = iksi%beg, iksi%end, 2
-                        do i = ieta%beg, ieta%end, 2
-                            un_alpha_x_qp(i, j, k)%vf(crv_idx(l))%sf = &
-                                dq_prim_dx_qp(i, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                max(gm_alpha_qp(i, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                            if (n > 0) then
-                                un_alpha_y_qp(i, j, k)%vf(crv_idx(l))%sf = &
-                                    dq_prim_dy_qp(i, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                    max(gm_alpha_qp(i, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                                if (p > 0) then
-                                    un_alpha_z_qp(i, j, k)%vf(crv_idx(l))%sf = &
-                                        dq_prim_dz_qp(i, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                        max(gm_alpha_qp(i, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                                end if
-                            end if
-                        end do
-                    end do
-                end do
-                ! ==================================================================
-
-                ! Apply the scalar divergence theorem to compute the gradient
-                ! of the gradient magnitude at the cell center
-                call s_apply_scalar_divergence_theorem( &
-                    gm_alphaL_ndqp(1, 0, 0)%vf(crv_idx(l):crv_idx(l)), &
-                    gm_alphaR_ndqp(1, 0, 0)%vf(crv_idx(l):crv_idx(l)), &
-                    dgm_alpha_dx_qp(0, 0, 0)%vf(crv_idx(l):crv_idx(l)), 1)
-                ! CALL s_reconstruct_cell_interior_values(dgm_alpha_dx_qp)
-
-                if (n > 0) then
-                    call s_apply_scalar_divergence_theorem( &
-                        gm_alphaL_ndqp(2, 0, 0)%vf(crv_idx(l):crv_idx(l)), &
-                        gm_alphaR_ndqp(2, 0, 0)%vf(crv_idx(l):crv_idx(l)), &
-                        dgm_alpha_dy_qp(0, 0, 0)%vf(crv_idx(l):crv_idx(l)), 2)
-                    ! CALL s_reconstruct_cell_interior_values(dgm_alpha_dy_qp)
-                    if (p > 0) then
-                        call s_apply_scalar_divergence_theorem( &
-                            gm_alphaL_ndqp(3, 0, 0)%vf(crv_idx(l):crv_idx(l)), &
-                            gm_alphaR_ndqp(3, 0, 0)%vf(crv_idx(l):crv_idx(l)), &
-                            dgm_alpha_dz_qp(0, 0, 0)%vf(crv_idx(l):crv_idx(l)), 3)
-                        ! CALL s_reconstruct_cell_interior_values(dgm_alpha_dz_qp)
-                    end if
-                end if
-                ! ==================================================================
-
-                !Apply the vector divergence theorem to compute the
-                ! Laplacian of the volume fraction at the cell center
-                call s_apply_vector_divergence_theorem( &
-                    dqL_prim_dx_ndqp, &
-                    dqL_prim_dy_ndqp, &
-                    dqL_prim_dz_ndqp, &
-                    dqR_prim_dx_ndqp, &
-                    dqR_prim_dy_ndqp, &
-                    dqR_prim_dz_ndqp, &
-                    laplacian_vf(crv_idx(l):crv_idx(l)))
-                ! ==================================================================
-
-                ! Compute alternate volume fraction curvature
-                alt_kappa_vf(crv_idx(l))%sf = (un_alpha_x_qp(0, 0, 0)%vf(crv_idx(l))%sf* &
-                                               dgm_alpha_dx_qp(0, 0, 0)%vf(crv_idx(l))%sf + &
-                                               un_alpha_y_qp(0, 0, 0)%vf(crv_idx(l))%sf* &
-                                               dgm_alpha_dy_qp(0, 0, 0)%vf(crv_idx(l))%sf + &
-                                               un_alpha_z_qp(0, 0, 0)%vf(crv_idx(l))%sf* &
-                                               dgm_alpha_dz_qp(0, 0, 0)%vf(crv_idx(l))%sf - &
-                                               laplacian_vf(crv_idx(l))%sf)/ &
-                                              max(gm_alpha_qp(0, 0, 0)%vf(crv_idx(l))%sf, sgm_eps)
-                ! ==================================================================
-            else
-                ! ==================================================================
-
-                ! Compute the normalized volume fraction gradient at the cell
-                ! boundaries
-                do k = ipsi%beg, ipsi%end, 2
-                    do j = ichi%beg, ichi%end, 2
-                        un_alphaL_x_ndqp(1, j, k)%vf(crv_idx(l))%sf = &
-                            dqL_prim_dx_ndqp(1, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                            max(gm_alphaL_ndqp(1, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                        un_alphaR_x_ndqp(1, j, k)%vf(crv_idx(l))%sf = &
-                            dqR_prim_dx_ndqp(1, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                            max(gm_alphaR_ndqp(1, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                        if (n > 0) then
-                            un_alphaL_y_ndqp(2, j, k)%vf(crv_idx(l))%sf = &
-                                dqL_prim_dy_ndqp(2, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                max(gm_alphaL_ndqp(2, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                            un_alphaR_y_ndqp(2, j, k)%vf(crv_idx(l))%sf = &
-                                dqR_prim_dy_ndqp(2, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                max(gm_alphaR_ndqp(2, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                            if (p > 0) then
-                                un_alphaL_z_ndqp(3, j, k)%vf(crv_idx(l))%sf = &
-                                    dqL_prim_dz_ndqp(3, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                    max(gm_alphaL_ndqp(3, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                                un_alphaR_z_ndqp(3, j, k)%vf(crv_idx(l))%sf = &
-                                    dqR_prim_dz_ndqp(3, j, k)%vf(E_idx + crv_idx(l))%sf/ &
-                                    max(gm_alphaR_ndqp(3, j, k)%vf(crv_idx(l))%sf, sgm_eps)
-                            end if
-                        end if
-                    end do
-                end do
-                ! ==================================================================
-
-                iv%beg = crv_idx(l); iv%end = iv%beg
-                ! Average the quadrature points at the cell boundaries to
-                ! obtain higher-order estimate of the normalized volume fraction
-                ! gradient
-                call s_average_cell_boundary_values(un_alphaL_x_ndqp(1, :, :))
-                call s_average_cell_boundary_values(un_alphaR_x_ndqp(1, :, :))
-                if (n > 0) then
-                    call s_average_cell_boundary_values(un_alphaL_y_ndqp(2, :, :))
-                    call s_average_cell_boundary_values(un_alphaR_y_ndqp(2, :, :))
-                    if (p > 0) then
-                        call s_average_cell_boundary_values(un_alphaL_z_ndqp(3, :, :))
-                        call s_average_cell_boundary_values(un_alphaR_z_ndqp(3, :, :))
-                    end if
-                end if
-                ! ==================================================================
-                if (lsq_deriv .neqv. .true.) then
-                    ! Apply the vector divergence theorem to compute the divergence
-                    ! of the normalized volume fraction gradient
-                    call s_apply_vector_divergence_theorem( &
-                        un_alphaL_x_ndqp, &
-                        un_alphaL_y_ndqp, &
-                        un_alphaL_z_ndqp, &
-                        un_alphaR_x_ndqp, &
-                        un_alphaR_y_ndqp, &
-                        un_alphaR_z_ndqp, &
-                        kappa_vf(iv%beg:iv%end))
-
-                    kappa_vf(crv_idx(l))%sf = -kappa_vf(crv_idx(l))%sf
-                end if
-                ! ==================================================================
-            end if
-        end do
-        ! END: Computing Volume Fraction Gradients and Curvatures ==========
-
-    end subroutine s_get_crv
 
     !>  The purpose of this procedure is to populate the buffers
         !!      of the conservative variables, depending on the selected
@@ -6245,13 +5090,6 @@ contains
                                 end if
                             end if
 
-                            do l = 1, crv_size
-                                deallocate (qL_cons_ndqp(i, j, k)%vf( &
-                                            E_idx + crv_idx(l))%sf)
-                                deallocate (qR_cons_ndqp(i, j, k)%vf( &
-                                            E_idx + crv_idx(l))%sf)
-                            end do
-
                             do l = 1, sys_size
                                 nullify (qL_cons_ndqp(i, j, k)%vf(l)%sf)
                                 nullify (qR_cons_ndqp(i, j, k)%vf(l)%sf)
@@ -6304,7 +5142,7 @@ contains
         ! END: Deallocation/Disassociation of qK_cons_ndqp and qK_prim_ndqp
 
         ! Deallocation of dq_prim_ds_qp ====================================
-        if (any(Re_size > 0) .or. We_size > 0 .or. hypoelasticity) then
+        if (any(Re_size > 0) .or. hypoelasticity) then
 
             do k = itau%beg, itau%end
                 do j = iksi%beg, iksi%end
@@ -6333,23 +5171,6 @@ contains
 
                         end if
 
-                        if ((i /= 0 .and. abs(j) >= abs(k)) &
-                            .or. &
-                            all((/i, j, k/) == 0)) then
-                            do l = 1, crv_size
-                                deallocate (dq_prim_dx_qp(i, j, k)%vf( &
-                                            E_idx + crv_idx(l))%sf)
-                                if (n > 0) then
-                                    deallocate (dq_prim_dy_qp(i, j, k)%vf( &
-                                                E_idx + crv_idx(l))%sf)
-                                    if (p > 0) then
-                                        deallocate (dq_prim_dz_qp(i, j, k)%vf( &
-                                                    E_idx + crv_idx(l))%sf)
-                                    end if
-                                end if
-                            end do
-                        end if
-
                         deallocate (dq_prim_dx_qp(i, j, k)%vf)
                         deallocate (dq_prim_dy_qp(i, j, k)%vf)
                         deallocate (dq_prim_dz_qp(i, j, k)%vf)
@@ -6365,7 +5186,7 @@ contains
         ! END: Deallocation of dq_prim_ds_qp ===============================
 
         ! Deallocation/Disassociation of dqK_prim_ds_ndqp ==================
-        if (any(Re_size > 0) .or. We_size > 0) then
+        if (any(Re_size > 0)) then
             do k = ipsi%beg, ipsi%end
                 do j = ichi%beg, ichi%end
                     do i = num_dims, 1, -1
@@ -6395,28 +5216,6 @@ contains
 
                             end if
 
-                            do l = 1, crv_size
-                                deallocate (dqL_prim_dx_ndqp(i, j, k)%vf( &
-                                            E_idx + crv_idx(l))%sf)
-                                deallocate (dqR_prim_dx_ndqp(i, j, k)%vf( &
-                                            E_idx + crv_idx(l))%sf)
-                                if (n > 0) then
-                                    deallocate (dqL_prim_dy_ndqp(i, j, k)%vf( &
-                                                E_idx + crv_idx(l))%sf)
-                                    deallocate (dqR_prim_dy_ndqp(i, j, k)%vf( &
-                                                E_idx + crv_idx(l))%sf)
-                                end if
-                            end do
-
-                            if (p > 0) then
-                                do l = 1, crv_size
-                                    deallocate (dqL_prim_dz_ndqp(i, j, k)%vf( &
-                                                E_idx + crv_idx(l))%sf)
-                                    deallocate (dqR_prim_dz_ndqp(i, j, k)%vf( &
-                                                E_idx + crv_idx(l))%sf)
-                                end do
-                            end if
-
                         end if
 
                         deallocate (dqL_prim_dx_ndqp(i, j, k)%vf)
@@ -6435,209 +5234,9 @@ contains
         deallocate (dqR_prim_dx_ndqp, dqR_prim_dy_ndqp, dqR_prim_dz_ndqp)
         ! END: Deallocation/Disassociation of dqK_prim_ds_ndqp =============
 
-        ! Deallocation of gm_alpha_qp ======================================
-        if (We_size > 0) then
-            do k = itau%beg, itau%end
-                do j = iksi%beg, iksi%end
-                    do i = ieta%beg, ieta%end
-
-                        if (any(sum(abs((/i, j, k/))) == (/0, num_dims/))) then
-                            do l = 1, crv_size
-                                deallocate (gm_alpha_qp(i, j, k)%vf(crv_idx(l))%sf)
-                            end do
-                        end if
-
-                        deallocate (gm_alpha_qp(i, j, k)%vf)
-
-                    end do
-                end do
-            end do
-        end if
-
         deallocate (gm_alpha_qp)
         ! ==================================================================
 
-        ! Deallocation of gm_alphaK_ndqp ===================================
-        if (We_size > 0) then
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-                    do i = 1, num_dims
-
-                        if (any(sum(abs((/j, k/))) == (/0, num_dims/))) then
-                            do l = 1, crv_size
-                                deallocate (gm_alphaL_ndqp(i, j, k)%vf( &
-                                            crv_idx(l))%sf)
-                                deallocate (gm_alphaR_ndqp(i, j, k)%vf( &
-                                            crv_idx(l))%sf)
-                            end do
-                        end if
-
-                        deallocate (gm_alphaL_ndqp(i, j, k)%vf)
-                        deallocate (gm_alphaR_ndqp(i, j, k)%vf)
-
-                    end do
-                end do
-            end do
-        end if
-
-        deallocate (gm_alphaL_ndqp, gm_alphaR_ndqp)
-        ! ==================================================================
-
-        ! Deallocation of un_alphaK_s_ndqp =================================
-        if (We_size > 0) then
-
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-
-                    if (abs(j) >= abs(k)) then
-
-                        do l = 1, crv_size
-                            deallocate (un_alphaL_x_ndqp(1, j, k)%vf(crv_idx(l))%sf)
-                            deallocate (un_alphaR_x_ndqp(1, j, k)%vf(crv_idx(l))%sf)
-                            if (n > 0) then
-                                deallocate (un_alphaL_y_ndqp(2, j, k)%vf(crv_idx(l))%sf)
-                                deallocate (un_alphaR_y_ndqp(2, j, k)%vf(crv_idx(l))%sf)
-                            end if
-                        end do
-
-                        if (p > 0) then
-                            do l = 1, crv_size
-                                deallocate (un_alphaL_z_ndqp(3, j, k)%vf( &
-                                            crv_idx(l))%sf)
-                                deallocate (un_alphaR_z_ndqp(3, j, k)%vf( &
-                                            crv_idx(l))%sf)
-                            end do
-                        end if
-
-                    end if
-
-                    do i = 1, num_dims
-                        deallocate (un_alphaL_x_ndqp(i, j, k)%vf)
-                        deallocate (un_alphaL_y_ndqp(i, j, k)%vf)
-                        deallocate (un_alphaL_z_ndqp(i, j, k)%vf)
-                        deallocate (un_alphaR_x_ndqp(i, j, k)%vf)
-                        deallocate (un_alphaR_y_ndqp(i, j, k)%vf)
-                        deallocate (un_alphaR_z_ndqp(i, j, k)%vf)
-                    end do
-
-                end do
-            end do
-
-            deallocate (un_alphaL_x_ndqp, un_alphaL_y_ndqp, un_alphaL_z_ndqp)
-            deallocate (un_alphaR_x_ndqp, un_alphaR_y_ndqp, un_alphaR_z_ndqp)
-
-        end if
-        ! ==================================================================
-
-        ! Deallocation of kappa_vf =========================================
-        if (We_size > 0) then
-
-            do i = 1, crv_size
-                deallocate (kappa_vf(crv_idx(i))%sf)
-            end do
-
-            deallocate (kappa_vf)
-
-        end if
-        ! ==================================================================
-
-        ! Deallocation/Disassociation of kappaK_ndqp =======================
-        if (We_size > 0) then
-            do k = ipsi%beg, ipsi%end
-                do j = ichi%beg, ichi%end
-                    do i = num_dims, 1, -1
-
-                        if (abs(j) >= abs(k)) then
-                            if (i /= 1) then
-                                do l = 1, crv_size
-                                    nullify (kappaL_ndqp(i, j, k)%vf(crv_idx(l))%sf)
-                                    nullify (kappaR_ndqp(i, j, k)%vf(crv_idx(l))%sf)
-                                end do
-                            else
-                                do l = 1, crv_size
-                                    deallocate (kappaL_ndqp(i, j, k)%vf( &
-                                                crv_idx(l))%sf)
-                                    deallocate (kappaR_ndqp(i, j, k)%vf( &
-                                                crv_idx(l))%sf)
-                                end do
-                            end if
-                        end if
-
-                        deallocate (kappaL_ndqp(i, j, k)%vf, kappaR_ndqp(i, j, k)%vf)
-
-                    end do
-                end do
-            end do
-        end if
-
-        deallocate (kappaL_ndqp, kappaR_ndqp)
-        ! ==================================================================
-
-        if (alt_crv) then
-            ! Deallocation of dgm_alpha_ds_qp & un_alpha_s_qp
-            if (We_size > 0) then
-                do k = itau%beg, itau%end
-                    do j = iksi%beg, iksi%end
-                        do i = ieta%beg, ieta%end
-
-                            if (any(sum(abs((/i, j, k/))) == (/0, num_dims/))) then
-                                do l = 1, crv_size
-                                    deallocate (dgm_alpha_dx_qp(i, j, k)%vf(crv_idx(l))%sf)
-                                    deallocate (dgm_alpha_dy_qp(i, j, k)%vf(crv_idx(l))%sf)
-                                    deallocate (dgm_alpha_dz_qp(i, j, k)%vf(crv_idx(l))%sf)
-                                    deallocate (un_alpha_x_qp(i, j, k)%vf(crv_idx(l))%sf)
-                                    deallocate (un_alpha_y_qp(i, j, k)%vf(crv_idx(l))%sf)
-                                    deallocate (un_alpha_z_qp(i, j, k)%vf(crv_idx(l))%sf)
-                                end do
-                            end if
-
-                            deallocate (dgm_alpha_dx_qp(i, j, k)%vf)
-                            deallocate (dgm_alpha_dy_qp(i, j, k)%vf)
-                            deallocate (dgm_alpha_dz_qp(i, j, k)%vf)
-                            deallocate (un_alpha_x_qp(i, j, k)%vf)
-                            deallocate (un_alpha_y_qp(i, j, k)%vf)
-                            deallocate (un_alpha_z_qp(i, j, k)%vf)
-
-                        end do
-                    end do
-                end do
-            end if
-
-            deallocate (dgm_alpha_dx_qp)
-            deallocate (dgm_alpha_dy_qp)
-            deallocate (dgm_alpha_dz_qp)
-            deallocate (un_alpha_x_qp)
-            deallocate (un_alpha_y_qp)
-            deallocate (un_alpha_z_qp)
-        end if
-
-        ! Deallocation of alt_kappa_vf & laplacian_vf
-        if (We_size > 0) then
-            if (alt_crv) then
-                do i = 1, crv_size
-                    deallocate (alt_kappa_vf(crv_idx(i))%sf)
-                    deallocate (laplacian_vf(crv_idx(i))%sf)
-                end do
-
-                deallocate (alt_kappa_vf)
-                deallocate (laplacian_vf)
-            end if
-
-            if (We_src) then
-                deallocate (We_mtm_src)
-                deallocate (We_nrg_src)
-            end if
-
-        end if
-
-        if (We_size > 0 .and. We_rhs_flux) then
-            do i = 1, num_dims
-                deallocate (tau_We_vf(cont_idx%end + i)%sf)
-            end do
-            deallocate (tau_We_vf(E_idx)%sf)
-
-            deallocate (tau_We_vf)
-        end if
 
         if (any(Re_size > 0) .and. cyl_coord) then
             do i = 1, num_dims
@@ -6677,7 +5276,7 @@ contains
                                 deallocate (flux_gsrc_ndqp(i, j, k)%vf(l)%sf)
                             end do
 
-                            if (any(Re_size > 0) .or. We_size > 0) then
+                            if (any(Re_size > 0)) then
                                 do l = mom_idx%beg, E_idx
                                     deallocate (flux_src_ndqp(i, j, k)%vf(l)%sf)
                                 end do

@@ -64,7 +64,6 @@ module m_start_up
  s_read_serial_data_files, &
  s_read_parallel_data_files, &
  s_populate_grid_variables_buffers, &
- s_account_for_capillary_potential_energy, &
  s_initialize_internal_energy_equations, &
  s_finalize_start_up_module
 
@@ -83,7 +82,7 @@ module m_start_up
 
     end interface ! ========================================================
 
-    type(scalar_field), allocatable, dimension(:)  :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf, kappa_vf
+    type(scalar_field), allocatable, dimension(:)  :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -112,11 +111,10 @@ contains
             hypoelasticity, &
             fluid_pp, com_wrt, cb_wrt, probe_wrt, &
             fd_order, probe, num_probes, t_step_old, &
-            threshold_mf, moment_order, alt_crv, &
+            threshold_mf, moment_order, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
-            We_rhs_flux, &
-            We_riemann_flux, We_src, null_weights, &
-            We_wave_speeds, lsq_deriv, precision, &
+            null_weights, &
+            precision, &
             parallel_io, &
             regularization, reg_eps, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
@@ -550,31 +548,6 @@ contains
             print '(A)', 'Unsupported combination of regularization '// &
                 'and value of n. Exiting ...'
             call s_mpi_abort()
-        elseif ((We_riemann_flux .neqv. .true.) .and. We_wave_speeds) then
-            print '(A)', 'Unsupported combination of We_riemann_flux and '// &
-                'We_wave_speeds. Exiting ...'
-            call s_mpi_abort()
-        elseif (We_rhs_flux .and. We_riemann_flux) then
-            print '(A)', 'Unsupported combination of We_rhs_flux '// &
-                'and We_riemann_flux. Exiting ...'
-            call s_mpi_abort()
-        elseif (We_src .and. We_riemann_flux) then
-            print '(A)', 'Unsupported combination of We_src '// &
-                'and We_riemann_flux. Exiting ...'
-            call s_mpi_abort()
-        elseif (We_rhs_flux .and. We_src) then
-            print '(A)', 'Unsupported combination of We_rhs_flux '// &
-                'and We_src. Exiting ...'
-            call s_mpi_abort()
-        elseif ((We_riemann_flux .or. We_rhs_flux .or. We_src) &
-                .and. (lsq_deriv .neqv. .true.)) then
-            print '(A)', 'Unsupported combination of We_riemann_flux, '// &
-                'We_rhs_flux, We_src, and lsq_deriv. Exiting ...'
-            call s_mpi_abort()
-        elseif (lsq_deriv .and. n == 0) then
-            print '(A)', 'Unsupported combination of lsq_deriv '// &
-                'and value of n. Exiting ...'
-            call s_mpi_abort()
         end if
         ! END: Simulation Algorithm Parameters =============================
 
@@ -691,95 +664,6 @@ contains
                         'of values of weno_order, '// &
                         'weno_avg and fluid_pp'// &
                         '(', i, ')%Re(', j, '). '// &
-                        'Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-            end do
-
-            do j = 1, num_fluids_max
-
-                if ((i == j &
-                     .or. &
-                     fluid_pp(i)%We(j) <= 0d0 &
-                     .or. &
-                     fluid_pp(j)%We(i) == dflt_real) &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported value of '// &
-                        'fluid_pp(', i, ')%'// &
-                        'We(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (model_eqns == 1 &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of model_eqns '// &
-                        'and fluid_pp(', i, ')%'// &
-                        'We(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (max(i, j) > num_fluids &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of num_fluids '// &
-                        'and fluid_pp(', i, ')%'// &
-                        'We(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (any(num_fluids == (/i, j/)) &
-                    .and. &
-                    (adv_alphan .neqv. .true.) &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of num_fluids '// &
-                        'adv_alphan and fluid_pp'// &
-                        '(', i, ')%We(', j, '). '// &
-                        'Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (char_decomp &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of char_decomp '// &
-                        'and fluid_pp(', i, ')%'// &
-                        'We(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (weno_order == 1 &
-                    .and. &
-                    (weno_avg .neqv. .true.) &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of weno_order, '// &
-                        'weno_avg and fluid_pp'// &
-                        '(', i, ')%We(', j, '). '// &
-                        'Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if ((We_riemann_flux .neqv. .true.) &
-                    .and. &
-                    (We_rhs_flux .neqv. .true.) &
-                    .and. &
-                    (We_src .neqv. .true.) &
-                    .and. &
-                    fluid_pp(i)%We(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of We_rhs_flux, '// &
-                        'We_riemann_flux, We_src '// &
-                        'and fluid_pp'// &
-                        '(', i, ')%We(', j, '). '// &
                         'Exiting ...'
                     call s_mpi_abort()
                 end if
@@ -1300,58 +1184,6 @@ contains
 
     end subroutine s_populate_grid_variables_buffers ! ---------------------
 
-    subroutine s_account_for_capillary_potential_energy(v_vf) !-------------
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: v_vf
-        real(kind(0d0)), allocatable, dimension(:, :, :) :: E_We
-        type(bounds_info) :: ix, iy, iz
-        type(bounds_info) :: iz1
-
-        ! Placeholders (_ph) for variables
-        real(kind(0d0)) :: rho_ph, gamma_ph, pi_inf_ph
-        real(kind(0d0)), dimension(2) :: Re_ph
-        real(kind(0d0)), dimension(num_fluids, num_fluids) :: We_ph
-
-        integer :: i, j, k, l
-
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        allocate (E_We(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-
-        if (p > 0) then
-            iz1%beg = iz%beg; iz1%end = iz%end
-        else
-            iz1%beg = -1; iz1%end = 1
-        end if
-
-        ! Compute volume fraction gradient magnitude for all fluids
-        call s_compute_lsq_gradient_curvature(v_vf, grad_x_vf, grad_y_vf, grad_z_vf, norm_vf, kappa_vf)
-
-        do k = iz1%beg + 1, iz1%end - 1
-            do j = iy%beg + 1, iy%end - 1
-                do i = ix%beg + 1, ix%end - 1
-                    E_We(i, j, k) = 0d0
-
-                    call s_convert_to_mixture_variables(v_vf, rho_ph, gamma_ph, &
-                                                        pi_inf_ph, Re_ph, We_ph, i, j, k)
-
-                    ! Compute capillary potential energy
-                    do l = 1, We_size
-                        E_We(i, j, k) = E_We(i, j, k) + &
-                                        v_vf(E_idx + We_idx(l, 1))%sf(i, j, k)* &
-                                        norm_vf(We_idx(l, 2))%sf(i, j, k)/We_ph(We_idx(l, 1), We_idx(l, 2)) + &
-                                        v_vf(E_idx + We_idx(l, 2))%sf(i, j, k)* &
-                                        norm_vf(We_idx(l, 1))%sf(i, j, k)/We_ph(We_idx(l, 1), We_idx(l, 2))
-                    end do
-                end do
-            end do
-        end do
-
-        ! Add capillary potential energy to conservative variable
-        v_vf(E_idx)%sf(:, :, :) = v_vf(E_idx)%sf(:, :, :) + E_We(:, :, :)
-
-    end subroutine s_account_for_capillary_potential_energy !---------------
 
     !> The purpose of this procedure is to initialize the
         !!      values of the internal-energy equations of each phase
@@ -1363,11 +1195,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) ::     v_vf
         real(kind(0d0))                                        ::      rho
         real(kind(0d0))                                        :: dyn_pres
-        real(kind(0d0))                                        ::     E_We
         real(kind(0d0))                                        ::    gamma
         real(kind(0d0))                                        ::   pi_inf
         real(kind(0d0)), dimension(2)                          ::       Re
-        real(kind(0d0)), dimension(num_fluids, num_fluids)      ::       We
         real(kind(0d0))                                        ::     pres
 
         integer :: i, j, k, l
@@ -1376,7 +1206,7 @@ contains
             do k = 0, n
                 do l = 0, p
 
-                    call s_convert_to_mixture_variables(v_vf, rho, gamma, pi_inf, Re, We, j, k, l)
+                    call s_convert_to_mixture_variables(v_vf, rho, gamma, pi_inf, Re, j, k, l)
 
                     dyn_pres = 0d0
                     do i = mom_idx%beg, mom_idx%end
@@ -1384,9 +1214,8 @@ contains
                                    /max(rho, sgm_eps)
                     end do
 
-                    E_We = 0d0
 
-                    pres = (v_vf(E_idx)%sf(j, k, l) - dyn_pres - E_We - pi_inf)/gamma
+                    pres = (v_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1405,37 +1234,6 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-            ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-            ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-            allocate (grad_x_vf(sys_size))
-            allocate (grad_y_vf(sys_size))
-            allocate (grad_z_vf(sys_size))
-            allocate (norm_vf(1:num_fluids))
-            allocate (kappa_vf(1:num_fluids))
-
-            do i = 1, crv_size
-                allocate (grad_x_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                           iy%beg:iy%end, &
-                                                           iz%beg:iz%end))
-                allocate (grad_y_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                           iy%beg:iy%end, &
-                                                           iz%beg:iz%end))
-                allocate (grad_z_vf(E_idx + crv_idx(i))%sf(ix%beg:ix%end, &
-                                                           iy%beg:iy%end, &
-                                                           iz%beg:iz%end))
-                allocate (norm_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                 iy%beg:iy%end, &
-                                                 iz%beg:iz%end))
-                allocate (kappa_vf(crv_idx(i))%sf(ix%beg:ix%end, &
-                                                  iy%beg:iy%end, &
-                                                  iz%beg:iz%end))
-            end do
-
-        end if
-
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files
         else
@@ -1447,20 +1245,6 @@ contains
     subroutine s_finalize_start_up_module() ! ------------------------------
 
         integer :: i !< Generic loop interator
-
-        if (We_size > 0 .and. (We_riemann_flux .or. We_rhs_flux)) then
-
-            do i = 1, crv_size
-                deallocate (grad_x_vf(E_idx + crv_idx(i))%sf)
-                deallocate (grad_y_vf(E_idx + crv_idx(i))%sf)
-                deallocate (grad_z_vf(E_idx + crv_idx(i))%sf)
-                deallocate (norm_vf(crv_idx(i))%sf)
-                deallocate (kappa_vf(crv_idx(i))%sf)
-            end do
-
-            deallocate (grad_x_vf, grad_y_vf, grad_z_vf)
-            deallocate (norm_vf, kappa_vf)
-        end if
 
         s_read_data_files => null()
 
