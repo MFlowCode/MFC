@@ -1,27 +1,27 @@
 !!       __  _______________
 !!      /  |/  / ____/ ____/
-!!     / /|_/ / /_  / /     
-!!    / /  / / __/ / /___   
-!!   /_/  /_/_/    \____/   
-!!                       
+!!     / /|_/ / /_  / /
+!!    / /  / / __/ / /___
+!!   /_/  /_/_/    \____/
+!!
 !!  This file is part of MFC.
 !!
-!!  MFC is the legal property of its developers, whose names 
-!!  are listed in the copyright file included with this source 
+!!  MFC is the legal property of its developers, whose names
+!!  are listed in the copyright file included with this source
 !!  distribution.
 !!
 !!  MFC is free software: you can redistribute it and/or modify
-!!  it under the terms of the GNU General Public License as published 
-!!  by the Free Software Foundation, either version 3 of the license 
+!!  it under the terms of the GNU General Public License as published
+!!  by the Free Software Foundation, either version 3 of the license
 !!  or any later version.
 !!
 !!  MFC is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
 !!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 !!  GNU General Public License for more details.
-!!  
+!!
 !!  You should have received a copy of the GNU General Public License
-!!  along with MFC (LICENSE).  
+!!  along with MFC (LICENSE).
 !!  If not, see <http://www.gnu.org/licenses/>.
 
 !>
@@ -32,138 +32,123 @@
 !! @date JUNE 06 2019
 
 !> @brief The module contains the subroutines for the FFT routines
-MODULE m_fftw
+module m_fftw
 
     ! Dependencies =============================================================
-    USE, INTRINSIC :: ISO_C_BINDING
+    use, intrinsic :: iso_c_binding
 
-    USE m_derived_types        !< Definitions of the derived types
-    
-    USE m_global_parameters    !< Definitions of the global parameters
-    
-    USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types        !< Definitions of the derived types
+
+    use m_global_parameters    !< Definitions of the global parameters
+
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
     ! ==========================================================================
 
-    IMPLICIT NONE
+    implicit none
 
-    PRIVATE; PUBLIC :: s_initialize_fftw_module,   &
-                       s_apply_fourier_filter,     &
-                       s_finalize_fftw_module
-    
-    INCLUDE 'fftw3.f03'
+    private; public :: s_initialize_fftw_module, &
+ s_apply_fourier_filter, &
+ s_finalize_fftw_module
 
-    TYPE(C_PTR) :: fwd_plan, bwd_plan
-    TYPE(C_PTR) :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
-    INTEGER :: real_size, cmplx_size
+    include 'fftw3.f03'
 
-    REAL(C_DOUBLE), POINTER :: data_real(:) !< Real data
+    type(c_ptr) :: fwd_plan, bwd_plan
+    type(c_ptr) :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
+    integer :: real_size, cmplx_size
 
-    COMPLEX(C_DOUBLE_COMPLEX), POINTER :: data_cmplx(:) !< 
+    real(c_double), pointer :: data_real(:) !< Real data
+
+    complex(c_double_complex), pointer :: data_cmplx(:) !<
     !! Complex data in Fourier space
-    
-    
 
-    COMPLEX(C_DOUBLE_COMPLEX), POINTER :: data_fltr_cmplx(:) !< 
+    complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
-    CONTAINS
+contains
 
-
-
-
-        !>  The purpose of this subroutine is to create the fftw plan
+    !>  The purpose of this subroutine is to create the fftw plan
         !!      that will be used in the forward and backward DFTs when
         !!      applying the Fourier filter in the azimuthal direction.
-        SUBROUTINE s_initialize_fftw_module() ! ----------------------------------
+    subroutine s_initialize_fftw_module() ! ----------------------------------
 
+        ! Size of input array going into DFT
+        real_size = p + 1
+        ! Size of output array coming out of DFT
+        cmplx_size = (p + 1)/2 + 1
 
+        ! Allocate input and output DFT data sizes
+        fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
+        fftw_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
+        fftw_fltr_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
+        ! Associate input and output data pointers with allocated memory
+        call c_f_pointer(fftw_real_data, data_real, [real_size])
+        call c_f_pointer(fftw_cmplx_data, data_cmplx, [cmplx_size])
+        call c_f_pointer(fftw_fltr_cmplx_data, data_fltr_cmplx, [cmplx_size])
 
-            ! Size of input array going into DFT
-            real_size = p+1
-            ! Size of output array coming out of DFT
-            cmplx_size = (p+1)/2+1
+        ! Generate plans for forward and backward DFTs
+        fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real, data_cmplx, FFTW_ESTIMATE)
+        bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 
-            ! Allocate input and output DFT data sizes
-            fftw_real_data       = fftw_alloc_real   (int( real_size, C_SIZE_T))
-            fftw_cmplx_data      = fftw_alloc_complex(int(cmplx_size, C_SIZE_T))
-            fftw_fltr_cmplx_data = fftw_alloc_complex(int(cmplx_size, C_SIZE_T))
-            ! Associate input and output data pointers with allocated memory
-            CALL c_f_pointer(fftw_real_data ,      data_real ,      [ real_size])
-            CALL c_f_pointer(fftw_cmplx_data,      data_cmplx,      [cmplx_size])
-            CALL c_f_pointer(fftw_fltr_cmplx_data, data_fltr_cmplx, [cmplx_size])
+    end subroutine s_initialize_fftw_module ! ------------------------------
 
-            ! Generate plans for forward and backward DFTs
-            fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real      , data_cmplx, FFTW_ESTIMATE)
-            bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real , FFTW_ESTIMATE)
-
-        END SUBROUTINE s_initialize_fftw_module ! ------------------------------
-
-
-
-
-        !>  The purpose of this subroutine is to apply a Fourier low-
+    !>  The purpose of this subroutine is to apply a Fourier low-
         !!      pass filter to the flow variables in the azimuthal direction
-        !!      to remove the high-frequency content. This alleviates the 
+        !!      to remove the high-frequency content. This alleviates the
         !!      restrictive CFL condition arising from cells near the axis.
-        SUBROUTINE s_apply_fourier_filter(q_cons_vf) ! --------------------------
+    subroutine s_apply_fourier_filter(q_cons_vf) ! --------------------------
 
-            TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
 
-            INTEGER :: Nfq !< Number of kept modes
+        integer :: Nfq !< Number of kept modes
 
-            INTEGER :: i,j,k !< Generic loop iterators
+        integer :: i, j, k !< Generic loop iterators
 
-            ! Restrict filter to processors that have cells adjacent to axis
-            IF (bc_y%beg >= 0) RETURN
+        ! Restrict filter to processors that have cells adjacent to axis
+        if (bc_y%beg >= 0) return
 
-            ! Keeping only the mean value for cells directly adjacent to axis
-            Nfq = 3
-            DO j = 0, m
-                DO k = 1, sys_size
-                    data_fltr_cmplx(:) = (0d0,0d0)
-                    data_real(1:p+1) = q_cons_vf(k)%sf(j,0,0:p)
-                    CALL fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
+        ! Keeping only the mean value for cells directly adjacent to axis
+        Nfq = 3
+        do j = 0, m
+            do k = 1, sys_size
+                data_fltr_cmplx(:) = (0d0, 0d0)
+                data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0, 0:p)
+                call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
+                data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
+                call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
+                data_real(:) = data_real(:)/real(real_size, kind(0d0))
+                q_cons_vf(k)%sf(j, 0, 0:p) = data_real(1:p + 1)
+            end do
+        end do
+
+        ! Apply Fourier filter to additional rings
+        do i = 1, fourier_rings
+            Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
+            do j = 0, m
+                do k = 1, sys_size
+                    data_fltr_cmplx(:) = (0d0, 0d0)
+                    data_real(1:p + 1) = q_cons_vf(k)%sf(j, i, 0:p)
+                    call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                     data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
-                    CALL fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
-                    data_real(:) = data_real(:)/REAL(real_size,KIND(0d0))
-                    q_cons_vf(k)%sf(j,0,0:p) = data_real(1:p+1)
-                END DO
-            END DO
+                    call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
+                    data_real(:) = data_real(:)/real(real_size, kind(0d0))
+                    q_cons_vf(k)%sf(j, i, 0:p) = data_real(1:p + 1)
+                end do
+            end do
+        end do
 
-            ! Apply Fourier filter to additional rings
-            DO i = 1, fourier_rings
-                Nfq = MIN(FLOOR(2d0*REAL(i,KIND(0d0))*pi),cmplx_size)
-                DO j = 0, m
-                    DO k = 1, sys_size
-                        data_fltr_cmplx(:) = (0d0,0d0)
-                        data_real(1:p+1) = q_cons_vf(k)%sf(j,i,0:p)
-                        CALL fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
-                        data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
-                        CALL fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
-                        data_real(:) = data_real(:)/REAL(real_size,KIND(0d0))
-                        q_cons_vf(k)%sf(j,i,0:p) = data_real(1:p+1)
-                    END DO
-                END DO
-            END DO
+    end subroutine s_apply_fourier_filter ! --------------------------------
 
-        END SUBROUTINE s_apply_fourier_filter ! --------------------------------
-
-
-
-
-        !>  The purpose of this subroutine is to destroy the fftw plan
+    !>  The purpose of this subroutine is to destroy the fftw plan
         !!      that will be used in the forward and backward DFTs when
         !!      applying the Fourier filter in the azimuthal direction.
-        SUBROUTINE s_finalize_fftw_module() ! ------------------------------------
-            CALL fftw_free(fftw_real_data)
-            CALL fftw_free(fftw_cmplx_data)
-            CALL fftw_free(fftw_fltr_cmplx_data)
+    subroutine s_finalize_fftw_module() ! ------------------------------------
+        call fftw_free(fftw_real_data)
+        call fftw_free(fftw_cmplx_data)
+        call fftw_free(fftw_fltr_cmplx_data)
 
-            CALL fftw_destroy_plan(fwd_plan)
-            CALL fftw_destroy_plan(bwd_plan)
+        call fftw_destroy_plan(fwd_plan)
+        call fftw_destroy_plan(bwd_plan)
 
-        END SUBROUTINE s_finalize_fftw_module ! --------------------------------
+    end subroutine s_finalize_fftw_module ! --------------------------------
 
-
-
-END MODULE
+end module
