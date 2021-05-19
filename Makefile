@@ -10,16 +10,7 @@ pre_process:
 	@$(MAKE) -C src/pre_process_code -f makefile
 
 simulation:
-
-ifneq ("$(wildcard $(fftw_include_dir)/fftw3.*)","")
-ifneq ("$(wildcard $(fftw_lib_dir)/libfftw*.la)","")
 	@$(MAKE) -C src/simulation_code -f makefile
-else
-	@echo "$$FFTW_LIB_ERR"
-endif
-else
-	@echo "$$FFTW_INC_ERR"
-endif
 
 post_process:
 

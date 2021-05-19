@@ -330,7 +330,7 @@ contains
             call s_mpi_abort()
 
             ! Constraints on Fourier decomposition options
-        elseif (fourier_decomp) then &
+        elseif (fourier_decomp) then 
             print '(A)', 'fourier not supported'
             call s_mpi_abort()
         end if
