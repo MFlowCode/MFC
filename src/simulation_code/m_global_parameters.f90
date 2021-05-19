@@ -44,7 +44,6 @@ module m_global_parameters
 
     use m_derived_types        !< Definitions of the derived types
 
-    use m_eigen
     ! ==========================================================================
 
     implicit none
@@ -571,8 +570,9 @@ contains
                     else if (nb > 1) then
                         if (R0_type == 1) then
                             call s_simpson
-                        else if (R0_type == 2) then
-                            call s_wheeler
+                        else 
+                            print*, 'Invalid R0 type - abort'
+                            stop
                         end if
                         V0(:) = 1d0
                     else
@@ -648,8 +648,9 @@ contains
                     else if (nb > 1) then
                         if (R0_type == 1) then
                             call s_simpson
-                        else if (R0_type == 2) then
-                            call s_wheeler
+                        else 
+                            print*, 'Invalid R0 type - abort'
+                            stop
                         end if
                         V0(:) = 1d0
                     else
@@ -1076,57 +1077,5 @@ contains
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
     end subroutine s_simpson
-
-    subroutine s_wheeler
-
-        real(kind(0d0)), dimension(2*nb, 2*nb) :: sig
-        real(kind(0d0)), dimension(nb, nb) :: Ja
-        real(kind(0d0)), dimension(2*nb) :: momRo
-        real(kind(0d0)), dimension(nb) :: evec, eigs, a, b
-        real(kind(0d0)) :: muRo
-        integer :: i, j
-
-        muRo = 1d0
-
-        a = 0d0; b = 0d0
-        sig = 0d0; Ja = 0d0
-
-        do i = 0, 2*nb - 1
-            momRo(i + 1) = DEXP(i*log(muRo) + 0.5d0*(i*poly_sigma)**2d0)
-        end do
-
-        do i = 0, 2*nb - 1
-            sig(2, i + 1) = momRo(i + 1)
-        end do
-
-        a(1) = momRo(2)/momRo(1)
-        do i = 1, nb - 1
-            do j = i, 2*nb - i - 1
-                sig(i + 2, j + 1) = sig(i + 1, j + 2) - a(i)*sig(i + 1, j + 1) - b(i)*sig(i, j + 1)
-                a(i + 1) = -1d0*(sig(i + 1, i + 1)/sig(i + 1, i)) + sig(i + 2, i + 2)/sig(i + 2, i + 1)
-                b(i + 1) = sig(i + 2, i + 1)/sig(i + 1, i)
-            end do
-        end do
-
-        do i = 1, nb
-            Ja(i, i) = a(i)
-        end do
-        do i = 1, nb - 1
-            Ja(i, i + 1) = -DSQRT(abs(b(i + 1)))
-            Ja(i + 1, i) = -DSQRT(abs(b(i + 1)))
-        end do
-
-        call s_eigs(Ja, eigs, evec, nb)
-
-        weight(1:nb) = (evec(nb:1:-1)**2d0)*momRo(1)
-        R0(1:nb) = eigs(nb:1:-1)
-
-        if (minval(R0) < 0d0) then
-            print *, 'Minimum R0 is negative. nb might be too large for Wheeler'
-            print *, 'Aborting...'
-            stop
-        end if
-
-    end subroutine s_wheeler
 
 end module m_global_parameters

@@ -15,9 +15,6 @@ FC = mpif90
 FFLAGS = -cpp -c -w -fall-intrinsics -fallow-argument-mismatch -ffree-line-length-none -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
 #NOTE: Cray compilers require: -eZ
 
-######### LAPACK library location #########
-lapack_lib_dir = $(MFC_DIR)/lib/lapack-3.4.2/
-
 ######### FFTW library and include locations #########
 ######### Set these to the location of FFTW  #########
 

@@ -53,4 +53,4 @@ m_fftw.o :                 m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 m_variables_conversion.o : m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 
 m_mpi_proxy.o :            m_derived_types.o m_global_parameters.o
-m_global_parameters.o :    m_derived_types.o m_eigen.o
+m_global_parameters.o :    m_derived_types.o

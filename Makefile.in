@@ -1,13 +1,5 @@
 include ../../Makefile.user
 
-#######################  Lapack Flags ###########################
-
-# Linker flags 
-ifdef lapack_lib_dir
-ld_pre_flags = -L$(lapack_lib_dir) -llapack -lblas
-else
-ld_pre_flags =
-endif
 
 ########################## FFTW Flags ###########################
 # Linker flags 
@@ -15,10 +7,6 @@ ifdef fftw_lib_dir
 ld_sim_flags = -L$(fftw_lib_dir) -lfftw3 -lm
 else
 ld_sim_flags = 
-endif
-
-ifdef lapack_lib_dir
-ld_sim_flags += -L$(lapack_lib_dir) -llapack -lblas
 endif
 
 # Header flags
