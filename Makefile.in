@@ -1,23 +1,7 @@
 include ../../Makefile.user
 
-
-########################## FFTW Flags ###########################
-# Linker flags 
-ifdef fftw_lib_dir
-ld_sim_flags = -L$(fftw_lib_dir) -lfftw3 -lm
-else
-ld_sim_flags = 
-endif
-
-# Header flags
-ifdef fftw_include_dir
-hd_flags = -I$(fftw_include_dir)
-else
-hd_flags = 
-endif
-
 # Compiler flags
-f90_flags = $(FFLAGS) $(hd_flags)
+f90_flags = $(FFLAGS)
 
 #################### Post-process Silo Flags #####################
 # Linker flags
