@@ -73,7 +73,7 @@ contains
             cons_vars_wrt, prim_vars_wrt, c_wrt, &
             omega_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
-            kappa_wrt, flux_lim, flux_wrt, cyl_coord, &
+            flux_lim, flux_wrt, cyl_coord, &
             parallel_io, coarsen_silo, fourier_decomp, &
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &

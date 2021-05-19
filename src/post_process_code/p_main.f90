@@ -251,19 +251,6 @@ program p_main
         end do
         ! ----------------------------------------------------------------------
 
-        ! Adding the curvature to the formatted database file
-        do i = 1, num_fluids
-            if (kappa_wrt(i)) then
-
-                call s_derive_curvature(i, q_prim_vf, q_sf)
-
-                write (varname, '(A,I0)') 'kappa', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
-            end if
-        end do
-        ! ----------------------------------------------------------------------
 
         ! Adding the energy to the formatted database file ---------------------
         if (E_wrt .or. cons_vars_wrt) then

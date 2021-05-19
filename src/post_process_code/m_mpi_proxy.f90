@@ -306,9 +306,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(flux_wrt(1), 3, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(kappa_wrt(1), num_fluids_max, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, &
-                       ierr)
         call MPI_BCAST(E_wrt, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(pres_wrt, 1, MPI_LOGICAL, &
