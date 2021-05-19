@@ -44,8 +44,6 @@ program p_main
     ! Dependencies =============================================================
     use m_derived_types         !< Definitions of the derived types
 
-    use m_fftw                  !< Module for FFTW functions
-
     use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
@@ -107,7 +105,6 @@ program p_main
     ! needed to properly setup the modules
     call s_initialize_global_parameters_module()
     if (num_procs > 1) call s_initialize_mpi_proxy_module()
-    if (fourier_decomp) call s_initialize_fftw_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_data_input_module()
     call s_initialize_derived_variables_module()
@@ -173,22 +170,12 @@ program p_main
                                            -offset_y%beg:n + offset_y%end, &
                                            -offset_z%beg:p + offset_z%end)
 
-                    if (fourier_decomp) then
-                        dft_q_sf(:, :, :) = q_sf(:, :, :)
-                        do j = fourier_modes%beg, fourier_modes%end
-                            q_sf(:, :, :) = dft_q_sf(:, :, :)
-                            call s_apply_fourier_decomposition(q_sf, j)
-                            write (varname, '(A,I0,A,I0)') 'alpha_rho', i, '_', j
-                            call s_write_variable_to_formatted_database_file(varname, t_step)
-                        end do
+                    if (model_eqns .ne. 4) then
+                        write (varname, '(A,I0)') 'alpha_rho', i
                     else
-                        if (model_eqns .ne. 4) then
-                            write (varname, '(A,I0)') 'alpha_rho', i
-                        else
-                            write (varname, '(A,I0)') 'rho', i
-                        end if
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
+                        write (varname, '(A,I0)') 'rho', i
                     end if
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
 
                     varname(:) = ' '
 
@@ -206,18 +193,8 @@ program p_main
                           -offset_y%beg:n + offset_y%end, &
                           -offset_z%beg:p + offset_z%end)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'rho_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'rho'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'rho'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -233,18 +210,8 @@ program p_main
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end)
 
-                if (fourier_decomp) then
-                    dft_q_sf(:, :, :) = q_sf(:, :, :)
-                    do j = fourier_modes%beg, fourier_modes%end
-                        q_sf(:, :, :) = dft_q_sf(:, :, :)
-                        call s_apply_fourier_decomposition(q_sf, j)
-                        write (varname, '(A,I0,A,I0)') 'mom', i, '_', j
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end do
-                else
-                    write (varname, '(A,I0)') 'mom', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                write (varname, '(A,I0)') 'mom', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
 
@@ -261,20 +228,8 @@ program p_main
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end)
 
-                if (fourier_decomp) then
-                    dft_q_sf(:, :, :) = q_sf(:, :, :)
-                    do j = fourier_modes%beg, fourier_modes%end
-                        if (any(j == (/1, 2, 3, 5, 7, 9/))) then
-                            q_sf(:, :, :) = dft_q_sf(:, :, :)
-                            call s_apply_fourier_decomposition(q_sf, j)
-                            write (varname, '(A,I0,A,I0)') 'vel', i, '_', j
-                            call s_write_variable_to_formatted_database_file(varname, t_step)
-                        end if
-                    end do
-                else
-                    write (varname, '(A,I0)') 'vel', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                write (varname, '(A,I0)') 'vel', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
 
@@ -288,18 +243,8 @@ program p_main
 
                 call s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
-                if (fourier_decomp) then
-                    dft_q_sf(:, :, :) = q_sf(:, :, :)
-                    do j = fourier_modes%beg, fourier_modes%end
-                        q_sf(:, :, :) = dft_q_sf(:, :, :)
-                        call s_apply_fourier_decomposition(q_sf, j)
-                        write (varname, '(A,I0,A,I0)') 'flux', i, '_', j
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end do
-                else
-                    write (varname, '(A,I0)') 'flux', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                write (varname, '(A,I0)') 'flux', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
             end if
@@ -312,18 +257,8 @@ program p_main
 
                 call s_derive_curvature(i, q_prim_vf, q_sf)
 
-                if (fourier_decomp) then
-                    dft_q_sf(:, :, :) = q_sf(:, :, :)
-                    do j = fourier_modes%beg, fourier_modes%end
-                        q_sf(:, :, :) = dft_q_sf(:, :, :)
-                        call s_apply_fourier_decomposition(q_sf, j)
-                        write (varname, '(A,I0,A,I0)') 'kappa', i, '_', j
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end do
-                else
-                    write (varname, '(A,I0)') 'kappa', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                write (varname, '(A,I0)') 'kappa', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
             end if
@@ -337,18 +272,8 @@ program p_main
                                        -offset_y%beg:n + offset_y%end, &
                                        -offset_z%beg:p + offset_z%end)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'E_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'E'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'E'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -362,18 +287,8 @@ program p_main
                                        -offset_y%beg:n + offset_y%end, &
                                        -offset_z%beg:p + offset_z%end)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'pres_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'pres'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'pres'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -393,18 +308,8 @@ program p_main
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
 
-                    if (fourier_decomp) then
-                        dft_q_sf(:, :, :) = q_sf(:, :, :)
-                        do j = fourier_modes%beg, fourier_modes%end
-                            q_sf(:, :, :) = dft_q_sf(:, :, :)
-                            call s_apply_fourier_decomposition(q_sf, j)
-                            write (varname, '(A,I0,A,I0)') 'alpha', i, '_', j
-                            call s_write_variable_to_formatted_database_file(varname, t_step)
-                        end do
-                    else
-                        write (varname, '(A,I0)') 'alpha', i
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end if
+                    write (varname, '(A,I0)') 'alpha', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
 
                     varname(:) = ' '
 
@@ -424,18 +329,8 @@ program p_main
                            -offset_z%beg:p + offset_z%end)
                 end if
 
-                if (fourier_decomp) then
-                    dft_q_sf(:, :, :) = q_sf(:, :, :)
-                    do j = fourier_modes%beg, fourier_modes%end
-                        q_sf(:, :, :) = dft_q_sf(:, :, :)
-                        call s_apply_fourier_decomposition(q_sf, j)
-                        write (varname, '(A,I0,A,I0)') 'alpha', num_fluids, '_', j
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end do
-                else
-                    write (varname, '(A,I0)') 'alpha', num_fluids
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                write (varname, '(A,I0)') 'alpha', num_fluids
+                call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
 
@@ -453,18 +348,8 @@ program p_main
                             -offset_y%beg:n + offset_y%end, &
                             -offset_z%beg:p + offset_z%end)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'gamma_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'gamma'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'gamma'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -476,18 +361,8 @@ program p_main
 
             call s_derive_specific_heat_ratio(gamma_sf, q_sf)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'heat_ratio_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'heat_ratio'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'heat_ratio'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -503,18 +378,8 @@ program p_main
                              -offset_y%beg:n + offset_y%end, &
                              -offset_z%beg:p + offset_z%end)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'pi_inf_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'pi_inf'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'pi_inf'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -526,18 +391,8 @@ program p_main
 
             call s_derive_liquid_stiffness(gamma_sf, pi_inf_sf, q_sf)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'pres_inf_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'pres_inf'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'pres_inf'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -550,18 +405,8 @@ program p_main
             call s_derive_sound_speed(q_prim_vf, rho_sf, gamma_sf, &
                                       pi_inf_sf, q_sf)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'c_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'c'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'c'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -575,18 +420,8 @@ program p_main
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
-                    if (fourier_decomp) then
-                        dft_q_sf(:, :, :) = q_sf(:, :, :)
-                        do j = fourier_modes%beg, fourier_modes%end
-                            q_sf(:, :, :) = dft_q_sf(:, :, :)
-                            call s_apply_fourier_decomposition(q_sf, j)
-                            write (varname, '(A,I0,A,I0)') 'omega', i, '_', j
-                            call s_write_variable_to_formatted_database_file(varname, t_step)
-                        end do
-                    else
-                        write (varname, '(A,I0)') 'omega', i
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end if
+                    write (varname, '(A,I0)') 'omega', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
 
                     varname(:) = ' '
                 end if
@@ -597,18 +432,8 @@ program p_main
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
-                    if (fourier_decomp) then
-                        dft_q_sf(:, :, :) = q_sf(:, :, :)
-                        do j = fourier_modes%beg, fourier_modes%end
-                            q_sf(:, :, :) = dft_q_sf(:, :, :)
-                            call s_apply_fourier_decomposition(q_sf, j)
-                            write (varname, '(A,I0,A,I0)') 'omega', i, '_', j
-                            call s_write_variable_to_formatted_database_file(varname, t_step)
-                        end do
-                    else
-                        write (varname, '(A,I0)') 'omega', i
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end if
+                    write (varname, '(A,I0)') 'omega', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
 
                     varname(:) = ' '
                 end if
@@ -621,18 +446,8 @@ program p_main
 
             call s_derive_numerical_schlieren_function(q_cons_vf, rho_sf, q_sf)
 
-            if (fourier_decomp) then
-                dft_q_sf(:, :, :) = q_sf(:, :, :)
-                do j = fourier_modes%beg, fourier_modes%end
-                    q_sf(:, :, :) = dft_q_sf(:, :, :)
-                    call s_apply_fourier_decomposition(q_sf, j)
-                    write (varname, '(A,I0)') 'schlieren_', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end do
-            else
-                write (varname, '(A)') 'schlieren'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-            end if
+            write (varname, '(A)') 'schlieren'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
 
@@ -647,18 +462,8 @@ program p_main
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end)
 
-                if (fourier_decomp) then
-                    dft_q_sf(:, :, :) = q_sf(:, :, :)
-                    do j = fourier_modes%beg, fourier_modes%end
-                        q_sf(:, :, :) = dft_q_sf(:, :, :)
-                        call s_apply_fourier_decomposition(q_sf, j)
-                        write (varname, '(A,I0,A,I0)') 'alpha', i - E_idx, '_', j
-                        call s_write_variable_to_formatted_database_file(varname, t_step)
-                    end do
-                else
-                    write (varname, '(A,I0)') 'alpha', i - E_idx
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                write (varname, '(A,I0)') 'alpha', i - E_idx
+                call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
             end do
         end if
@@ -741,7 +546,6 @@ program p_main
     call s_finalize_derived_variables_module()
     call s_finalize_data_input_module()
     call s_finalize_variables_conversion_module()
-    if (fourier_decomp) call s_finalize_fftw_module()
     if (num_procs > 1) call s_finalize_mpi_proxy_module()
     call s_finalize_global_parameters_module()
 

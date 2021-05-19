@@ -346,8 +346,6 @@ contains
 
         call MPI_BCAST(fourier_decomp, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(fourier_modes%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(fourier_modes%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         ! Tait EOS
         call MPI_BCAST(pref, 1, &
