@@ -197,7 +197,6 @@ module m_global_parameters
     logical, dimension(3)              :: vel_wrt
     integer                            :: flux_lim
     logical, dimension(3)              :: flux_wrt
-    logical, dimension(num_fluids_max) :: kappa_wrt
     logical                            :: E_wrt
     logical                            :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
@@ -320,7 +319,6 @@ contains
         flux_lim = dflt_int
         flux_wrt = .false.
         parallel_io = .false.
-        kappa_wrt = .false.
         E_wrt = .false.
         pres_wrt = .false.
         alpha_wrt = .false.

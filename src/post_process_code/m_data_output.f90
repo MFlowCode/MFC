@@ -451,13 +451,6 @@ contains
                 end do
             end if
 
-            ! Curvature
-            do i = 1, num_fluids
-                if (kappa_wrt(i)) then
-                    dbvars = dbvars + 1
-                end if
-            end do
-
             ! Numerical Schlieren function
             if (schlieren_wrt) dbvars = dbvars + 1
 
