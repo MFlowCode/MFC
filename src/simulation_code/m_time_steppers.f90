@@ -46,8 +46,6 @@ module m_time_steppers
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_fftw                 !< Module for FFTW functions
-
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
     use m_data_output          !< Run-time info & solution data output procedures
@@ -232,7 +230,6 @@ contains
                 + dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -288,7 +285,6 @@ contains
                 + dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         ! ==================================================================
@@ -311,7 +307,6 @@ contains
                  + dt*rhs_vf(i)%sf)/2d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -361,7 +356,6 @@ contains
                 + dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
@@ -385,7 +379,6 @@ contains
                  + dt*rhs_vf(i)%sf)/4d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
@@ -401,7 +394,6 @@ contains
                  + 2d0*dt*rhs_vf(i)%sf)/3d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -448,7 +440,6 @@ contains
                 + dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
@@ -471,7 +462,6 @@ contains
                                                    + dt*rhs_vf(i)%sf)/2d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(3)%vf)
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(3)%vf)
 
         ! Stage 2 of RK3
@@ -482,7 +472,6 @@ contains
                  + dt*rhs_vf(i)%sf)/4d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
@@ -497,7 +486,6 @@ contains
                  + 2d0*dt*rhs_vf(i)%sf)/3d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         ! ==================================================================
@@ -594,11 +582,6 @@ contains
                 + dt*rhs_vf(i)%sf/6d0
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(2)%vf)
-            call s_apply_fourier_filter(q_cons_ts(3)%vf)
-        end if
-
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
             call s_pressure_relaxation_procedure(q_cons_ts(3)%vf)
@@ -625,11 +608,6 @@ contains
                 + dt*rhs_vf(i)%sf/3d0
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(2)%vf)
-            call s_apply_fourier_filter(q_cons_ts(3)%vf)
-        end if
-
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
             call s_pressure_relaxation_procedure(q_cons_ts(3)%vf)
@@ -648,11 +626,6 @@ contains
                 + dt*rhs_vf(i)%sf/3d0
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(2)%vf)
-            call s_apply_fourier_filter(q_cons_ts(3)%vf)
-        end if
-
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
             call s_pressure_relaxation_procedure(q_cons_ts(3)%vf)
@@ -668,7 +641,6 @@ contains
                 + dt*rhs_vf(i)%sf/6d0
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -733,14 +705,6 @@ contains
                 + (37d0/378d0)*dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(2)%vf)
-            call s_apply_fourier_filter(q_cons_ts(3)%vf)
-            call s_apply_fourier_filter(q_cons_ts(4)%vf)
-            call s_apply_fourier_filter(q_cons_ts(5)%vf)
-            call s_apply_fourier_filter(q_cons_ts(6)%vf)
-            call s_apply_fourier_filter(q_cons_ts(1)%vf)
-        end if
 
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
@@ -778,12 +742,6 @@ contains
                 + (175d0/512d0)*dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(3)%vf)
-            call s_apply_fourier_filter(q_cons_ts(4)%vf)
-            call s_apply_fourier_filter(q_cons_ts(5)%vf)
-            call s_apply_fourier_filter(q_cons_ts(6)%vf)
-        end if
 
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(3)%vf)
@@ -819,12 +777,6 @@ contains
                 + (25d1/621d0)*dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(4)%vf)
-            call s_apply_fourier_filter(q_cons_ts(5)%vf)
-            call s_apply_fourier_filter(q_cons_ts(6)%vf)
-            call s_apply_fourier_filter(q_cons_ts(1)%vf)
-        end if
 
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(4)%vf)
@@ -857,11 +809,6 @@ contains
                 + (125d0/594d0)*dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) then
-            call s_apply_fourier_filter(q_cons_ts(5)%vf)
-            call s_apply_fourier_filter(q_cons_ts(6)%vf)
-            call s_apply_fourier_filter(q_cons_ts(1)%vf)
-        end if
 
         if (model_eqns == 3) then
             call s_pressure_relaxation_procedure(q_cons_ts(5)%vf)
@@ -887,7 +834,6 @@ contains
                 + (253d0/4096d0)*dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(6)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(6)%vf)
         ! ==================================================================
@@ -909,7 +855,6 @@ contains
                 + (512d0/1771d0)*dt*rhs_vf(i)%sf
         end do
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 

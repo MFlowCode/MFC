@@ -149,11 +149,6 @@ contains
         allocate (q_sf(-offset_x%beg:m + offset_x%end, &
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end))
-        if (fourier_decomp) then
-            allocate (dft_q_sf(-offset_x%beg:m + offset_x%end, &
-                               -offset_y%beg:n + offset_y%end, &
-                               -offset_z%beg:p + offset_z%end))
-        end if
         if (grid_geometry == 3) then
             if (coarsen_silo) then
                 allocate (cyl_coarse_q_sf(-offset_y%beg:(n/2) + offset_y%end, &
@@ -257,17 +252,9 @@ contains
 
             ! Creating the directory associated with the local process
             if (coarsen_silo) then
-                if (fourier_decomp) then
-                    dbdir = trim(case_dir)//'/coarse_fourier_silo_hdf5'
-                else
-                    dbdir = trim(case_dir)//'/coarse_silo_hdf5'
-                end if
+                dbdir = trim(case_dir)//'/coarse_silo_hdf5'
             else
-                if (fourier_decomp) then
-                    dbdir = trim(case_dir)//'/fourier_silo_hdf5'
-                else
-                    dbdir = trim(case_dir)//'/silo_hdf5'
-                end if
+                dbdir = trim(case_dir)//'/silo_hdf5'
             end if
 
             write (proc_rank_dir, '(A,I0)') '/p', proc_rank
@@ -1156,7 +1143,6 @@ contains
         ! that were written to the formatted database file(s). Note that the
         ! root variable is only deallocated in the case of a 1D computation.
         deallocate (q_sf)
-        if (fourier_decomp) deallocate (dft_q_sf)
         if (coarsen_silo) deallocate (coarse_x_q_sf, coarse_xy_q_sf, coarse_xyz_q_sf)
         if (n == 0) deallocate (q_root_sf)
         if (grid_geometry == 3) then

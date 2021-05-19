@@ -216,7 +216,6 @@ module m_global_parameters
     !! cylindrical coordinates are used
     !> @{
     logical                            :: fourier_decomp
-    type(bounds_info)                  :: fourier_modes
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -338,8 +337,6 @@ contains
         schlieren_alpha = dflt_real
 
         fourier_decomp = .false.
-        fourier_modes%beg = dflt_int
-        fourier_modes%end = dflt_int
 
         fd_order = dflt_int
 

@@ -47,9 +47,8 @@ m_qbmm.o :                 m_derived_types.o m_global_parameters.o m_variables_c
 m_cbc.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o
 m_weno.o :                 m_derived_types.o m_global_parameters.o m_variables_conversion.o
 
-m_time_steppers.o :        m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_fftw.o m_rhs.o m_data_output.o m_bubbles.o
+m_time_steppers.o :        m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_rhs.o m_data_output.o m_bubbles.o
 m_derived_variables.o :    m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_data_output.o m_time_steppers.o
-m_fftw.o :                 m_derived_types.o m_global_parameters.o m_mpi_proxy.o 
 m_variables_conversion.o : m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 
 m_mpi_proxy.o :            m_derived_types.o m_global_parameters.o

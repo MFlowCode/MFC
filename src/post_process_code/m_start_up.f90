@@ -75,7 +75,6 @@ contains
             fd_order, mixture_err, alt_soundspeed, &
             kappa_wrt, flux_lim, flux_wrt, cyl_coord, &
             parallel_io, coarsen_silo, fourier_decomp, &
-            fourier_modes, &
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma
@@ -331,23 +330,8 @@ contains
             call s_mpi_abort()
 
             ! Constraints on Fourier decomposition options
-        elseif (fourier_decomp &
-                .and. &
-                (cyl_coord .neqv. .true. &
-                 .or. &
-                 p == 0)) then
-            print '(A)', 'Unsupported choice of the combination of '// &
-                'fourier_decomp and cyl_coord or value of p. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (fourier_decomp &
-                .and. &
-                (fourier_modes%beg == dflt_int &
-                 .or. &
-                 fourier_modes%end == dflt_int)) then
-            print '(A)', 'Unsupported choice of the combination of '// &
-                'fourier_decomp and fourier_modes. '// &
-                'Exiting ...'
+        elseif (fourier_decomp) then &
+            print '(A)', 'fourier not supported'
             call s_mpi_abort()
         end if
 

@@ -40,7 +40,6 @@ $(PRG_OBJ) : $(MOD_OBJS)
 m_data_input.o :            m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_compile_specific.o
 m_data_output.o :           m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_compile_specific.o
 m_start_up.o :              m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_compile_specific.o
-m_fftw.o :                  m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 m_derived_variables.o :     m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 m_mpi_proxy.o :             m_derived_types.o m_global_parameters.o
 m_variables_conversion.o :  m_derived_types.o m_global_parameters.o

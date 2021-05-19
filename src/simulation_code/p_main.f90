@@ -46,8 +46,6 @@ program p_main
     ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
-    use m_fftw                 !< Module for FFTW functions
-
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
@@ -109,7 +107,6 @@ program p_main
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
     call s_initialize_mpi_proxy_module()
-    if (grid_geometry == 3) call s_initialize_fftw_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
@@ -226,7 +223,6 @@ program p_main
     call s_finalize_weno_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()
-    if (grid_geometry == 3) call s_finalize_fftw_module()
     call s_finalize_mpi_proxy_module()
     call s_finalize_global_parameters_module()
 
