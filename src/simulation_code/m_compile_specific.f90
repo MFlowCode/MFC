@@ -45,11 +45,11 @@ contains
         character(LEN=*), intent(IN) :: fileloc
         logical, intent(INOUT) :: dircheck
 
-#ifdef __INTEL_COMPILER
-        inquire (DIRECTORY=trim(fileloc), EXIST=dircheck)   !Intel
-#else
+! #ifdef __INTEL_COMPILER
+!         inquire (DIRECTORY=trim(fileloc), EXIST=dircheck)   !Intel
+! #else
         inquire (FILE=trim(fileloc), EXIST=dircheck)        !GCC
-#endif
+! #endif
 
     end subroutine my_inquire
 
