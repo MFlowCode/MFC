@@ -203,18 +203,8 @@ Note that the post-processing step
 requires installation of Silo and HDF5.
 
 # License
- 
-  MFC is free software: you can redistribute it and/or modify it under 
-  the terms of the GNU General Public License, either version 3 
-  of the License, or any later version. 
-  A copy of the GNU General Public License is included with the MFC, and is
-  also located at <a href="http://www.gnu.org/licenses">http://www.gnu.org/licenses</a>.
- 
-  The MFC is distributed in the hope that it will be useful, 
-  but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
-  FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- 
-  Copyright 2019 California Institute of Technology
+
+MFC is under the MIT license (see LICENSE file).
 
 # Acknowledgements
  
