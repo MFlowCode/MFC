@@ -627,8 +627,8 @@ MODULE m_global_parameters
                                 DO j = 1, nmom
                                     bub_idx%moms(i,j) = bub_idx%beg+(j-1)+(i-1)*nmom
                                 END DO 
-                                bub_idx%rs(i) = bub_idx%moms(i,1)
-                                bub_idx%vs(i) = bub_idx%moms(i,2)
+                                bub_idx%rs(i) = bub_idx%moms(i,2)
+                                bub_idx%vs(i) = bub_idx%moms(i,3)
                             END DO
                         ELSE
                             DO i = 1, nb
