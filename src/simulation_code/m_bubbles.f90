@@ -419,7 +419,7 @@ MODULE m_bubbles
             IF (Re_inv/=dflt_real) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
 
             tmp1 = fV/fC
-            tmp2 = 1.5D0*(fV**2d0)*( tmp1/2d0-1d0 ) +   &
+            tmp2 = 1.5D0*(fV**2d0)*( tmp1/3d0-1d0 ) +   &
                    (1d0 + tmp1)*(fCpbw - fCp)/fRho  +   &
                    cdot_star * fR/(fRho*fC)
 
