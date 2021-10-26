@@ -37,13 +37,9 @@
 !!                             1) Mixture        => Mixture
 !!                             2) Species        => Mixture
 !!                             3) Conservative   => Primitive
-!!                             4) Conservative   => Characteristic
 !!                             5) Conservative   => Flux
 !!                             6) Primitive      => Conservative
-!!                             7) Primitive      => Characteristic
 !!                             8) Primitive      => Flux
-!!                             9) Characteristic => Conservative
-!!                            10) Characteristic => Primitive
 module m_variables_conversion
 
     ! Dependencies =============================================================
@@ -62,14 +58,10 @@ module m_variables_conversion
  s_convert_species_to_mixture_variables_bubbles, &
  s_convert_species_to_mixture_variables, &
  s_convert_conservative_to_primitive_variables, &
- s_convert_conservative_to_characteristic_variables, &
  s_convert_conservative_to_flux_variables, &
  s_convert_primitive_to_conservative_variables, &
- s_convert_primitive_to_characteristic_variables, &
  s_convert_primitive_to_flux_variables, &
  s_convert_primitive_to_flux_variables_bubbles, &
- s_convert_characteristic_to_conservative_variables, &
- s_convert_characteristic_to_primitive_variables, &
  s_finalize_variables_conversion_module
 
     abstract interface ! =======================================================
@@ -572,52 +564,6 @@ contains
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
-    !>  This procedure takes care of the conversion between the
-        !!      conservative variables and the characteristic variables.
-        !!  @param q_rs_wsK Characteristic or conservative cell-avg. variables
-        !!  @param norm_dir Characteristic decomposition coordinate direction
-        !!  @param is1 Index bound in first coordinate direction
-        !!  @param is2 Index bound in second coordinate direction
-        !!  @param is3 Index bound in third coordinate direction
-        !!  @param dj  Evaluation location of the projection matrices
-    subroutine s_convert_conservative_to_characteristic_variables( & ! -----
-        q_rs_wsK, norm_dir, is1, is2, is3, dj)
-
-        type(vector_field), &
-            dimension(-weno_polyn:weno_polyn), &
-            intent(INOUT) :: q_rs_wsK
-
-        integer, intent(IN) :: norm_dir
-        type(bounds_info), intent(IN) :: is1, is2, is3
-        integer, intent(IN) :: dj
-
-        integer :: i, j, k, l !< Generic loop iterators
-
-        ! Initializing projection matrices for characteristic decomposition
-        if (dj == -1) call s_initialize_characteristic_decomposition( &
-            q_rs_wsK, &
-            norm_dir, &
-            is1, is2, is3)
-
-        ! Projecting conservative variables onto the characteristic fields
-        do i = -weno_polyn, weno_polyn
-            do l = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = is1%beg, is1%end
-
-                        if (proc_rank == 0) then
-                            print '(A)', 'Conversion from conservative to '// &
-                                'characteristic variables not '// &
-                                'implemented. Exiting ...'
-                            call s_mpi_abort()
-                        end if
-
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_convert_conservative_to_characteristic_variables ! ----
 
     !>  The following subroutine handles the conversion between
         !!      the conservative variables and the Euler flux variables.
@@ -710,85 +656,6 @@ contains
 
     end subroutine s_convert_primitive_to_conservative_variables ! ---------
 
-    !>  This subroutine takes care of the conversion between the
-        !!      the primitive variables and the characteristic variables.
-        !!  @param q_rs_wsK Primitive or characteristic cell-average variables
-        !!  @param norm_dir Characteristic decomposition coordinate direction
-        !!  @param is1 Index bound in first coordinate direction
-        !!  @param is2 Index bound in second coordinate direction
-        !!  @param is3 Index bound in third coordinate direction
-        !!  @param dj  Evaluation location of the projection matrices
-    subroutine s_convert_primitive_to_characteristic_variables( & ! --------
-        q_rs_wsK, norm_dir, is1, is2, is3, dj)
-
-        type(vector_field), &
-            dimension(-weno_polyn:weno_polyn), &
-            intent(INOUT) :: q_rs_wsK
-
-        integer, intent(IN) :: norm_dir
-
-        type(bounds_info), intent(IN) :: is1, is2, is3
-
-        integer, intent(IN) :: dj
-
-        real(kind(0d0)), dimension(cont_idx%end) :: alpha_rho   !< Cell-average partial density
-        real(kind(0d0)), dimension(num_dims)     :: vel         !< Cell-average velocity
-        real(kind(0d0))                          :: pres        !< Pressure
-
-        integer :: i, j, k, l, r !< Generic loop iterators
-
-        ! Initializing projection matrices for characteristic decomposition
-        if (dj == -1) call s_initialize_characteristic_decomposition( &
-            q_rs_wsK, &
-            norm_dir, &
-            is1, is2, is3)
-
-        ! I think it does this in place. take in primitive vars, set alpha rho, v, p, etc.
-        ! then compute the characteristic variables
-
-        !I think the speed of sound computation needs to be modified for Tait EOS here
-
-        ! Projecting the primitive variables onto the characteristic fields
-        do r = -weno_polyn, weno_polyn
-            do l = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = is1%beg, is1%end
-
-                        do i = 1, cont_idx%end
-                            alpha_rho(i) = q_rs_wsK(r)%vf(i)%sf(j, k, l)
-                        end do
-
-                        do i = 1, num_dims
-                            vel(i) = q_rs_wsK(r)%vf(cont_idx%end + i)%sf(j, k, l)
-                        end do
-
-                        pres = q_rs_wsK(r)%vf(E_idx)%sf(j, k, l)
-
-                        do i = 1, cont_idx%end
-                            q_rs_wsK(r)%vf(i)%sf(j, k, l) = alpha_rho(i) &
-                                                            - pres*mf_avg_vf(i)%sf(j + dj, k, l) &
-                                                            /c_avg_sf(j + dj, k, l) &
-                                                            /c_avg_sf(j + dj, k, l)
-                        end do
-
-                        do i = 1, num_dims
-                            q_rs_wsK(r)%vf(cont_idx%end + i)%sf(j, k, l) = &
-                                vel(dir_idx(i)) &
-                                - pres*dir_flg(dir_idx(i)) &
-                                /rho_avg_sf(j + dj, k, l) &
-                                /c_avg_sf(j + dj, k, l)
-                        end do
-
-                        q_rs_wsK(r)%vf(E_idx)%sf(j, k, l) = vel(dir_idx(1)) &
-                                                            + pres/rho_avg_sf(j + dj, k, l) &
-                                                            /c_avg_sf(j + dj, k, l)
-
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_convert_primitive_to_characteristic_variables ! -------
 
     !>  The following subroutine handles the conversion between
         !!      the primitive variables and the Eulerian flux variables.
@@ -985,221 +852,6 @@ contains
 
     end subroutine s_convert_primitive_to_flux_variables_bubbles ! -----------------
 
-    !>  This subroutine takes care of the conversion between the
-        !!      the conservative variables and the characteristic variables.
-        !!  @param qK_rs_vf Conservative or characteristic cell-boundary variables
-        !!  @param is1 Index bound in first coordinate direction
-        !!  @param is2 Index bound in second coordinate direction
-        !!  @param is3 Index bound in third coordinate direction
-        !!  @param dj  Evaluation location of the projection matrices
-    subroutine s_convert_characteristic_to_conservative_variables( & ! -----
-        qK_rs_vf, is1, is2, is3, dj)
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_rs_vf
-        type(bounds_info), intent(IN) :: is1, is2, is3
-        integer, intent(IN) :: dj
-
-        integer :: j, k, l !< Generic loop iterators
-
-        ! Projecting characteristic variables onto the conservative fields
-        do l = is3%beg, is3%end
-            do k = is2%beg, is2%end
-                do j = is1%beg, is1%end
-
-                    if (proc_rank == 0) then
-                        print '(A)', 'Conversion from characteristic to '// &
-                            'conservative variables not '// &
-                            'implemented. Exiting ...'
-                        call s_mpi_abort()
-                    end if
-
-                end do
-            end do
-        end do
-
-        ! Finalizing projection matrices for characteristic decomposition
-        if (dj == 0) call s_finalize_characteristic_decomposition()
-
-    end subroutine s_convert_characteristic_to_conservative_variables ! ----
-
-    !> This subroutine takes care of the conversion between the
-        !!      the characteristic variables and the primitive variables.
-        !!  @param qK_rs_vf Primitive or characteristic cell-boundary variables
-        !!  @param is1 Index bound in first coordinate direction
-        !!  @param is2 Index bound in second coordinate direction
-        !!  @param is3 Index bound in third coordinate direction
-        !!  @param dj  Evaluation location of the projection matrices
-    subroutine s_convert_characteristic_to_primitive_variables( & ! --------
-        qK_rs_vf, is1, is2, is3, dj)
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_rs_vf
-        type(bounds_info), intent(IN) :: is1, is2, is3
-        integer, intent(IN) :: dj
-
-        real(kind(0d0)), dimension(E_idx) :: w_K !< Characteristic cell-boundary variables
-        integer :: i, j, k, l !< Generic loop iterators
-
-        ! Projecting characteristic variables onto the primitive fields
-        do l = is3%beg, is3%end
-            do k = is2%beg, is2%end
-                do j = is1%beg, is1%end
-
-                    do i = 1, E_idx
-                        w_K(i) = qK_rs_vf(i)%sf(j, k, l)
-                    end do
-
-                    do i = 1, cont_idx%end
-                        qK_rs_vf(i)%sf(j, k, l) = w_K(i) + rho_avg_sf(j + dj, k, l)* &
-                                                  mf_avg_vf(i)%sf(j + dj, k, l)/ &
-                                                  c_avg_sf(j + dj, k, l)* &
-                                                  5d-1*(w_K(E_idx) &
-                                                        - w_K(mom_idx%beg))
-                    end do
-
-                    do i = 1, num_dims
-                        qK_rs_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                            (w_K(cont_idx%end + i) &
-                             + w_K(E_idx)* &
-                             dir_flg(dir_idx(i)))/ &
-                            (1d0 + dir_flg(dir_idx(i)))
-                    end do
-
-                    qK_rs_vf(E_idx)%sf(j, k, l) = 5d-1*rho_avg_sf(j + dj, k, l)* &
-                                                  c_avg_sf(j + dj, k, l)* &
-                                                  (w_K(E_idx) &
-                                                   - w_K(mom_idx%beg))
-
-                end do
-            end do
-        end do
-
-        ! Finalizing projection matrices for characteristic decomposition
-        if (dj == 0) call s_finalize_characteristic_decomposition()
-
-    end subroutine s_convert_characteristic_to_primitive_variables ! -------
-
-    !>  The computation of parameters, the allocation of memory,
-        !!      the association of pointers and/or the execution of any
-        !!      other procedures needed to configure the characteristic
-        !!      decomposition.
-        !!  @param q_rs_wsK Primitive or conservative cell-average variables
-        !!  @param norm_dir Characteristic decomposition coordinate direction
-        !!  @param is1 Index bound in first coordinate direction
-        !!  @param is2 Index bound in second coordinate direction
-        !!  @param is3 Index bound in third coordinate direction
-    subroutine s_initialize_characteristic_decomposition( & ! --------------
-        q_rs_wsK, norm_dir, is1, is2, is3)
-
-        type(vector_field), &
-            dimension(-weno_polyn:weno_polyn), &
-            intent(IN) :: q_rs_wsK
-
-        integer, intent(IN) :: norm_dir
-
-        type(bounds_info), intent(IN) :: is1, is2, is3
-
-        integer :: i, j, k, l, r !< Generic loop iterators
-
-        ! Configuring the coordinate direction indexes and flags
-        if (norm_dir == 1) then
-            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
-        elseif (norm_dir == 2) then
-            dir_idx = (/2, 1, 3/); dir_flg = (/0d0, 1d0, 0d0/)
-        else
-            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
-        end if
-
-        ! Allocating the average density, speed of sound and mass fractions
-        allocate (rho_avg_sf(is1%beg - 1:is1%end, &
-                             is2%beg:is2%end, &
-                             is3%beg:is3%end))
-        allocate (c_avg_sf(is1%beg - 1:is1%end, &
-                           is2%beg:is2%end, &
-                           is3%beg:is3%end))
-
-        do i = 1, cont_idx%end
-            allocate (mf_avg_vf(i)%sf(is1%beg - 1:is1%end, &
-                                      is2%beg:is2%end, &
-                                      is3%beg:is3%end))
-        end do
-
-        ! Performing evaluation of projection matrices at cell-boundaries
-        do r = -1, 0
-            do l = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = is1%beg, is1%beg + (r + 1)*(is1%end - is1%beg)
-
-                        call s_convert_to_mixture_variables(q_rs_wsK(r)%vf, &
-                                                            rho_L, gamma_L, &
-                                                            pi_inf_L, Re_L, &
-                                                            j, k, l)
-                        call s_convert_to_mixture_variables(q_rs_wsK(r + 1)%vf, &
-                                                            rho_R, gamma_R, &
-                                                            pi_inf_R, Re_R, &
-                                                            j, k, l)
-
-                        do i = 1, num_dims
-                            vel_L(i) = q_rs_wsK(r)%vf(cont_idx%end + i)%sf(j, k, l)
-                            vel_R(i) = q_rs_wsK(r + 1)%vf(cont_idx%end + i)%sf(j, k, l)
-                        end do
-
-                        ! alpha_L/R for mixture SOS computation
-                        alpha_L = q_rs_wsK(r)%vf(E_idx + 1)%sf(j, k, l)
-                        alpha_R = q_rs_wsK(r + 1)%vf(E_idx + 1)%sf(j, k, l)
-
-                        if (weno_vars == 1) then
-
-                            E_L = q_rs_wsK(r)%vf(E_idx)%sf(j, k, l)
-                            E_R = q_rs_wsK(r + 1)%vf(E_idx)%sf(j, k, l)
-
-                            pres_L = -(5d-1*rho_L*sum(vel_L**2d0) &
-                                       + pi_inf_L - E_L)/gamma_L
-                            pres_R = -(5d-1*rho_R*sum(vel_R**2d0) &
-                                       + pi_inf_R - E_R)/gamma_R
-
-                        else
-
-                            pres_L = q_rs_wsK(r)%vf(E_idx)%sf(j, k, l)
-                            pres_R = q_rs_wsK(r + 1)%vf(E_idx)%sf(j, k, l)
-
-                            E_L = gamma_L*pres_L + pi_inf_L &
-                                  + 5d-1*rho_L*sum(vel_L**2d0)
-                            E_R = gamma_R*pres_R + pi_inf_R &
-                                  + 5d-1*rho_R*sum(vel_R**2d0)
-
-                        end if
-
-                        H_L = (E_L + pres_L)/rho_L
-                        H_R = (E_R + pres_R)/rho_R
-
-                        do i = 1, cont_idx%end
-                            mf_L(i) = q_rs_wsK(r)%vf(i)%sf(j, k, l)/rho_L
-                            mf_R(i) = q_rs_wsK(r + 1)%vf(i)%sf(j, k, l)/rho_R
-                        end do
-
-                        call s_compute_average_state(j + r, k, l)
-
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_initialize_characteristic_decomposition ! -------------
-
-    !>  Deallocation and/or disassociation procedures that are
-        !!      necessary to finalize the characteristic decomposition
-    subroutine s_finalize_characteristic_decomposition() ! -----------------
-
-        integer :: i !< Generic loop iterator
-
-        ! Deallocating the average density, sound speed and mass fractions
-        deallocate (rho_avg_sf, c_avg_sf)
-
-        do i = 1, cont_idx%end
-            deallocate (mf_avg_vf(i)%sf)
-        end do
-
-    end subroutine s_finalize_characteristic_decomposition ! ---------------
 
 
     subroutine s_solve_linear_system(A, b, sol, ndim)
@@ -1267,19 +919,6 @@ contains
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
         s_convert_to_mixture_variables => null()
-
-        ! Deallocating the velocities, the mass fractions, and the Weber
-        ! numbers as well as disassociating the pointer to the procedure
-        ! which was used in the calculation of the average state
-        if (char_decomp) then
-
-            deallocate (vel_L, mf_L)
-            deallocate (vel_R, mf_R)
-            deallocate (vel_avg, mf_avg_vf)
-
-            s_compute_average_state => null()
-
-        end if
 
     end subroutine s_finalize_variables_conversion_module ! ----------------
 
