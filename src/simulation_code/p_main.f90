@@ -157,11 +157,7 @@ program p_main
     ! Time-stepping Loop =======================================================
     do
         if (proc_rank == 0) then
-            if (time_stepper == 23) then
-                print *, '------------', mytime/finaltime*100d0, 'percent done'
-            else
-                print *, '------ Time step ', t_step, 'of', t_step_stop, '----'
-            end if
+            print *, '------ Time step ', t_step, 'of', t_step_stop, '----'
         end if
         mytime = mytime + dt
 
@@ -175,28 +171,14 @@ program p_main
             call s_2nd_order_tvd_rk(t_step)
         elseif (time_stepper == 3) then
             call s_3rd_order_tvd_rk(t_step)
-        elseif (time_stepper == 4) then
-            call s_4th_order_rk(t_step)
-        elseif (time_stepper == 23) then
-            call s_23_order_tvd_rk(t_step)
-        else
-            call s_5th_order_rk(t_step)
         end if
 
         ! Time-stepping loop controls
-        if (time_stepper /= 23) then
-            if (t_step == t_step_stop) then
-                exit
-            else
-                t_step = t_step + 1
-            end if
+        if (mytime >= finaltime) then
+            exit
         else
-            if (mytime >= finaltime) then
-                exit
-            else
-                if ((mytime + dt) >= finaltime) dt = finaltime - mytime
-                t_step = t_step + 1
-            end if
+            if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+            t_step = t_step + 1
         end if
 
         ! print*, 'Write data files'
