@@ -500,19 +500,17 @@ contains
         !! @param v_vf Cell-averaged variables
         !! @param vL_vf Left WENO reconstructed cell-boundary values
         !! @param vR_vf Right WENO reconstructed cell-boundary values
-        !! @param cd_vars Characteristic decomposition state variables type
         !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
         !! @param ix Index bounds in first coordinate direction
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
-    subroutine s_weno(v_vf, vL_vf, vR_vf, cd_vars, & ! -------------------
+    subroutine s_weno(v_vf, vL_vf, vR_vf, & ! -------------------
                       norm_dir, weno_dir,  &
                       ix, iy, iz)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
         type(scalar_field), dimension(:), intent(INOUT) :: vL_vf, vR_vf
-        integer, intent(IN) :: cd_vars
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
         type(bounds_info), intent(IN) :: ix, iy, iz
@@ -534,7 +532,7 @@ contains
         ! Reshaping and/or projecting onto characteristic fields inputted
         ! data and in addition associating the WENO coefficients pointers
         if (weno_order /= 1) then
-            call s_initialize_weno(v_vf, vL_vf, vR_vf, cd_vars, &
+            call s_initialize_weno(v_vf, vL_vf, vR_vf, &
                                    norm_dir, weno_dir, ix, iy, iz)
             call s_associate_weno_coefficients_pointers(weno_dir)
         end if
@@ -729,7 +727,7 @@ contains
         ! Reshaping and/or projecting onto physical fields the outputted
         ! data, as well as disassociating the WENO coefficients pointers
         if (weno_order /= 1) then
-            call s_finalize_weno(vL_vf, vR_vf, cd_vars, weno_dir, ix, iy, iz)
+            call s_finalize_weno(vL_vf, vR_vf, weno_dir, ix, iy, iz)
             nullify (poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
         end if
 
@@ -742,18 +740,16 @@ contains
         !! @param v_vf Cell-averaged variables
         !! @param vL_vf Left WENO reconstructed cell-boundary values
         !! @param vR_vf Right WENO reconstructed cell-boundary values
-        !! @param cd_vars Characteristic decomposition state variables type
         !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
         !! @param ix Index bounds in first coordinate direction
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
-    subroutine s_initialize_weno(v_vf, vL_vf, vR_vf, cd_vars, & ! ---------
+    subroutine s_initialize_weno(v_vf, vL_vf, vR_vf, & ! ---------
                                  norm_dir, weno_dir, ix, iy, iz)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
         type(scalar_field), dimension(:), intent(INOUT) :: vL_vf, vR_vf
-        integer, intent(IN) :: cd_vars
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
         type(bounds_info), intent(IN) :: ix, iy, iz
@@ -788,14 +784,7 @@ contains
                                                is2%beg:is2%end, &
                                                is3%beg:is3%end))
 
-                if (char_decomp .and. cd_vars /= dflt_int) then
-                    allocate (v_rs_wsR(i)%vf(j)%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-                else
-                    v_rs_wsR(i)%vf(j)%sf => v_rs_wsL(i)%vf(j)%sf
-                end if
-
+                v_rs_wsR(i)%vf(j)%sf => v_rs_wsL(i)%vf(j)%sf
             end do
 
         end do
@@ -833,28 +822,6 @@ contains
                 end do
             end do
 
-            if (char_decomp .and. cd_vars /= dflt_int) then
-
-                do i = -weno_polyn, weno_polyn
-                    do j = 1, v_size
-                        v_rs_wsR(i)%vf(j)%sf = v_rs_wsL(i)%vf(j)%sf
-                    end do
-                end do
-
-                if (cd_vars == 1) then
-                    call s_convert_conservative_to_characteristic_variables( &
-                        v_rs_wsL, norm_dir, ix, iy, iz, -1)
-                    call s_convert_conservative_to_characteristic_variables( &
-                        v_rs_wsR, norm_dir, ix, iy, iz, 0)
-                else
-                    call s_convert_primitive_to_characteristic_variables( &
-                        v_rs_wsL, norm_dir, ix, iy, iz, -1)
-                    call s_convert_primitive_to_characteristic_variables( &
-                        v_rs_wsR, norm_dir, ix, iy, iz, 0)
-                end if
-
-            end if
-
             ! ==================================================================
 
             ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
@@ -871,27 +838,6 @@ contains
                 end do
             end do
 
-            if (char_decomp .and. cd_vars /= dflt_int) then
-
-                do i = -weno_polyn, weno_polyn
-                    do j = 1, v_size
-                        v_rs_wsR(i)%vf(j)%sf = v_rs_wsL(i)%vf(j)%sf
-                    end do
-                end do
-
-                if (cd_vars == 1) then
-                    call s_convert_conservative_to_characteristic_variables( &
-                        v_rs_wsL, norm_dir, iy, ix, iz, -1)
-                    call s_convert_conservative_to_characteristic_variables( &
-                        v_rs_wsR, norm_dir, iy, ix, iz, 0)
-                else
-                    call s_convert_primitive_to_characteristic_variables( &
-                        v_rs_wsL, norm_dir, iy, ix, iz, -1)
-                    call s_convert_primitive_to_characteristic_variables( &
-                        v_rs_wsR, norm_dir, iy, ix, iz, 0)
-                end if
-
-            end if
 
             ! ==================================================================
 
@@ -909,27 +855,6 @@ contains
                 end do
             end do
 
-            if (char_decomp .and. cd_vars /= dflt_int) then
-
-                do i = -weno_polyn, weno_polyn
-                    do j = 1, v_size
-                        v_rs_wsR(i)%vf(j)%sf = v_rs_wsL(i)%vf(j)%sf
-                    end do
-                end do
-
-                if (cd_vars == 1) then
-                    call s_convert_conservative_to_characteristic_variables( &
-                        v_rs_wsL, norm_dir, iz, iy, ix, -1)
-                    call s_convert_conservative_to_characteristic_variables( &
-                        v_rs_wsR, norm_dir, iz, iy, ix, 0)
-                else
-                    call s_convert_primitive_to_characteristic_variables( &
-                        v_rs_wsL, norm_dir, iz, iy, ix, -1)
-                    call s_convert_primitive_to_characteristic_variables( &
-                        v_rs_wsR, norm_dir, iz, iy, ix, 0)
-                end if
-
-            end if
 
         end if
         ! ==================================================================
@@ -1122,16 +1047,14 @@ contains
         !!      necessary in order to finalize the WENO reconstruction
         !! @param vL_vf Left WENO reconstructed cell-boundary values
         !! @param vR_vf Right WENO reconstructed cell-boundary values
-        !! @param cd_vars Characteristic decomposition state variables type
         !! @param weno_dir Coordinate direction of the WENO reconstruction
         !! @param ix Index bounds in first coordinate direction
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
-    subroutine s_finalize_weno(vL_vf, vR_vf, cd_vars, & ! -----------------
+    subroutine s_finalize_weno(vL_vf, vR_vf, & ! -----------------
                                weno_dir, ix, iy, iz)
 
         type(scalar_field), dimension(:), intent(INOUT) :: vL_vf, vR_vf
-        integer, intent(IN) :: cd_vars
         integer, intent(IN) :: weno_dir
         type(bounds_info), intent(IN) :: ix, iy, iz
 
@@ -1140,42 +1063,11 @@ contains
         ! Reshaping/Projecting onto Physical Fields in x-direction =========
         if (weno_dir == 1) then
 
-            if (char_decomp .and. cd_vars /= dflt_int) then
-
-                if (cd_vars == 1) then
-                    call s_convert_characteristic_to_conservative_variables( &
-                        vL_rs_vf, ix, iy, iz, -1)
-                    call s_convert_characteristic_to_conservative_variables( &
-                        vR_rs_vf, ix, iy, iz, 0)
-                else
-                    call s_convert_characteristic_to_primitive_variables( &
-                        vL_rs_vf, ix, iy, iz, -1)
-                    call s_convert_characteristic_to_primitive_variables( &
-                        vR_rs_vf, ix, iy, iz, 0)
-                end if
-
-            end if
-
             ! ==================================================================
 
             ! Reshaping/Projecting onto Physical Fields in y-direction =========
         elseif (weno_dir == 2) then
 
-            if (char_decomp .and. cd_vars /= dflt_int) then
-
-                if (cd_vars == 1) then
-                    call s_convert_characteristic_to_conservative_variables( &
-                        vL_rs_vf, iy, ix, iz, -1)
-                    call s_convert_characteristic_to_conservative_variables( &
-                        vR_rs_vf, iy, ix, iz, 0)
-                else
-                    call s_convert_characteristic_to_primitive_variables( &
-                        vL_rs_vf, iy, ix, iz, -1)
-                    call s_convert_characteristic_to_primitive_variables( &
-                        vR_rs_vf, iy, ix, iz, 0)
-                end if
-
-            end if
 
             do i = 1, v_size
                 do j = ix%beg, ix%end
@@ -1191,21 +1083,6 @@ contains
             ! Reshaping/Projecting onto Physical Fields in z-direction =========
         else
 
-            if (char_decomp .and. cd_vars /= dflt_int) then
-
-                if (cd_vars == 1) then
-                    call s_convert_characteristic_to_conservative_variables( &
-                        vL_rs_vf, iz, iy, ix, -1)
-                    call s_convert_characteristic_to_conservative_variables( &
-                        vR_rs_vf, iz, iy, ix, 0)
-                else
-                    call s_convert_characteristic_to_primitive_variables( &
-                        vL_rs_vf, iz, iy, ix, -1)
-                    call s_convert_characteristic_to_primitive_variables( &
-                        vR_rs_vf, iz, iy, ix, 0)
-                end if
-
-            end if
 
             do i = 1, v_size
                 do j = ix%beg, ix%end
@@ -1228,11 +1105,7 @@ contains
 
                 deallocate (v_rs_wsL(i)%vf(j)%sf)
 
-                if (char_decomp .and. cd_vars /= dflt_int) then
-                    deallocate (v_rs_wsR(i)%vf(j)%sf)
-                else
-                    v_rs_wsR(i)%vf(j)%sf => null()
-                end if
+                v_rs_wsR(i)%vf(j)%sf => null()
 
             end do
 

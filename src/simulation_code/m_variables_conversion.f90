@@ -436,19 +436,6 @@ contains
         ! Allocating velocities, mass fractions and Weber numbers as well
         ! as associating the procedural pointer to the correct subroutine
         ! utilized in the computation of the average state
-        if (char_decomp) then
-
-            allocate (vel_L(1:num_dims), mf_L(1:cont_idx%end))
-            allocate (vel_R(1:num_dims), mf_R(1:cont_idx%end))
-            allocate (vel_avg(1:num_dims), mf_avg_vf(1:cont_idx%end))
-
-            if (avg_state == 1) then
-                s_compute_average_state => s_compute_roe_average_state
-            else
-                s_compute_average_state => s_compute_arithmetic_average_state
-            end if
-
-        end if
 
     end subroutine s_initialize_variables_conversion_module ! --------------
 

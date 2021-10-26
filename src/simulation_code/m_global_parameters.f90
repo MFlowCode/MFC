@@ -121,7 +121,6 @@ module m_global_parameters
     integer         :: weno_order     !< Order of the WENO reconstruction
     integer         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-    logical         :: char_decomp    !< Characteristic decomposition
     logical         :: mapped_weno    !< WENO with mapping of nonlinear weights
     logical         :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical         :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
@@ -331,7 +330,6 @@ contains
         weno_vars = dflt_int
         weno_order = dflt_int
         weno_eps = dflt_real
-        char_decomp = .false.
         mapped_weno = .false.
         mp_weno = .false.
         weno_Re_flux = .false.

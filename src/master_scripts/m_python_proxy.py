@@ -926,7 +926,6 @@ simulation_dict =                                                              \
                     'weno_vars'                     : None,                    \
                     'weno_order'                    : None,                    \
                     'weno_eps'                      : None,                    \
-                    'char_decomp'                   : None,                    \
                     'mapped_weno'                   : None,                    \
                     'mp_weno'                       : None,                    \
                     'weno_avg'                      : None,                    \
