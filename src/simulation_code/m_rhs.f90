@@ -828,13 +828,13 @@ contains
                         q_cons_qp%vf(iv%beg:iv%end), &
                         qL_cons_ndqp(i), &
                         qR_cons_ndqp(i), &
-                        weno_vars, i)
+                        i)
                 else
                     call s_reconstruct_cell_boundary_values( &
                         q_prim_qp%vf(iv%beg:iv%end), &
                         qL_prim_ndqp(i), &
                         qR_prim_ndqp(i), &
-                        weno_vars, i)
+                        i)
                 end if
 
             else
@@ -849,7 +849,7 @@ contains
                         q_cons_qp%vf(iv%beg:iv%end), &
                         qL_cons_ndqp(i), &
                         qR_cons_ndqp(i), &
-                        dflt_int, i)
+                        i)
 
                 end if
                 ! ===============================================================
@@ -864,13 +864,13 @@ contains
                             q_cons_qp%vf(iv%beg:iv%end), &
                             qL_cons_ndqp(i), &
                             qR_cons_ndqp(i), &
-                            dflt_int, i)
+                            i)
                     else
                         call s_reconstruct_cell_boundary_values( &
                             q_prim_qp%vf(iv%beg:iv%end), &
                             qL_prim_ndqp(i), &
                             qR_prim_ndqp(i), &
-                            dflt_int, i)
+                            i)
                     end if
 
                 end if
@@ -884,13 +884,13 @@ contains
                         q_cons_qp%vf(iv%beg:iv%end), &
                         qL_cons_ndqp(i), &
                         qR_cons_ndqp(i), &
-                        dflt_int, i)
+                        i)
                 else
                     call s_reconstruct_cell_boundary_values( &
                         q_prim_qp%vf(iv%beg:iv%end), &
                         qL_prim_ndqp(i), &
                         qR_prim_ndqp(i), &
-                        dflt_int, i)
+                        i)
                 end if
                 ! ===============================================================
 
@@ -900,7 +900,7 @@ contains
                     q_cons_qp%vf(iv%beg:iv%end), &
                     qL_cons_ndqp(i), &
                     qR_cons_ndqp(i), &
-                    dflt_int, i)
+                    i)
 
             end if
 
@@ -946,7 +946,7 @@ contains
                         dq_prim_dx_qp%vf(iv%beg:iv%end), &
                         dqL_prim_dx_ndqp(i), &
                         dqR_prim_dx_ndqp(i), &
-                        dflt_int, i)
+                        i)
 
                     if (n > 0) then
 
@@ -954,13 +954,13 @@ contains
                             dq_prim_dy_qp%vf(iv%beg:iv%end), &
                             dqL_prim_dy_ndqp(i), &
                             dqR_prim_dy_ndqp(i), &
-                            dflt_int, i)
+                            i)
                         if (p > 0) then
                             call s_reconstruct_cell_boundary_values( &
                                 dq_prim_dz_qp%vf(iv%beg:iv%end), &
                                 dqL_prim_dz_ndqp(i), &
                                 dqR_prim_dz_ndqp(i), &
-                                dflt_int, i)
+                                i)
                         end if
 
                     end if
@@ -2603,7 +2603,7 @@ contains
                     q_cons_qp%vf(iv%beg:iv%end), &
                     qL_cons_ndqp(i), &
                     qR_cons_ndqp(i), &
-                    dflt_int, i)
+                    i)
 
                 do l = mom_idx%beg, mom_idx%end
 
@@ -2636,7 +2636,7 @@ contains
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_prim_ndqp(i), &
                     qR_prim_ndqp(i), &
-                    dflt_int, i)
+                    i)
 
             end if
 

@@ -1067,15 +1067,7 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! Reshaping/Projecting onto Physical Fields in x-direction =========
-        if (weno_dir == 1) then
-
-            ! ==================================================================
-
-            ! Reshaping/Projecting onto Physical Fields in y-direction =========
-        elseif (weno_dir == 2) then
-
-
+        if (weno_dir == 2) then
             do i = 1, v_size
                 do j = ix%beg, ix%end
                     do k = iy%beg, iy%end
@@ -1085,12 +1077,9 @@ contains
                 end do
             end do
 
-            ! ==================================================================
 
             ! Reshaping/Projecting onto Physical Fields in z-direction =========
         else
-
-
             do i = 1, v_size
                 do j = ix%beg, ix%end
                     do k = iz%beg, iz%end
@@ -1144,7 +1133,6 @@ contains
         ! Deallocating WENO coefficients in x-direction ====================
         deallocate (poly_coef_cbL_x, poly_coef_cbR_x)
         deallocate (d_cbL_x, d_cbR_x)
-
         deallocate (beta_coef_x)
         ! ==================================================================
 
@@ -1153,7 +1141,6 @@ contains
 
         deallocate (poly_coef_cbL_y, poly_coef_cbR_y)
         deallocate (d_cbL_y, d_cbR_y)
-
         deallocate (beta_coef_y)
         ! ==================================================================
 
@@ -1162,8 +1149,6 @@ contains
 
         deallocate (poly_coef_cbL_z, poly_coef_cbR_z)
         deallocate (d_cbL_z, d_cbR_z)
-
-
         deallocate (beta_coef_z)
         ! ==================================================================
 
