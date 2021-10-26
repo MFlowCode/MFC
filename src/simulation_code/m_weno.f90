@@ -299,7 +299,6 @@ contains
             ! Computing WENO5 Coefficients =====================================
         else
 
-
             do i = is%beg - 1, is%end - 1
 
                 poly_coef_R(0, 0, i + 1) = &
@@ -361,60 +360,68 @@ contains
                 d_L(1, i + 1) = 1d0 - d_L(0, i + 1) - d_L(2, i + 1)
 
                 beta_coef(0, 0, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
-                                                                                                                                                        s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
+                s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
+                s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
+
                 beta_coef(0, 1, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
-                                                                                                     s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
-                                                                                                                                                  s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
-                                                                                                                                                                                             s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
-                                                                                                                                                                                                                                        s_cb(i + 1)))
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
+                s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
+                s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
+                s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
+                s_cb(i + 1)))
+
                 beta_coef(0, 2, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
-                                                                                                      s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
-                                                                                                                                                  s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
-                                                                                                                                                                                                  s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
+                s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
+                s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
+                s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
+
                 beta_coef(1, 0, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                                                                                                            s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
-                                                                                                                                                    s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
+                s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
+                s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
+
                 beta_coef(1, 1, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
-                                                       s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
-                                                                                                     s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
-                                                                                                                                                 s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
-                                                                                                                                                                                      s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
-                                                                                                                                                                                                                                     s_cb(i)))
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
+                s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
+                s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
+                s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
+                s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
+                s_cb(i)))
+
                 beta_coef(1, 2, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
-                    ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                                                       s_cb(i + 2))**2d0)
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
+                s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
+                ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
+                s_cb(i + 2))**2d0)
+
                 beta_coef(2, 0, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
-                                                                                                        s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
-                                                                                                                                  (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
-                    ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                                                       s_cb(i + 1))**2d0)
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
+                s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
+                (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
+                ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
+                s_cb(i + 1))**2d0)
+
                 beta_coef(2, 1, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
-                                                                                                      s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
-                                                                                                                                                        s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
-                                                                                                                                                                                                       s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
-                                                                                                                                                                                                                                                  s_cb(i - 1)))
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
+                s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
+                s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
+                s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
+                s_cb(i - 1)))
+
                 beta_coef(2, 2, i + 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                            s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                                                                                                            s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
-                                                                                                                                                    s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
+                4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
+                s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
+                s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
+                s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
 
             end do
 
