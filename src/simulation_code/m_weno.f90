@@ -1100,17 +1100,11 @@ contains
         ! characteristically decomposed in the coordinate direction of WENO
         ! reconstruction
         do i = -weno_polyn, weno_polyn
-
             do j = 1, v_size
-
                 deallocate (v_rs_wsL(i)%vf(j)%sf)
-
                 v_rs_wsR(i)%vf(j)%sf => null()
-
             end do
-
             deallocate (v_rs_wsL(i)%vf, v_rs_wsR(i)%vf)
-
         end do
 
         ! Deallocating the left and right WENO reconstructions of the cell-
