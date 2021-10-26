@@ -364,9 +364,7 @@ contains
                         qR_prim_ndqp(1)%vf(l)%sf
                 end do
 
-                if ((char_decomp .neqv. .true.) &
-                    .and. &
-                    any(Re_size > 0)) then
+                if (any(Re_size > 0)) then
                     if (weno_vars == 1) then
                         do l = 1, mom_idx%end
                             allocate (qL_cons_ndqp(i)%vf(l)%sf( &
@@ -805,7 +803,7 @@ contains
             ! ===============================================================
 
             ! Reconstructing Primitive/Conservative Variables ===============
-            if (char_decomp .or. all(Re_size == 0)) then
+            if (all(Re_size == 0)) then
 
                 iv%beg = 1; 
                 if (adv_alphan) then
@@ -3534,16 +3532,14 @@ contains
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
-        !!  @param cd_vars Characteristic decomposition state variables type
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_qp, vR_qp, & ! -
-                                                  cd_vars, norm_dir)
+                                                  norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
         type(vector_field), intent(INOUT) :: vL_qp, vR_qp
 
-        integer, intent(IN) :: cd_vars
         integer, intent(IN) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
@@ -3567,7 +3563,7 @@ contains
         call s_weno(v_vf(iv%beg:iv%end), &
                     vL_qp%vf(iv%beg:iv%end), &
                     vR_qp%vf(iv%beg:iv%end), &
-                    cd_vars, norm_dir, weno_dir,  &
+                    norm_dir, weno_dir,  &
                     is1, is2, is3)
         ! ==================================================================
 
@@ -3889,9 +3885,7 @@ contains
 
             if (i /= 1) then
 
-                if ((char_decomp .neqv. .true.) &
-                    .and. &
-                    any(Re_size > 0)) then
+                if (any(Re_size > 0)) then
                     if (weno_vars == 1) then
                         do l = 1, mom_idx%end
                             deallocate (qL_cons_ndqp(i)%vf(l)%sf)

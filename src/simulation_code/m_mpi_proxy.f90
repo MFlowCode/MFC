@@ -227,8 +227,6 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(weno_eps, 1, MPI_DOUBLE_PRECISION, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(char_decomp, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(mapped_weno, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(mp_weno, 1, MPI_LOGICAL, &

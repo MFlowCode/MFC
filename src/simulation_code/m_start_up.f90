@@ -104,7 +104,7 @@ contains
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_vars, &
-            weno_order, weno_eps, char_decomp, &
+            weno_order, weno_eps, &
             mapped_weno, mp_weno, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
@@ -351,11 +351,6 @@ contains
         elseif (weno_eps <= 0d0 .or. weno_eps > 1d-6) then
             print '(A)', 'Unsupported value of weno_eps. Exiting ...'
             call s_mpi_abort()
-        elseif (weno_order == 1 .and. char_decomp) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'weno_order and char_decomp. '// &
-                'Exiting ...'
-            call s_mpi_abort()
         elseif (weno_order == 1 .and. mapped_weno) then
             print '(A)', 'Unsupported combination of values of '// &
                 'weno_order and mapped_weno. '// &
@@ -380,11 +375,6 @@ contains
             call s_mpi_abort()
         elseif (all(avg_state /= (/dflt_int, 1, 2/))) then
             print '(A)', 'Unsupported value of avg_state. Exiting ...'
-            call s_mpi_abort()
-        elseif (char_decomp .and. avg_state == dflt_int) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'char_decomp and avg_state. '// &
-                'Exiting ...'
             call s_mpi_abort()
         elseif (riemann_solver /= 3 .and. avg_state == dflt_int) then
             print '(A)', 'Unsupported combination of values of '// &
