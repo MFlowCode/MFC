@@ -540,8 +540,8 @@ contains
                             do j = 1, nmom
                                 bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
                             end do
-                            bub_idx%rs(i) = bub_idx%moms(i, 1)
-                            bub_idx%vs(i) = bub_idx%moms(i, 2)
+                            bub_idx%rs(i) = bub_idx%moms(i, 2)
+                            bub_idx%vs(i) = bub_idx%moms(i, 3)
                         end do
                     else
                         do i = 1, nb
