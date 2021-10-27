@@ -69,7 +69,6 @@ module m_cbc
     !! reshaping flux_vf and flux_src_vf in a coordinate direction normal to the
     !! domain boundary along which CBC is applied. flux_rs_vf and flux_src_rs_vf
     !! are subsequently modified based on the selected CBC.
-
     real(kind(0d0)), allocatable, dimension(:)   :: alpha_rho   !< Cell averaged partial densiy
     real(kind(0d0))                              :: rho         !< Cell averaged density
     real(kind(0d0)), allocatable, dimension(:)   :: vel         !< Cell averaged velocity
@@ -87,6 +86,7 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:) ::       dvel_ds !< Spatial derivatives in s-dir of velocity
     real(kind(0d0))                            ::      dpres_ds !< Spatial derivatives in s-dir of pressure
     real(kind(0d0)), allocatable, dimension(:) ::       dadv_ds !< Spatial derivatives in s-dir of advection variables
+
     !! Note that these are only obtained in those cells on the domain boundary along which the
     !! CBC is applied by employing finite differences (FD) on the cell-average primitive variables, q_prim_rs_vf.
 
@@ -102,7 +102,9 @@ module m_cbc
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
-    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
+! Bug with NVHPC when using nullified pointers in a declare create
+!    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
+    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef 
 
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
@@ -111,13 +113,19 @@ module m_cbc
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the location of the CBC.
 
-    real(kind(0d0)), pointer, dimension(:, :, :) :: pi_coef => null()
+    real(kind(0d0)), pointer, dimension(:, :, :) :: pi_coef 
+!    real(kind(0d0)), pointer, dimension(:, :, :) :: pi_coef => null()
     ! ==========================================================================
 
-    procedure(s_compute_abstract_L), pointer :: s_compute_L => null() !<
+    procedure(s_compute_abstract_L), pointer :: s_compute_L  !<
+!    procedure(s_compute_abstract_L), pointer :: s_compute_L => null() !<
     !! Pointer to procedure used to calculate L variables, based on choice of CBC
 
     type(bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
+
+!$acc declare create(q_prim_rs_vf,F_rs_vf, F_src_rs_vf,flux_rs_vf, flux_src_rs_vf,alpha_rho,vel,adv,mf,Re, &
+!$acc                dalpha_rho_ds,dvel_ds,dadv_ds,lambda,L,ds,fd_coef_x,fd_coef_y,fd_coef_z,fd_coef,      &
+!$acc                pi_coef_x,pi_coef_y,pi_coef_z,pi_coef,s_compute_L)
 
 contains
 
@@ -381,6 +389,7 @@ contains
         ! END: Computing CBC4 Coefficients =================================
 
         ! Nullifying CBC coefficients
+!$acc exit data detach(fd_coef, pi_coef)
         nullify (fd_coef, pi_coef)
 
     end subroutine s_compute_cbc_coefficients ! ----------------------------
@@ -445,6 +454,8 @@ contains
             end if
 
         end if
+!$acc enter data attach(fd_coef,pi_coef)
+
         ! ==================================================================
 
     end subroutine s_associate_cbc_coefficients_pointers ! -----------------
@@ -771,6 +782,7 @@ contains
                             cbc_dir, cbc_loc, &
                             ix, iy, iz)
 
+!$acc exit data detach(fd_coef,pi_coef)
         nullify (fd_coef, pi_coef)
 
     end subroutine s_cbc ! -------------------------------------------------

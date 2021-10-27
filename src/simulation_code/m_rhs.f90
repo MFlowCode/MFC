@@ -163,6 +163,13 @@ module m_rhs
 
     character(50) :: file_path !< Local file path for saving debug files
 
+!$acc declare create(q_cons_qp,q_prim_qp,qL_cons_n,qR_cons_n,qL_prim_n,qR_prim_n,  &
+!$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,gm_vel_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
+!$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
+!$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
+!$acc   tau_Re_vf,iv,ix, iy, iz,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src,         &
+!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum)
+
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -187,31 +194,39 @@ contains
                 allocate (tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
                                                          iy%beg:iy%end, &
                                                          iz%beg:iz%end))
+!$acc enter data create(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+!$acc                                                  iy%beg:iy%end, &
+!$acc                                                  iz%beg:iz%end))
             end do
             allocate (tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
                                           iy%beg:iy%end, &
                                           iz%beg:iz%end))
+!$acc enter data create (tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+!$acc                                        iy%beg:iy%end, &
+!$acc                                        iz%beg:iz%end))
         end if
-
 
         allocate (q_cons_qp%vf(1:sys_size))
         allocate (q_prim_qp%vf(1:sys_size))
-
+!$acc enter data create(q_cons_qp%vf(1:sys_size),q_prim_qp%vf(1:sys_size))
         ! ==================================================================
 
         if (qbmm) then
             allocate (mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
+!$acc enter data create(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
             do i = 0, 2; do j = 0, 2; do k = 1, nb
                     allocate (mom_3d(i, j, k)%sf( &
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
+!$acc enter data create(mom_3d(i, j, k)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do; end do; end do
             do i = 1, nmomsp
                 allocate (mom_sp(i)%sf( &
                           ix%beg:ix%end, &
                           iy%beg:iy%end, &
                           iz%beg:iz%end))
+!$acc enter data create(mom_sp(i)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
         end if
 
@@ -224,6 +239,7 @@ contains
         allocate (myflux_vf(1:num_dims))
         allocate (myflux_src_vf(1:num_dims))
 
+
         allocate (alf_sum%sf( &
                   ix%beg:ix%end, &
                   iy%beg:iy%end, &
@@ -234,9 +250,14 @@ contains
             allocate (qR_cons_n(i)%vf(1:sys_size))
             allocate (qL_prim_n(i)%vf(1:sys_size))
             allocate (qR_prim_n(i)%vf(1:sys_size))
-
             allocate (myflux_vf(i)%vf(1:sys_size))
             allocate (myflux_src_vf(i)%vf(1:sys_size))
+!$acc enter data create(qL_cons_n(i)%vf(1:sys_size))
+!$acc enter data create(qR_cons_n(i)%vf(1:sys_size))
+!$acc enter data create(qL_prim_n(i)%vf(1:sys_size))
+!$acc enter data create(qR_prim_n(i)%vf(1:sys_size))
+!$acc enter data create(myflux_vf(i)%vf(1:sys_size))
+!$acc enter data create(myflux_src_vf(i)%vf(1:sys_size))
 
             do l = 1, sys_size
                 allocate (myflux_vf(i)%vf(l)%sf( &
@@ -247,6 +268,8 @@ contains
                           ix%beg:ix%end, &
                           iy%beg:iy%end, &
                           iz%beg:iz%end))
+!$acc enter data create(myflux_vf(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(myflux_src_vf(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
 
             if (i == 1) then
@@ -260,6 +283,8 @@ contains
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
+!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do
 
                 if (weno_vars == 1) then
@@ -272,6 +297,8 @@ contains
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                 end if
 
@@ -284,6 +311,8 @@ contains
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
+!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do
 
                 if (model_eqns == 3) then
@@ -296,6 +325,8 @@ contains
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                 end if
 
@@ -308,6 +339,8 @@ contains
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
+!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do
 
                 if (bubbles) then
@@ -320,6 +353,8 @@ contains
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                 end if
             else
@@ -333,6 +368,11 @@ contains
                         qL_prim_n(1)%vf(l)%sf
                     qR_prim_n(i)%vf(l)%sf => &
                         qR_prim_n(1)%vf(l)%sf
+!$acc enter data attach(qL_cons_n(i)%vf(l)%sf,qR_cons_n(i)%vf(l)%sf,qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
+! #ifdef _OPENACC
+! call acc_attach(qL_cons_n(i)%vf(l)%sf)
+! #endif
+
                 end do
 
                 if (any(Re_size > 0)) then
@@ -346,6 +386,8 @@ contains
                                       ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
+!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                         end do
                     else
                         do l = mom_idx%beg, mom_idx%end
@@ -357,6 +399,8 @@ contains
                                       ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
+!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                         end do
                         if (model_eqns == 3) then
                             do l = internalEnergies_idx%beg, internalEnergies_idx%end
@@ -368,6 +412,8 @@ contains
                                           ix%beg:ix%end, &
                                           iy%beg:iy%end, &
                                           iz%beg:iz%end))
+!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                             end do
                         end if
                     end if
@@ -380,6 +426,7 @@ contains
                     qL_cons_n(i)%vf(l)%sf
                 qR_prim_n(i)%vf(l)%sf => &
                     qR_cons_n(i)%vf(l)%sf
+!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
             end do
 
             if (adv_alphan) then
@@ -388,6 +435,7 @@ contains
                         qL_cons_n(i)%vf(l)%sf
                     qR_prim_n(i)%vf(l)%sf => &
                         qR_cons_n(i)%vf(l)%sf
+!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
                 end do
             else
                 do l = adv_idx%beg, adv_idx%end + 1
@@ -395,6 +443,7 @@ contains
                         qL_cons_n(i)%vf(l)%sf
                     qR_prim_n(i)%vf(l)%sf => &
                         qR_cons_n(i)%vf(l)%sf
+!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
                 end do
             end if
 
@@ -410,7 +459,8 @@ contains
             allocate (dq_prim_dy_qp%vf(1:sys_size))
             allocate (dq_prim_dz_qp%vf(1:sys_size))
             allocate (gm_vel_qp%vf(1:sys_size))
-
+!$acc enter data create(dq_prim_dx_qp%vf(1:sys_size),dq_prim_dy_qp%vf(1:sys_size))
+!$acc enter data create(dq_prim_dz_qp%vf(1:sys_size),gm_vel_qp%vf(1:sys_size))
             if (any(Re_size > 0)) then
 
                 do l = mom_idx%beg, mom_idx%end
@@ -422,6 +472,8 @@ contains
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
+!$acc enter data create(dq_prim_dx_qp%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(gm_vel_qp%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do
 
                 if (n > 0) then
@@ -431,6 +483,7 @@ contains
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(dq_prim_dy_qp%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
 
                     if (p > 0) then
@@ -439,6 +492,7 @@ contains
                                       ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
+!$acc enter data create(dq_prim_dz_qp%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                         end do
                     end if
 
@@ -465,7 +519,12 @@ contains
                 allocate (dqR_prim_dx_n(i)%vf(1:sys_size))
                 allocate (dqR_prim_dy_n(i)%vf(1:sys_size))
                 allocate (dqR_prim_dz_n(i)%vf(1:sys_size))
-
+!$acc enter data create(dqL_prim_dx_n(i)%vf(1:sys_size))
+!$acc enter data create(dqL_prim_dy_n(i)%vf(1:sys_size))
+!$acc enter data create(dqL_prim_dz_n(i)%vf(1:sys_size))
+!$acc enter data create(dqR_prim_dx_n(i)%vf(1:sys_size))
+!$acc enter data create(dqR_prim_dy_n(i)%vf(1:sys_size))
+!$acc enter data create(dqR_prim_dz_n(i)%vf(1:sys_size))
                 if (any(Re_size > 0)) then
 
                     do l = mom_idx%beg, mom_idx%end
@@ -477,6 +536,8 @@ contains
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(dqL_prim_dx_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(dqR_prim_dx_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
 
                     if (n > 0) then
@@ -489,6 +550,8 @@ contains
                                       ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
+!$acc enter data create(dqL_prim_dy_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(dqR_prim_dy_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                         end do
                     end if
 
@@ -502,6 +565,8 @@ contains
                                       ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
+!$acc enter data create(dqL_prim_dz_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(dqR_prim_dz_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                         end do
                     end if
 
@@ -546,6 +611,8 @@ contains
         ix%beg = -1; if (n > 0) iy%beg = -1; if (p > 0) iz%beg = -1
 
         ix%end = m; iy%end = n; iz%end = p
+!$acc update device(ix,iy,iz)
+
         ! ==================================================================
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
@@ -558,6 +625,7 @@ contains
             allocate (flux_n(i)%vf(1:sys_size))
             allocate (flux_src_n(i)%vf(1:sys_size))
             allocate (flux_gsrc_n(i)%vf(1:sys_size))
+!$acc enter data create(flux_n(i)%vf(1:sys_size),flux_src_n(i)%vf(1:sys_size),flux_gsrc_n(i)%vf(1:sys_size))
 
             if (i == 1) then
 
@@ -570,6 +638,8 @@ contains
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
+!$acc enter data create(flux_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data create(flux_gsrc_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do
 
                 if (any(Re_size > 0)) then
@@ -578,6 +648,7 @@ contains
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                 end if
 
@@ -585,18 +656,21 @@ contains
                           ix%beg:ix%end, &
                           iy%beg:iy%end, &
                           iz%beg:iz%end))
+!$acc enter data create(flux_src_n(i)%vf(adv_idx%beg)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 if (riemann_solver == 1) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         allocate (flux_src_n(i)%vf(l)%sf( &
                                   ix%beg:ix%end, &
                                   iy%beg:iy%end, &
                                   iz%beg:iz%end))
+!$acc enter data create(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                 else
                     !IF ( (num_fluids > 1) .AND. (bubbles .NEQV. .TRUE.)) THEN
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => &
                             flux_src_n(i)%vf(adv_idx%beg)%sf
+!$acc enter data create(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                     !END IF
                 end if
@@ -610,6 +684,7 @@ contains
                         flux_src_n(1)%vf(l)%sf
                     flux_gsrc_n(i)%vf(l)%sf => &
                         flux_gsrc_n(1)%vf(l)%sf
+!$acc enter data attach(flux_src_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf,flux_gsrc_n(i)%vf(l)%sf)
                 end do
 
             end if
@@ -683,6 +758,7 @@ contains
         do i = 1, sys_size
             q_cons_qp%vf(i)%sf => q_cons_vf(i)%sf
             q_prim_qp%vf(i)%sf => q_prim_vf(i)%sf
+!$acc enter data attach(q_cons_qp%vf(i)%sf,q_prim_qp%vf(i)%sf)
         end do
 
         call s_populate_conservative_variables_buffers()
@@ -691,6 +767,7 @@ contains
 
         ! Converting Conservative to Primitive Variables ===================
         iv%beg = 1; iv%end = adv_idx%end
+!$acc update device(iv)
 
         !convert conservative variables to primitive
         !   (except first and last, \alpha \rho and \alpha)
@@ -702,6 +779,7 @@ contains
 
 
         iv%beg = mom_idx%beg; iv%end = E_idx
+!$acc update device(iv)
 
         if (t_step == t_step_stop) return
         ! ==================================================================

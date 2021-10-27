@@ -62,10 +62,12 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-
-    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
-    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
+    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L 
+    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R 
+!    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
+!    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
+
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
     !! left and the right quadrature points, in x-, y- and z-directions. Note
@@ -80,8 +82,10 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
 
-    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
-    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
+    real(kind(0d0)), pointer, dimension(:, :) :: d_L 
+    real(kind(0d0)), pointer, dimension(:, :) :: d_R 
+!    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
+!    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -93,7 +97,8 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_z
 
-    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
+    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef 
+!    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
     ! END: WENO Coefficients ===================================================
@@ -104,6 +109,11 @@ module m_weno
     !> @{
     type(bounds_info) :: is1, is2, is3
     !> @}
+
+!$acc declare create(v_rs_wsL, v_rs_wsR,vL_rs_vf, vR_rs_vf,poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
+!$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,poly_coef_L,poly_coef_R,d_cbL_x,       &
+!$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,d_L,d_R,beta_coef_x,beta_coef_y,beta_coef_z,   &
+!$acc                beta_coef,is1,is2,is3)
 
 contains
 
@@ -424,6 +434,8 @@ contains
         ! END: Computing WENO5 Coefficients ================================
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
+!$acc exit data detach(poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
+
         nullify (poly_coef_L, poly_coef_R, d_L, d_R, beta_coef, s_cb)
 
     end subroutine s_compute_weno_coefficients ! ---------------------------
@@ -466,6 +478,7 @@ contains
 
         end if
         ! ==================================================================
+!$acc enter data attach(poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
 
     end subroutine s_associate_weno_coefficients_pointers ! ----------------
 
@@ -518,9 +531,22 @@ contains
             call s_associate_weno_coefficients_pointers(weno_dir)
         end if
 
+! Syncronize host to device data
+!$acc update device(beta_coef,poly_coef_R,poly_coef_L,d_L,d_R)
+            do i = 1, ubound(v_vf, 1)
+!$acc update device(v_vf(i)%sf)
+!$acc update device(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
+            end do
+            do l = -weno_polyn,weno_polyn
+            do i = 1, ubound(v_vf, 1)
+!$acc update device(v_rs_wsL(l)%vf(i)%sf,v_rs_wsR(l)%vf(i)%sf)
+	    enddo
+	    enddo
+
         ! WENO1 ============================================================
         if (weno_order == 1) then
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, ubound(v_vf, 1)
                 do l = iz%beg, iz%end
                     do k = iy%beg, iy%end
@@ -537,6 +563,7 @@ contains
             ! WENO3 ============================================================
         elseif (weno_order == 3) then
 
+!$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
             do i = 1, v_size
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -604,6 +631,7 @@ contains
             ! WENO5 ============================================================
         else
 
+!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
             do i = 1, v_size
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -705,10 +733,15 @@ contains
         end if
         ! END: WENO5 =======================================================
 
+        do i = 1, ubound(v_vf, 1)
+!$acc update self(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
+        end do
+
         ! Reshaping and/or projecting onto physical fields the outputted
         ! data, as well as disassociating the WENO coefficients pointers
         if (weno_order /= 1) then
             call s_finalize_weno(vL_vf, vR_vf, weno_dir, ix, iy, iz)
+!$acc exit data detach(poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
             nullify (poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
         end if
 
@@ -751,6 +784,7 @@ contains
         else
             is1 = iz; is2 = iy; is3 = ix
         end if
+!$acc update device(is1,is2,is3)
 
         ! Allocating the cell-average variables, which are reshaped, and/or
         ! characteristically decomposed, in the coordinate direction of the
@@ -758,6 +792,7 @@ contains
         do i = -weno_polyn, weno_polyn
 
             allocate (v_rs_wsL(i)%vf(1:v_size), v_rs_wsR(i)%vf(1:v_size))
+!$acc enter data create(v_rs_wsL(i)%vf(1:v_size), v_rs_wsR(i)%vf(1:v_size))
 
             do j = 1, v_size
 
@@ -766,6 +801,8 @@ contains
                                                is3%beg:is3%end))
 
                 v_rs_wsR(i)%vf(j)%sf => v_rs_wsL(i)%vf(j)%sf
+!$acc enter data create(v_rs_wsL(i)%vf(j)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end)) 
+!$acc enter data attach(v_rs_wsR(i)%vf(j)%sf)
             end do
 
         end do
@@ -779,6 +816,8 @@ contains
             do i = 1, v_size
                 vL_rs_vf(i)%sf => vL_vf(i)%sf
                 vR_rs_vf(i)%sf => vR_vf(i)%sf
+!$acc enter data attach(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
+
             end do
         else
             do i = 1, v_size
@@ -788,11 +827,14 @@ contains
                 allocate (vR_rs_vf(i)%sf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end))
+!$acc enter data create(vL_rs_vf(i)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end))
+!$acc enter data create(vR_rs_vf(i)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end))
             end do
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in x-direction ===
         if (weno_dir == 1) then
+
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do k = ix%beg, ix%end
@@ -802,8 +844,11 @@ contains
                 end do
             end do
 
-        ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
+            ! ==================================================================
+
+            ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
         elseif (weno_dir == 2) then
+
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do k = ix%beg, ix%end
@@ -815,8 +860,12 @@ contains
                 end do
             end do
 
-        ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
+
+            ! ==================================================================
+
+            ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
         else
+
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do k = ix%beg, ix%end
@@ -827,6 +876,8 @@ contains
                     end do
                 end do
             end do
+
+
         end if
         ! ==================================================================
 
@@ -842,7 +893,7 @@ contains
         !!  @param alpha_K ideal weights
         !!  @param omega_K nonlinear weights
     subroutine s_map_nonlinear_weights(d_K, alpha_K, omega_K) ! ------------
-
+!$acc routine seq
         ! Ideal and nonlinear weights
         real(kind(0d0)), dimension(0:weno_polyn), intent(IN)    ::     d_K
         real(kind(0d0)), dimension(0:weno_polyn), intent(INOUT) :: alpha_K
@@ -1061,9 +1112,11 @@ contains
         ! reconstruction
         do i = -weno_polyn, weno_polyn
             do j = 1, v_size
+!$acc exit data delete(v_rs_wsL(i)%vf(j)%sf)
                 deallocate (v_rs_wsL(i)%vf(j)%sf)
                 v_rs_wsR(i)%vf(j)%sf => null()
             end do
+!$acc exit data delete(v_rs_wsL(i)%vf, v_rs_wsR(i)%vf)
             deallocate (v_rs_wsL(i)%vf, v_rs_wsR(i)%vf)
         end do
 
@@ -1077,6 +1130,7 @@ contains
             end do
         else
             do i = 1, v_size
+!$acc exit data delete(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
                 deallocate (vL_rs_vf(i)%sf)
                 deallocate (vR_rs_vf(i)%sf)
             end do
