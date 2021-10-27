@@ -10,10 +10,10 @@ FC = mpif90
 #Note: Requires -cpp to enable preprocessor 
 
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -fallow-argument-mismatch -ffree-line-length-none
-FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -ffree-line-length-none
+# FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -ffree-line-length-none
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O3 -pg -fallow-argument-mismatch
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O3
-# FFLAGS = -cpp -c -w -fall-intrinsics -fallow-argument-mismatch -ffree-line-length-none -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+FFLAGS = -cpp -c -w -fall-intrinsics -fallow-argument-mismatch -ffree-line-length-none -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
 #NOTE: Cray compilers require: -eZ
 
 ######### Silo library and include locations #########
