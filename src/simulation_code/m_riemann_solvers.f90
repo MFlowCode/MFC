@@ -785,8 +785,8 @@ contains
 
                             do i = 1, num_dims
                                 flux_rs_vf(mom_idx%beg - 1 + dir_idx(i))%sf(j, k, l) = rho_Star*s_S* &
-                                                                                       (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
-                                                                                       dir_flg(dir_idx(i))*p_Star
+                                   (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
+                                   dir_flg(dir_idx(i))*p_Star
 
                                 vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = vel_R(dir_idx(i)) + &
                                                                         dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))

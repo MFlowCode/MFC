@@ -1139,7 +1139,7 @@ contains
                     end do
                 end if
 
-                ! Applying the viscous and capillary source fluxes from the Riemann solver
+                ! Applying the viscous source fluxes from the Riemann solver
                 if (any(Re_size > 0)) then
                     do j = mom_idx%beg, E_idx
                         do k = 0, m
@@ -1306,7 +1306,7 @@ contains
                     end do
                 end if
 
-                ! Applying the viscous and capillary source fluxes from the Riemann solver
+                ! Applying the viscous source fluxes from the Riemann solver
                 if (any(Re_size > 0)) then
                     do j = mom_idx%beg, E_idx
                         if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
@@ -1547,7 +1547,7 @@ contains
                     end do
                 end if
 
-                ! Applying the viscous and capillary source fluxes from the Riemann solver
+                ! Applying the viscous source fluxes from the Riemann solver
                 if (any(Re_size > 0)) then
                     do j = mom_idx%beg, E_idx
                         do k = 0, p
@@ -1603,7 +1603,7 @@ contains
         real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc  !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_visc
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re !< Capillary stress tensor components
+        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
 
         type(bounds_info) :: ix, iy, iz
 
@@ -1805,7 +1805,8 @@ contains
 
                     const_sos = dsqrt(n_tait)
 
-                    s2 = f_g(mytime, sound, const_sos, mymono)*f_delta(j, k, l, mymono%loc, mymono%length, mymono)
+                    s2 = f_g(mytime, sound, const_sos, mymono) * &
+                        f_delta(j, k, l, mymono%loc, mymono%length, mymono)
 
                     mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
                     if (n == 0) then
@@ -2028,30 +2029,42 @@ contains
         do j = ix%beg + 1, ix%end - 1
             do k = iy%beg + 1, iy%end - 1
                 do l = iz%beg + 1, iz%end - 1
-                    grad_x%sf(j, k, l) = (var%sf(j + 1, k, l) - var%sf(j - 1, k, l))/(x_cc(j + 1) - x_cc(j - 1))
+                    grad_x%sf(j, k, l) = &
+                        (var%sf(j + 1, k, l) - var%sf(j - 1, k, l)) / &
+                        (x_cc(j + 1) - x_cc(j - 1))
                     if (n > 0) then
-                        grad_y%sf(j, k, l) = (var%sf(j, k + 1, l) - var%sf(j, k - 1, l))/(y_cc(k + 1) - y_cc(k - 1))
+                        grad_y%sf(j, k, l) = &
+                            (var%sf(j, k + 1, l) - var%sf(j, k - 1, l)) / &
+                            (y_cc(k + 1) - y_cc(k - 1))
                         if (p > 0) then
-                            grad_z%sf(j, k, l) = (var%sf(j, k, l + 1) - var%sf(j, k, l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                            grad_z%sf(j, k, l) = &
+                                (var%sf(j, k, l + 1) - var%sf(j, k, l - 1)) / &
+                                (z_cc(l + 1) - z_cc(l - 1))
                         end if
                     end if
                 end do
             end do
         end do
-        grad_x%sf(ix%beg, :, :) = (-3d0*var%sf(ix%beg, :, :) + 4d0*var%sf(ix%beg + 1, :, :) - var%sf(ix%beg + 2, :, :))/ &
-                                  (x_cc(ix%beg + 2) - x_cc(ix%beg))
-        grad_x%sf(ix%end, :, :) = (3d0*var%sf(ix%end, :, :) - 4d0*var%sf(ix%end - 1, :, :) + var%sf(ix%end - 2, :, :))/ &
-                                  (x_cc(ix%end) - x_cc(ix%end - 2))
+        grad_x%sf(ix%beg, :, :) = &
+            (-3d0*var%sf(ix%beg, :, :) + 4d0*var%sf(ix%beg + 1, :, :) - var%sf(ix%beg + 2, :, :))/ &
+            (x_cc(ix%beg + 2) - x_cc(ix%beg))
+        grad_x%sf(ix%end, :, :) = &
+            (3d0*var%sf(ix%end, :, :) - 4d0*var%sf(ix%end - 1, :, :) + var%sf(ix%end - 2, :, :))/ &
+            (x_cc(ix%end) - x_cc(ix%end - 2))
         if (n > 0) then
-            grad_y%sf(:, iy%beg, :) = (-3d0*var%sf(:, iy%beg, :) + 4d0*var%sf(:, iy%beg + 1, :) - var%sf(:, iy%beg + 2, :))/ &
-                                      (y_cc(iy%beg + 2) - y_cc(iy%beg))
-            grad_y%sf(:, iy%end, :) = (3d0*var%sf(:, iy%end, :) - 4d0*var%sf(:, iy%end - 1, :) + var%sf(:, iy%end - 2, :))/ &
-                                      (y_cc(iy%end) - y_cc(iy%end - 2))
+            grad_y%sf(:, iy%beg, :) = &
+                (-3d0*var%sf(:, iy%beg, :) + 4d0*var%sf(:, iy%beg + 1, :) - var%sf(:, iy%beg + 2, :))/ &
+                (y_cc(iy%beg + 2) - y_cc(iy%beg))
+            grad_y%sf(:, iy%end, :) = &
+                (3d0*var%sf(:, iy%end, :) - 4d0*var%sf(:, iy%end - 1, :) + var%sf(:, iy%end - 2, :))/ &
+                (y_cc(iy%end) - y_cc(iy%end - 2))
             if (p > 0) then
-                grad_z%sf(:, :, iz%beg) = (-3d0*var%sf(:, :, iz%beg) + 4d0*var%sf(:, :, iz%beg + 1) - var%sf(:, :, iz%beg + 2))/ &
-                                          (z_cc(iz%beg + 2) - z_cc(iz%beg))
-                grad_z%sf(:, :, iz%end) = (3d0*var%sf(:, :, iz%end) - 4d0*var%sf(:, :, iz%end - 1) + var%sf(:, :, iz%end - 2))/ &
-                                          (z_cc(iz%end) - z_cc(iz%end - 2))
+                grad_z%sf(:, :, iz%beg) = &
+                    (-3d0*var%sf(:, :, iz%beg) + 4d0*var%sf(:, :, iz%beg + 1) - var%sf(:, :, iz%beg + 2)) / &
+                    (z_cc(iz%beg + 2) - z_cc(iz%beg))
+                grad_z%sf(:, :, iz%end) = &
+                    (3d0*var%sf(:, :, iz%end) - 4d0*var%sf(:, :, iz%end - 1) + var%sf(:, :, iz%end - 2)) / &
+                    (z_cc(iz%end) - z_cc(iz%end - 2))
             end if
         end if
 
@@ -2074,12 +2087,14 @@ contains
             end if
             if (p > 0) then
                 if (bc_z%beg <= -3) then
-                    grad_z%sf(:, :, 0) = (-3d0*var%sf(:, :, 0) + 4d0*var%sf(:, :, 1) - var%sf(:, :, 2))/ &
-                                         (z_cc(2) - z_cc(0))
+                    grad_z%sf(:, :, 0) = &
+                        (-3d0*var%sf(:, :, 0) + 4d0*var%sf(:, :, 1) - var%sf(:, :, 2))/ &
+                        (z_cc(2) - z_cc(0))
                 end if
                 if (bc_z%end <= -3) then
-                    grad_z%sf(:, :, p) = (3d0*var%sf(:, :, p) - 4d0*var%sf(:, :, p - 1) + var%sf(:, :, p - 2))/ &
-                                         (z_cc(p) - z_cc(p - 2))
+                    grad_z%sf(:, :, p) = &
+                        (3d0*var%sf(:, :, p) - 4d0*var%sf(:, :, p - 1) + var%sf(:, :, p - 2))/ &
+                        (z_cc(p) - z_cc(p - 2))
                 end if
             end if
         end if
@@ -3588,7 +3603,6 @@ contains
 
         deallocate (q_cons_qp%vf, q_prim_qp%vf)
 
-        ! Deallocation/Disassociation of qK_cons_n and qK_prim_n =====
         do i = num_dims, 1, -1
             do l = 1, cont_idx%end
                 nullify (qL_prim_n(i)%vf(l)%sf)
@@ -3601,7 +3615,6 @@ contains
             end do
 
             if (i /= 1) then
-
                 if (any(Re_size > 0)) then
                     if (weno_vars == 1) then
                         do l = 1, mom_idx%end
@@ -3628,9 +3641,7 @@ contains
                     nullify (qL_prim_n(i)%vf(l)%sf)
                     nullify (qR_prim_n(i)%vf(l)%sf)
                 end do
-
             else
-
                 do l = 1, cont_idx%end
                     deallocate (qL_cons_n(i)%vf(l)%sf)
                     deallocate (qR_cons_n(i)%vf(l)%sf)
@@ -3659,7 +3670,6 @@ contains
                     deallocate (qL_cons_n(i)%vf(l)%sf)
                     deallocate (qR_cons_n(i)%vf(l)%sf)
                 end do
-
             end if
 
             deallocate (qL_cons_n(i)%vf, qL_prim_n(i)%vf)
@@ -3667,9 +3677,7 @@ contains
         end do
 
         deallocate (qL_cons_n, qR_cons_n, qL_prim_n, qR_prim_n)
-        ! END: Deallocation/Disassociation of qK_cons_n and qK_prim_n
 
-        ! Deallocation of dq_prim_ds_qp ====================================
         if (any(Re_size > 0)) then
             do l = mom_idx%beg, mom_idx%end
                 deallocate (dq_prim_dx_qp%vf(l)%sf)
@@ -3695,9 +3703,7 @@ contains
             deallocate (dq_prim_dz_qp%vf)
             deallocate (gm_vel_qp%vf)
         end if
-        ! END: Deallocation of dq_prim_ds_qp ===============================
 
-        ! Deallocation/Disassociation of dqK_prim_ds_n ==================
         if (any(Re_size > 0)) then
             do i = num_dims, 1, -1
                 if (any(Re_size > 0)) then
@@ -3734,9 +3740,6 @@ contains
 
         deallocate (dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
         deallocate (dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
-        ! END: Deallocation/Disassociation of dqK_prim_ds_n =============
-
-        ! ==================================================================
 
 
         if (any(Re_size > 0) .and. cyl_coord) then
@@ -3744,22 +3747,17 @@ contains
                 deallocate (tau_Re_vf(cont_idx%end + i)%sf)
             end do
             deallocate (tau_Re_vf(E_idx)%sf)
-
             deallocate (tau_Re_vf)
         end if
 
-        ! Deallocation/Disassociation of flux_n, flux_src_n, and flux_gsrc_n ====
         do i = num_dims, 1, -1
             if (i /= 1) then
-
                 do l = 1, sys_size
                     nullify (flux_n(i)%vf(l)%sf)
                     nullify (flux_src_n(i)%vf(l)%sf)
                     nullify (flux_gsrc_n(i)%vf(l)%sf)
                 end do
-
             else
-
                 do l = 1, sys_size
                     deallocate (flux_n(i)%vf(l)%sf)
                     deallocate (flux_gsrc_n(i)%vf(l)%sf)
@@ -3782,23 +3780,14 @@ contains
                 end if
 
                 deallocate (flux_src_n(i)%vf(adv_idx%beg)%sf)
-
             end if
 
             deallocate (flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
-
         end do
 
         deallocate (flux_n, flux_src_n, flux_gsrc_n)
 
-        ! END: Deallocation/Disassociation of flux_n, flux_src_n, and flux_gsrc_n  ===
-
-        ! Disassociating procedural pointer to the subroutine which was
-        ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()
-
-        ! Disassociating the pointer to the procedure that was utilized to
-        ! to convert mixture or species variables to the mixture variables
         s_convert_to_mixture_variables => null()
 
     end subroutine s_finalize_rhs_module ! ---------------------------------
