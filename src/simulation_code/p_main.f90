@@ -66,7 +66,6 @@ program p_main
         call s_read_input_file()
         call s_check_input_file()
     end if
-    print *, 'Read input file'
 
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -74,7 +73,6 @@ program p_main
     call s_mpi_bcast_user_inputs()
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
-    print *, 'Broadcast'
 
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -90,7 +88,6 @@ program p_main
     call s_initialize_time_steppers_module()
     if (qbmm) call s_initialize_qbmm_module()
 
-    print *, 'Initialize'
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -126,7 +123,6 @@ program p_main
         mytime = t_step*dt
     end if
     finaltime = t_step_stop*dt
-    dt0 = dt
 
     ! Time-stepping Loop =======================================================
     do

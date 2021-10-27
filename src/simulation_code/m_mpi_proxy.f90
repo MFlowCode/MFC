@@ -178,9 +178,6 @@ contains
         call MPI_BCAST(t_step_stop, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(t_step_save, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-        call MPI_BCAST(t_tol, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
         call MPI_BCAST(debug, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
 
@@ -214,10 +211,6 @@ contains
         call MPI_BCAST(avg_state, 1, MPI_INTEGER, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(alt_soundspeed, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(regularization, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(reg_eps, 1, MPI_DOUBLE_PRECISION, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(null_weights, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)

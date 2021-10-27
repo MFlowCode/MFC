@@ -126,9 +126,6 @@ module m_rhs
     !> @}
 
 
-    type(scalar_field), allocatable, dimension(:) :: reg_src_vf !<
-    !! Additional field for regularization terms
-
     !> @name Additional field for capillary source terms
     !> @{
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
@@ -521,15 +518,6 @@ contains
         allocate (gm_alphaL_n(1:num_dims))
         allocate (gm_alphaR_n(1:num_dims))
         ! ==================================================================
-
-
-        ! Allocation of regularization terms
-        if (regularization) then
-            allocate (reg_src_vf(1:sys_size))
-            do i = 1, sys_size
-                allocate (reg_src_vf(i)%sf(0:m, 0:n, 0:p))
-            end do
-        end if
 
         if (bubbles) then
             allocate (bub_adv_src(0:m, 0:n, 0:p))
@@ -986,7 +974,7 @@ contains
 
             ! ===============================================================
 
-            if (alt_soundspeed .or. regularization) then
+            if (alt_soundspeed) then
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
@@ -1045,7 +1033,7 @@ contains
                     end do
                 else
                     do j = adv_idx%beg, adv_idx%end
-                        if (alt_soundspeed .or. regularization) then
+                        if (alt_soundspeed) then
                             if (adv_alphan .and. (j == adv_idx%end) .and. (bubbles .neqv. .true.)) then
                                 !adv_idx%end, -k div(u)
                                 do k = 0, m
@@ -1204,7 +1192,7 @@ contains
                 else
                     do j = adv_idx%beg, adv_idx%end
                         do k = 0, n
-                            if (alt_soundspeed .or. regularization) then
+                            if (alt_soundspeed) then
                                 if (adv_alphan .and. (j == adv_idx%end)) then
                                     rhs_vf(j)%sf(:, k, :) = &
                                         rhs_vf(j)%sf(:, k, :) + 1d0/dy(k)* &
@@ -1378,14 +1366,6 @@ contains
                     end if
                 end if
 
-                ! Applying interface sharpening regularization source terms
-                if (regularization .and. num_dims == 2) then
-                    call s_compute_regularization_source(i, q_prim_vf)
-                    do j = cont_idx%beg, adv_idx%end
-                        rhs_vf(j)%sf(:, :, :) = rhs_vf(j)%sf(:, :, :) + reg_src_vf(j)%sf(:, :, :)
-                    end do
-                end if
-
                 ! ===============================================================
 
                 ! RHS Contribution in z-direction ===============================
@@ -1454,7 +1434,7 @@ contains
                         if (grid_geometry == 3) then
                             do l = 0, n
                                 do k = 0, p
-                                    if (alt_soundspeed .or. regularization) then
+                                    if (alt_soundspeed) then
                                         if (adv_alphan .and. j == adv_idx%end) then
                                             rhs_vf(j)%sf(:, l, k) = &
                                                 rhs_vf(j)%sf(:, l, k) + 1d0/dz(k)/y_cc(l)* &
@@ -1479,7 +1459,7 @@ contains
                             end do
                         else
                             do k = 0, p
-                                if (alt_soundspeed .or. regularization) then
+                                if (alt_soundspeed) then
                                     if (adv_alphan .and. j == adv_idx%end) then
                                         rhs_vf(j)%sf(:, :, k) = &
                                             rhs_vf(j)%sf(:, :, k) + 1d0/dz(k)* &
@@ -1592,15 +1572,6 @@ contains
                         end do
                     end if
                 end if
-
-                ! Applying interface sharpening regularization source terms
-                if (regularization .and. num_dims == 3) then
-                    call s_compute_regularization_source(i, q_prim_vf)
-                    do j = cont_idx%beg, adv_idx%end
-                        rhs_vf(j)%sf(:, :, :) = rhs_vf(j)%sf(:, :, :) + reg_src_vf(j)%sf(:, :, :)
-                    end do
-                end if
-
             end if
             ! ===============================================================
 
@@ -2023,179 +1994,6 @@ contains
 
     end function f_delta
 
-    !>  The purpose of this procedure is to compute the interface
-        !!      sharpening regularization source terms. Only applicable
-        !!      for 2-fluid system!
-        !!  @param i Dimensional split index
-        !!  @param q_prim_vf Cell-averaged primitive variables
-    subroutine s_compute_regularization_source(i, q_prim_vf) ! -----------------
-
-        integer, intent(IN) :: i
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
-        type(scalar_field), allocatable :: var
-        type(scalar_field), allocatable :: grad_x, grad_y, grad_z
-        type(scalar_field), allocatable :: alpharho_grad_x, alpharho_grad_y, alpharho_grad_z
-        type(scalar_field), allocatable :: norm
-        type(scalar_field), allocatable :: un_alpha_x, un_alpha_y, un_alpha_z
-
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: Lheaviside, U0, velmag
-        real(kind(0d0)) :: U0_loc, U0_glb
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: Rnohat, R1hat, R2hat
-        real(kind(0d0)), dimension(num_dims) :: vel
-
-        type(bounds_info) :: ix, iy, iz
-
-        integer :: j, k, l, r !< Generic loop iterators
-
-        ix%beg = -buff_size; iy%beg = -buff_size
-        ix%end = m + buff_size; iy%end = n + buff_size
-        if (p > 0) then
-            iz%beg = -buff_size; iz%end = p + buff_size
-        else
-            iz%beg = 0; iz%end = 0
-        end if
-        allocate (var%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (grad_x%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (grad_y%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (grad_z%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (alpharho_grad_x%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (alpharho_grad_y%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (alpharho_grad_z%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (norm%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (un_alpha_x%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (un_alpha_y%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        allocate (un_alpha_z%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-
-        do j = 0, m
-            do k = 0, n
-                do l = 0, p
-                    if ((q_prim_vf(adv_idx%beg)%sf(j, k, l) > 1d-6) &
-                        .and. &
-                        (q_prim_vf(adv_idx%beg)%sf(j, k, l) < (1d0 - 1d-6))) then
-                        Lheaviside(j, k, l) = 1d0
-                    else
-                        Lheaviside(j, k, l) = 0d0
-                    end if
-
-                    do r = 1, num_dims
-                        vel(r) = q_prim_vf(cont_idx%end + r)%sf(j, k, l)
-                    end do
-
-                    velmag(j, k, l) = sqrt(dot_product(vel, vel))
-
-                    U0(j, k, l) = 4d0*q_prim_vf(adv_idx%beg)%sf(j, k, l)* &
-                                  (1d0 - q_prim_vf(adv_idx%beg)%sf(j, k, l))* &
-                                  velmag(j, k, l)
-                end do
-            end do
-        end do
-
-        U0_loc = maxval(U0)
-        if (num_procs > 1) then
-            call s_mpi_allreduce_max(U0_loc, U0_glb)
-        else
-            U0_glb = U0_loc
-        end if
-
-        var%sf(:, :, :) = q_prim_vf(adv_idx%beg)%sf(:, :, :)
-        call s_compute_fd_gradient(var, grad_x, grad_y, grad_z, norm)
-        un_alpha_x%sf(:, :, :) = grad_x%sf(:, :, :)/max(norm%sf(:, :, :), sgm_eps)
-        un_alpha_y%sf(:, :, :) = grad_y%sf(:, :, :)/max(norm%sf(:, :, :), sgm_eps)
-        un_alpha_z%sf(:, :, :) = grad_z%sf(:, :, :)/max(norm%sf(:, :, :), sgm_eps)
-
-        do j = ix%beg, ix%end
-            do k = iy%beg, iy%end
-                do l = iz%beg, iz%end
-                    var%sf(j, k, l) = reg_eps*norm%sf(j, k, l) - q_prim_vf(adv_idx%beg)%sf(j, k, l)* &
-                                      (1d0 - q_prim_vf(adv_idx%beg)%sf(j, k, l))
-                end do
-            end do
-        end do
-        call s_compute_fd_gradient(var, grad_x, grad_y, grad_z, norm)
-        do j = 0, m
-            do k = 0, n
-                do l = 0, p
-                    if (p > 0) then
-                        Rnohat(j, k, l) = Lheaviside(j, k, l)*U0_glb* &
-                                          (un_alpha_x%sf(j, k, l)*grad_x%sf(j, k, l) + &
-                                           un_alpha_y%sf(j, k, l)*grad_y%sf(j, k, l) + &
-                                           un_alpha_z%sf(j, k, l)*grad_z%sf(j, k, l))
-                    else
-                        Rnohat(j, k, l) = Lheaviside(j, k, l)*U0_glb* &
-                                          (un_alpha_x%sf(j, k, l)*grad_x%sf(j, k, l) + &
-                                           un_alpha_y%sf(j, k, l)*grad_y%sf(j, k, l))
-                    end if
-                end do
-            end do
-        end do
-
-        do r = cont_idx%beg, cont_idx%end
-            var%sf(:, :, :) = q_prim_vf(r)%sf(:, :, :)
-            call s_compute_fd_gradient(var, alpharho_grad_x, alpharho_grad_y, alpharho_grad_z, norm)
-            do j = ix%beg, ix%end
-                do k = iy%beg, iy%end
-                    do l = iz%beg, iz%end
-                        if (p > 0) then
-                            var%sf(j, k, l) = reg_eps* &
-                                              (un_alpha_x%sf(j, k, l)*alpharho_grad_x%sf(j, k, l) + &
-                                               un_alpha_y%sf(j, k, l)*alpharho_grad_y%sf(j, k, l) + &
-                                               un_alpha_z%sf(j, k, l)*alpharho_grad_z%sf(j, k, l))
-                        else
-                            var%sf(j, k, l) = reg_eps* &
-                                              (un_alpha_x%sf(j, k, l)*alpharho_grad_x%sf(j, k, l) + &
-                                               un_alpha_y%sf(j, k, l)*alpharho_grad_y%sf(j, k, l))
-                        end if
-                    end do
-                end do
-            end do
-            call s_compute_fd_gradient(var, grad_x, grad_y, grad_z, norm)
-            do j = 0, m
-                do k = 0, n
-                    do l = 0, p
-                        if (p > 0) then
-                            var%sf(j, k, l) = Lheaviside(j, k, l)*U0_glb* &
-                                              (un_alpha_x%sf(j, k, l)*(grad_x%sf(j, k, l) - &
-                                                                       (1d0 - 2d0*q_prim_vf(adv_idx%beg)%sf(j, k, l))*alpharho_grad_x%sf(j, k, l)) + &
-                                               un_alpha_y%sf(j, k, l)*(grad_y%sf(j, k, l) - &
-                                                                       (1d0 - 2d0*q_prim_vf(adv_idx%beg)%sf(j, k, l))*alpharho_grad_y%sf(j, k, l)) + &
-                                               un_alpha_z%sf(j, k, l)*(grad_z%sf(j, k, l) - &
-                                                                       (1d0 - 2d0*q_prim_vf(adv_idx%beg)%sf(j, k, l))*alpharho_grad_z%sf(j, k, l)))
-                        else
-                            var%sf(j, k, l) = Lheaviside(j, k, l)*U0_glb* &
-                                              (un_alpha_x%sf(j, k, l)*(grad_x%sf(j, k, l) - &
-                                                                       (1d0 - 2d0*q_prim_vf(adv_idx%beg)%sf(j, k, l))*alpharho_grad_x%sf(j, k, l)) + &
-                                               un_alpha_y%sf(j, k, l)*(grad_y%sf(j, k, l) - &
-                                                                       (1d0 - 2d0*q_prim_vf(adv_idx%beg)%sf(j, k, l))*alpharho_grad_y%sf(j, k, l)))
-                        end if
-                    end do
-                end do
-            end do
-            if (r == cont_idx%beg) then
-                R1hat(:, :, :) = var%sf(0:m, 0:n, 0:p)
-            elseif (r == cont_idx%end) then
-                R2hat(:, :, :) = var%sf(0:m, 0:n, 0:p)
-            end if
-        end do
-
-        reg_src_vf(cont_idx%beg)%sf(:, :, :) = R1hat(:, :, :)
-        reg_src_vf(cont_idx%end)%sf(:, :, :) = R2hat(:, :, :)
-        do r = mom_idx%beg, mom_idx%end
-            reg_src_vf(r)%sf(:, :, :) = q_prim_vf(r)%sf(:, :, :)*(R1hat(:, :, :) + R2hat(:, :, :))
-        end do
-        reg_src_vf(E_idx)%sf(:, :, :) = 5d-1*velmag(:, :, :)**2d0*(R1hat(:, :, :) + R2hat(:, :, :)) + &
-                                        (q_prim_vf(E_idx)%sf(:, :, :)*(fluid_pp(1)%gamma - fluid_pp(2)%gamma) + &
-                                         fluid_pp(1)%pi_inf - fluid_pp(2)%pi_inf)*Rnohat(:, :, :)
-        reg_src_vf(adv_idx%beg)%sf(:, :, :) = Rnohat(:, :, :)
-        if (adv_alphan) then
-            reg_src_vf(adv_idx%end)%sf(:, :, :) = -Rnohat(:, :, :)
-        end if
-
-        deallocate (var%sf, grad_x%sf, grad_y%sf, grad_z%sf, norm%sf)
-        deallocate (un_alpha_x%sf, un_alpha_y%sf, un_alpha_z%sf)
-        deallocate (alpharho_grad_x%sf, alpharho_grad_y%sf, alpharho_grad_z%sf)
-
-    end subroutine s_compute_regularization_source ! ----------------------------------
 
     !>  Computes the scalar gradient fields via finite differences
         !!  @param var Variable to compute derivative of
@@ -3948,14 +3746,6 @@ contains
             deallocate (tau_Re_vf(E_idx)%sf)
 
             deallocate (tau_Re_vf)
-        end if
-
-        ! Deallocation of reg_src_vf
-        if (regularization) then
-            do i = 1, sys_size
-                deallocate (reg_src_vf(i)%sf)
-            end do
-            deallocate (reg_src_vf)
         end if
 
         ! Deallocation/Disassociation of flux_n, flux_src_n, and flux_gsrc_n ====

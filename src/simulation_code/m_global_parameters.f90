@@ -102,8 +102,6 @@ module m_global_parameters
     integer         :: wave_speeds    !< Wave speeds estimation method
     integer         :: avg_state      !< Average state evaluation method
     logical         :: alt_soundspeed !< Alternate mixture sound speed
-    logical         :: regularization !< Regularization terms of Tiwari (2013)
-    real(kind(0d0)) :: reg_eps        !< User-defined interface thickness parameter for regularization terms
     logical         :: null_weights   !< Null undesired WENO weights
     logical         :: mixture_err    !< Mixture properties correction
 
@@ -257,8 +255,6 @@ module m_global_parameters
 
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
-    real(kind(0d0)) :: t_tol        !< Tolerance
-    real(kind(0d0)) :: dt0          !< Initial time step size
 
     ! ======================================================================
 
@@ -289,7 +285,6 @@ contains
         cyl_coord = .false.
 
         dt = dflt_real
-        t_tol = dflt_real
 
         t_step_start = dflt_int
         t_step_stop = dflt_int
@@ -311,8 +306,6 @@ contains
         wave_speeds = dflt_int
         avg_state = dflt_int
         alt_soundspeed = .false.
-        regularization = .false.
-        reg_eps = dflt_real
         null_weights = .false.
         mixture_err = .false.
         parallel_io = .false.
