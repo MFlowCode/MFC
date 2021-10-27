@@ -86,17 +86,14 @@ contains
             fd_order, probe, num_probes, t_step_old, &
             threshold_mf, moment_order, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
-            null_weights, &
-            precision, &
-            parallel_io, &
-            regularization, reg_eps, cyl_coord, &
+            null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
             R0ref, nb, Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, nnode, &
-            R0_type, DEBUG, t_tol
+            R0_type, DEBUG
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -223,9 +220,6 @@ contains
         elseif (bubbles .and. riemann_solver /= 2) then
             print '(A)', 'Bubble modeling requires riemann_solver = 2'
             call s_mpi_abort()
-        elseif (bubbles .and. regularization) then
-            print '(A)', 'Bubble modeling is not compatible with regularization'
-            call s_mpi_abort()
         elseif (bubbles .and. (adv_alphan .neqv. .true.)) then
             print '(A)', 'Bubble modeling requires adv_alphan'
             call s_mpi_abort()
@@ -246,9 +240,9 @@ contains
                 'model_eqns (6-eq) and riemann_solver (please use riemann_solver = 2). '// &
                 'Exiting ...'
             call s_mpi_abort()
-        elseif (model_eqns == 3 .and. (alt_soundspeed .or. regularization)) then
+        elseif (model_eqns == 3 .and. alt_soundspeed) then
             print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and alt_soundspeed or regularization. '// &
+                'model_eqns (6-eq) and alt_soundspeed. '// &
                 'Exiting ...'
             call s_mpi_abort()
         elseif (model_eqns == 3 .and. avg_state == 1) then
@@ -301,9 +295,6 @@ contains
                 print '(A)', 'Unsupported value of time_stepper. Exiting ...'
                 call s_mpi_abort()
             end if
-        elseif (t_tol == dflt_real .and. time_stepper == 23) then
-            print '(A)', 'Adaptive timestepping requires a tolerance t_tol'
-            call s_mpi_abort()
         elseif (all(weno_vars /= (/1, 2/))) then
             print '(A)', 'Unsupported value of weno_vars. Exiting ...'
             call s_mpi_abort()
@@ -458,30 +449,6 @@ contains
         elseif (riemann_solver /= 2 .and. alt_soundspeed) then
             print '(A)', 'Unsupported combination of riemann_solver '// &
                 'and alt_soundspeed. Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 1 .and. regularization) then
-            print '(A)', 'Unsupported combination of model_eqns '// &
-                'and regularization. Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 4 .and. regularization) then
-            print '(A)', 'Unsupported combination of model_eqns '// &
-                'and regularization. Exiting ...'
-            call s_mpi_abort()
-        elseif (num_fluids /= 2 .and. regularization) then
-            print '(A)', 'Unsupported combination of num_fluids '// &
-                'and regularization. Exiting ...'
-            call s_mpi_abort()
-        elseif (riemann_solver /= 2 .and. regularization) then
-            print '(A)', 'Unsupported combination of riemann_solver '// &
-                'and regularization. Exiting ...'
-            call s_mpi_abort()
-        elseif (regularization .and. reg_eps == dflt_real) then
-            print '(A)', 'Unsupported combination of regularization '// &
-                'and value of reg_eps. Exiting ...'
-            call s_mpi_abort()
-        elseif (regularization .and. n == 0) then
-            print '(A)', 'Unsupported combination of regularization '// &
-                'and value of n. Exiting ...'
             call s_mpi_abort()
         end if
         ! END: Simulation Algorithm Parameters =============================

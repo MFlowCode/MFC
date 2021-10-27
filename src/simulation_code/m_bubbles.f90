@@ -155,15 +155,6 @@ contains
                     end if
 
                 end do; end do; end do; end do
-
-            if (DEBUG) then
-                print *, 'bub rhs'
-                print *, 'bub adv', bub_adv_src(:, 0, 0)
-                print *, 'bub r', bub_r_src(q, :, 0, 0)
-                print *, 'bub v', bub_v_src(q, :, 0, 0)
-                print *, 'bub p', bub_p_src(q, :, 0, 0)
-                print *, 'bub m', bub_m_src(q, :, 0, 0)
-            end if
         end if
 
     end subroutine s_compute_bubble_source
@@ -359,21 +350,10 @@ contains
                                               (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else
             f_cpbw_KM = fpb
-            ! @ t = 0, by default this is = pb0 = pl0[1] + 2*ss/(R0ref * R) computed by s_init_nonpoly
         end if
 
-        ! PRINT*, 'surface tension component', (3.D0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
-
         if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
-
         if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
-
-        ! PRINT*, ((fR0/fR)**(3.d0*gam))*(3.D0/(Web*fR0))-3.D0/(fR*Web)
-        ! PRINT*, f_cpbw_KM
-
-        ! At t = 0, we have R0 = R
-        ! fcpbw = Ca - Ca + 1
-        ! Add surface tension: fcpbw = fcpbw + 2/(Web*fR0) - 2/(Web*fR)
 
     end function f_cpbw_KM
 

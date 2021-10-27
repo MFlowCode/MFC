@@ -27,16 +27,14 @@ module m_variables_conversion
     implicit none
 
     private; public :: s_initialize_variables_conversion_module, &
- s_convert_to_mixture_variables, &
- s_convert_mixture_to_mixture_variables, &
- s_convert_species_to_mixture_variables_bubbles, &
- s_convert_species_to_mixture_variables, &
- s_convert_conservative_to_primitive_variables, &
- s_convert_conservative_to_flux_variables, &
- s_convert_primitive_to_conservative_variables, &
- s_convert_primitive_to_flux_variables, &
- s_convert_primitive_to_flux_variables_bubbles, &
- s_finalize_variables_conversion_module
+         s_convert_to_mixture_variables, &
+         s_convert_mixture_to_mixture_variables, &
+         s_convert_species_to_mixture_variables_bubbles, &
+         s_convert_species_to_mixture_variables, &
+         s_convert_conservative_to_primitive_variables, &
+         s_convert_primitive_to_conservative_variables, &
+         s_convert_primitive_to_flux_variables, &
+         s_finalize_variables_conversion_module
 
     abstract interface ! =======================================================
 
@@ -94,7 +92,7 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:)   ::     mf_L, mf_R      !< left/right states mass fraction
     real(kind(0d0))                              ::  gamma_L, gamma_R      !< left/right states specific heat ratio
     real(kind(0d0))                              :: pi_inf_L, pi_inf_R      !< left/right states liquid stiffness
-    real(kind(0d0)), dimension(2)   ::     Re_L, Re_R      !< left/right states Reynolds number
+    real(kind(0d0)), dimension(2)                ::     Re_L, Re_R      !< left/right states Reynolds number
     real(kind(0d0))                              ::   alpha_L, alpha_R    !< left/right states void fraction
     !> @}
 
@@ -218,9 +216,6 @@ contains
                     gamma_k = gamma_k + qK_vf(l + E_idx)%sf(i, j, k)*fluid_pp(l)%gamma
                     pi_inf_k = pi_inf_k + qK_vf(l + E_idx)%sf(i, j, k)*fluid_pp(l)%pi_inf
                 end do
-                !rho_K    = qK_vf(1)%sf(i,j,k)
-                !gamma_K  = fluid_pp(1)%gamma
-                !pi_inf_K = fluid_pp(1)%pi_inf
             else
                 rho_K = qK_vf(1)%sf(i, j, k)
                 gamma_K = fluid_pp(1)%gamma
@@ -399,10 +394,6 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-        ! Allocating velocities, mass fractions and Weber numbers as well
-        ! as associating the procedural pointer to the correct subroutine
-        ! utilized in the computation of the average state
-
     end subroutine s_initialize_variables_conversion_module ! --------------
 
     !> The following procedure handles the conversion between
@@ -491,8 +482,6 @@ contains
                               - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) &
                              - pi_inf_K &
                              )/gamma_K
-                        ! qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.3d0
-                        ! qK_prim_vf(E_idx)%sf(j,k,l) = 1d0/0.7d0
 
                     else if (model_eqns .ne. 4) then
                         ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
@@ -520,7 +509,6 @@ contains
                             !IF (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
                         end do
 
-                        ! PRINT*, 'alf1: ', qK_cons_vf(alf_idx)%sf(j,k,l)
                         call s_comp_n_from_cons(qK_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
                         if (DEBUG) then
                             if (j == 0 .and. k == 0 .and. l == 0) print *, 'nbub1: ', nbub
@@ -539,49 +527,6 @@ contains
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
 
-    !>  The following subroutine handles the conversion between
-        !!      the conservative variables and the Euler flux variables.
-        !!  @param qK_cons_vf Conservative variables
-        !!  @param FK_vf Flux variables
-        !!  @param FK_src_vf Flux source variables
-        !!  @param ix Index bounds in the first coordinate direction
-        !!  @param iy Index bounds in the second coordinate direction
-        !!  @param iz Index bounds in the third coordinate direction
-    subroutine s_convert_conservative_to_flux_variables(qK_cons_vf, & ! ---
-                                                        FK_vf, &
-                                                        FK_src_vf, &
-                                                        ix, iy, iz)
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: qK_cons_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: FK_vf, FK_src_vf
-
-        type(bounds_info), intent(IN) :: ix, iy, iz
-
-        integer :: j, k, l !< Generic loop iterators
-
-        ! Calculating the flux variables from the conservative ones, without
-        ! accounting for the contribution of either viscosity or capillarity
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
-
-                    if (proc_rank == 0) then
-                        print '(A)', 'Conversion from conservative to '// &
-                            'flux variables not implemented. '// &
-                            'Exiting ...'
-                        call s_mpi_abort()
-                    end if
-
-                end do
-            end do
-        end do
-
-    end subroutine s_convert_conservative_to_flux_variables ! --------------
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
@@ -734,164 +679,9 @@ contains
 
     end subroutine s_convert_primitive_to_flux_variables ! -----------------
 
-    !>  The following subroutine handles the conversion between
-        !!      the primitive variables and the Eulerian flux variables
-        !!      for cases with ensemble bubble modeling.
-        !!  @param qK_prim_vf Primitive variables
-        !!  @param qK_cons_vf Primitive variables
-        !!  @param FK_vf Flux variables
-        !!  @param FK_src_vf Flux source variables
-        !!  @param ix Index bounds in the first coordinate direction
-        !!  @param iy Index bounds in the second coordinate direction
-        !!  @param iz Index bounds in the third coordinate direction
-    subroutine s_convert_primitive_to_flux_variables_bubbles(qK_prim_vf, & ! ------
-                                                             qk_cons_vf, &
-                                                             FK_vf, &
-                                                             FK_src_vf, &
-                                                             ix, iy, iz)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: qK_prim_vf, qK_cons_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: FK_vf, FK_src_vf
-
-        type(bounds_info), intent(IN) :: ix, iy, iz
-
-        ! Partial densities, density, velocity, pressure, energy, advection
-        ! variables, the specific heat ratio and liquid stiffness functions,
-        ! the shear and volume Reynolds numbers and the Weber numbers
-        real(kind(0d0)), dimension(cont_idx%end)          :: alpha_rho_K
-        real(kind(0d0))                                   ::       rho_K
-        real(kind(0d0)), dimension(num_dims)              ::       vel_K
-        real(kind(0d0))                                   ::      pres_K
-        real(kind(0d0))                                   ::         E_K
-        real(kind(0d0)), dimension(adv_idx%end - E_idx)     ::       adv_K
-        real(kind(0d0))                                   ::     gamma_K
-        real(kind(0d0))                                   ::    pi_inf_K
-        real(kind(0d0)), dimension(2)                     ::        Re_K
-
-        ! Generic loop iterators
-        integer :: i, j, k, l
-
-        dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
-
-        ! Computing the flux variables from the primitive variables, without
-        ! accounting for the contribution of either viscosity or capillarity
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
-
-                    do i = 1, cont_idx%end
-                        alpha_rho_K(i) = qK_prim_vf(i)%sf(j, k, l)
-                    end do
-
-                    do i = 1, num_dims
-                        vel_K(i) = qK_prim_vf(cont_idx%end + i)%sf(j, k, l)
-                    end do
-
-                    pres_K = qK_prim_vf(E_idx)%sf(j, k, l)
-
-                    call s_convert_to_mixture_variables(qK_prim_vf, rho_K, &
-                                                        gamma_K, pi_inf_K, &
-                                                        Re_K, j, k, l)
-
-                    ! mass flux, \rho u
-                    do i = 1, cont_idx%end
-                        FK_vf(i)%sf(j, k, l) = alpha_rho_K(i)*vel_K(dir_idx(1))
-                    end do
-
-                    ! momentum flux, \rho u u + p I
-                    do i = 1, num_dims
-                        FK_vf(cont_idx%end + dir_idx(i))%sf(j, k, l) = &
-                            rho_K*vel_K(dir_idx(1)) &
-                            *vel_K(dir_idx(i)) &
-                            + pres_K*dir_flg(dir_idx(i))
-                    end do
-
-                    ! energy flux, 0
-                    FK_vf(E_idx)%sf(j, k, l) = 0.
-
-                    ! vol. frac, nR, and nRdot fluxes, u{\alpha, nR, nRdot}
-                    do i = adv_idx%beg, sys_size
-                        FK_vf(i)%sf(j, k, l) = vel_K(dir_idx(1))*qK_cons_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        !stop
-
-    end subroutine s_convert_primitive_to_flux_variables_bubbles ! -----------------
-
-
-
-    subroutine s_solve_linear_system(A, b, sol, ndim)
-
-        integer, intent(IN) :: ndim
-        real(kind(0d0)), dimension(ndim, ndim), intent(INOUT) :: A
-        real(kind(0d0)), dimension(ndim), intent(INOUT) :: b
-        real(kind(0d0)), dimension(ndim), intent(OUT) :: sol
-
-!            INTEGER, DIMENSION(ndim) :: ipiv
-!            INTEGER :: nrhs, lda, ldb, info
-!            EXTERNAL DGESV
-
-        integer :: i, j, k
-
-        ! Solve linear system using Intel MKL (Hooke)
-!            nrhs = 1
-!            lda = ndim
-!            ldb = ndim
-!
-!            CALL DGESV(ndim, nrhs, A, lda, ipiv, b, ldb, info)
-!
-!            DO i = 1, ndim
-!                sol(i) = b(i)
-!            END DO
-!
-!            IF (info /= 0) THEN
-!                PRINT '(A)', 'Trouble solving linear system'
-!                CALL s_mpi_abort()
-!            END IF
-
-        ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede)
-        ! Forward elimination
-        do i = 1, ndim
-            ! Pivoting
-            j = i - 1 + maxloc(abs(A(i:ndim, i)), 1)
-            sol = A(i, :)
-            A(i, :) = A(j, :)
-            A(j, :) = sol
-            sol(1) = b(i)
-            b(i) = b(j)
-            b(j) = sol(1)
-            ! Elimination
-            b(i) = b(i)/A(i, i)
-            A(i, :) = A(i, :)/A(i, i)
-            do k = i + 1, ndim
-                b(k) = b(k) - A(k, i)*b(i)
-                A(k, :) = A(k, :) - A(k, i)*A(i, :)
-            end do
-        end do
-
-        ! Backward substitution
-        do i = ndim, 1, -1
-            sol(i) = b(i)
-            do k = i + 1, ndim
-                sol(i) = sol(i) - A(i, k)*sol(k)
-            end do
-        end do
-
-    end subroutine s_solve_linear_system
-
-    !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_variables_conversion_module() ! ------------------
 
-        ! Disassociating the pointer to the procedure that was utilized to
-        ! to convert mixture or species variables to the mixture variables
         s_convert_to_mixture_variables => null()
 
     end subroutine s_finalize_variables_conversion_module ! ----------------

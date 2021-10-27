@@ -911,8 +911,6 @@ simulation_dict =                                                              \
                     'split_err'                     : None,                    \
                     'alt_crv'                       : None,                    \
                     'alt_soundspeed'                : None,                    \
-                    'regularization'                : None,                    \
-                    'reg_eps'                       : None,                    \
                     'null_weights'                  : None,                    \
                     'mixture_err'                   : None,                    \
                     'tvd_riemann_flux'              : None,                    \

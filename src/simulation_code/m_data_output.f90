@@ -1747,7 +1747,7 @@ contains
                     end if
 
                     ! Compute mixture sound speed
-                    if (alt_soundspeed .or. regularization) then
+                    if (alt_soundspeed) then
                         do s = 1, num_fluids
                             alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k, l)
                         end do
@@ -1834,7 +1834,7 @@ contains
                         end if
 
                         ! Compute mixture sound speed
-                        if (alt_soundspeed .or. regularization) then
+                        if (alt_soundspeed) then
                             do s = 1, num_fluids
                                 alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k - 2, l)
                             end do
@@ -1890,7 +1890,7 @@ contains
                             pres = (q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2) - 0.5d0*rho*dot_product(vel, vel) - pi_inf)/gamma
 
                             ! Compute mixture sound speed
-                            if (alt_soundspeed .or. regularization) then
+                            if (alt_soundspeed) then
                                 do s = 1, num_fluids
                                     alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k - 2, l - 2)
                                 end do

@@ -1289,7 +1289,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        if ((alt_soundspeed .or. regularization)) then
+        if (alt_soundspeed) then
             do i = 1, num_fluids
                 alpha_L(i) = qL_prim_rs_vf(E_idx + i)%sf(j, k, l)
                 alpha_R(i) = qR_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)

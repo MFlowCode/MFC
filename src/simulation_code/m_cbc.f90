@@ -597,7 +597,7 @@ contains
                 mf = alpha_rho/rho
 
                 ! Compute mixture sound speed
-                if (alt_soundspeed .or. regularization) then
+                if (alt_soundspeed) then
                     blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
                                fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
                     blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
