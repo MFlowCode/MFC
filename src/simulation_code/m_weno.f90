@@ -793,7 +793,6 @@ contains
 
         ! Reshaping/Projecting onto Characteristic Fields in x-direction ===
         if (weno_dir == 1) then
-
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do k = ix%beg, ix%end
@@ -803,11 +802,8 @@ contains
                 end do
             end do
 
-            ! ==================================================================
-
-            ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
+        ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
         elseif (weno_dir == 2) then
-
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do k = ix%beg, ix%end
@@ -819,12 +815,8 @@ contains
                 end do
             end do
 
-
-            ! ==================================================================
-
-            ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
+        ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
         else
-
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do k = ix%beg, ix%end
@@ -835,8 +827,6 @@ contains
                     end do
                 end do
             end do
-
-
         end if
         ! ==================================================================
 
