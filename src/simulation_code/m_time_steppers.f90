@@ -44,6 +44,8 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
+!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts)
+
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -88,6 +90,7 @@ contains
 
         do i = 1, num_ts
             allocate (q_cons_ts(i)%vf(1:sys_size))
+!$acc enter data create(q_cons_ts(i)%vf(1:sys_size))
         end do
 
         do i = 1, num_ts
@@ -95,6 +98,7 @@ contains
                 allocate (q_cons_ts(i)%vf(j)%sf(ix%beg:ix%end, &
                                                 iy%beg:iy%end, &
                                                 iz%beg:iz%end))
+!$acc enter data create(q_cons_ts(i)%vf(j)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
         end do
 
@@ -104,6 +108,7 @@ contains
 
             do i = 0, 3
                 allocate (q_prim_ts(i)%vf(1:sys_size))
+!$acc enter data create(q_prim_ts(i)%vf(1:sys_size))
             end do
 
             do i = 0, 3
@@ -111,6 +116,7 @@ contains
                     allocate (q_prim_ts(i)%vf(j)%sf(ix%beg:ix%end, &
                                                     iy%beg:iy%end, &
                                                     iz%beg:iz%end))
+!$acc enter data create(q_prim_ts(i)%vf(j)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                 end do
             end do
         end if
@@ -122,6 +128,7 @@ contains
             allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
+!$acc enter data create(q_prim_vf(i)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
         end do
 
         if (bubbles) then
@@ -129,6 +136,7 @@ contains
                 allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
                                           iy%beg:iy%end, &
                                           iz%beg:iz%end))
+!$acc enter data create(q_prim_vf(i)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
         end if
 
@@ -138,6 +146,7 @@ contains
                 allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
                                           iy%beg:iy%end, &
                                           iz%beg:iz%end))
+!$acc enter data create(q_prim_vf(i)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
         end if
 
@@ -146,6 +155,7 @@ contains
 
         do i = 1, sys_size
             allocate (rhs_vf(i)%sf(0:m, 0:n, 0:p))
+!$acc enter data create(rhs_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
         ! Opening and writing the header of the run-time information file
@@ -166,15 +176,18 @@ contains
         ! Stage 1 of 1 =====================================================
         do i = 1, cont_idx%end
             q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         if (adv_alphan) then
             do i = adv_idx%beg, adv_idx%end
                 q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
             end do
         else
             do i = adv_idx%beg, sys_size
                 q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
             end do
         end if
 
@@ -196,21 +209,25 @@ contains
             q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) = &
                 q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
                 + dt*rhs_vf(i)%sf
+!$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
 
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         do i = 1, cont_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
             q_prim_vf(i)%sf => null()
         end do
 
         if (adv_alphan) then
             do i = adv_idx%beg, adv_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
                 q_prim_vf(i)%sf => null()
             end do
         else
             do i = adv_idx%beg, sys_size ! adv_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
                 q_prim_vf(i)%sf => null()
             end do
         end if
@@ -229,10 +246,12 @@ contains
         ! Stage 1 of 2 =====================================================
         do i = 1, cont_idx%end
             q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         do i = adv_idx%beg, adv_idx%end
             q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
@@ -300,10 +319,12 @@ contains
         ! Stage 1 of 3 =====================================================
         do i = 1, cont_idx%end
             q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         do i = adv_idx%beg, adv_idx%end
             q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
@@ -332,10 +353,12 @@ contains
         ! Stage 2 of 3 =====================================================
         do i = 1, cont_idx%end
             q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         do i = adv_idx%beg, adv_idx%end
             q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
@@ -366,10 +389,12 @@ contains
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         do i = 1, cont_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
             q_prim_vf(i)%sf => null()
         end do
 
         do i = adv_idx%beg, adv_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
             q_prim_vf(i)%sf => null()
         end do
         ! ==================================================================

@@ -107,6 +107,8 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
+!$acc declare create(weno_polyn)
+
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(bounds_info) :: bc_x, bc_y, bc_z
@@ -414,6 +416,7 @@ contains
 
         ! Determining the degree of the WENO polynomials
         weno_polyn = (weno_order - 1)/2
+!$acc update device(weno_polyn)
 
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces
