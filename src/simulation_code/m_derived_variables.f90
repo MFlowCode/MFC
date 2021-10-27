@@ -27,9 +27,9 @@ module m_derived_variables
     implicit none
 
     private; public :: s_initialize_derived_variables_module, &
- s_initialize_derived_variables, &
- s_compute_derived_variables, &
- s_finalize_derived_variables_module
+         s_initialize_derived_variables, &
+         s_compute_derived_variables, &
+         s_finalize_derived_variables_module
 
     !> @name Finite-difference coefficients
     !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
