@@ -43,11 +43,11 @@ module m_rhs
     implicit none
 
     private; public :: s_initialize_rhs_module, &
- s_compute_rhs, &
- s_pressure_relaxation_procedure, &
- s_populate_variables_buffers, &
- s_finalize_rhs_module, &
- s_get_viscous
+     s_compute_rhs, &
+     s_pressure_relaxation_procedure, &
+     s_populate_variables_buffers, &
+     s_finalize_rhs_module, &
+     s_get_viscous
 
     type(vector_field) :: q_cons_qp !<
     !! This variable contains the WENO-reconstructed values of the cell-average

@@ -119,27 +119,26 @@ case_dict =                                                                     
                     'p'                            : 0,                         \
                     'dt'                           : dt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : Nt,                        \
+                    't_step_stop'                  : Nt+1,                        \
                     't_step_save'                  : Nt,   \
-		    # ==========================================================
+                    # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
                     'num_patches'                  : 2,                        \
                     'model_eqns'                   : 2,                        \
                     'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 1,                        \
-		    'adv_alphan'                   : 'T',                      \
-		    'mpp_lim'                      : 'F',                      \
-		    'mixture_err'                  : 'T',                      \
-		    'time_stepper'                 : 3,                        \
+                    'adv_alphan'                   : 'T',                      \
+                    'mpp_lim'                      : 'F',                      \
+                    'mixture_err'                  : 'T',                      \
+                    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
-                    'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
-		    'riemann_solver'               : 2,                        \
+                    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
                     'bc_x%beg'                     : -8,                       \
@@ -150,8 +149,8 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'F',                       \
-		    # ==========================================================
+                    'parallel_io'                  :'F',                       \
+                    # ==========================================================
                                                                                 
                     # Patch 1 _ Background =====================================
                     'patch_icpp(1)%geometry'       : 1,                         \

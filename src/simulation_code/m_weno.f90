@@ -1053,7 +1053,7 @@ contains
 
 
             ! Reshaping/Projecting onto Physical Fields in z-direction =========
-        else
+        elseif (weno_dir == 3) then
             do i = 1, v_size
                 do j = ix%beg, ix%end
                     do k = iz%beg, iz%end

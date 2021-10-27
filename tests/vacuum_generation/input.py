@@ -58,7 +58,7 @@ case_dict =                                                                    \
                     'p'                            : 0,                        \
                     'dt'                           : 5.E-08,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 1000,                    \
+                    't_step_stop'                  : 1001,                    \
                     't_step_save'                  : 1000,                     \
 		    # ==========================================================
                                                                                \
@@ -74,7 +74,6 @@ case_dict =                                                                    \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 3,                        \
                     'weno_eps'                     : 1.E-16,                   \
-                    'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'F',                      \
