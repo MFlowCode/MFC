@@ -43,11 +43,11 @@ module m_rhs
     implicit none
 
     private; public :: s_initialize_rhs_module, &
- s_compute_rhs, &
- s_pressure_relaxation_procedure, &
- s_populate_variables_buffers, &
- s_finalize_rhs_module, &
- s_get_viscous
+         s_compute_rhs, &
+         s_pressure_relaxation_procedure, &
+         s_populate_variables_buffers, &
+         s_finalize_rhs_module, &
+         s_get_viscous
 
     type(vector_field) :: q_cons_qp !<
     !! This variable contains the WENO-reconstructed values of the cell-average
@@ -642,16 +642,225 @@ contains
 
     end subroutine s_initialize_rhs_module ! -------------------------------
 
-    !> The purpose of this procedure is to employ the inputted
-        !!      cell-average conservative variables in order to compute
-        !!      the cell-average RHS variables of the semidiscrete form
-        !!      of the governing equations by utilizing the appropriate
-        !!      Riemann solver.
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param q_prim_vf Cell-average primitive variables
-        !!  @param rhs_vf Cell-average RHS variables
-        !!  @param t_step Current time-step
+
+    ! [SHB]: This is a 'pruned' version of s_compute_rhs 
+    !   (see compute_rhs_full below for full version)
+    !   it exercises all the key things, but gets rid of some of the extraneous 
+    !   calls that might hold back progress
+    ! Specifics [!!]: Does NOT use alt_soundspeed, weno_vars == 1, 
+    !   riemann_solver == 1, viscous terms, bubbles, model_eqns == 3, 
+    !   adv_alphan == .false., cyl_coords, monopole, and possibly more.
+    !   HOWEVER: it is very short! and exercises most of the code in 3D with BCs
     subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, t_step) ! -------
+
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        integer, intent(IN) :: t_step
+
+        real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
+
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
+
+        real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
+        real(kind(0d0)) :: rho_K
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: rho_K_field
+        real(kind(0d0)) :: gamma_K, pi_inf_K
+        real(kind(0d0)), dimension(2) :: Re_K
+
+        integer :: i, j, k, l, r, ii !< Generic loop iterators
+
+        ! Configuring Coordinate Direction Indexes =========================
+        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+
+        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ! ==================================================================
+
+
+        ! Association/Population of Working Variables ======================
+        do i = 1, sys_size
+            q_cons_qp%vf(i)%sf => q_cons_vf(i)%sf
+            q_prim_qp%vf(i)%sf => q_prim_vf(i)%sf
+        end do
+
+        call s_populate_conservative_variables_buffers()
+
+        ! ==================================================================
+
+        ! Converting Conservative to Primitive Variables ===================
+        iv%beg = 1; iv%end = adv_idx%end
+
+        !convert conservative variables to primitive
+        !   (except first and last, \alpha \rho and \alpha)
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_qp%vf, &
+            q_prim_qp%vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+
+        iv%beg = mom_idx%beg; iv%end = E_idx
+
+        if (t_step == t_step_stop) return
+        ! ==================================================================
+
+
+        ! Dimensional Splitting Loop =======================================
+        do i = 1, num_dims
+
+            ! Configuring Coordinate Direction Indexes ======================
+            ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+
+            if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+
+            ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+            ! ===============================================================
+
+            ! Reconstructing Primitive/Conservative Variables ===============
+            iv%beg = 1; iv%end = adv_idx%end
+
+            call s_reconstruct_cell_boundary_values( &
+                q_prim_qp%vf(iv%beg:iv%end), &
+                qL_prim_n(i), &
+                qR_prim_n(i), &
+                i)
+
+            ! Reconstructing Partial or Mixture Energy/Pressure Variables ===
+            iv%beg = E_idx; iv%end = iv%beg
+
+            call s_reconstruct_cell_boundary_values( &
+                q_prim_qp%vf(iv%beg:iv%end), &
+                qL_prim_n(i), &
+                qR_prim_n(i), &
+                i)
+
+            iv%beg = adv_idx%beg
+            iv%end = adv_idx%end
+
+            call s_reconstruct_cell_boundary_values( &
+                q_cons_qp%vf(iv%beg:iv%end), &
+                qL_cons_n(i), &
+                qR_cons_n(i), &
+                i)
+
+
+            ! Configuring Coordinate Direction Indexes ======================
+            if (i == 1) then
+                ix%beg = -1; iy%beg = 0; iz%beg = 0
+            elseif (i == 2) then
+                ix%beg = 0; iy%beg = -1; iz%beg = 0
+            else
+                ix%beg = 0; iy%beg = 0; iz%beg = -1
+            end if
+
+            ix%end = m; iy%end = n; iz%end = p
+            ! ===============================================================
+
+            ! Computing Riemann Solver Flux and Source Flux =================
+            call s_riemann_solver(qR_prim_n(i)%vf, &
+                                  dqR_prim_dx_n(i)%vf, &
+                                  dqR_prim_dy_n(i)%vf, &
+                                  dqR_prim_dz_n(i)%vf, &
+                                  gm_alphaR_n(i)%vf, &
+                                  qL_prim_n(i)%vf, &
+                                  dqL_prim_dx_n(i)%vf, &
+                                  dqL_prim_dy_n(i)%vf, &
+                                  dqL_prim_dz_n(i)%vf, &
+                                  gm_alphaL_n(i)%vf, &
+                                  q_prim_qp%vf, &
+                                  flux_n(i)%vf, &
+                                  flux_src_n(i)%vf, &
+                                  flux_gsrc_n(i)%vf, &
+                                  i, ix, iy, iz)
+
+            iv%beg = 1; iv%end = adv_idx%end
+            ! ===============================================================
+
+            if (i == 1) then
+            ! RHS Contribution in x-direction
+
+                ! Applying the Riemann fluxes
+                do j = 1, sys_size
+                    do k = 0, m
+                        rhs_vf(j)%sf(k, :, :) = 1d0/dx(k)* &
+                            (flux_n(i)%vf(j)%sf(k - 1, 0:n, 0:p) &
+                             - flux_n(i)%vf(j)%sf(k, 0:n, 0:p))
+                    end do
+                end do
+
+                ! Applying source terms to the RHS of the advection equations
+                do j = adv_idx%beg, adv_idx%end
+                    do k = 0, m
+                        rhs_vf(j)%sf(k, :, :) = &
+                            rhs_vf(j)%sf(k, :, :) + 1d0/dx(k)* &
+                            q_cons_qp%vf(j)%sf(k, 0:n, 0:p)* &
+                            (flux_src_n(i)%vf(j)%sf(k, 0:n, 0:p) &
+                             - flux_src_n(i)%vf(j)%sf(k - 1, 0:n, 0:p))
+                    end do
+                end do
+            elseif (i == 2) then
+            ! RHS Contribution in y-direction ===============================
+
+                ! Applying the Riemann fluxes
+                do j = 1, sys_size
+                    do k = 0, n
+                        rhs_vf(j)%sf(:, k, :) = &
+                            rhs_vf(j)%sf(:, k, :) + 1d0/dy(k)* &
+                            (flux_n(i)%vf(j)%sf(0:m, k - 1, 0:p) &
+                             - flux_n(i)%vf(j)%sf(0:m, k, 0:p))
+                    end do
+                end do
+
+                ! Applying source terms to the RHS of the advection equations
+                do j = adv_idx%beg, adv_idx%end
+                    do k = 0, n
+                        rhs_vf(j)%sf(:, k, :) = &
+                            rhs_vf(j)%sf(:, k, :) + 1d0/dy(k)* &
+                            q_cons_qp%vf(j)%sf(0:m, k, 0:p)* &
+                            (flux_src_n(i)%vf(j)%sf(0:m, k, 0:p) &
+                             - flux_src_n(i)%vf(j)%sf(0:m, k - 1, 0:p))
+                    end do
+                end do
+            elseif (i == 3) then
+            ! RHS Contribution in z-direction ===============================
+
+                ! Applying the Riemann fluxes
+                do j = 1, sys_size
+                    do k = 0, p
+                        rhs_vf(j)%sf(:, :, k) = &
+                            rhs_vf(j)%sf(:, :, k) + 1d0/dz(k)* &
+                            (flux_n(i)%vf(j)%sf(0:m, 0:n, k - 1) &
+                             - flux_n(i)%vf(j)%sf(0:m, 0:n, k))
+                    end do
+                end do
+
+                ! Applying source terms to the RHS of the advection equations
+                do j = adv_idx%beg, adv_idx%end
+                    do k = 0, p
+                        rhs_vf(j)%sf(:, :, k) = &
+                            rhs_vf(j)%sf(:, :, k) + 1d0/dz(k)* &
+                            q_cons_qp%vf(j)%sf(0:m, 0:n, k)* &
+                            (flux_src_n(i)%vf(j)%sf(0:m, 0:n, k) &
+                             - flux_src_n(i)%vf(j)%sf(0:m, 0:n, k - 1))
+                    end do
+                end do
+            end if  ! i loop
+        end do
+        ! END: Dimensional Splitting Loop ==================================
+
+        ! Disassociation of Working Variables ==============================
+        do i = 1, sys_size
+            nullify (q_cons_qp%vf(i)%sf, q_prim_qp%vf(i)%sf)
+        end do
+        ! ==================================================================
+
+    end subroutine s_compute_rhs ! -----------------------------------------
+
+
+
+    subroutine s_compute_rhs_full(q_cons_vf, q_prim_vf, rhs_vf, t_step) ! -------
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
@@ -1584,7 +1793,7 @@ contains
         end do
         ! ==================================================================
 
-    end subroutine s_compute_rhs ! -----------------------------------------
+    end subroutine s_compute_rhs_full ! -----------------------------------------
 
     !> The purpose of this subroutine is to compute the viscous
         !!      stress tensor for the cells directly next to the axis in
