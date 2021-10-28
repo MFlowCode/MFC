@@ -3,7 +3,7 @@
 MFC_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 ### Compiler command ###
-FC = mpif90
+FC = mpif90 -acc
 #FC = mpiifort
    
 ### Compiler flags [set according to your compiler] ### 
@@ -12,9 +12,23 @@ FC = mpif90
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -fallow-argument-mismatch -ffree-line-length-none
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -ffree-line-length-none
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O3 -pg -fallow-argument-mismatch
-# FFLAGS = -cpp -c -w -freal-4-real-8 -O3
-FFLAGS = -cpp -c -w -fall-intrinsics -fallow-argument-mismatch -ffree-line-length-none -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+FFLAGS = -cpp -c -w -O0 -Minfo=accel -g -gopt -traceback
+# FFLAGS = -cpp -c -w -O0 -Minfo=accel
+# -g -gopt -traceback 
+# FFLAGS = -cpp -c -w -fast -Minfo=accel
+# FFLAGS = -cpp -c -w -fall-intrinsics -fallow-argument-mismatch -ffree-line-length-none -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
 #NOTE: Cray compilers require: -eZ
+
+
+# -C                  Generate code to check array bounds
+# -g                  Generate information for debugger
+# -gopt               Generate information for debugger without disabling optimizations
+# -M[no]bounds        Generate code to check array bounds
+# -Mchkptr            Check for NULL pointers
+# -Memit-dwarf-inlined
+#                     Enable generation of DWARF for inlined functions
+# -Mstack-init=<snan> Enable auto initialization of stack memory to 64bit signaling NaNs
+# -[no]traceback      Add debug information for runtime traceback
 
 ######### Silo library and include locations #########
 ######### Set these to the location of Silo  #########

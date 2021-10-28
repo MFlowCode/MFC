@@ -540,8 +540,8 @@ contains
             do l = -weno_polyn,weno_polyn
             do i = 1, ubound(v_vf, 1)
 !$acc update device(v_rs_wsL(l)%vf(i)%sf,v_rs_wsR(l)%vf(i)%sf)
-	    enddo
-	    enddo
+        enddo
+        enddo
 
         ! WENO1 ============================================================
         if (weno_order == 1) then
@@ -630,6 +630,8 @@ contains
 
             ! WENO5 ============================================================
         else
+
+!!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R)
 
 !$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
             do i = 1, v_size
@@ -893,7 +895,8 @@ contains
         !!  @param alpha_K ideal weights
         !!  @param omega_K nonlinear weights
     subroutine s_map_nonlinear_weights(d_K, alpha_K, omega_K) ! ------------
-!$acc routine seq
+        !$acc routine seq
+
         ! Ideal and nonlinear weights
         real(kind(0d0)), dimension(0:weno_polyn), intent(IN)    ::     d_K
         real(kind(0d0)), dimension(0:weno_polyn), intent(INOUT) :: alpha_K
@@ -921,6 +924,7 @@ contains
         !!  @param k Second-coordinate cell index
         !!  @param l Third-coordinate cell index
     subroutine s_preserve_monotonicity(i, j, k, l) ! --------------------------
+        !$acc routine seq
 
         integer, intent(IN) :: i, j, k, l
 
@@ -947,6 +951,8 @@ contains
         real(kind(0d0)), parameter :: beta = 4d0/3d0 !<
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
+
+
 
         ! Left Monotonicity Preserving Bound ===============================
         d(-1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
