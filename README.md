@@ -15,15 +15,15 @@ Now it is developed and maintained by the groups of Professors <a href="https://
 # Documentation
  
   The following codes are documented, please follow the links to see their Doxygen:
-* <a href="https://mfc-caltech.github.io/pre_process/namespaces.html">Pre_process</a> 
-* <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
-* <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
+* <a href="https://mflowcode.github.io/pre_process/namespaces.html">Pre_process</a> 
+* <a href="https://mflowcode.github.io/simulation/namespaces.html">Simulation</a> 
+* <a href="https://mflowcode.github.io/post_process/namespaces.html">Post_process</a>
  
 
 ## User's guide
  
   A user's guide is included 
-  <a href="https://github.com/ComputationalFlowPhysics/MFC-Caltech/raw/master/doc/MFC_user_guide.pdf">here.</a>
+  <a href="https://github.com/ComputationalFlowPhysics/MFC/raw/master/doc/MFC_user_guide.pdf">here.</a>
  
 ## MFC paper
  
@@ -93,19 +93,17 @@ Ph.D. Disserations:
  
 ### Main dependencies: MPI and Python 
   If you do not have Python, it can be installed via
-  <a href="https://brew.sh/">Homebrew on OSX</a> as:  
+  <a href="https://brew.sh/">Homebrew on MacOS</a> as:  
 `brew install python`
  
   or compiled via your favorite package manager on Unix systems.
  
   An MPI fortran compiler is required for all systems.
   If you do not have one, Homebrew can take care of this
-  on OSX:  
-
-`brew install open-mpi` or `brew install mpich`    
-
-  If a gcc v10.1+ backend is used, then the additional flag `-fallow-argument-mismatch` must be added to `FFLAGS` in `Makefile.user`.
-  MPICH and Open-MPI can be compiled via another package manager on *nix systems.
+  on MacOS:  
+`brew install open-mpi`  
+ 
+  or compiled via another package manager on Unix systems.
  
 ### Simulation code dependency: FFTW 
 
@@ -126,7 +124,7 @@ If you do not have FFTW compiler, the library and
   but can indeed be handled with the MFC. For this, HDF5
   and Silo must be installed
  
-  On OSX, a custom Homebrew tap for Silo is included in the installers
+  On MacOS, a custom Homebrew tap for Silo is included in the installers
   directory. You can use it via  
 `cd installers`  
 `brew install silo.rb`  
@@ -199,9 +197,15 @@ for the flow variables via
 Note that the post-processing step 
 requires installation of Silo and HDF5.
 
-# License
+# MIT License
+ 
+Copyright 2021
 
-MFC is under the MIT license (see LICENSE file).
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # Acknowledgements
  
