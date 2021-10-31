@@ -2,33 +2,28 @@
 
 [![DOI](https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg)](http://dx.doi.org/10.1016/j.cpc.2020.107396)
 
-Welcome to the MFC! The MFC is a fully-documented parallel simulation software
-for multi-component, multi-phase, and bubbly flows.
+Welcome to the MFC! 
+The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows.
 
 # Authors
 
-  MFC was developed at Caltech by a group of post-doctoral scientists and graduate research students under the supervision of Professor Tim Colonius.
-  These contributors include:
-* Dr. Spencer Bryngelson
-* Dr. Kevin Schmidmayer
-* Dr. Vedran Coralic
-* Dr. Jomela Meng
-* Dr. Kazuki Maeda  
-
-  and their contact information is located in the `AUTHORS` file in the source code.
+This is the documentation for the MFC (Multicomponent Flow Code).
+The MFC is a simulation software for multi-component, multi-phase, and bubbly flows. 
+MFC was first developed by the Colonius research group at Caltech.
+Now it is developed and maintained by the groups of Professors <a href="https://colonius.caltech.edu/">Tim Colonius</a>, <a href="https://comp-physics.group">Spencer Bryngelson</a>, and <a href="https://vivo.brown.edu/display/mrodri97">Mauro Rodriguez</a>.
 
 # Documentation
  
   The following codes are documented, please follow the links to see their Doxygen:
-* <a href="https://mfc-caltech.github.io/pre_process/namespaces.html">Pre_process</a> 
-* <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
-* <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
+* <a href="https://mflowcode.github.io/pre_process/namespaces.html">Pre_process</a> 
+* <a href="https://mflowcode.github.io/simulation/namespaces.html">Simulation</a> 
+* <a href="https://mflowcode.github.io/post_process/namespaces.html">Post_process</a>
  
 
 ## User's guide
  
   A user's guide is included 
-  <a href="https://github.com/ComputationalFlowPhysics/MFC-Caltech/raw/master/doc/MFC_user_guide.pdf">here.</a>
+  <a href="https://github.com/ComputationalFlowPhysics/MFC/raw/master/doc/MFC_user_guide.pdf">here.</a>
  
 ## MFC paper
  
@@ -98,14 +93,14 @@ Ph.D. Disserations:
  
 ### Main dependencies: MPI and Python 
   If you do not have Python, it can be installed via
-  <a href="https://brew.sh/">Homebrew on OSX</a> as:  
+  <a href="https://brew.sh/">Homebrew on MacOS</a> as:  
 `brew install python`
  
   or compiled via your favorite package manager on Unix systems.
  
   An MPI fortran compiler is required for all systems.
   If you do not have one, Homebrew can take care of this
-  on OSX:  
+  on MacOS:  
 `brew install open-mpi`  
  
   or compiled via another package manager on Unix systems.
@@ -129,7 +124,7 @@ If you do not have FFTW compiler, the library and
   but can indeed be handled with the MFC. For this, HDF5
   and Silo must be installed
  
-  On OSX, a custom Homebrew tap for Silo is included in the installers
+  On MacOS, a custom Homebrew tap for Silo is included in the installers
   directory. You can use it via  
 `cd installers`  
 `brew install silo.rb`  
