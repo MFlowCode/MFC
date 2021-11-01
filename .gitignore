@@ -24,7 +24,8 @@ tests/*/*.out
 tests/*/binary
 example_cases/*batch/*/
 example_cases/*/D/*
-example_cases/*/p*
+example_cases/*/p?
+example_cases/*/p??
 example_cases/*/D_*
 example_cases/*/*.inf
 example_cases/*/*.dat
