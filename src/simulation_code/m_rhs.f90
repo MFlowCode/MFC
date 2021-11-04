@@ -805,24 +805,7 @@ contains
                 qR_prim_n(i), &
                 i)
 
-            ! Reconstructing Partial or Mixture Energy/Pressure Variables ===
-            iv%beg = E_idx; iv%end = iv%beg
-
-            call s_reconstruct_cell_boundary_values( &
-                q_prim_qp%vf(iv%beg:iv%end), &
-                qL_prim_n(i), &
-                qR_prim_n(i), &
-                i)
-
-            iv%beg = adv_idx%beg
-            iv%end = adv_idx%end
-
-            call s_reconstruct_cell_boundary_values( &
-                q_cons_qp%vf(iv%beg:iv%end), &
-                qL_cons_n(i), &
-                qR_cons_n(i), &
-                i)
-
+    
 
             ! Configuring Coordinate Direction Indexes ======================
             if (i == 1) then

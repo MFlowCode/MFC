@@ -15,7 +15,6 @@
 !!              that the basic WENO approach is implemented according to the work
 !!              of Jiang and Shu (1996).
 module m_weno
-
     ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
@@ -46,6 +45,7 @@ module m_weno
     !> @{
     type(scalar_field), allocatable, dimension(:) :: vL_rs_vf, vR_rs_vf
     !> @}
+
 
     ! WENO Coefficients ========================================================
 
