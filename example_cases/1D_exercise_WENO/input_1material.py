@@ -62,7 +62,6 @@ case_dict =                                                                     
                     # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
-                    'debug_weno'                  : 'T',                        \
                     'num_patches'                  : 1,                         \
                     'model_eqns'                   : 2,                         \
                     'alt_soundspeed'               : 'F',                       \

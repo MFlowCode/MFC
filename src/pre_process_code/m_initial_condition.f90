@@ -1619,7 +1619,7 @@ contains
                 !what variables to alter
                 !bump in pressure
                 q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                               (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                    (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                 !bump in void fraction
                 !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
@@ -1632,9 +1632,9 @@ contains
                 !IF (model_eqns == 4) THEN
                 !reassign density
                 !IF (num_fluids == 1) THEN
-                q_prim_vf(1)%sf(i, 0, 0) = &
-                    (((q_prim_vf(E_idx)%sf(i, 0, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                    rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, 0, 0))
+                ! q_prim_vf(1)%sf(i, 0, 0) = &
+                !     (((q_prim_vf(E_idx)%sf(i, 0, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                !     rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, 0, 0))
                 !END IF
                 !ELSE IF (model_eqns == 2) THEN
                 !can manually adjust density here
