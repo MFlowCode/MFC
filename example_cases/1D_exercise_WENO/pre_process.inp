@@ -4,7 +4,7 @@ x_domain%beg = 0.0
 patch_icpp(1)%alpha_rho(1) = 1.0
 adv_alphan = T
 x_domain%end = 1.0
-m = 1000
+m = 250
 precision = 2
 n = 0
 bc_x%beg = -1
@@ -22,7 +22,7 @@ case_dir = '.'
 patch_icpp(1)%vel(1) = 0.05
 patch_icpp(1)%pres = 1.1
 patch_icpp(1)%alpha(1) = 1.0
-patch_icpp(1)%geometry = 1
+patch_icpp(1)%geometry = 15
 bc_x%end = -1
 &end
 /
