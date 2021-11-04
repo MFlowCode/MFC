@@ -1118,6 +1118,7 @@ contains
         ! reconstruction
         do i = -weno_polyn, weno_polyn
             do j = 1, v_size
+!$acc exit data detach(v_rs_wsR(i)%vf(j)%sf)                
 !$acc exit data delete(v_rs_wsL(i)%vf(j)%sf)
                 deallocate (v_rs_wsL(i)%vf(j)%sf)
                 v_rs_wsR(i)%vf(j)%sf => null()
@@ -1131,6 +1132,8 @@ contains
         ! decomposed, in the coordinate direction of WENO reconstruction
         if (weno_dir == 1) then
             do i = 1, v_size
+!$acc exit data detach(vL_rs_vf(i)%sf) 
+!$acc exit data detach(vR_rs_vf(i)%sf) 
                 vL_rs_vf(i)%sf => null()
                 vR_rs_vf(i)%sf => null()
             end do

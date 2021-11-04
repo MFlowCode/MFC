@@ -211,12 +211,13 @@ contains
                 + dt*rhs_vf(i)%sf
 !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
-
-        print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(312,0,0)
-        print *, q_cons_ts(1)%vf(E_idx)%sf(312,0,0)
-        print *, q_cons_ts(1)%vf(adv_idx%end)%sf(312,0,0)
-        print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(312,0,0)
-
+        if(t_step == t_step_stop - 1) then
+            print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
+            print *, q_cons_ts(1)%vf(E_idx)%sf(102,0,0)
+            print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)
+            print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(102,0,0)
+        end if
+        
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         do i = 1, cont_idx%end
