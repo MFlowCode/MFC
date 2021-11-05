@@ -35,7 +35,7 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-    type(vector_field), allocatable, dimension(:) :: v_rs_wsL, v_rs_wsR
+    type(vector_field), allocatable, dimension(:) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
 
     !> @name Left and right WENO-reconstructed values of the cell-average variables.
@@ -43,7 +43,7 @@ module m_weno
     !! obtained, v_rs_wsL and v_rs_wsR, is initially kept. Once the reshaping
     !! is undone, the reconstructed values are moved into vL_vf and vR_vf.
     !> @{
-    type(scalar_field), allocatable, dimension(:) :: vL_rs_vf, vR_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
     !> @}
 
 
@@ -110,10 +110,11 @@ module m_weno
     type(bounds_info) :: is1, is2, is3
     !> @}
 
-!$acc declare create(v_rs_wsL, v_rs_wsR,vL_rs_vf, vR_rs_vf,poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
+!$acc declare create(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & 
+!$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
 !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,poly_coef_L,poly_coef_R,d_cbL_x,       &
 !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,d_L,d_R,beta_coef_x,beta_coef_y,beta_coef_z,   &
-!$acc                beta_coef,is1,is2,is3)
+!$acc                beta_coef,is1, is2, is3)
 
 contains
 
@@ -122,78 +123,173 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_weno_module() ! --------------------------------
 
-        type(bounds_info) :: ix, iy, iz !< Indical bounds in the x-, y- and z-directions
-
+        integer :: i, j
         if (weno_order == 1) return
 
-        ! Allocating WENO-stencil for the variables to be WENO-reconstructed
-        allocate (v_rs_wsL(-weno_polyn:weno_polyn))
-        allocate (v_rs_wsR(-weno_polyn:weno_polyn))
 
         ! Allocating/Computing WENO Coefficients in x-direction ============
-        ix%beg = -buff_size + weno_polyn; ix%end = m - ix%beg
-
+        is1%beg = -buff_size + weno_polyn; is1%end = m - is1%beg
+        is2%beg = -buff_size; is2%end = n - is2%beg
+        is3%beg = -buff_size; is3%end = p - is3%beg
         allocate (poly_coef_cbL_x(0:weno_polyn, &
                                   0:weno_polyn - 1, &
-                                  ix%beg:ix%end))
+                                  is1%beg:is1%end))
         allocate (poly_coef_cbR_x(0:weno_polyn, &
                                   0:weno_polyn - 1, &
-                                  ix%beg:ix%end))
+                                  is1%beg:is1%end))
 
-        allocate (d_cbL_x(0:weno_polyn, ix%beg:ix%end))
-        allocate (d_cbR_x(0:weno_polyn, ix%beg:ix%end))
+        allocate (d_cbL_x(0:weno_polyn, is1%beg:is1%end))
+        allocate (d_cbR_x(0:weno_polyn, is1%beg:is1%end))
 
         allocate (beta_coef_x(0:weno_polyn, &
                               0:2*(weno_polyn - 1), &
-                              ix%beg:ix%end))
+                              is1%beg:is1%end))
 
-        call s_compute_weno_coefficients(1, ix)
+        call s_compute_weno_coefficients(1, is1)
+
+
+        ! Allocating WENO-stencil for the variables to be WENO-reconstructed
+        allocate (v_rs_ws_x(-weno_polyn:weno_polyn))
+
+        ! Allocating the cell-average variables, which are reshaped, and/or
+        ! characteristically decomposed, in the coordinate direction of the
+        ! WENO reconstruction
+        do i = -weno_polyn, weno_polyn
+
+            allocate (v_rs_ws_x(i)%vf(1:sys_size))
+!$acc enter data create(v_rs_ws_x(i)%vf(1:sys_size))
+
+            do j = 1, sys_size
+
+                allocate (v_rs_ws_x(i)%vf(j)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end)) 
+!$acc enter data create(v_rs_ws_x(i)%vf(j)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end)) 
+            end do
+
+        end do
+
+        ! Allocating the left and right WENO reconstructions of the cell-
+        ! average variables that are reshaped, and/or characteristically
+        ! decomposed, in the coordinate direction of WENO reconstruction
+        allocate (vL_rs_vf_x(1:sys_size), vR_rs_vf_x(1:sys_size))
+
+
+
+
+
+
 
         ! ==================================================================
 
         ! Allocating/Computing WENO Coefficients in y-direction ============
         if (n == 0) return
 
-        iy%beg = -buff_size + weno_polyn; iy%end = n - iy%beg
+        is2%beg = -buff_size + weno_polyn; is2%end = n - is2%beg
+        is1%beg = -buff_size; is1%end = m - is1%beg
+        is3%beg = -buff_size; is3%end = p - is3%beg
 
         allocate (poly_coef_cbL_y(0:weno_polyn, &
                                   0:weno_polyn - 1, &
-                                  iy%beg:iy%end))
+                                  is2%beg:is2%end))
         allocate (poly_coef_cbR_y(0:weno_polyn, &
                                   0:weno_polyn - 1, &
-                                  iy%beg:iy%end))
+                                  is2%beg:is2%end))
 
-        allocate (d_cbL_y(0:weno_polyn, iy%beg:iy%end))
-        allocate (d_cbR_y(0:weno_polyn, iy%beg:iy%end))
+        allocate (d_cbL_y(0:weno_polyn, is2%beg:is2%end))
+        allocate (d_cbR_y(0:weno_polyn, is2%beg:is2%end))
 
         allocate (beta_coef_y(0:weno_polyn, &
                               0:2*(weno_polyn - 1), &
-                              iy%beg:iy%end))
+                              is2%beg:is2%end))
 
-        call s_compute_weno_coefficients(2, iy)
+        call s_compute_weno_coefficients(2, is2)
+
+        allocate (v_rs_ws_y(-weno_polyn:weno_polyn))
+
+        ! Allocating the cell-average variables, which are reshaped, and/or
+        ! characteristically decomposed, in the coordinate direction of the
+        ! WENO reconstruction
+        do i = -weno_polyn, weno_polyn
+            allocate (v_rs_ws_y(i)%vf(1:sys_size))
+!$acc enter data create(v_rs_ws_y(i)%vf(1:sys_size))
+
+            do j = 1, sys_size
+
+                allocate (v_rs_ws_y(i)%vf(j)%sf(is2%beg:is2%end, &
+                                               is1%beg:is1%end, &
+                                               is3%beg:is3%end))
+!$acc enter data create(v_rs_ws_y(i)%vf(j)%sf(is2%beg:is2%end,is1%beg:is1%end,is3%beg:is3%end)) 
+            end do
+
+        end do
+
+        allocate (vL_rs_vf_y(1:sys_size), vR_rs_vf_y(1:sys_size))
+
+        do i = 1, sys_size
+            allocate (vL_rs_vf_y(i)%sf(is2%beg:is2%end, &
+                                     is1%beg:is1%end, &
+                                     is3%beg:is3%end))
+            allocate (vR_rs_vf_y(i)%sf(is2%beg:is2%end, &
+                                     is1%beg:is1%end, &
+                                     is3%beg:is3%end))
+!$acc enter data create(vL_rs_vf_y(i)%sf(is2%beg:is2%end, is1%beg:is1%end, is3%beg:is3%end))
+!$acc enter data create(vR_rs_vf_y(i)%sf(is2%beg:is2%end, is1%beg:is1%end, is3%beg:is3%end))
+        end do
 
         ! ==================================================================
 
         ! Allocating/Computing WENO Coefficients in z-direction ============
         if (p == 0) return
 
-        iz%beg = -buff_size + weno_polyn; iz%end = p - iz%beg
+        is2%beg = -buff_size; is2%end = n - is2%beg
+        is1%beg = -buff_size; is1%end = m - is1%beg
+        is3%beg = -buff_size + weno_polyn; is3%end = p - is3%beg
 
         allocate (poly_coef_cbL_z(0:weno_polyn, &
                                   0:weno_polyn - 1, &
-                                  iz%beg:iz%end))
+                                  is3%beg:is3%end))
         allocate (poly_coef_cbR_z(0:weno_polyn, &
                                   0:weno_polyn - 1, &
-                                  iz%beg:iz%end))
+                                  is3%beg:is3%end))
 
-        allocate (d_cbL_z(0:weno_polyn, iz%beg:iz%end))
-        allocate (d_cbR_z(0:weno_polyn, iz%beg:iz%end))
+        allocate (d_cbL_z(0:weno_polyn, is3%beg:is3%end))
+        allocate (d_cbR_z(0:weno_polyn, is3%beg:is3%end))
 
         allocate (beta_coef_z(0:weno_polyn, &
                               0:2*(weno_polyn - 1), &
-                              iz%beg:iz%end))
+                              is3%beg:is3%end))
 
-        call s_compute_weno_coefficients(3, iz)
+        call s_compute_weno_coefficients(3, is3)
+
+        allocate (v_rs_ws_z(-weno_polyn:weno_polyn))
+
+        do i = -weno_polyn, weno_polyn
+            allocate (v_rs_ws_z(i)%vf(1:sys_size))
+!$acc enter data create(v_rs_ws_z(i)%vf(1:sys_size))
+
+            do j = 1, sys_size
+
+                allocate (v_rs_ws_z(i)%vf(j)%sf(is3%beg:is3%end, &
+                                               is2%beg:is2%end, &
+                                               is1%beg:is1%end))
+!$acc enter data create(v_rs_ws_z(i)%vf(j)%sf(is3%beg:is3%end, is2%beg:is2%end, is1%beg:is1%end)) 
+            end do
+
+        end do
+
+        allocate (vL_rs_vf_z(1:sys_size), vR_rs_vf_z(1:sys_size))
+
+        do i = 1, sys_size
+            allocate (vL_rs_vf_z(i)%sf(is3%beg:is3%end, &
+                                               is2%beg:is2%end, &
+                                               is1%beg:is1%end))
+            allocate (vR_rs_vf_z(i)%sf(is3%beg:is3%end, &
+                                               is2%beg:is2%end, &
+                                               is1%beg:is1%end))
+!$acc enter data create(vL_rs_vf_z(i)%sf(is3%beg:is3%end, is2%beg:is2%end, is1%beg:is1%end))
+!$acc enter data create(vR_rs_vf_z(i)%sf(is3%beg:is3%end, is2%beg:is2%end, is1%beg:is1%end))
+        end do
 
         ! ==================================================================
 
@@ -433,6 +529,7 @@ contains
         end if
         ! END: Computing WENO5 Coefficients ================================
 
+!$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x,poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y, poly_coef_cbL_z,poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z)
         ! Nullifying WENO coefficients and cell-boundary locations pointers
 !$acc exit data detach(poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
 
@@ -496,18 +593,18 @@ contains
         !! @param vR_vf Right WENO reconstructed cell-boundary values
         !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
-        !! @param ix Index bounds in first coordinate direction
-        !! @param iy Index bounds in second coordinate direction
-        !! @param iz Index bounds in third coordinate direction
+        !! @param is1 Index bounds in first coordinate direction
+        !! @param is2 Index bounds in second coordinate direction
+        !! @param is3 Index bounds in third coordinate direction
     subroutine s_weno(v_vf, vL_vf, vR_vf, & ! -------------------
                       norm_dir, weno_dir,  &
-                      ix, iy, iz)
+                      is1_d, is2_d, is3_d)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
         type(scalar_field), dimension(:), intent(INOUT) :: vL_vf, vR_vf
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(bounds_info), intent(IN) :: is1_d, is2_d, is3_d
 
         real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd !<
             !! Newton divided differences
@@ -523,34 +620,27 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
+        is1 = is1_d; is2 = is2_d; is3 = is3_d;
+!$acc update device(is1, is2, is3)
+
         ! Reshaping and/or projecting onto characteristic fields inputted
         ! data and in addition associating the WENO coefficients pointers
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, vL_vf, vR_vf, &
-                                   norm_dir, weno_dir, ix, iy, iz)
-            call s_associate_weno_coefficients_pointers(weno_dir)
+                                   norm_dir, weno_dir)
         end if
 
 ! Syncronize host to device data
-!$acc update device(beta_coef,poly_coef_R,poly_coef_L,d_L,d_R)
-            do i = 1, ubound(v_vf, 1)
-!$acc update device(v_vf(i)%sf)
-!$acc update device(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
-            end do
-            do l = -weno_polyn,weno_polyn
-            do i = 1, ubound(v_vf, 1)
-!$acc update device(v_rs_wsL(l)%vf(i)%sf,v_rs_wsR(l)%vf(i)%sf)
-        enddo
-        enddo
+
 
         ! WENO1 ============================================================
         if (weno_order == 1) then
 
 !$acc parallel loop collapse(4) default(present)
             do i = 1, ubound(v_vf, 1)
-                do l = iz%beg, iz%end
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
                             vL_vf(i)%sf(j, k, l) = v_vf(i)%sf(j, k, l)
                             vR_vf(i)%sf(j, k, l) = v_vf(i)%sf(j, k, l)
                         end do
@@ -562,192 +652,516 @@ contains
 
             ! WENO3 ============================================================
         elseif (weno_order == 3) then
-
+            if(weno_dir == 1) then
 !$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
-            do i = 1, v_size
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            ! reconstruct from left side
+                do i = 1, v_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                ! reconstruct from left side
 
-                            dvd(0) = v_rs_wsL(1)%vf(i)%sf(j, k, l) &
-                                     - v_rs_wsL(0)%vf(i)%sf(j, k, l)
-                            dvd(-1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                      - v_rs_wsL(-1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_x(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_x(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_x(-1)%vf(i)%sf(j, k, l)
 
-                            poly_L(0) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_L(0, 0, j)*dvd(0)
-                            poly_L(1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_L(1, 0, j)*dvd(-1)
+                                poly_L(0) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(0, 0, j)*dvd(0)
+                                poly_L(1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(1, 0, j)*dvd(-1)
 
-                            beta(0) = beta_coef(0, 0, j)*dvd(0)*dvd(0) &
-                                      + weno_eps
-                            beta(1) = beta_coef(1, 0, j)*dvd(-1)*dvd(-1) &
-                                      + weno_eps
+                                beta(0) = beta_coef_x(0, 0, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_x(1, 0, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
 
-                            alpha_L = d_L(:, j)/(beta*beta)
+                                alpha_L = d_cbL_x(:, j)/(beta*beta)
 
-                            omega_L = alpha_L/sum(alpha_L)
+                                omega_L = alpha_L/sum(alpha_L)
 
-                            ! reconstruct from right side
-                            dvd(0) = v_rs_wsR(1)%vf(i)%sf(j, k, l) &
-                                     - v_rs_wsR(0)%vf(i)%sf(j, k, l)
-                            dvd(-1) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                      - v_rs_wsR(-1)%vf(i)%sf(j, k, l)
+                                ! reconstruct from right side
+                                dvd(0) = v_rs_ws_x(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_x(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_x(-1)%vf(i)%sf(j, k, l)
 
-                            poly_R(0) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_R(0, 0, j)*dvd(0)
-                            poly_R(1) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_R(1, 0, j)*dvd(-1)
+                                poly_R(0) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(0, 0, j)*dvd(0)
+                                poly_R(1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(1, 0, j)*dvd(-1)
 
-                            beta(0) = beta_coef(0, 0, j)*dvd(0)*dvd(0) &
-                                      + weno_eps
-                            beta(1) = beta_coef(1, 0, j)*dvd(-1)*dvd(-1) &
-                                      + weno_eps
+                                beta(0) = beta_coef_x(0, 0, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_x(1, 0, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
 
-                            alpha_R = d_R(:, j)/(beta*beta)
+                                alpha_R = d_cbR_x(:, j)/(beta*beta)
 
-                            omega_R = alpha_R/sum(alpha_R)
+                                omega_R = alpha_R/sum(alpha_R)
 
-                            if (mapped_weno) then
-                                call s_map_nonlinear_weights(d_L(:, j), &
-                                                             alpha_L, &
-                                                             omega_L)
-                                call s_map_nonlinear_weights(d_R(:, j), &
-                                                             alpha_R, &
-                                                             omega_R)
-                            end if
+                                if (mapped_weno) then
+                                    call s_map_nonlinear_weights(d_cbL_x(:, j), &
+                                                                 alpha_L, &
+                                                                 omega_L)
+                                    call s_map_nonlinear_weights(d_cbR_x(:, j), &
+                                                                 alpha_R, &
+                                                                 omega_R)
+                                end if
 
-                            vL_rs_vf(i)%sf(j, k, l) = sum(omega_L*poly_L)
-                            vR_rs_vf(i)%sf(j, k, l) = sum(omega_R*poly_R)
+                                vL_rs_vf_x(i)%sf(j, k, l) = sum(omega_L*poly_L)
+                                vR_rs_vf_x(i)%sf(j, k, l) = sum(omega_R*poly_R)
 
+                            end do
                         end do
                     end do
                 end do
-            end do
+
+            elseif(weno_dir == 2) then 
+!$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+                do i = 1, v_size
+                    do l = is3%beg, is3%end
+                        do k = is1%beg, is1%end
+                            do j = is2%beg, is2%end
+                                ! reconstruct from left side
+
+                                dvd(0) = v_rs_ws_y(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_y(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_y(-1)%vf(i)%sf(j, k, l)
+
+                                poly_L(0) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(0, 0, j)*dvd(0)
+                                poly_L(1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(1, 0, j)*dvd(-1)
+
+                                beta(0) = beta_coef_y(0, 0, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_y(1, 0, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+
+                                alpha_L = d_cbL_y(:, j)/(beta*beta)
+
+                                omega_L = alpha_L/sum(alpha_L)
+
+                                ! reconstruct from right side
+                                dvd(0) = v_rs_ws_y(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_y(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_y(-1)%vf(i)%sf(j, k, l)
+
+                                poly_R(0) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(0, 0, j)*dvd(0)
+                                poly_R(1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(1, 0, j)*dvd(-1)
+
+                                beta(0) = beta_coef_y(0, 0, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_y(1, 0, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+
+                                alpha_R = d_cbR_y(:, j)/(beta*beta)
+
+                                omega_R = alpha_R/sum(alpha_R)
+
+                                if (mapped_weno) then
+                                    call s_map_nonlinear_weights(d_cbL_y(:, j), &
+                                                                 alpha_L, &
+                                                                 omega_L)
+                                    call s_map_nonlinear_weights(d_cbR_y(:, j), &
+                                                                 alpha_R, &
+                                                                 omega_R)
+                                end if
+
+                                vL_rs_vf_y(i)%sf(j, k, l) = sum(omega_L*poly_L)
+                                vR_rs_vf_y(i)%sf(j, k, l) = sum(omega_R*poly_R)
+
+                            end do
+                        end do
+                    end do
+                end do
+
+            elseif(weno_dir == 3) then 
+!$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+                do i = 1, v_size
+                    do l = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            do j = is3%beg, is3%end
+                                ! reconstruct from left side
+
+                                dvd(0) = v_rs_ws_z(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_z(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_z(-1)%vf(i)%sf(j, k, l)
+
+                                poly_L(0) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(0, 0, j)*dvd(0)
+                                poly_L(1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(1, 0, j)*dvd(-1)
+
+                                beta(0) = beta_coef_z(0, 0, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_z(1, 0, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+
+                                alpha_L = d_cbL_y(:, j)/(beta*beta)
+
+                                omega_L = alpha_L/sum(alpha_L)
+
+                                ! reconstruct from right side
+                                dvd(0) = v_rs_ws_z(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_z(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_z(-1)%vf(i)%sf(j, k, l)
+
+                                poly_R(0) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(0, 0, j)*dvd(0)
+                                poly_R(1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(1, 0, j)*dvd(-1)
+
+                                beta(0) = beta_coef_z(0, 0, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_z(1, 0, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+
+                                alpha_R = d_cbR_z(:, j)/(beta*beta)
+
+                                omega_R = alpha_R/sum(alpha_R)
+
+                                if (mapped_weno) then
+                                    call s_map_nonlinear_weights(d_cbL_z(:, j), &
+                                                                 alpha_L, &
+                                                                 omega_L)
+                                    call s_map_nonlinear_weights(d_cbR_z(:, j), &
+                                                                 alpha_R, &
+                                                                 omega_R)
+                                end if
+
+                                vL_rs_vf_z(i)%sf(j, k, l) = sum(omega_L*poly_L)
+                                vR_rs_vf_z(i)%sf(j, k, l) = sum(omega_R*poly_R)
+
+                            end do
+                        end do
+                    end do
+                end do
+
+            end if
 
             ! END: WENO3 =======================================================
 
             ! WENO5 ============================================================
         else
-
-!!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R)
-
+            if(weno_dir == 1) then
 !$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
-            do i = 1, v_size
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
+                do i = 1, v_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
 
-                            dvd(1) = v_rs_wsL(2)%vf(i)%sf(j, k, l) &
-                                     - v_rs_wsL(1)%vf(i)%sf(j, k, l)
-                            dvd(0) = v_rs_wsL(1)%vf(i)%sf(j, k, l) &
-                                     - v_rs_wsL(0)%vf(i)%sf(j, k, l)
-                            dvd(-1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                      - v_rs_wsL(-1)%vf(i)%sf(j, k, l)
-                            dvd(-2) = v_rs_wsL(-1)%vf(i)%sf(j, k, l) &
-                                      - v_rs_wsL(-2)%vf(i)%sf(j, k, l)
+                                dvd(1) = v_rs_ws_x(2)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_x(1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_x(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_x(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_x(-1)%vf(i)%sf(j, k, l)
+                                dvd(-2) = v_rs_ws_x(-1)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_x(-2)%vf(i)%sf(j, k, l)
 
-                            poly_L(0) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_L(0, 0, j)*dvd(1) &
-                                        + poly_coef_L(0, 1, j)*dvd(0)
-                            poly_L(1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_L(1, 0, j)*dvd(0) &
-                                        + poly_coef_L(1, 1, j)*dvd(-1)
-                            poly_L(2) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_L(2, 0, j)*dvd(-1) &
-                                        + poly_coef_L(2, 1, j)*dvd(-2)
+                                poly_L(0) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(0, 0, j)*dvd(1) &
+                                            + poly_coef_cbL_x(0, 1, j)*dvd(0)
+                                poly_L(1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(1, 0, j)*dvd(0) &
+                                            + poly_coef_cbL_x(1, 1, j)*dvd(-1)
+                                poly_L(2) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_x(2, 0, j)*dvd(-1) &
+                                            + poly_coef_cbL_x(2, 1, j)*dvd(-2)
 
-                            beta(0) = beta_coef(0, 0, j)*dvd(1)*dvd(1) &
-                                      + beta_coef(0, 1, j)*dvd(1)*dvd(0) &
-                                      + beta_coef(0, 2, j)*dvd(0)*dvd(0) &
-                                      + weno_eps
-                            beta(1) = beta_coef(1, 0, j)*dvd(0)*dvd(0) &
-                                      + beta_coef(1, 1, j)*dvd(0)*dvd(-1) &
-                                      + beta_coef(1, 2, j)*dvd(-1)*dvd(-1) &
-                                      + weno_eps
-                            beta(2) = beta_coef(2, 0, j)*dvd(-1)*dvd(-1) &
-                                      + beta_coef(2, 1, j)*dvd(-1)*dvd(-2) &
-                                      + beta_coef(2, 2, j)*dvd(-2)*dvd(-2) &
-                                      + weno_eps
+                                beta(0) = beta_coef_x(0, 0, j)*dvd(1)*dvd(1) &
+                                          + beta_coef_x(0, 1, j)*dvd(1)*dvd(0) &
+                                          + beta_coef_x(0, 2, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_x(1, 0, j)*dvd(0)*dvd(0) &
+                                          + beta_coef_x(1, 1, j)*dvd(0)*dvd(-1) &
+                                          + beta_coef_x(1, 2, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_x(2, 0, j)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_x(2, 1, j)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_x(2, 2, j)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
 
-                            alpha_L = d_L(:, j)/(beta*beta)
+                                alpha_L = d_cbL_x(:, j)/(beta*beta)
 
-                            omega_L = alpha_L/sum(alpha_L)
+                                omega_L = alpha_L/sum(alpha_L)
 
-                            dvd(1) = v_rs_wsR(2)%vf(i)%sf(j, k, l) &
-                                     - v_rs_wsR(1)%vf(i)%sf(j, k, l)
-                            dvd(0) = v_rs_wsR(1)%vf(i)%sf(j, k, l) &
-                                     - v_rs_wsR(0)%vf(i)%sf(j, k, l)
-                            dvd(-1) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                      - v_rs_wsR(-1)%vf(i)%sf(j, k, l)
-                            dvd(-2) = v_rs_wsR(-1)%vf(i)%sf(j, k, l) &
-                                      - v_rs_wsR(-2)%vf(i)%sf(j, k, l)
+                                dvd(1) = v_rs_ws_x(2)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_x(1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_x(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_x(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_x(-1)%vf(i)%sf(j, k, l)
+                                dvd(-2) = v_rs_ws_x(-1)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_x(-2)%vf(i)%sf(j, k, l)
 
-                            poly_R(0) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_R(0, 0, j)*dvd(1) &
-                                        + poly_coef_R(0, 1, j)*dvd(0)
-                            poly_R(1) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_R(1, 0, j)*dvd(0) &
-                                        + poly_coef_R(1, 1, j)*dvd(-1)
-                            poly_R(2) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                                        + poly_coef_R(2, 0, j)*dvd(-1) &
-                                        + poly_coef_R(2, 1, j)*dvd(-2)
+                                poly_R(0) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_x(0, 0, j)*dvd(1) &
+                                            + poly_coef_cbR_x(0, 1, j)*dvd(0)
+                                poly_R(1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_x(1, 0, j)*dvd(0) &
+                                            + poly_coef_cbR_x(1, 1, j)*dvd(-1)
+                                poly_R(2) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_x(2, 0, j)*dvd(-1) &
+                                            + poly_coef_cbR_x(2, 1, j)*dvd(-2)
 
-                            beta(0) = beta_coef(0, 0, j)*dvd(1)*dvd(1) &
-                                      + beta_coef(0, 1, j)*dvd(1)*dvd(0) &
-                                      + beta_coef(0, 2, j)*dvd(0)*dvd(0) &
-                                      + weno_eps
-                            beta(1) = beta_coef(1, 0, j)*dvd(0)*dvd(0) &
-                                      + beta_coef(1, 1, j)*dvd(0)*dvd(-1) &
-                                      + beta_coef(1, 2, j)*dvd(-1)*dvd(-1) &
-                                      + weno_eps
-                            beta(2) = beta_coef(2, 0, j)*dvd(-1)*dvd(-1) &
-                                      + beta_coef(2, 1, j)*dvd(-1)*dvd(-2) &
-                                      + beta_coef(2, 2, j)*dvd(-2)*dvd(-2) &
-                                      + weno_eps
+                                beta(0) = beta_coef_x(0, 0, j)*dvd(1)*dvd(1) &
+                                          + beta_coef_x(0, 1, j)*dvd(1)*dvd(0) &
+                                          + beta_coef_x(0, 2, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_x(1, 0, j)*dvd(0)*dvd(0) &
+                                          + beta_coef_x(1, 1, j)*dvd(0)*dvd(-1) &
+                                          + beta_coef_x(1, 2, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_x(2, 0, j)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_x(2, 1, j)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_x(2, 2, j)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
 
-                            alpha_R = d_R(:, j)/(beta*beta)
+                                alpha_R = d_cbR_x(:, j)/(beta*beta)
 
-                            omega_R = alpha_R/sum(alpha_R)
+                                omega_R = alpha_R/sum(alpha_R)
 
-                            if (mapped_weno) then
-                                call s_map_nonlinear_weights(d_L(:, j), &
-                                                             alpha_L, &
-                                                             omega_L)
-                                call s_map_nonlinear_weights(d_R(:, j), &
-                                                             alpha_R, &
-                                                             omega_R)
-                            end if
+                                if (mapped_weno) then
+                                    call s_map_nonlinear_weights(d_cbL_x(:, j), &
+                                                                 alpha_L, &
+                                                                 omega_L)
+                                    call s_map_nonlinear_weights(d_cbR_x(:, j), &
+                                                                 alpha_R, &
+                                                                 omega_R)
+                                end if
 
-                            vL_rs_vf(i)%sf(j, k, l) = sum(omega_L*poly_L)
-                            vR_rs_vf(i)%sf(j, k, l) = sum(omega_R*poly_R)
+                                vL_rs_vf_x(i)%sf(j, k, l) = sum(omega_L*poly_L)
+                                vR_rs_vf_x(i)%sf(j, k, l) = sum(omega_R*poly_R)
 
-                            if (mp_weno) then
-                                call s_preserve_monotonicity(i, j, k, l)
-                            end if
+                                if (mp_weno) then
+                                    call s_preserve_monotonicity(v_rs_ws_x, vL_rs_vf_x, vR_rs_vf_x, i, j, k, l)
+                                end if
 
+                            end do
                         end do
                     end do
                 end do
-            end do
 
+            elseif(weno_dir == 2) then
+!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+                do i = 1, v_size
+                    do l = is3%beg, is3%end
+                        do k = is1%beg, is1%end
+                            do j = is2%beg, is2%end
+
+                                dvd(1) = v_rs_ws_y(2)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_y(1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_y(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_y(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_y(-1)%vf(i)%sf(j, k, l)
+                                dvd(-2) = v_rs_ws_y(-1)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_y(-2)%vf(i)%sf(j, k, l)
+
+                                poly_L(0) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(0, 0, j)*dvd(1) &
+                                            + poly_coef_cbL_y(0, 1, j)*dvd(0)
+                                poly_L(1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(1, 0, j)*dvd(0) &
+                                            + poly_coef_cbL_y(1, 1, j)*dvd(-1)
+                                poly_L(2) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_y(2, 0, j)*dvd(-1) &
+                                            + poly_coef_cbL_y(2, 1, j)*dvd(-2)
+
+                                beta(0) = beta_coef_y(0, 0, j)*dvd(1)*dvd(1) &
+                                          + beta_coef_y(0, 1, j)*dvd(1)*dvd(0) &
+                                          + beta_coef_y(0, 2, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_y(1, 0, j)*dvd(0)*dvd(0) &
+                                          + beta_coef_y(1, 1, j)*dvd(0)*dvd(-1) &
+                                          + beta_coef_y(1, 2, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_y(2, 0, j)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_y(2, 1, j)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_y(2, 2, j)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
+
+                                alpha_L = d_cbL_y(:, j)/(beta*beta)
+
+                                omega_L = alpha_L/sum(alpha_L)
+
+                                dvd(1) = v_rs_ws_y(2)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_y(1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_y(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_y(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_y(-1)%vf(i)%sf(j, k, l)
+                                dvd(-2) = v_rs_ws_y(-1)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_y(-2)%vf(i)%sf(j, k, l)
+
+                                poly_R(0) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_y(0, 0, j)*dvd(1) &
+                                            + poly_coef_cbR_y(0, 1, j)*dvd(0)
+                                poly_R(1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_y(1, 0, j)*dvd(0) &
+                                            + poly_coef_cbR_y(1, 1, j)*dvd(-1)
+                                poly_R(2) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_y(2, 0, j)*dvd(-1) &
+                                            + poly_coef_cbR_y(2, 1, j)*dvd(-2)
+
+                                beta(0) = beta_coef_y(0, 0, j)*dvd(1)*dvd(1) &
+                                          + beta_coef_y(0, 1, j)*dvd(1)*dvd(0) &
+                                          + beta_coef_y(0, 2, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_y(1, 0, j)*dvd(0)*dvd(0) &
+                                          + beta_coef_y(1, 1, j)*dvd(0)*dvd(-1) &
+                                          + beta_coef_y(1, 2, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_y(2, 0, j)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_y(2, 1, j)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_y(2, 2, j)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
+
+                                alpha_R = d_cbR_y(:, j)/(beta*beta)
+
+                                omega_R = alpha_R/sum(alpha_R)
+
+                                if (mapped_weno) then
+                                    call s_map_nonlinear_weights(d_cbL_y(:, j), &
+                                                                 alpha_L, &
+                                                                 omega_L)
+                                    call s_map_nonlinear_weights(d_cbR_y(:, j), &
+                                                                 alpha_R, &
+                                                                 omega_R)
+                                end if
+
+                                vL_rs_vf_y(i)%sf(j, k, l) = sum(omega_L*poly_L)
+                                vR_rs_vf_y(i)%sf(j, k, l) = sum(omega_R*poly_R)
+
+                                if (mp_weno) then
+                                    call s_preserve_monotonicity(v_rs_ws_y, vL_rs_vf_y, vR_rs_vf_y, i, j, k, l)
+                                end if
+
+                            end do
+                        end do
+                    end do
+                end do                
+
+            else
+!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+                do i = 1, v_size
+                    do l = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            do j = is3%beg, is3%end
+
+                                dvd(1) = v_rs_ws_z(2)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_z(1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_z(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_z(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_z(-1)%vf(i)%sf(j, k, l)
+                                dvd(-2) = v_rs_ws_z(-1)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_z(-2)%vf(i)%sf(j, k, l)
+
+                                poly_L(0) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(0, 0, j)*dvd(1) &
+                                            + poly_coef_cbL_z(0, 1, j)*dvd(0)
+                                poly_L(1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(1, 0, j)*dvd(0) &
+                                            + poly_coef_cbL_z(1, 1, j)*dvd(-1)
+                                poly_L(2) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbL_z(2, 0, j)*dvd(-1) &
+                                            + poly_coef_cbL_z(2, 1, j)*dvd(-2)
+
+                                beta(0) = beta_coef_z(0, 0, j)*dvd(1)*dvd(1) &
+                                          + beta_coef_z(0, 1, j)*dvd(1)*dvd(0) &
+                                          + beta_coef_z(0, 2, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_z(1, 0, j)*dvd(0)*dvd(0) &
+                                          + beta_coef_z(1, 1, j)*dvd(0)*dvd(-1) &
+                                          + beta_coef_z(1, 2, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_z(2, 0, j)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_z(2, 1, j)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_z(2, 2, j)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
+
+                                alpha_L = d_cbL_z(:, j)/(beta*beta)
+
+                                omega_L = alpha_L/sum(alpha_L)
+
+                                dvd(1) = v_rs_ws_z(2)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_z(1)%vf(i)%sf(j, k, l)
+                                dvd(0) = v_rs_ws_z(1)%vf(i)%sf(j, k, l) &
+                                         - v_rs_ws_z(0)%vf(i)%sf(j, k, l)
+                                dvd(-1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_z(-1)%vf(i)%sf(j, k, l)
+                                dvd(-2) = v_rs_ws_z(-1)%vf(i)%sf(j, k, l) &
+                                          - v_rs_ws_z(-2)%vf(i)%sf(j, k, l)
+
+                                poly_R(0) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_z(0, 0, j)*dvd(1) &
+                                            + poly_coef_cbR_z(0, 1, j)*dvd(0)
+                                poly_R(1) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_z(1, 0, j)*dvd(0) &
+                                            + poly_coef_cbR_z(1, 1, j)*dvd(-1)
+                                poly_R(2) = v_rs_ws_z(0)%vf(i)%sf(j, k, l) &
+                                            + poly_coef_cbR_z(2, 0, j)*dvd(-1) &
+                                            + poly_coef_cbR_z(2, 1, j)*dvd(-2)
+
+                                beta(0) = beta_coef_z(0, 0, j)*dvd(1)*dvd(1) &
+                                          + beta_coef_z(0, 1, j)*dvd(1)*dvd(0) &
+                                          + beta_coef_z(0, 2, j)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_z(1, 0, j)*dvd(0)*dvd(0) &
+                                          + beta_coef_z(1, 1, j)*dvd(0)*dvd(-1) &
+                                          + beta_coef_z(1, 2, j)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_z(2, 0, j)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_z(2, 1, j)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_z(2, 2, j)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
+
+                                alpha_R = d_cbR_z(:, j)/(beta*beta)
+
+                                omega_R = alpha_R/sum(alpha_R)
+
+                                if (mapped_weno) then
+                                    call s_map_nonlinear_weights(d_cbL_z(:, j), &
+                                                                 alpha_L, &
+                                                                 omega_L)
+                                    call s_map_nonlinear_weights(d_cbR_z(:, j), &
+                                                                 alpha_R, &
+                                                                 omega_R)
+                                end if
+
+                                vL_rs_vf_z(i)%sf(j, k, l) = sum(omega_L*poly_L)
+                                vR_rs_vf_z(i)%sf(j, k, l) = sum(omega_R*poly_R)
+
+                                if (mp_weno) then
+                                    call s_preserve_monotonicity(v_rs_ws_z, vL_rs_vf_z, vR_rs_vf_z, i, j, k, l)
+                                end if
+
+                            end do
+                        end do
+                    end do
+                end do  
+            end if
         end if
         ! END: WENO5 =======================================================
 
-        do i = 1, ubound(v_vf, 1)
-!$acc update self(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
-        end do
 
         ! Reshaping and/or projecting onto physical fields the outputted
         ! data, as well as disassociating the WENO coefficients pointers
         if (weno_order /= 1) then
-            call s_finalize_weno(vL_vf, vR_vf, weno_dir, ix, iy, iz)
-!$acc exit data detach(poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
-            nullify (poly_coef_L, poly_coef_R, d_L, d_R, beta_coef)
+            call s_finalize_weno(vL_vf, vR_vf, weno_dir)
         end if
 
     end subroutine s_weno ! ------------------------------------------------
+
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -758,19 +1172,18 @@ contains
         !! @param vR_vf Right WENO reconstructed cell-boundary values
         !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
-        !! @param ix Index bounds in first coordinate direction
-        !! @param iy Index bounds in second coordinate direction
-        !! @param iz Index bounds in third coordinate direction
+        !! @param is1 Index bounds in first coordinate direction
+        !! @param is2 Index bounds in second coordinate direction
+        !! @param is3 Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, vL_vf, vR_vf, & ! ---------
-                                 norm_dir, weno_dir, ix, iy, iz)
+                                 norm_dir, weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
         type(scalar_field), dimension(:), intent(INOUT) :: vL_vf, vR_vf
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: ix, iy, iz
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, m !< Generic loop iterators
 
         ! Determining the number of cell-average variables which will be
         ! WENO-reconstructed and mapping their indical bounds in the x-,
@@ -778,110 +1191,70 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-
-        if (weno_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-        elseif (weno_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-        else
-            is1 = iz; is2 = iy; is3 = ix
-        end if
-!$acc update device(is1,is2,is3)
-
-        ! Allocating the cell-average variables, which are reshaped, and/or
-        ! characteristically decomposed, in the coordinate direction of the
-        ! WENO reconstruction
-        do i = -weno_polyn, weno_polyn
-
-            allocate (v_rs_wsL(i)%vf(1:v_size), v_rs_wsR(i)%vf(1:v_size))
-!$acc enter data create(v_rs_wsL(i)%vf(1:v_size), v_rs_wsR(i)%vf(1:v_size))
-
-            do j = 1, v_size
-
-                allocate (v_rs_wsL(i)%vf(j)%sf(is1%beg:is1%end, &
-                                               is2%beg:is2%end, &
-                                               is3%beg:is3%end))
-
-                v_rs_wsR(i)%vf(j)%sf => v_rs_wsL(i)%vf(j)%sf
-!$acc enter data create(v_rs_wsL(i)%vf(j)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end)) 
-!$acc enter data attach(v_rs_wsR(i)%vf(j)%sf)
-            end do
-
+        do i = 1, v_size
+!$acc update device(v_vf(i)%sf)
         end do
 
-        ! Allocating the left and right WENO reconstructions of the cell-
-        ! average variables that are reshaped, and/or characteristically
-        ! decomposed, in the coordinate direction of WENO reconstruction
-        allocate (vL_rs_vf(1:v_size), vR_rs_vf(1:v_size))
-
-        if (weno_dir == 1) then
-            do i = 1, v_size
-                vL_rs_vf(i)%sf => vL_vf(i)%sf
-                vR_rs_vf(i)%sf => vR_vf(i)%sf
-!$acc enter data attach(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
-
-            end do
-        else
-            do i = 1, v_size
-                allocate (vL_rs_vf(i)%sf(is1%beg:is1%end, &
-                                         is2%beg:is2%end, &
-                                         is3%beg:is3%end))
-                allocate (vR_rs_vf(i)%sf(is1%beg:is1%end, &
-                                         is2%beg:is2%end, &
-                                         is3%beg:is3%end))
-!$acc enter data create(vL_rs_vf(i)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end))
-!$acc enter data create(vR_rs_vf(i)%sf(is1%beg:is1%end,is2%beg:is2%end,is3%beg:is3%end))
-            end do
-        end if
-
+        do i = 1, v_size
+            vL_rs_vf_x(i)%sf => vL_vf(i)%sf
+            vR_rs_vf_x(i)%sf => vR_vf(i)%sf
+!$acc enter data attach(vL_rs_vf_x(i)%sf, vR_rs_vf_x(i)%sf)
+        end do
+        
         ! Reshaping/Projecting onto Characteristic Fields in x-direction ===
-        if (weno_dir == 1) then
-
-            do i = -weno_polyn, weno_polyn
-                do j = 1, v_size
-                    do k = ix%beg, ix%end
-                        v_rs_wsL(i)%vf(j)%sf(k, :, :) = &
-                            v_vf(j)%sf(i + k, iy%beg:iy%end, iz%beg:iz%end)
+!$acc parallel loop collapse(5) default(present)  
+        do i = -weno_polyn, weno_polyn
+            do j = 1, v_size
+                do m = is3%beg, is3%end
+                    do l = is2%beg, is2%end
+                        do k = is1%beg, is1%end
+                            v_rs_ws_x(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(k + i, l, m)
+                        end do 
                     end do
                 end do
             end do
+        end do
+!$acc end parallel loop   
 
             ! ==================================================================
 
             ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
-        elseif (weno_dir == 2) then
-
-            do i = -weno_polyn, weno_polyn
-                do j = 1, v_size
-                    do k = ix%beg, ix%end
-                        do l = iy%beg, iy%end
-                            v_rs_wsL(i)%vf(j)%sf(l, k, :) = &
-                                v_vf(j)%sf(k, i + l, iz%beg:iz%end)
-                        end do
+        if(n == 0) return
+!$acc parallel loop collapse(5) default(present)  
+        do i = -weno_polyn, weno_polyn
+            do j = 1, v_size
+                do m = is3%beg, is3%end
+                    do l = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            v_rs_ws_y(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(l, k + i, m)
+                        end do 
                     end do
                 end do
             end do
+        end do
+!$acc end parallel loop  
+
 
 
             ! ==================================================================
 
+        if(p == 0) return 
             ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
-        else
-
-            do i = -weno_polyn, weno_polyn
-                do j = 1, v_size
-                    do k = ix%beg, ix%end
-                        do l = iz%beg, iz%end
-                            v_rs_wsL(i)%vf(j)%sf(l, :, k) = &
-                                v_vf(j)%sf(k, iy%beg:iy%end, i + l)
-                        end do
+!$acc parallel loop collapse(5) default(present)  
+        do i = -weno_polyn, weno_polyn
+            do j = 1, v_size
+                do m = is1%beg, is1%end
+                    do l = is2%beg, is2%end
+                        do k = is3%beg, is3%end
+                            v_rs_ws_z(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(m, l, k + i)
+                        end do 
                     end do
                 end do
             end do
-
-
-        end if
+        end do
+!$acc end parallel loop   
         ! ==================================================================
+
 
     end subroutine s_initialize_weno ! -------------------------------------
 
@@ -923,9 +1296,11 @@ contains
         !!  @param j First-coordinate cell index
         !!  @param k Second-coordinate cell index
         !!  @param l Third-coordinate cell index
-    subroutine s_preserve_monotonicity(i, j, k, l) ! --------------------------
+    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf, i, j, k, l) ! --------------------------
         !$acc routine seq
 
+        type(vector_field), dimension(:), intent(IN) :: v_rs_ws
+        type(scalar_field), dimension(:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
         integer, intent(IN) :: i, j, k, l
 
         real(kind(0d0)), dimension(-1:1) :: d !< Curvature measures at the zone centers
@@ -955,17 +1330,17 @@ contains
 
 
         ! Left Monotonicity Preserving Bound ===============================
-        d(-1) = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                + v_rs_wsL(-2)%vf(i)%sf(j, k, l) &
-                - v_rs_wsL(-1)%vf(i)%sf(j, k, l) &
+        d(-1) = v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                + v_rs_ws(-2)%vf(i)%sf(j, k, l) &
+                - v_rs_ws(-1)%vf(i)%sf(j, k, l) &
                 *2d0
-        d(0) = v_rs_wsL(1)%vf(i)%sf(j, k, l) &
-               + v_rs_wsL(-1)%vf(i)%sf(j, k, l) &
-               - v_rs_wsL(0)%vf(i)%sf(j, k, l) &
+        d(0) = v_rs_ws(1)%vf(i)%sf(j, k, l) &
+               + v_rs_ws(-1)%vf(i)%sf(j, k, l) &
+               - v_rs_ws(0)%vf(i)%sf(j, k, l) &
                *2d0
-        d(1) = v_rs_wsL(2)%vf(i)%sf(j, k, l) &
-               + v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-               - v_rs_wsL(1)%vf(i)%sf(j, k, l) &
+        d(1) = v_rs_ws(2)%vf(i)%sf(j, k, l) &
+               + v_rs_ws(0)%vf(i)%sf(j, k, l) &
+               - v_rs_ws(1)%vf(i)%sf(j, k, l) &
                *2d0
 
         d_MD = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
@@ -980,29 +1355,29 @@ contains
                *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
                     abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
 
-        vL_UL = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                - (v_rs_wsL(1)%vf(i)%sf(j, k, l) &
-                   - v_rs_wsL(0)%vf(i)%sf(j, k, l))*alpha
+        vL_UL = v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                - (v_rs_ws(1)%vf(i)%sf(j, k, l) &
+                   - v_rs_ws(0)%vf(i)%sf(j, k, l))*alpha
 
-        vL_MD = (v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                 + v_rs_wsL(-1)%vf(i)%sf(j, k, l) &
+        vL_MD = (v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                 + v_rs_ws(-1)%vf(i)%sf(j, k, l) &
                  - d_MD)*5d-1
 
-        vL_LC = v_rs_wsL(0)%vf(i)%sf(j, k, l) &
-                - (v_rs_wsL(1)%vf(i)%sf(j, k, l) &
-                   - v_rs_wsL(0)%vf(i)%sf(j, k, l))*5d-1 + beta*d_LC
+        vL_LC = v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                - (v_rs_ws(1)%vf(i)%sf(j, k, l) &
+                   - v_rs_ws(0)%vf(i)%sf(j, k, l))*5d-1 + beta*d_LC
 
-        vL_min = max(min(v_rs_wsL(0)%vf(i)%sf(j, k, l), &
-                         v_rs_wsL(-1)%vf(i)%sf(j, k, l), &
+        vL_min = max(min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
+                         v_rs_ws(-1)%vf(i)%sf(j, k, l), &
                          vL_MD), &
-                     min(v_rs_wsL(0)%vf(i)%sf(j, k, l), &
+                     min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
                          vL_UL, &
                          vL_LC))
 
-        vL_max = min(max(v_rs_wsL(0)%vf(i)%sf(j, k, l), &
-                         v_rs_wsL(-1)%vf(i)%sf(j, k, l), &
+        vL_max = min(max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
+                         v_rs_ws(-1)%vf(i)%sf(j, k, l), &
                          vL_MD), &
-                     max(v_rs_wsL(0)%vf(i)%sf(j, k, l), &
+                     max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
                          vL_UL, &
                          vL_LC))
 
@@ -1014,15 +1389,15 @@ contains
         ! END: Left Monotonicity Preserving Bound ==========================
 
         ! Right Monotonicity Preserving Bound ==============================
-        d(-1) = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                + v_rs_wsR(-2)%vf(i)%sf(j, k, l) &
-                - v_rs_wsR(-1)%vf(i)%sf(j, k, l)*2d0
-        d(0) = v_rs_wsR(1)%vf(i)%sf(j, k, l) &
-               + v_rs_wsR(-1)%vf(i)%sf(j, k, l) &
-               - v_rs_wsR(0)%vf(i)%sf(j, k, l)*2d0
-        d(1) = v_rs_wsR(2)%vf(i)%sf(j, k, l) &
-               + v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-               - v_rs_wsR(1)%vf(i)%sf(j, k, l)*2d0
+        d(-1) = v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                + v_rs_ws(-2)%vf(i)%sf(j, k, l) &
+                - v_rs_ws(-1)%vf(i)%sf(j, k, l)*2d0
+        d(0) = v_rs_ws(1)%vf(i)%sf(j, k, l) &
+               + v_rs_ws(-1)%vf(i)%sf(j, k, l) &
+               - v_rs_ws(0)%vf(i)%sf(j, k, l)*2d0
+        d(1) = v_rs_ws(2)%vf(i)%sf(j, k, l) &
+               + v_rs_ws(0)%vf(i)%sf(j, k, l) &
+               - v_rs_ws(1)%vf(i)%sf(j, k, l)*2d0
 
         d_MD = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
                *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
@@ -1036,29 +1411,29 @@ contains
                *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
                     abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
 
-        vR_UL = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                + (v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                   - v_rs_wsR(-1)%vf(i)%sf(j, k, l))*alpha
+        vR_UL = v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                + (v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                   - v_rs_ws(-1)%vf(i)%sf(j, k, l))*alpha
 
-        vR_MD = (v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                 + v_rs_wsR(1)%vf(i)%sf(j, k, l) &
+        vR_MD = (v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                 + v_rs_ws(1)%vf(i)%sf(j, k, l) &
                  - d_MD)*5d-1
 
-        vR_LC = v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                + (v_rs_wsR(0)%vf(i)%sf(j, k, l) &
-                   - v_rs_wsR(-1)%vf(i)%sf(j, k, l))*5d-1 + beta*d_LC
+        vR_LC = v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                + (v_rs_ws(0)%vf(i)%sf(j, k, l) &
+                   - v_rs_ws(-1)%vf(i)%sf(j, k, l))*5d-1 + beta*d_LC
 
-        vR_min = max(min(v_rs_wsR(0)%vf(i)%sf(j, k, l), &
-                         v_rs_wsR(1)%vf(i)%sf(j, k, l), &
+        vR_min = max(min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
+                         v_rs_ws(1)%vf(i)%sf(j, k, l), &
                          vR_MD), &
-                     min(v_rs_wsR(0)%vf(i)%sf(j, k, l), &
+                     min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
                          vR_UL, &
                          vR_LC))
 
-        vR_max = min(max(v_rs_wsR(0)%vf(i)%sf(j, k, l), &
-                         v_rs_wsR(1)%vf(i)%sf(j, k, l), &
+        vR_max = min(max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
+                         v_rs_ws(1)%vf(i)%sf(j, k, l), &
                          vR_MD), &
-                     max(v_rs_wsR(0)%vf(i)%sf(j, k, l), &
+                     max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
                          vR_UL, &
                          vR_LC))
 
@@ -1076,86 +1451,97 @@ contains
         !! @param vL_vf Left WENO reconstructed cell-boundary values
         !! @param vR_vf Right WENO reconstructed cell-boundary values
         !! @param weno_dir Coordinate direction of the WENO reconstruction
-        !! @param ix Index bounds in first coordinate direction
-        !! @param iy Index bounds in second coordinate direction
-        !! @param iz Index bounds in third coordinate direction
+        !! @param is1 Index bounds in first coordinate direction
+        !! @param is2 Index bounds in second coordinate direction
+        !! @param is3 Index bounds in third coordinate direction
     subroutine s_finalize_weno(vL_vf, vR_vf, & ! -----------------
-                               weno_dir, ix, iy, iz)
+                               weno_dir)
 
         type(scalar_field), dimension(:), intent(INOUT) :: vL_vf, vR_vf
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: ix, iy, iz
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k, l, m !< Generic loop iterators
+
 
         if (weno_dir == 2) then
-            do i = 1, v_size
-                do j = ix%beg, ix%end
-                    do k = iy%beg, iy%end
-                        vL_vf(i)%sf(j, k, iz%beg:iz%end) = vL_rs_vf(i)%sf(k, j, :)
-                        vR_vf(i)%sf(j, k, iz%beg:iz%end) = vR_rs_vf(i)%sf(k, j, :)
+!$acc parallel loop collapse(4) default(present)  
+            do j = 1, v_size
+                do m = is3%beg, is3%end
+                    do l = is2%beg, is2%end
+                        do k = is1%beg, is1%end
+                            vL_vf(j)%sf(k, l, m) = vL_rs_vf_y(j)%sf(l, k, m)
+                            vR_vf(j)%sf(k, l, m) = vR_rs_vf_y(j)%sf(l, k, m)
+                        end do 
                     end do
                 end do
             end do
-
-
-            ! Reshaping/Projecting onto Physical Fields in z-direction =========
+!$acc end parallel loop
         elseif (weno_dir == 3) then
-            do i = 1, v_size
-                do j = ix%beg, ix%end
-                    do k = iz%beg, iz%end
-                        vL_vf(i)%sf(j, iy%beg:iy%end, k) = vL_rs_vf(i)%sf(k, :, j)
-                        vR_vf(i)%sf(j, iy%beg:iy%end, k) = vR_rs_vf(i)%sf(k, :, j)
+!$acc parallel loop collapse(4) default(present)  
+            do j = 1, v_size
+                do m = is3%beg, is3%end
+                    do l = is2%beg, is2%end
+                        do k = is1%beg, is1%end
+                            vL_vf(j)%sf(k, l, m) = vL_rs_vf_z(j)%sf(m, l, k)
+                            vR_vf(j)%sf(k, l, m) = vR_rs_vf_z(j)%sf(m, l, k)
+                        end do 
                     end do
                 end do
             end do
-
+        elseif (weno_dir == 1) then
+!$acc parallel loop collapse(4) default(present)  
+            do j = 1, v_size
+                do m = is3%beg, is3%end
+                    do l = is2%beg, is2%end
+                        do k = is1%beg, is1%end
+                            vL_vf(j)%sf(k, l, m) = vL_rs_vf_x(j)%sf(k, l, m)
+                            vR_vf(j)%sf(k, l, m) = vR_rs_vf_x(j)%sf(k, l, m)
+                        end do 
+                    end do
+                end do
+            end do    
+!$acc end parallel loop
         end if
         ! ==================================================================
 
-        ! Deallocating the cell-average variables that were reshaped and/or
-        ! characteristically decomposed in the coordinate direction of WENO
-        ! reconstruction
-        do i = -weno_polyn, weno_polyn
-            do j = 1, v_size
-!$acc exit data detach(v_rs_wsR(i)%vf(j)%sf)                
-!$acc exit data delete(v_rs_wsL(i)%vf(j)%sf)
-                deallocate (v_rs_wsL(i)%vf(j)%sf)
-                v_rs_wsR(i)%vf(j)%sf => null()
-            end do
-!$acc exit data delete(v_rs_wsL(i)%vf, v_rs_wsR(i)%vf)
-            deallocate (v_rs_wsL(i)%vf, v_rs_wsR(i)%vf)
+        !!! This might not be necessary but I've put it in for convenience
+        do j = 1, v_size
+!$acc update self(vL_vf(j)%sf, vR_vf(j)%sf)
         end do
 
-        ! Deallocating the left and right WENO reconstructions of the cell-
-        ! average variables which were reshaped, and/or characteristically
-        ! decomposed, in the coordinate direction of WENO reconstruction
-        if (weno_dir == 1) then
-            do i = 1, v_size
-!$acc exit data detach(vL_rs_vf(i)%sf) 
-!$acc exit data detach(vR_rs_vf(i)%sf) 
-                vL_rs_vf(i)%sf => null()
-                vR_rs_vf(i)%sf => null()
-            end do
-        else
-            do i = 1, v_size
-!$acc exit data delete(vL_rs_vf(i)%sf,vR_rs_vf(i)%sf)
-                deallocate (vL_rs_vf(i)%sf)
-                deallocate (vR_rs_vf(i)%sf)
-            end do
-        end if
-
-        deallocate (vL_rs_vf, vR_rs_vf)
+        do i = 1, v_size
+!$acc exit data detach(vL_rs_vf_x(i)%sf, vR_rs_vf_x(i)%sf)
+            nullify(vL_rs_vf_x(i)%sf,vR_rs_vf_x(i)%sf)
+        end do
+        
 
     end subroutine s_finalize_weno ! ---------------------------------------
 
     !>  Module deallocation and/or disassociation procedures
     subroutine s_finalize_weno_module() ! ----------------------------------
 
+        integer :: i, j
         if (weno_order == 1) return
 
-        ! Deallocating the WENO-stencil of the WENO-reconstructed variables
-        deallocate (v_rs_wsL, v_rs_wsR)
+
+
+       ! Deallocating the WENO-stencil of the WENO-reconstructed variables
+        deallocate (vL_rs_vf_x, vR_rs_vf_x)
+
+
+        do i = -weno_polyn, weno_polyn
+            do j = 1, sys_size
+!$acc exit data delete(v_rs_ws_x(i)%vf(j)%sf)
+                deallocate(v_rs_ws_x(i)%vf(j)%sf)
+            end do
+        end do
+        do i = -weno_polyn, weno_polyn
+!$acc exit data delete(v_rs_ws_x(i)%vf)
+            deallocate(v_rs_ws_x(i)%vf)
+        end do
+
+        deallocate(v_rs_ws_x)
+
 
         ! Deallocating WENO coefficients in x-direction ====================
         deallocate (poly_coef_cbL_x, poly_coef_cbR_x)
@@ -1163,8 +1549,29 @@ contains
         deallocate (beta_coef_x)
         ! ==================================================================
 
+
         ! Deallocating WENO coefficients in y-direction ====================
         if (n == 0) return
+
+        do i = 1, sys_size
+!$acc exit data delete(vL_rs_vf_y(i)%sf, vR_rs_vf_y(i)%sf)
+            deallocate(vL_rs_vf_y(i)%sf,vR_rs_vf_y(i)%sf)
+        end do
+        deallocate (vL_rs_vf_y, vR_rs_vf_y)
+
+        do i = -weno_polyn, weno_polyn
+            do j = 1, sys_size
+!$acc exit data delete(v_rs_ws_y(i)%vf(j)%sf)
+                deallocate(v_rs_ws_y(i)%vf(j)%sf)
+            end do
+        end do
+
+        do i = -weno_polyn, weno_polyn
+!$acc exit data delete(v_rs_ws_y(i)%vf)
+            deallocate(v_rs_ws_y(i))
+        end do
+
+        deallocate(v_rs_ws_y)
 
         deallocate (poly_coef_cbL_y, poly_coef_cbR_y)
         deallocate (d_cbL_y, d_cbR_y)
@@ -1173,6 +1580,26 @@ contains
 
         ! Deallocating WENO coefficients in z-direction ====================
         if (p == 0) return
+
+        do i = 1, sys_size
+!$acc exit data delete(vL_rs_vf_z(i)%sf, vR_rs_vf_z(i)%sf)
+            deallocate(vL_rs_vf_z(i)%sf,vR_rs_vf_z(i)%sf)
+        end do
+        deallocate (vL_rs_vf_z, vR_rs_vf_z)
+
+        do i = -weno_polyn, weno_polyn
+            do j = 1, sys_size
+!$acc exit data delete(v_rs_ws_z(i)%vf(j)%sf)
+                deallocate(v_rs_ws_z(i)%vf(j)%sf)
+            end do
+        end do
+
+        do i = -weno_polyn, weno_polyn
+!$acc exit data delete(v_rs_ws_z(i)%vf)
+            deallocate(v_rs_ws_z(i))
+        end do
+
+        deallocate(v_rs_ws_z)
 
         deallocate (poly_coef_cbL_z, poly_coef_cbR_z)
         deallocate (d_cbL_z, d_cbR_z)
