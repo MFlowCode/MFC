@@ -462,8 +462,6 @@ contains
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
 
-                if ((adv_alphan .neqv. .true.) .and. &
-                    (num_fluids > 1)) adv_idx%end = adv_idx%end - 1
 
                 sys_size = adv_idx%end
 

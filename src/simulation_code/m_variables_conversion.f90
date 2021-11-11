@@ -197,7 +197,7 @@ contains
             rho_K = qK_vf(1)%sf(i, j, k)
             gamma_K = fluid_pp(1)%gamma !qK_vf(gamma_idx)%sf(i,j,k)
             pi_inf_K = fluid_pp(1)%pi_inf !qK_vf(pi_inf_idx)%sf(i,j,k)
-        else if ((model_eqns == 2) .and. bubbles .and. adv_alphan) then
+        else if ((model_eqns == 2) .and. bubbles) then
             rho_k = 0d0; gamma_k = 0d0; pi_inf_k = 0d0
 
             if (mpp_lim .and. (num_fluids > 2)) then
