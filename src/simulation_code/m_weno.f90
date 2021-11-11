@@ -803,7 +803,7 @@ contains
                                 beta(1) = beta_coef_z(1, 0, j)*dvd(-1)*dvd(-1) &
                                           + weno_eps
 
-                                alpha_L = d_cbL_y(:, j)/(beta*beta)
+                                alpha_L = d_cbL_z(:, j)/(beta*beta)
 
                                 omega_L = alpha_L/sum(alpha_L)
 
@@ -1005,10 +1005,10 @@ contains
                                 poly_R(0) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
                                             + poly_coef_cbR_y(0, 0, j)*dvd(1) &
                                             + poly_coef_cbR_y(0, 1, j)*dvd(0)
-                                poly_R(1) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                poly_R(1) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
                                             + poly_coef_cbR_y(1, 0, j)*dvd(0) &
                                             + poly_coef_cbR_y(1, 1, j)*dvd(-1)
-                                poly_R(2) = v_rs_ws_x(0)%vf(i)%sf(j, k, l) &
+                                poly_R(2) = v_rs_ws_y(0)%vf(i)%sf(j, k, l) &
                                             + poly_coef_cbR_y(2, 0, j)*dvd(-1) &
                                             + poly_coef_cbR_y(2, 1, j)*dvd(-2)
 
@@ -1195,64 +1195,73 @@ contains
 !$acc update device(v_vf(i)%sf)
         end do
 
-        do i = 1, v_size
-            vL_rs_vf_x(i)%sf => vL_vf(i)%sf
-            vR_rs_vf_x(i)%sf => vR_vf(i)%sf
+        if(weno_dir == 1) then
+            do i = 1, v_size
+                vL_rs_vf_x(i)%sf => vL_vf(i)%sf
+                vR_rs_vf_x(i)%sf => vR_vf(i)%sf
 !$acc enter data attach(vL_rs_vf_x(i)%sf, vR_rs_vf_x(i)%sf)
-        end do
+            end do
+        end if
         
         ! Reshaping/Projecting onto Characteristic Fields in x-direction ===
+        if(weno_dir == 1) then
 !$acc parallel loop collapse(5) default(present)  
-        do i = -weno_polyn, weno_polyn
-            do j = 1, v_size
-                do m = is3%beg, is3%end
-                    do l = is2%beg, is2%end
-                        do k = is1%beg, is1%end
-                            v_rs_ws_x(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(k + i, l, m)
-                        end do 
+            do i = -weno_polyn, weno_polyn
+                do j = 1, v_size
+                    do m = is3%beg, is3%end
+                        do l = is2%beg, is2%end
+                            do k = is1%beg, is1%end
+                                v_rs_ws_x(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(k + i, l, m)
+                            end do 
+                        end do
                     end do
                 end do
             end do
-        end do
 !$acc end parallel loop   
+        end if 
 
             ! ==================================================================
 
             ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
         if(n == 0) return
+        if(weno_dir == 2) then
 !$acc parallel loop collapse(5) default(present)  
-        do i = -weno_polyn, weno_polyn
-            do j = 1, v_size
-                do m = is3%beg, is3%end
-                    do l = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            v_rs_ws_y(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(l, k + i, m)
-                        end do 
+            do i = -weno_polyn, weno_polyn
+                do j = 1, v_size
+                    do m = is3%beg, is3%end
+                        do l = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                v_rs_ws_y(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(l, k + i, m)
+                            end do 
+                        end do
                     end do
                 end do
             end do
-        end do
-!$acc end parallel loop  
+!$acc end parallel loop 
+        end if 
 
 
 
             ! ==================================================================
 
-        if(p == 0) return 
+         
             ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
+        if(p == 0) return 
+        if(weno_dir == 3) then  
 !$acc parallel loop collapse(5) default(present)  
-        do i = -weno_polyn, weno_polyn
-            do j = 1, v_size
-                do m = is1%beg, is1%end
-                    do l = is2%beg, is2%end
-                        do k = is3%beg, is3%end
-                            v_rs_ws_z(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(m, l, k + i)
-                        end do 
+            do i = -weno_polyn, weno_polyn
+                do j = 1, v_size
+                    do m = is1%beg, is1%end
+                        do l = is2%beg, is2%end
+                            do k = is3%beg, is3%end
+                                v_rs_ws_z(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(m, l, k + i)
+                            end do 
+                        end do
                     end do
                 end do
             end do
-        end do
-!$acc end parallel loop   
+!$acc end parallel loop  
+        end if 
         ! ==================================================================
 
 
@@ -1488,19 +1497,6 @@ contains
                     end do
                 end do
             end do
-        elseif (weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present)  
-            do j = 1, v_size
-                do m = is3%beg, is3%end
-                    do l = is2%beg, is2%end
-                        do k = is1%beg, is1%end
-                            vL_vf(j)%sf(k, l, m) = vL_rs_vf_x(j)%sf(k, l, m)
-                            vR_vf(j)%sf(k, l, m) = vR_rs_vf_x(j)%sf(k, l, m)
-                        end do 
-                    end do
-                end do
-            end do    
-!$acc end parallel loop
         end if
         ! ==================================================================
 
@@ -1509,10 +1505,17 @@ contains
 !$acc update self(vL_vf(j)%sf, vR_vf(j)%sf)
         end do
 
-        do i = 1, v_size
+!        print *, vL_vf(E_idx)%sf(50,50,50)
+!        print *, vL_vf(mom_idx%beg)%sf(50,50,50)
+!        print *, vR_vf(E_idx)%sf(50,50,50)
+!        print *, vR_vf(mom_idx%beg)%sf(50,50,50)
+
+        if(weno_dir == 1) then
+            do i = 1, v_size
 !$acc exit data detach(vL_rs_vf_x(i)%sf, vR_rs_vf_x(i)%sf)
-            nullify(vL_rs_vf_x(i)%sf,vR_rs_vf_x(i)%sf)
-        end do
+                nullify(vL_rs_vf_x(i)%sf,vR_rs_vf_x(i)%sf)
+            end do
+        end if
         
 
     end subroutine s_finalize_weno ! ---------------------------------------
@@ -1568,7 +1571,7 @@ contains
 
         do i = -weno_polyn, weno_polyn
 !$acc exit data delete(v_rs_ws_y(i)%vf)
-            deallocate(v_rs_ws_y(i))
+            deallocate(v_rs_ws_y(i)%vf)
         end do
 
         deallocate(v_rs_ws_y)
@@ -1596,7 +1599,7 @@ contains
 
         do i = -weno_polyn, weno_polyn
 !$acc exit data delete(v_rs_ws_z(i)%vf)
-            deallocate(v_rs_ws_z(i))
+            deallocate(v_rs_ws_z(i)%vf)
         end do
 
         deallocate(v_rs_ws_z)

@@ -1113,6 +1113,11 @@ contains
         end if
         ! ==================================================================
 
+        print *, vL_vf(E_idx)%sf(50,50,0)
+        print *, vL_vf(mom_idx%beg)%sf(50,50,0)
+        print *, vR_vf(E_idx)%sf(50,50,0)
+        print *, vR_vf(mom_idx%beg)%sf(50,50,0)
+
         ! Deallocating the cell-average variables that were reshaped and/or
         ! characteristically decomposed in the coordinate direction of WENO
         ! reconstruction
