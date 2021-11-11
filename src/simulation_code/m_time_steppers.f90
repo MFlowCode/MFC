@@ -179,17 +179,11 @@ contains
 !$acc enter data attach(q_prim_vf(i)%sf)
         end do
 
-        if (adv_alphan) then
-            do i = adv_idx%beg, adv_idx%end
-                q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+        do i = adv_idx%beg, adv_idx%end
+            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
 !$acc enter data attach(q_prim_vf(i)%sf)
-            end do
-        else
-            do i = adv_idx%beg, sys_size
-                q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-            end do
-        end if
+        end do
+
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
         if (DEBUG) print *, 'got rhs'
@@ -225,17 +219,12 @@ contains
             q_prim_vf(i)%sf => null()
         end do
 
-        if (adv_alphan) then
-            do i = adv_idx%beg, adv_idx%end
+
+        do i = adv_idx%beg, adv_idx%end
 !$acc exit data detach(q_prim_vf(i)%sf)
-                q_prim_vf(i)%sf => null()
-            end do
-        else
-            do i = adv_idx%beg, sys_size ! adv_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-                q_prim_vf(i)%sf => null()
-            end do
-        end if
+            q_prim_vf(i)%sf => null()
+        end do
+
         ! ==================================================================
 
     end subroutine s_1st_order_tvd_rk ! ------------------------------------

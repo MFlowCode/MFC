@@ -135,7 +135,7 @@ contains
             rho_K = qK_vf(1)%sf(j, k, l)
             gamma_K = fluid_pp(1)%gamma    !qK_vf(gamma_idx)%sf(i,j,k)
             pi_inf_K = fluid_pp(1)%pi_inf   !qK_vf(pi_inf_idx)%sf(i,j,k)
-        else if ((model_eqns == 2) .and. bubbles .and. adv_alphan) then
+        else if ((model_eqns == 2) .and. bubbles) then
             rho_k = 0d0; gamma_k = 0d0; pi_inf_k = 0d0
 
             if (mpp_lim .and. (num_fluids > 2)) then
@@ -194,33 +194,18 @@ contains
 
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
-        if (adv_alphan) then
 
-            rho = 0d0; gamma = 0d0; pi_inf = 0d0
 
-            do i = 1, num_fluids
-                rho = rho + q_vf(i)%sf(j, k, l)
-                gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
-                pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
-            end do
+        rho = 0d0; gamma = 0d0; pi_inf = 0d0
 
-        else
+        do i = 1, num_fluids
+            rho = rho + q_vf(i)%sf(j, k, l)
+            gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
+            pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
+        end do
 
-            rho = q_vf(num_fluids)%sf(j, k, l)
-            gamma = fluid_pp(num_fluids)%gamma
-            pi_inf = fluid_pp(num_fluids)%pi_inf
+       
 
-            do i = 1, num_fluids - 1
-                rho = rho + q_vf(i)%sf(j, k, l)
-                gamma = gamma + q_vf(i + E_idx)%sf(j, k, l) &
-                        *(fluid_pp(i)%gamma &
-                          - fluid_pp(num_fluids)%gamma)
-                pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l) &
-                         *(fluid_pp(i)%pi_inf &
-                           - fluid_pp(num_fluids)%pi_inf)
-            end do
-
-        end if
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
 

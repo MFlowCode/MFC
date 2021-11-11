@@ -909,35 +909,19 @@ contains
             do j = 0, n
                 do i = 0, m
                     call random_number(rand_real)
-                    if ((perturb_sph_fluid == num_fluids) .and. (adv_alphan .neqv. .true.)) then
-                        perturb_alpha = 1d0
-                        do l = adv_idx%beg, adv_idx%end
-                            perturb_alpha = perturb_alpha - q_prim_vf(l)%sf(i, j, k)
-                        end do
-                    else
-                        perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
-                    end if
+                    
+                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
+                    
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
 !                        IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
                     if ((perturb_alpha /= 0d0) .and. (perturb_alpha /= 1d0)) then
-                        if (adv_alphan .neqv. .true.) then
-                            ! Find new unadvected volume fraction
-                            alpha_unadv = 1d0
-                            do l = adv_idx%beg, adv_idx%end
-                                alpha_unadv = alpha_unadv - q_prim_vf(l)%sf(i, j, k)
-                            end do
-                            ! Derive new partial densities
-                            do l = 1, num_fluids - 1
-                                q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
-                            end do
-                            q_prim_vf(num_fluids)%sf(i, j, k) = alpha_unadv*fluid_rho(num_fluids)
-                        else
-                            ! Derive new partial densities
-                            do l = 1, num_fluids
-                                q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
-                            end do
-                        end if
+                        
+                        ! Derive new partial densities
+                        do l = 1, num_fluids
+                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
+                        end do
+                        
                     end if
                 end do
             end do
@@ -957,14 +941,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    if ((perturb_flow_fluid == num_fluids) .and. (adv_alphan .neqv. .true.)) then
-                        perturb_alpha = 1d0
-                        do l = adv_idx%beg, adv_idx%end
-                            perturb_alpha = perturb_alpha - q_prim_vf(l)%sf(i, j, k)
-                        end do
-                    else
-                        perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
-                    end if
+
+                    perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
                     ! IF (perturb_alpha == 1d0) THEN
                     ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
