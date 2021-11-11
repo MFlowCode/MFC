@@ -1771,12 +1771,12 @@ contains
 
                     !what variables to alter
                     !x-y bump in pressure
-                    !q_prim_vf(E_idx)%sf(i,j,0) = q_prim_vf(E_idx)%sf(i,j,0) * &
-                    !    ( 1d0 + 0.2d0*dexp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
+                    q_prim_vf(E_idx)%sf(i,j,0) = q_prim_vf(E_idx)%sf(i,j,0) * &
+                        ( 1d0 + 0.2d0*dexp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
 
                     !x-bump
-                    q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                                                   (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                    !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
+                                                   !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !bump in void fraction
                     !q_prim_vf(adv_idx%beg)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * &
@@ -1787,9 +1787,9 @@ contains
                     !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
 
                     !reassign density
-                    q_prim_vf(1)%sf(i, j, 0) = &
-                        (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                        rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
+                    !q_prim_vf(1)%sf(i, j, 0) = &
+                        !(((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                        !rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
 
                     ! ================================================================================
 
@@ -1907,24 +1907,24 @@ contains
                         q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)* &
                                                        (1d0 + 0.2d0*exp(-1d0* &
                                                                         ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-                                                                        /(2.d0*0.005d0)))
+                                                                        /(2.d0*0.5d0)))
 
                         !bump in void fraction
-                        q_prim_vf(adv_idx%beg)%sf(i, j, k) = q_prim_vf(adv_idx%beg)%sf(i, j, k)* &
-                                                             (1d0 + 0.2d0*exp(-1d0* &
-                                                                              ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-                                                                              /(2.d0*0.005d0)))
+ !                       q_prim_vf(adv_idx%beg)%sf(i, j, k) = q_prim_vf(adv_idx%beg)%sf(i, j, k)* &
+  !                                                           (1d0 + 0.2d0*exp(-1d0* &
+   !                                                                           ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
+    !                                                                          /(2.d0*0.005d0)))
 
                         !bump in R(x)
-                        q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
-                                                                 (1d0 + 0.2d0*exp(-1d0* &
-                                                                                  ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-                                                                                  /(2.d0*0.005d0)))
+                 !       q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
+                  !                                               (1d0 + 0.2d0*exp(-1d0* &
+   !                                                                               ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
+!                                                                                  /(2.d0*0.005d0)))
 
                         !reassign density
-                        q_prim_vf(1)%sf(i, j, k) = &
-                            (((q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                            rhoref*(1d0 - q_prim_vf(E_idx + 1)%sf(i, j, k))
+               !         q_prim_vf(1)%sf(i, j, k) = &
+               !             (((q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                !            rhoref*(1d0 - q_prim_vf(E_idx + 1)%sf(i, j, k))
 
                         ! ================================================================================
 
