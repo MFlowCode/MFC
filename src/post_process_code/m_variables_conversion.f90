@@ -127,7 +127,7 @@ contains
             rho_sf = qK_vf(1)%sf(j, k, l)
             gamma_sf = fluid_pp(1)%gamma
             pi_inf_sf = fluid_pp(1)%pi_inf
-        else if (model_eqns == 2 .and. bubbles .and. adv_alphan) then
+        else if (model_eqns == 2 .and. bubbles) then
             rho_sf = 0d0; gamma_sf = 0d0; pi_inf_sf = 0d0
 
             if (mpp_lim .and. num_fluids > 1) then
@@ -172,45 +172,25 @@ contains
 
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
-        if (adv_alphan) then
-            if (bubbles .neqv. .true.) then
-                rho_sf(j, k, l) = 0d0
-                gamma_sf(j, k, l) = 0d0
-                pi_inf_sf(j, k, l) = 0d0
+        if (bubbles .neqv. .true.) then
+            rho_sf(j, k, l) = 0d0
+            gamma_sf(j, k, l) = 0d0
+            pi_inf_sf(j, k, l) = 0d0
 
-                do i = 1, num_fluids
-                    rho_sf(j, k, l) = rho_sf(j, k, l) &
-                                      + q_cons_vf(i)%sf(j, k, l)
-                    gamma_sf(j, k, l) = gamma_sf(j, k, l) &
-                                        + q_cons_vf(i + E_idx)%sf(j, k, l) &
-                                        *fluid_pp(i)%gamma
-                    pi_inf_sf(j, k, l) = pi_inf_sf(j, k, l) &
-                                         + q_cons_vf(i + E_idx)%sf(j, k, l) &
-                                         *fluid_pp(i)%pi_inf
-                end do
-            else
-                rho_sf(j, k, l) = q_cons_vf(1)%sf(j, k, l)
-                gamma_sf(j, k, l) = fluid_pp(1)%gamma
-                pi_inf_sf(j, k, l) = fluid_pp(1)%pi_inf
-            end if
-        else
-            rho_sf(j, k, l) = q_cons_vf(num_fluids)%sf(j, k, l)
-            gamma_sf(j, k, l) = fluid_pp(num_fluids)%gamma
-            pi_inf_sf(j, k, l) = fluid_pp(num_fluids)%pi_inf
-
-            do i = 1, num_fluids - 1
+            do i = 1, num_fluids
                 rho_sf(j, k, l) = rho_sf(j, k, l) &
                                   + q_cons_vf(i)%sf(j, k, l)
                 gamma_sf(j, k, l) = gamma_sf(j, k, l) &
                                     + q_cons_vf(i + E_idx)%sf(j, k, l) &
-                                    *(fluid_pp(i)%gamma &
-                                      - fluid_pp(num_fluids)%gamma)
+                                    *fluid_pp(i)%gamma
                 pi_inf_sf(j, k, l) = pi_inf_sf(j, k, l) &
                                      + q_cons_vf(i + E_idx)%sf(j, k, l) &
-                                     *(fluid_pp(i)%pi_inf &
-                                       - fluid_pp(num_fluids)%pi_inf)
+                                     *fluid_pp(i)%pi_inf
             end do
-
+        else
+            rho_sf(j, k, l) = q_cons_vf(1)%sf(j, k, l)
+            gamma_sf(j, k, l) = fluid_pp(1)%gamma
+            pi_inf_sf(j, k, l) = fluid_pp(1)%pi_inf
         end if
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
