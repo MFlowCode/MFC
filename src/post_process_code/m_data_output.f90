@@ -382,7 +382,7 @@ contains
 
                 if (alpha_wrt(num_fluids) &
                     .or. &
-                    (adv_alphan .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                    (cons_vars_wrt .or. prim_vars_wrt)) &
                     then
                     dbvars = dbvars + 1
                 end if

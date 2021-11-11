@@ -220,9 +220,6 @@ contains
         elseif (bubbles .and. riemann_solver /= 2) then
             print '(A)', 'Bubble modeling requires riemann_solver = 2'
             call s_mpi_abort()
-        elseif (bubbles .and. (adv_alphan .neqv. .true.)) then
-            print '(A)', 'Bubble modeling requires adv_alphan'
-            call s_mpi_abort()
         elseif ((bubbles .neqv. .true.) .and. polydisperse) then
             print '(A)', 'Polydisperse bubble modeling requires the bubble switch to be activated'
             call s_mpi_abort()
@@ -275,11 +272,6 @@ contains
         elseif (model_eqns == 1 .and. adv_alphan) then
             print '(A)', 'Unsupported combination of values of '// &
                 'model_eqns and adv_alphan. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (num_fluids == 1 .and. (adv_alphan .neqv. .true.)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'num_fluids and adv_alphan. '// &
                 'Exiting ...'
             call s_mpi_abort()
         elseif (model_eqns == 1 .and. mpp_lim) then

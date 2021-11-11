@@ -174,11 +174,6 @@ contains
                 'model_eqns and adv_alphan. '// &
                 'Exiting ...'
             call s_mpi_abort()
-        elseif (num_fluids == 1 .and. (adv_alphan .neqv. .true.)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'num_fluids and adv_alphan. '// &
-                'Exiting ...'
-            call s_mpi_abort()
 
             ! Constraints on the order of the WENO scheme
         elseif (weno_order /= 1 .and. weno_order /= 3 &

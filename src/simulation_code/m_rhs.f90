@@ -429,23 +429,14 @@ contains
 !$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
             end do
 
-            if (adv_alphan) then
-                do l = adv_idx%beg, adv_idx%end
-                    qL_prim_n(i)%vf(l)%sf => &
-                        qL_cons_n(i)%vf(l)%sf
-                    qR_prim_n(i)%vf(l)%sf => &
-                        qR_cons_n(i)%vf(l)%sf
+
+            do l = adv_idx%beg, adv_idx%end
+                qL_prim_n(i)%vf(l)%sf => &
+                    qL_cons_n(i)%vf(l)%sf
+                qR_prim_n(i)%vf(l)%sf => &
+                    qR_cons_n(i)%vf(l)%sf
 !$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
-                end do
-            else
-                do l = adv_idx%beg, adv_idx%end + 1
-                    qL_prim_n(i)%vf(l)%sf => &
-                        qL_cons_n(i)%vf(l)%sf
-                    qR_prim_n(i)%vf(l)%sf => &
-                        qR_cons_n(i)%vf(l)%sf
-!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
-                end do
-            end if
+            end do
 
 
         end do
@@ -724,7 +715,7 @@ contains
     !   calls that might hold back progress
     ! Specifics [!!]: Does NOT use alt_soundspeed, weno_vars == 1, 
     !   riemann_solver == 1, viscous terms, bubbles, model_eqns == 3, 
-    !   adv_alphan == .false., cyl_coords, monopole, and possibly more.
+    !    cyl_coords, monopole, and possibly more.
     !   HOWEVER: it is very short! and exercises most of the code in 3D with BCs
     subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, t_step) ! -------
 
@@ -958,15 +949,6 @@ contains
         call s_populate_conservative_variables_buffers()
 
         if (DEBUG) print *, 'pop cons vars'
-        if ((model_eqns == 2 .or. model_eqns == 3) .and. (adv_alphan .neqv. .true.)) then
-            q_cons_qp%vf(sys_size)%sf = 1d0
-
-            do i = adv_idx%beg, adv_idx%end
-                q_cons_qp%vf(sys_size)%sf = &
-                    q_cons_qp%vf(sys_size)%sf - &
-                    q_cons_qp%vf(i)%sf
-            end do
-        end if
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -985,19 +967,6 @@ contains
 
         ! Converting Conservative to Primitive Variables ===================
         iv%beg = 1; iv%end = adv_idx%end
-
-        if ((model_eqns == 2 .or. model_eqns == 3) &
-            .and. &
-            (adv_alphan .neqv. .true.) &
-            ) then
-            q_cons_qp%vf(adv_idx%end)%sf = 1d0
-
-            do l = adv_idx%beg, adv_idx%end
-                q_cons_qp%vf(adv_idx%end)%sf = &
-                    q_cons_qp%vf(adv_idx%end)%sf - &
-                    q_cons_qp%vf(l)%sf
-            end do
-        end if
 
         !convert conservative variables to primitive
         !   (except first and last, \alpha \rho and \alpha)
@@ -1036,13 +1005,10 @@ contains
             ! Reconstructing Primitive/Conservative Variables ===============
             if (all(Re_size == 0)) then
 
-                iv%beg = 1; 
-                if (adv_alphan) then
-                    iv%end = adv_idx%end
-                    if (bubbles) iv%end = sys_size
-                else
-                    iv%end = adv_idx%end + 1
-                end if
+                iv%beg = 1 
+                iv%end = adv_idx%end
+                if (bubbles) iv%end = sys_size
+
 
                 !reconstruct either primitive or conservative vars
                 if (DEBUG) then
@@ -1135,20 +1101,6 @@ contains
 
             end if
 
-            if ((model_eqns == 2 .or. model_eqns == 3) .and. (adv_alphan .neqv. .true.)) then
-                qL_cons_n(i)%vf(sys_size)%sf = 1d0
-                qR_cons_n(i)%vf(sys_size)%sf = 1d0
-
-                do l = adv_idx%beg, adv_idx%end
-                    qL_cons_n(i)%vf(sys_size)%sf = &
-                        qL_cons_n(i)%vf(sys_size)%sf - &
-                        qL_cons_n(i)%vf(l)%sf
-
-                    qR_cons_n(i)%vf(sys_size)%sf = &
-                        qR_cons_n(i)%vf(sys_size)%sf - &
-                        qR_cons_n(i)%vf(l)%sf
-                end do
-            end if
             ! END: Reconstructing Volume Fraction Variables =================
 
             ! Converting Conservative to Primitive Variables ================
@@ -1303,7 +1255,7 @@ contains
                 else
                     do j = adv_idx%beg, adv_idx%end
                         if (alt_soundspeed) then
-                            if (adv_alphan .and. (j == adv_idx%end) .and. (bubbles .neqv. .true.)) then
+                            if ((j == adv_idx%end) .and. (bubbles .neqv. .true.)) then
                                 !adv_idx%end, -k div(u)
                                 do k = 0, m
                                     rhs_vf(j)%sf(k, :, :) = &
@@ -1312,7 +1264,7 @@ contains
                                         (flux_src_n(i)%vf(j)%sf(k, 0:n, 0:p) &
                                          - flux_src_n(i)%vf(j)%sf(k - 1, 0:n, 0:p))
                                 end do
-                            else if (adv_alphan .and. (j == adv_idx%beg) .and. (bubbles .neqv. .true.)) then
+                            else if ((j == adv_idx%beg) .and. (bubbles .neqv. .true.)) then
                                 !adv_idx%beg, +k div(u)
                                 do k = 0, m
                                     rhs_vf(j)%sf(k, :, :) = &
@@ -1462,7 +1414,7 @@ contains
                     do j = adv_idx%beg, adv_idx%end
                         do k = 0, n
                             if (alt_soundspeed) then
-                                if (adv_alphan .and. (j == adv_idx%end)) then
+                                if ((j == adv_idx%end)) then
                                     rhs_vf(j)%sf(:, k, :) = &
                                         rhs_vf(j)%sf(:, k, :) + 1d0/dy(k)* &
                                         (q_cons_qp%vf(j)%sf(0:m, k, 0:p) - Kterm(:, k, :))* &
@@ -1704,7 +1656,7 @@ contains
                             do l = 0, n
                                 do k = 0, p
                                     if (alt_soundspeed) then
-                                        if (adv_alphan .and. j == adv_idx%end) then
+                                        if (j == adv_idx%end) then
                                             rhs_vf(j)%sf(:, l, k) = &
                                                 rhs_vf(j)%sf(:, l, k) + 1d0/dz(k)/y_cc(l)* &
                                                 (q_cons_qp%vf(j)%sf(0:m, l, k) - Kterm(:, l, k))* &
@@ -1729,7 +1681,7 @@ contains
                         else
                             do k = 0, p
                                 if (alt_soundspeed) then
-                                    if (adv_alphan .and. j == adv_idx%end) then
+                                    if (j == adv_idx%end) then
                                         rhs_vf(j)%sf(:, :, k) = &
                                             rhs_vf(j)%sf(:, :, k) + 1d0/dz(k)* &
                                             (q_cons_qp%vf(j)%sf(0:m, 0:n, k) - Kterm(:, :, k))* &

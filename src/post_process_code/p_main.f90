@@ -279,16 +279,14 @@ program p_main
 
             if (alpha_wrt(num_fluids) &
                 .or. &
-                (adv_alphan .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+                (cons_vars_wrt .or. prim_vars_wrt)) then
 
-                if (adv_alphan .neqv. .true.) then
-                    call s_derive_unadvected_volume_fraction(q_cons_vf, q_sf)
-                else
-                    q_sf = q_cons_vf(adv_idx%end)%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
-                end if
+                
+                q_sf = q_cons_vf(adv_idx%end)%sf( &
+                       -offset_x%beg:m + offset_x%end, &
+                       -offset_y%beg:n + offset_y%end, &
+                       -offset_z%beg:p + offset_z%end)
+                
 
                 write (varname, '(A,I0)') 'alpha', num_fluids
                 call s_write_variable_to_formatted_database_file(varname, t_step)
