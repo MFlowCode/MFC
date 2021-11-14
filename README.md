@@ -12,13 +12,18 @@ The MFC is a simulation software for multi-component, multi-phase, and bubbly fl
 MFC was first developed by the Colonius research group at Caltech.
 Now it is developed and maintained by the groups of Professors <a href="https://colonius.caltech.edu/">Tim Colonius</a>, <a href="https://comp-physics.group">Spencer Bryngelson</a>, and <a href="https://vivo.brown.edu/display/mrodri97">Mauro Rodriguez</a>.
 
+
+# Development
+
+This is the fully-tested release of MFC.
+Tested changes are pulled from the development repository, [located here.](https://github.com/ComputationalFlowPhysics/MFC-develop)
+
 # Documentation
  
   The following codes are documented, please follow the links to see their Doxygen:
 * <a href="https://mflowcode.github.io/pre_process/namespaces.html">Pre_process</a> 
 * <a href="https://mflowcode.github.io/simulation/namespaces.html">Simulation</a> 
 * <a href="https://mflowcode.github.io/post_process/namespaces.html">Post_process</a>
- 
 
 ## User's guide
  
