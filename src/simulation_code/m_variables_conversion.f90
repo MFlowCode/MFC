@@ -22,6 +22,8 @@ module m_variables_conversion
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use nvtx
     ! ==========================================================================
 
     implicit none
@@ -423,6 +425,13 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
+        real(kind(0d0)) :: ixb,ixe,iyb,iye,izb,ize
+        real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs
+!$acc declare create(gammas, pi_infs)
+
+
+
+
         ! Density, dynamic pressure, surface energy, specific heat ratio
         ! function, liquid stiffness function, shear and volume Reynolds
         ! numbers and the Weber numbers
@@ -434,7 +443,21 @@ contains
         real(kind(0d0)), dimension(2)                     ::       Re_K
         real(kind(0d0)), dimension(nb) :: nRtmp
 
+
+
+
         integer :: i, j, k, l !< Generic loop iterators
+
+        do i = 1, num_fluids
+            gammas(i) = fluid_pp(i)%gamma
+            pi_infs(i) = fluid_pp(i)%pi_inf
+        end do
+
+!$acc update device(gammas, pi_infs)
+
+        ixb = ix%beg; ixe = ix%end
+        iyb = iy%beg; iye = iy%end
+        izb = iz%beg; ize = iz%end
 
         ! Calculating the velocity and pressure from the momentum and energy
         do l = iz%beg, iz%end

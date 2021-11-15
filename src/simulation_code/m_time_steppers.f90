@@ -25,6 +25,8 @@ module m_time_steppers
     use m_bubbles              !< Bubble dynamics routines
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use nvtx
     ! ==========================================================================
 
     implicit none
