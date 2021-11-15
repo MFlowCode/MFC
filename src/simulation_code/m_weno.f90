@@ -1191,9 +1191,7 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-        do i = 1, v_size
-!$acc update device(v_vf(i)%sf)
-        end do
+
 
         if(weno_dir == 1) then
             do i = 1, v_size
@@ -1501,14 +1499,7 @@ contains
         ! ==================================================================
 
         !!! This might not be necessary but I've put it in for convenience
-        do j = 1, v_size
-!$acc update self(vL_vf(j)%sf, vR_vf(j)%sf)
-        end do
 
-!        print *, vL_vf(E_idx)%sf(50,50,50)
-!        print *, vL_vf(mom_idx%beg)%sf(50,50,50)
-!        print *, vR_vf(E_idx)%sf(50,50,50)
-!        print *, vR_vf(mom_idx%beg)%sf(50,50,50)
 
         if(weno_dir == 1) then
             do i = 1, v_size

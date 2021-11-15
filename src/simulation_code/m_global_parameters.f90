@@ -181,6 +181,7 @@ module m_global_parameters
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
+
     ! ==========================================================================
 
     integer :: fd_order !<

@@ -38,6 +38,8 @@ module m_rhs
     use m_bubbles              !< Bubble dynamic routines
 
     use m_qbmm                 !< Moment inversion
+
+    use nvtx
     ! ==========================================================================
 
     implicit none
@@ -772,6 +774,11 @@ contains
         iv%beg = mom_idx%beg; iv%end = E_idx
 !$acc update device(iv)
 
+        do i = 1, sys_size
+!$acc update device(q_prim_qp%vf(i)%sf)
+        end do
+
+
         if (t_step == t_step_stop) return
         ! ==================================================================
 
@@ -789,12 +796,22 @@ contains
 
             ! Reconstructing Primitive/Conservative Variables ===============
             iv%beg = 1; iv%end = adv_idx%end
-
+            call nvtxStartRange("RHS-WENO")
             call s_reconstruct_cell_boundary_values( &
                 q_prim_qp%vf(iv%beg:iv%end), &
                 qL_prim_n(i), &
                 qR_prim_n(i), &
                 i)
+            call nvtxEndRange
+
+            do j = iv%beg, iv%end
+!$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf)
+            end do
+
+            print *, qL_prim_n(i)%vf(E_idx)%sf(50,50,0)
+            print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50,50,0)
+            print *, qR_prim_n(i)%vf(E_idx)%sf(50,50,0)
+            print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50,50,0)
 
     
 
