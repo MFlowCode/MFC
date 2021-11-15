@@ -458,6 +458,68 @@ contains
         ixb = ix%beg; ixe = ix%end
         iyb = iy%beg; iye = iy%end
         izb = iz%beg; ize = iz%end
+!$acc update device(ixb,ixe,iyb,iye,izb,ize)
+
+
+        if((model_eqns .ne. 4) .and. (bubbles .neqv. .true.)) then 
+!$ acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K, Re_K, dyn_pres_K)
+            do l = izb, ize
+                do k = iyb, iye
+                    do j = ixb, ixe
+                        dyn_pres_K = 0d0
+                        call s_convert_to_mixture_variables(qK_cons_vf, rho_K, gamma_K, pi_inf_K, Re_K, j, k, l)
+                        do i = mom_idx%beg, mom_idx%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                            /max(rho_K, sgm_eps)
+                                dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
+                                             *qK_prim_vf(i)%sf(j, k, l)
+                        end do 
+
+                        qK_prim_vf(E_idx)%sf(j, k, l) = (qK_cons_vf(E_idx)%sf(j, k, l) &
+                                 - dyn_pres_K - pi_inf_K )/gamma_K
+!$acc end parallel loop
+
+        elseif((model_eqns .ne. 4)) then 
+!$ acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K, Re_K, dyn_pres_K)
+            do l = izb, ize
+                do k = iyb, iye
+                    do j = ixb, ixe
+                        dyn_pres_K = 0d0
+                        call s_convert_to_mixture_variables(qK_cons_vf, rho_K, gamma_K, pi_inf_K, Re_K, j, k, l)
+                        do i = mom_idx%beg, mom_idx%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                            /max(rho_K, sgm_eps)
+                                dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
+                                             *qK_prim_vf(i)%sf(j, k, l)
+                        end do 
+
+                        qK_prim_vf(E_idx)%sf(j, k, l) = &
+                            ((qK_cons_vf(E_idx)%sf(j, k, l) &
+                              - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf_K &)/gamma_K
+
+
+
+                        do i = 1, nb
+                            nRtmp(i) = qK_cons_vf(bub_idx%rs(i))%sf(j, k, l)
+                            !IF (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
+                        end do
+
+                        call s_comp_n_from_cons(qK_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
+                        if (DEBUG) then
+                            if (j == 0 .and. k == 0 .and. l == 0) print *, 'nbub1: ', nbub
+                        end if
+
+                        if (nbub < 0.d0) stop 'nbub is negative'
+                        do i = bub_idx%beg, bub_idx%end
+                            qk_prim_vf(i)%sf(j, k, l) = qk_cons_vf(i)%sf(j, k, l)/nbub
+                        end do
+                        
+!$acc end parallel loop
+
+ 
+
+
+
 
         ! Calculating the velocity and pressure from the momentum and energy
         do l = iz%beg, iz%end

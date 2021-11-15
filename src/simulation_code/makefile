@@ -9,7 +9,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-FLFLAGS = -g $(ld_sim_flags)
+FLFLAGS = -g $(ld_sim_flags) -L$(CUDA_DIR)/lib64 -lnvToolsExt
 FCFLAGS = -g $(f90_flags)
 EXEC = simulation
 PROGRAM = p_main
