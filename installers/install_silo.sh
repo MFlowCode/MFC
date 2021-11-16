@@ -19,8 +19,13 @@ rm $library_name".tgz"
 
 cd $library_name
     echo $(pwd)
-    export PYTHON_CPPFLAGS=$(python3-config --cflags)
-    ./configure --prefix=$(pwd) --enable-pythonmodule --enable-optimization --disable-hzip --disable-fpzip FC=mpif90 F77=mpif77 -with-hdf5=$(pwd)/../hdf5/hdf5/include,$(pwd)/../hdf5/hdf5/lib --disable-silex
+
+    export PYTHON_CPPFLAGS="$PYTHON_CPPFLAGS $(python3-config --cflags)"
+
+    ./configure --prefix=$(pwd) --enable-pythonmodule --enable-optimization    \
+                --disable-hzip --disable-fpzip FC=mpif90 F77=mpif77            \
+                -with-hdf5=$(pwd)/../hdf5/hdf5/include,$(pwd)/../hdf5/hdf5/lib \
+                --disable-silex
     make "$@"
     make install
 cd ..
