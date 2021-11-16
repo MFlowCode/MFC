@@ -51,3 +51,8 @@ done
 echo -----------------------------------------------
 echo ---- $nfail Tests failed
 echo ---- $npass Tests passed
+
+# Proper Exit Code
+#      0 - Success
+# Not(0) - Fail (1 or more tests)
+exit $nfail
