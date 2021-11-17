@@ -86,9 +86,6 @@ Ph.D. Disserations:
 
 # Installation
  
-  The documents that describe how to configure and install the MFC are located in the 
-  source code as `CONFIGURE` and `INSTALL`. They are also described here.
- 
 ## Step 1: Configure and ensure dependencies can be located
  
  
@@ -198,23 +195,12 @@ for the flow variables via
 Note that the post-processing step 
 requires installation of Silo and HDF5.
 
-# MIT License
+# License
  
-Copyright 2021
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Copyright 2021.
+MFC is under the MIT license (see LICENSE file for full text).
 
 # Acknowledgements
  
-The development of the MFC  was supported in part by multiple past grants from the US Office of 
-Naval Research (ONR), the US National Institute of 
-Health (NIH), and the US National Science Foundation (NSF), as well as current ONR grant numbers 
-N0014-17-1-2676 and N0014-18-1-2625 and NIH grant number 2P01-DK043881.
-The computations presented here utilized the Extreme Science
-and Engineering Discovery Environment, which is supported under NSF
-grant number CTS120005. K.M. acknowledges support from the Funai Foundation
-for Information Technology via the Overseas Scholarship.
+The development of the MFC  was supported in part by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
+MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and ORNL Summit under allocation CFD154 (PI Bryngelson).
