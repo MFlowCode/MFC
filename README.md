@@ -84,92 +84,87 @@ Ph.D. Disserations:
 
 
 
-# Installation
- 
-## Step 1: Configure and ensure dependencies can be located
- 
- 
-### Main dependencies: MPI and Python 
-  If you do not have Python, it can be installed via
-  <a href="https://brew.sh/">Homebrew on MacOS</a> as:  
-`brew install python`
- 
-  or compiled via your favorite package manager on Unix systems.
- 
-  An MPI fortran compiler is required for all systems.
-  If you do not have one, Homebrew can take care of this
-  on MacOS:  
-`brew install open-mpi`  
- 
-  or compiled via another package manager on Unix systems.
- 
-### Simulation code dependency: FFTW 
+# Simple Installation
 
-If you already have FFTW compiled:
-* Specify the location of your FFTW library and
-      include files in Makefile.user (`fftw_lib_dir` and
-      `fftw_include_dir`)  
+To get MFC running as fast as possible without having to configure the
+dependencies yourself, you can follow the following steps on most UNIX-like
+systems. This method is best suited for development and Continous Integration
+(CI) workflows.
 
+To fetch, build, and run MFC and its dependencies on a UNIX-like system, you
+must have installed common utilities (Tar, Wget, GNU Make, ...), Python2,
+Python3, Python's developement headers and libraries, a C/C++ compiler
+((GCC and G++) or Clang), an MPI Fortran compiler
+(like [Open MPI](https://www.open-mpi.org/)). Here are some commands for popular
+Operating Systems and package managers, 
 
-If you do not have FFTW compiler, the library and
-  installer are included in this package. Just:  
-`cd installers`  
-`./install_fftw.sh`  
- 
-### Post process code dependency: Silo/HDF5
- 
-  Post-processing of parallel data files is not required,
-  but can indeed be handled with the MFC. For this, HDF5
-  and Silo must be installed
- 
-  On MacOS, a custom Homebrew tap for Silo is included in the installers
-  directory. You can use it via  
-`cd installers`  
-`brew install silo.rb`  
- 
-  This will install silo and its dependences (including HDF5)
-  in their usual locations (`/usr/local/lib` and
-  `/usr/local/include`)
- 
-  On Unix systems, you can install via a package manager or
-  from source. On CentOS (also Windows 7), HDF5
-  binaries can be found <a href="https://support.hdfgroup.org/ftp/HDF5/current18/bin/">here.</a>
-  
-  Untar this archive in your intended location via  
-`tar -zxf [your HDF5 archive]`  
-  
-  Silo should be downloaded 
-  <a href="https://wci.llnl.gov/simulation/computer-codes/silo/downloads">here,</a>
-  then  
-`tar -zxf [your Silo archive]`  
-`cd [your Silo archive]`  
-`./configure --prefix=[target installation directory] --enable-pythonmodule --enable-optimization --disable-hzip --disable-fpzip FC=mpif90 F77=mpif77 -with-hdf5=[your hdf5 directory]/include,/[your hdf5 directory]/lib --disable-silex`  
-`make`  
-`make install`  
- 
-  Add the following line to your `~/.bash_profile`:  
-  `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/[your silo directory]/lib:/[your hdf5 directory]/lib`
- 
-  Finally:  
-`source ~/.bash_profile`  
-  
-  You will then need to modify `silo_lib_dir` and `silo_include_dir` in
-  `Makefile.user` to point to your silo directory.
- 
-## Step 2: Build and test
- 
-  Once all dependencies have been installed, the MFC can be built via  
-`make`
- 
-  from the MFC directory. This will build all MFC components. Individual
-  components can be built via  
-`make [component]`  
- 
-  where `[component]` is one of `pre_process`, `simulation`, or `post_process`.
- 
-  Once this is completed, you can ensure that the software is working
-  as intended by  
-`make test`  
+Package Manager                                            | Suggested Command 
+---                                                        | ---
+[Aptitude](https://wiki.debian.org/Aptitude) (Debian-like) | `sudo apt install tar wget make gcc g++ python3 openmpi-* python3-dev`
+[Homebrew](https://brew.sh/) (macOS)                       | `brew install wget make python open-mpi make gcc`
+
+The following commands fetch and build the required dependencies to to the
+`dependencies/` folder within your MFC installation. This should have no impact on your
+local installations of these packages.
+
+```
+cd dependencies
+sh ./install.sh -j <num_threads>
+cd ..
+```
+
+You can now run `make -j <num_threads>` on MFC to build it, and check your
+installation by running tests with `make tests`.
+
+```
+make -j <num_threads>
+make tests
+```
+
+# Advanced Installation
+
+MFC is split into 3 components with (mostly) layered dependencies. The following
+table can be used to resolve the minimal amount of packages you are required to
+install and configure depending on your specific use case.
+
+Codes             | Description                             | Required Packages
+----------------- | --------------------------------------- | ---
+Pre process Code  | "The pre-processor generates initial conditions and spatial grids from the physical patches specified in the Python input file andexports them as binary files to be read by the simulator." [1] | <ul><li>UNIX Utilities</li><li>GNU Make</li><li>C/C++ Compiler</li><li>Fortran MPI Compiler</li><li>[Python](https://www.python.org/)</li>
+Simulation Code   | "The simulator, given the initial-condition files generated bythe pre-processor, solves the corresponding governing flowequations with the specified boundary conditions using ourinterface-capturingnumericalmethod." [1] | <ul><li>[FFTW](https://www.fftw.org/)</li><li>[Lapack](http://www.netlib.org/lapack/)</li></ul>
+Post process Code | "The post-processor reads simulation data and exports HDF5/Silo databases that include variables and derived variables, asspecifiedintheinputfile." [1] | <ul><li>[HDF5](https://www.hdfgroup.org/solutions/hdf5/)</li><li>[Silo](https://wci.llnl.gov/simulation/computer-codes/silo)*</li></ul>
+
+<sub>[1] <a href="https://doi.org/10.1016/j.cpc.2020.107396">
+        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2020) Computer Physics Communications 4655, 107396
+</a></sub>
+
+<sup>*Please note that <a href="https://wci.llnl.gov/simulation/computer-codes/silo">Silo</a> depends on <a href="https://www.hdfgroup.org/solutions/hdf5/">HDF5</a>.
+
+Once you have decided on which dependencies you want to install, you can:
+
+- Build them from source
+- Obtain them through your package manager
+- Modify and run the [install.sh](dependencies/install.sh) script above
+
+You can now modify the [Makefile.user](Makefile.user) file at the root of MFC's 
+source tree to specify the paths to those packages' binaries and header files, 
+as well as to supply additional command line arguments.
+
+Variable           | Description
+------------------ | ---
+`FC`               | Binary to execute to compile and preprocess Fortran files.
+`FFLAGS`           | Command-line arguments to supply to your Fortran compiler of choice.
+`lapack_lib_dir`   | Path to the [Lapack](http://www.netlib.org/lapack/)'s install location.
+`fftw_lib_dir`     | Path to the parent folder containing [FFTW](https://www.fftw.org/)'s binaries (/lib).
+`fftw_include_dir` | Path to the parent folder containing [FFTW](https://www.fftw.org/)'s header files (/include).
+`silo_lib_dir`     | Path to the parent folder containing [Silo](https://wci.llnl.gov/simulation/computer-codes/silo)'s binaries (/lib).
+`silo_include_dir` | Path to the parent folder containing [Silo](https://wci.llnl.gov/simulation/computer-codes/silo)'s header files (/include).
+
+You can now run `make -j <num_threads>` on MFC to build it, and check your installation by running tests with `make tests`.
+
+```
+make -j <num_threads>
+make tests
+```
 
 # Running
 
@@ -179,26 +174,32 @@ Example Python input files can be found in the
 `example_cases` directories, and they are called `input.py`.
 Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in `example_cases/3d_sphbubcollapse`.
+can also be found in [example_cases/3d_sphbubcollapse/](example_cases/3D_sphbubcollapse/)
 MFC can be executed as  
-`python pre_process`
+
+```
+python pre_process
+```
 
 which will generate the restart and grid files that will be read 
 by the simulation code. Then  
-`python simulation`
+
+```
+python simulation
+```
 
 will execute the flow solver. The last (optional) step
 is to post treat the data files and output HDF5 databases
 for the flow variables via  
-`python post_process`
 
-Note that the post-processing step 
-requires installation of Silo and HDF5.
+```
+python post_process
+```
 
 # License
  
 Copyright 2021.
-MFC is under the MIT license (see LICENSE file for full text).
+MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 # Acknowledgements
  
