@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  ci_main:
+  CI:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,19 +17,16 @@ jobs:
 
       - name: Fetch Aptitude Dependencies
         run: |
-          sudo apt install -y tar wget make gcc clang python3 openmpi-* python-dev
+          sudo apt install -y tar wget make gcc clang python3 openmpi-* python python-dev python3-dev
 
-      - name: Fetch & Install Dependencies (/installers)
+      - name: Fetch & Install Dependencies (/dependencies)
         run: |
-          cd installers
-          sh ./install_fftw.sh   -j 4
-          sh ./install_lapack.sh -j 4
-          sh ./install_hdf5.sh   -j 4
-          sh ./install_silo.sh   -j 4
+          cd dependencies
+          ./install.sh -j $(nproc)
           cd ..
       
       - name: Build MFC
-        run: make -j 4
+        run: make -j $(nproc)
       
       - name: Run MFC Tests
         run: make test
