@@ -2,7 +2,7 @@ include Makefile.user
 
 default: all
 
-include installers/Makefile.messages
+include Makefile.messages
 
 all: pre_process simulation post_process
 
