@@ -100,7 +100,7 @@ Operating Systems and package managers,
 
 Package Manager                                            | Suggested Command 
 ---                                                        | ---
-[Aptitude](https://wiki.debian.org/Aptitude) (Debian-like) | `sudo apt install tar wget make gcc g++ python3 openmpi-* python3-dev`
+[Aptitude](https://wiki.debian.org/Aptitude) (Debian-like) | `sudo apt install tar wget make gcc g++ python3 openmpi-* python python-dev python3-dev`
 [Homebrew](https://brew.sh/) (macOS)                       | `brew install wget make python open-mpi make gcc`
 
 The following commands fetch and build the required dependencies to to the
