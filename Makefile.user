@@ -19,14 +19,14 @@ FFLAGS = -cpp -c -w -Ofast
 #NOTE: Cray compilers require: -eZ
 
 ######### LAPACK library location #########
-lapack_lib_dir = $(MFC_DIR)/lib/lapack/
+lapack_lib_dir = $(MFC_DIR)/dependencies/LAPACK/
 
 ######### FFTW library and include locations #########
 ######### Set these to the location of FFTW  #########
 
 ## For the FFTW included in the MFC package
-fftw_lib_dir     = $(MFC_DIR)/lib/fftw/lib
-fftw_include_dir = $(MFC_DIR)/lib/fftw/include
+fftw_lib_dir     = $(MFC_DIR)/dependencies/FFTW3/lib
+fftw_include_dir = $(MFC_DIR)/dependencies/FFTW3/include
 
 ## Other possible locatins [only use absolute paths]
 #fftw_lib_dir = /usr/local/lib
@@ -37,8 +37,8 @@ fftw_include_dir = $(MFC_DIR)/lib/fftw/include
 ######### Set these to the location of Silo  #########
 #########   [  only use absolute paths   ]   #########
 
-silo_lib_dir     = $(MFC_DIR)/lib/silo/lib
-silo_include_dir = $(MFC_DIR)/lib/silo/include
+silo_lib_dir     = $(MFC_DIR)/dependencies/SILO/lib
+silo_include_dir = $(MFC_DIR)/dependencies/SILO/include
 
 #silo_lib_dir = /home/spencer/packages/silo-4.10.2/lib
 #silo_include_dir = /home/spencer/packages/silo-4.10.2/include
