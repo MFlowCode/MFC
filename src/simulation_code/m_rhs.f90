@@ -730,11 +730,7 @@ contains
 
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
-        real(kind(0d0)) :: rho_K
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: rho_K_field
-        real(kind(0d0)) :: gamma_K, pi_inf_K
-        real(kind(0d0)), dimension(2) :: Re_K
+
 
         integer :: i, j, k, l, r, ii !< Generic loop iterators
 
@@ -753,6 +749,9 @@ contains
             q_prim_qp%vf(i)%sf => q_prim_vf(i)%sf
 !$acc enter data attach(q_cons_qp%vf(i)%sf,q_prim_qp%vf(i)%sf)
         end do
+        
+        !print *, q_cons_qp%vf(E_idx)%sf(102,0,0)
+        !print *, q_cons_qp%vf(mom_idx%beg)%sf(102,0,0)
 
         call s_populate_conservative_variables_buffers()
 
@@ -761,6 +760,13 @@ contains
         ! Converting Conservative to Primitive Variables ===================
         iv%beg = 1; iv%end = adv_idx%end
 !$acc update device(iv)
+
+        do i = iv%beg, iv%end
+!$acc update device(q_cons_qp%vf(i)%sf)
+        end do
+
+        !print *, q_cons_qp%vf(E_idx)%sf(102,0,0)
+        !print *, q_cons_qp%vf(mom_idx%beg)%sf(102,0,0)
 
         !convert conservative variables to primitive
         !   (except first and last, \alpha \rho and \alpha)
@@ -771,12 +777,6 @@ contains
             ix, iy, iz)
 
 
-        iv%beg = mom_idx%beg; iv%end = E_idx
-!$acc update device(iv)
-
-        do i = 1, sys_size
-!$acc update device(q_prim_qp%vf(i)%sf)
-        end do
 
 
         if (t_step == t_step_stop) return
@@ -804,6 +804,12 @@ contains
                 i)
             call nvtxEndRange
 
+            if(i == 1) then 
+              do j = mom_idx%beg, E_idx
+!$acc update host(q_prim_qp%vf(j)%sf)
+              end do
+            end if
+
             do j = iv%beg, iv%end
 !$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf)
             end do
@@ -812,6 +818,8 @@ contains
             print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50,50,0)
             print *, qR_prim_n(i)%vf(E_idx)%sf(50,50,0)
             print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50,50,0)
+
+
 
     
 
@@ -846,6 +854,8 @@ contains
 
             iv%beg = 1; iv%end = adv_idx%end
             ! ===============================================================
+
+
 
             if (i == 1) then
             ! RHS Contribution in x-direction
@@ -918,6 +928,7 @@ contains
             end if  ! i loop
         end do
         ! END: Dimensional Splitting Loop ==================================
+
         ! Disassociation of Working Variables ==============================
         do i = 1, sys_size
             nullify (q_cons_qp%vf(i)%sf, q_prim_qp%vf(i)%sf)

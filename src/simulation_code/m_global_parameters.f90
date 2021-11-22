@@ -107,7 +107,7 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
-!$acc declare create(weno_polyn)
+!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -148,6 +148,7 @@ module m_global_parameters
     integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
+!$acc declare create(sys_size, E_idx, gamma_idx, pi_inf_idx, alf_idx)
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -208,6 +209,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)) :: rhoref, pref
     !> @}
+!$acc declare create(rhoref, pref)
 
     !> @name Bubble modeling
     !> @{
@@ -234,6 +236,8 @@ module m_global_parameters
     integer         :: nmomsp !< Number of moments required by ensemble-averaging
     integer         :: nmomtot !< Total number of carried moments moments/transport equations
     integer         :: R0_type
+
+!$acc declare create(nb,weight,bubbles)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -929,6 +933,8 @@ contains
         real(kind(0.d0)) :: nR3
         integer :: i
 
+!$acc routine seq
+
         call s_quad(nRtmp**3d0, nR3)
 
         if (nR3 < 0d0) then
@@ -938,13 +944,13 @@ contains
             ! END IF
             ! END DO
             ! nR3 = 1.d-12
-            print *, vftmp, nR3, nRtmp(:)
+            !print *, vftmp, nR3, nRtmp(:)
             stop 'nR3 is negative'
         end if
         if (vftmp < 0d0) then
             ! vftmp = small_alf
             ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
-            print *, vftmp, nR3, nRtmp(:)
+            !print *, vftmp, nR3, nRtmp(:)
             stop 'vf negative'
         end if
 
@@ -984,7 +990,7 @@ contains
         !! @param func is the bubble dynamic variables for each bin
         !! @param mom is the computed moment
     subroutine s_quad(func, mom)
-
+!$acc routine seq
         real(kind(0.d0)), dimension(nb), intent(IN) :: func
         real(kind(0.d0)), intent(OUT) :: mom
 
