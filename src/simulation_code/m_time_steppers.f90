@@ -152,6 +152,16 @@ contains
             end do
         end if
 
+        do i = 1, cont_idx%end
+            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
+        end do
+
+        do i = adv_idx%beg, adv_idx%end
+            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
+        end do
+
         ! Allocating the cell-average RHS variables
         allocate (rhs_vf(1:sys_size))
 
@@ -176,16 +186,10 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
+        do i = 1, sys_size
+!$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
-
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
         if (DEBUG) print *, 'got rhs'
@@ -205,7 +209,6 @@ contains
             q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) = &
                 q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
                 + dt*rhs_vf(i)%sf
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
 
         !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
@@ -216,16 +219,7 @@ contains
         
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        do i = 1, cont_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
 
-
-        do i = adv_idx%beg, adv_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
 
         ! ==================================================================
 
@@ -439,6 +433,18 @@ contains
     subroutine s_finalize_time_steppers_module() ! -------------------------
 
         integer :: i, j !< Generic loop iterators
+
+
+        do i = 1, cont_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
+            q_prim_vf(i)%sf => null()
+        end do
+
+
+        do i = adv_idx%beg, adv_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
+            q_prim_vf(i)%sf => null()
+        end do
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts

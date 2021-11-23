@@ -174,7 +174,16 @@ contains
         ! decomposed, in the coordinate direction of WENO reconstruction
         allocate (vL_rs_vf_x(1:sys_size), vR_rs_vf_x(1:sys_size))
 
-
+        do i = 1, sys_size
+            allocate (vL_rs_vf_x(i)%sf(is1%beg:is1%end, &
+                                     is2%beg:is2%end, &
+                                     is3%beg:is3%end))
+            allocate (vR_rs_vf_x(i)%sf(is1%beg:is1%end, &
+                                     is2%beg:is2%end, &
+                                     is3%beg:is3%end))
+!$acc enter data create(vL_rs_vf_x(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+!$acc enter data create(vR_rs_vf_x(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+        end do
 
 
 
@@ -653,7 +662,7 @@ contains
             ! WENO3 ============================================================
         elseif (weno_order == 3) then
             if(weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
                 do i = 1, v_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -717,7 +726,7 @@ contains
                 end do
 
             elseif(weno_dir == 2) then 
-!$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
                 do i = 1, v_size
                     do l = is3%beg, is3%end
                         do k = is1%beg, is1%end
@@ -781,7 +790,7 @@ contains
                 end do
 
             elseif(weno_dir == 3) then 
-!$acc parallel loop collapse(4) default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
                 do i = 1, v_size
                     do l = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -851,11 +860,12 @@ contains
             ! WENO5 ============================================================
         else
             if(weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
-                do i = 1, v_size
+!$acc parallel loop collapse(3) gang vector default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+!$acc loop seq
+                                do i = 1, v_size
 
                                 dvd(1) = v_rs_ws_x(2)%vf(i)%sf(j, k, l) &
                                          - v_rs_ws_x(1)%vf(i)%sf(j, k, l)
@@ -951,7 +961,7 @@ contains
                 end do
 
             elseif(weno_dir == 2) then
-!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+!$acc parallel loop collapse(4) gang vector default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
                 do i = 1, v_size
                     do l = is3%beg, is3%end
                         do k = is1%beg, is1%end
@@ -1051,7 +1061,7 @@ contains
                 end do                
 
             else
-!$acc parallel loop collapse(4) default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+!$acc parallel loop collapse(4) gang vector default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
                 do i = 1, v_size
                     do l = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -1193,17 +1203,10 @@ contains
         v_size = ubound(v_vf, 1)
 
 
-        if(weno_dir == 1) then
-            do i = 1, v_size
-                vL_rs_vf_x(i)%sf => vL_vf(i)%sf
-                vR_rs_vf_x(i)%sf => vR_vf(i)%sf
-!$acc enter data attach(vL_rs_vf_x(i)%sf, vR_rs_vf_x(i)%sf)
-            end do
-        end if
-        
+
         ! Reshaping/Projecting onto Characteristic Fields in x-direction ===
         if(weno_dir == 1) then
-!$acc parallel loop collapse(5) default(present)  
+!$acc parallel loop collapse(5) gang vector default(present)  
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do m = is3%beg, is3%end
@@ -1223,7 +1226,7 @@ contains
             ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
         if(n == 0) return
         if(weno_dir == 2) then
-!$acc parallel loop collapse(5) default(present)  
+!$acc parallel loop collapse(5) gang vector default(present)  
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do m = is3%beg, is3%end
@@ -1246,7 +1249,7 @@ contains
             ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
         if(p == 0) return 
         if(weno_dir == 3) then  
-!$acc parallel loop collapse(5) default(present)  
+!$acc parallel loop collapse(5) gang vector default(present)  
             do i = -weno_polyn, weno_polyn
                 do j = 1, v_size
                     do m = is1%beg, is1%end
@@ -1471,7 +1474,7 @@ contains
 
 
         if (weno_dir == 2) then
-!$acc parallel loop collapse(4) default(present)  
+!$acc parallel loop collapse(4) gang vector default(present)  
             do j = 1, v_size
                 do m = is3%beg, is3%end
                     do l = is2%beg, is2%end
@@ -1484,7 +1487,7 @@ contains
             end do
 !$acc end parallel loop
         elseif (weno_dir == 3) then
-!$acc parallel loop collapse(4) default(present)  
+!$acc parallel loop collapse(4) gang vector default(present)  
             do j = 1, v_size
                 do m = is3%beg, is3%end
                     do l = is2%beg, is2%end
@@ -1495,18 +1498,20 @@ contains
                     end do
                 end do
             end do
+        elseif (weno_dir == 1) then
+!$acc parallel loop collapse(4) gang vector default(present)  
+            do j = 1, v_size
+                do m = is3%beg, is3%end
+                    do l = is2%beg, is2%end
+                        do k = is1%beg, is1%end
+                            vL_vf(j)%sf(k, l, m) = vL_rs_vf_x(j)%sf(k, l, m)
+                            vR_vf(j)%sf(k, l, m) = vR_rs_vf_x(j)%sf(k, l, m)
+                        end do 
+                    end do
+                end do
+            end do            
         end if
         ! ==================================================================
-
-        !!! This might not be necessary but I've put it in for convenience
-
-
-        if(weno_dir == 1) then
-            do i = 1, v_size
-!$acc exit data detach(vL_rs_vf_x(i)%sf, vR_rs_vf_x(i)%sf)
-                nullify(vL_rs_vf_x(i)%sf,vR_rs_vf_x(i)%sf)
-            end do
-        end if
         
 
     end subroutine s_finalize_weno ! ---------------------------------------

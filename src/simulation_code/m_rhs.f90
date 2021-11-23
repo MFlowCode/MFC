@@ -163,6 +163,10 @@ module m_rhs
     type(scalar_field) :: alf_sum
     !> @}
 
+    real(kind(0d0)) :: momxb, momxe
+    real(kind(0d0)) :: contxb, contxe
+    real(kind(0d0)) :: advxb, advxe
+
     character(50) :: file_path !< Local file path for saving debug files
 
 !$acc declare create(q_cons_qp,q_prim_qp,qL_cons_n,qR_cons_n,qL_prim_n,qR_prim_n,  &
@@ -170,7 +174,7 @@ module m_rhs
 !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
 !$acc   tau_Re_vf,iv,ix, iy, iz,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src,         &
-!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum)
+!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe)
 
 contains
 
@@ -211,6 +215,32 @@ contains
         allocate (q_cons_qp%vf(1:sys_size))
         allocate (q_prim_qp%vf(1:sys_size))
 !$acc enter data create(q_cons_qp%vf(1:sys_size),q_prim_qp%vf(1:sys_size))
+
+        do l = 1, sys_size
+          allocate(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+!$acc enter data create(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        end do
+
+        do l = mom_idx%beg, E_idx
+          allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+!$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        end do
+
+        do l = 1, cont_idx%end
+            q_prim_qp%vf(l)%sf => &
+                q_cons_qp%vf(l)%sf
+!$acc enter data attach(q_prim_qp%vf(l)%sf)
+        end do
+
+
+        do l = adv_idx%beg, adv_idx%end
+            q_prim_qp%vf(l)%sf => &
+                q_cons_qp%vf(l)%sf
+!$acc enter data attach(q_prim_qp%vf(l)%sf)
+        end do
+
+
+
         ! ==================================================================
 
         if (qbmm) then
@@ -685,6 +715,13 @@ contains
 
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, sys_size, E_idx)
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
@@ -744,37 +781,39 @@ contains
 
 
         ! Association/Population of Working Variables ======================
+!$acc parallel loop collapse(4) default(present)
         do i = 1, sys_size
-            q_cons_qp%vf(i)%sf => q_cons_vf(i)%sf
-            q_prim_qp%vf(i)%sf => q_prim_vf(i)%sf
-!$acc enter data attach(q_cons_qp%vf(i)%sf,q_prim_qp%vf(i)%sf)
+          do l = iz%beg, iz%end
+            do k = iy%beg, iy%end
+              do j = ix%beg, ix%end
+                q_cons_qp%vf(i)%sf(j,k,l) = q_cons_vf(i)%sf(j,k,l)
+              end do
+            end do
+          end do
         end do
         
-        !print *, q_cons_qp%vf(E_idx)%sf(102,0,0)
-        !print *, q_cons_qp%vf(mom_idx%beg)%sf(102,0,0)
 
+
+
+        call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
+        call nvtxEndRange
 
         ! ==================================================================
 
-        ! Converting Conservative to Primitive Variables ===================
-        iv%beg = 1; iv%end = adv_idx%end
-!$acc update device(iv)
+        ! Converting Conservative to Primitive Variables ==================
 
-        do i = iv%beg, iv%end
-!$acc update device(q_cons_qp%vf(i)%sf)
-        end do
 
-        !print *, q_cons_qp%vf(E_idx)%sf(102,0,0)
-        !print *, q_cons_qp%vf(mom_idx%beg)%sf(102,0,0)
 
         !convert conservative variables to primitive
         !   (except first and last, \alpha \rho and \alpha)
+        call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
             ix, iy, iz)
+        call nvtxEndRange
 
 
 
@@ -805,8 +844,8 @@ contains
             call nvtxEndRange
 
             if(i == 1) then 
-              do j = mom_idx%beg, E_idx
-!$acc update host(q_prim_qp%vf(j)%sf)
+              do j = 1, sys_size
+!$acc update host(q_prim_qp%vf(j)%sf, q_cons_qp%vf(j)%sf)
               end do
             end if
 
@@ -814,11 +853,22 @@ contains
 !$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf)
             end do
 
-            print *, qL_prim_n(i)%vf(E_idx)%sf(50,50,0)
-            print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50,50,0)
-            print *, qR_prim_n(i)%vf(E_idx)%sf(50,50,0)
-            print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50,50,0)
-
+            !if(num_dims == 4) then
+            !  print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+            !  print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+            !  print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+            !  print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+            !elseif(num_dims == 5) then
+            !  print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+            !  print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
+            !  print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+            !  print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
+            !elseif(num_dims == 6) then
+            !  print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+            !  print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
+            !  print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+            !  print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
+            !end if   
 
 
     
@@ -927,12 +977,8 @@ contains
                 end do
             end if  ! i loop
         end do
-        ! END: Dimensional Splitting Loop ==================================
+        ! END: Dimensional Splitting Loop ================================== 
 
-        ! Disassociation of Working Variables ==============================
-        do i = 1, sys_size
-            nullify (q_cons_qp%vf(i)%sf, q_prim_qp%vf(i)%sf)
-        end do
         ! ==================================================================
 
     end subroutine s_compute_rhs ! -----------------------------------------
@@ -3182,38 +3228,53 @@ contains
 
         if (bc_x%beg <= -3) then         ! Ghost-cell extrap. BC at beginning
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
-                do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(0, 0:n, 0:p)
+              do l = 0, p
+                do k = 0, n                
+                  do j = 1, buff_size
+                    q_cons_qp%vf(i)%sf(-j, k, l) = &
+                        q_cons_qp%vf(i)%sf(0, k, l)
+                  end do
                 end do
-            end do
+              end do
+           end do
 
         elseif (bc_x%beg == -2) then     ! Symmetry BC at beginning
 
-            do j = 1, buff_size
+!$acc parallel loop collapse(3) default(present)
+                do l = 0, p 
+                  do k = 0, n
+                    do j = 1, buff_size
+!$acc loop seq
+                    do i = 1, contxe
+                      q_cons_qp%vf(i)%sf(-j, k, l) = &
+                        q_cons_qp%vf(i)%sf(j - 1, k, l)
+                    end do
 
-                do i = 1, cont_idx%end
-                    q_cons_qp%vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
 
-                q_cons_qp%vf(mom_idx%beg)%sf(-j, 0:n, 0:p) = &
-                    -q_cons_qp%vf(mom_idx%beg)%sf(j - 1, 0:n, 0:p)
-
-                do i = mom_idx%beg + 1, sys_size
-                    q_cons_qp%vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-
+                    q_cons_qp%vf(momxb)%sf(-j, k, l) = &
+                        -q_cons_qp%vf(momxb)%sf(j - 1, k, l)
+!$acc loop seq
+                      do i = momxb + 1, sys_size
+                          q_cons_qp%vf(i)%sf(-j, k, l) = &
+                              q_cons_qp%vf(i)%sf(j - 1, k, l)
+                      end do
+               end do
+             end do
             end do
 
         elseif (bc_x%beg == -1) then     ! Periodic BC at beginning
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
-                do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(m - (j - 1), 0:n, 0:p)
+                do l = 0, p
+                  do k = 0, n
+                    do j = 1, buff_size
+                    q_cons_qp%vf(i)%sf(-j, k, l) = &
+                        q_cons_qp%vf(i)%sf(m - (j - 1),k, l)
+                      end do
+                    end do
                 end do
             end do
 
@@ -3226,40 +3287,57 @@ contains
 
         if (bc_x%end <= -3) then         ! Ghost-cell extrap. BC at end
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
-                do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(m, 0:n, 0:p)
+              do l = 0, p
+                do k = 0, n  
+                  do j = 1, buff_size
+                    q_cons_qp%vf(i)%sf(m + j, k, l) = &
+                        q_cons_qp%vf(i)%sf(m, k, l)
+                  end do
                 end do
             end do
+          end do
 
         elseif (bc_x%end == -2) then     ! Symmetry BC at end
 
-            do j = 1, buff_size
+!$acc parallel loop collapse(3) default(present)
+         do l = 0, p
+            do k = 0, n 
+              do j = 1, buff_size
 
-                do i = 1, cont_idx%end
-                    q_cons_qp%vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(m - (j - 1), 0:n, 0:p)
+!$acc loop seq
+                do i = 1, contxe
+                    q_cons_qp%vf(i)%sf(m + j, k, l) = &
+                        q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
                 end do
 
-                q_cons_qp%vf(mom_idx%beg)%sf(m + j, 0:n, 0:p) = &
-                    -q_cons_qp%vf(mom_idx%beg)%sf(m - (j - 1), 0:n, 0:p)
+                q_cons_qp%vf(momxb)%sf(m + j, k, l) = &
+                    -q_cons_qp%vf(momxb)%sf(m - (j - 1), k, l)
 
-                do i = mom_idx%beg + 1, sys_size
-                    q_cons_qp%vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(m - (j - 1), 0:n, 0:p)
+!$acc loop seq
+                do i = momxb + 1, sys_size
+                    q_cons_qp%vf(i)%sf(m + j, k, l) = &
+                        q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
                 end do
 
+              end do
             end do
+          end do
 
         elseif (bc_x%end == -1) then     ! Periodic BC at end
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
-                do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_qp%vf(i)%sf(j - 1, 0:n, 0:p)
+              do l = 0, p
+                do k = 0, n
+                  do j = 1, buff_size
+                    q_cons_qp%vf(i)%sf(m + j, k, l) = &
+                        q_cons_qp%vf(i)%sf(j - 1, k, l)
                 end do
             end do
+          end do
+        end do
 
         else                            ! Processor BC at end
 
@@ -3278,80 +3356,99 @@ contains
 
         elseif (bc_y%beg <= -3 .and. bc_y%beg /= -13) then     ! Ghost-cell extrap. BC at beginning
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
+              do k = 0, p
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, -j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, 0, 0:p)
-                end do
+                  do l = 0, m
+                    q_cons_qp%vf(i)%sf(l, -j, k) = &
+                        q_cons_qp%vf(i)%sf(l, 0, k)
+                  end do
+              end do
             end do
+          end do
 
         elseif (bc_y%beg == -13) then    ! Axis BC at beginning
 
-            do j = 1, buff_size
-                do k = 0, p
+!$acc parallel loop collapse(3) default(present)            
+              do k = 0, p
+                do j = 1, buff_size
+                  do l = 0, m
                     if (z_cc(k) < pi) then
-                        do i = 1, mom_idx%beg
-                            q_cons_qp%vf(i)%sf(:, -j, k) = &
-                                q_cons_qp%vf(i)%sf(:, j - 1, k + ((p + 1)/2))
+!$acc loop seq
+                        do i = 1, momxb
+                            q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                q_cons_qp%vf(i)%sf(l, j - 1, k + ((p + 1)/2))
                         end do
 
-                        q_cons_qp%vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                            -q_cons_qp%vf(mom_idx%beg + 1)%sf(:, j - 1, k + ((p + 1)/2))
+                        q_cons_qp%vf(momxb + 1)%sf(l, -j, k) = &
+                            -q_cons_qp%vf(momxb + 1)%sf(l, j - 1, k + ((p + 1)/2))
 
-                        q_cons_qp%vf(mom_idx%end)%sf(:, -j, k) = &
-                            -q_cons_qp%vf(mom_idx%end)%sf(:, j - 1, k + ((p + 1)/2))
+                        q_cons_qp%vf(momxe)%sf(l, -j, k) = &
+                            -q_cons_qp%vf(momxe)%sf(l, j - 1, k + ((p + 1)/2))
 
+!$acc loop seq
                         do i = E_idx, sys_size
-                            q_cons_qp%vf(i)%sf(:, -j, k) = &
-                                q_cons_qp%vf(i)%sf(:, j - 1, k + ((p + 1)/2))
+                            q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                q_cons_qp%vf(i)%sf(l, j - 1, k + ((p + 1)/2))
                         end do
                     else
-                        do i = 1, mom_idx%beg
-                            q_cons_qp%vf(i)%sf(:, -j, k) = &
-                                q_cons_qp%vf(i)%sf(:, j - 1, k - ((p + 1)/2))
+!$acc loop seq                      
+                        do i = 1, momxb
+                            q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                q_cons_qp%vf(i)%sf(l, j - 1, k - ((p + 1)/2))
                         end do
 
-                        q_cons_qp%vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                            -q_cons_qp%vf(mom_idx%beg + 1)%sf(:, j - 1, k - ((p + 1)/2))
+                        q_cons_qp%vf(momxb + 1)%sf(l, -j, k) = &
+                            -q_cons_qp%vf(momxb + 1)%sf(l, j - 1, k - ((p + 1)/2))
 
-                        q_cons_qp%vf(mom_idx%end)%sf(:, -j, k) = &
-                            -q_cons_qp%vf(mom_idx%end)%sf(:, j - 1, k - ((p + 1)/2))
+                        q_cons_qp%vf(momxe)%sf(l, -j, k) = &
+                            -q_cons_qp%vf(momxe)%sf(l, j - 1, k - ((p + 1)/2))
 
+!$acc loop seq
                         do i = E_idx, sys_size
-                            q_cons_qp%vf(i)%sf(:, -j, k) = &
-                                q_cons_qp%vf(i)%sf(:, j - 1, k - ((p + 1)/2))
+                            q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                q_cons_qp%vf(i)%sf(l, j - 1, k - ((p + 1)/2))
                         end do
                     end if
                 end do
             end do
+          end do
 
         elseif (bc_y%beg == -2) then     ! Symmetry BC at beginning
-
+!$acc parallel loop collapse(3) default(present) 
+          do k = 0, p
             do j = 1, buff_size
-
-                do i = 1, mom_idx%beg
-                    q_cons_qp%vf(i)%sf(:, -j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, j - 1, 0:p)
+              do l = 0, m
+!$acc loop seq 
+                do i = 1, momxb
+                    q_cons_qp%vf(i)%sf(l, -j, k) = &
+                        q_cons_qp%vf(i)%sf(l, j - 1, k)
                 end do
 
-                q_cons_qp%vf(mom_idx%beg + 1)%sf(:, -j, 0:p) = &
-                    -q_cons_qp%vf(mom_idx%beg + 1)%sf(:, j - 1, 0:p)
-
-                do i = mom_idx%beg + 2, sys_size
-                    q_cons_qp%vf(i)%sf(:, -j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, j - 1, 0:p)
+                q_cons_qp%vf(momxb + 1)%sf(l, -j, k) = &
+                    -q_cons_qp%vf(momxb + 1)%sf(l, j - 1, k)
+!$acc loop seq
+                do i = momxb + 2, sys_size
+                    q_cons_qp%vf(i)%sf(l, -j, k) = &
+                        q_cons_qp%vf(i)%sf(l, j - 1, k)
                 end do
-
+              end do
             end do
+          end do
 
         elseif (bc_y%beg == -1) then     ! Periodic BC at beginning
-
+!$acc parallel loop collapse(4) default(present)       
             do i = 1, sys_size
+              do k = 0, p
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, -j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, n - (j - 1), 0:p)
+                  do l = 0, m
+                    q_cons_qp%vf(i)%sf(l, -j, k) = &
+                        q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
                 end do
             end do
+          end do
+        end do
 
         else                            ! Processor BC at beginning
 
@@ -3361,41 +3458,53 @@ contains
         end if
 
         if (bc_y%end <= -3) then         ! Ghost-cell extrap. BC at end
-
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
+              do k = 0, p
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, n + j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, n, 0:p)
+                  do l = 0, m
+                    q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                        q_cons_qp%vf(i)%sf(l, n, k)
                 end do
             end do
+          end do
+        end do
 
         elseif (bc_y%end == -2) then     ! Symmetry BC at end
 
+!$acc parallel loop collapse(3) default(present)
+          do k = 0, p
             do j = 1, buff_size
-
-                do i = 1, mom_idx%beg
-                    q_cons_qp%vf(i)%sf(:, n + j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, n - (j - 1), 0:p)
+              do l = 0, m
+!$acc loop seq                
+                do i = 1, momxb
+                    q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                        q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
                 end do
 
-                q_cons_qp%vf(mom_idx%beg + 1)%sf(:, n + j, 0:p) = &
-                    -q_cons_qp%vf(mom_idx%beg + 1)%sf(:, n - (j - 1), 0:p)
-
-                do i = mom_idx%beg + 2, sys_size
-                    q_cons_qp%vf(i)%sf(:, n + j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, n - (j - 1), 0:p)
+                q_cons_qp%vf(momxb + 1)%sf(l, n + j, k) = &
+                    -q_cons_qp%vf(momxb + 1)%sf(l, n - (j - 1), k)
+!$acc loop seq
+                do i = momxb + 2, sys_size
+                    q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                        q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
                 end do
-
+              end do
             end do
+          end do
 
         elseif (bc_y%end == -1) then     ! Periodic BC at end
-
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
+              do k = 0, p
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, n + j, 0:p) = &
-                        q_cons_qp%vf(i)%sf(:, j - 1, 0:p)
+                  do l = 0, m
+                    q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                        q_cons_qp%vf(i)%sf(l, j - 1, k)
                 end do
             end do
+          end do
+        end do
 
         else                            ! Processor BC at end
 
@@ -3414,40 +3523,53 @@ contains
 
         elseif (bc_z%beg <= -3) then     ! Ghost-cell extrap. BC at beginning
 
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, :, -j) = &
-                        q_cons_qp%vf(i)%sf(:, :, 0)
+                  do l = 0, n
+                    do k = 0, m
+                    q_cons_qp%vf(i)%sf(k, l, -j) = &
+                        q_cons_qp%vf(i)%sf(k, l, 0)
                 end do
+              end do
             end do
+          end do
 
         elseif (bc_z%beg == -2) then     ! Symmetry BC at beginning
 
+!$acc parallel loop collapse(3) default(present)                    
             do j = 1, buff_size
-
-                do i = 1, mom_idx%beg + 1
-                    q_cons_qp%vf(i)%sf(:, :, -j) = &
-                        q_cons_qp%vf(i)%sf(:, :, j - 1)
+              do l = 0, n
+                do k = 0, m
+!$acc loop seq                  
+                  do i = 1, momxb + 1
+                    q_cons_qp%vf(i)%sf(k, l, -j) = &
+                        q_cons_qp%vf(i)%sf(k, l, j - 1)
                 end do
 
-                q_cons_qp%vf(mom_idx%end)%sf(:, :, -j) = &
-                    -q_cons_qp%vf(mom_idx%end)%sf(:, :, j - 1)
-
+                q_cons_qp%vf(momxe)%sf(k, l, -j) = &
+                    -q_cons_qp%vf(momxe)%sf(k, l, j - 1)
+!$acc loop seq
                 do i = E_idx, sys_size
-                    q_cons_qp%vf(i)%sf(:, :, -j) = &
-                        q_cons_qp%vf(i)%sf(:, :, j - 1)
+                    q_cons_qp%vf(i)%sf(k, l, -j) = &
+                        q_cons_qp%vf(i)%sf(k, l, j - 1)
                 end do
-
+              end do
             end do
+          end do
 
         elseif (bc_z%beg == -1) then     ! Periodic BC at beginning
-
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, :, -j) = &
-                        q_cons_qp%vf(i)%sf(:, :, p - (j - 1))
+                  do l = 0, n 
+                    do k = 0, m
+                    q_cons_qp%vf(i)%sf(k, l, -j) = &
+                        q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
                 end do
+              end do
             end do
+          end do
 
         else                            ! Processor BC at beginning
 
@@ -3457,40 +3579,51 @@ contains
         end if
 
         if (bc_z%end <= -3) then         ! Ghost-cell extrap. BC at end
-
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, :, p + j) = &
-                        q_cons_qp%vf(i)%sf(:, :, p)
+                  do l = 0, n
+                    do k = 0, m
+                    q_cons_qp%vf(i)%sf(k, l, p + j) = &
+                        q_cons_qp%vf(i)%sf(k, l, p)
                 end do
             end do
+          end do
+        end do
 
         elseif (bc_z%end == -2) then     ! Symmetry BC at end
-
+!$acc parallel loop collapse(3) default(present)
             do j = 1, buff_size
+              do l = 0, n 
+                do k = 0, m
+!$acc loop seq                  
+                  do i = 1, momxb + 1
+                      q_cons_qp%vf(i)%sf(k, l , p + j) = &
+                          q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
+                  end do
 
-                do i = 1, mom_idx%beg + 1
-                    q_cons_qp%vf(i)%sf(:, :, p + j) = &
-                        q_cons_qp%vf(i)%sf(:, :, p - (j - 1))
+                  q_cons_qp%vf(momxe)%sf(k, l, p + j) = &
+                      -q_cons_qp%vf(momxe)%sf(k, l, p - (j - 1))
+!$acc loop seq
+                  do i = E_idx, sys_size
+                      q_cons_qp%vf(i)%sf(k, l, p + j) = &
+                          q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
+                  end do
                 end do
-
-                q_cons_qp%vf(mom_idx%end)%sf(:, :, p + j) = &
-                    -q_cons_qp%vf(mom_idx%end)%sf(:, :, p - (j - 1))
-
-                do i = E_idx, sys_size
-                    q_cons_qp%vf(i)%sf(:, :, p + j) = &
-                        q_cons_qp%vf(i)%sf(:, :, p - (j - 1))
-                end do
-
+              end do
             end do
 
         elseif (bc_z%end == -1) then     ! Periodic BC at end
-
+!$acc parallel loop collapse(4) default(present)
             do i = 1, sys_size
                 do j = 1, buff_size
-                    q_cons_qp%vf(i)%sf(:, :, p + j) = &
-                        q_cons_qp%vf(i)%sf(:, :, j - 1)
+                  do l = 0, n 
+                    do k = 0, m
+                    q_cons_qp%vf(i)%sf(k, l, p + j) = &
+                        q_cons_qp%vf(i)%sf(k, l, j - 1)
+                    end do
                 end do
+              end do
             end do
 
         else                            ! Processor BC at end
@@ -3660,6 +3793,21 @@ contains
     subroutine s_finalize_rhs_module() ! -----------------------------------
 
         integer :: i, j, k, l !< Generic loop iterators
+
+        do j = cont_idx%beg, cont_idx%end
+!$acc exit data detach(q_prim_qp%vf(j)%sf)
+          nullify(q_prim_qp%vf(j)%sf)
+        end do
+
+        do j = adv_idx%beg, adv_idx%end
+!$acc exit data detach(q_prim_qp%vf(j)%sf)          
+          nullify(q_prim_qp%vf(j)%sf)
+        end do
+
+        do j = mom_idx%beg, E_idx
+          deallocate(q_cons_qp%vf(j)%sf)
+          deallocate(q_prim_qp%vf(j)%sf)
+        end do
 
         deallocate (q_cons_qp%vf, q_prim_qp%vf)
 
