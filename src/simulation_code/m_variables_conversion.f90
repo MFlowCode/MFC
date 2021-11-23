@@ -131,6 +131,8 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:) :: nRtmp
 !$acc declare create(nbub, nRtmp)
 
+
+
     procedure(s_convert_abstract_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
     !! Pointer to the procedure utilized to convert either the mixture or the
@@ -330,12 +332,10 @@ contains
 
     subroutine s_convert_species_to_mixture_variables_acc( rho_K, &
                                                       gamma_K, pi_inf_K, &
-                                                      Re_K, alpha_K, alpha_rho_K,  k, l, r)
+                                                       alpha_K, alpha_rho_K,  k, l, r)
 !$acc routine seq
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
-
-        real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
 
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
@@ -360,30 +360,16 @@ contains
             pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
         end do
 
-        ! Computing the shear and bulk Reynolds numbers from species analogs
-        do i = 1, 2
-
-            Re_K(i) = -1d6; !if (Re_size(i) > 0) Re_K(i) = 0d0
-
-            !do j = 1, Re_size(i)
-            !    Re_K(i) = alpha_K(Re_idx(i, j))/fluid_pp(Re_idx(i, j))%Re(i) &
-            !              + Re_K(i)
-            !end do
-
-            Re_K(i) = 1d0/max(Re_K(i), 1d-16)
-
-        end do
 
     end subroutine s_convert_species_to_mixture_variables_acc ! ----------------
 
     subroutine s_convert_species_to_mixture_variables_bubbles_acc( rho_K, &
                                                       gamma_K, pi_inf_K, &
-                                                      Re_K, alpha_K, alpha_rho_K,  k, l, r)
+                                                       alpha_K, alpha_rho_K,  k, l, r)
 !$acc routine seq
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
 
-        real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
 
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
@@ -486,8 +472,26 @@ contains
         advxb = adv_idx%beg; advxe = adv_idx%end
 !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe)
 
+        ixb = -buff_size
+        ixe = m - ixb
+
+        iyb = 0; iye = 0; izb = 0; ize = 0;
+
+        if(n > 0) then
+            iyb = -buff_size
+            iye = n - iyb
+        end if
+
+        if(p > 0) then
+            izb = -buff_size
+            ize = p - izb
+        end if
+
+!$acc update device(ixb, ixe, iyb, iye, izb, ize)
+        
         allocate(gammas(1:num_fluids))
         allocate(pi_infs(1:num_fluids))
+
         allocate(bubrs(1:nb))
 
         do i = 1, num_fluids
@@ -549,23 +553,14 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
+        real(kind(0d0)),   dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
-        real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
-        real(kind(0d0)), dimension(2) :: Re_K
-
 
         integer :: i, j, k, l !< Generic loop iterators
 
 
-
-        ixb = ix%beg; ixe = ix%end
-        iyb = iy%beg; iye = iy%end
-        izb = iz%beg; ize = iz%end
-!$acc update device(ixb,ixe,iyb,iye,izb,ize)
-
-
         if((model_eqns .ne. 4) .and. (bubbles .neqv. .true.)) then 
-!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K, Re_K, dyn_pres_K, alpha_K, alpha_rho_K)
+!$acc parallel loop collapse(3) default(present) private( alpha_K, alpha_rho_K)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
@@ -577,7 +572,7 @@ contains
                         end do
 
 
-                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, Re_K, alpha_K, alpha_rho_K, j, k, l)
+                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, alpha_rho_K, j, k, l)
 
 
 !$acc loop seq
@@ -596,7 +591,7 @@ contains
             end do
 !$acc end parallel loop 
         elseif((model_eqns .ne. 4)) then 
-!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K, Re_K, dyn_pres_K, nRtmp, nbub)
+!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K, nRtmp, nbub)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
@@ -607,7 +602,7 @@ contains
                             alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                         end do
 
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, Re_K, alpha_K, alpha_rho_K, j, k, l)
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K,  alpha_K, alpha_rho_K, j, k, l)
 !$acc loop seq
                         do i = momxb, momxe
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -644,7 +639,7 @@ contains
             end do
 !$acc end parallel loop 
         else 
-!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K, Re_K, dyn_pres_K)
+!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
