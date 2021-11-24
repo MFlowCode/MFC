@@ -74,6 +74,8 @@ program p_main
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
 
+
+
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
@@ -102,6 +104,14 @@ program p_main
     call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
+!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
+!$acc update device(sys_size, buff_size)
+!$acc update device(m, n, p)
+    do i = 1, sys_size
+!$acc update device(q_cons_ts(1)%vf(i)%sf)
+    end do
+
+
     ! Populating the buffers of the grid variables using the boundary conditions
     call s_populate_grid_variables_buffers()
 
@@ -115,11 +125,7 @@ program p_main
 
     call s_initialize_derived_variables()
 
-!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
-!$acc update device(m, n, p)
-    do i = 1, sys_size
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
-    end do
+
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start

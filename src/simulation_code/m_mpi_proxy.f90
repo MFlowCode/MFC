@@ -1090,7 +1090,7 @@ contains
                 if (bc_x%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_x%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                       do l = 0, p
                         do k = 0, n
@@ -1105,6 +1105,7 @@ contains
 
 !$acc update host(q_cons_buff_send)
 
+
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
@@ -1118,7 +1119,7 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_x%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                       do l = 0, p
                           do k = 0, n
@@ -1148,7 +1149,7 @@ contains
 !$acc update device(q_cons_buff_recv)
 
                 ! Unpacking buffer received from bc_x%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                 do i = 1, sys_size
                   do l = 0, p
                       do k = 0, n
@@ -1165,7 +1166,7 @@ contains
 
                 if (bc_x%beg >= 0) then      ! PBC at the end and beginning
 
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                     ! Packing buffer to be sent to bc_x%beg
                   do i = 1, sys_size
                     do l = 0, p
@@ -1194,7 +1195,7 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_x%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -1224,7 +1225,7 @@ contains
 !$acc update device(q_cons_buff_recv)
 
                 ! Unpacking buffer received from bc_x%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
               do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
@@ -1248,7 +1249,7 @@ contains
                 if (bc_y%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_y%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = 0, p
                         do k = n - buff_size + 1, n
@@ -1277,7 +1278,7 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_y%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = 0, p
                         do k = 0, buff_size - 1
@@ -1308,7 +1309,7 @@ contains
 !$acc update device(q_cons_buff_recv)
 
                 ! Unpacking buffer received from bc_y%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
               do i = 1, sys_size
                 do l = 0, p
                     do k = -buff_size, -1
@@ -1327,7 +1328,7 @@ contains
                 if (bc_y%beg >= 0) then      ! PBC at the end and beginning
 
                     ! Packing buffer to be sent to bc_y%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = 0, p
                         do k = 0, buff_size - 1
@@ -1356,7 +1357,7 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_y%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = 0, p
                         do k = n - buff_size + 1, n
@@ -1387,7 +1388,7 @@ contains
 !$acc update device(q_cons_buff_recv)
 
                 ! Unpacking buffer received form bc_y%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
               do i = 1, sys_size
                 do l = 0, p
                     do k = n + 1, n + buff_size
@@ -1412,7 +1413,7 @@ contains
                 if (bc_z%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_z%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size 
                     do l = p - buff_size + 1, p
                         do k = -buff_size, n + buff_size
@@ -1445,7 +1446,7 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_z%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                  do i = 1, sys_size
                     do l = 0, buff_size - 1
                         do k = -buff_size, n + buff_size
@@ -1478,7 +1479,7 @@ contains
 !$acc update device(q_cons_buff_recv)
 
                 ! Unpacking buffer from bc_z%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
               do i = 1, sys_size
                 do l = -buff_size, -1
                     do k = -buff_size, n + buff_size
@@ -1498,7 +1499,7 @@ contains
                 if (bc_z%beg >= 0) then      ! PBC at the end and beginning
 
                     ! Packing buffer to be sent to bc_z%beg
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = 0, buff_size - 1
                         do k = -buff_size, n + buff_size
@@ -1530,7 +1531,7 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_z%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                   do i = 1, sys_size
                     do l = p - buff_size + 1, p
                         do k = -buff_size, n + buff_size
@@ -1564,7 +1565,7 @@ contains
 !$acc update device(q_cons_buff_recv)
 
                 ! Unpacking buffer received from bc_z%end
-!$acc parallel loop collapse(4) default(present) private(r)
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
               do i = 1, sys_size
                 do l = p + 1, p + buff_size
                     do k = -buff_size, n + buff_size
