@@ -33,6 +33,7 @@ example_cases/*/silo*
 example_cases/*/restart*
 example_cases/*/*.out
 example_cases/*/binary
+example_cases/*/*.qdrep
 lib/fftw-3.3.8
 lib/lapack-3.4.2
 stashed_cases/
