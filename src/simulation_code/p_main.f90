@@ -50,7 +50,7 @@ program p_main
 
     implicit none
 
-    integer :: t_step !< Iterator for the time-stepping loop
+    integer :: t_step, i !< Iterator for the time-stepping loop
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
@@ -114,6 +114,12 @@ program p_main
     call s_initialize_cbc_module()
 
     call s_initialize_derived_variables()
+
+!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
+!$acc update device(m, n, p)
+    do i = 1, sys_size
+!$acc update device(q_cons_ts(1)%vf(i)%sf)
+    end do
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start

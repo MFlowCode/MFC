@@ -170,6 +170,7 @@ contains
 !$acc enter data create(rhs_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
+
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_open_run_time_information_file()
@@ -183,13 +184,9 @@ contains
 
         integer, intent(IN) :: t_step
 
-        integer :: i !< Generic loop iterator
+        integer :: i,j,k,l !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-
-        do i = 1, sys_size
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
-        end do
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
         if (DEBUG) print *, 'got rhs'
@@ -205,10 +202,18 @@ contains
 
         if (t_step == t_step_stop) return
 
+
+!$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
-            q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                + dt*rhs_vf(i)%sf
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do 
+                end do 
+            end do
         end do
 
         !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)

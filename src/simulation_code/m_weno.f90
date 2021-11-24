@@ -860,12 +860,11 @@ contains
             ! WENO5 ============================================================
         else
             if(weno_dir == 1) then
-!$acc parallel loop collapse(3) gang vector default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
-                    do l = is3%beg, is3%end
+!$acc parallel loop collapse(4) gang vector default(present) private(dvd,beta,poly_L,poly_R,omega_L,omega_R,alpha_L,alpha_R)
+                  do i = 1, v_size 
+                    do l = is3%beg, is3%end                                       
                         do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-!$acc loop seq
-                                do i = 1, v_size
+                            do j = is1%beg, is1%end                                                                                                
 
                                 dvd(1) = v_rs_ws_x(2)%vf(i)%sf(j, k, l) &
                                          - v_rs_ws_x(1)%vf(i)%sf(j, k, l)

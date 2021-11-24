@@ -76,6 +76,8 @@ module m_global_parameters
 
     real(kind(0d0)) :: dt !< Size of the time-step
 
+!$acc declare create(x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
     !> @{
