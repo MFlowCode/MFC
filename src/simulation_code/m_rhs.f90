@@ -906,7 +906,7 @@ contains
             ! ===============================================================
 
             do j = 1, sys_size
-!$acc update device(flux_n(i)%vf(j)%sf,flux_src_n(i)%vf(j)%sf)
+!$acc update device(flux_n(i)%vf(j)%sf,flux_src_n(i)%vf(j)%sf,flux_gsrc_n(i)%vf%sf)
             end do
 
 
