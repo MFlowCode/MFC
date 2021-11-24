@@ -707,7 +707,7 @@ contains
                         flux_src_n(1)%vf(l)%sf
                     flux_gsrc_n(i)%vf(l)%sf => &
                         flux_gsrc_n(1)%vf(l)%sf
-!$acc enter data attach(flux_src_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf,flux_gsrc_n(i)%vf(l)%sf)
+!$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf,flux_gsrc_n(i)%vf(l)%sf)
                 end do
 
             end if
@@ -769,7 +769,7 @@ contains
 
 
 
-        integer :: i, j, k, l, r, ii !< Generic loop iterators
+        integer :: i, j, k, l, r, q,  ii !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -845,7 +845,7 @@ contains
 
             if(i == 1) then 
               do j = 1, sys_size
-!$acc update host(q_prim_qp%vf(j)%sf, q_cons_qp%vf(j)%sf)
+!$acc update host(q_prim_qp%vf(j)%sf)
               end do
             end if
 
@@ -853,21 +853,21 @@ contains
 !$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf)
             end do
 
-            !if(num_dims == 4) then
-            !  print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
-            !  print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
-            !  print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
-            !  print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
-            !elseif(num_dims == 5) then
-            !  print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
-            !  print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
-            !  print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
-            !  print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
-            !elseif(num_dims == 6) then
-            !  print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-            !  print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
-            !  print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-            !  print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
+            !if(num_dims == 1) then
+              !print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+              !print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+              !print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+              !print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+            !elseif(num_dims == 2) then
+              !print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+              !print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
+              !print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+              !print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
+            !elseif(num_dims == 3) then
+              !print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+              !print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
+              !print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+              !print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
             !end if   
 
 
@@ -905,76 +905,109 @@ contains
             iv%beg = 1; iv%end = adv_idx%end
             ! ===============================================================
 
+            do j = 1, sys_size
+!$acc update device(flux_n(i)%vf(j)%sf,flux_src_n(i)%vf(j)%sf)
+            end do
 
 
             if (i == 1) then
             ! RHS Contribution in x-direction
 
                 ! Applying the Riemann fluxes
+!$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
-                    do k = 0, m
-                        rhs_vf(j)%sf(k, :, :) = 1d0/dx(k)* &
-                            (flux_n(i)%vf(j)%sf(k - 1, 0:n, 0:p) &
-                             - flux_n(i)%vf(j)%sf(k, 0:n, 0:p))
+                  do q = 0, p
+                    do l = 0, n
+                      do k = 0, m
+                        rhs_vf(j)%sf(k, l, q) = 1d0/dx(k)* &
+                            (flux_n(1)%vf(j)%sf(k - 1, l, q) &
+                             - flux_n(1)%vf(j)%sf(k, l, q))
+                          end do 
+                        end do
                     end do
                 end do
 
                 ! Applying source terms to the RHS of the advection equations
-                do j = adv_idx%beg, adv_idx%end
-                    do k = 0, m
-                        rhs_vf(j)%sf(k, :, :) = &
-                            rhs_vf(j)%sf(k, :, :) + 1d0/dx(k)* &
-                            q_cons_qp%vf(j)%sf(k, 0:n, 0:p)* &
-                            (flux_src_n(i)%vf(j)%sf(k, 0:n, 0:p) &
-                             - flux_src_n(i)%vf(j)%sf(k - 1, 0:n, 0:p))
+!$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
+                  do q = 0, p
+                    do l = 0, n                  
+                      do k = 0, m
+                        rhs_vf(j)%sf(k, l, q) = &
+                            rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
+                            q_cons_qp%vf(j)%sf(k, l, q)* &
+                            (flux_src_n(1)%vf(j)%sf(k, l, q) &
+                             - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
                     end do
+                  end do 
                 end do
+              end do
+
+
             elseif (i == 2) then
             ! RHS Contribution in y-direction ===============================
-
                 ! Applying the Riemann fluxes
+!$acc parallel loop collapse(4) gang vector default(present)                
                 do j = 1, sys_size
+                  do l = 0, p
                     do k = 0, n
-                        rhs_vf(j)%sf(:, k, :) = &
-                            rhs_vf(j)%sf(:, k, :) + 1d0/dy(k)* &
-                            (flux_n(i)%vf(j)%sf(0:m, k - 1, 0:p) &
-                             - flux_n(i)%vf(j)%sf(0:m, k, 0:p))
+                      do q = 0, m
+                        rhs_vf(j)%sf(q, k, l) = &
+                            rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                            (flux_n(2)%vf(j)%sf(q, k - 1, l) &
+                             - flux_n(2)%vf(j)%sf(q, k, l))
+                      end do
                     end do
+                  end do
                 end do
-
                 ! Applying source terms to the RHS of the advection equations
-                do j = adv_idx%beg, adv_idx%end
+!$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
+                  do l = 0, p
                     do k = 0, n
-                        rhs_vf(j)%sf(:, k, :) = &
-                            rhs_vf(j)%sf(:, k, :) + 1d0/dy(k)* &
-                            q_cons_qp%vf(j)%sf(0:m, k, 0:p)* &
-                            (flux_src_n(i)%vf(j)%sf(0:m, k, 0:p) &
-                             - flux_src_n(i)%vf(j)%sf(0:m, k - 1, 0:p))
+                      do q = 0, m  
+                      rhs_vf(j)%sf(q, k, l) = &
+                            rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                            q_cons_qp%vf(j)%sf(q, k, l)* &
+                            (flux_src_n(2)%vf(j)%sf(q, k, l) &
+                             - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
                     end do
+                  end do
                 end do
+              end do
             elseif (i == 3) then
             ! RHS Contribution in z-direction ===============================
 
                 ! Applying the Riemann fluxes
+!$acc parallel loop collapse(4) gang vector default(present) 
                 do j = 1, sys_size
                     do k = 0, p
-                        rhs_vf(j)%sf(:, :, k) = &
-                            rhs_vf(j)%sf(:, :, k) + 1d0/dz(k)* &
-                            (flux_n(i)%vf(j)%sf(0:m, 0:n, k - 1) &
-                             - flux_n(i)%vf(j)%sf(0:m, 0:n, k))
+                      do q = 0, n
+                        do l = 0, m
+                        rhs_vf(j)%sf(l, q, k) = &
+                            rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                            (flux_n(3)%vf(j)%sf(l, q, k - 1) &
+                             - flux_n(3)%vf(j)%sf(l, q, k))
                     end do
+                  end do
                 end do
-
+              end do
                 ! Applying source terms to the RHS of the advection equations
-                do j = adv_idx%beg, adv_idx%end
+!$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
                     do k = 0, p
-                        rhs_vf(j)%sf(:, :, k) = &
-                            rhs_vf(j)%sf(:, :, k) + 1d0/dz(k)* &
-                            q_cons_qp%vf(j)%sf(0:m, 0:n, k)* &
-                            (flux_src_n(i)%vf(j)%sf(0:m, 0:n, k) &
-                             - flux_src_n(i)%vf(j)%sf(0:m, 0:n, k - 1))
-                    end do
-                end do
+                      do q = 0, n
+                        do l = 0, m
+                        rhs_vf(j)%sf(l, q, k) = &
+                            rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                            q_cons_qp%vf(j)%sf(l, q, k)* &
+                            (flux_src_n(3)%vf(j)%sf(l, q, k) &
+                             - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
+                      end do
+                  end do
+                end do 
+              end do 
+  
             end if  ! i loop
         end do
         ! END: Dimensional Splitting Loop ================================== 
