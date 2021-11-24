@@ -560,7 +560,7 @@ contains
 
 
         if((model_eqns .ne. 4) .and. (bubbles .neqv. .true.)) then 
-!$acc parallel loop collapse(3) default(present) private( alpha_K, alpha_rho_K)
+!$acc parallel loop collapse(3) gang vector default(present) private( alpha_K, alpha_rho_K)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
@@ -591,7 +591,7 @@ contains
             end do
 !$acc end parallel loop 
         elseif((model_eqns .ne. 4)) then 
-!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K, nRtmp, nbub)
+!$acc parallel loop collapse(3) gang vector default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K, nRtmp, nbub)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
@@ -639,7 +639,7 @@ contains
             end do
 !$acc end parallel loop 
         else 
-!$acc parallel loop collapse(3) default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K)
+!$acc parallel loop collapse(3) gang vector default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe

@@ -150,7 +150,7 @@ module m_global_parameters
     integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
-!$acc declare create(sys_size, E_idx, gamma_idx, pi_inf_idx, alf_idx)
+
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -174,6 +174,8 @@ module m_global_parameters
     !! The number of cells that are necessary to be able to store enough boundary
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
+
+!$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 

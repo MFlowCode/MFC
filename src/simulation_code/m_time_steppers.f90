@@ -188,6 +188,8 @@ contains
 
         ! Stage 1 of 1 =====================================================
 
+        call nvtxStartRange("Time_Step")
+
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
         if (DEBUG) print *, 'got rhs'
 
@@ -224,7 +226,7 @@ contains
         
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-
+        call nvtxEndRange
 
         ! ==================================================================
 
