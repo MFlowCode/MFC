@@ -40,6 +40,7 @@ module m_riemann_solvers
  s_riemann_solver, &
  s_hll_riemann_solver, &
  s_hllc_riemann_solver, &
+ s_hllc_riemann_solver_acc, &
  s_exact_riemann_solver, &
  s_finalize_riemann_solvers_module
 
@@ -120,9 +121,10 @@ module m_riemann_solvers
         !!  @param i First coordinate location index
         !!  @param j Second coordinate location index
         !!  @param k Third coordinate location index
-        subroutine s_compute_abstract_average_state(i, j, k)
-
+        subroutine s_compute_abstract_average_state(qL_prim_rs_vf, qR_prim_rs_vf,i, j, k)
+            import :: scalar_field, bounds_info, sys_size
             integer, intent(IN) :: i, j, k
+            type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
 
         end subroutine s_compute_abstract_average_state
 
@@ -178,15 +180,28 @@ module m_riemann_solvers
 
     end interface ! ============================================================
 
+    type(scalar_field), allocatable, dimension(:) :: qL_prim_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: qR_prim_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: flux_rs_vf, flux_src_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rs_vf !<
+    type(scalar_field), allocatable, dimension(:) :: vel_src_rs_vf
+
+
     !> The left (L) and right (R) WENO-reconstructed cell-boundary values of the
     !! cell-average primitive variables that define the left and right states of
     !! the Riemann problem. Variables qK_prim_rs_vf, K = L or R, are obtained by
     !! reshaping (RS) qK_prim_vf in a coordinate direction that is normal to the
     !! cell-boundaries along which the fluxes are to be determined.
     !> @{
-    type(scalar_field), allocatable, dimension(:) :: qL_prim_rs_vf
-    type(scalar_field), allocatable, dimension(:) :: qR_prim_rs_vf
-    type(scalar_field), allocatable, dimension(:) :: q_prim_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: qL_prim_rsx_vf
+    type(scalar_field), allocatable, dimension(:) :: qR_prim_rsx_vf
+
+    type(scalar_field), allocatable, dimension(:) :: qL_prim_rsy_vf
+    type(scalar_field), allocatable, dimension(:) :: qR_prim_rsy_vf
+
+    type(scalar_field), allocatable, dimension(:) :: qL_prim_rsz_vf
+    type(scalar_field), allocatable, dimension(:) :: qR_prim_rsz_vf
+
     !> @}
 
 
@@ -195,17 +210,25 @@ module m_riemann_solvers
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
     !! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
     !> @{
-    type(scalar_field), allocatable, dimension(:) :: flux_rs_vf, flux_src_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: flux_rsx_vf, flux_src_rsx_vf
+   type(scalar_field), allocatable, dimension(:) :: flux_rsy_vf, flux_src_rsy_vf
+   type(scalar_field), allocatable, dimension(:) :: flux_rsz_vf, flux_src_rsz_vf
+
     !> @}
 
-    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rs_vf !<
+    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rsx_vf !<
+   type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rsy_vf !<
+   type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rsz_vf !<
+
     !! The cell-boundary values of the geometrical source flux that are computed
     !! through the chosen Riemann problem solver by using the left and right
     !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
-    type(scalar_field), allocatable, dimension(:) :: vel_src_rs_vf
+    type(scalar_field), allocatable, dimension(:) :: vel_src_rsx_vf
+   type(scalar_field), allocatable, dimension(:) :: vel_src_rsy_vf
+   type(scalar_field), allocatable, dimension(:) :: vel_src_rsz_vf
 
     !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
     !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
@@ -228,6 +251,10 @@ module m_riemann_solvers
     real(kind(0d0)), dimension(2)   ::        Re_L, Re_R
     real(kind(0d0)), allocatable, dimension(:)   ::     tau_e_L, tau_e_R
 
+!$acc declare create(alpha_rho_L, alpha_rho_R,rho_L, rho_R,vel_L, vel_R,pres_L, pres_R, &
+!$acc    E_L, E_R, H_L, H_R, alpha_L, alpha_R, Y_L, Y_R, gamma_L, gamma_R,pi_inf_L, pi_inf_R, &
+!$acc    c_L, c_R,Re_L, Re_R,tau_e_L, tau_e_R)
+
     !> @}
 
     !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
@@ -243,6 +270,7 @@ module m_riemann_solvers
     real(kind(0d0)), allocatable, dimension(:, :) ::       moms_L, moms_R
     real(kind(0d0))                              ::     ptilde_L, ptilde_R
     !> @}
+!$acc declare create(nbub_L, nbub_R, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, moms_L, moms_R, ptilde_L, ptilde_R )
 
     !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
     !> @{
@@ -277,7 +305,8 @@ module m_riemann_solvers
     !> @{
     real(kind(0d0)) :: dpres_L, dpres_R
     !> @}
-
+!$acc declare create(pres_S, vel_S, alpha_IC, alpha_rho_IC, vel_IC, pres_IC, E_IC, rho_IC, tau_e_IC, dpres_L, dpres_R)
+   
     !> @name Roe or arithmetic average density, velocity, enthalpy, volume fractions,
     !! specific heat ratio function, speed of sound, shear and volume Reynolds
     !! numbers, Weber numbers and curvatures, at the cell-boundaries, computed
@@ -290,6 +319,10 @@ module m_riemann_solvers
     real(kind(0d0))                                 :: gamma_avg
     real(kind(0d0))                                 :: c_avg
     type(scalar_field), allocatable, dimension(:)   :: Re_avg_rs_vf
+    type(scalar_field), allocatable, dimension(:)   :: Re_avg_rsx_vf
+    type(scalar_field), allocatable, dimension(:)   :: Re_avg_rsy_vf
+    type(scalar_field), allocatable, dimension(:)   :: Re_avg_rsz_vf        
+!$acc declare create(rho_avg, vel_avg, H_avg, alpha_avg_rs_vf, gamma_avg, c_avg, Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
     !> @}
 
     !> @name Left, right and star (S) region wave speeds
@@ -311,6 +344,8 @@ module m_riemann_solvers
     !> @{
     real(kind(0d0)) :: xi_M, xi_P
     !> @}
+
+!$acc declare create(s_L, s_R, s_S, rho_Star, E_Star, p_Star, p_K_Star, s_M, s_P, xi_M, xi_P)
 
     procedure(s_abstract_riemann_solver), &
         pointer :: s_riemann_solver => null() !<
@@ -337,8 +372,22 @@ module m_riemann_solvers
     !> @{
     type(bounds_info) :: is1, is2, is3
     !> @}
+!$acc declare create(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+!$acc    is1, is2, is3, flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf, vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
+!$acc    flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf)
 
+    real(kind(0d0)) :: momxb, momxe
+    real(kind(0d0)) :: contxb, contxe
+    real(kind(0d0)) :: advxb, advxe
+    real(kind(0d0)) :: bubxb, bubxe
+
+!$acc declare create(momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe)
+
+    real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs
+!$acc declare create(gammas, pi_infs)
+    
 contains
+
 
     !>  The procedure features the Harten, Lax and van Leer (HLL)
         !!      approximate Riemann solver algorithm, see Toro (1999) as
@@ -432,7 +481,7 @@ contains
             do k = is2%beg, is2%end
                 do j = is1%beg, is1%end
 
-                    call s_compute_average_state(j, k, l)
+                    call s_compute_average_state(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l)
 
                     call s_compute_wave_speeds(j, k, l)
 
@@ -668,7 +717,7 @@ contains
                 do j = is1%beg, is1%end
 
                     ! print*, 'about to get average state'
-                    call s_compute_average_state(j, k, l)
+                    call s_compute_average_state(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l)
                     ! print*, 'got average state'
 
                     call s_compute_wave_speeds(j, k, l)
@@ -1044,6 +1093,390 @@ contains
 
     end subroutine s_hllc_riemann_solver ! ---------------------------------
 
+        subroutine s_hllc_riemann_solver_acc(qL_prim_vf, dqL_prim_dx_vf, & ! ------
+                                     dqL_prim_dy_vf, &
+                                     dqL_prim_dz_vf, &
+                                     gm_alphaL_vf, &
+                                     qR_prim_vf, dqR_prim_dx_vf, &
+                                     dqR_prim_dy_vf, &
+                                     dqR_prim_dz_vf, &
+                                     gm_alphaR_vf, &
+                                     q_prim_vf, &
+                                     flux_vf, flux_src_vf, &
+                                     flux_gsrc_vf, &
+                                     norm_dir, ix, iy, iz)
+
+       type(scalar_field), &
+            dimension(sys_size), &
+            intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+
+        type(scalar_field), &
+            allocatable, dimension(:), &
+            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                             dqL_prim_dy_vf, dqR_prim_dy_vf, &
+                             dqL_prim_dz_vf, dqR_prim_dz_vf, &
+                             gm_alphaL_vf, gm_alphaR_vf
+
+        ! Intercell fluxes
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+
+        integer, intent(IN) :: norm_dir
+        type(bounds_info), intent(IN) :: ix, iy, iz
+
+
+        integer :: i, j, k, l !< Generic loop iterators
+
+        
+
+        ! Populating the buffers of the left and right Riemann problem
+        ! states variables, based on the choice of boundary conditions
+        call s_populate_riemann_states_variables_buffers( &
+            qL_prim_vf, dqL_prim_dx_vf, &
+            dqL_prim_dy_vf, &
+            dqL_prim_dz_vf, &
+            gm_alphaL_vf, &
+            qR_prim_vf, dqR_prim_dx_vf, &
+            dqR_prim_dy_vf, &
+            dqR_prim_dz_vf, &
+            gm_alphaR_vf, &
+            norm_dir, ix, iy, iz)
+
+        ! Reshaping inputted data based on dimensional splitting direction
+        call s_initialize_riemann_solver(qL_prim_vf, &
+                                         qR_prim_vf, &
+                                         q_prim_vf, &
+                                         flux_vf, flux_src_vf, &
+                                         flux_gsrc_vf, &
+                                         norm_dir, ix, iy, iz)
+
+        ! Computing HLLC flux and source flux for Euler system of equations
+
+        ! print*, 'xbounds are: ', is1%beg, is1%end
+        ! print*, 'ybounds are: ', is2%beg, is2%end
+        ! print*, 'zbounds are: ', is3%beg, is3%end
+!$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg)        
+        do l = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = is1%beg, is1%end
+
+                    ! print*, 'about to get average state'
+
+
+
+                    if(norm_dir == 1) then
+
+                        do i = 1, contxe
+                            alpha_rho_L(i) = qL_prim_rsx_vf(i)%sf(j, k, l)
+                            alpha_rho_R(i) = qR_prim_rsx_vf(i)%sf(j + 1, k, l)
+                        end do
+
+                        do i = 1, num_dims
+                            vel_L(i) = qL_prim_rsx_vf(contxe + i)%sf(j, k, l)
+                            vel_R(i) = qR_prim_rsx_vf(contxe + i)%sf(j + 1, k, l)
+                        end do
+
+                        do i = 1, num_fluids
+                            alpha_L(i) = qL_prim_rsx_vf(E_idx + i)%sf(j, k, l)
+                            alpha_R(i) = qR_prim_rsx_vf(E_idx + i)%sf(j + 1, k, l)
+                        end do
+
+                        pres_L = qL_prim_rsx_vf(E_idx)%sf(j, k, l)
+                        pres_R = qR_prim_rsx_vf(E_idx)%sf(j + 1, k, l)
+
+                        call s_compute_average_state(qL_prim_rsx_vf, qR_prim_rsx_vf,j, k, l)
+                        ! print*, 'got average state'
+
+                        call s_compute_wave_speeds(j, k, l)
+                        ! print*, 'got wave speeds'
+
+                        call s_hllc_solve(qL_prim_rsx_vf, qR_prim_rsx_vf, flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf, vel_src_rsx_vf, norm_dir, j, k, l)
+
+                    elseif(norm_dir == 2) then
+                        do i = 1, contxe
+                            alpha_rho_L(i) = qL_prim_rsy_vf(i)%sf(j, k, l)
+                            alpha_rho_R(i) = qR_prim_rsy_vf(i)%sf(j + 1, k, l)
+                        end do
+
+                        do i = 1, num_dims
+                            vel_L(i) = qL_prim_rsy_vf(contxe + i)%sf(j, k, l)
+                            vel_R(i) = qR_prim_rsy_vf(contxe + i)%sf(j + 1, k, l)
+                        end do
+
+                        do i = 1, num_fluids
+                            alpha_L(i) = qL_prim_rsy_vf(E_idx + i)%sf(j, k, l)
+                            alpha_R(i) = qR_prim_rsy_vf(E_idx + i)%sf(j + 1, k, l)
+                        end do
+
+                        pres_L = qL_prim_rsy_vf(E_idx)%sf(j, k, l)
+                        pres_R = qR_prim_rsy_vf(E_idx)%sf(j + 1, k, l)
+
+                        call s_compute_average_state(qL_prim_rsy_vf, qR_prim_rsy_vf,j, k, l)
+                        ! print*, 'got average state'
+
+                        call s_compute_wave_speeds(j, k, l)
+                        ! print*, 'got wave speeds'
+                        call s_hllc_solve(qL_prim_rsy_vf, qR_prim_rsy_vf, flux_rsy_vf, flux_src_rsy_vf, flux_gsrc_rsy_vf, vel_src_rsy_vf, norm_dir, j, k, l)
+
+                    else 
+                        do i = 1, contxe
+                            alpha_rho_L(i) = qL_prim_rsz_vf(i)%sf(j, k, l)
+                            alpha_rho_R(i) = qR_prim_rsz_vf(i)%sf(j + 1, k, l)
+                        end do
+
+                        do i = 1, num_dims
+                            vel_L(i) = qL_prim_rsz_vf(contxe + i)%sf(j, k, l)
+                            vel_R(i) = qR_prim_rsz_vf(contxe + i)%sf(j + 1, k, l)
+                        end do
+
+                        do i = 1, num_fluids
+                            alpha_L(i) = qL_prim_rsz_vf(E_idx + i)%sf(j, k, l)
+                            alpha_R(i) = qR_prim_rsz_vf(E_idx + i)%sf(j + 1, k, l)
+                        end do
+
+                        pres_L = qL_prim_rsz_vf(E_idx)%sf(j, k, l)
+                        pres_R = qR_prim_rsz_vf(E_idx)%sf(j + 1, k, l)
+
+                        call s_compute_average_state(qL_prim_rsz_vf, qR_prim_rsz_vf,j, k, l)
+                        ! print*, 'got average state'
+
+                        call s_compute_wave_speeds(j, k, l)
+                        ! print*, 'got wave speeds'
+                        call  s_hllc_solve(qL_prim_rsz_vf, qR_prim_rsz_vf, flux_rsz_vf, flux_src_rsz_vf, flux_gsrc_rsz_vf, vel_src_rsz_vf, norm_dir, j, k, l)
+
+                    end if
+                end do
+            end do
+        end do
+
+        if (any(Re_size > 0)) then
+            if (weno_Re_flux) then
+                call s_compute_viscous_source_flux( &
+                    qL_prim_vf(mom_idx%beg:mom_idx%end), &
+                    dqL_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                    dqL_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                    dqL_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                    qR_prim_vf(mom_idx%beg:mom_idx%end), &
+                    dqR_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                    dqR_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                    dqR_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                    flux_src_vf, norm_dir, ix, iy, iz)
+            else
+                call s_compute_viscous_source_flux( &
+                    q_prim_vf(mom_idx%beg:mom_idx%end), &
+                    dqL_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                    dqL_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                    dqL_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                    q_prim_vf(mom_idx%beg:mom_idx%end), &
+                    dqR_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                    dqR_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                    dqR_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                    flux_src_vf, norm_dir, ix, iy, iz)
+            end if
+        end if
+
+        call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
+                                       flux_gsrc_vf, &
+                                       norm_dir, ix, iy, iz)
+
+    end subroutine s_hllc_riemann_solver_acc ! ---------------------------------
+
+    subroutine s_hllc_solve(qL_prim_rs_vf, qR_prim_rs_vf, flux_rs_vf, flux_src_rs_vf, flux_gsrc_rs_vf, vel_src_rs_vf, norm_dir, j, k, l)
+!$acc routine seq
+       type(scalar_field), dimension(sys_size), intent(INOUT) :: qL_prim_rs_vf, qR_prim_rs_vf
+       type(scalar_field), dimension(sys_size), intent(OUT) :: flux_rs_vf, flux_src_rs_vf, flux_gsrc_rs_vf, vel_src_rs_vf
+        integer, intent(IN) :: norm_dir, j, k, l
+        real(kind(0d0)) :: xi_L, xi_R
+        integer :: i
+
+       ! follows Einfeldt et al.
+        ! s_M/P = min/max(0.,s_L/R)
+        s_M = min(0d0, s_L); s_P = max(0d0, s_R)
+
+        ! goes with q_star_L/R = xi_L/R * (variable)
+        ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
+        xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
+        xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+
+        ! goes with numerical velocity in x/y/z directions
+        ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
+        xi_M = (5d-1 + sign(5d-1, s_S))
+        xi_P = (5d-1 - sign(5d-1, s_S))
+
+
+        do i = 1, contxe
+            flux_rs_vf(i)%sf(j, k, l) = &
+                xi_M*alpha_rho_L(i) &
+                *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                + xi_P*alpha_rho_R(i) &
+                *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+        end do
+
+        if (bubbles .and. (model_eqns == 2) .and. (num_fluids > 1)) then
+            ! Kill mass transport @ gas density
+            flux_rs_vf(contxe)%sf(j, k, l) = 0.d0
+        end if
+
+        ! Momentum flux.
+        ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
+        if (bubbles .neqv. .true.) then
+            do i = 1, num_dims
+                flux_rs_vf(contxe + dir_idx(i))%sf(j, k, l) = &
+                    xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                 vel_L(dir_idx(i)) + &
+                                 s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                            (1d0 - dir_flg(dir_idx(i)))* &
+                                            vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                          dir_flg(dir_idx(i))*(pres_L)) &
+                    + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                   vel_R(dir_idx(i)) + &
+                                   s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                              (1d0 - dir_flg(dir_idx(i)))* &
+                                              vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                            dir_flg(dir_idx(i))*(pres_R))
+                ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+            end do
+        else
+            ! Include p_tilde
+            do i = 1, num_dims
+                flux_rs_vf(contxe + dir_idx(i))%sf(j, k, l) = &
+                    xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                 vel_L(dir_idx(i)) + &
+                                 s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                            (1d0 - dir_flg(dir_idx(i)))* &
+                                            vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                          dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
+                    + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                   vel_R(dir_idx(i)) + &
+                                   s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                              (1d0 - dir_flg(dir_idx(i)))* &
+                                              vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                            dir_flg(dir_idx(i))*(pres_R - ptilde_R))
+                ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+            end do
+
+        end if
+
+        ! Energy flux.
+        ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
+        if ((model_eqns .ne. 4) .and. bubbles) then
+            flux_rs_vf(E_idx)%sf(j, k, l) = &
+                xi_M*(vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + &
+                      s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                 (rho_L*s_S + (pres_L - ptilde_L)/ &
+                                  (s_L - vel_L(dir_idx(1))))) - E_L)) &
+                + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) + &
+                        s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                   (rho_R*s_S + (pres_R - ptilde_R)/ &
+                                    (s_R - vel_R(dir_idx(1))))) - E_R))
+        else if (model_eqns .ne. 4) then
+            flux_rs_vf(E_idx)%sf(j, k, l) = &
+                xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + &
+                      s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                 (rho_L*s_S + pres_L/ &
+                                  (s_L - vel_L(dir_idx(1))))) - E_L)) &
+                + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + &
+                        s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                   (rho_R*s_S + pres_R/ &
+                                    (s_R - vel_R(dir_idx(1))))) - E_R))
+        else
+            ! Tait EOS, no energy equation
+            flux_rs_vf(E_idx)%sf(j, k, l) = 0.d0
+        end if
+
+        ! Volume fraction flux
+        if (model_eqns == 4) then
+            do i = alf_idx, alf_idx !only advect the void fraction
+                flux_rs_vf(i)%sf(j, k, l) = &
+                    xi_M*qL_prim_rs_vf(i)%sf(j, k, l) &
+                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                    + xi_P*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+            end do
+        else
+            do i = advxb, advxe
+                flux_rs_vf(i)%sf(j, k, l) = &
+                    xi_M*qL_prim_rs_vf(i)%sf(j, k, l) &
+                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                    + xi_P*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+            end do
+        end if
+
+        ! Source for volume fraction advection equation
+        do i = 1, num_dims
+            vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = &
+                xi_M*(vel_L(dir_idx(i)) + &
+                      dir_flg(dir_idx(i))* &
+                      s_M*(xi_L - 1d0)) &
+                + xi_P*(vel_R(dir_idx(i)) + &
+                        dir_flg(dir_idx(i))* &
+                        s_P*(xi_R - 1d0))
+
+            if (model_eqns == 4) vel_src_rs_vf(dir_idx(i))%sf(j, k, l) = 0d0
+            !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+        end do
+
+        flux_src_rs_vf(advxb)%sf(j, k, l) = vel_src_rs_vf(dir_idx(1))%sf(j, k, l)
+
+        ! Add advection flux for bubble variables
+        if (bubbles) then
+            do i = bubxb, bubxe
+                flux_rs_vf(i)%sf(j, k, l) = &
+                    xi_M*nbub_L*qL_prim_rs_vf(i)%sf(j, k, l) &
+                    *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                    + xi_P*nbub_R*qR_prim_rs_vf(i)%sf(j + 1, k, l) &
+                    *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+            end do
+        end if
+
+
+        ! Geometrical source flux for cylindrical coordinates
+        if (norm_dir == 2 .and. cyl_coord) then
+            ! Substituting the advective flux into the inviscid geometrical source flux
+            do i = 1, E_idx
+                flux_gsrc_rs_vf(i)%sf(j, k, l) = flux_rs_vf(i)%sf(j, k, l)
+            end do
+            ! Recalculating the radial momentum geometric source flux
+            flux_gsrc_rs_vf(contxe + dir_idx(1))%sf(j, k, l) = &
+                xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                             vel_L(dir_idx(1)) + &
+                             s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                        (1d0 - dir_flg(dir_idx(1)))* &
+                                        vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                               vel_R(dir_idx(1)) + &
+                               s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                          (1d0 - dir_flg(dir_idx(1)))* &
+                                          vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+            ! Geometrical source of the void fraction(s) is zero
+            do i = advxb, advxe
+                flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
+            end do
+        elseif (norm_dir == 3 .and. grid_geometry == 3) then
+            do i = 1, sys_size
+                flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
+            end do
+            flux_gsrc_rs_vf(momxb + 1)%sf(j, k, l) = &
+                -xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                              vel_L(dir_idx(1)) + &
+                              s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
+                                         (1d0 - dir_flg(dir_idx(1)))* &
+                                         vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
+                - xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                               vel_R(dir_idx(1)) + &
+                               s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
+                                          (1d0 - dir_flg(dir_idx(1)))* &
+                                          vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+            flux_gsrc_rs_vf(momxe)%sf(j, k, l) = flux_rs_vf(momxb + 1)%sf(j, k, l)
+        else
+            do i = 1, sys_size
+                flux_gsrc_rs_vf(i)%sf(j, k, l) = 0d0
+            end do
+        end if
+    end subroutine s_hllc_solve
     !>  This procedure is the implementation of the exact Riemann
         !!      solver, see Toro (1999). The effects of viscosity and the
         !!      surface tension have been incorporated following the work
@@ -1242,7 +1675,7 @@ contains
         H_L = (E_L + pres_L)/rho_L
         H_R = (E_R + pres_R)/rho_R
 
-        call s_compute_mixture_sound_speeds(j, k, l)
+        call s_compute_mixture_sound_speeds(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l)
 
         do i = 1, 2
             if (Re_size(i) > 0) then
@@ -1281,8 +1714,9 @@ contains
         !! @param j  First coordinate index
         !! @param k Second coordinate index
         !! @param l  Third coordinate index
-    subroutine s_compute_mixture_sound_speeds(j, k, l) ! ---------------------
-
+    subroutine s_compute_mixture_sound_speeds(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l) ! ---------------------
+!$acc routine seq
+        type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for alternate sound speed
@@ -1290,40 +1724,33 @@ contains
         integer :: i !< Generic loop iterator
 
         if (alt_soundspeed) then
-            do i = 1, num_fluids
-                alpha_L(i) = qL_prim_rs_vf(E_idx + i)%sf(j, k, l)
-                alpha_R(i) = qR_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
-            end do
 
-            blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres_L + &
-                       fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-            blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres_L + &
-                       fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+
+            blkmod1 = ((gammas(1) + 1d0)*pres_L + &
+                       pi_infs(1))/gammas(1)
+            blkmod2 = ((gammas(2) + 1d0)*pres_L + &
+                       pi_infs(2))/gammas(2)
             c_L = 1d0/(rho_L*(alpha_L(1)/blkmod1 + alpha_L(2)/blkmod2))
 
-            blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres_R + &
-                       fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-            blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres_R + &
-                       fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+            blkmod1 = ((gammas(1) + 1d0)*pres_R + &
+                       pi_infs(1))/gammas(1)
+            blkmod2 = ((gammas(2) + 1d0)*pres_R + &
+                       pi_infs(2))/gammas(2)
             c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
 
         elseif (model_eqns == 3) then
             c_L = 0d0
             c_R = 0d0
             do i = 1, num_fluids
-                c_L = c_L + qL_prim_rs_vf(i + adv_idx%beg - 1)%sf(j, k, l)*(1d0/fluid_pp(i)%gamma + 1d0)* &
-                      (qL_prim_rs_vf(E_idx)%sf(j, k, l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma + 1d0))
-                c_R = c_R + qR_prim_rs_vf(i + adv_idx%beg - 1)%sf(j + 1, k, l)*(1d0/fluid_pp(i)%gamma + 1d0)* &
-                      (qR_prim_rs_vf(E_idx)%sf(j + 1, k, l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma + 1d0))
+                c_L = c_L + qL_prim_rs_vf(i + advxb - 1)%sf(j, k, l)*(1d0/gammas(i) + 1d0)* &
+                      (qL_prim_rs_vf(E_idx)%sf(j, k, l) + pi_infs(i)/(gammas(i) + 1d0))
+                c_R = c_R + qR_prim_rs_vf(i + advxb - 1)%sf(j + 1, k, l)*(1d0/gammas(i) + 1d0)* &
+                      (qR_prim_rs_vf(E_idx)%sf(j + 1, k, l) + pi_infs(i)/(gammas(i) + 1d0))
             end do
             c_L = c_L/rho_L
             c_R = c_R/rho_R
         elseif ((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles)) then
             ! Sound speed for bubble mmixture to order O(\alpha)
-            do i = 1, num_fluids
-                alpha_L(i) = qL_prim_rs_vf(E_idx + i)%sf(j, k, l)
-                alpha_R(i) = qR_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
-            end do
 
             if (mpp_lim .and. (num_fluids > 1)) then
                 c_L = (1d0/gamma_L + 1d0)* &
@@ -1341,10 +1768,7 @@ contains
                     (rho_R*(1d0 - alpha_R(num_fluids)))
             end if
         else
-            do i = 1, num_fluids
-                alpha_L(i) = qL_prim_rs_vf(E_idx + i)%sf(j, k, l)
-                alpha_R(i) = qR_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
-            end do
+
             c_L = ((H_L - 5d-1*sum(vel_L**2d0))/gamma_L)
             c_R = ((H_R - 5d-1*sum(vel_R**2d0))/gamma_R)
         end if
@@ -1780,33 +2204,23 @@ contains
         !! @param j  First coordinate index
         !! @param k Second coordinate index
         !! @param l  Third coordinate index
-    subroutine s_compute_roe_average_state(j, k, l) ! ---------------
-
+    subroutine s_compute_roe_average_state(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l) ! ---------------
+!$acc routine seq
+        type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
         integer, intent(IN) :: j, k, l
 
         integer :: i
 
         ! Left and Right Riemann Problem States ============================
-        do i = 1, cont_idx%end
-            alpha_rho_L(i) = qL_prim_rs_vf(i)%sf(j, k, l)
-            alpha_rho_R(i) = qR_prim_rs_vf(i)%sf(j + 1, k, l)
-        end do
 
-        do i = 1, num_dims
-            vel_L(i) = qL_prim_rs_vf(cont_idx%end + i)%sf(j, k, l)
-            vel_R(i) = qR_prim_rs_vf(cont_idx%end + i)%sf(j + 1, k, l)
-        end do
 
-        pres_L = qL_prim_rs_vf(E_idx)%sf(j, k, l)
-        pres_R = qR_prim_rs_vf(E_idx)%sf(j + 1, k, l)
-
-        call s_convert_to_mixture_variables(qL_prim_rs_vf, &
+        call s_convert_species_to_mixture_variables_acc( &
                                             rho_L, gamma_L, &
-                                            pi_inf_L, Re_L, &
+                                            pi_inf_L, alpha_L, alpha_rho_L, &
                                             j, k, l)
-        call s_convert_to_mixture_variables(qR_prim_rs_vf, &
+        call s_convert_species_to_mixture_variables_acc( &
                                             rho_R, gamma_R, &
-                                            pi_inf_R, Re_R, &
+                                            pi_inf_R, alpha_R, alpha_rho_R, &
                                             j + 1, k, l)
 
         E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*sum(vel_L**2d0)
@@ -1815,7 +2229,7 @@ contains
         H_L = (E_L + pres_L)/rho_L
         H_R = (E_R + pres_R)/rho_R
 
-        call s_compute_mixture_sound_speeds(j, k, l)
+        call s_compute_mixture_sound_speeds(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l)
 
         ! ==================================================================
 
@@ -1833,13 +2247,14 @@ contains
 
         if (mixture_err) then
             if ((H_avg - 5d-1*sum(vel_avg**2d0)) < 0d0) then
-                c_avg = sgm_eps
+                c_avg = 1d-16
             else
                 c_avg = sqrt((H_avg - 5d-1*sum(vel_avg**2d0))/gamma_avg)
             end if
         else
             c_avg = sqrt((H_avg - 5d-1*sum(vel_avg**2d0))/gamma_avg)
         end if
+
 
         do i = 1, 2
             if (Re_size(i) > 0) then
@@ -1859,7 +2274,9 @@ contains
         !!  @param j  First coordinate index
         !!  @param k Second coordinate index
         !!  @param l  Third coordinate index
-    subroutine s_compute_arithmetic_average_state(j, k, l) ! --------
+    subroutine s_compute_arithmetic_average_state(qL_prim_rs_vf, qR_prim_rs_vf, j, k, l) ! --------
+!$acc routine seq
+        type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
 
         integer, intent(IN) :: j, k, l
 
@@ -1871,15 +2288,8 @@ contains
         real(kind(0d0)) :: R3V2Lbar, R3V2Rbar
 
         ! Left and Right Riemann Problem States ============================
-        do i = 1, cont_idx%end
-            alpha_rho_L(i) = qL_prim_rs_vf(i)%sf(j, k, l)
-            alpha_rho_R(i) = qR_prim_rs_vf(i)%sf(j + 1, k, l)
-        end do
 
-        do i = 1, num_dims
-            vel_L(i) = qL_prim_rs_vf(cont_idx%end + i)%sf(j, k, l)
-            vel_R(i) = qR_prim_rs_vf(cont_idx%end + i)%sf(j + 1, k, l)
-        end do
+
 
         call s_convert_to_mixture_variables(qL_prim_rs_vf, &
                                             rho_L, gamma_L, &
@@ -1888,10 +2298,11 @@ contains
         call s_convert_to_mixture_variables(qR_prim_rs_vf, &
                                             rho_R, gamma_R, &
                                             pi_inf_R, Re_R, &
-                                            j + 1, k, l)
+                                              j + 1, k, l)
 
-        pres_L = qL_prim_rs_vf(E_idx)%sf(j, k, l)
-        pres_R = qR_prim_rs_vf(E_idx)%sf(j + 1, k, l)
+        
+
+
 
         E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*sum(vel_L**2d0)
         E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*sum(vel_R**2d0)
@@ -1900,85 +2311,85 @@ contains
         H_R = (E_R + pres_R)/rho_R
 
         ! Compute left/right states for bubble number density
-        if (bubbles) then
-            do i = 1, num_fluids
-                alpha_L(i) = qL_prim_rs_vf(E_idx + i)%sf(j, k, l)
-                alpha_R(i) = qR_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
-            end do
+!        if (bubbles) then
+!            do i = 1, num_fluids
+!                alpha_L(i) = qL_prim_rs_vf(E_idx + i)%sf(j, k, l)
+!                alpha_R(i) = qR_prim_rs_vf(E_idx + i)%sf(j + 1, k, l)
+!            end do!
+!
+!            do i = 1, nb
+!                R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j, k, l)
+!                R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j + 1, k, l)
+!
+ !               V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j, k, l)
+ !               V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j + 1, k, l)
+ !               if (.not. polytropic) then
+ !                   P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j, k, l)
+ !                   P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j + 1, k, l)
+ !               end if
+ !           end do
 
-            do i = 1, nb
-                R0_L(i) = qL_prim_rs_vf(bub_idx%rs(i))%sf(j, k, l)
-                R0_R(i) = qR_prim_rs_vf(bub_idx%rs(i))%sf(j + 1, k, l)
+!            call s_comp_n_from_prim(alpha_L(num_fluids), R0_L, nbub_L)
+!            call s_comp_n_from_prim(alpha_R(num_fluids), R0_R, nbub_R)
+!
+!            do i = 1, nb
+!                if (.not. qbmm) then
+!                    if (polytropic) then
+!                        pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
+!                        pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
+!                    else
+!                        pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
+!                        pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
+!                    end if
+!                end if
+!            end do
+!
+!            if (qbmm) then
+!                PbwR3Lbar = mom_sp(4)%sf(j, k, l)
+!                PbwR3Rbar = mom_sp(4)%sf(j + 1, k, l)
+!
+!                R3Lbar = mom_sp(1)%sf(j, k, l)
+!                R3Rbar = mom_sp(1)%sf(j + 1, k, l)
+!
+!                R3V2Lbar = mom_sp(3)%sf(j, k, l)
+!                R3V2Rbar = mom_sp(3)%sf(j + 1, k, l)
+!            else
+!                call s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
+!                call s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
 
-                V0_L(i) = qL_prim_rs_vf(bub_idx%vs(i))%sf(j, k, l)
-                V0_R(i) = qR_prim_rs_vf(bub_idx%vs(i))%sf(j + 1, k, l)
-                if (.not. polytropic) then
-                    P0_L(i) = qL_prim_rs_vf(bub_idx%ps(i))%sf(j, k, l)
-                    P0_R(i) = qR_prim_rs_vf(bub_idx%ps(i))%sf(j + 1, k, l)
-                end if
-            end do
-
-            call s_comp_n_from_prim(alpha_L(num_fluids), R0_L, nbub_L)
-            call s_comp_n_from_prim(alpha_R(num_fluids), R0_R, nbub_R)
-
-            do i = 1, nb
-                if (.not. qbmm) then
-                    if (polytropic) then
-                        pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
-                        pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
-                    else
-                        pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
-                        pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
-                    end if
-                end if
-            end do
-
-            if (qbmm) then
-                PbwR3Lbar = mom_sp(4)%sf(j, k, l)
-                PbwR3Rbar = mom_sp(4)%sf(j + 1, k, l)
-
-                R3Lbar = mom_sp(1)%sf(j, k, l)
-                R3Rbar = mom_sp(1)%sf(j + 1, k, l)
-
-                R3V2Lbar = mom_sp(3)%sf(j, k, l)
-                R3V2Rbar = mom_sp(3)%sf(j + 1, k, l)
-            else
-                call s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
-                call s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
-
-                call s_quad(R0_L**3.d0, R3Lbar)
-                call s_quad(R0_R**3.d0, R3Rbar)
-
-                call s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
-                call s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
-            end if
+!                call s_quad(R0_L**3.d0, R3Lbar)
+!                call s_quad(R0_R**3.d0, R3Rbar)
+!
+!                call s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
+!                call s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
+!            end if
 
             !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} )
-            if (alpha_L(num_fluids) < small_alf .or. R3Lbar < small_alf) then
-                ptilde_L = alpha_L(num_fluids)*pres_L
-            else
-                ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
-                                                rho_L*R3V2Lbar/R3Lbar)
-            end if
+!            if (alpha_L(num_fluids) < small_alf .or. R3Lbar < small_alf) then
+!                ptilde_L = alpha_L(num_fluids)*pres_L
+!            else
+!                ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
+!                                                rho_L*R3V2Lbar/R3Lbar)
+!            end if
 
-            if (alpha_R(num_fluids) < small_alf .or. R3Rbar < small_alf) then
-                ptilde_R = alpha_R(num_fluids)*pres_R
-            else
-                ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
-                                                rho_R*R3V2Rbar/R3Rbar)
-            end if
+ !           if (alpha_R(num_fluids) < small_alf .or. R3Rbar < small_alf) then
+ !               ptilde_R = alpha_R(num_fluids)*pres_R
+ !           else
+  !              ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
+  !                                              rho_R*R3V2Rbar/R3Rbar)
+  !          end if
 
-            if ((ptilde_L .ne. ptilde_L) .or. (ptilde_R .ne. ptilde_R)) then
-                print *, 'Ptilde NaN at ', j, k, l, x_cb(j)
-                print *, nbub_L, alpha_L, pres_L, PbwR3Lbar, R3Lbar, rho_L, R3V2Lbar, R3Lbar
-                print *, nbub_R, alpha_R, pres_R, PbwR3Rbar, R3Rbar, rho_R, R3V2Rbar, R3Rbar
-                call s_mpi_abort()
-            end if
+!            if ((ptilde_L .ne. ptilde_L) .or. (ptilde_R .ne. ptilde_R)) then
+!                print *, 'Ptilde NaN at ', j, k, l, x_cb(j)
+!                print *, nbub_L, alpha_L, pres_L, PbwR3Lbar, R3Lbar, rho_L, R3V2Lbar, R3Lbar
+!                print *, nbub_R, alpha_R, pres_R, PbwR3Rbar, R3Rbar, rho_R, R3V2Rbar, R3Rbar
+!                call s_mpi_abort()
+!            end if
 
-            ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
-        end if
+!            ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
+!        end if
 
-        call s_compute_mixture_sound_speeds(j, k, l)
+        call s_compute_mixture_sound_speeds(qL_prim_rs_vf, qR_prim_rs_vf,j, k, l)
 
         ! ==================================================================
 
@@ -2007,8 +2418,7 @@ contains
             end if
         end do
 
-        ! ==================================================================
-
+        !
     end subroutine s_compute_arithmetic_average_state ! --------------------
 
     !>  The direct estimation of the left, right and middle wave
@@ -2018,7 +2428,7 @@ contains
         !!  @param k Second coordinate index
         !!  @param l  Third coordinate index
     subroutine s_compute_direct_wave_speeds(j, k, l) ! -----------------------
-
+!$acc routine seq
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0)) :: denom
@@ -2050,7 +2460,7 @@ contains
         !!  @param k Second coordinate index
         !!  @param l  Third coordinate index
     subroutine s_compute_pressure_velocity_wave_speeds(j, k, l) ! ------------
-
+!$acc routine seq
         integer, intent(IN) :: j, k, l
 
         ! Left and right pressures in the star region
@@ -2092,13 +2502,172 @@ contains
         ! Allocating the variables that will be utilized to formulate the
         ! left, right, and average states of the Riemann problem, as well
         ! the Riemann problem solution
-        allocate (qL_prim_rs_vf(1:sys_size), qR_prim_rs_vf(1:sys_size))
+        integer :: i
 
-        allocate (flux_rs_vf(1:sys_size), flux_src_rs_vf(1:sys_size))
 
-        allocate (flux_gsrc_rs_vf(1:sys_size))
+        allocate(gammas(1:num_fluids))
+        allocate(pi_infs(1:num_fluids))
 
-        allocate (vel_src_rs_vf(1:num_dims))
+
+        do i = 1, num_fluids
+            gammas(i) = fluid_pp(i)%gamma
+            pi_infs(i) = fluid_pp(i)%pi_inf
+        end do
+!$acc update device(gammas, pi_infs)
+
+        allocate (qL_prim_rsx_vf(1:sys_size), qR_prim_rsx_vf(1:sys_size))
+        allocate (qL_prim_rsy_vf(1:sys_size), qR_prim_rsy_vf(1:sys_size))
+        allocate (qL_prim_rsz_vf(1:sys_size), qR_prim_rsz_vf(1:sys_size))
+
+        allocate (flux_rsx_vf(1:sys_size), flux_src_rsx_vf(1:sys_size))
+        allocate (flux_rsy_vf(1:sys_size), flux_src_rsy_vf(1:sys_size))
+        allocate (flux_rsz_vf(1:sys_size), flux_src_rsz_vf(1:sys_size))
+
+        allocate (flux_gsrc_rsx_vf(1:sys_size))
+        allocate (flux_gsrc_rsy_vf(1:sys_size))
+        allocate (flux_gsrc_rsz_vf(1:sys_size))
+
+        allocate (vel_src_rsx_vf(1:num_dims))
+        allocate (vel_src_rsy_vf(1:num_dims))
+        allocate (vel_src_rsz_vf(1:num_dims))
+
+        if (any(Re_size > 0)) allocate (Re_avg_rsx_vf(1:2))
+        if (any(Re_size > 0)) allocate (Re_avg_rsy_vf(1:2))
+        if (any(Re_size > 0)) allocate (Re_avg_rsz_vf(1:2))
+
+        is1%beg = -1; is2%beg = 0; is3%beg = 0
+        is1%end = m; is2%end = n; is3%end = p
+
+        do i = 1, sys_size
+            allocate(qL_prim_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            allocate(qR_prim_rsx_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        do i = 1, sys_size
+                allocate (flux_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                           is2%beg:is2%end, &
+                                           is3%beg:is3%end))
+                allocate (flux_gsrc_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                                is2%beg:is2%end, &
+                                                is3%beg:is3%end))
+        end do
+
+        allocate (flux_src_rsx_vf(adv_idx%beg)%sf(is1%beg:is1%end, &
+                                                     is2%beg:is2%end, &
+                                                     is3%beg:is3%end))
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+                allocate (flux_src_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end))
+            end do
+        end if
+
+        do i = 1, num_dims
+            allocate (vel_src_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                                   is2%beg:is2%end, &
+                                                   is3%beg:is3%end))
+        end do
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                allocate (Re_avg_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                             is2%beg:is2%end, &
+                                             is3%beg:is3%end))
+            end if
+        end do
+
+
+        is1%beg = -1; is2%beg = 0; is3%beg = 0
+        is1%end = n; is2%end = m; is3%end = p
+
+        do i = 1, sys_size
+            allocate(qL_prim_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            allocate(qR_prim_rsy_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        do i = 1, sys_size
+                allocate (flux_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                           is2%beg:is2%end, &
+                                           is3%beg:is3%end))
+                allocate (flux_gsrc_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                                is2%beg:is2%end, &
+                                                is3%beg:is3%end))
+        end do
+
+        allocate (flux_src_rsy_vf(adv_idx%beg)%sf(is1%beg:is1%end, &
+                                                     is2%beg:is2%end, &
+                                                     is3%beg:is3%end))
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+                allocate (flux_src_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end))
+            end do
+        end if
+
+        do i = 1, num_dims
+            allocate (vel_src_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                                   is2%beg:is2%end, &
+                                                   is3%beg:is3%end))
+        end do
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                allocate (Re_avg_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                             is2%beg:is2%end, &
+                                             is3%beg:is3%end))
+            end if
+        end do
+
+        is1%beg = -1; is2%beg = 0; is3%beg = 0
+        is1%end = p; is2%end = n; is3%end = m
+
+        do i = 1, sys_size
+            allocate(qL_prim_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            allocate(qR_prim_rsz_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        do i = 1, sys_size
+                allocate (flux_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                           is2%beg:is2%end, &
+                                           is3%beg:is3%end))
+                allocate (flux_gsrc_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                                is2%beg:is2%end, &
+                                                is3%beg:is3%end))
+        end do
+
+        allocate (flux_src_rsz_vf(adv_idx%beg)%sf(is1%beg:is1%end, &
+                                                     is2%beg:is2%end, &
+                                                     is3%beg:is3%end))
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+                allocate (flux_src_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end))
+            end do
+        end if
+
+        do i = 1, num_dims
+            allocate (vel_src_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                                   is2%beg:is2%end, &
+                                                   is3%beg:is3%end))
+        end do
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                allocate (Re_avg_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                             is2%beg:is2%end, &
+                                             is3%beg:is3%end))
+            end if
+        end do
+
 
         allocate (alpha_rho_L(1:cont_idx%end), vel_L(1:num_dims))
         allocate (alpha_rho_R(1:cont_idx%end), vel_R(1:num_dims))
@@ -2108,7 +2677,6 @@ contains
         allocate (alpha_L(1:num_fluids))
         allocate (alpha_R(1:num_fluids))
 
-        if (any(Re_size > 0)) allocate (Re_avg_rs_vf(1:2))
 
 
         if (riemann_solver == 3) then
@@ -2121,7 +2689,7 @@ contains
         if (riemann_solver == 1) then
             s_riemann_solver => s_hll_riemann_solver
         elseif (riemann_solver == 2) then
-            s_riemann_solver => s_hllc_riemann_solver
+            s_riemann_solver => s_hllc_riemann_solver_acc
         else
             s_riemann_solver => s_exact_riemann_solver
         end if
@@ -2179,6 +2747,12 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
+        momxb = mom_idx%beg; momxe = mom_idx%end
+        contxb = cont_idx%beg; contxe = cont_idx%end
+        bubxb = bub_idx%beg; bubxe = bub_idx%end
+        advxb = adv_idx%beg; advxe = adv_idx%end
+!$acc update device(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe)
+
     end subroutine s_initialize_riemann_solvers_module ! -------------------
 
     !>  The purpose of this subroutine is to populate the buffers
@@ -2232,16 +2806,34 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
-        integer :: i !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
+
+        if (norm_dir == 1) then
+            is1 = ix; is2 = iy; is3 = iz
+            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
+        elseif (norm_dir == 2) then
+            is1 = iy; is2 = ix; is3 = iz
+            dir_idx = (/2, 1, 3/); dir_flg = (/0d0, 1d0, 0d0/)
+        else
+            is1 = iz; is2 = iy; is3 = ix
+            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
+        end if
+
+!$acc update device(is1, is2, is3, dir_idx, dir_flg)
+
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then
 
             if (bc_x%beg == -4) then    ! Riemann state extrap. BC at beginning
-
+!$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
-                    qL_prim_vf(i)%sf(-1, iy%beg:iy%end, iz%beg:iz%end) = &
-                        qR_prim_vf(i)%sf(0, iy%beg:iy%end, iz%beg:iz%end)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                    qL_prim_vf(i)%sf(-1, k, l) = &
+                        qR_prim_vf(i)%sf(0, k, l)
+                        end do
+                    end do
                 end do
 
                 if (any(Re_size > 0)) then
@@ -2285,10 +2877,16 @@ contains
 
             if (bc_x%end == -4) then    ! Riemann state extrap. BC at end
 
+!$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
-                    qR_prim_vf(i)%sf(m + 1, iy%beg:iy%end, iz%beg:iz%end) = &
-                        qL_prim_vf(i)%sf(m, iy%beg:iy%end, iz%beg:iz%end)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                    qL_prim_vf(i)%sf(m + 1, k, l) = &
+                        qR_prim_vf(i)%sf(m, k, l)
+                        end do
+                    end do
                 end do
+
 
                 if (any(Re_size > 0)) then
 
@@ -2334,10 +2932,14 @@ contains
         elseif (norm_dir == 2) then
 
             if (bc_y%beg == -4) then    ! Riemann state extrap. BC at beginning
-
+!$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
-                    qL_prim_vf(i)%sf(ix%beg:ix%end, -1, iz%beg:iz%end) = &
-                        qR_prim_vf(i)%sf(ix%beg:ix%end, 0, iz%beg:iz%end)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                    qL_prim_vf(i)%sf(k, -1, l) = &
+                        qR_prim_vf(i)%sf(k, 0, l)
+                        end do
+                    end do
                 end do
 
                 if (any(Re_size > 0)) then
@@ -2376,9 +2978,14 @@ contains
 
             if (bc_y%end == -4) then    ! Riemann state extrap. BC at end
 
+!$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
-                    qR_prim_vf(i)%sf(ix%beg:ix%end, n + 1, iz%beg:iz%end) = &
-                        qL_prim_vf(i)%sf(ix%beg:ix%end, n, iz%beg:iz%end)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                    qL_prim_vf(i)%sf(k, n + 1, l) = &
+                        qR_prim_vf(i)%sf(k, n, l)
+                        end do
+                    end do
                 end do
 
                 if (any(Re_size > 0)) then
@@ -2420,10 +3027,14 @@ contains
         else
 
             if (bc_z%beg == -4) then    ! Riemann state extrap. BC at beginning
-
+!$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
-                    qL_prim_vf(i)%sf(ix%beg:ix%end, iy%beg:iy%end, -1) = &
-                        qR_prim_vf(i)%sf(ix%beg:ix%end, iy%beg:iy%end, 0)
+                    do k = is2%beg, is2%end
+                        do l = is3%beg, is3%end
+                    qL_prim_vf(i)%sf(l, k, -1) = &
+                        qR_prim_vf(i)%sf(l, k, 0)
+                        end do
+                    end do
                 end do
 
                 if (any(Re_size > 0)) then
@@ -2453,9 +3064,14 @@ contains
 
             if (bc_z%end == -4) then    ! Riemann state extrap. BC at end
 
+!$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
-                    qR_prim_vf(i)%sf(ix%beg:ix%end, iy%beg:iy%end, p + 1) = &
-                        qL_prim_vf(i)%sf(ix%beg:ix%end, iy%beg:iy%end, p)
+                    do k = is2%beg, is2%end
+                        do l = is3%beg, is3%end
+                    qL_prim_vf(i)%sf(l, k, p + 1) = &
+                        qR_prim_vf(i)%sf(l, k, p)
+                        end do
+                    end do
                 end do
 
                 if (any(Re_size > 0)) then
@@ -2524,160 +3140,98 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
-        integer :: i, j, k ! Generic loop iterators
+        integer :: i, j, k, l ! Generic loop iterators
 
-        integer :: xbeg, xend, ybeg, yend, zbeg, zend
-        integer :: s1beg, s1end, s2beg, s2end, s3beg, s3end
-
-        ! Configuring the coordinate direction indexes and flags
-        if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
-        elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            dir_idx = (/2, 1, 3/); dir_flg = (/0d0, 1d0, 0d0/)
-        else
-            is1 = iz; is2 = iy; is3 = ix
-            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
-        end if
-
-
-        ! Setting up special bounds for cell-average values
-        xbeg = -buff_size; ybeg = 0; zbeg = 0
-        if (n > 0) ybeg = -buff_size; if (p > 0) zbeg = -buff_size
-        xend = m - xbeg; yend = n - ybeg; zend = p - zbeg
-
-        ! Configuring the coordinate direction indexes
-        if (norm_dir == 1) then
-            s1beg = xbeg; s1end = xend; s2beg = ybeg; s2end = yend; s3beg = zbeg; s3end = zend
-        elseif (norm_dir == 2) then
-            s1beg = ybeg; s1end = yend; s2beg = xbeg; s2end = xend; s3beg = zbeg; s3end = zend
-        else
-            s1beg = zbeg; s1end = zend; s2beg = ybeg; s2end = yend; s3beg = xbeg; s3end = xend
-        end if
-
-        ! Allocating Left, Right and Average Riemann Problem States ========
-        do i = 1, sys_size
-            allocate (qL_prim_rs_vf(i)%sf(is1%beg:is1%end, &
-                                          is2%beg:is2%end, &
-                                          is3%beg:is3%end))
-            allocate (qR_prim_rs_vf(i)%sf(is1%beg + 1:is1%end + 1, &
-                                          is2%beg:is2%end, &
-                                          is3%beg:is3%end))
-        end do
-
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                allocate (Re_avg_rs_vf(i)%sf(is1%beg:is1%end, &
-                                             is2%beg:is2%end, &
-                                             is3%beg:is3%end))
-            end if
-        end do
-        ! ==================================================================
-
-        ! Allocating Intercell Fluxes and Velocity =========================
-        if (norm_dir /= 1) then
-
-            do i = 1, sys_size
-                allocate (flux_rs_vf(i)%sf(is1%beg:is1%end, &
-                                           is2%beg:is2%end, &
-                                           is3%beg:is3%end))
-                allocate (flux_gsrc_rs_vf(i)%sf(is1%beg:is1%end, &
-                                                is2%beg:is2%end, &
-                                                is3%beg:is3%end))
-            end do
-
-            allocate (flux_src_rs_vf(adv_idx%beg)%sf(is1%beg:is1%end, &
-                                                     is2%beg:is2%end, &
-                                                     is3%beg:is3%end))
-
-            if (riemann_solver == 1) then
-                do i = adv_idx%beg + 1, sys_size
-                    allocate (flux_src_rs_vf(i)%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-                end do
-            end if
-            !ELSE
-            !    DO i = adv_idx%beg,sys_size
-            !        ALLOCATE(flux_src_rs_vf(i)%sf( is1%beg : is1%end, &
-            !                                       is2%beg : is2%end, &
-            !                                       is3%beg : is3%end ))
-            !    END DO
-            !END IF
-        else
-
-            do i = 1, sys_size
-                flux_rs_vf(i)%sf => flux_vf(i)%sf
-                flux_src_rs_vf(i)%sf => flux_src_vf(i)%sf
-                flux_gsrc_rs_vf(i)%sf => flux_gsrc_vf(i)%sf
-            end do
-
-        end if
-
-        if (any(Re_size > 0)) then
-            do i = mom_idx%beg, E_idx
-                flux_src_vf(i)%sf = 0d0
-            end do
-        end if
-
-        if (riemann_solver == 1) then
-            allocate (vel_src_rs_vf(dir_idx(1))%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-        else
-            vel_src_rs_vf(dir_idx(1))%sf => flux_src_rs_vf(adv_idx%beg)%sf
-        end if
-
-        do i = 2, num_dims
-            allocate (vel_src_rs_vf(dir_idx(i))%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-        end do
-        ! END: Allocating Intercell Fluxes and Velocity ====================
 
         ! Reshaping Inputted Data in x-direction ===========================
         if (norm_dir == 1) then
-
+!$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                qL_prim_rs_vf(i)%sf = qL_prim_vf(i)%sf(ix%beg:ix%end, &
-                                                       iy%beg:iy%end, &
-                                                       iz%beg:iz%end)
-                qR_prim_rs_vf(i)%sf = qR_prim_vf(i)%sf(ix%beg + 1:ix%end + 1, &
-                                                       iy%beg:iy%end, &
-                                                       iz%beg:iz%end)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                        qL_prim_rsx_vf(i)%sf(j, k, l) = &
+                            qL_prim_vf(i)%sf(j, k, l)
+                        qR_prim_rsx_vf(i)%sf(j + 1, k, l) = &
+                            qR_prim_vf(i)%sf(j + 1, k, l)
+                        end do
+                    end do
+                end do
             end do
+
+            if (any(Re_size > 0)) then
+!$acc parallel loop collapse(4) gang vector default(present)            
+                do i = momxb, E_idx
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                flux_src_vf(i)%sf(j, k, l) = 0d0
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
             ! ==================================================================
 
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
-
+!$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do j = ix%beg, ix%end
-                    do k = iy%beg, iy%end
-                        qL_prim_rs_vf(i)%sf(k, j, :) = &
-                            qL_prim_vf(i)%sf(j, k, iz%beg:iz%end)
-                        qR_prim_rs_vf(i)%sf(k + 1, j, :) = &
-                            qR_prim_vf(i)%sf(j, k + 1, iz%beg:iz%end)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                        qL_prim_rsy_vf(i)%sf(j, k, l) = &
+                            qL_prim_vf(i)%sf(k, j, l)
+                        qR_prim_rsy_vf(i)%sf(j + 1, k, l) = &
+                            qR_prim_vf(i)%sf(k, j + 1, l)
+                        end do
                     end do
                 end do
             end do
+
+            if (any(Re_size > 0)) then
+!$acc parallel loop collapse(4) gang vector default(present)            
+                do i = momxb, E_idx
+                    do l = is3%beg, is3%end                       
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                flux_src_vf(i)%sf(k, j, l) = 0d0
+                            end do
+                        end do
+                    end do
+                end do
+            end if
             ! ==================================================================
 
             ! Reshaping Inputted Data in z-direction ===========================
         else
-
+!$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do j = ix%beg, ix%end
-                    do k = iz%beg, iz%end
-                        qL_prim_rs_vf(i)%sf(k, :, j) = &
-                            qL_prim_vf(i)%sf(j, iy%beg:iy%end, k)
-                        qR_prim_rs_vf(i)%sf(k + 1, :, j) = &
-                            qR_prim_vf(i)%sf(j, iy%beg:iy%end, k + 1)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                        qL_prim_rsz_vf(i)%sf(j, k, l) = &
+                            qL_prim_vf(i)%sf(l, k, j )
+                        qR_prim_rsz_vf(i)%sf(j + 1, k, l) = &
+                            qR_prim_vf(i)%sf(l, k, j+1)
+                        end do
                     end do
                 end do
             end do
+
+            if (any(Re_size > 0)) then
+!$acc parallel loop collapse(4) gang vector default(present)            
+                do i = momxb, E_idx
+                    do j = is1%beg, is1%end 
+                        do k = is2%beg, is2%end                           
+                            do l = is3%beg, is3%end
+                                flux_src_vf(i)%sf(l, k, j) = 0d0
+                            end do
+                        end do
+                    end do
+                end do
+            end if
 
         end if
         ! ==================================================================
@@ -3684,36 +4238,42 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k, l !< Generic loop iterators
 
         ! Reshaping Outputted Data in y-direction ==========================
         if (norm_dir == 2) then
-
+!$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
-                        flux_vf(i)%sf(j, k, iz%beg:iz%end) = &
-                            flux_rs_vf(i)%sf(k, j, :)
-                        flux_gsrc_vf(i)%sf(j, k, iz%beg:iz%end) = &
-                            flux_gsrc_rs_vf(i)%sf(k, j, :)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                        flux_vf(i)%sf(k, j, l) = &
+                            flux_rsy_vf(i)%sf(j, k, l)
+                        flux_gsrc_vf(i)%sf(k, j, l) = &
+                            flux_gsrc_rsy_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+!$acc parallel loop collapse(3) gang vector default(present)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                    flux_src_vf(advxb)%sf(k, j, l) = &
+                        flux_src_rsy_vf(advxb)%sf(j, k, l)
                     end do
                 end do
             end do
 
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
-                    flux_src_vf(adv_idx%beg)%sf(j, k, iz%beg:iz%end) = &
-                        flux_src_rs_vf(adv_idx%beg)%sf(k, j, :)
-                end do
-            end do
-
             if (riemann_solver == 1) then
-
-                do i = adv_idx%beg + 1, sys_size
-                    do k = iy%beg, iy%end
-                        do j = ix%beg, ix%end
-                            flux_src_vf(i)%sf(j, k, iz%beg:iz%end) = &
-                                flux_src_rs_vf(i)%sf(k, j, :)
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = advxb + 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                            flux_src_vf(i)%sf(k, j, l) = &
+                                flux_src_rsy_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
@@ -3723,90 +4283,86 @@ contains
 
             ! Reshaping Outputted Data in z-direction ==========================
         elseif (norm_dir == 3) then
-
+!$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do k = iz%beg, iz%end
-                    do j = ix%beg, ix%end
-                        flux_vf(i)%sf(j, iy%beg:iy%end, k) = &
-                            flux_rs_vf(i)%sf(k, :, j)
-                        flux_gsrc_vf(i)%sf(j, iy%beg:iy%end, k) = &
-                            flux_gsrc_rs_vf(i)%sf(k, :, j)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                        flux_vf(i)%sf(l, k, j) = &
+                            flux_rsz_vf(i)%sf(j, k, l)
+                        flux_gsrc_vf(i)%sf(l, k, j) = &
+                            flux_gsrc_rsz_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+!$acc parallel loop collapse(3) gang vector default(present)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                    flux_src_vf(advxb)%sf(l, k, j) = &
+                        flux_src_rsz_vf(advxb)%sf(j, k, l)
                     end do
                 end do
             end do
 
-            do k = iz%beg, iz%end
-                do j = ix%beg, ix%end
-                    flux_src_vf(adv_idx%beg)%sf(j, iy%beg:iy%end, k) = &
-                        flux_src_rs_vf(adv_idx%beg)%sf(k, :, j)
-                end do
-            end do
-
             if (riemann_solver == 1) then
-
-                do i = adv_idx%beg + 1, sys_size
-                    do k = iz%beg, iz%end
-                        do j = ix%beg, ix%end
-                            flux_src_vf(i)%sf(j, iy%beg:iy%end, k) = &
-                                flux_src_rs_vf(i)%sf(k, :, j)
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = advxb + 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                            flux_src_vf(i)%sf(l, k, j) = &
+                                flux_src_rsz_vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
 
             end if
-
-        end if
-        ! ==================================================================
-
-        ! Deallocating Left, Right and Average Riemann Problem States ======
-        do i = 1, sys_size
-            deallocate (qL_prim_rs_vf(i)%sf, qR_prim_rs_vf(i)%sf)
-        end do
-
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                deallocate (Re_avg_rs_vf(i)%sf)
-            end if
-        end do
-
-        ! ==================================================================
-
-        ! Deallocating Intercell Fluxes and Velocity =======================
-        if (norm_dir /= 1) then
-
+        elseif (norm_dir == 1) then
+!$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                deallocate (flux_rs_vf(i)%sf)
-                deallocate (flux_gsrc_rs_vf(i)%sf)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                        flux_vf(i)%sf(j, k, l) = &
+                            flux_rsx_vf(i)%sf(j, k, l)
+                        flux_gsrc_vf(i)%sf(j, k, l) = &
+                            flux_gsrc_rsx_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+!$acc parallel loop collapse(3) gang vector default(present)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                    flux_src_vf(advxb)%sf(j, k, l) = &
+                        flux_src_rsx_vf(advxb)%sf(j, k, l)
+                    end do
+                end do
             end do
 
             if (riemann_solver == 1) then
-                do i = adv_idx%beg + 1, sys_size
-                    deallocate (flux_src_rs_vf(i)%sf)
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = advxb + 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                            flux_src_vf(i)%sf(j, k, l) = &
+                                flux_src_rsx_vf(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
                 end do
-            end if
 
-            deallocate (flux_src_rs_vf(adv_idx%beg)%sf)
-
-        else
-
-            do i = 1, sys_size
-                flux_rs_vf(i)%sf => null()
-                flux_src_rs_vf(i)%sf => null()
-                flux_gsrc_rs_vf(i)%sf => null()
-            end do
+            end if            
 
         end if
+        ! ==================================================================
 
-        if (riemann_solver == 1) then
-            deallocate (vel_src_rs_vf(dir_idx(1))%sf)
-        else
-            vel_src_rs_vf(dir_idx(1))%sf => null()
-        end if
 
-        do i = 2, num_dims
-            deallocate (vel_src_rs_vf(dir_idx(i))%sf)
-        end do
         ! ==================================================================
 
     end subroutine s_finalize_riemann_solver ! -----------------------------
@@ -3817,11 +4373,97 @@ contains
         ! Deallocating the variables that were utilized to formulate the
         ! left, right and average states of the Riemann problem, as well
         ! the Riemann problem solution
-        deallocate (qL_prim_rs_vf, qR_prim_rs_vf)
 
-        deallocate (flux_rs_vf, flux_src_rs_vf, flux_gsrc_rs_vf)
+        integer :: i
 
-        deallocate (vel_src_rs_vf)
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                deallocate (Re_avg_rsx_vf(i)%sf)
+            end if
+        end do
+
+        do i = 1, num_dims
+            deallocate (vel_src_rsx_vf(dir_idx(i))%sf)
+        end do
+
+        do i = 1, sys_size
+            deallocate (flux_rsx_vf(i)%sf)
+            deallocate (flux_gsrc_rsx_vf(i)%sf)
+        end do
+
+        deallocate (flux_src_rsx_vf(adv_idx%beg)%sf)
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+                deallocate (flux_src_rsx_vf(i)%sf)
+            end do
+        end if
+
+        deallocate (qL_prim_rsx_vf, qR_prim_rsx_vf)
+
+        deallocate (flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf)
+
+        deallocate (vel_src_rsx_vf)
+
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                deallocate (Re_avg_rsy_vf(i)%sf)
+            end if
+        end do
+
+        do i = 1, num_dims
+            deallocate (vel_src_rsy_vf(dir_idx(i))%sf)
+        end do
+
+        do i = 1, sys_size
+            deallocate (flux_rsy_vf(i)%sf)
+            deallocate (flux_gsrc_rsy_vf(i)%sf)
+        end do
+
+        deallocate (flux_src_rsy_vf(adv_idx%beg)%sf)
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+                deallocate (flux_src_rsy_vf(i)%sf)
+            end do
+        end if
+
+        deallocate (qL_prim_rsy_vf, qR_prim_rsy_vf)
+
+        deallocate (flux_rsy_vf, flux_src_rsy_vf, flux_gsrc_rsy_vf)
+
+        deallocate (vel_src_rsy_vf)
+
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                deallocate (Re_avg_rsz_vf(i)%sf)
+            end if
+        end do
+
+        do i = 1, num_dims
+            deallocate (vel_src_rsz_vf(dir_idx(i))%sf)
+        end do
+
+        do i = 1, sys_size
+            deallocate (flux_rsz_vf(i)%sf)
+            deallocate (flux_gsrc_rsz_vf(i)%sf)
+        end do
+
+        deallocate (flux_src_rsz_vf(adv_idx%beg)%sf)
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+                deallocate (flux_src_rsz_vf(i)%sf)
+            end do
+        end if
+
+        deallocate (qL_prim_rsz_vf, qR_prim_rsz_vf)
+
+        deallocate (flux_rsz_vf, flux_src_rsz_vf, flux_gsrc_rsz_vf)
+
+        deallocate (vel_src_rsz_vf)
 
         deallocate (alpha_rho_L, vel_L)
         deallocate (alpha_rho_R, vel_R)
@@ -3845,6 +4487,7 @@ contains
             deallocate (V0_L, V0_R)
         end if
 
+        deallocate(gammas, pi_infs)
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()

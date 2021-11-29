@@ -4,7 +4,7 @@ MFC_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 ### Compiler command ###
 FC = mpif90 -acc
-#FC = mpif90
+FC = mpif90
    
 ### Compiler flags [set according to your compiler] ### 
 #Note: Requires -cpp to enable preprocessor 

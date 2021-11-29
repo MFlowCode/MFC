@@ -58,6 +58,7 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry
     !> @}
+!$acc declare create(cyl_coord, grid_geometry)
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -109,7 +110,7 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
-!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns)
+!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -159,6 +160,7 @@ module m_global_parameters
     integer, dimension(2)   :: Re_size
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
+!$acc declare create(Re_size, Re_idx)
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
@@ -168,7 +170,7 @@ module m_global_parameters
     integer, dimension(3) :: dir_idx
     real(kind(0d0)), dimension(3) :: dir_flg
     !> @}
-
+!$acc declare create(dir_idx, dir_flg)
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
@@ -681,6 +683,7 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
+!$acc update device(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
