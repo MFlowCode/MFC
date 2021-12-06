@@ -4888,161 +4888,6 @@ contains
         if (any(Re_size > 0)) allocate (Re_avg_rsy_vf(1:2))
         if (any(Re_size > 0)) allocate (Re_avg_rsz_vf(1:2))
 
-        is1%beg = -1; is2%beg = 0; is3%beg = 0
-        is1%end = m; is2%end = n; is3%end = p
-
-        do i = 1, sys_size
-            allocate(qL_prim_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            allocate(qR_prim_rsx_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
-!$acc enter data create(qL_prim_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end), qR_prim_rsx_vf(i)%sf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
-        end do
-
-        do i = 1, sys_size
-                allocate (flux_rsx_vf(i)%sf(is1%beg:is1%end, &
-                                           is2%beg:is2%end, &
-                                           is3%beg:is3%end))
-                allocate (flux_gsrc_rsx_vf(i)%sf(is1%beg:is1%end, &
-                                                is2%beg:is2%end, &
-                                                is3%beg:is3%end))
-!$acc enter data create(flux_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end),flux_gsrc_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-        end do
-
-        allocate (flux_src_rsx_vf(advxb)%sf(is1%beg:is1%end, &
-                                                     is2%beg:is2%end, &
-                                                     is3%beg:is3%end))
-!$acc enter data create(flux_src_rsx_vf(advxb)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-        if (riemann_solver == 1) then
-            do i = advxb + 1, sys_size
-                allocate (flux_src_rsx_vf(i)%sf(is1%beg:is1%end, &
-                                               is2%beg:is2%end, &
-                                               is3%beg:is3%end))
-!$acc enter data create(flux_src_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            
-            end do
-        end if
-
-        do i = 1, num_dims
-            allocate (vel_src_rsx_vf(i)%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-!$acc enter data create(vel_src_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-        end do
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                allocate (Re_avg_rsx_vf(i)%sf(is1%beg:is1%end, &
-                                             is2%beg:is2%end, &
-                                             is3%beg:is3%end))
-!$acc enter data create(Re_avg_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-
-            end if
-        end do
-
-
-        is1%beg = -1; is2%beg = 0; is3%beg = 0
-        is1%end = n; is2%end = m; is3%end = p
-
-        do i = 1, sys_size
-            allocate(qL_prim_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            allocate(qR_prim_rsy_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
-!$acc enter data create(qL_prim_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end), qR_prim_rsy_vf(i)%sf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
-
-        end do
-
-        do i = 1, sys_size
-                allocate (flux_rsy_vf(i)%sf(is1%beg:is1%end, &
-                                           is2%beg:is2%end, &
-                                           is3%beg:is3%end))
-                allocate (flux_gsrc_rsy_vf(i)%sf(is1%beg:is1%end, &
-                                                is2%beg:is2%end, &
-                                                is3%beg:is3%end))
-!$acc enter data create(flux_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end),flux_gsrc_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-
-        end do
-
-        allocate (flux_src_rsy_vf(advxb)%sf(is1%beg:is1%end, &
-                                                     is2%beg:is2%end, &
-                                                     is3%beg:is3%end))
-!$acc enter data create(flux_src_rsy_vf(advxb)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-
-        if (riemann_solver == 1) then
-            do i = advxb + 1, sys_size
-                allocate (flux_src_rsy_vf(i)%sf(is1%beg:is1%end, &
-                                               is2%beg:is2%end, &
-                                               is3%beg:is3%end))
-!$acc enter data create(flux_src_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-
-            end do
-        end if
-
-        do i = 1, num_dims
-            allocate (vel_src_rsy_vf(i)%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-!$acc enter data create(vel_src_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-        end do
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                allocate (Re_avg_rsy_vf(i)%sf(is1%beg:is1%end, &
-                                             is2%beg:is2%end, &
-                                             is3%beg:is3%end))
-!$acc enter data create(Re_avg_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            end if
-        end do
-
-        is1%beg = -1; is2%beg = 0; is3%beg = 0
-        is1%end = p; is2%end = n; is3%end = m
-
-        do i = 1, sys_size
-            allocate(qL_prim_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            allocate(qR_prim_rsz_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
-!$acc enter data create(qL_prim_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end), qR_prim_rsz_vf(i)%sf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
-
-        end do
-
-        do i = 1, sys_size
-                allocate (flux_rsz_vf(i)%sf(is1%beg:is1%end, &
-                                           is2%beg:is2%end, &
-                                           is3%beg:is3%end))
-                allocate (flux_gsrc_rsz_vf(i)%sf(is1%beg:is1%end, &
-                                                is2%beg:is2%end, &
-                                                is3%beg:is3%end))
-!$acc enter data create(flux_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end),flux_gsrc_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-
-        end do
-
-        allocate (flux_src_rsz_vf(advxb)%sf(is1%beg:is1%end, &
-                                                     is2%beg:is2%end, &
-                                                     is3%beg:is3%end))
-!$acc enter data create(flux_src_rsz_vf(advxb)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-
-        if (riemann_solver == 1) then
-            do i = advxb + 1, sys_size
-                allocate (flux_src_rsz_vf(i)%sf(is1%beg:is1%end, &
-                                               is2%beg:is2%end, &
-                                               is3%beg:is3%end))
-!$acc enter data create(flux_src_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            end do
-        end if
-
-        do i = 1, num_dims
-            allocate (vel_src_rsz_vf(i)%sf(is1%beg:is1%end, &
-                                                   is2%beg:is2%end, &
-                                                   is3%beg:is3%end))
-!$acc enter data create(vel_src_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-        end do
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                allocate (Re_avg_rsz_vf(i)%sf(is1%beg:is1%end, &
-                                             is2%beg:is2%end, &
-                                             is3%beg:is3%end))
-!$acc enter data create(Re_avg_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
-            end if
-        end do
-
-
         allocate (alpha_rho_L(1:cont_idx%end), vel_L(1:num_dims))
         allocate (alpha_rho_R(1:cont_idx%end), vel_R(1:num_dims))
 
@@ -5122,6 +4967,166 @@ contains
             s_convert_to_mixture_variables => &
                 s_convert_species_to_mixture_variables
         end if
+
+        is1%beg = -1; is2%beg = 0; is3%beg = 0
+        is1%end = m; is2%end = n; is3%end = p
+
+        do i = 1, sys_size
+            allocate(qL_prim_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            allocate(qR_prim_rsx_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+!$acc enter data create(qL_prim_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end), qR_prim_rsx_vf(i)%sf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+        end do
+
+        do i = 1, sys_size
+                allocate (flux_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                           is2%beg:is2%end, &
+                                           is3%beg:is3%end))
+                allocate (flux_gsrc_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                                is2%beg:is2%end, &
+                                                is3%beg:is3%end))
+!$acc enter data create(flux_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end),flux_gsrc_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+        end do
+
+        allocate (flux_src_rsx_vf(advxb)%sf(is1%beg:is1%end, &
+                                                     is2%beg:is2%end, &
+                                                     is3%beg:is3%end))
+!$acc enter data create(flux_src_rsx_vf(advxb)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+        if (riemann_solver == 1) then
+            do i = advxb + 1, sys_size
+                allocate (flux_src_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end))
+!$acc enter data create(flux_src_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            
+            end do
+        end if
+
+        do i = 1, num_dims
+            allocate (vel_src_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                                   is2%beg:is2%end, &
+                                                   is3%beg:is3%end))
+!$acc enter data create(vel_src_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+        end do
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                allocate (Re_avg_rsx_vf(i)%sf(is1%beg:is1%end, &
+                                             is2%beg:is2%end, &
+                                             is3%beg:is3%end))
+!$acc enter data create(Re_avg_rsx_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+
+            end if
+        end do
+
+        if(n == 0) return
+
+        is1%beg = -1; is2%beg = 0; is3%beg = 0
+        is1%end = n; is2%end = m; is3%end = p
+
+        do i = 1, sys_size
+            allocate(qL_prim_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            allocate(qR_prim_rsy_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+!$acc enter data create(qL_prim_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end), qR_prim_rsy_vf(i)%sf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        do i = 1, sys_size
+                allocate (flux_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                           is2%beg:is2%end, &
+                                           is3%beg:is3%end))
+                allocate (flux_gsrc_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                                is2%beg:is2%end, &
+                                                is3%beg:is3%end))
+!$acc enter data create(flux_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end),flux_gsrc_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        allocate (flux_src_rsy_vf(advxb)%sf(is1%beg:is1%end, &
+                                                     is2%beg:is2%end, &
+                                                     is3%beg:is3%end))
+!$acc enter data create(flux_src_rsy_vf(advxb)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+
+        if (riemann_solver == 1) then
+            do i = advxb + 1, sys_size
+                allocate (flux_src_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end))
+!$acc enter data create(flux_src_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+
+            end do
+        end if
+
+        do i = 1, num_dims
+            allocate (vel_src_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                                   is2%beg:is2%end, &
+                                                   is3%beg:is3%end))
+!$acc enter data create(vel_src_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+        end do
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                allocate (Re_avg_rsy_vf(i)%sf(is1%beg:is1%end, &
+                                             is2%beg:is2%end, &
+                                             is3%beg:is3%end))
+!$acc enter data create(Re_avg_rsy_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            end if
+        end do
+
+        if(p == 0) return
+
+        is1%beg = -1; is2%beg = 0; is3%beg = 0
+        is1%end = p; is2%end = n; is3%end = m
+
+        do i = 1, sys_size
+            allocate(qL_prim_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            allocate(qR_prim_rsz_vf(i)%sf(is1%beg + 1 :is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+!$acc enter data create(qL_prim_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end), qR_prim_rsz_vf(i)%sf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        do i = 1, sys_size
+                allocate (flux_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                           is2%beg:is2%end, &
+                                           is3%beg:is3%end))
+                allocate (flux_gsrc_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                                is2%beg:is2%end, &
+                                                is3%beg:is3%end))
+!$acc enter data create(flux_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end),flux_gsrc_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+
+        end do
+
+        allocate (flux_src_rsz_vf(advxb)%sf(is1%beg:is1%end, &
+                                                     is2%beg:is2%end, &
+                                                     is3%beg:is3%end))
+!$acc enter data create(flux_src_rsz_vf(advxb)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+
+        if (riemann_solver == 1) then
+            do i = advxb + 1, sys_size
+                allocate (flux_src_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                               is2%beg:is2%end, &
+                                               is3%beg:is3%end))
+!$acc enter data create(flux_src_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            end do
+        end if
+
+        do i = 1, num_dims
+            allocate (vel_src_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                                   is2%beg:is2%end, &
+                                                   is3%beg:is3%end))
+!$acc enter data create(vel_src_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+        end do
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                allocate (Re_avg_rsz_vf(i)%sf(is1%beg:is1%end, &
+                                             is2%beg:is2%end, &
+                                             is3%beg:is3%end))
+!$acc enter data create(Re_avg_rsz_vf(i)%sf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end))
+            end if
+        end do
+
+
+
 
 
 
@@ -6755,107 +6760,6 @@ contains
 
         integer :: i
 
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-!$acc exit data delete(Re_avg_rsx_vf(i)%sf)
-                deallocate (Re_avg_rsx_vf(i)%sf)
-            end if
-        end do
-
-        do i = 1, num_dims
-!$acc exit data delete(vel_src_rsx_vf(dir_idx(i))%sf)
-            deallocate (vel_src_rsx_vf(dir_idx(i))%sf)
-        end do
-
-        do i = 1, sys_size
-!$acc exit data delete(flux_rsx_vf(i)%sf, flux_gsrc_rsx_vf(i)%sf)
-            deallocate (flux_rsx_vf(i)%sf)
-            deallocate (flux_gsrc_rsx_vf(i)%sf)
-        end do
-!$acc exit data delete(flux_src_rsx_vf(advxb)%sf)
-        deallocate (flux_src_rsx_vf(adv_idx%beg)%sf)
-
-        if (riemann_solver == 1) then
-            do i = adv_idx%beg + 1, sys_size
-!$acc exit data delete(flux_src_rsx_vf(i)%sf)
-                deallocate (flux_src_rsx_vf(i)%sf)
-            end do
-        end if
-
-        deallocate (qL_prim_rsx_vf, qR_prim_rsx_vf)
-
-        deallocate (flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf)
-
-        deallocate (vel_src_rsx_vf)
-
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                deallocate (Re_avg_rsy_vf(i)%sf)
-!$acc exit data delete(Re_avg_rsy_vf(i)%sf)
-            end if
-        end do
-
-        do i = 1, num_dims
-!$acc exit data delete(vel_src_rsy_vf(dir_idx(i))%sf)
-            deallocate (vel_src_rsy_vf(dir_idx(i))%sf)
-        end do
-
-        do i = 1, sys_size
-!$acc exit data delete(flux_rsy_vf(i)%sf, flux_gsrc_rsy_vf(i)%sf)
-            deallocate (flux_rsy_vf(i)%sf)
-            deallocate (flux_gsrc_rsy_vf(i)%sf)
-        end do
-!$acc exit data delete(flux_src_rsy_vf(advxb)%sf)
-        deallocate (flux_src_rsy_vf(adv_idx%beg)%sf)
-
-        if (riemann_solver == 1) then
-            do i = adv_idx%beg + 1, sys_size
-!$acc exit data delete(flux_src_rsy_vf(i)%sf)
-                deallocate (flux_src_rsy_vf(i)%sf)
-            end do
-        end if
-
-        deallocate (qL_prim_rsy_vf, qR_prim_rsy_vf)
-
-        deallocate (flux_rsy_vf, flux_src_rsy_vf, flux_gsrc_rsy_vf)
-
-        deallocate (vel_src_rsy_vf)
-
-
-        do i = 1, 2
-            if (Re_size(i) > 0) then
-                deallocate (Re_avg_rsz_vf(i)%sf)
-!$acc exit data delete(Re_avg_rsz_vf(i)%sf)
-            end if
-        end do
-
-        do i = 1, num_dims
-!$acc exit data delete(vel_src_rsz_vf(dir_idx(i))%sf)
-            deallocate (vel_src_rsz_vf(dir_idx(i))%sf)
-        end do
-
-        do i = 1, sys_size
-!$acc exit data delete(flux_rsz_vf(i)%sf, flux_gsrc_rsz_vf(i)%sf)
-            deallocate (flux_rsz_vf(i)%sf)
-            deallocate (flux_gsrc_rsz_vf(i)%sf)
-        end do
-!$acc exit data delete(flux_src_rsz_vf(advxb)%sf)
-        deallocate (flux_src_rsz_vf(adv_idx%beg)%sf)
-
-        if (riemann_solver == 1) then
-            do i = adv_idx%beg + 1, sys_size
-!$acc exit data delete(flux_src_rsz_vf(i)%sf)
-                deallocate (flux_src_rsz_vf(i)%sf)
-            end do
-        end if
-
-        deallocate (qL_prim_rsz_vf, qR_prim_rsz_vf)
-
-        deallocate (flux_rsz_vf, flux_src_rsz_vf, flux_gsrc_rsz_vf)
-
-        deallocate (vel_src_rsz_vf)
-
         deallocate (alpha_rho_L, vel_L)
         deallocate (alpha_rho_R, vel_R)
 
@@ -6894,6 +6798,112 @@ contains
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
         s_convert_to_mixture_variables => null()
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+!$acc exit data delete(Re_avg_rsx_vf(i)%sf)
+                deallocate (Re_avg_rsx_vf(i)%sf)
+            end if
+        end do
+
+        do i = 1, num_dims
+!$acc exit data delete(vel_src_rsx_vf(dir_idx(i))%sf)
+            deallocate (vel_src_rsx_vf(dir_idx(i))%sf)
+        end do
+
+        do i = 1, sys_size
+!$acc exit data delete(flux_rsx_vf(i)%sf, flux_gsrc_rsx_vf(i)%sf)
+            deallocate (flux_rsx_vf(i)%sf)
+            deallocate (flux_gsrc_rsx_vf(i)%sf)
+        end do
+!$acc exit data delete(flux_src_rsx_vf(advxb)%sf)
+        deallocate (flux_src_rsx_vf(adv_idx%beg)%sf)
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+!$acc exit data delete(flux_src_rsx_vf(i)%sf)
+                deallocate (flux_src_rsx_vf(i)%sf)
+            end do
+        end if
+
+        deallocate (qL_prim_rsx_vf, qR_prim_rsx_vf)
+
+        deallocate (flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf)
+
+        deallocate (vel_src_rsx_vf)
+
+        if(n == 0) return
+        
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                deallocate (Re_avg_rsy_vf(i)%sf)
+!$acc exit data delete(Re_avg_rsy_vf(i)%sf)
+            end if
+        end do
+
+        do i = 1, num_dims
+!$acc exit data delete(vel_src_rsy_vf(dir_idx(i))%sf)
+            deallocate (vel_src_rsy_vf(dir_idx(i))%sf)
+        end do
+
+        do i = 1, sys_size
+!$acc exit data delete(flux_rsy_vf(i)%sf, flux_gsrc_rsy_vf(i)%sf)
+            deallocate (flux_rsy_vf(i)%sf)
+            deallocate (flux_gsrc_rsy_vf(i)%sf)
+        end do
+!$acc exit data delete(flux_src_rsy_vf(advxb)%sf)
+        deallocate (flux_src_rsy_vf(adv_idx%beg)%sf)
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+!$acc exit data delete(flux_src_rsy_vf(i)%sf)
+                deallocate (flux_src_rsy_vf(i)%sf)
+            end do
+        end if
+
+        deallocate (qL_prim_rsy_vf, qR_prim_rsy_vf)
+
+        deallocate (flux_rsy_vf, flux_src_rsy_vf, flux_gsrc_rsy_vf)
+
+        deallocate (vel_src_rsy_vf)
+
+
+        if(p == 0) return
+
+        do i = 1, 2
+            if (Re_size(i) > 0) then
+                deallocate (Re_avg_rsz_vf(i)%sf)
+!$acc exit data delete(Re_avg_rsz_vf(i)%sf)
+            end if
+        end do
+
+        do i = 1, num_dims
+!$acc exit data delete(vel_src_rsz_vf(dir_idx(i))%sf)
+            deallocate (vel_src_rsz_vf(dir_idx(i))%sf)
+        end do
+
+        do i = 1, sys_size
+!$acc exit data delete(flux_rsz_vf(i)%sf, flux_gsrc_rsz_vf(i)%sf)
+            deallocate (flux_rsz_vf(i)%sf)
+            deallocate (flux_gsrc_rsz_vf(i)%sf)
+        end do
+!$acc exit data delete(flux_src_rsz_vf(advxb)%sf)
+        deallocate (flux_src_rsz_vf(adv_idx%beg)%sf)
+
+        if (riemann_solver == 1) then
+            do i = adv_idx%beg + 1, sys_size
+!$acc exit data delete(flux_src_rsz_vf(i)%sf)
+                deallocate (flux_src_rsz_vf(i)%sf)
+            end do
+        end if
+
+        deallocate (qL_prim_rsz_vf, qR_prim_rsz_vf)
+
+        deallocate (flux_rsz_vf, flux_src_rsz_vf, flux_gsrc_rsz_vf)
+
+        deallocate (vel_src_rsz_vf)
+
+
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
 

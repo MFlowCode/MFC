@@ -1,4 +1,4 @@
-################ Compiler options ####################
+############### Compiler options ####################
 # Gets the MFC directory [do not modify]
 MFC_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
