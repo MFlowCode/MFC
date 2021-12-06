@@ -7,7 +7,7 @@
 export PGI_ACC_TIME=0
 export PGI_ACC_NOTIFY=
 export PGI_ACC_DEBUG=
-jsrun -r1 -a1 -c1 -g1 ../../src/pre_process_code/pre_process
-time jsrun -r1 -a1 -c1 -g1 ../../src/simulation_code/simulation
-#time jsrun -r1 -a1 -c1 -g1 nsys profile ../../src/simulation_code/simulation
+jsrun -r2 -a1 -c1 -g1 ../../src/pre_process_code/pre_process
+time jsrun -r2 -a1 -c1 -g1 ../../src/simulation_code/simulation
+#time jsrun -r2 -a1 -c1 -g1 nsys profile ../../src/simulation_code/simulation
 

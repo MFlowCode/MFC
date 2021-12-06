@@ -850,9 +850,9 @@ contains
                 i)
             call nvtxEndRange
 
-            !do j = 1, sys_size
+!            do j = 1, sys_size
 !!$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf )
-            !end do
+!            end do
 
 !            if(proc_rank == 0) then
 !              if(num_dims == 1) then
