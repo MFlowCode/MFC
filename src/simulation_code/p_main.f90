@@ -166,6 +166,9 @@ program p_main
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         if (mod(t_step - t_step_start, t_step_save) == 0) then
+                do i = 1, sys_size
+!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
         end if
 

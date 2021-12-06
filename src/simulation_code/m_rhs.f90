@@ -729,7 +729,7 @@ contains
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
-            s_riemann_solver => s_hll_riemann_solver
+            s_riemann_solver => s_hll_riemann_solver_acc
         elseif (riemann_solver == 2) then
             s_riemann_solver => s_hllc_riemann_solver_acc
         else
@@ -850,34 +850,28 @@ contains
                 i)
             call nvtxEndRange
 
-            if(i == 1) then 
-              do j = 1, sys_size
-!$acc update host(q_prim_qp%vf(j)%sf)
-              end do
-            end if
+            !do j = 1, sys_size
+!!$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf )
+            !end do
 
-            do j = iv%beg, iv%end
-!$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf)
-            end do
-
-            !if(proc_rank == 0) then
-              if(num_dims == 1) then
-                print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
-                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
-                print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
-                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
-              elseif(num_dims == 2) then
-                print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
-                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
-                print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
-                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
-              elseif(num_dims == 3) then
-                print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
-                print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
-              end if   
-            !end if
+!            if(proc_rank == 0) then
+!              if(num_dims == 1) then
+!                print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+!                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+!                print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+!                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+!              elseif(num_dims == 2) then
+!                print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+!                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
+!                print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+!                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
+!              elseif(num_dims == 3) then
+!                print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+!                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
+!                print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+!                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
+!              end if   
+!            end if
 
 
     
@@ -913,17 +907,12 @@ contains
             call nvtxEndRange
 
             iv%beg = 1; iv%end = adv_idx%end
+
             ! ===============================================================
 
-            do j = 1, sys_size
-!$acc update device(flux_n(i)%vf(j)%sf,flux_src_n(i)%vf(j)%sf,flux_gsrc_n(i)%vf%sf)
-            end do
-
+ 
             call nvtxStartRange("RHS_Flux_Add")
             if (i == 1) then
-            ! RHS Contribution in x-direction
-
-                ! Applying the Riemann fluxes
 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                   do q = 0, p
@@ -935,7 +924,9 @@ contains
                           end do 
                         end do
                     end do
-                end do
+                end do  
+
+
 
                 ! Applying source terms to the RHS of the advection equations
 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1020,6 +1011,7 @@ contains
   
             end if  ! i loop
             call nvtxEndRange
+
         end do
         ! END: Dimensional Splitting Loop ================================== 
 
