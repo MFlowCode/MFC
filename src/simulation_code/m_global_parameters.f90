@@ -110,7 +110,7 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
-!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed)
+!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{

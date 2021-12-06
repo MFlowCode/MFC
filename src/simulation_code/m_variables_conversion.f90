@@ -507,7 +507,7 @@ contains
 
         allocate(nRtmp(1:nb))
 
-!$acc update device(sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, nbub, grid_geometry, cyl_coord)
+!$acc update device(sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, nbub, grid_geometry, cyl_coord)
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
