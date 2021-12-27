@@ -1,9 +1,11 @@
 &user_inputs
 fluid_pp(1)%gamma = 2.5
-p = 60
+p = 100
 num_fluids = 1
 mpp_lim = F
-n = 70
+n = 100
+weno_flat = T
+riemann_flat = F
 mapped_weno = T
 t_step_save = 20
 parallel_io = F
