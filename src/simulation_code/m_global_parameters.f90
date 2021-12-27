@@ -110,7 +110,7 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
-!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state)
+!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -269,6 +269,8 @@ module m_global_parameters
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
+    logical :: weno_flat, riemann_flat
+
     ! ======================================================================
 
     ! Mathematical and Physical Constants ======================================
@@ -323,6 +325,8 @@ contains
         mixture_err = .false.
         parallel_io = .false.
         precision = 2
+        weno_flat = .true.
+        riemann_flat = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -428,6 +432,8 @@ contains
         ! Determining the degree of the WENO polynomials
         weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
+
+
 
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces

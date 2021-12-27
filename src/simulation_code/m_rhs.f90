@@ -163,6 +163,7 @@ module m_rhs
     type(scalar_field) :: alf_sum
     !> @}
 
+
     real(kind(0d0)) :: momxb, momxe
     real(kind(0d0)) :: contxb, contxe
     real(kind(0d0)) :: advxb, advxe
@@ -173,8 +174,10 @@ module m_rhs
 !$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,gm_vel_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
 !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
-!$acc   tau_Re_vf,iv,ix, iy, iz,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src,         &
+!$acc   tau_Re_vf,iv,ix, iy, iz,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
 !$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe)
+
+
 
 contains
 
@@ -197,6 +200,7 @@ contains
 
 
 !$acc update device(ix, iy, iz)
+
 
         if (any(Re_size > 0) .and. cyl_coord) then
             allocate (tau_Re_vf(1:sys_size))
@@ -769,11 +773,15 @@ contains
 
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kter
+        real(kind(0d0)) :: start, finish
+        real(kind(0d0)), dimension(20) :: time_wr
+        integer :: time_wr_index
+        real(kind(0d0)) :: t_avg
 
 
 
-        integer :: i, j, k, l, r, q,  ii !< Generic loop iterators
+        integer :: i, j, k, l, r, q,  ii, id !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -830,7 +838,7 @@ contains
 
 
         ! Dimensional Splitting Loop =======================================
-        do i = 1, num_dims
+        do id = 1, num_dims
 
             ! Configuring Coordinate Direction Indexes ======================
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -841,45 +849,49 @@ contains
             ! ===============================================================
 
             ! Reconstructing Primitive/Conservative Variables ===============
-            iv%beg = 1; iv%end = adv_idx%end
+            
+            
             call nvtxStartRange("RHS-WENO")
+            
+            iv%beg = 1; iv%end = adv_idx%end
+            !call nvtxStartRange("RHS-WENO")
             call s_reconstruct_cell_boundary_values( &
-                q_prim_qp%vf(iv%beg:iv%end), &
-                qL_prim_n(i), &
-                qR_prim_n(i), &
-                i)
+               q_prim_qp%vf(iv%beg:iv%end), &
+                qL_prim_n(id), &
+                qR_prim_n(id), &
+                id)
             call nvtxEndRange
 
 !            do j = 1, sys_size
 !!$acc update host(qL_prim_n(i)%vf(j)%sf, qR_prim_n(i)%vf(j)%sf )
 !            end do
 
-!            if(proc_rank == 0) then
-!              if(num_dims == 1) then
-!                print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
-!                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
-!                print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
-!                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
-!              elseif(num_dims == 2) then
-!                print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
-!                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
-!                print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
-!                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
-!              elseif(num_dims == 3) then
-!                print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-!                print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
-!                print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-!                print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
-!              end if   
-!            end if
+ !           if(proc_rank == 0) then
+ !             if(num_dims == 1) then
+ !               print *, qL_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+ !               print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+ !               print *, qR_prim_n(i)%vf(E_idx)%sf(102, 0, 0)
+ !               print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(102, 0, 0)
+ !             elseif(num_dims == 2) then
+ !               print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+ !               print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
+ !               print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
+ !               print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
+ !             elseif(num_dims == 3) then
+  !              print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+  !              print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
+  !              print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
+  !              print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
+  !            end if   
+  !          end if
 
 
     
 
             ! Configuring Coordinate Direction Indexes ======================
-            if (i == 1) then
+            if (id == 1) then
                 ix%beg = -1; iy%beg = 0; iz%beg = 0
-            elseif (i == 2) then
+            elseif (id == 2) then
                 ix%beg = 0; iy%beg = -1; iz%beg = 0
             else
                 ix%beg = 0; iy%beg = 0; iz%beg = -1
@@ -889,21 +901,21 @@ contains
             ! ===============================================================
             call nvtxStartRange("RHS-Riemann")
             ! Computing Riemann Solver Flux and Source Flux =================
-            call s_riemann_solver(qR_prim_n(i)%vf, &
-                                  dqR_prim_dx_n(i)%vf, &
-                                  dqR_prim_dy_n(i)%vf, &
-                                  dqR_prim_dz_n(i)%vf, &
-                                  gm_alphaR_n(i)%vf, &
-                                  qL_prim_n(i)%vf, &
-                                  dqL_prim_dx_n(i)%vf, &
-                                  dqL_prim_dy_n(i)%vf, &
-                                  dqL_prim_dz_n(i)%vf, &
-                                  gm_alphaL_n(i)%vf, &
+            call s_riemann_solver(qR_prim_n(id)%vf, &
+                                  dqR_prim_dx_n(id)%vf, &
+                                  dqR_prim_dy_n(id)%vf, &
+                                  dqR_prim_dz_n(id)%vf, &
+                                  gm_alphaR_n(id)%vf, &
+                                  qL_prim_n(id)%vf, &
+                                  dqL_prim_dx_n(id)%vf, &
+                                  dqL_prim_dy_n(id)%vf, &
+                                  dqL_prim_dz_n(id)%vf, &
+                                  gm_alphaL_n(id)%vf, &
                                   q_prim_qp%vf, &
-                                  flux_n(i)%vf, &
-                                  flux_src_n(i)%vf, &
-                                  flux_gsrc_n(i)%vf, &
-                                  i, ix, iy, iz)
+                                  flux_n(id)%vf, &
+                                  flux_src_n(id)%vf, &
+                                  flux_gsrc_n(id)%vf, &
+                                  id, ix, iy, iz)
             call nvtxEndRange
 
             iv%beg = 1; iv%end = adv_idx%end
@@ -912,7 +924,7 @@ contains
 
  
             call nvtxStartRange("RHS_Flux_Add")
-            if (i == 1) then
+            if (id == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                   do q = 0, p
@@ -945,7 +957,7 @@ contains
               end do
 
 
-            elseif (i == 2) then
+            elseif (id == 2) then
             ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
 !$acc parallel loop collapse(4) gang vector default(present)                
@@ -976,7 +988,7 @@ contains
                   end do
                 end do
               end do
-            elseif (i == 3) then
+            elseif (id == 3) then
             ! RHS Contribution in z-direction ===============================
 
                 ! Applying the Riemann fluxes
@@ -3710,7 +3722,7 @@ contains
             is3%end = is3%end - weno_polyn
         end if
 
-        call s_weno(v_vf(iv%beg:iv%end), &
+        call s_weno_alt(v_vf(iv%beg:iv%end), &  
                     vL_qp%vf(iv%beg:iv%end), &
                     vR_qp%vf(iv%beg:iv%end), &
                     norm_dir, weno_dir,  &

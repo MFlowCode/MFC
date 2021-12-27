@@ -12,7 +12,7 @@ FC = mpif90 -acc
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -fallow-argument-mismatch -ffree-line-length-none
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O0 -ffree-line-length-none
 # FFLAGS = -cpp -c -w -freal-4-real-8 -O3 -pg -fallow-argument-mismatch
-FFLAGS = -cpp -c -w -fast -Minfo=accel
+FFLAGS = -Minfo=accel -cpp -c -w -O3 
 # FFLAGS = -cpp -c -w -O0 -Minfo=accel
 # -g -gopt -traceback 
 # FFLAGS = -cpp -c -w -fast -Minfo=accel

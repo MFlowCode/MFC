@@ -778,7 +778,9 @@ contains
             end if
         end if
         ! ==================================================================
-
+        if(proc_rank == 0) then
+          print *, m, n, p
+        end if
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
     !>  The goal of this procedure is to populate the buffers of
