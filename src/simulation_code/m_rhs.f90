@@ -862,26 +862,26 @@ contains
                 id)
             call nvtxEndRange
 
-            do j = 1, sys_size
-!$acc update host(qL_prim_n(id)%vf(j)%sf, qR_prim_n(id)%vf(j)%sf )
-            end do
+!            do j = 1, sys_size
+!!$acc update host(qL_prim_n(id)%vf(j)%sf, qR_prim_n(id)%vf(j)%sf )
+!            end do
 
  !           if(proc_rank == 0) then
  !             if(num_dims == 1) then
-                print *, qL_prim_n(id)%vf(E_idx)%sf(102, 0, 0)
-                print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(102, 0, 0)
-                print *, qR_prim_n(id)%vf(E_idx)%sf(102, 0, 0)
-                print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(102, 0, 0)
+ !               print *, qL_prim_n(id)%vf(E_idx)%sf(102, 0, 0)
+ !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(102, 0, 0)
+ !               print *, qR_prim_n(id)%vf(E_idx)%sf(102, 0, 0)
+ !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(102, 0, 0)
  !             elseif(num_dims == 2) then
- !               print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
- !               print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)
- !               print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 0)
- !               print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 0)  
+ !               print *, qL_prim_n(id)%vf(E_idx)%sf(50, 50, 0)
+ !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 0)
+ !               print *, qR_prim_n(id)%vf(E_idx)%sf(50, 50, 0)
+ !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 0)  
  !             elseif(num_dims == 3) then
-  !              print *, qL_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-  !              print *, qL_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50)
-  !              print *, qR_prim_n(i)%vf(E_idx)%sf(50, 50, 50)
-  !              print *, qR_prim_n(i)%vf(mom_idx%beg)%sf(50, 50, 50) 
+  !              print *, qL_prim_n(id)%vf(E_idx)%sf(50, 50, 50)
+  !              print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50)
+  !              print *, qR_prim_n(id)%vf(E_idx)%sf(50, 50, 50)
+  !              print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50) 
   !            end if   
   !          end if
 
