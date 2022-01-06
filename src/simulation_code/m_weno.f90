@@ -3445,8 +3445,8 @@ contains
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
                     do m = is3%beg, is3%end
-                        do l = is1%beg, is1%end 
-                            do k = is2%beg, is2%end                                                       
+                        do k = is2%beg, is2%end 
+                            do l = is1%beg, is1%end                                                       
                                 vL_vf(j)%sf(l, k, m) = vL_rs_vf_y_flat(k, l, m, j)
                                 vR_vf(j)%sf(l, k, m) = vR_rs_vf_y_flat(k, l, m, j)
                             end do 
@@ -3457,9 +3457,9 @@ contains
             elseif (weno_dir == 3) then
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
+                  do k = is3%beg, is3%end
+                   do l = is2%beg, is2%end
                     do m = is1%beg, is1%end                
-                        do l = is2%beg, is2%end
-                            do k = is3%beg, is3%end                               
                                 vL_vf(j)%sf(m, l, k) = vL_rs_vf_z_flat(k, l, m, j)
                                 vR_vf(j)%sf(m, l, k) = vR_rs_vf_z_flat(k, l, m, j)
                             end do 
@@ -3486,8 +3486,8 @@ contains
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
                     do m = is3%beg, is3%end
-                        do l = is1%beg, is1%end
                             do k = is2%beg, is2%end                          
+                        do l = is1%beg, is1%end
                                 vL_vf(j)%sf(l, k, m) = vL_rs_vf_y(j)%sf(k, l, m)
                                 vR_vf(j)%sf(l, k, m) = vR_rs_vf_y(j)%sf(k, l, m)
                             end do 
@@ -3498,9 +3498,9 @@ contains
             elseif (weno_dir == 3) then
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
-                    do m = is1%beg, is1%end
-                        do l = is2%beg, is2%end
                             do k = is3%beg, is3%end                           
+                        do l = is2%beg, is2%end
+                    do m = is1%beg, is1%end
                                 vL_vf(j)%sf(m, l, k) = vL_rs_vf_z(j)%sf(k, l, m)
                                 vR_vf(j)%sf(m, l, k) = vR_rs_vf_z(j)%sf(k, l, m)
                             end do 
