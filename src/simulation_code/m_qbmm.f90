@@ -1,9 +1,6 @@
 !>
 !! @file m_qbmm.f90
 !! @brief Contains module m_qbmm
-!! @author S. Bryngelson
-!! @version 1.0
-!! @date MAY 28, 2020
 
 !> @brief This module is used to compute moment inversion via qbmm
 MODULE m_qbmm

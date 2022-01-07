@@ -1,9 +1,6 @@
 !>
 !! @file p_main.f90
 !! @brief Contains program p_main
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief  Quasi-conservative, shock- and interface- capturing finite-volume
 !!              scheme for the multicomponent Navier-Stokes equations. The system

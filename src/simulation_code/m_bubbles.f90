@@ -1,9 +1,6 @@
 !>
 !! @file m_bubbles.f90
 !! @brief Contains module m_bubbles
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
 MODULE m_bubbles

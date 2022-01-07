@@ -1,9 +1,6 @@
 !>
 !! @file m_derived_variables.f90
 !! @brief Contains module m_derived_variables
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module features subroutines that allow for the derivation of
 !!              numerous flow variables from the conservative and primitive ones.

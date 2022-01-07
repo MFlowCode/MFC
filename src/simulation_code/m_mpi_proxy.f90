@@ -1,9 +1,6 @@
 !>
 !! @file m_mpi_proxy.f90
 !! @brief Contains module m_mpi_proxy
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief The module serves as a proxy to the parameters and subroutines
 !!          available in the MPI implementation's MPI module. Specifically,
