@@ -1,9 +1,6 @@
 !>
 !! @file m_cbc.f90
 !! @brief Contains module m_cbc
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief The module features a large database of characteristic boundary
 !!              conditions (CBC) for the Euler system of equations. This system

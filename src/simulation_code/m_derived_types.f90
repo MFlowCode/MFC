@@ -1,9 +1,6 @@
 !>
 !! @file m_derived_types.f90
 !! @brief Contains module m_derived_types
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module features the definitions of all the custom-defined
 !!        derived types that are utilized throughout the simulation code.

@@ -1,9 +1,6 @@
 !>
 !! @file m_rhs.f90
 !! @brief Contains module m_rhs
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief The module contains the subroutines used to calculate the right-
 !!              hand-side (RHS) in the quasi-conservative, shock- and interface-
@@ -1605,14 +1602,14 @@ MODULE m_rhs
                     IF(weno_vars == 1) THEN
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_cons_ndqp(i,:,:), &
-                                                  qR_cons_ndqp(i,:,:), &
+                                                  qL_cons_ndqp(i,0,0), &
+                                                  qR_cons_ndqp(i,0,0), &
                                                          weno_vars, i  )
                     ELSE
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_prim_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_prim_ndqp(i,:,:), &
-                                                  qR_prim_ndqp(i,:,:), &
+                                                  qL_prim_ndqp(i,0,0), &
+                                                  qR_prim_ndqp(i,0,0), &
                                                          weno_vars, i  )
                     END IF
 
@@ -1626,8 +1623,8 @@ MODULE m_rhs
                      
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_cons_ndqp(i,:,:), &
-                                                  qR_cons_ndqp(i,:,:), &
+                                                  qL_cons_ndqp(i,0,0), &
+                                                  qR_cons_ndqp(i,0,0), &
                                                           dflt_int, i  )
                      
                     END IF
@@ -1641,14 +1638,14 @@ MODULE m_rhs
                         IF(weno_vars == 1) THEN
                             CALL s_reconstruct_cell_boundary_values(      &
                                       q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                     qL_cons_ndqp(i,:,:), &
-                                                     qR_cons_ndqp(i,:,:), &
+                                                     qL_cons_ndqp(i,0,0), &
+                                                     qR_cons_ndqp(i,0,0), &
                                                              dflt_int, i  )
                         ELSE
                             CALL s_reconstruct_cell_boundary_values(      &
                                       q_prim_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                     qL_prim_ndqp(i,:,:), &
-                                                     qR_prim_ndqp(i,:,:), &
+                                                     qL_prim_ndqp(i,0,0), &
+                                                     qR_prim_ndqp(i,0,0), &
                                                              dflt_int, i  )
                         END IF
                      
@@ -1661,14 +1658,14 @@ MODULE m_rhs
                     IF(weno_vars == 1) THEN
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_cons_ndqp(i,:,:), &
-                                                  qR_cons_ndqp(i,:,:), &
+                                                  qL_cons_ndqp(i,0,0), &
+                                                  qR_cons_ndqp(i,0,0), &
                                                           dflt_int, i  )
                     ELSE
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_prim_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_prim_ndqp(i,:,:), &
-                                                  qR_prim_ndqp(i,:,:), &
+                                                  qL_prim_ndqp(i,0,0), &
+                                                  qR_prim_ndqp(i,0,0), &
                                                           dflt_int, i  )
                     END IF
                ! ===============================================================
@@ -1680,8 +1677,8 @@ MODULE m_rhs
                      
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_cons_ndqp(i,:,:), &
-                                                  qR_cons_ndqp(i,:,:), &
+                                                  qL_cons_ndqp(i,0,0), &
+                                                  qR_cons_ndqp(i,0,0), &
                                                           dflt_int, i  )
                      
                     ELSE
@@ -1693,8 +1690,8 @@ MODULE m_rhs
                                 
                                 CALL s_reconstruct_cell_boundary_values(    &
                                         q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                       qL_cons_ndqp(i,:,:), &
-                                                       qR_cons_ndqp(i,:,:), &
+                                                       qL_cons_ndqp(i,0,0), &
+                                                       qR_cons_ndqp(i,0,0), &
                                                                dflt_int, i  )
                            
                             END IF
@@ -1756,22 +1753,22 @@ MODULE m_rhs
 
                         CALL s_reconstruct_cell_boundary_values(         &
                                  dq_prim_dx_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                dqL_prim_dx_ndqp(i,:,:), &
-                                                dqR_prim_dx_ndqp(i,:,:), &
+                                                dqL_prim_dx_ndqp(i,0,0), &
+                                                dqR_prim_dx_ndqp(i,0,0), &
                                                             dflt_int, i  )
                    
                         IF(n > 0) THEN
                            
                             CALL s_reconstruct_cell_boundary_values(         &
                                      dq_prim_dy_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                    dqL_prim_dy_ndqp(i,:,:), &
-                                                    dqR_prim_dy_ndqp(i,:,:), &
+                                                    dqL_prim_dy_ndqp(i,0,0), &
+                                                    dqR_prim_dy_ndqp(i,0,0), &
                                                                 dflt_int, i  )
                             IF(p > 0) THEN
                                 CALL s_reconstruct_cell_boundary_values(         &
                                          dq_prim_dz_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                        dqL_prim_dz_ndqp(i,:,:), &
-                                                        dqR_prim_dz_ndqp(i,:,:), &
+                                                        dqL_prim_dz_ndqp(i,0,0), &
+                                                        dqR_prim_dz_ndqp(i,0,0), &
                                                                    dflt_int, i  )
                             END IF
 
@@ -1790,14 +1787,14 @@ MODULE m_rhs
                     IF (alt_crv .NEQV. .TRUE.) THEN
                               CALL s_reconstruct_cell_boundary_values(   &
                                                 kappa_vf(iv%beg:iv%end), &
-                                                     kappaL_ndqp(i,:,:), &
-                                                     kappaR_ndqp(i,:,:), &
+                                                     kappaL_ndqp(i,0,0), &
+                                                     kappaR_ndqp(i,0,0), &
                                                             dflt_int, i  )
                     ELSE
                         CALL s_reconstruct_cell_boundary_values(    &
                                     alt_kappa_vf(iv%beg:iv%end),    &
-                                                kappaL_ndqp(i,:,:), &
-                                                kappaR_ndqp(i,:,:), &
+                                                kappaL_ndqp(i,0,0), &
+                                                kappaR_ndqp(i,0,0), &
                                                         dflt_int, i )
                     END IF
                   
@@ -1895,7 +1892,7 @@ MODULE m_rhs
                   
                     iv%beg = 1; iv%end = adv_idx%end
        
-                    CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
                    
                     IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                         iv%beg = mom_idx%beg
@@ -1905,8 +1902,8 @@ MODULE m_rhs
                    
                     IF(riemann_solver /= 1) iv%end = adv_idx%beg
                    
-                    CALL s_average_cell_boundary_values(flux_src_ndqp(i,:,:))
-                    CALL s_average_cell_boundary_values(flux_gsrc_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(flux_src_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(flux_gsrc_ndqp(i,:,:))
                    ! ===============================================================
                 END IF
 
@@ -4472,7 +4469,7 @@ MODULE m_rhs
 
             iv%beg = 1; iv%end = adv_idx%end
         
-            CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
+            ! CALL s_average_cell_boundary_values(flux_ndqp(i,:,:))
             
             IF(ANY(Re_size > 0) .OR. We_size > 0 .OR. hypoelasticity) THEN
                iv%beg = mom_idx%beg
@@ -4482,8 +4479,8 @@ MODULE m_rhs
             
             IF(riemann_solver /= 1) iv%end = adv_idx%beg
             
-            CALL s_average_cell_boundary_values(flux_src_ndqp(i,:,:))
-            CALL s_average_cell_boundary_values(flux_gsrc_ndqp(i,:,:))
+            ! CALL s_average_cell_boundary_values(flux_src_ndqp(i,:,:))
+            ! CALL s_average_cell_boundary_values(flux_gsrc_ndqp(i,:,:))
         END SUBROUTINE s_get_tvd_flux
 
 
@@ -4507,8 +4504,8 @@ MODULE m_rhs
                         
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_cons_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_cons_ndqp(i,:,:), &
-                                                  qR_cons_ndqp(i,:,:), &
+                                                  qL_cons_ndqp(i,0,0), &
+                                                  qR_cons_ndqp(i,0,0), &
                                                           dflt_int, i  )
                         
                         DO k = ipsi%beg, ipsi%end, 2
@@ -4544,16 +4541,16 @@ MODULE m_rhs
                      
                         CALL s_reconstruct_cell_boundary_values(       &
                                    q_prim_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                  qL_prim_ndqp(i,:,:), &
-                                                  qR_prim_ndqp(i,:,:), &
+                                                  qL_prim_ndqp(i,0,0), &
+                                                  qR_prim_ndqp(i,0,0), &
                                                           dflt_int, i  )
                      
                     END IF
 
                     iv%beg = mom_idx%beg; iv%end = mom_idx%end
                   
-                    CALL s_average_cell_boundary_values(qL_prim_ndqp(i,:,:))
-                    CALL s_average_cell_boundary_values(qR_prim_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(qL_prim_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(qR_prim_ndqp(i,:,:))
                 END DO
 
                 IF (weno_Re_flux) THEN
@@ -4793,13 +4790,13 @@ MODULE m_rhs
                     ! Reconstruct the volume fraction at the cell boundaries
                     CALL s_reconstruct_cell_boundary_values(         &
                                  q_prim_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                qL_prim_ndqp(i,:,:), &
-                                                qR_prim_ndqp(i,:,:), &
+                                                qL_prim_ndqp(i,0,0), &
+                                                qR_prim_ndqp(i,0,0), &
                                                         dflt_int, i  )
                     ! Average the quadrature points at the cell boundaries to
                     ! obtain higher-order estimate of the volume fraction
-                    CALL s_average_cell_boundary_values(qL_prim_ndqp(i,:,:))
-                    CALL s_average_cell_boundary_values(qR_prim_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(qL_prim_ndqp(i,:,:))
+                    ! CALL s_average_cell_boundary_values(qR_prim_ndqp(i,:,:))
                   
                 END DO
             ! ==================================================================
@@ -4865,20 +4862,20 @@ MODULE m_rhs
                    
                      CALL s_reconstruct_cell_boundary_values(           &
                                 dq_prim_dx_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                               dqL_prim_dx_ndqp(i,:,:), &
-                                               dqR_prim_dx_ndqp(i,:,:), &
+                                               dqL_prim_dx_ndqp(i,0,0), &
+                                               dqR_prim_dx_ndqp(i,0,0), &
                                                            dflt_int, i  )
                      IF (n > 0) THEN
                          CALL s_reconstruct_cell_boundary_values(           &
                                     dq_prim_dy_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                   dqL_prim_dy_ndqp(i,:,:), &
-                                                   dqR_prim_dy_ndqp(i,:,:), &
+                                                   dqL_prim_dy_ndqp(i,0,0), &
+                                                   dqR_prim_dy_ndqp(i,0,0), &
                                                                dflt_int, i  )
                          IF (p > 0) THEN
                              CALL s_reconstruct_cell_boundary_values(         &
                                       dq_prim_dz_qp(0,0,0)%vf(iv%beg:iv%end), &
-                                                     dqL_prim_dz_ndqp(i,:,:), &
-                                                     dqR_prim_dz_ndqp(i,:,:), &
+                                                     dqL_prim_dz_ndqp(i,0,0), &
+                                                     dqR_prim_dz_ndqp(i,0,0), &
                                                                  dflt_int, i  )
                          END IF
                      END IF
@@ -5015,16 +5012,16 @@ MODULE m_rhs
                     ! Average the quadrature points at the cell boundaries to
                     ! obtain higher-order estimate of the normalized volume fraction
                     ! gradient
-                    CALL s_average_cell_boundary_values(un_alphaL_x_ndqp(1,:,:))
-                    CALL s_average_cell_boundary_values(un_alphaR_x_ndqp(1,:,:))
-                    IF (n > 0) THEN
-                        CALL s_average_cell_boundary_values(un_alphaL_y_ndqp(2,:,:))
-                        CALL s_average_cell_boundary_values(un_alphaR_y_ndqp(2,:,:))
-                        IF(p > 0) THEN
-                            CALL s_average_cell_boundary_values(un_alphaL_z_ndqp(3,:,:))
-                            CALL s_average_cell_boundary_values(un_alphaR_z_ndqp(3,:,:))
-                        END IF
-                    END IF
+                    ! ! CALL s_average_cell_boundary_values(un_alphaL_x_ndqp(1,:,:))
+                    ! CALL s_average_cell_boundary_values(un_alphaR_x_ndqp(1,:,:))
+                    ! IF (n > 0) THEN
+                    !     CALL s_average_cell_boundary_values(un_alphaL_y_ndqp(2,:,:))
+                    !     CALL s_average_cell_boundary_values(un_alphaR_y_ndqp(2,:,:))
+                    !     IF(p > 0) THEN
+                    !         CALL s_average_cell_boundary_values(un_alphaL_z_ndqp(3,:,:))
+                    !         CALL s_average_cell_boundary_values(un_alphaR_z_ndqp(3,:,:))
+                    !     END IF
+                    ! END IF
             ! ==================================================================
                     IF (lsq_deriv .NEQV. .TRUE.) THEN 
                        ! Apply the vector divergence theorem to compute the divergence
@@ -5913,10 +5910,12 @@ MODULE m_rhs
            
             TYPE(scalar_field), DIMENSION(iv%beg:iv%end), INTENT(IN) :: v_vf
             
-            TYPE(vector_field),             &
-            DIMENSION( ichi%beg:ichi%end,   &
-                       ipsi%beg:ipsi%end ), &
-            INTENT(INOUT) :: vL_qp, vR_qp
+            ! TYPE(vector_field),             &
+            ! DIMENSION( ichi%beg:ichi%end,   &
+            !            ipsi%beg:ipsi%end ), &
+            ! INTENT(INOUT) :: vL_qp, vR_qp
+
+            TYPE(vector_field), INTENT(INOUT) :: vL_qp, vR_qp
             
             INTEGER, INTENT(IN) :: cd_vars
             INTEGER, INTENT(IN) :: norm_dir
@@ -5940,68 +5939,16 @@ MODULE m_rhs
             END IF
             
             CALL s_weno(            v_vf(iv%beg:iv%end), &
-                         vL_qp( 0, 0)%vf(iv%beg:iv%end), &
-                         vR_qp( 0, 0)%vf(iv%beg:iv%end), &
+                         vL_qp%vf(iv%beg:iv%end), &
+                         vR_qp%vf(iv%beg:iv%end), &
                          cd_vars, norm_dir, weno_dir, 1, &
                          is1,is2,is3                     )
             ! ==================================================================
             
             ! Reconstruction in s2-direction ===================================
             IF(split_err .NEQV. .TRUE.) RETURN
-            
-            IF(norm_dir /= 1) THEN
-                weno_dir = 1; is1%beg = is1%beg + weno_polyn
-                              is1%end = is1%end - weno_polyn
-            ELSE
-                weno_dir = 2; is2%beg = is2%beg + weno_polyn
-                              is2%end = is2%end - weno_polyn
-            END IF
-            
-            CALL s_weno( vL_qp( 0, 0)%vf(iv%beg:iv%end), &
-                         vL_qp(-1, 0)%vf(iv%beg:iv%end), &
-                         vL_qp( 1, 0)%vf(iv%beg:iv%end), &
-                         dflt_int, norm_dir,weno_dir, 2, &
-                         is1,is2,is3                     )
-            CALL s_weno( vR_qp( 0, 0)%vf(iv%beg:iv%end), &
-                         vR_qp(-1, 0)%vf(iv%beg:iv%end), &
-                         vR_qp( 1, 0)%vf(iv%beg:iv%end), &
-                         dflt_int, norm_dir,weno_dir, 2, &
-                         is1,is2,is3                     )
-            ! ==================================================================
-            
-            
-            ! Reconstruction in s3-direction ===================================
-            IF(p == 0) RETURN
-            
-            IF(norm_dir /= 3) THEN
-                weno_dir = 3; is3%beg = is3%beg + weno_polyn
-                              is3%end = is3%end - weno_polyn
-            ELSE
-                weno_dir = 2; is2%beg = is2%beg + weno_polyn
-                              is2%end = is2%end - weno_polyn
-            END IF
-            
-            CALL s_weno( vL_qp(-1, 0)%vf(iv%beg:iv%end), &
-                         vL_qp(-1,-1)%vf(iv%beg:iv%end), &
-                         vL_qp(-1, 1)%vf(iv%beg:iv%end), &
-                         dflt_int, norm_dir,weno_dir, 2, &
-                         is1,is2,is3                     )
-            CALL s_weno( vL_qp( 1, 0)%vf(iv%beg:iv%end), &
-                         vL_qp( 1,-1)%vf(iv%beg:iv%end), &
-                         vL_qp( 1, 1)%vf(iv%beg:iv%end), &
-                         dflt_int, norm_dir,weno_dir, 2, &
-                         is1,is2,is3                     )
-            CALL s_weno( vR_qp(-1, 0)%vf(iv%beg:iv%end), &
-                         vR_qp(-1,-1)%vf(iv%beg:iv%end), &
-                         vR_qp(-1, 1)%vf(iv%beg:iv%end), &
-                         dflt_int, norm_dir,weno_dir, 2, &
-                         is1,is2,is3                     )
-            CALL s_weno( vR_qp( 1, 0)%vf(iv%beg:iv%end), &
-                         vR_qp( 1,-1)%vf(iv%beg:iv%end), &
-                         vR_qp( 1, 1)%vf(iv%beg:iv%end), &
-                         dflt_int, norm_dir,weno_dir, 2, &
-                         is1,is2,is3                     )
-            ! ==================================================================
+
+            call s_mpi_abort()
             
             
         END SUBROUTINE s_reconstruct_cell_boundary_values ! --------------------

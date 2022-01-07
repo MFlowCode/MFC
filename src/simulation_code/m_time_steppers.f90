@@ -1,9 +1,6 @@
 !>
 !! @file m_time_steppers.f90
 !! @brief Contains module m_time_steppers
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:
