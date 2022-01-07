@@ -1,9 +1,6 @@
 !>
 !! @file m_weno.f90
 !! @brief Contains module m_weno
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
 !!              that is supplemented with monotonicity preserving bounds (MPWENO)

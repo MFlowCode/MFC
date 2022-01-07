@@ -1,9 +1,6 @@
 !>
 !! @file m_compile_specific.f90
 !! @brief Contains module m_compile_specific
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module contains subroutines that are compiler specific
 MODULE m_compile_specific
