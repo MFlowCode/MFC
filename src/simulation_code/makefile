@@ -9,7 +9,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-FLFLAGS = -g $(ld_sim_flags)
+FLFLAGS = -g $(ld_sim_flags) -L$(CUDA_DIR)/lib64 -lnvToolsExt
 FCFLAGS = -g $(f90_flags)
 EXEC = simulation
 PROGRAM = p_main
@@ -37,7 +37,7 @@ clean:
 $(PRG_OBJ) : $(MOD_OBJS)
 
 # Modules depend on each other
-m_rhs.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_weno.o m_riemann_solvers.o m_cbc.o m_bubbles.o m_qbmm.o
+m_rhs.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_weno.o m_riemann_solvers.o m_cbc.o m_bubbles.o m_qbmm.o nvtx.o
 m_start_up.o :             m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_compile_specific.o
 m_data_output.o :          m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_compile_specific.o
 m_riemann_solvers.o :      m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_bubbles.o
@@ -49,7 +49,7 @@ m_weno.o :                 m_derived_types.o m_global_parameters.o m_variables_c
 
 m_time_steppers.o :        m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_rhs.o m_data_output.o m_bubbles.o
 m_derived_variables.o :    m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_data_output.o m_time_steppers.o m_rhs.o
-m_variables_conversion.o : m_derived_types.o m_global_parameters.o m_mpi_proxy.o
+m_variables_conversion.o : m_derived_types.o m_global_parameters.o m_mpi_proxy.o nvtx.o
 
 m_mpi_proxy.o :            m_derived_types.o m_global_parameters.o
 m_global_parameters.o :    m_derived_types.o

@@ -37,6 +37,8 @@ module m_mpi_proxy
     integer, private :: err_code, ierr
     !> @}
 
+!$acc declare create(q_cons_buff_send, q_cons_buff_recv)
+
 contains
 
     !> The subroutine intializes the MPI execution environment
@@ -776,7 +778,9 @@ contains
             end if
         end if
         ! ==================================================================
-
+        if(proc_rank == 0) then
+          print *, m, n, p
+        end if
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
     !>  The goal of this procedure is to populate the buffers of
@@ -1088,17 +1092,21 @@ contains
                 if (bc_x%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_x%end
-                    do l = 0, p
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, sys_size
+                      do l = 0, p
                         do k = 0, n
                             do j = m - buff_size + 1, m
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j - m - 1) + buff_size*((k + 1) + (n + 1)*l))
                                     q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l)
-                                end do
                             end do
                         end do
+                      end do
                     end do
+
+!$acc update host(q_cons_buff_send)
+
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1113,10 +1121,11 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_x%beg
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, buff_size - 1
-                                do i = 1, sys_size
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, sys_size
+                      do l = 0, p
+                          do k = 0, n
+                              do j = 0, buff_size - 1
                                     r = (i - 1) + sys_size* &
                                         (j + buff_size*(k + (n + 1)*l))
                                     q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l)
@@ -1124,6 +1133,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1137,11 +1148,14 @@ contains
 
                 end if
 
+!$acc update device(q_cons_buff_recv)
+
                 ! Unpacking buffer received from bc_x%beg
-                do l = 0, p
-                    do k = 0, n
-                        do j = -buff_size, -1
-                            do i = 1, sys_size
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                do i = 1, sys_size
+                  do l = 0, p
+                      do k = 0, n
+                          do j = -buff_size, -1
                                 r = (i - 1) + sys_size* &
                                     (j + buff_size*((k + 1) + (n + 1)*l))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
@@ -1154,11 +1168,12 @@ contains
 
                 if (bc_x%beg >= 0) then      ! PBC at the end and beginning
 
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
                     ! Packing buffer to be sent to bc_x%beg
+                  do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         (j + buff_size*(k + (n + 1)*l))
                                     q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l)
@@ -1166,6 +1181,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_x%beg/bc_x%end
                     call MPI_SENDRECV( &
@@ -1180,10 +1197,11 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_x%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
                             do j = m - buff_size + 1, m
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j - m - 1) + buff_size*((k + 1) + (n + 1)*l))
                                     q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l)
@@ -1191,6 +1209,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%end
                     call MPI_SENDRECV( &
@@ -1204,11 +1224,14 @@ contains
 
                 end if
 
+!$acc update device(q_cons_buff_recv)
+
                 ! Unpacking buffer received from bc_x%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+              do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
                         do j = m + 1, m + buff_size
-                            do i = 1, sys_size
                                 r = (i - 1) + sys_size* &
                                     ((j - m - 1) + buff_size*(k + (n + 1)*l))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
@@ -1228,10 +1251,11 @@ contains
                 if (bc_y%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_y%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = 0, p
                         do k = n - buff_size + 1, n
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k - n + buff_size - 1) + buff_size*l))
@@ -1240,6 +1264,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_y%end/bc_y%beg
                     call MPI_SENDRECV( &
@@ -1254,10 +1280,11 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_y%beg
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = 0, p
                         do k = 0, buff_size - 1
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
@@ -1266,6 +1293,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_y%beg/bc_y%beg
                     call MPI_SENDRECV( &
@@ -1279,11 +1308,14 @@ contains
 
                 end if
 
+!$acc update device(q_cons_buff_recv)
+
                 ! Unpacking buffer received from bc_y%beg
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+              do i = 1, sys_size
                 do l = 0, p
                     do k = -buff_size, -1
                         do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
                                 r = (i - 1) + sys_size* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + buff_size*l))
@@ -1298,10 +1330,11 @@ contains
                 if (bc_y%beg >= 0) then      ! PBC at the end and beginning
 
                     ! Packing buffer to be sent to bc_y%beg
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = 0, p
                         do k = 0, buff_size - 1
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
@@ -1310,6 +1343,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_y%beg/bc_y%end
                     call MPI_SENDRECV( &
@@ -1324,10 +1359,11 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_y%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = 0, p
                         do k = n - buff_size + 1, n
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k - n + buff_size - 1) + buff_size*l))
@@ -1336,6 +1372,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_y%end/bc_y%end
                     call MPI_SENDRECV( &
@@ -1349,11 +1387,14 @@ contains
 
                 end if
 
+!$acc update device(q_cons_buff_recv)
+
                 ! Unpacking buffer received form bc_y%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+              do i = 1, sys_size
                 do l = 0, p
                     do k = n + 1, n + buff_size
                         do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
                                 r = (i - 1) + sys_size* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k - n - 1) + buff_size*l))
@@ -1374,10 +1415,11 @@ contains
                 if (bc_z%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_z%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size 
                     do l = p - buff_size + 1, p
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
@@ -1387,6 +1429,9 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
+
 
                     ! Send/receive buffer to/from bc_z%end/bc_z%beg
                     call MPI_SENDRECV( &
@@ -1403,10 +1448,11 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_z%beg
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                 do i = 1, sys_size
                     do l = 0, buff_size - 1
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
@@ -1415,6 +1461,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_z%beg/bc_z%beg
                     call MPI_SENDRECV( &
@@ -1430,11 +1478,14 @@ contains
 
                 end if
 
+!$acc update device(q_cons_buff_recv)
+
                 ! Unpacking buffer from bc_z%beg
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+              do i = 1, sys_size
                 do l = -buff_size, -1
                     do k = -buff_size, n + buff_size
-                        do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
+                        do j = -buff_size, m + buff_size                            
                                 r = (i - 1) + sys_size* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
@@ -1450,10 +1501,11 @@ contains
                 if (bc_z%beg >= 0) then      ! PBC at the end and beginning
 
                     ! Packing buffer to be sent to bc_z%beg
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = 0, buff_size - 1
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
@@ -1462,6 +1514,9 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
+
 
                     ! Send/receive buffer to/from bc_z%beg/bc_z%end
                     call MPI_SENDRECV( &
@@ -1478,10 +1533,11 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_z%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                  do i = 1, sys_size
                     do l = p - buff_size + 1, p
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                do i = 1, sys_size
                                     r = (i - 1) + sys_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
@@ -1491,6 +1547,8 @@ contains
                             end do
                         end do
                     end do
+
+!$acc update host(q_cons_buff_send)
 
                     ! Send/receive buffer to/from bc_z%end/bc_z%end
                     call MPI_SENDRECV( &
@@ -1506,11 +1564,14 @@ contains
 
                 end if
 
+!$acc update device(q_cons_buff_recv)
+
                 ! Unpacking buffer received from bc_z%end
+!$acc parallel loop collapse(4) gang vector default(present) private(r)
+              do i = 1, sys_size
                 do l = p + 1, p + buff_size
                     do k = -buff_size, n + buff_size
-                        do j = -buff_size, m + buff_size
-                            do i = 1, sys_size
+                        do j = -buff_size, m + buff_size                            
                                 r = (i - 1) + sys_size* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &

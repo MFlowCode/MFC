@@ -78,7 +78,7 @@ contains
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_vars, &
-            weno_order, weno_eps, &
+            weno_order, weno_eps, weno_flat, riemann_flat, &
             mapped_weno, mp_weno, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &

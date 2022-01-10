@@ -2,11 +2,14 @@
 import math
 
 #Numerical setup
-Nx      = 250
+Nx      = 100
 dx      = 1./(1.*(Nx+1))
-
+Ny  = 70
+dy = 1./(1.*(Ny+1))
+Nz = 60
+dz = 1./(1.*(Nz+1))
 Tend    = 0.03
-Nt      = 10
+Nt      = 100
 mydt    = Tend/(1.*Nt)
 
 # Command to navigate between directories
@@ -51,14 +54,20 @@ case_dict =                                                                     
                                                                                 \
                     # Computational Domain Parameters ==========================
                     'x_domain%beg'                 : 0.E+00,                    \
+                    'y_domain%beg'                 : 0.E+00,                    \
+                    'z_domain%beg'                 : 0.E+00,                    \
                     'x_domain%end'                 : 1.E+00,                    \
+                    'y_domain%end'                 : 1.E+00,                    \
+                    'z_domain%end'                 : 1.E+00,                    \
                     'm'                            : Nx,                        \
-                    'n'                            : 0,                         \
-                    'p'                            : 0,                         \
+                    'n'                            : Ny,                         \
+                    'p'                            : Nz,                         \
                     'dt'                           : mydt,                      \
                     't_step_start'                 : 0,                         \
-                    't_step_stop'                  : int(Nt),                   \
-                    't_step_save'                  : int(Nt),                   \
+                    't_step_stop'                  : 20,
+                    \
+                    't_step_save'                  : 20, 
+                    \
                     # ==========================================================
                                                                                 \
                     # Simulation Algorithm Parameters ==========================
@@ -80,7 +89,11 @@ case_dict =                                                                     
                     'wave_speeds'                  : 1,                         \
                     'avg_state'                    : 2,                         \
                     'bc_x%beg'                     : -1,                        \
+                    'bc_y%beg'                     : -1,                        \
+                    'bc_z%beg'                     : -1,                        \
                     'bc_x%end'                     : -1,                        \
+                    'bc_y%end'                     : -1,                        \
+                    'bc_z%end'                     : -1,                        \
                     # ==========================================================
                                                                                 \
                     # Formatted Database Files Structure Parameters ============
@@ -111,10 +124,17 @@ case_dict =                                                                     
                     # ==========================================================
 
                     # Patch 1D Analytical ======================================
-                    'patch_icpp(1)%geometry'       : 15,                        \
+                    'patch_icpp(1)%geometry'       : 13,
+                    \
                     'patch_icpp(1)%x_centroid'     : 0.5,                       \
+                    'patch_icpp(1)%y_centroid'     : 0.5,                       \
+                    'patch_icpp(1)%z_centroid'     : 0.5,                       \
                     'patch_icpp(1)%length_x'       : 1.0,                       \
+                    'patch_icpp(1)%length_y'       : 1.0,                       \
+                    'patch_icpp(1)%length_z'       : 1.0,                       \
                     'patch_icpp(1)%vel(1)'         : 0.05,                      \
+                    'patch_icpp(1)%vel(2)'         : 0.05,                      \
+                    'patch_icpp(1)%vel(3)'         : 0.05,                      \
                     'patch_icpp(1)%pres'           : 1.1,                       \
                     'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,                    \
                     'patch_icpp(1)%alpha(1)'       : 1.,                        \

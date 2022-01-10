@@ -25,6 +25,8 @@ module m_time_steppers
     use m_bubbles              !< Bubble dynamics routines
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use nvtx
     ! ==========================================================================
 
     implicit none
@@ -150,6 +152,16 @@ contains
             end do
         end if
 
+        do i = 1, cont_idx%end
+            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
+        end do
+
+        do i = adv_idx%beg, adv_idx%end
+            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
+!$acc enter data attach(q_prim_vf(i)%sf)
+        end do
+
         ! Allocating the cell-average RHS variables
         allocate (rhs_vf(1:sys_size))
 
@@ -157,6 +169,7 @@ contains
             allocate (rhs_vf(i)%sf(0:m, 0:n, 0:p))
 !$acc enter data create(rhs_vf(i)%sf(0:m, 0:n, 0:p))
         end do
+
 
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
@@ -171,19 +184,11 @@ contains
 
         integer, intent(IN) :: t_step
 
-        integer :: i !< Generic loop iterator
+        integer :: i,j,k,l !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
-
+        call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
         if (DEBUG) print *, 'got rhs'
@@ -199,31 +204,29 @@ contains
 
         if (t_step == t_step_stop) return
 
+
+!$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
-            q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                + dt*rhs_vf(i)%sf
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do 
+                end do 
+            end do
         end do
 
-        !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(50,30,0)
-        !print *, q_cons_ts(1)%vf(E_idx)%sf(50,30,0)
-        !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(50,30,0)
-        !print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(50,30,0)
+        !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
+        !print *, q_cons_ts(1)%vf(E_idx)%sf(102,0,0)
+        !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)
+        !print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(102,0,0)
 
         
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        do i = 1, cont_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
-
-
-        do i = adv_idx%beg, adv_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
+        call nvtxEndRange
 
         ! ==================================================================
 
@@ -437,6 +440,18 @@ contains
     subroutine s_finalize_time_steppers_module() ! -------------------------
 
         integer :: i, j !< Generic loop iterators
+
+
+        do i = 1, cont_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
+            q_prim_vf(i)%sf => null()
+        end do
+
+
+        do i = adv_idx%beg, adv_idx%end
+!$acc exit data detach(q_prim_vf(i)%sf)
+            q_prim_vf(i)%sf => null()
+        end do
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts

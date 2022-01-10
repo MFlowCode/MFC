@@ -50,7 +50,7 @@ program p_main
 
     implicit none
 
-    integer :: t_step !< Iterator for the time-stepping loop
+    integer :: t_step, i !< Iterator for the time-stepping loop
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
@@ -73,6 +73,8 @@ program p_main
     call s_mpi_bcast_user_inputs()
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
+
+
 
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -102,6 +104,14 @@ program p_main
     call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
+!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
+!$acc update device(sys_size, buff_size)
+!$acc update device(m, n, p)
+    do i = 1, sys_size
+!$acc update device(q_cons_ts(1)%vf(i)%sf)
+    end do
+
+
     ! Populating the buffers of the grid variables using the boundary conditions
     call s_populate_grid_variables_buffers()
 
@@ -114,6 +124,8 @@ program p_main
     call s_initialize_cbc_module()
 
     call s_initialize_derived_variables()
+
+
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
@@ -154,6 +166,9 @@ program p_main
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         if (mod(t_step - t_step_start, t_step_save) == 0) then
+                do i = 1, sys_size
+!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
         end if
 
