@@ -58,6 +58,7 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry
     !> @}
+!$acc declare create(cyl_coord, grid_geometry)
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -75,6 +76,8 @@ module m_global_parameters
     !> @}
 
     real(kind(0d0)) :: dt !< Size of the time-step
+
+!$acc declare create(x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -107,7 +110,7 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
-!$acc declare create(weno_polyn)
+!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -149,6 +152,7 @@ module m_global_parameters
     integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
 
+
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
     !! numbers, will be non-negligible.
@@ -156,6 +160,7 @@ module m_global_parameters
     integer, dimension(2)   :: Re_size
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
+!$acc declare create(Re_size, Re_idx)
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
@@ -165,12 +170,14 @@ module m_global_parameters
     integer, dimension(3) :: dir_idx
     real(kind(0d0)), dimension(3) :: dir_flg
     !> @}
-
+!$acc declare create(dir_idx, dir_flg)
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
+
+!$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -180,6 +187,7 @@ module m_global_parameters
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
+
 
     ! ==========================================================================
 
@@ -207,6 +215,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)) :: rhoref, pref
     !> @}
+!$acc declare create(rhoref, pref)
 
     !> @name Bubble modeling
     !> @{
@@ -234,6 +243,8 @@ module m_global_parameters
     integer         :: nmomtot !< Total number of carried moments moments/transport equations
     integer         :: R0_type
 
+!$acc declare create(nb,weight,bubbles)
+
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
     !> @}
@@ -257,6 +268,8 @@ module m_global_parameters
 
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
+
+    logical :: weno_flat, riemann_flat
 
     ! ======================================================================
 
@@ -312,6 +325,8 @@ contains
         mixture_err = .false.
         parallel_io = .false.
         precision = 2
+        weno_flat = .true.
+        riemann_flat = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -417,6 +432,8 @@ contains
         ! Determining the degree of the WENO polynomials
         weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
+
+
 
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces
@@ -672,6 +689,7 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
+!$acc update device(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
@@ -928,6 +946,8 @@ contains
         real(kind(0.d0)) :: nR3
         integer :: i
 
+!$acc routine seq
+
         call s_quad(nRtmp**3d0, nR3)
 
         if (nR3 < 0d0) then
@@ -937,13 +957,13 @@ contains
             ! END IF
             ! END DO
             ! nR3 = 1.d-12
-            print *, vftmp, nR3, nRtmp(:)
+            !print *, vftmp, nR3, nRtmp(:)
             stop 'nR3 is negative'
         end if
         if (vftmp < 0d0) then
             ! vftmp = small_alf
             ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
-            print *, vftmp, nR3, nRtmp(:)
+            !print *, vftmp, nR3, nRtmp(:)
             stop 'vf negative'
         end if
 
@@ -983,7 +1003,7 @@ contains
         !! @param func is the bubble dynamic variables for each bin
         !! @param mom is the computed moment
     subroutine s_quad(func, mom)
-
+!$acc routine seq
         real(kind(0.d0)), dimension(nb), intent(IN) :: func
         real(kind(0.d0)), intent(OUT) :: mom
 

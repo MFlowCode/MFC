@@ -6,12 +6,8 @@
 
 export PGI_ACC_TIME=0
 export PGI_ACC_NOTIFY=
-export PGI_ACC_DEBUG=
-
-#mpirun -n 1 ../../src/pre_process_code/pre_process
-#mpirun -n 1 nsys profile --stats=true ../../src/simulation_code/simulation
-
+export PGI_ACC_DEBUG=0
 jsrun -r1 -a1 -c1 -g1 ../../src/pre_process_code/pre_process
-time jsrun -r1 -a1 -c1 -g1 nsys profile --stats=true ../../src/simulation_code/simulation
 #time jsrun -r1 -a1 -c1 -g1 ../../src/simulation_code/simulation
+time jsrun -r1 -a1 -c1 -g1 nsys profile --stats=true ../../src/simulation_code/simulation
 
