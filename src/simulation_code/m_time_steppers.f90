@@ -238,18 +238,10 @@ contains
 
         integer, intent(IN) :: t_step
 
-        integer :: i !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
 
         ! Stage 1 of 2 =====================================================
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 
@@ -263,10 +255,18 @@ contains
 
         if (t_step == t_step_stop) return
 
+
+!$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
-            q_cons_ts(2)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                + dt*rhs_vf(i)%sf
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do 
+                end do 
+            end do
         end do
 
 
@@ -274,33 +274,27 @@ contains
         ! ==================================================================
 
         ! Stage 2 of 2 =====================================================
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
-        end do
-
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
-        end do
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
-        do i = 1, sys_size
-            q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                (q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                 + q_cons_ts(2)%vf(i)%sf(0:m, 0:n, 0:p) &
-                 + dt*rhs_vf(i)%sf)/2d0
-        end do
 
+!$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                               ( q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                               + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l))/2d0
+                    end do 
+                end do 
+            end do
+        end do
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => null()
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => null()
-        end do
         ! ==================================================================
 
     end subroutine s_2nd_order_tvd_rk ! ------------------------------------
@@ -311,18 +305,11 @@ contains
 
         integer, intent(IN) :: t_step
 
-        integer :: i, j !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
 
         ! Stage 1 of 3 =====================================================
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
+        call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 
@@ -336,35 +323,43 @@ contains
 
         if (t_step == t_step_stop) return
 
-        do i = 1, sys_size
-            q_cons_ts(2)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                + dt*rhs_vf(i)%sf
-        end do
 
+
+
+!$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do 
+                end do 
+            end do
+        end do
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(2)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
+!$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
-            q_cons_ts(2)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                (3d0*q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                 + q_cons_ts(2)%vf(i)%sf(0:m, 0:n, 0:p) &
-                 + dt*rhs_vf(i)%sf)/4d0
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                               (3d0* q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                               + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                    end do 
+                end do 
+            end do
         end do
 
 
@@ -375,25 +370,25 @@ contains
         ! Stage 3 of 3 =====================================================
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
+
+!$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
-            q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) = &
-                (q_cons_ts(1)%vf(i)%sf(0:m, 0:n, 0:p) &
-                 + 2d0*q_cons_ts(2)%vf(i)%sf(0:m, 0:n, 0:p) &
-                 + 2d0*dt*rhs_vf(i)%sf)/3d0
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                               ( q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                               + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                            + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                    end do 
+                end do 
+            end do
         end do
 
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        do i = 1, cont_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
 
-        do i = adv_idx%beg, adv_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
         ! ==================================================================
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
