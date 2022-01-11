@@ -46,27 +46,34 @@ program p_main
 
     use m_qbmm                 !< Quadrature MOM
 
+    use nvtx
+
     ! ==========================================================================
 
     implicit none
 
     integer :: t_step, i !< Iterator for the time-stepping loop
 
+    
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
     ! Initializing MPI execution environment
+    
     call s_mpi_initialize()
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
     ! their consistency is checked. The identification of any inconsistencies
-    ! will result in the termination of the simulation.
+ 
+   ! will result in the termination of the simulation.
     if (proc_rank == 0) then
+    
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
+    
         call s_check_input_file()
     end if
-
+    
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
@@ -80,16 +87,18 @@ program p_main
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
+    
     call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
     call s_initialize_rhs_module()
+    
     call s_initialize_data_output_module()
     call s_initialize_derived_variables_module()
     call s_initialize_time_steppers_module()
     if (qbmm) call s_initialize_qbmm_module()
-
+    
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -103,7 +112,7 @@ program p_main
     ! Reading in the user provided initial condition and grid data
     call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
-
+    
 !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
 !$acc update device(sys_size, buff_size)
 !$acc update device(m, n, p)
@@ -126,7 +135,7 @@ program p_main
     call s_initialize_derived_variables()
 
 
-
+    
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
     if (t_step == 0) then
@@ -166,10 +175,13 @@ program p_main
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         if (mod(t_step - t_step_start, t_step_save) == 0) then
+            
+            call nvtxStartRange("I/O")
                 do i = 1, sys_size
 !$acc update host(q_cons_ts(1)%vf(i)%sf)
                 end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
+            call nvtxEndRange
         end if
 
         call system_clock(cpu_end)
