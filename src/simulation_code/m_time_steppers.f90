@@ -388,6 +388,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+        call nvtxEndRange
 
         ! ==================================================================
 
