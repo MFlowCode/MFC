@@ -32,13 +32,16 @@ program p_main
 
     implicit none
 
-    ! Initialization of the MPI environment
+ 
+   ! Initialization of the MPI environment
+
     call s_mpi_initialize()
 
     ! Rank 0 processor assigns default values to user inputs prior to reading
     ! those in from the input file. Next, the user inputs are read in and their
     ! consistency is checked. The detection of any inconsistencies automatically
     ! leads to the termination of the pre-process.
+
     if (proc_rank == 0) then
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
