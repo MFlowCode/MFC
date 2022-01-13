@@ -862,9 +862,9 @@ contains
                 id)
             call nvtxEndRange
 
- !           do j = 1, sys_size
+!            do j = 1, sys_size
 !!$acc update host(qL_prim_n(id)%vf(j)%sf, qR_prim_n(id)%vf(j)%sf )
- !           end do
+!            end do
 
  !           if(proc_rank == 0) then
  !             if(num_dims == 1) then
@@ -882,7 +882,7 @@ contains
  !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50)
  !               print *, qR_prim_n(id)%vf(E_idx)%sf(50, 50, 50)
  !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50) 
- !             end if   
+  !            end if   
   !          end if
 
 
