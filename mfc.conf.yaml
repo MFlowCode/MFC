@@ -13,12 +13,12 @@ configurations:
     c:       -O3
     c++:     -O3
     fortran: -O3 -cpp -w -acc -Minfo=accel -lnvToolsExt -L${CUDA:INSTALL_PATH}/lib64
-- name: debug
+- name: debug-cpu
   flags:
     c:       -Og -g
     c++:     -Og -g
     fortran: -Og -g -cpp -w
-- name: ci
+- name: ci-cpu
   flags:
     fortran: -cpp -w
 targets:

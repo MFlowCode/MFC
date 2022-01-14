@@ -151,32 +151,32 @@ In the `compilers` section you can specify which compilers you wish to have used
 
 ```yaml
 compilers:
-  regular:
-    c:       gcc
-    c++:     g++
-    fortran: gfortran
-  mpi:
-    c:       mpicc
-    c++:     mpicxx
-    fortran: mpif90
+  c:       mpicc
+  c++:     mpicxx
+  fortran: mpif90
 ```
 
 ### Compiler Configurations
 
-The `configurations` section within `compilers` consists of a list of "compiler configurations", describing modifications for including but not limited to "release" and "debug" builds. You can freely modify the existing configurations and add your own. Here is the description of "release":
+The `configurations` section consists of a list of "compiler configurations", describing modifications for including but not limited to "release" and "debug" builds for CPUs or GPUs. You can freely modify the existing configurations and add your own. Examples:
 
 ```yaml
-- name: release
+- name: release-cpu
   flags:
     c:       -O3
     c++:     -O3
     fortran: -O3 -cpp -w
+- name: release-gpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w -acc -Minfo=accel -lnvToolsExt -L${CUDA:INSTALL_PATH}/lib64
 ```
 
-To use a desired compiler configuration with `mfc.py`, you must specify the `--compiler-configuration` (a.k.a `-cc`) option, along with the name of your configuration. `release` is its default value. For example, to build MFC and its dependencies in `debug` mode, you can run:
+To use a desired compiler configuration with `mfc.py`, you must specify the `--compiler-configuration` (a.k.a `-cc`) option, along with the name of your configuration. `release-cpu` is its default value. For example, to build MFC and its dependencies in `debug-cpu` mode, you can run:
 
 ```
-./mfc.py --build -cc debug
+./mfc.py --build -cc debug-cpu
 ```
 
 ### Targets
@@ -238,9 +238,9 @@ For example, to build MFC's simulation component and its dependencies from scrat
 + Use the `--set-current <name>` (a.k.a `-sc <name>`) option to select explicitly which compiler configuration to use when running MFC.
 
 ```
-./mfc.py --build -t MFC_Simulation -cc debug -j 8 --scratch
+./mfc.py --build -t MFC_Simulation -cc release-cpu -j 8 --scratch
 ./mfc.py --test
-./mfc.py --set-current debug
+./mfc.py --set-current debug-cpu
 ```
 
 # Running

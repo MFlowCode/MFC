@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # Description: Vacuum.
 
@@ -86,7 +86,7 @@ case_dict =                                                                    \
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'F',                       \
+		    'parallel_io'                  :'T',                       \
 		    # ==========================================================
                                                                                
 		    # Patch 1: Left state ======================================

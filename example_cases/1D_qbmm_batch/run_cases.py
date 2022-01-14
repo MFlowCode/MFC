@@ -6,7 +6,7 @@ import os
 with open(r'_data/publist.yml') as file:
 
     for pub in pubs:
-        for k,v in pub.items():
+        for k,v in list(pub.items()):
             if (k=='url'):
                 url=v
             if (k=='arxiv'):

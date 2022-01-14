@@ -1672,7 +1672,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     
     # Checking the validity of the configuration of the engine
     if (engine != 'parallel') and (engine != 'serial'):
-        print(('\n' + comp_name + '>> Unsupported engine configuration. Exiting ...' + '\n'))
+        print('\n' + comp_name + '>> Unsupported engine configuration. Exiting ...' + '\n')
         exit(0)
     
     
@@ -1680,8 +1680,8 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     if (comp_name != 'MFC_PreProcess' ) and \
        (comp_name != 'MFC_Simulation'  ) and \
        (comp_name != 'MFC_PostProcess'):
-        print(( '\n' + 'Unsupported choice of MFC component to execute. ' \
-                   + 'Exiting ...' + '\n'))
+        print( '\n' + 'Unsupported choice of MFC component to execute. ' \
+                   + 'Exiting ...' + '\n')
         exit(0)
     
     
@@ -1692,8 +1692,8 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
             (  parameter not in  post_process_dict ) and \
             (  parameter not in  pre_process_dict ) and \
             (  parameter not in  pbs_dict ):
-               print(( '\n' + comp_name + '>> Unsupported parameter choice ' \
-                          + parameter + '. Exiting ...' + '\n'))
+               print( '\n' + comp_name + '>> Unsupported parameter choice ' \
+                          + parameter + '. Exiting ...' + '\n')
                exit(0)
     
     
@@ -1725,7 +1725,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     
     
     # Outputting the component's start-up message
-    print(( '\n' + comp_name + '>> Preparing ' + engine + ' job ...' + '\n'))
+    print( '\n' + comp_name + '>> Preparing ' + engine + ' job ...' + '\n')
     
     
     # Setting the directory location for the MFC component
@@ -1744,13 +1744,13 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     # component, is run in the command-line, else, for a parallel configuration,
     # a bash script is generated and the job is submitted to a queue via PBS.
     if engine == 'serial':
-        print(( '\n' + comp_name + '>> Serial job in progress ...' + '\n'))
+        print( '\n' + comp_name + '>> Serial job in progress ...' + '\n')
         #cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
         
         cmd_status = Popen(f'LD_LIBRARY_PATH="{mfc_dir}/../.mfc/___current___/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"', shell=True )
         output, errors = cmd_status.communicate()
         #print '\n' + output
-        print(( comp_name + '>> Serial job completed!' + '\n'))
+        print( comp_name + '>> Serial job completed!' + '\n')
         #cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE)
         #output, errors = cmd_status.communicate()
     else:
@@ -1760,8 +1760,8 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
         # submit job to queue (sbatch)
         cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE)
         output, errors = cmd_status.communicate()
-        print(( '\n' + output))
-        print(( comp_name + '>> Parallel job submitted to queue!' + '\n'))
+        print( '\n' + output)
+        print( comp_name + '>> Parallel job submitted to queue!' + '\n')
 # END: def f_execute_mfc_component ---------------------------------------------
 
 

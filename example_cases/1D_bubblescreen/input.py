@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import math
 
@@ -68,7 +68,7 @@ Nfiles = 20.
 Nout = int(math.ceil(Nt/Nfiles))
 Nt = int(Nout*Nfiles)
 
-print 'dt: ', dt
+print('dt: ', dt)
 
 # Command to navigate between directories
 from os import chdir
@@ -152,7 +152,7 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'F',                       \
+		    'parallel_io'                  :'T',                       \
 	            'fd_order'                     : 1,                       \
                     #'schlieren_wrt'                :'T',                      \
 		    'probe_wrt'                    :'T',                   \
