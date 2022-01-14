@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # Dependencies and Logistics ===================================================
 # Command to navigate between directories
@@ -28,8 +28,8 @@ cfl = 0.1
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
 
-print 'c_l, Ma', c_l, vel/c_l
-print 'Nt', Nt
+print('c_l, Ma', c_l, vel/c_l)
+print('Nt', Nt)
 
 # Navigating to script directory
 if len(dirname(argv[0])) != 0: chdir(dirname(argv[0]))

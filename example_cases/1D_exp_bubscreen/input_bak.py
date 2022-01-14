@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import math
 
@@ -167,7 +167,7 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'F',                       \
+		    'parallel_io'                  :'T',                       \
 	            'fd_order'                     : 1,                       \
                     #'schlieren_wrt'                :'T',                      \
 		    'probe_wrt'                    :'T',                   \

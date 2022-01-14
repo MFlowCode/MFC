@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # Dependencies and Logistics ===================================================
 # Command to navigate between directories
 from os import chdir
@@ -24,8 +24,8 @@ v_g = -500.
 c_l = math.sqrt( ( p_l+4.E8)/rho_l )
 c_g = math.sqrt( 1.4*p_g/rho_g )
 
-print 'c_l, Mach_l', c_l, v_l/c_l
-print 'c_g, Mach_g', c_g, v_g/c_g
+print('c_l, Mach_l', c_l, v_l/c_l)
+print('c_g, Mach_g', c_g, v_g/c_g)
 
 
 # Navigating to script directory

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ## @brief The following script describes the steps necessary to configure
 ##		and interconnect the pre-process, simulation and post-process
