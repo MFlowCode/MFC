@@ -1,31 +1,26 @@
 compilers:
-  regular:
-    c:       gcc
-    c++:     g++
-    fortran: gfortran
-  mpi:
-    c:       mpicc
-    c++:     mpicxx
-    fortran: mpif90
-  configurations:
-  - name: release
-    flags:
-      c:       -O3
-      c++:     -O3
-      fortran: -O3 -cpp -w
-  - name: release-gpu
-    flags:
-      c:       -O3
-      c++:     -O3
-      fortran: -O3 -cpp -w -acc -Minfo=accel -lnvToolsExt -L$(CUDA:INSTALL_PATH)/lib64
-  - name: debug
-    flags:
-      c:       -Og -g
-      c++:     -Og -g
-      fortran: -Og -g -cpp -w
-  - name: ci
-    flags:
-      fortran: -cpp -w
+  c:       mpicc
+  c++:     mpicxx
+  fortran: mpif90
+configurations:
+- name: release-cpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w
+- name: release-gpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w -acc -Minfo=accel -lnvToolsExt -L${CUDA:INSTALL_PATH}/lib64
+- name: debug
+  flags:
+    c:       -Og -g
+    c++:     -Og -g
+    fortran: -Og -g -cpp -w
+- name: ci
+  flags:
+    fortran: -cpp -w
 targets:
 - name: FFTW3
   type: download
@@ -33,8 +28,8 @@ targets:
     version: 3.3.10
     link:    http://www.fftw.org/fftw-${VERSION}.tar.gz
   build:
-  - ./configure ${CONFIGURE_OPTIONS} ${MPI_COMPILERS} --enable-threads --enable-mpi
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${MPI_COMPILERS}
+  - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   - make install
   test: []
 
@@ -44,8 +39,8 @@ targets:
     git:  https://github.com/HDFGroup/hdf5
     hash: 4aa40365623cf35643b262781f92578220c42bbb
   build:
-  - ./configure ${CONFIGURE_OPTIONS} ${MPI_COMPILERS} --enable-parallel --enable-deprecated-symbols
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${MPI_COMPILERS}
+  - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   - make install prefix="${INSTALL_PATH}"
   test: []
 
@@ -61,8 +56,8 @@ targets:
     ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
     --disable-hzip --disable-fpzip --disable-silex
     --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
-    ${MPI_COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
-  - make ${MAKE_OPTIONS} ${MPI_COMPILERS}
+    ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   - make install prefix="${INSTALL_PATH}"
   test: []
 
@@ -72,7 +67,7 @@ targets:
   source:
     source: ${MFC_ROOT_PATH}/src/pre_process_code
   build:
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${MPI_COMPILERS}
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   test: []
 
 - name: MFC_Simulation
@@ -83,7 +78,7 @@ targets:
     source: ${MFC_ROOT_PATH}/src/simulation_code
   build:
   - >-
-    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${MPI_COMPILERS}
+    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
@@ -97,7 +92,7 @@ targets:
     source:  ${MFC_ROOT_PATH}/src/post_process_code
   build:
   - >-
-    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${MPI_COMPILERS}
+    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
@@ -112,3 +107,4 @@ targets:
   build: []
   test:
   - ./tests/checks.sh
+
