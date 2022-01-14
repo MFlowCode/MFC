@@ -57,7 +57,7 @@ targets:
     --disable-hzip --disable-fpzip --disable-silex
     --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
     ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+  - make ${MAKE_OPTIONS}
   - make install prefix="${INSTALL_PATH}"
   test: []
 
