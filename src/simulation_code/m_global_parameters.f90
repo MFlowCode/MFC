@@ -269,7 +269,7 @@ module m_global_parameters
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
-    logical :: weno_flat, riemann_flat
+    logical :: weno_flat, riemann_flat, cu_mpi
 
     ! ======================================================================
 
@@ -327,6 +327,7 @@ contains
         precision = 2
         weno_flat = .true.
         riemann_flat = .false.
+        cu_mpi = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

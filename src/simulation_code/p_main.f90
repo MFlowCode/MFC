@@ -53,6 +53,10 @@ program p_main
     implicit none
 
     integer :: t_step, i !< Iterator for the time-stepping loop
+    real(kind(0d0)) :: time_avg, time_final
+    real(kind(0d0)), allocatable, dimension(:) :: proc_time
+    logical :: file_exists
+
 
     
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
@@ -134,6 +138,8 @@ program p_main
 
     call s_initialize_derived_variables()
 
+    allocate(proc_time(0:num_procs - 1))
+
 
     
     ! Setting the time-step iterator to the first time-step
@@ -157,15 +163,46 @@ program p_main
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
-            call s_1st_order_tvd_rk(t_step)
+            call s_1st_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 2) then
-            call s_2nd_order_tvd_rk(t_step)
+            call s_2nd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3) then
-            call s_3rd_order_tvd_rk(t_step)
+            call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
 
         ! Time-stepping loop controls
+
         if (mytime >= finaltime) then
+
+            call s_mpi_barrier()
+
+            if(num_procs > 1) then
+                call mpi_bcast_time_step_values(proc_time, time_avg)
+            end if 
+            
+            if(proc_rank == 0) then
+                time_final = 0d0
+                if(num_procs == 1) then
+                    print*, "Final Time", time_avg
+                else    
+                    do i = 0, num_procs - 1
+                        time_final = time_final + proc_time(i)
+                    end do
+                    time_final = time_final/num_procs
+                    print*, "Final Time", time_final
+                    INQUIRE(FILE = 'time_data.dat', EXIST = file_exists)
+                    if(file_exists) then
+                        open(1, file = 'time_data.dat', position = 'append',status = 'old')
+                        write(1,*) num_procs, time_final
+                        close(1)
+                    else
+                        open(1, file = 'time_data.dat', status = 'new')
+                        write(1,*) num_procs, time_final
+                        close(1)
+                    end if                
+                end if
+            end if
+
             exit
         else
             if ((mytime + dt) >= finaltime) dt = finaltime - mytime
@@ -193,6 +230,9 @@ program p_main
     s_write_data_files => null()
 
     ! Deallocation and/or disassociation procedures for the modules
+
+    deallocate(proc_time)
+
     call s_finalize_time_steppers_module()
     call s_finalize_derived_variables_module()
     call s_finalize_data_output_module()

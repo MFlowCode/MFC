@@ -771,17 +771,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: t_step
 
+
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
 
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: blkmod1, blkmod2, alpha1, alpha2, Kter
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)), dimension(20) :: time_wr
-        integer :: time_wr_index
-        real(kind(0d0)) :: t_avg
+
+
+ 
 
 
 
         integer :: i, j, k, l, r, q,  ii, id !< Generic loop iterators
+
+
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -1028,6 +1030,8 @@ contains
         ! END: Dimensional Splitting Loop ================================== 
 
         ! ==================================================================
+
+
 
     end subroutine s_compute_rhs ! -----------------------------------------
 
