@@ -408,6 +408,16 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
 
+    subroutine mpi_bcast_time_step_values(proc_time, time_avg)
+
+            real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time 
+            real(kind(0d0)), intent(INOUT) :: time_avg
+            integer :: j
+
+            call MPI_GATHER(time_avg, 1, MPI_DOUBLE_PRECISION, proc_time(0), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr )
+
+      end subroutine mpi_bcast_time_step_values
+
     !>  The purpose of this procedure is to optimally decompose
         !!      the computational domain among the available processors.
         !!      This is performed by attempting to award each processor,
@@ -778,6 +788,7 @@ contains
             end if
         end if
         ! ==================================================================
+        
         if(proc_rank == 0) then
           print *, m, n, p
         end if
@@ -1105,8 +1116,8 @@ contains
                       end do
                     end do
 
-!$acc update host(q_cons_buff_send)
-
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
@@ -1117,6 +1128,23 @@ contains
                         buff_size*sys_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 else                        ! PBC at the beginning only
 
@@ -1134,21 +1162,41 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%beg
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*sys_size*(n + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
                         buff_size*sys_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
+
                 end if
 
+              if(cu_mpi == .false.) then
 !$acc update device(q_cons_buff_recv)
+              end if
 
                 ! Unpacking buffer received from bc_x%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1182,17 +1230,35 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%end
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*sys_size*(n + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
                         buff_size*sys_size*(n + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 else                        ! PBC at the end only
 
@@ -1210,21 +1276,41 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%end
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*sys_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
                         buff_size*sys_size*(n + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 end if
 
+              if(cu_mpi == .false.) then
 !$acc update device(q_cons_buff_recv)
+              end if
 
                 ! Unpacking buffer received from bc_x%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1265,17 +1351,35 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_y%end/bc_y%beg
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 else                        ! PBC at the beginning only
 
@@ -1294,21 +1398,40 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%beg
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
                 end if
 
+              if(cu_mpi == .false.) then
 !$acc update device(q_cons_buff_recv)
+              end if
 
                 ! Unpacking buffer received from bc_y%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1344,17 +1467,35 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%end
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 else                        ! PBC at the end only
 
@@ -1373,21 +1514,41 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_y%end/bc_y%end
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 end if
 
+              if(cu_mpi == .false.) then
 !$acc update device(q_cons_buff_recv)
+              end if
 
                 ! Unpacking buffer received form bc_y%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1430,20 +1591,35 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-
-                    ! Send/receive buffer to/from bc_z%end/bc_z%beg
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 else                        ! PBC at the beginning only
 
@@ -1462,23 +1638,41 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%beg
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
 
                 end if
 
+              if(cu_mpi == .false.) then
 !$acc update device(q_cons_buff_recv)
+              end if
 
                 ! Unpacking buffer from bc_z%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1515,21 +1709,35 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%end
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_z%end
@@ -1548,23 +1756,41 @@ contains
                         end do
                     end do
 
-!$acc update host(q_cons_buff_send)
+                    if(cu_mpi) then
+!$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
-                    ! Send/receive buffer to/from bc_z%end/bc_z%end
+                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                         q_cons_buff_recv(0), &
-                        buff_size*sys_size*(m + 2*buff_size + 1) &
-                        *(n + 2*buff_size + 1), &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+!$acc end host_data
+!$acc wait
+                    else
+!$acc update host(q_cons_buff_send)
+
+! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*sys_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    end if
+                      
                 end if
 
+              if(cu_mpi == .false.) then
 !$acc update device(q_cons_buff_recv)
+              end if
 
                 ! Unpacking buffer received from bc_z%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
