@@ -1,11 +1,11 @@
 &user_inputs
 case_dir = '.'
-m = 4800
-n = 100
-p = 100
+m = 800
+n = 400
+p = 400
 dt = 4e-08
 t_step_start = 0
-t_step_stop = 20
+t_step_stop = 400
 t_step_save = 20
 weno_flat = T
 riemann_flat = T
@@ -22,7 +22,7 @@ riemann_solver = 2
 wave_speeds = 1
 avg_state = 2
 parallel_io = T
-precision = 2
+precision = 400
 bc_x%beg = -3
 bc_x%end = -3
 bc_y%beg = -3
