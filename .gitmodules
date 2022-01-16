@@ -1,6 +1,0 @@
-[submodule "python_packages/pyyaml"]
-	path = python_packages/pyyaml
-	url = https://github.com/yaml/pyyaml
-[submodule "python_packages/colorama"]
-	path = python_packages/colorama
-	url = https://github.com/tartley/colorama
