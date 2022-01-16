@@ -28,6 +28,7 @@ example_cases/*/D/*
 example_cases/*/p_all
 example_cases/*/D_*
 example_cases/*/*.inf
+example_cases/*/*.inp
 example_cases/*/*.dat
 example_cases/*/*.o*
 example_cases/*/silo*
