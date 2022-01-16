@@ -180,13 +180,18 @@ contains
 
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
-    subroutine s_1st_order_tvd_rk(t_step) ! --------------------------------
+    subroutine s_1st_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+
 
         integer :: i,j,k,l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
 
         ! Stage 1 of 1 =====================================================
+
+        call CPU_time(start)
 
         call nvtxStartRange("Time_Step")
 
@@ -228,20 +233,34 @@ contains
 
         call nvtxEndRange
 
+        call CPU_time(finish)
+
+        if(t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if     
+
+
+
         ! ==================================================================
 
     end subroutine s_1st_order_tvd_rk ! ------------------------------------
 
     !> 2nd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_2nd_order_tvd_rk(t_step) ! --------------------------------
+    subroutine s_2nd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
+
+        integer :: i,j,k,l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
 
         ! Stage 1 of 2 =====================================================
 
+        call CPU_time(start)
 
         call nvtxStartRange("Time_Step")
 
@@ -298,19 +317,34 @@ contains
 
         call nvtxEndRange
 
+        call CPU_time(finish)
+
+        if(t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if  
+
+
+
         ! ==================================================================
 
     end subroutine s_2nd_order_tvd_rk ! ------------------------------------
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step) ! --------------------------------
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
+
+        integer :: i,j,k,l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
 
         ! Stage 1 of 3 =====================================================
+
+        call CPU_time(start)
 
         call nvtxStartRange("Time_Step")
 
@@ -392,6 +426,14 @@ contains
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         call nvtxEndRange
+
+        call CPU_time(finish)
+
+        if(t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if  
 
         ! ==================================================================
 
