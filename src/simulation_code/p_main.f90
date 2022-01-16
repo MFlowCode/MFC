@@ -57,13 +57,13 @@ program p_main
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
     logical :: file_exists
 
-
     
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
     ! Initializing MPI execution environment
     
     call s_mpi_initialize()
+   
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
@@ -84,7 +84,6 @@ program p_main
     call s_mpi_bcast_user_inputs()
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
-
 
 
     ! Computation of parameters, allocation of memory, association of pointers,
@@ -183,24 +182,26 @@ program p_main
             if(proc_rank == 0) then
                 time_final = 0d0
                 if(num_procs == 1) then
-                    print*, "Final Time", time_avg
+                   time_final = time_avg 
+                   print*, "Final Time", time_final
                 else    
                     do i = 0, num_procs - 1
                         time_final = time_final + proc_time(i)
                     end do
                     time_final = time_final/num_procs
                     print*, "Final Time", time_final
-                    INQUIRE(FILE = 'time_data.dat', EXIST = file_exists)
-                    if(file_exists) then
-                        open(1, file = 'time_data.dat', position = 'append',status = 'old')
-                        write(1,*) num_procs, time_final
-                        close(1)
-                    else
-                        open(1, file = 'time_data.dat', status = 'new')
-                        write(1,*) num_procs, time_final
-                        close(1)
-                    end if                
-                end if
+                end if               
+                INQUIRE(FILE = 'time_data.dat', EXIST = file_exists)
+                if(file_exists) then
+                    open(1, file = 'time_data.dat', position = 'append',status = 'old')
+                    write(1,*) num_procs, time_final
+                    close(1)
+                else
+                    open(1, file = 'time_data.dat', status = 'new')
+                    write(1,*) num_procs, time_final
+                    close(1)
+                end if                
+                
             end if
 
             exit

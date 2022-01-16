@@ -810,8 +810,6 @@ contains
         end do
         
 
-
-
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange
@@ -2943,6 +2941,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: v_vf
 
         integer :: i, j, k !< Generic loop iterators
+
 
         ! Population of Buffers in x-direction =============================
         if (bc_x%beg <= -3) then         ! Ghost-cell extrap. BC at beginning

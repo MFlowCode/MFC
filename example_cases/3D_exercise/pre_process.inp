@@ -1,11 +1,11 @@
 &user_inputs
-mpp_lim = F
+mpp_lim = 500
 x_domain%beg = 0.0
 patch_icpp(1)%alpha_rho(1) = 1.0
 y_domain%beg = 0.0
 adv_alphan = T
 x_domain%end = 1.0
-m = 1200
+m = 500
 precision = 2
 n = 100
 patch_icpp(1)%z_centroid = 0.5
