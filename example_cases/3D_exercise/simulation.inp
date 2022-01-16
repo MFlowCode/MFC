@@ -2,7 +2,7 @@
 fluid_pp(1)%gamma = 2.5
 p = 100
 num_fluids = 1
-mpp_lim = F
+mpp_lim = 500
 n = 100
 cu_mpi = F
 weno_flat = T
@@ -20,7 +20,7 @@ adv_alphan = T
 case_dir = '.'
 null_weights = F
 weno_eps = 1e-16
-m = 1200
+m = 500
 dt = 1e-7
 alt_soundspeed = F
 wave_speeds = 1
