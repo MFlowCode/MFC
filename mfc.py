@@ -347,9 +347,9 @@ class MFC:
             raise MFCException(f'Unknown type "{dep["type"]}".')
 
         flags = copy.deepcopy(compiler_cfg["flags"])
-        for lang, lang_flags in flags.items():
-            lang: str ; lang_flags: str
-            if "${CUDA:INSTALL_PATH}" in lang_flags:
+        for lang in flags.keys():
+            lang: str
+            if "${CUDA:INSTALL_PATH}" in flags[lang]:
                 matches = list(filter(lambda test_key: test_key in [ "CUDA_HOME", "CUDA_DIR" ], os.environ))
 
                 if len(matches) == 0:
@@ -367,7 +367,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
                 cuda_install_path = os.environ[matches[0]]
 
-                lang_flags = lang_flags.replace("${CUDA:INSTALL_PATH}", cuda_install_path)
+                flags[lang] = flags[lang].replace("${CUDA:INSTALL_PATH}", cuda_install_path)
 
         replace_list = [
             ("${MFC_ROOT_PATH}",     self.ROOT_PATH),
