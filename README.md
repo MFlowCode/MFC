@@ -126,24 +126,26 @@ The dependencies are built to the `dependencies/build/` directory within your MF
 This should have no impact on your local installation(s) of these packages.
 
 ```
-git clone --recursive https://github.com/MFlowCode/MFC && cd MFC
+git clone --recursive https://github.com/MFlowCode/MFC
+cd MFC
 ```
 
-+ Build MFC and its dependencies with `<N>` threads in `release` mode:
++ Build MFC and its dependencies with `<N>` threads in `release-cpu` mode:
 
 ```
-./mfc.py --build -j <N>
+chmod +x ./mfc.sh
+./mfc.sh --build -j <N>
 ```
 
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
 
 ```
-./mfc.py --test
+./mfc.sh --test
 ```
 
-## Configuring `mfc.py`
+## Configuring `mfc.sh`
 
-The `mfc.py` script used in the previous section is configured through the file named `mfc.conf.yaml`. 
+The `mfc.sh` script used in the previous section is configured through the file named `mfc.conf.yaml`. 
 
 ### Compilers
 
@@ -173,15 +175,15 @@ The `configurations` section consists of a list of "compiler configurations", de
     fortran: -O3 -cpp -w -acc -Minfo=accel -lnvToolsExt -L${CUDA:INSTALL_PATH}/lib64
 ```
 
-To use a desired compiler configuration with `mfc.py`, you must specify the `--compiler-configuration` (a.k.a `-cc`) option, along with the name of your configuration. `release-cpu` is its default value. For example, to build MFC and its dependencies in `debug-cpu` mode, you can run:
+To use a desired compiler configuration with `mfc.sh`, you must specify the `--compiler-configuration` (a.k.a `-cc`) option, along with the name of your configuration. `release-cpu` is its default value. For example, to build MFC and its dependencies in `debug-cpu` mode, you can run:
 
 ```
-./mfc.py --build -cc debug-cpu
+./mfc.sh --build -cc debug-cpu
 ```
 
 ### Targets
 
-The largest section of `mfc.conf.yaml` is labeled `targets`, containing a list of targets. A target is defined as an entity on which `mfc.py` can run `--build` or `--test`. `mfc.conf.yaml` contains a target for each dependency and MFC component, and for MFC as a whole. Targets have the following general format:
+The largest section of `mfc.conf.yaml` is labeled `targets`, containing a list of targets. A target is defined as an entity on which `mfc.sh` can run `--build` or `--test`. `mfc.conf.yaml` contains a target for each dependency and MFC component, and for MFC as a whole. Targets have the following general format:
 
 ```yaml
 - name: <target name> # The name of the target
@@ -229,7 +231,7 @@ To build a desired target and its dependencies, you must specify the `--targets`
 For example, to build MFC's simulation component and its dependencies from scratch, you can run:
 
 ```
-./mfc.py --build -t MFC_Simulation --scratch
+./mfc.sh --build -t MFC_Simulation --scratch
 ```
 
 ### Miscellaneous
@@ -238,9 +240,9 @@ For example, to build MFC's simulation component and its dependencies from scrat
 + Use the `--set-current <name>` (a.k.a `-sc <name>`) option to select explicitly which compiler configuration to use when running MFC.
 
 ```
-./mfc.py --build -t MFC_Simulation -cc release-cpu -j 8 --scratch
-./mfc.py --test
-./mfc.py --set-current debug-cpu
+./mfc.sh --build -t MFC_Simulation -cc release-cpu -j 8 --scratch
+./mfc.sh --test
+./mfc.sh --set-current debug-cpu
 ```
 
 # Running
