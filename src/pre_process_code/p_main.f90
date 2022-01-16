@@ -35,7 +35,7 @@ program p_main
  
    ! Initialization of the MPI environment
 
-    call s_mpi_initialize()
+   call s_mpi_initialize()
 
     ! Rank 0 processor assigns default values to user inputs prior to reading
     ! those in from the input file. Next, the user inputs are read in and their
@@ -47,6 +47,7 @@ program p_main
         call s_read_input_file()
         call s_check_input_file()
     end if
+
 
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -113,6 +114,7 @@ program p_main
     s_read_grid_data_files => null()
     s_read_ic_data_files => null()
     s_write_data_files => null()
+    
 
     ! Deallocation procedures for the modules
     call s_finalize_initial_condition_module()
