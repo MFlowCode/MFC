@@ -58,17 +58,17 @@ case_dict =                                                                    \
                     # to minimize computational costs. The grid is coarsened
                     # away from the bubble / origin
                     'stretch_x'                    : 'T',                      \
-		    'a_x'                          : 4.E+00,                   \
-		    'x_a'                          : -1.5E-03/1.E-03,          \
-		    'x_b'                          : 1.5E-03/1.E-03,           \
-		    'stretch_y'                    : 'T',                      \
-		    'a_y'                          : 4.E+00,                   \
-		    'y_a'                          : -1.5E-03/1.E-03,          \
-		    'y_b'                          : 1.5E-03/1.E-03,           \
-		    'stretch_z'                    : 'T',                      \
-		    'a_z'                          : 4.E+00,                   \
-		    'z_a'                          : -1.5E-03/1.E-03,          \
-		    'z_b'                          : 1.5E-03/1.E-03,           \
+            'a_x'                          : 4.E+00,                   \
+            'x_a'                          : -1.5E-03/1.E-03,          \
+            'x_b'                          : 1.5E-03/1.E-03,           \
+            'stretch_y'                    : 'T',                      \
+            'a_y'                          : 4.E+00,                   \
+            'y_a'                          : -1.5E-03/1.E-03,          \
+            'y_b'                          : 1.5E-03/1.E-03,           \
+            'stretch_z'                    : 'T',                      \
+            'a_z'                          : 4.E+00,                   \
+            'z_a'                          : -1.5E-03/1.E-03,          \
+            'z_b'                          : 1.5E-03/1.E-03,           \
                     'cyl_coord'                    : 'F',                      \
                     'm'                            : 99,                       \
                     'n'                            : 99,                       \
@@ -77,7 +77,7 @@ case_dict =                                                                    \
                     't_step_start'                 : 0,                        \
                     't_step_stop'                  : 133300,                   \
                     't_step_save'                  : 100,                      \
-		    # ==========================================================
+            # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
                     # Only two patches are necesssary, the background liquid and the
@@ -90,14 +90,14 @@ case_dict =                                                                    \
                     # Two fluids: water and air
                     'num_fluids'                   : 2,                        \
                     # Advect both volume fractions
-		    'adv_alphan'                   : 'T',                      \
+            'adv_alphan'                   : 'T',                      \
                     # Ensure the volume fractions sum to unity at the end of each
                     # time step
-		    'mpp_lim'                      : 'T',                      \
+            'mpp_lim'                      : 'T',                      \
                     # Correct errors when computing speed of sound
-		    'mixture_err'                  : 'T',                      \
+            'mixture_err'                  : 'T',                      \
                     # Use TVD RK3 for time marching
-		    'time_stepper'                 : 3,                        \
+            'time_stepper'                 : 3,                        \
                     # Reconstruct the primitive variables to minimize spurious
                     # oscillations
                     'weno_vars'                    : 2,                        \
@@ -112,7 +112,7 @@ case_dict =                                                                    \
                     'mp_weno'                      : 'F',                      \
                     'weno_avg'                     : 'F',                      \
                     # Use the HLLC  Riemann solver
-		    'riemann_solver'               : 2,                        \
+            'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'commute_err'                  : 'F',                      \
                     'split_err'                    : 'F',                      \
@@ -133,10 +133,10 @@ case_dict =                                                                    \
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'T',                       \
-		    # ==========================================================
+            'parallel_io'                  :'T',                       \
+            # ==========================================================
                                                                                 
-		    # Patch 1: High pressured water ============================
+            # Patch 1: High pressured water ============================
                     # Specify the cubic water background grid geometry
                     'patch_icpp(1)%geometry'       : 9,                        \
                     'patch_icpp(1)%x_centroid'     : 80.E-03/1.E-03,           \
@@ -152,8 +152,8 @@ case_dict =                                                                    \
                     'patch_icpp(1)%pres'           : 1.E+05,                   \
                     'patch_icpp(1)%alpha_rho(1)'   : 1000.E+00,                \
                     'patch_icpp(1)%alpha_rho(2)'   : 0.E+00,                   \
-                    'patch_icpp(1)%alpha(1)'       : 1.E+00,                   \
-                    'patch_icpp(1)%alpha(2)'       : 0.E+00,                   \
+                    'patch_icpp(1)%alpha(1)'       : 0.9E+00,                   \
+                    'patch_icpp(1)%alpha(2)'       : 0.1E+00,                   \
                     # ==========================================================
 
                     # Patch 3: Air bubble ======================================
@@ -174,16 +174,16 @@ case_dict =                                                                    \
                     'patch_icpp(2)%pres'           : 1.E+03,                   \
                     'patch_icpp(2)%alpha_rho(1)'   : 0.E+00,                   \
                     'patch_icpp(2)%alpha_rho(2)'   : 0.19E+00,                 \
-                    'patch_icpp(2)%alpha(1)'       : 0.E+00,                   \
-                    'patch_icpp(2)%alpha(2)'       : 1.E+00,                   \
+                    'patch_icpp(2)%alpha(1)'       : 0.9E+00,                   \
+                    'patch_icpp(2)%alpha(2)'       : 0.1E+00,                   \
                     # ==========================================================
  
-		    # Fluids Physical Parameters ===============================
+            # Fluids Physical Parameters ===============================
                     'fluid_pp(1)%gamma'            : 1.E+00/(4.4E+00-1.E+00),  \
                     'fluid_pp(1)%pi_inf'           : 4.4E+00*6.E+08/(4.4E+00-1.E+00), \
                     'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),  \
                     'fluid_pp(2)%pi_inf'           : 0.E+00,                   \
-	            # ==========================================================
+                # ==========================================================
 
     }
 
