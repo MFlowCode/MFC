@@ -50,7 +50,7 @@ n0      = vf0/(math.pi*4.E+00/3.E+00)
 cact    = 1475.
 t0      = x0/c0
 
-nbubbles = 1 
+nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
@@ -149,9 +149,9 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
-                    'parallel_io'                  :'T',                       \
+                    'parallel_io'                  :'F',                       \
                     # ==========================================================
-                                                                                
+
                     # Patch 1 _ Background =====================================
                     'patch_icpp(1)%geometry'       : 1,                         \
                     'patch_icpp(1)%x_centroid'     : 0.,                        \

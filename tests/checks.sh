@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ### Note: Designed to be run from MFC root directory, not tests/
 
@@ -17,15 +17,14 @@ echo -----------------------------------------------
 cd tests
 for mytest in "${mytests[@]}"; do
     cd $mytest
-        
         #Run test case
-        ./input.py pre_process > pre_process.out
-        ./input.py  simulation > simulation.out
-        
+        /usr/bin/env python3 ./input.py MFC_PreProcess > MFC_PreProcess.out
+        /usr/bin/env python3 ./input.py MFC_Simulation > MFC_Simulation.out
+
         cd check
             check_file=$(echo *)
         cd ..
-        
+
         #Check that the files are the same
         rm -f diff.out
         diff check/$check_file D/$check_file > diff.out
