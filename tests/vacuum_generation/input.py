@@ -88,10 +88,10 @@ case_dict =                                                                    \
                     'format'                       : 1,                        \
                     'precision'                    : 1,                        \
                     'prim_vars_wrt'                :'T',                       \
-                    'parallel_io'                  :'T',                       \
+                    'parallel_io'                  :'F',                       \
                     # ==========================================================
-                                                                               
-                    # Patch 1: Left state ======================================
+
+		    # Patch 1: Left state ======================================
                     'patch_icpp(1)%geometry'       : 1,                        \
                     'patch_icpp(1)%x_centroid'     : 0.25E+00,                 \
                     'patch_icpp(1)%length_x'       : 0.5E+00,                  \
@@ -115,8 +115,8 @@ case_dict =                                                                    \
                     'patch_icpp(2)%alpha(1)'       : 0.99E+00,                 \
                     'patch_icpp(2)%alpha(2)'       : 0.01E+00,                 \
                     # ==========================================================
- 
-                    # Fluids Physical Parameters ===============================
+
+		    # Fluids Physical Parameters ===============================
                     'fluid_pp(1)%gamma'            : 1.E+00/(4.4E+00-1.E+00),  \
                     'fluid_pp(1)%pi_inf'           : 4.4E+00*6.E+08/(4.4E+00-1.E+00), \
                     'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),  \
