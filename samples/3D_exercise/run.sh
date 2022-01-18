@@ -9,7 +9,7 @@ export PGI_ACC_TIME=0
 export PGI_ACC_NOTIFY=
 export PGI_ACC_DEBUG=0
 
-for proc in 1 2 3 4 5 6
+for proc in 3
 do
 	size=$((100 * proc))
 	sed -i 's/m = .*/m = '"$size"'/' simulation.inp
