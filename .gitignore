@@ -17,6 +17,7 @@ cases/
 tests/*/D/*
 tests/*/p*
 tests/*/D_*
+tests/*/*.inp
 tests/*/*.inf
 tests/*/*.dat
 tests/*/silo*
