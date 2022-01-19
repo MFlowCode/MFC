@@ -1564,8 +1564,8 @@ contains
 !$acc parallel loop collapse (4) gang vector default(present) private(dvd, poly, beta, alpha, omega, d)
 
                     do l = is3%beg, is3%end
-                        do k = is1%beg, is1%end
-                            do j = is2%beg, is2%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
                                 do i = 1, v_size
                                     dvd(1) = v_rs_ws_y_flat(j + 2, k, l, i) &
                                              - v_rs_ws_y_flat(j + 1, k, l, i)
@@ -1784,9 +1784,9 @@ contains
 !$acc end parallel loop 
                 else
 !$acc parallel loop collapse (4) gang vector default(present) private(dvd, poly, beta, alpha, omega, d)
-                    do l = is1%beg, is1%end
+                    do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            do j = is3%beg, is3%end
+                            do j = is1%beg, is1%end
                                 do i = 1, v_size
 
                                     dvd(1) = v_rs_ws_z_flat(j + 2, k, l, i) &
@@ -2097,8 +2097,8 @@ contains
                 elseif(weno_dir == 2) then 
 !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
                     do l = is3%beg, is3%end
-                        do k = is1%beg, is1%end
-                            do j = is2%beg, is2%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
                                 do i = 1, v_size
                                     ! reconstruct from left side
                                     dvd(0) = v_rs_ws_y(1)%vf(i)%sf(j, k, l) &
@@ -2164,9 +2164,9 @@ contains
 
                 elseif(weno_dir == 3) then 
 !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
-                    do l = is1%beg, is1%end
+                    do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            do j = is3%beg, is3%end
+                            do j = is1%beg, is1%end
                                 do i = 1, v_size
                                     ! reconstruct from left side
 
@@ -2462,8 +2462,8 @@ contains
                 elseif(weno_dir == 2) then
 !$acc parallel loop collapse(4) gang vector default(present) private(dvd,beta,poly,omega,alpha,d)
                     do l = is3%beg, is3%end
-                        do k = is1%beg, is1%end
-                            do j = is2%beg, is2%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
                                 do i = 1, v_size
                                     dvd(1) = v_rs_ws_y(2)%vf(i)%sf(j, k, l) &
                                              - v_rs_ws_y(1)%vf(i)%sf(j, k, l)
@@ -2683,9 +2683,9 @@ contains
                 else
 !$acc parallel loop collapse(4) gang vector default(present) private(dvd,beta,poly,omega,alpha,d)
                     do i = 1, v_size
-                        do l = is1%beg, is1%end
+                        do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
-                                do j = is3%beg, is3%end
+                                do j = is1%beg, is1%end
 
                                     dvd(1) = v_rs_ws_z(2)%vf(i)%sf(j, k, l) &
                                              - v_rs_ws_z(1)%vf(i)%sf(j, k, l)
@@ -2966,8 +2966,8 @@ contains
 !$acc parallel loop collapse(4) gang vector default(present)                 
                     do j = 1, v_size
                         do m = is3%beg, is3%end
-                            do l = is1%beg, is1%end
-                                do k = is2%beg  , is2%end  
+                            do l = is2%beg, is2%end
+                                do k = is1%beg  , is1%end  
                                     v_rs_ws_y_flat(k, l, m, j) = v_vf(j)%sf(l, k, m)
                                 end do 
                             end do
@@ -2986,9 +2986,9 @@ contains
             if(weno_dir == 3) then  
 !$acc parallel loop collapse(4) gang vector default(present)               
                     do j = 1, v_size
-                        do m = is1%beg, is1%end
+                        do m = is3%beg, is3%end
                             do l = is2%beg, is2%end
-                                do k = is3%beg  , is3%end 
+                                do k = is1%beg  , is1%end 
                                     v_rs_ws_z_flat(k, l, m, j) = v_vf(j)%sf(m, l, k)
                                 end do 
                             end do
@@ -3024,8 +3024,8 @@ contains
                 do i = -weno_polyn, weno_polyn
                     do j = 1, v_size
                         do m = is3%beg, is3%end
-                            do l = is1%beg, is1%end
-                                do k = is2%beg, is2%end
+                            do l = is2%beg, is2%end
+                                do k = is1%beg, is1%end
                                     v_rs_ws_y(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(l, k + i, m)
                                 end do 
                             end do
@@ -3046,9 +3046,9 @@ contains
 !$acc parallel loop collapse(5) gang vector default(present)  
                 do i = -weno_polyn, weno_polyn
                     do j = 1, v_size
-                        do m = is1%beg, is1%end
+                        do m = is3%beg, is3%end
                             do l = is2%beg, is2%end
-                                do k = is3%beg, is3%end
+                                do k = is1%beg, is1%end
                                     v_rs_ws_z(i)%vf(j)%sf(k, l, m) = v_vf(j)%sf(m, l, k + i)
                                 end do 
                             end do
@@ -3445,8 +3445,8 @@ contains
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
                     do m = is3%beg, is3%end
-                        do k = is2%beg, is2%end 
-                            do l = is1%beg, is1%end                                                       
+                        do k = is1%beg, is1%end 
+                            do l = is2%beg, is2%end                                                       
                                 vL_vf(j)%sf(l, k, m) = vL_rs_vf_y_flat(k, l, m, j)
                                 vR_vf(j)%sf(l, k, m) = vR_rs_vf_y_flat(k, l, m, j)
                             end do 
@@ -3457,9 +3457,9 @@ contains
             elseif (weno_dir == 3) then
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
-                  do k = is3%beg, is3%end
+                  do k = is1%beg, is1%end
                    do l = is2%beg, is2%end
-                    do m = is1%beg, is1%end                
+                    do m = is3%beg, is3%end                
                                 vL_vf(j)%sf(m, l, k) = vL_rs_vf_z_flat(k, l, m, j)
                                 vR_vf(j)%sf(m, l, k) = vR_rs_vf_z_flat(k, l, m, j)
                             end do 
@@ -3486,8 +3486,8 @@ contains
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
                     do m = is3%beg, is3%end
-                            do k = is2%beg, is2%end                          
-                        do l = is1%beg, is1%end
+                            do k = is1%beg, is1%end                          
+                        do l = is2%beg, is2%end
                                 vL_vf(j)%sf(l, k, m) = vL_rs_vf_y(j)%sf(k, l, m)
                                 vR_vf(j)%sf(l, k, m) = vR_rs_vf_y(j)%sf(k, l, m)
                             end do 
@@ -3498,9 +3498,9 @@ contains
             elseif (weno_dir == 3) then
 !$acc parallel loop collapse(4) gang vector default(present)  
                 do j = 1, v_size
-                            do k = is3%beg, is3%end                           
+                            do k = is1%beg, is1%end                           
                         do l = is2%beg, is2%end
-                    do m = is1%beg, is1%end
+                    do m = is3%beg, is3%end
                                 vL_vf(j)%sf(m, l, k) = vL_rs_vf_z(j)%sf(k, l, m)
                                 vR_vf(j)%sf(m, l, k) = vR_rs_vf_z(j)%sf(k, l, m)
                             end do 
