@@ -862,7 +862,7 @@ contains
                 id)
             call nvtxEndRange
 
-!            do j = 1, sys_size
+!           do j = 1, sys_size
 !!$acc update host(qL_prim_n(id)%vf(j)%sf, qR_prim_n(id)%vf(j)%sf )
 !            end do
 
@@ -882,7 +882,7 @@ contains
  !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50)
  !               print *, qR_prim_n(id)%vf(E_idx)%sf(50, 50, 50)
  !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50) 
-  !            end if   
+ !             end if   
   !          end if
 
 
@@ -3712,17 +3712,20 @@ contains
         type(bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
 
         ! Reconstruction in s1-direction ===================================
-        is1 = ix; is2 = iy; is3 = iz
+        
 
         if (norm_dir == 1) then
+            is1 = ix; is2 = iy; is3 = iz
             weno_dir = 1; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
         elseif (norm_dir == 2) then
-            weno_dir = 2; is2%beg = is2%beg + weno_polyn
-            is2%end = is2%end - weno_polyn
+            is1 = iy; is2 = ix; is3 = iz
+            weno_dir = 2; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
         else
-            weno_dir = 3; is3%beg = is3%beg + weno_polyn
-            is3%end = is3%end - weno_polyn
+            is1 = iz; is2 = iy; is3 = ix
+            weno_dir = 3; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
         end if
 
         call s_weno_alt(v_vf(iv%beg:iv%end), &  
