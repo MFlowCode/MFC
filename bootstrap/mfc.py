@@ -27,7 +27,7 @@ def execute_shell_command_safe(command: str, no_exception: bool = False):
 
     if status != 0 and not(no_exception):
         raise MFCException(f'Failed to execute command "{command}".')
-    
+
     return status
 
 
@@ -39,13 +39,13 @@ def import_module_safe(import_name: str, pip_name: str):
 
     except ImportError:
         pass
-    
+
     prompt = f"The Python package {pip_name} needs to be installed. Would you like to install it now? (from ./python_packages/{pip_name}) (yY/nN): "
 
     if input(prompt).upper().strip() != "Y":
         raise Exception(f'You requested not to download the Python package {pip_name}. Aborting...')
 
-    if 0 != execute_shell_command_safe(f'cd "{pip_name}" && python3 setup.py install --user', no_exception=True):
+    if 0 != execute_shell_command_safe(f'python3 -m pip install {pip_name}', no_exception=True):
         raise Exception(f'Failed to automatically install the Python package {pip_name}. Please install it manually using Pip. Aborting...')
 
     print("\n")
@@ -62,7 +62,7 @@ def file_load_yaml(filepath: str):
     try:
         with open(filepath, "r") as f:
             return yaml.safe_load(f)
-    
+
     except (IOError, yaml.YAMLError) as exc:
         raise MFCException(f'Failed to load YAML from "{filepath}": {exc}')
 
@@ -71,7 +71,7 @@ def file_dump_yaml(filepath: str, data):
     try:
         with open(filepath, "w") as f:
             yaml.dump(data, f)
-    
+
     except (IOError, yaml.YAMLError) as exc:
         raise MFCException(f'Failed to dump YAML to "{filepath}": {exc}.')
 
@@ -129,7 +129,7 @@ def clear_print(message, end='\n'):
 def update_symlink(at: str, to: str):
     if os.path.islink(at):
         os.remove(at)
-            
+
     os.symlink(to, at)
 
 
@@ -151,13 +151,13 @@ class MFCConf:
 
     def does_target_exist(self, name: str):
         return len(self.get_target_matches(name)) > 0
-    
+
     def does_unique_target_exist(self, name: str):
         return len(self.get_target_matches(name)) == 1
 
     def get_target(self, name: str):
         matches = self.get_target_matches(name)
-        
+
         if len(matches) == 0:
             raise MFCException(f'Failed to retrieve dependency "{name}" in "{obj}" with restrict_cc="{restrict_cc}".')
 
@@ -208,23 +208,23 @@ class MFCLock:
         def peek_filter(e: dict):
             if e["name"] != name:
                 return False
-            
+
             if restrict_cc is None:
                 return True
-            
+
             return e.get("compiler_configuration", None) == restrict_cc
-        
+
         return list(filter(peek_filter, self["targets"]))
 
     def does_target_exist(self, name: str, restrict_cc: str = None):
         return len(self.get_target_matches(name, restrict_cc)) > 0
-    
+
     def does_unique_target_exist(self, name: str, restrict_cc: str = None):
         return len(self.get_target_matches(name, restrict_cc)) == 1
 
     def get_target(self, name: str, restrict_cc: str = None):
         matches = self.get_target_matches(name, restrict_cc)
-        
+
         if len(matches) == 0:
             raise MFCException(f'Failed to retrieve dependency "{name}" in "{obj}" with restrict_cc="{restrict_cc}".')
 
@@ -246,7 +246,7 @@ class MFCArgs:
         parser.add_argument("--build", action="store_true", help="Build targets.")
         parser.add_argument("--test",  action="store_true", help="Test targets.")
         parser.add_argument("--clean", action="store_true", help="Clean the targets.")
-        parser.add_argument("-sc", "--set-current", type=str, choices=compiler_configuration_names, 
+        parser.add_argument("-sc", "--set-current", type=str, choices=compiler_configuration_names,
                             help="Select a compiler configuration to use when running MFC.")
 
         compiler_target_names = [e["name"] for e in conf["targets"]]
@@ -279,7 +279,7 @@ class MFC:
     def get_base_path(self, cc: str = None):
         if cc is None:
             cc = self.args["compiler_configuration"]
-        
+
         return f'{MFC_SUBDIR}/{cc}'
 
     def get_source_path(self, name: str):
@@ -302,7 +302,7 @@ class MFC:
                 create_directory_safe(f"{MFC_SUBDIR}/{cc}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
-                        create_directory_safe(f"{MFC_SUBDIR}/{cc}/{d}/{build_subdir}")        
+                        create_directory_safe(f"{MFC_SUBDIR}/{cc}/{d}/{build_subdir}")
 
     def check_environment(self):
         print("|--> Checking for the presence of required command-line utilities...", end='\r')
@@ -321,7 +321,7 @@ class MFC:
         if sys.platform == "darwin": # MacOS
             pass
             #mfc_state.conf["compilers"]["mpi"]["fortran"]
-        
+
         clear_print(f"|--> Build environment: Passing. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
 
     def string_replace(self, dependency_name: str, string: str, recursive=True):
@@ -398,9 +398,9 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 matches[i] = re.sub(r'"$', ' ', matches[i])
 
             string = re.sub(FLAG_PATTERN, ' ', string, len(matches) - 1)
-            string = re.sub(FLAG_PATTERN, f' {FLAG_NAME}="{" ".join(matches)}"', string)                
+            string = re.sub(FLAG_PATTERN, f' {FLAG_NAME}="{" ".join(matches)}"', string)
 
-        # Fetch 
+        # Fetch
         if recursive:
             for dep2_info in self.conf["targets"]:
                 string = string.replace("${" + dep2_info["name"] + ":", "${")
@@ -412,7 +412,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         # Check if it hasn't been built before
         if not self.lock.does_target_exist(name, self.args["compiler_configuration"]):
             return False
-        
+
         # Retrive CONF & LOCK descriptors
         conf_desc = self.conf.get_target(name)
         lock_desc = self.lock.get_target(name, self.args["compiler_configuration"])
@@ -437,10 +437,10 @@ If you think MFC could (or should) be able to find it automatically for you syst
     def build_target__clean_previous(self, name: str):
         if not self.lock.does_unique_target_exist(name, self.args["compiler_configuration"]):
             return
-        
+
         conf_desc = self.conf.get_target(name)
         lock_desc = self.lock.get_target(name, self.args["compiler_configuration"])
-        
+
         if ((    conf_desc["type"] != lock_desc["type"]
              and lock_desc["type"] in ["clone", "download"]
             ) or (self.args["scratch"])):
@@ -448,11 +448,11 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def build_target__fetch(self, name: str, logfile: io.IOBase):
         conf = self.conf.get_target(name)
-        
+
         if conf["type"] in ["clone", "download"]:
             if conf["type"] == "clone":
                 lock_matches = self.lock.get_target_matches(name, self.args["compiler_configuration"])
-                
+
                 if ((   len(lock_matches)    == 1
                     and conf["clone"]["git"] != self.lock.get_target(name, self.args["compiler_configuration"])["clone"]["git"])
                     or (self.args["scratch"])):
@@ -462,7 +462,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
                 if not os.path.isdir(self.get_source_path(name)):
                     clear_print(f'|--> Package {name}: Cloning repository...', end='\r')
-                    
+
                     execute_shell_command_safe(
                         f'git clone --recursive "{conf["clone"]["git"]}" "{self.get_source_path(name)}" >> "{logfile.name}" 2>&1')
 
@@ -481,8 +481,8 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 clear_print(f'|--> Package {name}: Downloading source...', end='\r')
 
                 create_directory_safe(self.get_temp_path(name))
-                
-                download_path = f'{self.get_temp_path(name)}/{filename}'                
+
+                download_path = f'{self.get_temp_path(name)}/{filename}'
                 urllib.request.urlretrieve(download_link, download_path)
 
                 clear_print(f'|--> Package {name}: Uncompressing archive...', end='\r')
@@ -501,7 +501,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         if conf["type"] not in ["clone", "download", "source"]:
             raise MFCException(f'Unknown target type "{conf["type"]}".')
-        
+
         for command in conf["build"]:
             command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
@@ -513,7 +513,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
             clear_print(f'|--> Package {name}: Building (Logging to {logfile.name})...', end='\r')
 
-            execute_shell_command_safe(command)    
+            execute_shell_command_safe(command)
 
     def build_target__update_lock(self, name: str):
         conf = self.conf.get_target(name)
@@ -536,7 +536,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         if self.is_build_satisfied(name):
             clear_print(f'|--> Package {name}: Nothing to do ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
             return False
-        
+
         # Build its dependencies
         for dependency_names in self.conf.get_dependency_names(name, recursive=False):
             self.build_target(dependency_names)
@@ -555,17 +555,17 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
     def print_header(self):
         print(center_ansi_escaped_text(f"""{colorama.Fore.BLUE}
-     ___            ___          ___     
-    /__/\          /  /\        /  /\    
-   |  |::\        /  /:/_      /  /:/    
-   |  |:|:\      /  /:/ /\    /  /:/     
- __|__|:|\:\    /  /:/ /:/   /  /:/  ___ 
-/__/::::| \:\  /__/:/ /:/   /__/:/  /  /\ 
+     ___            ___          ___
+    /__/\          /  /\        /  /\
+   |  |::\        /  /:/_      /  /:/
+   |  |:|:\      /  /:/ /\    /  /:/
+ __|__|:|\:\    /  /:/ /:/   /  /:/  ___
+/__/::::| \:\  /__/:/ /:/   /__/:/  /  /\
 \  \:\~~\__\/  \  \:\/:/    \  \:\ /  /:/
- \  \:\         \  \::/      \  \:\  /:/ 
-  \  \:\         \  \:\       \  \:\/:/  
-   \  \:\         \  \:\       \  \::/   
-    \__\/          \__\/        \__\/    
+ \  \:\         \  \::/      \  \:\  /:/
+  \  \:\         \  \:\       \  \:\/:/
+   \  \:\         \  \:\       \  \::/
+    \__\/          \__\/        \__\/
 {colorama.Style.RESET_ALL}"""))
 
         print(center_ansi_escaped_text("""
@@ -580,7 +580,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
     def test_target(self, name: str):
         if not self.is_build_satisfied(name, ignoreIfSource=True):
             raise MFCException(f"Can't test {name} because its build isn't satisfied.")
-        
+
         with open(self.get_log_filepath(name), "w") as logfile:
             for command in self.conf.get_target(name)["test"]:
                 command = self.string_replace(name, f"""\
@@ -633,7 +633,7 @@ def main():
 
     for module in [("yaml", "pyyaml"), ("colorama", "colorama")]:
         import_module_safe(*module)
-    
+
     try:
         colorama.init()
 
