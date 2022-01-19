@@ -11,17 +11,27 @@ if (($?)); then
     exit 1
 fi
 
+python3 -m venv ./venv
+if (($?)); then
+    echo "[mfc.sh] Error: Failed to create a Python virtual environment."
+    exit 1
+fi
+
+source ./venv/bin/activate
+if (($?)); then
+    echo "[mfc.sh] Error: Faild to activate the Python virtual environment."
+    exit 1
+fi
+
 python3 -c 'print("")' > /dev/null
 if (($?)); then
     echo "[mfc.sh] Error: Python3 is present but can't execute a simple program. Please ensure that python3 is working."
     exit 1
 fi
 
-chmod +x ./bootstrap/mfc.py
-if (($?)); then
-    echo "[mfc.sh] Error: Failed to set ./bootstrap/mfc.py as executable."
-    exit 1
-fi
+cd bootstrap
+python3 ./mfc.py $@
+cd ..
 
-cd bootstrap && ./mfc.py $@
 exit $?
+
