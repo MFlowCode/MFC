@@ -1,0 +1,110 @@
+compilers:
+  c:       mpicc
+  c++:     mpicxx
+  fortran: mpif90
+configurations:
+- name: release-cpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w
+- name: release-gpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+- name: debug-cpu
+  flags:
+    c:       -Og -g
+    c++:     -Og -g
+    fortran: -Og -g -cpp -w
+- name: ci-cpu
+  flags:
+    fortran: -cpp -w
+targets:
+- name: FFTW3
+  type: download
+  download:
+    version: 3.3.10
+    link:    http://www.fftw.org/fftw-${VERSION}.tar.gz
+  build:
+  - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+  - make install
+  test: []
+
+- name: HDF5
+  type: clone
+  clone:
+    git:  https://github.com/HDFGroup/hdf5
+    hash: 4aa40365623cf35643b262781f92578220c42bbb
+  build:
+  - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+  - make install prefix="${INSTALL_PATH}"
+  test: []
+
+- name: SILO
+  type: clone
+  depends:
+  - HDF5
+  clone:
+    git:  https://github.com/LLNL/Silo
+    hash: 9e3a31fbf661c4d26e9f5272287e5ff41971d117
+  build:
+  - >-
+    ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
+    --disable-hzip --disable-fpzip --disable-silex
+    --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
+    ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
+  - make ${MAKE_OPTIONS}
+  - make install prefix="${INSTALL_PATH}"
+  test: []
+
+- name: MFC_PreProcess
+  type: source
+  depends: []
+  source:
+    source: ${MFC_ROOT_PATH}/src/pre_process_code
+  build:
+  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+  test: []
+
+- name: MFC_Simulation
+  type: source
+  depends:
+  - FFTW3
+  source:
+    source: ${MFC_ROOT_PATH}/src/simulation_code
+  build:
+  - >-
+    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+  test: []
+
+- name: MFC_PostProcess
+  type: source
+  depends:
+  - FFTW3
+  - HDF5
+  - SILO
+  source:
+    source:  ${MFC_ROOT_PATH}/src/post_process_code
+  build:
+  - >-
+    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+  test: []
+
+- name: MFC
+  type: source
+  depends:
+  - MFC_PreProcess
+  - MFC_Simulation
+  - MFC_PostProcess
+  source:
+    source: ${MFC_ROOT_PATH}
+  build: []
+  test:
+  - ./tests/checks.sh
+

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 import math
 
 #Numerical setup
@@ -89,8 +89,8 @@ case_dict =                                                                     
                     'prim_vars_wrt'                :'T',                       \
                     'parallel_io'                  :'F',                       \
                     # ==========================================================
-                                                                                
-                    # Patch 1 L ================================================
+
+		    # Patch 1 L ================================================
                     'patch_icpp(1)%geometry'       : 1,                     \
                     'patch_icpp(1)%x_centroid'     : 0.25,                   \
                     'patch_icpp(1)%length_x'       : 0.5,                    \
@@ -115,7 +115,7 @@ case_dict =                                                                     
                     'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),  \
                     'fluid_pp(1)%pi_inf'           : 0.0, \
                     # ==========================================================
-                    
+
     }
 
 # Executing MFC component

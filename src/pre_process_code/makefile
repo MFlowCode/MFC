@@ -1,5 +1,3 @@
-include ../../Makefile.in
-
 # Find all source files, create a list of corresponding object files
 SRCS=$(wildcard *.f90)
 OBJS=$(patsubst %.f90,%.o,$(SRCS))
@@ -9,9 +7,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-FLFLAGS = -g $(ld_pre_flags)
-FCFLAGS = -g $(f90_flags)
-EXEC = pre_process
+EXEC = ../../.mfc/___current___/build/bin/MFC_PreProcess
 PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 
@@ -20,11 +16,11 @@ all : $(PROGRAM)
 
 # Compiler steps for all objects
 $(OBJS) : %.o : %.f90
-	$(FC) $(FCFLAGS) -o $@ $<
+	$(FC) $(FFLAGS) -c -o $@ $<
 
 # Linker
 $(PROGRAM) : $(OBJS)
-	$(FC) -o $(EXEC) $(OBJS) $(FLFLAGS) 
+	$(FC) $(FFLAGS) -o $(EXEC) $(OBJS) 
 
 .PHONY: all clean
 
@@ -39,7 +35,6 @@ $(PRG_OBJ) : $(MOD_OBJS)
 # Modules depend on each other
 m_data_output.o m_start_up.o : m_compile_specific.o
 m_start_up.o : m_data_output.o
-# m_global_parameters.o : m_eigen.o
 m_data_output.o m_global_parameters.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_start_up.o m_variables_conversion.o : m_derived_types.o
 m_data_output.o m_grid.o m_initial_condition.o m_mpi_proxy.o m_variables_conversion.o m_start_up.o : m_global_parameters.o
 m_data_output.o m_grid.o m_start_up.o : m_mpi_proxy.o
