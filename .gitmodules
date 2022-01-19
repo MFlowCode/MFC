@@ -1,0 +1,6 @@
+[submodule "bootstrap/pyyaml"]
+	path = bootstrap/pyyaml
+	url = https://github.com/yaml/pyyaml
+[submodule "bootstrap/colorama"]
+	path = bootstrap/colorama
+	url = https://github.com/tartley/colorama

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import math
 
@@ -64,10 +64,10 @@ rhol0 = 1.
 
 #IC setup
 vf0     = 1.E-5
-vv      = 0.E+00 
+vv      = 0.E+00
 cref    = math.sqrt( n_tait*(pl0+B_tait)/( (1-vf0)**2.E+00 ) )
 
-nbubbles = 1 
+nbubbles = 1
 myr0    = R0ref
 
 #Size of the domain
@@ -183,7 +183,7 @@ case_dict =                                                                     
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-                    'parallel_io'                  :'T',                       \
+                    'parallel_io'                  :'F',                       \
                     #'fd_order'                     : 1,                        \
                     #'schlieren_wrt'                :'T',                    \
                     #'schlieren_alpha(1)'           : 1.,                    \

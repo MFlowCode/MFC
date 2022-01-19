@@ -1,5 +1,3 @@
-include ../../Makefile.in
-
 # Find all source files, create a list of corresponding object files
 SRCS=$(wildcard *.f90)
 OBJS=$(patsubst %.f90,%.o,$(SRCS))
@@ -9,9 +7,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-FLFLAGS = -g $(ld_post_flags)
-FCFLAGS = -g $(f90_post_flags)
-EXEC = post_process
+EXEC = ../../.mfc/___current___/build/bin/MFC_PostProcess
 PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 
@@ -20,11 +16,11 @@ all : $(PROGRAM)
 
 # Compiler steps for all objects
 $(OBJS) : %.o : %.f90
-	$(FC) $(FCFLAGS) -o $@ $<
+	$(FC) $(FFLAGS) -c -o $@ $<
 
 # Linker
 $(PROGRAM) : $(OBJS)
-	$(FC) -o $(EXEC) $(OBJS) $(FLFLAGS)
+	$(FC) $(OBJS) $(FFLAGS) -o $(EXEC)
 
 .PHONY: all clean
 
@@ -40,6 +36,7 @@ $(PRG_OBJ) : $(MOD_OBJS)
 m_data_input.o :            m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_compile_specific.o
 m_data_output.o :           m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_compile_specific.o
 m_start_up.o :              m_derived_types.o m_global_parameters.o m_mpi_proxy.o m_compile_specific.o
+m_fftw.o :                  m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 m_derived_variables.o :     m_derived_types.o m_global_parameters.o m_mpi_proxy.o
 m_mpi_proxy.o :             m_derived_types.o m_global_parameters.o
 m_variables_conversion.o :  m_derived_types.o m_global_parameters.o

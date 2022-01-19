@@ -1,38 +1,40 @@
 # Multi-component Flow Code (MFC)
 
-Welcome to the MFC! The MFC is a fully-documented parallel simulation software
-for multi-component, multi-phase, and bubbly flows.
+[![DOI](https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg)](http://dx.doi.org/10.1016/j.cpc.2020.107396)
+[![YourActionName Actions Status](https://github.com/ComputationalFlowPhysics/MFC-develop/workflows/CI/badge.svg)](https://github.com/ComputationalFlowPhysics/MFC-develop/actions)
+[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
+[![GitHub latest commit](https://badgen.net/github/last-commit/MFlowCode/MFC-develop)](https://github.com/MFlowCode/MFC-develop/commit/)
+
+
+Welcome to MFC! 
+The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows.
 
 # Authors
 
-  MFC was developed at Caltech by a group of post-doctoral scientists and graduate research students under the supervision of Professor Tim Colonius.
-  These contributors include:
-* Dr. Spencer Bryngelson
-* Dr. Kevin Schmidmayer
-* Dr. Vedran Coralic
-* Dr. Jomela Meng
-* Dr. Kazuki Maeda  
-
-  and their contact information is located in the `AUTHORS` file in the source code.
+This is the documentation for the MFC (Multicomponent Flow Code).
+The MFC is a simulation software for multi-component, multi-phase, and bubbly flows. 
+MFC was first developed by the Colonius research group at Caltech.
+Now it is developed and maintained by the groups of Professors <a href="https://colonius.caltech.edu/">Tim Colonius</a>, <a href="https://comp-physics.group">Spencer Bryngelson</a>, and <a href="https://vivo.brown.edu/display/mrodri97">Mauro Rodriguez</a>.
+We try to maintain a list of current and past developers in the `AUTHORS` file!
 
 # Documentation
  
   The following codes are documented, please follow the links to see their Doxygen:
-* <a href="https://mfc-caltech.github.io/pre_process/namespaces.html">Pre_process</a> 
-* <a href="https://mfc-caltech.github.io/simulation/namespaces.html">Simulation</a> 
-* <a href="https://mfc-caltech.github.io/post_process/namespaces.html">Post_process</a>
+* <a href="https://mflowcode.github.io/pre_process/namespaces.html">Pre_process</a> 
+* <a href="https://mflowcode.github.io/simulation/namespaces.html">Simulation</a> 
+* <a href="https://mflowcode.github.io/post_process/namespaces.html">Post_process</a>
  
 
 ## User's guide
  
   A user's guide is included 
-  <a href="https://github.com/ComputationalFlowPhysics/MFC-Caltech/raw/master/doc/MFC_user_guide.pdf">here.</a>
+  <a href="https://github.com/MFlowCode/MFC/raw/master/doc/MFC_user_guide.pdf">here.</a>
  
 ## MFC paper
  
   The paper that describes the MFC's capabilities:
 * <a href="https://doi.org/10.1016/j.cpc.2020.107396">
-        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2020) Computer Physics Communications 4655, 107396
+        S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications 4655, 107396
         </a>
   
 ## Related publications
@@ -40,7 +42,10 @@ for multi-component, multi-phase, and bubbly flows.
   Several publications have used the MFC in various stages of its 
   development. A partial list is included here.
  
-  Refereed journal publications:
+  Journal papers:
+* <a href="https://arxiv.org/abs/2112.14172">
+        S. H. Bryngelson, R. O. Fox, T. Colonius (2021) arXiv: 2112.14172.
+        </a>
 * <a href="https://asa.scitation.org/doi/full/10.1121/10.0000746">
         S. H. Bryngelson and T. Colonius (2020) Journal of the Acoustical Society of America, Vol. 147, pp. 1126-1135
         </a>
@@ -69,7 +74,6 @@ for multi-component, multi-phase, and bubbly flows.
         V. Coralic and T. Colonius (2014) Journal of Computational Physics, Vol. 274, pp. 95-121 
         </a>
  
- 
 Ph.D. Disserations:
 * <a href="https://thesis.library.caltech.edu/11395/">
         J.-C. Veilleux (2019) Ph.D. thesis, California Institute of Technology 
@@ -84,99 +88,162 @@ Ph.D. Disserations:
         V. Coralic (2014) Ph.D. thesis, California Institute of Technology
         </a>
 
+## Installing MFC
 
+To get MFC running as fast as possible without having to configure the dependencies yourself, you can follow the following steps on most UNIX-like
+systems. 
+This method is best suited for development and Continous Integration (CI) workflows.
 
-# Installation
- 
-  The documents that describe how to configure and install the MFC are located in the 
-  source code as `CONFIGURE` and `INSTALL`. They are also described here.
- 
-## Step 1: Configure and ensure dependencies can be located
- 
- 
-### Main dependencies: MPI and Python 
-  If you do not have Python, it can be installed via
-  <a href="https://brew.sh/">Homebrew on OSX</a> as:  
-`brew install python`
- 
-  or compiled via your favorite package manager on Unix systems.
- 
-  An MPI fortran compiler is required for all systems.
-  If you do not have one, Homebrew can take care of this
-  on OSX:  
+To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its developement headers and libraries, a C/C++ compiler
+(GCC, NVHPC, etc., but *not Clang*), and an MPI wrapper (like Open MPI). 
+Below are some commands for popular operating systems and package managers.
 
-`brew install open-mpi` or `brew install mpich`    
+### \*nix
 
-  If a gcc v10.1+ backend is used, then the additional flag `-fallow-argument-mismatch` must be added to `FFLAGS` in `Makefile.user`.
-  MPICH and Open-MPI can be compiled via another package manager on *nix systems.
- 
-### Simulation code dependency: FFTW 
+* Via [Aptitude](https://wiki.debian.org/Aptitude)
+```
+sudo apt install tar wget make cmake gcc g++ python3 openmpi-*  python python-dev python3-dev libopenmpi-dev
+```
 
-If you already have FFTW compiled:
-* Specify the location of your FFTW library and
-      include files in Makefile.user (`fftw_lib_dir` and
-      `fftw_include_dir`)  
+### MacOS (including x86 and M1/Apple Silicon)
 
+* Via [Homebrew](https://brew.sh/)
 
-If you do not have FFTW compiler, the library and
-  installer are included in this package. Just:  
-`cd installers`  
-`./install_fftw.sh`  
- 
-### Post process code dependency: Silo/HDF5
- 
-  Post-processing of parallel data files is not required,
-  but can indeed be handled with the MFC. For this, HDF5
-  and Silo must be installed
- 
-  On OSX, a custom Homebrew tap for Silo is included in the installers
-  directory. You can use it via  
-`cd installers`  
-`brew install silo.rb`  
- 
-  This will install silo and its dependences (including HDF5)
-  in their usual locations (`/usr/local/lib` and
-  `/usr/local/include`)
- 
-  On Unix systems, you can install via a package manager or
-  from source. On CentOS (also Windows 7), HDF5
-  binaries can be found <a href="https://support.hdfgroup.org/ftp/HDF5/current18/bin/">here.</a>
-  
-  Untar this archive in your intended location via  
-`tar -zxf [your HDF5 archive]`  
-  
-  Silo should be downloaded 
-  <a href="https://wci.llnl.gov/simulation/computer-codes/silo/downloads">here,</a>
-  then  
-`tar -zxf [your Silo archive]`  
-`cd [your Silo archive]`  
-`./configure --prefix=[target installation directory] --enable-pythonmodule --enable-optimization --disable-hzip --disable-fpzip FC=mpif90 F77=mpif77 -with-hdf5=[your hdf5 directory]/include,/[your hdf5 directory]/lib --disable-silex`  
-`make`  
-`make install`  
- 
-  Add the following line to your `~/.bash_profile`:  
-  `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/[your silo directory]/lib:/[your hdf5 directory]/lib`
- 
-  Finally:  
-`source ~/.bash_profile`  
-  
-  You will then need to modify `silo_lib_dir` and `silo_include_dir` in
-  `Makefile.user` to point to your silo directory.
- 
-## Step 2: Build and test
- 
-  Once all dependencies have been installed, the MFC can be built via  
-`make`
- 
-  from the MFC directory. This will build all MFC components. Individual
-  components can be built via  
-`make [component]`  
- 
-  where `[component]` is one of `pre_process`, `simulation`, or `post_process`.
- 
-  Once this is completed, you can ensure that the software is working
-  as intended by  
-`make test`  
+You can modify the assignment on the first line to have the GCC major version you wish to have installed and use.
+
+```
+USE_GCC_VERSION=11
+brew install wget make python make cmake gcc@$USE_GCC_VERSION
+HOMEBREW_CC=gcc-$USE_GCC_VERSION; HOMEBREW_CXX=g++-$USE_GCC_VERSION; brew install open-mpi
+```
+
+Further reading `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
+
+### Fetch and build MFC
+
+The following commands fetch and build MFC and its required dependencies. 
+The dependencies are built to the `dependencies/build/` directory within your MFC installation. 
+This should have no impact on your local installation(s) of these packages.
+
+```
+git clone --recursive https://github.com/MFlowCode/MFC
+cd MFC
+```
+
++ Build MFC and its dependencies with `<N>` threads in `release-cpu` mode:
+
+```
+chmod +x ./mfc.sh
+./mfc.sh --build -j <N>
+```
+
++ Run MFC's tests to make sure it was correctly built and your environment is adequate
+
+```
+./mfc.sh --test
+```
+
+## Configuring `mfc.sh`
+
+The `mfc.sh` script used in the previous section is configured through the file named `mfc.conf.yaml`. 
+
+### Compilers
+
+In the `compilers` section you can specify which compilers you wish to have used. Entries representing the name to an executable locatable through your system's `$PATH` or an absolute path to an executable are valid. The default configuration is:
+
+```yaml
+compilers:
+  c:       mpicc
+  c++:     mpicxx
+  fortran: mpif90
+```
+
+### Compiler Configurations
+
+The `configurations` section consists of a list of "compiler configurations", describing modifications for including but not limited to "release" and "debug" builds for CPUs or GPUs. You can freely modify the existing configurations and add your own. Examples:
+
+```yaml
+- name: release-cpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w
+- name: release-gpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -O3 -cpp -w -acc -Minfo=accel -lnvToolsExt -L${CUDA:INSTALL_PATH}/lib64
+```
+
+To use a desired compiler configuration with `mfc.sh`, you must specify the `--compiler-configuration` (a.k.a `-cc`) option, along with the name of your configuration. `release-cpu` is its default value. For example, to build MFC and its dependencies in `debug-cpu` mode, you can run:
+
+```
+./mfc.sh --build -cc debug-cpu
+```
+
+### Targets
+
+The largest section of `mfc.conf.yaml` is labeled `targets`, containing a list of targets. A target is defined as an entity on which `mfc.sh` can run `--build` or `--test`. `mfc.conf.yaml` contains a target for each dependency and MFC component, and for MFC as a whole. Targets have the following general format:
+
+```yaml
+- name: <target name> # The name of the target
+  type: <target type> # The type of target (defined bellow) 
+  <type>:             # The structure associated with the target's type (defined bellow)
+     ...
+  depends: # A list of the names of the targets this target depends on
+  - ...
+  build:   # A list of commands that build the target
+  - ...
+  test:    # A list of commands that run the target's tests
+  - ...
+```
+
+The target's `type` refers to which method is used for fetching its source code, and associated metadata to check for updates. Here is a description of its possible values and associated structures:
+
++ Download
+
+```yaml
+type: download
+download:
+  version: <version>
+  link:    <archive download link>
+```
+
++ Clone
+
+```yaml
+type: clone
+clone:
+  git:  <git repository link>
+  hash: <commit hash>
+```
+
++ Source
+
+```yaml
+type: source
+source:
+  source: <absolute path to the directory where to run commands>
+```
+
+To build a desired target and its dependencies, you must specify the `--targets` (a.k.a `-t`) option, along with the name of your targets separated by spaces. `MFC` is its default value. To build a target and its dependencies from scratch, add the `--scratch` option.
+
+For example, to build MFC's simulation component and its dependencies from scratch, you can run:
+
+```
+./mfc.sh --build -t MFC_Simulation --scratch
+```
+
+### Miscellaneous
+
++ Use the `--jobs <N>` (a.k.a `-j <N>`) option to build with a certain number of threads.
++ Use the `--set-current <name>` (a.k.a `-sc <name>`) option to select explicitly which compiler configuration to use when running MFC.
+
+```
+./mfc.sh --build -t MFC_Simulation -cc release-cpu -j 8 --scratch
+./mfc.sh --test
+./mfc.sh --set-current debug-cpu
+```
 
 # Running
 
@@ -186,33 +253,34 @@ Example Python input files can be found in the
 `example_cases` directories, and they are called `input.py`.
 Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in `example_cases/3d_sphbubcollapse`.
+can also be found in [example_cases/3d_sphbubcollapse/](example_cases/3D_sphbubcollapse/)
 MFC can be executed as  
-`python pre_process`
+
+```
+./input.py MFC_PreProcess
+```
 
 which will generate the restart and grid files that will be read 
 by the simulation code. Then  
-`python simulation`
+
+```
+./input.py MFC_Simulation
+```
 
 will execute the flow solver. The last (optional) step
 is to post treat the data files and output HDF5 databases
 for the flow variables via  
-`python post_process`
 
-Note that the post-processing step 
-requires installation of Silo and HDF5.
+```
+./input.py MFC_PostProcess
+```
 
 # License
  
-MFC is under the MIT License.
+Copyright 2022.
+MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 # Acknowledgements
  
-The development of the MFC  was supported in part by multiple past grants from the US Office of 
-Naval Research (ONR), the US National Institute of 
-Health (NIH), and the US National Science Foundation (NSF), as well as current ONR grant numbers 
-N0014-17-1-2676 and N0014-18-1-2625 and NIH grant number 2P01-DK043881.
-The computations presented here utilized the Extreme Science
-and Engineering Discovery Environment, which is supported under NSF
-grant number CTS120005. K.M. acknowledges support from the Funai Foundation
-for Information Technology via the Overseas Scholarship.
+The development of the MFC  was supported in part by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
+MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and ORNL Summit under allocation CFD154 (PI Bryngelson).
