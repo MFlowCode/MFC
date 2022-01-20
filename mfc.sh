@@ -17,16 +17,27 @@ fi
 #    exit 1
 #fi
 
-wget -O ./bootstrap/get-pip.py https://bootstrap.pypa.io/get-pip.py
-if (($?)); then
-    echo "[mfc.sh] Error: Couldn't download get-pip.py using wget."
-    exit 1
-fi
+MFC_DIR="./.mfc"
+MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
 
-python3 ./bootstrap/get-pip.py --user
-if (($?)); then
-    echo "[mfc.sh] Error: Coudln't install pip with get-pip.py."
-    exit 1
+if [ ! -f "$MFC_GET_PIP_PATH" ]; then
+    mkdir -p "$MFC_DIR"
+    if (($?)); then
+        echo "[mfc.sh] Error: Failed to create directory '$MFC_DIR'."
+        exit 1
+    fi
+
+    wget -O "$MFC_GET_PIP_PATH" https://bootstrap.pypa.io/get-pip.py
+    if (($?)); then
+        echo "[mfc.sh] Error: Couldn't download get-pip.py using wget to '$MFC_GET_PIP_PATH'."
+        exit 1
+    fi
+
+    python3 "$MFC_GET_PIP_PATH" --user
+    if (($?)); then
+        echo "[mfc.sh] Error: Coudln't install pip with get-pip.py ($MFC_GET_PIP_PATH)."
+        exit 1
+    fi
 fi
 
 #source ./venv/bin/activate
