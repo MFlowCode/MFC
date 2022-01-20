@@ -11,17 +11,29 @@ if (($?)); then
     exit 1
 fi
 
-python3 -m venv ./venv
+#python3 -m venv ./venv
+#if (($?)); then
+#    echo "[mfc.sh] Error: Failed to create a Python virtual environment."
+#    exit 1
+#fi
+
+wget -O ./bootstrap/get-pip.py https://bootstrap.pypa.io/get-pip.py
 if (($?)); then
-    echo "[mfc.sh] Error: Failed to create a Python virtual environment."
+    echo "[mfc.sh] Error: Couldn't download get-pip.py using wget."
     exit 1
 fi
 
-source ./venv/bin/activate
+python3 ./bootstrap/get-pip.py --user
 if (($?)); then
-    echo "[mfc.sh] Error: Faild to activate the Python virtual environment."
+    echo "[mfc.sh] Error: Coudln't install pip with get-pip.py."
     exit 1
 fi
+
+#source ./venv/bin/activate
+#if (($?)); then
+#    echo "[mfc.sh] Error: Faild to activate the Python virtual environment."
+#    exit 1
+#fi
 
 python3 -c 'print("")' > /dev/null
 if (($?)); then
