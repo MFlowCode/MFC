@@ -1,5 +1,6 @@
 tags
 .mfc/
+venv/
 src/*/tags
 doc/Doxygen/*/html
 doc/Doxygen/*logo*
