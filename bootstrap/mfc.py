@@ -5,7 +5,9 @@ import re
 import io
 import sys
 import copy
+import yaml     # *: PyYAML package
 import shutil
+import colorama # *: Colorama package
 import tarfile
 import argparse
 import traceback
@@ -29,29 +31,6 @@ def execute_shell_command_safe(command: str, no_exception: bool = False):
         raise MFCException(f'Failed to execute command "{command}".')
 
     return status
-
-
-def import_module_safe(import_name: str, pip_name: str):
-    try:
-        globals()[import_name] = __import__(import_name)
-
-        return
-
-    except ImportError:
-        pass
-
-    prompt = f"The Python package {pip_name} needs to be installed. Would you like to install it now? (from ./python_packages/{pip_name}) (yY/nN): "
-
-    if input(prompt).upper().strip() != "Y":
-        raise Exception(f'You requested not to download the Python package {pip_name}. Aborting...')
-
-    if 0 != execute_shell_command_safe(f'python3 -m pip install {pip_name}', no_exception=True):
-        raise Exception(f'Failed to automatically install the Python package {pip_name}. Please install it manually using Pip. Aborting...')
-
-    print("\n")
-
-    # Restart mfc.py
-    os.execv(sys.argv[0], sys.argv)
 
 
 def clear_line():
@@ -630,9 +609,6 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
 def main():
     execute_shell_command_safe("git submodule update --init --recursive", no_exception=True)
-
-    for module in [("yaml", "pyyaml"), ("colorama", "colorama")]:
-        import_module_safe(*module)
 
     try:
         colorama.init()
