@@ -34,5 +34,4 @@ elif [ "$response" == "a" ]; then # For Ascent
     module list
 else
     echo "Error: Requested system is not supported"
-    exit 1
 fi
