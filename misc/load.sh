@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
+echo -e "\nPlease run this file with \"source\": \"source load.sh\"\n".
 
 echo "Which computer would like to laod submodules for?"
-echo "- Summit   (s)"
-echo "- Bridges2 (b)"
-echo "- Ascent   (a)"
+echo " - Summit   (s)"
+echo " - Bridges2 (b)"
+echo " - Ascent   (a)"
 echo -n "(s/b/a): "
 read response
 
