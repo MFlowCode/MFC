@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Check whether this script was called from MFC's root directory.
-if [ ! -f ./bootstrap/mfc.py ]; then
+if [ ! -f ./bootstrap/delegate.py ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
     exit 1
 fi
@@ -60,7 +60,7 @@ fi
 #fi
 
 # Install PyYAML if it isn't installed
-python3 -m pip show -q pyyaml
+python3 -c 'import yaml'
 if (($?)); then
     python3 -m pip install pyyaml
     if (($?)); then
@@ -70,7 +70,7 @@ if (($?)); then
 fi
 
 # Install Colorama if it isn't installed
-python3 -m pip show -q colorama
+python3 -c 'import colorama'
 if (($?)); then
     python3 -m pip install colorama
     if (($?)); then
@@ -81,10 +81,9 @@ fi
 
 # Run the mfc.py bootstrap script
 cd bootstrap
-python3 ./mfc.py $@
+python3 ./delegate.py $@
 code=$?
 
 cd ..
 
 exit $code
-

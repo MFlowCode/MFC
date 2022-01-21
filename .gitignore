@@ -2,9 +2,9 @@ tags
 .mfc/
 venv/
 src/*/tags
-doc/Doxygen/*/html
-doc/Doxygen/*logo*
-doc/Doxygen/*icon*
+
+__pycache__
+
 src/*/*.mod
 src/*/*.o
 src/pre_process_code/pre_process
