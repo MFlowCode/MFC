@@ -729,7 +729,7 @@ contains
         real(kind(0d0))                              ::       nbub_L_acc, nbub_R_acc
         real(kind(0d0))                              ::     ptilde_L_acc, ptilde_R_acc
         real(kind(0d0))  :: vel_L_rms_acc, vel_R_rms_acc, vel_avg_rms_acc
-        real(kind(0d0)) :: blkmod1, blkmod2
+        real(kind(0d0)) :: blkmod1_acc, blkmod2_acc
         real(kind(0d0)) :: rho_Star_acc, E_Star_acc, p_Star_acc, p_K_Star_acc
         real(kind(0d0)) :: Ms_L, Ms_R, pres_SL, pres_SR
 
@@ -871,17 +871,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -1180,17 +1180,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -1489,17 +1489,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -1801,17 +1801,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -2111,17 +2111,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -2419,17 +2419,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -3181,7 +3181,7 @@ contains
         real(kind(0d0))                              ::       nbub_L_acc, nbub_R_acc
         real(kind(0d0))                              ::     ptilde_L_acc, ptilde_R_acc
         real(kind(0d0))  :: vel_L_rms_acc, vel_R_rms_acc, vel_avg_rms_acc
-        real(kind(0d0)) :: blkmod1, blkmod2
+        real(kind(0d0)) :: blkmod1_acc, blkmod2_acc
         real(kind(0d0)) :: rho_Star_acc, E_Star_acc, p_Star_acc, p_K_Star_acc
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         integer :: i, j, k, l !< Generic loop iterators
@@ -3338,17 +3338,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             else
                                 c_L_acc = 0d0
@@ -3678,17 +3678,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
 
                             else
@@ -3980,17 +3980,17 @@ contains
                                 if (alt_soundspeed) then
 
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                                 else
                                     ! Sound speed for bubble mmixture to order O(\alpha)
@@ -4292,17 +4292,17 @@ contains
                                 if (alt_soundspeed) then
 
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                                 else
                                     c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc**2d0)/gamma_L_acc)
@@ -4572,17 +4572,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             else
                                 c_L_acc = 0d0
@@ -4912,17 +4912,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
 
                             else
@@ -5239,17 +5239,17 @@ contains
                                 if (alt_soundspeed) then
 
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                                 else
                                     ! Sound speed for bubble mmixture to order O(\alpha)
@@ -5576,17 +5576,17 @@ contains
                                 if (alt_soundspeed) then
 
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                                 else
                                     c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc**2d0)/gamma_L_acc)
@@ -5886,17 +5886,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             else
                                 c_L_acc = 0d0
@@ -6226,17 +6226,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
 
                             else
@@ -6547,17 +6547,17 @@ contains
                                 if (alt_soundspeed) then
 
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                                 else
                                     ! Sound speed for bubble mmixture to order O(\alpha)
@@ -6879,17 +6879,17 @@ contains
                                 if (alt_soundspeed) then
 
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                    c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                    blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                    blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                                pi_infs(1))/gammas(1)
-                                    blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                    blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                                pi_infs(2))/gammas(2)
-                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                    c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                                 else
                                     c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc**2d0)/gamma_L_acc)
@@ -7186,17 +7186,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -7688,17 +7688,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
@@ -8233,17 +8233,17 @@ contains
                             if (alt_soundspeed) then
 
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_L_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_L_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_L_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_L_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1 + alpha_L_acc(2)/blkmod2))
+                                c_L_acc = 1d0/(rho_L_acc*(alpha_L_acc(1)/blkmod1_acc + alpha_L_acc(2)/blkmod2_acc))
 
-                                blkmod1 = ((gammas(1) + 1d0)*pres_R_acc + &
+                                blkmod1_acc = ((gammas(1) + 1d0)*pres_R_acc + &
                                            pi_infs(1))/gammas(1)
-                                blkmod2 = ((gammas(2) + 1d0)*pres_R_acc + &
+                                blkmod2_acc = ((gammas(2) + 1d0)*pres_R_acc + &
                                            pi_infs(2))/gammas(2)
-                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1 + alpha_R_acc(2)/blkmod2))
+                                c_R_acc = 1d0/(rho_R_acc*(alpha_R_acc(1)/blkmod1_acc + alpha_R_acc(2)/blkmod2_acc))
 
                             elseif (model_eqns == 3) then
                                 c_L_acc = 0d0
