@@ -204,6 +204,12 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(mp_weno, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(cu_mpi, 1, MPI_LOGICAL, &
+                       0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(weno_flat, 1, MPI_LOGICAL, &
+                       0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(riemann_flat, 1, MPI_LOGICAL, &
+                       0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(weno_Re_flux, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(riemann_solver, 1, MPI_INTEGER, &
@@ -768,10 +774,13 @@ contains
 
         ! Boundary condition at the beginning
         if (proc_coords(1) > 0 .or. bc_x%beg == -1) then
+            print *, "Hello"
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
         end if
+
+        print *, bc_x%beg
 
         ! Boundary condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then

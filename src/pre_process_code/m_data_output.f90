@@ -135,7 +135,7 @@ contains
         pi_inf = fluid_pp(1)%pi_inf
 
         if (precision == 1) then
-            FMT = "(2F30.7)"
+            FMT = "(2F30.3)"
         else
             FMT = "(2F40.14)"
         end if
