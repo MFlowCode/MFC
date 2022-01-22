@@ -31,8 +31,8 @@ for mytest in "${mytests[@]}"; do
 
         mytest="Test $i of $ntest: $mytest"
         #Print if not
-        if [ -s diff.txt ]; then
-            echo $mytest: Test failed! Output files are different.
+        if [ -s diff.out ]; then
+            echo -e $mytest": Test failed! Output files are different."
             ((++nfail))
         elif [ ! -f "D/$check_file" ]; then
             echo $mytest: Test failed! Output file was not found.

@@ -35,7 +35,6 @@ case_dict =                                                                    \
     {                                                                          \
                     # Logistics ================================================
                     'case_dir'                     : '\'.\'',                  \
-                    'run_time_info'                : 'T',                      \
                     'nodes'                        : 1,                        \
                     'ppn'                          : 1,                        \
                     'queue'                        : 'normal',                 \
@@ -50,42 +49,38 @@ case_dict =                                                                    \
                     'x_domain%end'                 : 1.E+00,                   \
                     'y_domain%end'                 : 1.E+00,                   \
                     'z_domain%end'                 : 1.E+00,                   \
-                    'm'                            : 99,                      \
-                    'n'                            : 99,                        \
-                    'p'                            : 99,                        \
+                    'm'                            : 200,                      \
+                    'n'                            : 200,                        \
+                    'p'                            : 200,                        \
                     'dt'                           : 4.E-08,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 10,                     \
-                    't_step_save'                  : 9,                     \
+                    't_step_stop'                  : 20,                     \
+                    't_step_save'                  : 20,                     \
 		            # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
                     'num_patches'                  : 2,                        \
                     'model_eqns'                   : 2,                        \
-                    'alt_soundspeed'               : 'F',                      \
                     'num_fluids'                   : 2,                        \
-		    'adv_alphan'                   : 'T',                      \
-		    'mpp_lim'                      : 'F',                      \
-		    'mixture_err'                  : 'F',                      \
 		    'time_stepper'                 : 3,                        \
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
-                    'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'F',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
-                    'commute_err'                  : 'F',                      \
-                    'split_err'                    : 'F',                      \
-                    'bc_x%beg'                     : -3,                       \
-                    'bc_y%beg'                     : -3,                       \
-                    'bc_z%beg'                     : -3,                       \
-                    'bc_x%end'                     : -3,                       \
-                    'bc_y%end'                     : -3,                       \
-                    'bc_z%end'                     : -3,                       \
+                    'cu_mpi'                    : 'T',                        \
+                    'riemann_flat'                    : 'T',                        \
+                    'weno_flat'                    : 'T',                        \
+                    'bc_x%beg'                     : -1,                       \
+                    'bc_y%beg'                     : -1,                       \
+                    'bc_z%beg'                     : -1,                       \
+                    'bc_x%end'                     : -1,                       \
+                    'bc_y%end'                     : -1,                       \
+                    'bc_z%end'                     : -1,                       \
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============

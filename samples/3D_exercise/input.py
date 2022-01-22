@@ -2,15 +2,13 @@
 import math
 
 #Numerical setup
-Nx      = 100
+Nx      = 200
 dx      = 1./(1.*(Nx+1))
-Ny  = 70
+Ny  = 200
 dy = 1./(1.*(Ny+1))
-Nz = 60
+Nz = 200
 dz = 1./(1.*(Nz+1))
-Tend    = 0.03
-Nt      = 100
-mydt    = Tend/(1.*Nt)
+mydt    = 0.0003
 
 # Command to navigate between directories
 from os import chdir
@@ -85,9 +83,13 @@ case_dict =                                                                     
                     'mapped_weno'                  : 'T',                       \
                     'null_weights'                 : 'F',                       \
                     'mp_weno'                      : 'F',                       \
+                    'weno_flat'                      : 'T',                       \
+                    'riemann_flat'                      : 'T',                       \
                     'riemann_solver'               : 2,                         \
                     'wave_speeds'                  : 1,                         \
                     'avg_state'                    : 2,                         \
+                    'cu_mpi'                  : 'F',
+                         \
                     'bc_x%beg'                     : -1,                        \
                     'bc_y%beg'                     : -1,                        \
                     'bc_z%beg'                     : -1,                        \
@@ -100,7 +102,7 @@ case_dict =                                                                     
                     'format'                       : 1,                         \
                     'precision'                    : 2,                         \
                     'prim_vars_wrt'                :'T',                        \
-                    'parallel_io'                  :'T',                        \
+                    'parallel_io'                  :'F',                        \
                     # ==========================================================
                                                                                 
                     # Patch 1 L ================================================
