@@ -582,7 +582,10 @@ contains
                                 alpha_K_sum = alpha_K_sum + alpha_K(i)
                             end do
 
-                            alpha_K = alpha_K/max(alpha_K_sum,1d-16)
+!$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_K(i) = alpha_K(i)/max(alpha_K_sum,1d-16)
+                            end do
 
                         end if
 
