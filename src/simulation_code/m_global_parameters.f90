@@ -326,8 +326,8 @@ contains
         parallel_io = .false.
         precision = 2
         weno_flat = .true.
-        riemann_flat = .false.
-        cu_mpi = .false.
+        riemann_flat = .true.
+        cu_mpi = .true.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

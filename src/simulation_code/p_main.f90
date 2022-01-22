@@ -81,9 +81,11 @@ program p_main
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
+
     call s_mpi_bcast_user_inputs()
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
+
 
 
     ! Computation of parameters, allocation of memory, association of pointers,
@@ -149,6 +151,8 @@ program p_main
         mytime = t_step*dt
     end if
     finaltime = t_step_stop*dt
+
+
 
     ! Time-stepping Loop =======================================================
     do
