@@ -350,6 +350,7 @@ contains
         ! fluids physical parameters that make up the mixture
 
 
+
         rho_K = 0d0
         gamma_K = 0d0
         pi_inf_K = 0d0
@@ -554,7 +555,7 @@ contains
         type(bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)),   dimension(10) :: alpha_K, alpha_rho_K
-        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
+        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K, alpha_K_sum
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -570,6 +571,20 @@ contains
                             alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
                             alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                         end do
+
+                        alpha_K_sum = 0d0
+
+                        if (mpp_lim) then
+!$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_rho_K(i) = max(0d0, alpha_rho_K(i))
+                                alpha_K(i) = min(max(0d0, alpha_K(i)), 1d0)
+                                alpha_K_sum = alpha_K_sum + alpha_K(i)
+                            end do
+
+                            alpha_K = alpha_K/max(alpha_K_sum,1d-16)
+
+                        end if
 
 
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, alpha_rho_K, j, k, l)
