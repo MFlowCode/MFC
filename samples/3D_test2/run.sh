@@ -17,5 +17,7 @@ do
 	time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 nsys profile --stats=true  ../../.mfc/___current___/build/bin/MFC_Simulation
 	#time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 ../src/simulation_code/simulation
 	#time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 nsys profile --stats=true ../../src/simulation_code/simulation
-	#time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 nv-nsight-cu-cli --set full -k m_weno_s_weno_902_gpu -f -o profile_anand_alt ../../src/simulation_code/simulation
+	#time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 nv-nsight-cu-cli --set full -k m_weno_s_weno_alt_1341_gpu -f -o profile_anand_weno ../../src/simulation_code/simulation
+	#time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 nv-nsight-cu-cli --set full -k m_weno_s_weno_alt_1565_gpu -f -o profile_anand_mp_weno ../../src/simulation_code/simulation
+	#time jsrun --smpiargs="-gpu" -r$proc -a1 -c1 -g1 nv-nsight-cu-cli --set full -k m_riemann_solvers_s_hllc_riemann_solver_acc_4212_gpu -f -o profile_anand_riemann ../../src/simulation_code/simulation
 done
