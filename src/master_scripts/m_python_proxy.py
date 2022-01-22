@@ -906,8 +906,11 @@ simulation_dict =                                                              \
                     'char_decomp'                   : None,                    \
                     'mapped_weno'                   : None,                    \
                     'mp_weno'                       : None,                    \
+                    'riemann_flat'                       : None,                    \
+                    'weno_flat'                       : None,                    \
                     'weno_avg'                      : None,                    \
                     'weno_Re_flux'                  : None,                    \
+                    'cu_mpi'                       : None,                    \
                     'riemann_solver'                : None,                    \
                     'wave_speeds'                   : None,                    \
                     'avg_state'                     : None,                    \
