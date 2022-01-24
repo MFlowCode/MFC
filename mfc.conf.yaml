@@ -18,6 +18,11 @@ configurations:
     c:       -Og -g
     c++:     -Og -g
     fortran: -Og -g -cpp -w
+- name: debug-gpu
+  flags:
+    c:       -O3
+    c++:     -O3
+    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt -DMFC_MEMORY_DUMP
 - name: ci-cpu
   flags:
     fortran: -cpp -w
@@ -67,7 +72,7 @@ targets:
   source:
     source: ${MFC_ROOT_PATH}/src/pre_process_code
   build:
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+  - ./../../bootstrap/prepare_make.sh ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   test: []
 
 - name: MFC_Simulation
@@ -78,7 +83,7 @@ targets:
     source: ${MFC_ROOT_PATH}/src/simulation_code
   build:
   - >-
-    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    ./../../bootstrap/prepare_make.sh ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
@@ -92,7 +97,7 @@ targets:
     source:  ${MFC_ROOT_PATH}/src/post_process_code
   build:
   - >-
-    make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    ./../../bootstrap/prepare_make.sh ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 

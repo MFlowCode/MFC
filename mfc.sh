@@ -6,6 +6,10 @@ if [ ! -f ./bootstrap/delegate.py ]; then
     exit 1
 fi
 
+# Make bootstrap files executable
+chmod +x ./bootstrap/delegate.py
+chmod +x ./bootstrap/prepare_make.sh
+
 # Check whether python3 is in the $PATH / is accessible.
 which python3 > /dev/null 2>&1
 if (($?)); then

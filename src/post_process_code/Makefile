@@ -7,7 +7,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-EXEC = ../../.mfc/___current___/build/bin/MFC_PostProcess
+EXEC = ./../../../.mfc/___current___/build/bin/MFC_PostProcess
 PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 
