@@ -22,7 +22,7 @@ configurations:
   flags:
     c:       -O3
     c++:     -O3
-    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt -DMFC_MEMORY_DUMP
+    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 - name: ci-cpu
   flags:
     fortran: -cpp -w
@@ -72,7 +72,9 @@ targets:
   source:
     source: ${MFC_ROOT_PATH}/src/pre_process_code
   build:
-  - ./../../bootstrap/prepare_make.sh ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+  - >-
+    ${MFC_ROOT_PATH}/bootstrap/prepare_make.sh INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}"
+    ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   test: []
 
 - name: MFC_Simulation
@@ -83,7 +85,8 @@ targets:
     source: ${MFC_ROOT_PATH}/src/simulation_code
   build:
   - >-
-    ./../../bootstrap/prepare_make.sh ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    ${MFC_ROOT_PATH}/bootstrap/prepare_make.sh INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
+    ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
@@ -94,10 +97,11 @@ targets:
   - HDF5
   - SILO
   source:
-    source:  ${MFC_ROOT_PATH}/src/post_process_code
+    source: ${MFC_ROOT_PATH}/src/post_process_code
   build:
   - >-
-    ./../../bootstrap/prepare_make.sh ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    ${MFC_ROOT_PATH}/bootstrap/prepare_make.sh INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
+    ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 

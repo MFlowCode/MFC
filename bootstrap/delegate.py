@@ -7,8 +7,6 @@ import internal.common    as common
 import internal.bootstrap as bootstrap
 
 def main():
-    common.execute_shell_command_safe("git submodule update --init --recursive", no_exception=True)
-
     try:
         common.colorama.init()
 
