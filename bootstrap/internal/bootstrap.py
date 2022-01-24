@@ -249,7 +249,10 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
                 common.clear_print(f'|--> Package {name}: Building (Logging to {logfile.name})...', end='\r')
 
-                common.execute_shell_command_safe(command)
+                def cmd_on_error():
+                    print(logfile.read())
+
+                common.execute_shell_command_safe(command, onError=cmd_on_error)
         elif conf["type"] == "collection":
             pass
         else:
@@ -284,7 +287,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         common.clear_print(f'|--> Package {name}: Preparing build...', end='\r')
 
-        with open(self.get_log_filepath(name), "w") as logfile:
+        with open(self.get_log_filepath(name), "r+") as logfile:
             self.build_target__clean_previous(name)          # Clean any old build artifacts
             self.build_target__fetch         (name, logfile) # Fetch Source Code
             self.build_target__build         (name, logfile) # Build
