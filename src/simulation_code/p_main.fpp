@@ -71,7 +71,6 @@ program p_main
  
    ! will result in the termination of the simulation.
     if (proc_rank == 0) then
-    
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
     
@@ -93,36 +92,36 @@ program p_main
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
 
-#ifdef _OPENACC
-    PRINT *, "[MEM-INST] After: s_initialize_global_parameters_module"
+#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+    PRINT *, "[MEMORY-DUMP] After: s_initialize_global_parameters_module"
     call acc_present_dump()
-#endif // _OPENACC
+#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     
     call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
 
-#ifdef _OPENACC
-    PRINT *, "[MEM-INST] After: s_initialize_riemann_solvers_module"
+#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+    PRINT *, "[MEMORY-DUMP] After: s_initialize_riemann_solvers_module"
     call acc_present_dump()
-#endif // _OPENACC
+#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
     call s_initialize_rhs_module()
 
-#ifdef _OPENACC
-    PRINT *, "[MEM-INST] After: s_initialize_rhs_module"
+#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+    PRINT *, "[MEMORY-DUMP] After: s_initialize_rhs_module"
     call acc_present_dump()
-#endif // _OPENACC
+#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     
     call s_initialize_data_output_module()
     call s_initialize_derived_variables_module()
     call s_initialize_time_steppers_module()
 
-#ifdef _OPENACC
-    PRINT *, "[MEM-INST] After: s_initialize_time_steppers_module"
+#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+    PRINT *, "[MEMORY-DUMP] After: s_initialize_time_steppers_module"
     call acc_present_dump()
-#endif // _OPENACC    
+#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)    
 
     if (qbmm) call s_initialize_qbmm_module()
     
@@ -158,10 +157,10 @@ program p_main
     ! the modules. The preparations below DO DEPEND on the grid being complete.
     call s_initialize_weno_module()
 
-#ifdef _OPENACC
+#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     PRINT *, "[MEM-INST] After: s_initialize_weno_module"
     call acc_present_dump()
-#endif // _OPENACC
+#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
     call s_initialize_cbc_module()
 
