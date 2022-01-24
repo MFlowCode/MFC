@@ -582,10 +582,7 @@ contains
                                 alpha_K_sum = alpha_K_sum + alpha_K(i)
                             end do
 
-!$acc loop seq
-                            do i = 1, num_fluids
-                                alpha_K(i) = alpha_K(i)/max(alpha_K_sum,1d-16)
-                            end do
+                            alpha_K = alpha_K/max(alpha_K_sum,1d-16)
 
                         end if
 
@@ -609,7 +606,7 @@ contains
             end do
 !$acc end parallel loop 
         elseif((model_eqns .ne. 4)) then 
-!$acc parallel loop collapse(3) gang vector default(present) private(rho_K, gamma_K, pi_inf_K,  dyn_pres_K, nRtmp, nbub)
+!$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_K, alpha_K, nRtmp)
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
@@ -628,30 +625,27 @@ contains
                                 dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
                                              *qK_prim_vf(i)%sf(j, k, l)
                         end do 
-!$acc end loop
+
                        qK_prim_vf(E_idx)%sf(j, k, l) = &
                             ((qK_cons_vf(E_idx)%sf(j, k, l) &
                               - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) &
                              - pi_inf_K &
                             )/gamma_K
 
-!$acc loop 
+!$acc loop seq 
                         do i = 1, nb
                             nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
                             !IF (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
                         end do
-!$acc end loop
+
 
                         call s_comp_n_from_cons(qK_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
-                        if (DEBUG) then
-                            if (j == 0 .and. k == 0 .and. l == 0) print *, 'nbub1: ', nbub
-                        end if
-                        if (nbub < 0.d0) stop 'nbub is negative'
-!$acc loop 
+
+!$acc loop seq 
                         do i = bubxb, bubxe
                             qk_prim_vf(i)%sf(j, k, l) = qk_cons_vf(i)%sf(j, k, l)/nbub
                         end do
-!$acc end loop
+
                     end do
                 end do
             end do
