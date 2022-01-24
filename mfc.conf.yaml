@@ -100,13 +100,13 @@ targets:
     source: ${MFC_ROOT_PATH}/src/post_process_code
   build:
   - >-
-    ${MFC_ROOT_PATH}/bootstrap/prepare_make.sh INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
+    ${MFC_ROOT_PATH}/bootstrap/prepare_make.sh INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}"
     ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
 - name: MFC
-  type: source
+  type: collection
   depends:
   - MFC_PreProcess
   - MFC_Simulation

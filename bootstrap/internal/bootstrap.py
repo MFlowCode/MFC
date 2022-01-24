@@ -229,27 +229,32 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
             shutil.copytree(self.string_replace(name, conf["source"]["source"]),
                             self.get_source_path(name))
+        elif conf["type"] == "collection":
+            pass
         else:
             raise common.MFCException(f'Dependency type "{conf["type"]}" is unsupported.')
 
     def build_target__build(self, name: str, logfile: io.IOBase):
         conf = self.conf.get_target(name)
 
-        if conf["type"] not in ["clone", "download", "source"]:
-            raise common.MFCException(f'Unknown target type "{conf["type"]}".')
-
-        for command in conf["build"]:
-            command = self.string_replace(name, f"""\
+        if conf["type"] in ["clone", "download", "source"]:
+            for command in conf["build"]:
+                command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 PYTHON="python3" PYTHON_CPPFLAGS="$PYTHON_CPPFLAGS $(python3-config --includes) $(python3-config --libs)" \
 stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
-            logfile.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
-            logfile.flush()
+                logfile.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
+                logfile.flush()
 
-            common.clear_print(f'|--> Package {name}: Building (Logging to {logfile.name})...', end='\r')
+                common.clear_print(f'|--> Package {name}: Building (Logging to {logfile.name})...', end='\r')
 
-            common.execute_shell_command_safe(command)
+                common.execute_shell_command_safe(command)
+        elif conf["type"] == "collection":
+            pass
+        else:
+            raise common.MFCException(f'Unknown target type "{conf["type"]}".')
+
 
     def build_target__update_lock(self, name: str):
         conf = self.conf.get_target(name)
