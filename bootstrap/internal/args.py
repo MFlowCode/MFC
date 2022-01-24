@@ -1,5 +1,4 @@
 import argparse
-import argcomplete
 
 import internal.conf   as conf
 import internal.common as common
@@ -29,8 +28,6 @@ class MFCArgs:
 
         parser.add_argument("-s", "--scratch", action="store_true",
                             help="Build all targets from scratch.")
-
-        argcomplete.autocomplete(parser)
 
         self.data = vars(parser.parse_args())
 
