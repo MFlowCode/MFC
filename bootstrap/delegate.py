@@ -12,7 +12,6 @@ def main():
 
         bootstrap.Bootstrap()
     except common.MFCException as exc:
-        print(traceback.format_exc())
         print(f"{colorama.Fore.RED}|--> {str(exc)}{colorama.Style.RESET_ALL}")
         exit(1)
 
