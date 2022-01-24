@@ -152,6 +152,7 @@ module m_global_parameters
     integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
 
+!$acc declare create(bub_idx)
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -177,7 +178,9 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
-!$acc declare create(sys_size, buff_size, E_idx, gamma_idx, pi_inf_idx, alf_idx)
+    integer :: startx, starty, startz
+
+!$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -512,6 +515,7 @@ contains
                     allocate (weight(nb), R0(nb), V0(nb))
                     allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                     allocate (bub_idx%ps(nb), bub_idx%ms(nb))
+!$acc enter data create(bub_idx%rs(nb), bub_idx%vs(nb), bub_idx%ps(nb), bub_idx%ms(nb))
 
                     if (num_fluids == 1) then
                         gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
@@ -521,7 +525,7 @@ contains
 
                     if (qbmm) then
                         allocate (bub_idx%moms(nb, nmom))
-
+!$acc enter data create(bub_idx%moms(nb,nmom))
                         do i = 1, nb
                             do j = 1, nmom
                                 bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
@@ -546,6 +550,8 @@ contains
                             end if
                         end do
                     end if
+
+!$acc update device(bub_idx%rs, bub_idx%vs, bub_idx%ps, bub_idx%ms) 
 
                     if (nb == 1) then
                         weight(:) = 1d0
@@ -608,6 +614,7 @@ contains
                     allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                     allocate (bub_idx%ps(nb), bub_idx%ms(nb))
                     allocate (weight(nb), R0(nb), V0(nb))
+!$acc enter data create(bub_idx%rs(nb), bub_idx%rs(nb), bub_idx%ps(nb), bub_idx%ms(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -624,7 +631,7 @@ contains
                             bub_idx%ms(i) = bub_idx%ps(i) + 1
                         end if
                     end do
-
+!$acc update device(bub_idx%rs, bub_idx%vs, bub_idx%ps, bub_idx%ms) 
                     if (nb == 1) then
                         weight(:) = 1d0
                         R0(:) = 1d0
@@ -700,6 +707,18 @@ contains
         else
             buff_size = weno_polyn + 2
         end if
+
+        startx = -buff_size
+        starty = 0
+        startz = 0
+        if(n > 0) then
+            starty = -buff_size
+        end if
+        if(p > 0) then
+            startz = -buff_size
+        end if
+
+!$acc update device(startx, starty, startz)
 
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
@@ -940,14 +959,12 @@ contains
         !! @param nRtmp is the bubble number  density times the bubble radii
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-
+!$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
         real(kind(0.d0)) :: nR3
         integer :: i
-
-!$acc routine seq
 
         call s_quad(nRtmp**3d0, nR3)
 
@@ -978,7 +995,7 @@ contains
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-
+!$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
@@ -986,17 +1003,7 @@ contains
 
         call s_quad(Rtmp**3d0, R3)
 
-        if (R3 < 0d0) then
-            print *, vftmp, R3, Rtmp(:)
-            stop 'R3 is negative'
-        end if
-        if (vftmp < 0d0) then
-            print *, vftmp, R3, Rtmp(:)
-            stop 'vf negative'
-        end if
-
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-        ! ntmp = 1d0
 
     end subroutine s_comp_n_from_prim
 
