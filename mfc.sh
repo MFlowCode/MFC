@@ -25,7 +25,7 @@ if (($?)); then
 fi
 
 # Check if Python is at least minimally functionnal.
-python3 -c 'print("")' > /dev/null
+python3 -c 'print("")' > /dev/null 2>&1
 if (($?)); then
     echo "[mfc.sh] Error: Python3 is present but can't execute a simple program. Please ensure that python3 is working."
     exit 1
@@ -72,7 +72,7 @@ for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
     import_name=$(echo $module | tr ',' '\n' | head -n 1)
     install_name=$(echo $module | tr ',' '\n' | tail -n 1)
 
-    python3 -c "import $import_name"
+    python3 -c "import $import_name" > /dev/null 2>&1
     if (($?)); then
         python3 -m pip install $install_name
         if (($?)); then

@@ -17,13 +17,17 @@ class MFCException(Exception):
     pass
 
 
-def execute_shell_command_safe(command: str, no_exception: bool = False, onError=lambda: None) -> int:
+def execute_shell_command_safe(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
     status = os.system(command)
 
     if status != 0:
-        onError()
+        on_error()
+
         if not(no_exception):
-            raise MFCException(f'Failed to execute command "{command}".')
+            if exception_text is None:
+                exception_text = f'Failed to execute command "{command}".'
+
+            raise MFCException(exception_text)
 
     return status
 

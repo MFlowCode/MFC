@@ -238,7 +238,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         conf = self.conf.get_target(name)
 
         if conf["type"] in ["clone", "download", "source"]:
-            for command in conf["build"]:
+            for cmd_idx, command in enumerate(conf["build"]):
                 command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 PYTHON="python3" PYTHON_CPPFLAGS="$PYTHON_CPPFLAGS $(python3-config --includes) $(python3-config --libs)" \
@@ -252,7 +252,10 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 def cmd_on_error():
                     print(logfile.read())
 
-                common.execute_shell_command_safe(command, onError=cmd_on_error)
+                cmd_exception_text=f"Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.conf.yaml)"
+                cmd_exception_text=cmd_exception_text+f"You can also view it by running:\n\ncat \"{logfile.name}\"\n"
+
+                common.execute_shell_command_safe(command, exception_text=cmd_exception_text, on_error=cmd_on_error)
         elif conf["type"] == "collection":
             pass
         else:
@@ -287,6 +290,8 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         common.clear_print(f'|--> Package {name}: Preparing build...', end='\r')
 
+        common.create_file_safe(self.get_log_filepath(name))
+        
         with open(self.get_log_filepath(name), "r+") as logfile:
             self.build_target__clean_previous(name)          # Clean any old build artifacts
             self.build_target__fetch         (name, logfile) # Fetch Source Code
