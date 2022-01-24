@@ -6563,6 +6563,8 @@ contains
                                              is2%beg:is2%end, &
                                              is3%beg:is3%end, 1:2))
         end if
+
+
   
 
         if(n == 0) return
@@ -6616,15 +6618,6 @@ contains
                                              is2%beg:is2%end, &
                                              is3%beg:is3%end, 1:2))
         end if
- 
-
-
-
-
-
-
-
-
 
 
 
@@ -8080,37 +8073,50 @@ contains
 
 
             if (norm_dir == 2) then
-    !$acc parallel loop collapse(4) gang vector default(present)
-                 do i = 1, sys_size       
-                  do l = is3%beg, is3%end
-                    do j = is1%beg, is1%end
-                    do k = is2%beg, is2%end
-                            flux_vf(i)%sf(k, j, l) = &
-                                flux_rsy_vf_flat(j, k, l, i)
-                            flux_gsrc_vf(i)%sf(k, j, l) = &
-                                flux_gsrc_rsy_vf_flat(j, k, l, i)
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size       
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                flux_vf(i)%sf(k, j, l) = &
+                                    flux_rsy_vf_flat(j, k, l, i)
                             end do
                         end do
                     end do
                 end do
+
+                if(cyl_coord) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size       
+                      do l = is3%beg, is3%end
+                            do j = is1%beg, is1%end
+                                do k = is2%beg, is2%end
+                                        flux_gsrc_vf(i)%sf(k, j, l) = &
+                                            flux_gsrc_rsy_vf_flat(j, k, l, i)
+                                end do
+                            end do
+                        end do
+                    end do 
+                end if                   
+
     !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = is3%beg, is3%end
-                      do j = is1%beg, is1%end
+                do l = is3%beg, is3%end
+                  do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
-                        flux_src_vf(advxb)%sf(k, j, l) = &
-                            flux_src_rsy_vf_flat(j, k, l, advxb)
+                            flux_src_vf(advxb)%sf(k, j, l) = &
+                                flux_src_rsy_vf_flat(j, k, l, advxb)
                         end do
                     end do
                 end do
 
                 if (riemann_solver == 1) then
     !$acc parallel loop collapse(4) gang vector default(present)
-                                do i = advxb + 1, sys_size
-                    do l = is3%beg, is3%end
+                    do i = advxb + 1, sys_size
+                        do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                                flux_src_vf(i)%sf(k, j, l) = &
-                                    flux_src_rsy_vf_flat(j, k, l, i)
+                                do k = is2%beg, is2%end
+                                    flux_src_vf(i)%sf(k, j, l) = &
+                                        flux_src_rsy_vf_flat(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -8122,36 +8128,50 @@ contains
                 ! Reshaping Outputted Data in z-direction ==========================
             elseif (norm_dir == 3) then
     !$acc parallel loop collapse(4) gang vector default(present)
-               do i = 1, sys_size                           
-                        do j = is1%beg, is1%end
-                    do k = is2%beg, is2%end
-                do l = is3%beg, is3%end
+               do i = 1, sys_size 
+                    do j = is1%beg, is1%end                         
+                        do k = is2%beg, is2%end
+                            do l = is3%beg, is3%end                            
+                                
                             flux_vf(i)%sf(l, k, j) = &
                                 flux_rsz_vf_flat(j, k, l, i)
-                            flux_gsrc_vf(i)%sf(l, k, j) = &
-                                flux_gsrc_rsz_vf_flat(j, k, l, i)
                             end do
                         end do
                     end do
                 end do
+                if(grid_geometry == 3) then
+    !$acc parallel loop collapse(4) gang vector default(present)
+                   do i = 1, sys_size 
+                        do j = is1%beg, is1%end                         
+                            do k = is2%beg, is2%end
+                                do l = is3%beg, is3%end                            
+
+                                    flux_gsrc_vf(i)%sf(l, k, j) = &
+                                        flux_gsrc_rsz_vf_flat(j, k, l, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+
     !$acc parallel loop collapse(3) gang vector default(present)
-                            do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                    do l = is3%beg, is3%end
-                        flux_src_vf(advxb)%sf(l, k, j) = &
-                            flux_src_rsz_vf_flat(j, k, l, advxb)
+                do j = is1%beg, is1%end
+                    do k = is2%beg, is2%end
+                        do l = is3%beg, is3%end
+                            flux_src_vf(advxb)%sf(l, k, j) = &
+                                flux_src_rsz_vf_flat(j, k, l, advxb)
                         end do
                     end do
                 end do
 
                 if (riemann_solver == 1) then
     !$acc parallel loop collapse(4) gang vector default(present)
-                                do i = advxb + 1, sys_size
-                            do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                    do l = is3%beg, is3%end
-                                flux_src_vf(i)%sf(l, k, j) = &
-                                    flux_src_rsz_vf_flat(j, k, l, i)
+                    do i = advxb + 1, sys_size
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                 do l = is3%beg, is3%end
+                                    flux_src_vf(i)%sf(l, k, j) = &
+                                        flux_src_rsz_vf_flat(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -8161,30 +8181,29 @@ contains
             elseif (norm_dir == 1) then
     !$acc parallel loop collapse(4) gang vector default(present)
                do i = 1, sys_size
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            flux_vf(i)%sf(j, k, l) = &
-                                flux_rsx_vf_flat(j, k, l, i)
-                            flux_gsrc_vf(i)%sf(j, k, l) = &
-                                flux_gsrc_rsx_vf_flat(j, k, l, i)
-                            end do
-                        end do
-                    end do
-                end do
-    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                        flux_src_vf(advxb)%sf(j, k, l) = &
-                            flux_src_rsx_vf_flat(j, k, l, advxb)
+                                flux_vf(i)%sf(j, k, l) = &
+                                    flux_rsx_vf_flat(j, k, l, i)
+                            end do
+                        end do
+                    end do
+                end do               
+
+    !$acc parallel loop collapse(3) gang vector default(present)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                    flux_src_vf(advxb)%sf(j, k, l) = &
+                        flux_src_rsx_vf_flat(j, k, l, advxb)
                         end do
                     end do
                 end do
 
                 if (riemann_solver == 1) then
     !$acc parallel loop collapse(4) gang vector default(present)
-                                do i = advxb + 1, sys_size
+                do i = advxb + 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -8194,9 +8213,7 @@ contains
                             end do
                         end do
                     end do
-
                 end if            
-
             end if
 
 

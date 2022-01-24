@@ -741,15 +741,20 @@ contains
                 end if
 
             else
-
+                do l = 1, sys_size
+                  allocate (flux_gsrc_n(i)%vf(l)%sf( &
+                              ix%beg:ix%end, &
+                              iy%beg:iy%end, &
+                              iz%beg:iz%end))
+!$acc enter data create(flux_gsrc_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+                end do
                 do l = 1, sys_size
                     flux_n(i)%vf(l)%sf => &
                         flux_n(1)%vf(l)%sf
                     flux_src_n(i)%vf(l)%sf => &
                         flux_src_n(1)%vf(l)%sf
-                    flux_gsrc_n(i)%vf(l)%sf => &
-                        flux_gsrc_n(1)%vf(l)%sf
-!$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf,flux_gsrc_n(i)%vf(l)%sf)
+
+!$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
                 end do
 
             end if
@@ -801,6 +806,25 @@ contains
             s_convert_to_mixture_variables => &
                 s_convert_species_to_mixture_variables
         end if
+
+!$acc parallel loop collapse(4) gang vector default(present)
+           do i = 1, sys_size 
+                do l = startz, p - startz                         
+                    do k = starty, n - starty
+                        do j = startx, m - startx                                                           
+                            flux_gsrc_n(1)%vf(i)%sf(j, k, l) = 0d0
+
+                            if(n > 0) then
+                              flux_gsrc_n(2)%vf(i)%sf(j, k, l) = 0d0
+                            end if
+                            
+                            if(p > 0) then
+                              flux_gsrc_n(3)%vf(i)%sf(j, k, l) = 0d0
+                            end if
+                        end do
+                    end do
+                end do
+            end do
 
     end subroutine s_initialize_rhs_module ! -------------------------------
 
@@ -4363,7 +4387,7 @@ contains
                 do l = 1, sys_size
                     nullify (flux_n(i)%vf(l)%sf)
                     nullify (flux_src_n(i)%vf(l)%sf)
-                    nullify (flux_gsrc_n(i)%vf(l)%sf)
+                    deallocate (flux_gsrc_n(i)%vf(l)%sf)
                 end do
             else
                 do l = 1, sys_size
