@@ -156,19 +156,16 @@ contains
 
 
 
-        allocate (poly_coef_cbL_x(0:weno_polyn, &
-                                  0:weno_polyn - 1, &
-                                  is1%beg + weno_polyn:is1%end - weno_polyn))
-        allocate (poly_coef_cbR_x(0:weno_polyn, &
-                                  0:weno_polyn - 1, &
-                                  is1%beg + weno_polyn:is1%end - weno_polyn))
+        allocate (poly_coef_cbL_x(is1%beg + weno_polyn:is1%end - weno_polyn,0:weno_polyn, &
+                                  0:weno_polyn - 1 ))
+        allocate (poly_coef_cbR_x(is1%beg + weno_polyn:is1%end - weno_polyn,0:weno_polyn, &
+                                  0:weno_polyn - 1))
 
-        allocate (d_cbL_x(0:2, is1%beg + weno_polyn:is1%end - weno_polyn))
-        allocate (d_cbR_x(0:2, is1%beg + weno_polyn:is1%end - weno_polyn))
+        allocate (d_cbL_x( 0:2,is1%beg + weno_polyn:is1%end - weno_polyn))
+        allocate (d_cbR_x( 0:2,is1%beg + weno_polyn:is1%end - weno_polyn))
 
-        allocate (beta_coef_x(0:weno_polyn, &
-                              0:2*(weno_polyn - 1), &
-                              is1%beg + weno_polyn:is1%end - weno_polyn))
+        allocate (beta_coef_x(is1%beg + weno_polyn:is1%end - weno_polyn,0:weno_polyn, &
+                              0:2*(weno_polyn - 1) ))
 
         call s_compute_weno_coefficients(1, is1)
 
@@ -198,19 +195,16 @@ contains
 
         is3%end = p - is3%beg
 
-        allocate (poly_coef_cbL_y(0:weno_polyn, &
-                                  0:weno_polyn - 1, &
-                                  is2%beg + weno_polyn:is2%end - weno_polyn))
-        allocate (poly_coef_cbR_y(0:weno_polyn, &
-                                  0:weno_polyn - 1, &
-                                  is2%beg + weno_polyn:is2%end - weno_polyn))
+        allocate (poly_coef_cbL_y(is2%beg + weno_polyn:is2%end - weno_polyn,0:weno_polyn, &
+                                  0:weno_polyn - 1 ))
+        allocate (poly_coef_cbR_y(is2%beg + weno_polyn:is2%end - weno_polyn,0:weno_polyn, &
+                                  0:weno_polyn - 1))
 
-        allocate (d_cbL_y(0:2, is2%beg + weno_polyn:is2%end - weno_polyn))
-        allocate (d_cbR_y(0:2, is2%beg + weno_polyn:is2%end - weno_polyn))
+        allocate (d_cbL_y( 0:2,is2%beg + weno_polyn:is2%end - weno_polyn))
+        allocate (d_cbR_y( 0:2,is2%beg + weno_polyn:is2%end - weno_polyn))
 
-        allocate (beta_coef_y(0:weno_polyn, &
-                              0:2*(weno_polyn - 1), &
-                              is2%beg + weno_polyn:is2%end - weno_polyn))
+        allocate (beta_coef_y(is2%beg + weno_polyn:is2%end - weno_polyn,0:weno_polyn, &
+                              0:2*(weno_polyn - 1) ))
 
         call s_compute_weno_coefficients(2, is2)
 
@@ -228,19 +222,16 @@ contains
         is1%beg = -buff_size; is1%end = m - is1%beg
         is3%beg = -buff_size; is3%end = p - is3%beg
 
-        allocate (poly_coef_cbL_z(0:weno_polyn, &
-                                  0:weno_polyn - 1, &
-                                  is3%beg + weno_polyn:is3%end - weno_polyn))
-        allocate (poly_coef_cbR_z(0:weno_polyn, &
-                                  0:weno_polyn - 1, &
-                                  is3%beg + weno_polyn:is3%end - weno_polyn))
+        allocate (poly_coef_cbL_z(is3%beg + weno_polyn:is3%end - weno_polyn,0:weno_polyn, &
+                                  0:weno_polyn - 1 ))
+        allocate (poly_coef_cbR_z(is3%beg + weno_polyn:is3%end - weno_polyn,0:weno_polyn, &
+                                  0:weno_polyn - 1))
 
-        allocate (d_cbL_z(0:2, is3%beg + weno_polyn:is3%end - weno_polyn))
-        allocate (d_cbR_z(0:2, is3%beg + weno_polyn:is3%end - weno_polyn))
+        allocate (d_cbL_z( 0:2,is3%beg + weno_polyn:is3%end - weno_polyn))
+        allocate (d_cbR_z( 0:2,is3%beg + weno_polyn:is3%end - weno_polyn))
 
-        allocate (beta_coef_z(0:weno_polyn, &
-                              0:2*(weno_polyn - 1), &
-                              is3%beg + weno_polyn:is3%end - weno_polyn))
+        allocate (beta_coef_z(is3%beg + weno_polyn:is3%end - weno_polyn,0:weno_polyn, &
+                              0:2*(weno_polyn - 1) ))
 
         call s_compute_weno_coefficients(3, is3)
 
@@ -290,28 +281,28 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_x(0, 0, i + 1) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_x(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i) - s_cb(i + 2))
-                    poly_coef_cbR_x(1, 0, i + 1) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_x(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i - 1) - s_cb(i + 1))
 
-                    poly_coef_cbL_x(0, 0, i + 1) = -poly_coef_cbR_x(0, 0, i + 1)
-                    poly_coef_cbL_x(1, 0, i + 1) = -poly_coef_cbR_x(1, 0, i + 1)
+                    poly_coef_cbL_x(i + 1, 0, 0) = -poly_coef_cbR_x(i + 1, 0, 0 )
+                    poly_coef_cbL_x(i + 1, 1, 0) = -poly_coef_cbR_x(i + 1, 1, 0 )
 
-                    d_cbR_x(0, i + 1) = (s_cb(i - 1) - s_cb(i + 1))/ &
+                    d_cbR_x(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
-                    d_cbL_x(0, i + 1) = (s_cb(i - 1) - s_cb(i))/ &
+                    d_cbL_x(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
 
-                    d_cbR_x(1, i + 1) = 1d0 - d_cbR_x(0, i + 1)
-                    d_cbL_x(1, i + 1) = 1d0 - d_cbL_x(0, i + 1)
+                    d_cbR_x( 1, i+1) = 1d0 - d_cbR_x(0, i + 1)
+                    d_cbL_x( 1, i+1) = 1d0 - d_cbL_x(0, i + 1)
 
-                    d_cbR_x(2, i + 1) = 0d0
-                    d_cbL_x(2, i + 1) = 0d0
+                    d_cbR_x( 2, i+1) = 0d0
+                    d_cbL_x( 2, i+1) = 0d0
 
-                    beta_coef_x(0, 0, i + 1) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_x(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i) - s_cb(i + 2))**2d0
-                    beta_coef_x(1, 0, i + 1) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_x(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i - 1) - s_cb(i + 1))**2d0
 
                 end do
@@ -340,71 +331,71 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_x(0, 0, i + 1) = &
+                    poly_coef_cbR_x(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbR_x(1, 0, i + 1) = &
+                    poly_coef_cbR_x(i + 1, 1, 0) = &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
-                    poly_coef_cbR_x(1, 1, i + 1) = &
+                    poly_coef_cbR_x(i + 1, 1, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbR_x(2, 1, i + 1) = &
+                    poly_coef_cbR_x(i + 1, 2, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-                    poly_coef_cbL_x(0, 0, i + 1) = &
+                    poly_coef_cbL_x(i + 1, 0, 0) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbL_x(1, 0, i + 1) = &
+                    poly_coef_cbL_x(i + 1, 1, 0) = &
                         ((s_cb(i) - s_cb(i - 1))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 2)))
-                    poly_coef_cbL_x(1, 1, i + 1) = &
+                    poly_coef_cbL_x(i + 1, 1, 1) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbL_x(2, 1, i + 1) = &
+                    poly_coef_cbL_x(i + 1, 2, 1) = &
                         ((s_cb(i - 1) - s_cb(i))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
 
-                    poly_coef_cbR_x(0, 1, i + 1) = &
+                    poly_coef_cbR_x(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i) - s_cb(i + 1)))
-                    poly_coef_cbR_x(2, 0, i + 1) = &
+                    poly_coef_cbR_x(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i + 1)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 2)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_x(0, 1, i + 1) = &
+                    poly_coef_cbL_x(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_x(2, 0, i + 1) = &
+                    poly_coef_cbL_x(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))* &
                         ((s_cb(i) - s_cb(i + 1)))
 
-                    d_cbR_x(0, i + 1) = &
+                    d_cbR_x(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbR_x(2, i + 1) = &
+                    d_cbR_x(2, i+1) = &
                         ((s_cb(i + 1) - s_cb(i + 2))*(s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-                    d_cbL_x(0, i + 1) = &
+                    d_cbL_x(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbL_x(2, i + 1) = &
+                    d_cbL_x(2, i+1) = &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
 
-                    d_cbR_x(1, i + 1) = 1d0 - d_cbR_x(0, i + 1) - d_cbR_x(2, i + 1)
-                    d_cbL_x(1, i + 1) = 1d0 - d_cbL_x(0, i + 1) - d_cbL_x(2, i + 1)
+                    d_cbR_x(1, i+1) = 1d0 - d_cbR_x(0, i+1) - d_cbR_x(2, i+1)
+                    d_cbL_x(1, i+1) = 1d0 - d_cbL_x(0, i+1) - d_cbL_x(2, i+1)
 
-                    beta_coef_x(0, 0, i + 1) = &
+                    beta_coef_x(i + 1, 0, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
                     s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
 
-                    beta_coef_x(0, 1, i + 1) = &
+                    beta_coef_x(i + 1, 0, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
                     s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
@@ -412,20 +403,20 @@ contains
                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
                     s_cb(i + 1)))
 
-                    beta_coef_x(0, 2, i + 1) = &
+                    beta_coef_x(i + 1, 0, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
 
-                    beta_coef_x(1, 0, i + 1) = &
+                    beta_coef_x(i + 1, 1, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
 
-                    beta_coef_x(1, 1, i + 1) = &
+                    beta_coef_x(i + 1, 1, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
                     s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
                     s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
@@ -433,14 +424,14 @@ contains
                     s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
                     s_cb(i)))
 
-                    beta_coef_x(1, 2, i + 1) = &
+                    beta_coef_x(i + 1, 1, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
                     ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 2))**2d0)
 
-                    beta_coef_x(2, 0, i + 1) = &
+                    beta_coef_x(i + 1, 2, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
                     s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
@@ -448,7 +439,7 @@ contains
                     ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 1))**2d0)
 
-                    beta_coef_x(2, 1, i + 1) = &
+                    beta_coef_x(i + 1, 2, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
                     s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
@@ -456,7 +447,7 @@ contains
                     s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
                     s_cb(i - 1)))
 
-                    beta_coef_x(2, 2, i + 1) = &
+                    beta_coef_x(i + 1, 2, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
@@ -491,28 +482,28 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_y(0, 0, i + 1) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_y(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i) - s_cb(i + 2))
-                    poly_coef_cbR_y(1, 0, i + 1) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_y(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i - 1) - s_cb(i + 1))
 
-                    poly_coef_cbL_y(0, 0, i + 1) = -poly_coef_cbR_y(0, 0, i + 1)
-                    poly_coef_cbL_y(1, 0, i + 1) = -poly_coef_cbR_y(1, 0, i + 1)
+                    poly_coef_cbL_y(i + 1, 0, 0) = -poly_coef_cbR_y(i + 1, 0, 0 )
+                    poly_coef_cbL_y(i + 1, 1, 0) = -poly_coef_cbR_y(i + 1, 1, 0 )
 
-                    d_cbR_y(0, i + 1) = (s_cb(i - 1) - s_cb(i + 1))/ &
+                    d_cbR_y(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
-                    d_cbL_y(0, i + 1) = (s_cb(i - 1) - s_cb(i))/ &
+                    d_cbL_y(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
 
-                    d_cbR_y(1, i + 1) = 1d0 - d_cbR_y(0, i + 1)
-                    d_cbL_y(1, i + 1) = 1d0 - d_cbL_y(0, i + 1)
+                    d_cbR_y( 1, i+1) = 1d0 - d_cbR_y(0, i + 1)
+                    d_cbL_y( 1, i+1) = 1d0 - d_cbL_y(0, i + 1)
 
-                    d_cbR_y(2, i + 1) = 0d0
-                    d_cbL_y(2, i + 1) = 0d0
+                    d_cbR_y( 2, i+1) = 0d0
+                    d_cbL_y( 2, i+1) = 0d0
 
-                    beta_coef_y(0, 0, i + 1) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_y(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i) - s_cb(i + 2))**2d0
-                    beta_coef_y(1, 0, i + 1) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_y(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i - 1) - s_cb(i + 1))**2d0
 
                 end do
@@ -541,71 +532,71 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_y(0, 0, i + 1) = &
+                    poly_coef_cbR_y(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbR_y(1, 0, i + 1) = &
+                    poly_coef_cbR_y(i + 1, 1, 0) = &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
-                    poly_coef_cbR_y(1, 1, i + 1) = &
+                    poly_coef_cbR_y(i + 1, 1, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbR_y(2, 1, i + 1) = &
+                    poly_coef_cbR_y(i + 1, 2, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-                    poly_coef_cbL_y(0, 0, i + 1) = &
+                    poly_coef_cbL_y(i + 1, 0, 0) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbL_y(1, 0, i + 1) = &
+                    poly_coef_cbL_y(i + 1, 1, 0) = &
                         ((s_cb(i) - s_cb(i - 1))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 2)))
-                    poly_coef_cbL_y(1, 1, i + 1) = &
+                    poly_coef_cbL_y(i + 1, 1, 1) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbL_y(2, 1, i + 1) = &
+                    poly_coef_cbL_y(i + 1, 2, 1) = &
                         ((s_cb(i - 1) - s_cb(i))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
 
-                    poly_coef_cbR_y(0, 1, i + 1) = &
+                    poly_coef_cbR_y(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i) - s_cb(i + 1)))
-                    poly_coef_cbR_y(2, 0, i + 1) = &
+                    poly_coef_cbR_y(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i + 1)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 2)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_y(0, 1, i + 1) = &
+                    poly_coef_cbL_y(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_y(2, 0, i + 1) = &
+                    poly_coef_cbL_y(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))* &
                         ((s_cb(i) - s_cb(i + 1)))
 
-                    d_cbR_y(0, i + 1) = &
+                    d_cbR_y(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbR_y(2, i + 1) = &
+                    d_cbR_y(2, i+1) = &
                         ((s_cb(i + 1) - s_cb(i + 2))*(s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-                    d_cbL_y(0, i + 1) = &
+                    d_cbL_y(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbL_y(2, i + 1) = &
+                    d_cbL_y(2, i+1) = &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
 
-                    d_cbR_y(1, i + 1) = 1d0 - d_cbR_y(0, i + 1) - d_cbR_y(2, i + 1)
-                    d_cbL_y(1, i + 1) = 1d0 - d_cbL_y(0, i + 1) - d_cbL_y(2, i + 1)
+                    d_cbR_y(1, i+1) = 1d0 - d_cbR_y(0, i+1) - d_cbR_y(2, i+1)
+                    d_cbL_y(1, i+1) = 1d0 - d_cbL_y(0, i+1) - d_cbL_y(2, i+1)
 
-                    beta_coef_y(0, 0, i + 1) = &
+                    beta_coef_y(i + 1, 0, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
                     s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
 
-                    beta_coef_y(0, 1, i + 1) = &
+                    beta_coef_y(i + 1, 0, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
                     s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
@@ -613,20 +604,20 @@ contains
                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
                     s_cb(i + 1)))
 
-                    beta_coef_y(0, 2, i + 1) = &
+                    beta_coef_y(i + 1, 0, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
 
-                    beta_coef_y(1, 0, i + 1) = &
+                    beta_coef_y(i + 1, 1, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
 
-                    beta_coef_y(1, 1, i + 1) = &
+                    beta_coef_y(i + 1, 1, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
                     s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
                     s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
@@ -634,14 +625,14 @@ contains
                     s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
                     s_cb(i)))
 
-                    beta_coef_y(1, 2, i + 1) = &
+                    beta_coef_y(i + 1, 1, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
                     ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 2))**2d0)
 
-                    beta_coef_y(2, 0, i + 1) = &
+                    beta_coef_y(i + 1, 2, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
                     s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
@@ -649,7 +640,7 @@ contains
                     ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 1))**2d0)
 
-                    beta_coef_y(2, 1, i + 1) = &
+                    beta_coef_y(i + 1, 2, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
                     s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
@@ -657,7 +648,7 @@ contains
                     s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
                     s_cb(i - 1)))
 
-                    beta_coef_y(2, 2, i + 1) = &
+                    beta_coef_y(i + 1, 2, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
@@ -692,28 +683,28 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_z(0, 0, i + 1) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_z(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i) - s_cb(i + 2))
-                    poly_coef_cbR_z(1, 0, i + 1) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_z(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i - 1) - s_cb(i + 1))
 
-                    poly_coef_cbL_z(0, 0, i + 1) = -poly_coef_cbR_z(0, 0, i + 1)
-                    poly_coef_cbL_z(1, 0, i + 1) = -poly_coef_cbR_z(1, 0, i + 1)
+                    poly_coef_cbL_z(i + 1, 0, 0) = -poly_coef_cbR_z(i + 1, 0, 0 )
+                    poly_coef_cbL_z(i + 1, 1, 0) = -poly_coef_cbR_z(i + 1, 1, 0 )
 
-                    d_cbR_z(0, i + 1) = (s_cb(i - 1) - s_cb(i + 1))/ &
+                    d_cbR_z(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
-                    d_cbL_z(0, i + 1) = (s_cb(i - 1) - s_cb(i))/ &
+                    d_cbL_z(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
 
-                    d_cbR_z(1, i + 1) = 1d0 - d_cbR_z(0, i + 1)
-                    d_cbL_z(1, i + 1) = 1d0 - d_cbL_z(0, i + 1)
+                    d_cbR_z( 1, i+1) = 1d0 - d_cbR_z(0, i + 1)
+                    d_cbL_z( 1, i+1) = 1d0 - d_cbL_z(0, i + 1)
 
-                    d_cbR_z(2, i + 1) = 0d0
-                    d_cbL_z(2, i + 1) = 0d0
+                    d_cbR_z( 2, i+1) = 0d0
+                    d_cbL_z( 2, i+1) = 0d0
 
-                    beta_coef_z(0, 0, i + 1) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_z(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i) - s_cb(i + 2))**2d0
-                    beta_coef_z(1, 0, i + 1) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_z(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i - 1) - s_cb(i + 1))**2d0
 
                 end do
@@ -742,71 +733,71 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_z(0, 0, i + 1) = &
+                    poly_coef_cbR_z(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbR_z(1, 0, i + 1) = &
+                    poly_coef_cbR_z(i + 1, 1, 0) = &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
-                    poly_coef_cbR_z(1, 1, i + 1) = &
+                    poly_coef_cbR_z(i + 1, 1, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbR_z(2, 1, i + 1) = &
+                    poly_coef_cbR_z(i + 1, 2, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-                    poly_coef_cbL_z(0, 0, i + 1) = &
+                    poly_coef_cbL_z(i + 1, 0, 0) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbL_z(1, 0, i + 1) = &
+                    poly_coef_cbL_z(i + 1, 1, 0) = &
                         ((s_cb(i) - s_cb(i - 1))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 2)))
-                    poly_coef_cbL_z(1, 1, i + 1) = &
+                    poly_coef_cbL_z(i + 1, 1, 1) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbL_z(2, 1, i + 1) = &
+                    poly_coef_cbL_z(i + 1, 2, 1) = &
                         ((s_cb(i - 1) - s_cb(i))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
 
-                    poly_coef_cbR_z(0, 1, i + 1) = &
+                    poly_coef_cbR_z(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i) - s_cb(i + 1)))
-                    poly_coef_cbR_z(2, 0, i + 1) = &
+                    poly_coef_cbR_z(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i + 1)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 2)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_z(0, 1, i + 1) = &
+                    poly_coef_cbL_z(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_z(2, 0, i + 1) = &
+                    poly_coef_cbL_z(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))* &
                         ((s_cb(i) - s_cb(i + 1)))
 
-                    d_cbR_z(0, i + 1) = &
+                    d_cbR_z(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbR_z(2, i + 1) = &
+                    d_cbR_z(2, i+1) = &
                         ((s_cb(i + 1) - s_cb(i + 2))*(s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-                    d_cbL_z(0, i + 1) = &
+                    d_cbL_z(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbL_z(2, i + 1) = &
+                    d_cbL_z(2, i+1) = &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
 
-                    d_cbR_z(1, i + 1) = 1d0 - d_cbR_z(0, i + 1) - d_cbR_z(2, i + 1)
-                    d_cbL_z(1, i + 1) = 1d0 - d_cbL_z(0, i + 1) - d_cbL_z(2, i + 1)
+                    d_cbR_z(1, i+1) = 1d0 - d_cbR_z(0, i+1) - d_cbR_z(2, i+1)
+                    d_cbL_z(1, i+1) = 1d0 - d_cbL_z(0, i+1) - d_cbL_z(2, i+1)
 
-                    beta_coef_z(0, 0, i + 1) = &
+                    beta_coef_z(i + 1, 0, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
                     s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
 
-                    beta_coef_z(0, 1, i + 1) = &
+                    beta_coef_z(i + 1, 0, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
                     s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
@@ -814,20 +805,20 @@ contains
                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
                     s_cb(i + 1)))
 
-                    beta_coef_z(0, 2, i + 1) = &
+                    beta_coef_z(i + 1, 0, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
 
-                    beta_coef_z(1, 0, i + 1) = &
+                    beta_coef_z(i + 1, 1, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
 
-                    beta_coef_z(1, 1, i + 1) = &
+                    beta_coef_z(i + 1, 1, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
                     s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
                     s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
@@ -835,14 +826,14 @@ contains
                     s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
                     s_cb(i)))
 
-                    beta_coef_z(1, 2, i + 1) = &
+                    beta_coef_z(i + 1, 1, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
                     ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 2))**2d0)
 
-                    beta_coef_z(2, 0, i + 1) = &
+                    beta_coef_z(i + 1, 2, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
                     s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
@@ -850,7 +841,7 @@ contains
                     ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 1))**2d0)
 
-                    beta_coef_z(2, 1, i + 1) = &
+                    beta_coef_z(i + 1, 2, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
                     s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
@@ -858,7 +849,7 @@ contains
                     s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
                     s_cb(i - 1)))
 
-                    beta_coef_z(2, 2, i + 1) = &
+                    beta_coef_z(i + 1, 2, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
@@ -1055,14 +1046,14 @@ contains
                                               - v_rs_ws_x_flat(j - 1, k, l, i)
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(0, 0, j)*dvd(0)
+                                                + poly_coef_cbL_x(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbL_x(j, 1, 0)*dvd(-1)
           
 
-                                    beta(0) = beta_coef_x(0, 0, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_x(j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_x(1, 0, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_x(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
                                     
 
@@ -1089,9 +1080,9 @@ contains
                                     ! reconstruct from right side
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(0, 0, j)*dvd(0)
+                                                + poly_coef_cbR_x(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbR_x(j, 1, 0)*dvd(-1)
 
 
 !$acc loop seq
@@ -1133,14 +1124,14 @@ contains
                                               - v_rs_ws_x_flat(j - 1, k, l, i)
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(0, 0, j)*dvd(0)
+                                                + poly_coef_cbL_x(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbL_x(j, 1, 0)*dvd(-1)
           
 
-                                    beta(0) = beta_coef_x(0, 0, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_x(j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_x(1, 0, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_x(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
                                     
 
@@ -1160,9 +1151,9 @@ contains
                                     ! reconstruct from right side
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(0, 0, j)*dvd(0)
+                                                + poly_coef_cbR_x(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbR_x(j, 1, 0)*dvd(-1)
 
 
 !$acc loop seq
@@ -1198,13 +1189,13 @@ contains
                                               - v_rs_ws_y_flat(j - 1, k, l, i)
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(0, 0, j)*dvd(0)
+                                                + poly_coef_cbL_y(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbL_y(j, 1, 0)*dvd(-1)
 
-                                    beta(0) = beta_coef_y(0, 0, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_y(j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_y(1, 0, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_y(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
 !$acc loop seq
@@ -1229,9 +1220,9 @@ contains
 
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(0, 0, j)*dvd(0)
+                                                + poly_coef_cbR_y(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbR_y(j, 1, 0)*dvd(-1)
 
 
 
@@ -1273,13 +1264,13 @@ contains
                                               - v_rs_ws_y_flat(j - 1, k, l, i)
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(0, 0, j)*dvd(0)
+                                                + poly_coef_cbL_y(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbL_y(j, 1, 0)*dvd(-1)
 
-                                    beta(0) = beta_coef_y(0, 0, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_y(j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_y(1, 0, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_y(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
 !$acc loop seq
@@ -1300,9 +1291,9 @@ contains
 
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(0, 0, j)*dvd(0)
+                                                + poly_coef_cbR_y(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbR_y(j, 1, 0)*dvd(-1)
 
 
 
@@ -1342,13 +1333,13 @@ contains
                                               - v_rs_ws_z_flat(j - 1, k, l, i)
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(0, 0, j)*dvd(0)
+                                                + poly_coef_cbL_z(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbL_z(j, 1, 0)*dvd(-1)
 
-                                    beta(0) = beta_coef_z(0, 0, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_z(j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_z(1, 0, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_z(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
 !$acc loop seq
@@ -1372,9 +1363,9 @@ contains
 
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(0, 0, j)*dvd(0)
+                                                + poly_coef_cbR_z(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbR_z(j, 1, 0)*dvd(-1)
 
 
 
@@ -1416,13 +1407,13 @@ contains
                                               - v_rs_ws_z_flat(j - 1, k, l, i)
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(0, 0, j)*dvd(0)
+                                                + poly_coef_cbL_z(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbL_z(j, 1, 0)*dvd(-1)
 
-                                    beta(0) = beta_coef_z(0, 0, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_z(j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_z(1, 0, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_z(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
 !$acc loop seq
@@ -1446,9 +1437,9 @@ contains
 
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(0, 0, j)*dvd(0)
+                                                + poly_coef_cbR_z(j, 0, 0)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(1, 0, j)*dvd(-1)
+                                                + poly_coef_cbR_z(j, 1, 0)*dvd(-1)
 
 
 
@@ -1498,26 +1489,26 @@ contains
                                               - v_rs_ws_x_flat(j - 2, k, l, i)
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbL_x(0, 1, j)*dvd(0)
+                                                + poly_coef_cbL_x( j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbL_x( j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbL_x(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbL_x(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbL_x(j, 1 , 1)*dvd(-1)
                                     poly(2) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbL_x(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbL_x(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbL_x(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_x(0, 0, j)*dvd(1)*dvd(1) &
-                                              + beta_coef_x(0, 1, j)*dvd(1)*dvd(0) &
-                                              + beta_coef_x(0, 2, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_x(j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_x(j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_x(j, 0, 2)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_x(1, 0, j)*dvd(0)*dvd(0) &
-                                              + beta_coef_x(1, 1, j)*dvd(0)*dvd(-1) &
-                                              + beta_coef_x(1, 2, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_x(j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_x(j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_x(j, 1, 2)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    beta(2) = beta_coef_x(2, 0, j)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_x(2, 1, j)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_x(2, 2, j)*dvd(-2)*dvd(-2) &
+                                    beta(2) = beta_coef_x(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_x(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_x(j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
 
@@ -1536,14 +1527,14 @@ contains
 
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbR_x(0, 1, j)*dvd(0)
+                                                + poly_coef_cbR_x(j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbR_x(j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbR_x(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbR_x(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbR_x(j, 1, 1)*dvd(-1)
                                     poly(2) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbR_x(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbR_x(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbR_x(j, 2, 1)*dvd(-2)
 
 
                                     alpha = d_cbR_x(:, j)/(beta*beta)
@@ -1572,6 +1563,7 @@ contains
                             do j = is1%beg, is1%end                               
                                 do i = 1, v_size
                                     
+                                   
                                     dvd(1) = v_rs_ws_x_flat(j + 2, k, l, i) &
                                              - v_rs_ws_x_flat(j + 1, k, l, i)
                                     dvd(0) = v_rs_ws_x_flat(j + 1, k, l, i) &
@@ -1582,26 +1574,26 @@ contains
                                               - v_rs_ws_x_flat(j - 2, k, l, i)
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbL_x(0, 1, j)*dvd(0)
+                                                + poly_coef_cbL_x( j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbL_x( j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbL_x(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbL_x(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbL_x(j, 1 , 1)*dvd(-1)
                                     poly(2) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbL_x(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbL_x(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbL_x(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbL_x(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_x(0, 0, j)*dvd(1)*dvd(1) &
-                                              + beta_coef_x(0, 1, j)*dvd(1)*dvd(0) &
-                                              + beta_coef_x(0, 2, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_x(j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_x(j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_x(j, 0, 2)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_x(1, 0, j)*dvd(0)*dvd(0) &
-                                              + beta_coef_x(1, 1, j)*dvd(0)*dvd(-1) &
-                                              + beta_coef_x(1, 2, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_x(j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_x(j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_x(j, 1, 2)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    beta(2) = beta_coef_x(2, 0, j)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_x(2, 1, j)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_x(2, 2, j)*dvd(-2)*dvd(-2) &
+                                    beta(2) = beta_coef_x(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_x(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_x(j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
 
@@ -1609,25 +1601,25 @@ contains
 
                                     omega = alpha/sum(alpha)
 
+
                                     vL_rs_vf_x_flat(j, k, l, i) = sum(omega*poly)
 
 
 
                                     poly(0) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbR_x(0, 1, j)*dvd(0)
+                                                + poly_coef_cbR_x(j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbR_x(j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbR_x(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbR_x(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbR_x(j, 1, 1)*dvd(-1)
                                     poly(2) = v_rs_ws_x_flat(j, k, l, i) &
-                                                + poly_coef_cbR_x(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbR_x(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbR_x(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbR_x(j, 2, 1)*dvd(-2)
 
 
                                     alpha = d_cbR_x(:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
-
 
                                     vR_rs_vf_x_flat(j, k, l, i) = sum(omega*poly)
 
@@ -1773,10 +1765,11 @@ contains
 
                 elseif(weno_dir == 2) then
                     if(mapped_weno) then
-!$acc parallel loop gang vector collapse (4)  default(present) private(dvd, poly, beta, alpha, omega)
+!$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end                                                         
+                            do j = is1%beg, is1%end
+!$acc loop seq                                                           
                                 do i = 1, v_size
                                     
                                     dvd(1) = v_rs_ws_y_flat(j + 2, k, l, i) &
@@ -1789,26 +1782,26 @@ contains
                                               - v_rs_ws_y_flat(j - 2, k, l, i)
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbL_y(0, 1, j)*dvd(0)
+                                                + poly_coef_cbL_y( j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbL_y( j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbL_y(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbL_y(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbL_y(j, 1 , 1)*dvd(-1)
                                     poly(2) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbL_y(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbL_y(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbL_y(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_y(0, 0, j)*dvd(1)*dvd(1) &
-                                              + beta_coef_y(0, 1, j)*dvd(1)*dvd(0) &
-                                              + beta_coef_y(0, 2, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_y(j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_y(j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_y(j, 0, 2)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_y(1, 0, j)*dvd(0)*dvd(0) &
-                                              + beta_coef_y(1, 1, j)*dvd(0)*dvd(-1) &
-                                              + beta_coef_y(1, 2, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_y(j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_y(j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_y(j, 1, 2)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    beta(2) = beta_coef_y(2, 0, j)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_y(2, 1, j)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_y(2, 2, j)*dvd(-2)*dvd(-2) &
+                                    beta(2) = beta_coef_y(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_y(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_y(j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
 
@@ -1827,14 +1820,14 @@ contains
 
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbR_y(0, 1, j)*dvd(0)
+                                                + poly_coef_cbR_y(j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbR_y(j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbR_y(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbR_y(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbR_y(j, 1, 1)*dvd(-1)
                                     poly(2) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbR_y(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbR_y(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbR_y(j, 2, 1)*dvd(-2)
 
 
                                     alpha = d_cbR_y(:, j)/(beta*beta)
@@ -1863,6 +1856,7 @@ contains
                             do j = is1%beg, is1%end                               
                                 do i = 1, v_size
                                     
+                                   
                                     dvd(1) = v_rs_ws_y_flat(j + 2, k, l, i) &
                                              - v_rs_ws_y_flat(j + 1, k, l, i)
                                     dvd(0) = v_rs_ws_y_flat(j + 1, k, l, i) &
@@ -1873,26 +1867,26 @@ contains
                                               - v_rs_ws_y_flat(j - 2, k, l, i)
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbL_y(0, 1, j)*dvd(0)
+                                                + poly_coef_cbL_y( j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbL_y( j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbL_y(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbL_y(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbL_y(j, 1 , 1)*dvd(-1)
                                     poly(2) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbL_y(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbL_y(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbL_y(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbL_y(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_y(0, 0, j)*dvd(1)*dvd(1) &
-                                              + beta_coef_y(0, 1, j)*dvd(1)*dvd(0) &
-                                              + beta_coef_y(0, 2, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_y(j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_y(j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_y(j, 0, 2)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_y(1, 0, j)*dvd(0)*dvd(0) &
-                                              + beta_coef_y(1, 1, j)*dvd(0)*dvd(-1) &
-                                              + beta_coef_y(1, 2, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_y(j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_y(j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_y(j, 1, 2)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    beta(2) = beta_coef_y(2, 0, j)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_y(2, 1, j)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_y(2, 2, j)*dvd(-2)*dvd(-2) &
+                                    beta(2) = beta_coef_y(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_y(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_y(j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
 
@@ -1900,25 +1894,25 @@ contains
 
                                     omega = alpha/sum(alpha)
 
+
                                     vL_rs_vf_y_flat(j, k, l, i) = sum(omega*poly)
 
 
 
                                     poly(0) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbR_y(0, 1, j)*dvd(0)
+                                                + poly_coef_cbR_y(j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbR_y(j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbR_y(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbR_y(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbR_y(j, 1, 1)*dvd(-1)
                                     poly(2) = v_rs_ws_y_flat(j, k, l, i) &
-                                                + poly_coef_cbR_y(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbR_y(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbR_y(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbR_y(j, 2, 1)*dvd(-2)
 
 
                                     alpha = d_cbR_y(:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
-
 
                                     vR_rs_vf_y_flat(j, k, l, i) = sum(omega*poly)
 
@@ -2063,11 +2057,12 @@ contains
                     end if
 
                 else
-                    if(mapped_weno) then   
-!$acc parallel loop gang vector collapse (4)  default(present) private(dvd, poly, beta, alpha, omega)
+                    if(mapped_weno) then
+!$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end                               
+                            do j = is1%beg, is1%end
+!$acc loop seq                                                           
                                 do i = 1, v_size
                                     
                                     dvd(1) = v_rs_ws_z_flat(j + 2, k, l, i) &
@@ -2080,26 +2075,26 @@ contains
                                               - v_rs_ws_z_flat(j - 2, k, l, i)
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbL_z(0, 1, j)*dvd(0)
+                                                + poly_coef_cbL_z( j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbL_z( j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbL_z(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbL_z(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbL_z(j, 1 , 1)*dvd(-1)
                                     poly(2) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbL_z(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbL_z(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbL_z(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_z(0, 0, j)*dvd(1)*dvd(1) &
-                                              + beta_coef_z(0, 1, j)*dvd(1)*dvd(0) &
-                                              + beta_coef_z(0, 2, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_z(j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_z(j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_z(j, 0, 2)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_z(1, 0, j)*dvd(0)*dvd(0) &
-                                              + beta_coef_z(1, 1, j)*dvd(0)*dvd(-1) &
-                                              + beta_coef_z(1, 2, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_z(j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_z(j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_z(j, 1, 2)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    beta(2) = beta_coef_z(2, 0, j)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_z(2, 1, j)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_z(2, 2, j)*dvd(-2)*dvd(-2) &
+                                    beta(2) = beta_coef_z(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_z(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_z(j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
 
@@ -2118,14 +2113,14 @@ contains
 
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbR_z(0, 1, j)*dvd(0)
+                                                + poly_coef_cbR_z(j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbR_z(j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbR_z(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbR_z(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbR_z(j, 1, 1)*dvd(-1)
                                     poly(2) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbR_z(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbR_z(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbR_z(j, 2, 1)*dvd(-2)
 
 
                                     alpha = d_cbR_z(:, j)/(beta*beta)
@@ -2154,6 +2149,7 @@ contains
                             do j = is1%beg, is1%end                               
                                 do i = 1, v_size
                                     
+                                   
                                     dvd(1) = v_rs_ws_z_flat(j + 2, k, l, i) &
                                              - v_rs_ws_z_flat(j + 1, k, l, i)
                                     dvd(0) = v_rs_ws_z_flat(j + 1, k, l, i) &
@@ -2164,26 +2160,26 @@ contains
                                               - v_rs_ws_z_flat(j - 2, k, l, i)
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbL_z(0, 1, j)*dvd(0)
+                                                + poly_coef_cbL_z( j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbL_z( j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbL_z(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbL_z(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbL_z(j, 1 , 1)*dvd(-1)
                                     poly(2) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbL_z(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbL_z(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbL_z(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbL_z(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_z(0, 0, j)*dvd(1)*dvd(1) &
-                                              + beta_coef_z(0, 1, j)*dvd(1)*dvd(0) &
-                                              + beta_coef_z(0, 2, j)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_z(j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_z(j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_z(j, 0, 2)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_z(1, 0, j)*dvd(0)*dvd(0) &
-                                              + beta_coef_z(1, 1, j)*dvd(0)*dvd(-1) &
-                                              + beta_coef_z(1, 2, j)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_z(j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_z(j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_z(j, 1, 2)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    beta(2) = beta_coef_z(2, 0, j)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_z(2, 1, j)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_z(2, 2, j)*dvd(-2)*dvd(-2) &
+                                    beta(2) = beta_coef_z(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_z(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_z(j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
 
@@ -2191,25 +2187,25 @@ contains
 
                                     omega = alpha/sum(alpha)
 
+
                                     vL_rs_vf_z_flat(j, k, l, i) = sum(omega*poly)
 
 
 
                                     poly(0) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(0, 0, j)*dvd(1) &
-                                                + poly_coef_cbR_z(0, 1, j)*dvd(0)
+                                                + poly_coef_cbR_z(j, 0, 0)*dvd(1) &
+                                                + poly_coef_cbR_z(j, 0, 1)*dvd(0)
                                     poly(1) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(1, 0, j)*dvd(0) &
-                                                + poly_coef_cbR_z(1, 1, j)*dvd(-1)
+                                                + poly_coef_cbR_z(j, 1, 0)*dvd(0) &
+                                                + poly_coef_cbR_z(j, 1, 1)*dvd(-1)
                                     poly(2) = v_rs_ws_z_flat(j, k, l, i) &
-                                                + poly_coef_cbR_z(2, 0, j)*dvd(-1) &
-                                                + poly_coef_cbR_z(2, 1, j)*dvd(-2)
+                                                + poly_coef_cbR_z(j, 2, 0)*dvd(-1) &
+                                                + poly_coef_cbR_z(j, 2, 1)*dvd(-2)
 
 
                                     alpha = d_cbR_z(:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
-
 
                                     vR_rs_vf_z_flat(j, k, l, i) = sum(omega*poly)
 
