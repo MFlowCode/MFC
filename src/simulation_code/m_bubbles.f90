@@ -47,7 +47,7 @@ contains
         integer, intent(IN) :: idir
 
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) ::  bub_adv_src
-        real(kind(0d0)), dimension(1:nb, 0:m, 0:n, 0:p), intent(INOUT) ::  bub_r_src, &
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb), intent(INOUT) ::  bub_r_src, &
                                                                           bub_v_src, &
                                                                           bub_p_src, &
                                                                           bub_m_src
@@ -95,7 +95,7 @@ contains
 
             ! bubble radius and radial velocity source
             do q = 1, nb; do j = 0, m; do k = 0, n; do l = 0, p
-                    bub_r_src(q, j, k, l) = q_cons_vf(bub_idx%vs(q))%sf(j, k, l)
+                    bub_r_src( j, k, l, q) = q_cons_vf(bub_idx%vs(q))%sf(j, k, l)
 
                     call s_convert_to_mixture_variables(q_cons_vf, myRho, n_tait, B_tait, Re, j, k, l)
 
@@ -114,8 +114,8 @@ contains
                         vflux = f_vflux(myR, myV, mv, q)
                         pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
-                        bub_p_src(q, j, k, l) = nbub(j, k, l)*pbdot
-                        bub_m_src(q, j, k, l) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
+                        bub_p_src( j, k, l, q) = nbub(j, k, l)*pbdot
+                        bub_m_src( j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
                     else
                         pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
                     end if
@@ -142,15 +142,15 @@ contains
                         rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
                     end if
 
-                    bub_v_src(q, j, k, l) = nbub(j, k, l)*rddot
+                    bub_v_src( j, k, l, q) = nbub(j, k, l)*rddot
 
                     if (alf < 1.d-11) then
                         bub_adv_src(j, k, l) = 0d0
-                        bub_r_src(q, j, k, l) = 0d0
-                        bub_v_src(q, j, k, l) = 0d0
+                        bub_r_src( j, k, l, q) = 0d0
+                        bub_v_src( j, k, l, q) = 0d0
                         if (.not. polytropic) then
-                            bub_p_src(q, j, k, l) = 0d0
-                            bub_m_src(q, j, k, l) = 0d0
+                            bub_p_src( j, k, l, q) = 0d0
+                            bub_m_src( j, k, l, q) = 0d0
                         end if
                     end if
 
