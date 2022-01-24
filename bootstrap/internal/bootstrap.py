@@ -2,6 +2,7 @@ import io
 import os
 import re
 import sys
+import glob
 import copy
 import shutil
 import colorama
@@ -75,14 +76,8 @@ class Bootstrap:
             raise common.MFCException(
                 f'Failed to locate the compiler configuration "{self.args["compiler_configuration"]}".')
 
-        if dep["type"] in ["clone", "download"]:
-            install_path = self.get_build_path()
-            source_path  = self.get_source_path(dependency_name)
-        elif dep["type"] == "source":
-            install_path = "ERR_INSTALL_PATH_IS_UNDEFINED"
-            source_path  = dep["source"]["source"]
-        else:
-            raise common.MFCException(f'Unknown type "{dep["type"]}".')
+        install_path = self.get_build_path()
+        source_path  = self.get_source_path(dependency_name)
 
         flags = copy.deepcopy(compiler_cfg["flags"])
         for lang in flags.keys():
@@ -229,7 +224,11 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
                 os.remove(download_path)
         elif conf["type"] == "source":
-            pass
+            if os.path.isdir(self.get_source_path(name)):
+                common.delete_directory_recursive_safe(self.get_source_path(name))
+
+            shutil.copytree(self.string_replace(name, conf["source"]["source"]),
+                            self.get_source_path(name))
         else:
             raise common.MFCException(f'Dependency type "{conf["type"]}" is unsupported.')
 

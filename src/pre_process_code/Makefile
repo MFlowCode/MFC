@@ -7,7 +7,7 @@ MODS=$(wildcard m*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
 # Compiler/Linker settings
-EXEC = ./../../../.mfc/___current___/build/bin/MFC_PreProcess
+EXEC = $(INSTALL_PATH)/bin/MFC_PreProcess
 PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 
