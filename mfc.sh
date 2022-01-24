@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+
+# Script Constants
+MFC_DIR="./.mfc"
+MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
+PYTHON_VENV_DIR="./.venv"
+
+
 # Check whether this script was called from MFC's root directory.
 if [ ! -f ./bootstrap/delegate.py ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
@@ -24,9 +31,6 @@ if (($?)); then
     exit 1
 fi
 
-MFC_DIR="./.mfc"
-MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
-
 # (Re)-Install Pip via get-pip to make sure it is properly configured and working.
 # Note: Some supercomputers require(d) this workaround to install and import python packages.
 if [ ! -f "$MFC_GET_PIP_PATH" ]; then
@@ -49,45 +53,41 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
     fi
 fi
 
-# Optional: Use a Python virtual environment (venv)
-#
-#python3 -m venv ./venv
-#if (($?)); then
-#    echo "[mfc.sh] Error: Failed to create a Python virtual environment."
-#    exit 1
-#fi
-#
-#source ./venv/bin/activate
-#if (($?)); then
-#    echo "[mfc.sh] Error: Faild to activate the Python virtual environment."
-#    exit 1
-#fi
-
-# Install PyYAML if it isn't installed
-python3 -c 'import yaml'
-if (($?)); then
-    python3 -m pip install pyyaml
+# Create a Python virtualenv if it hasn't already been created
+if [ ! -d "$PYTHON_VENV_DIR" ]; then
+    python3 -m venv "$PYTHON_VENV_DIR"
     if (($?)); then
-        echo "[mfc.sh] Error: Failed to install PyYAML through Python3's pip."
+        echo "[mfc.sh] Error: Failed to create a Python virtual environment."
         exit 1
     fi
 fi
 
-# Install Colorama if it isn't installed
-python3 -c 'import colorama'
-if (($?)); then
-    python3 -m pip install colorama
+# Activate the Python venv
+source "$PYTHON_VENV_DIR"/bin/activate
+
+# Fetch required Python modules
+declare -a REQUIRED_PYTHON_MODULES=("yaml,pyyaml" "colorama,colorama" "fypp,fypp")
+
+for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
+    import_name=$(echo $module | tr ',' '\n' | head -n 1)
+    install_name=$(echo $module | tr ',' '\n' | tail -n 1)
+
+    python3 -c "import $import_name"
     if (($?)); then
-        echo "[mfc.sh] Error: Failed to install Colorama through Python3's pip."
-        exit 1
+        python3 -m pip install $install_name
+        if (($?)); then
+            echo "[mfc.sh] Error: Failed to install $import_name/$install_name through Python3's pip."
+            exit 1
+        fi
     fi
-fi
+done
 
 # Run the mfc.py bootstrap script
-cd bootstrap
-python3 ./delegate.py $@
+python3 ./bootstrap/delegate.py "$@"
 code=$?
 
-cd ..
+# Deactivate the Python virtualenv in case the user "source"'d this script
+deactivate
 
+# Exit with ./bootstrap/delegate.py's exit code
 exit $code

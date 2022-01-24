@@ -102,7 +102,7 @@ Below are some commands for popular operating systems and package managers.
 
 * Via [Aptitude](https://wiki.debian.org/Aptitude)
 ```
-sudo apt install tar wget make cmake gcc g++ python3 openmpi-*  python python-dev python3-dev libopenmpi-dev
+sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-dev python3-dev python3-venv libopenmpi-dev
 ```
 
 ### MacOS (including x86 and M1/Apple Silicon)
