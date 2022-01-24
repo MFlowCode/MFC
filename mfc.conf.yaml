@@ -26,6 +26,9 @@ configurations:
 - name: ci-cpu
   flags:
     fortran: -cpp -w
+- name: ci-gpu
+  flags:
+    fortran: -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 targets:
 - name: FFTW3
   type: download
