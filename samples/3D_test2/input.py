@@ -49,13 +49,13 @@ case_dict =                                                                    \
                     'x_domain%end'                 : 1.E+00,                   \
                     'y_domain%end'                 : 1.E+00,                   \
                     'z_domain%end'                 : 1.E+00,                   \
-                    'm'                            : 200,                      \
-                    'n'                            : 200,                        \
-                    'p'                            : 200,                        \
+                    'm'                            : 100,                      \
+                    'n'                            : 100,                        \
+                    'p'                            : 100,                        \
                     'dt'                           : 4.E-08,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 20,                     \
-                    't_step_save'                  : 20,                     \
+                    't_step_stop'                  : 100,                     \
+                    't_step_save'                  : 100,                     \
 		            # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
