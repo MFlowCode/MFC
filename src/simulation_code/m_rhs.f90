@@ -673,10 +673,7 @@ contains
 !$acc enter data create(divu%sf( ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
 
         ! Configuring Coordinate Direction Indexes =========================
-        ix%beg = -1; if (n > 0) iy%beg = -1; if (p > 0) iz%beg = -1
 
-        ix%end = m; iy%end = n; iz%end = p
-!$acc update device(ix,iy,iz)
 
         ! ==================================================================
 
