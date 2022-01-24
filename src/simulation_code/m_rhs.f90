@@ -163,15 +163,20 @@ module m_rhs
     type(scalar_field) :: alf_sum
     !> @}
 
+
+
     real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat
 
 
     real(kind(0d0)) :: momxb, momxe
     real(kind(0d0)) :: contxb, contxe
     real(kind(0d0)) :: advxb, advxe
 
+    real(kind(0d0)) :: bubxb, bubxe
     real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs
 !$acc declare create(gammas, pi_infs)
+
 
     character(50) :: file_path !< Local file path for saving debug files
 
@@ -180,8 +185,9 @@ module m_rhs
 !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
 !$acc   tau_Re_vf,iv,ix, iy, iz,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
-!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe, gammas, pi_infs, &
-!$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm)
+!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, &
+!$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat)
+
 
 
 
@@ -488,6 +494,27 @@ contains
         end do
         ! END: Allocation/Association of qK_cons_n and qK_prim_n =====
 
+
+          allocate(qL_rsx_vf_flat(ix%beg:ix%end, &
+              iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+          allocate(qR_rsx_vf_flat(ix%beg:ix%end, &
+              iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+
+          if(n > 0) then
+
+            allocate(qL_rsy_vf_flat(iy%beg:iy%end, &
+              ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
+            allocate(qR_rsy_vf_flat(iy%beg:iy%end, &
+              ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
+          end if
+
+          if(p > 0) then
+            allocate(qL_rsz_vf_flat( iz%beg:iz%end, &
+                iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
+            allocate(qR_rsz_vf_flat( iz%beg:iz%end, &
+                iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
+          end if
+
         ! Allocation of dq_prim_ds_qp ======================================
 
         if (any(Re_size > 0)) then
@@ -624,12 +651,12 @@ contains
         if (bubbles) then
             allocate (bub_adv_src(0:m, 0:n, 0:p))
             if (qbmm) then
-                allocate (bub_mom_src(1:nb, 1:nmom, 0:m, 0:n, 0:p))
+                allocate (bub_mom_src( 1:nmom, 0:m, 0:n, 0:p, 1:nb))
             else
-                allocate (bub_r_src(1:nb, 0:m, 0:n, 0:p))
-                allocate (bub_v_src(1:nb, 0:m, 0:n, 0:p))
-                allocate (bub_p_src(1:nb, 0:m, 0:n, 0:p))
-                allocate (bub_m_src(1:nb, 0:m, 0:n, 0:p))
+                allocate (bub_r_src( 0:m, 0:n, 0:p, 1:nb))
+                allocate (bub_v_src( 0:m, 0:n, 0:p, 1:nb))
+                allocate (bub_p_src( 0:m, 0:n, 0:p, 1:nb))
+                allocate (bub_m_src( 0:m, 0:n, 0:p, 1:nb))
             end if
         end if
 
@@ -643,6 +670,7 @@ contains
                   ix%beg:ix%end, &
                   iy%beg:iy%end, &
                   iz%beg:iz%end))
+!$acc enter data create(divu%sf( ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -1; if (n > 0) iy%beg = -1; if (p > 0) iz%beg = -1
@@ -727,10 +755,12 @@ contains
             end if
         end do
 
+        ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
+
         if(alt_soundspeed) then
           allocate(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
-        end if  
-        
+        end if 
+
         allocate(gammas(1:num_fluids), pi_infs(1:num_fluids))
 
         do i = 1, num_fluids
@@ -739,7 +769,6 @@ contains
         end do
 !$acc update device(gammas, pi_infs)
 
-        ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         momxb = mom_idx%beg
         momxe = mom_idx%end
@@ -747,7 +776,9 @@ contains
         advxe = adv_idx%end
         contxb = cont_idx%beg
         contxe = cont_idx%end
-!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, sys_size, buff_size, E_idx)
+        bubxb = bub_idx%beg
+        bubxe = bub_idx%end
+!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, sys_size, buff_size, E_idx, alf_idx)
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
@@ -790,7 +821,11 @@ contains
         integer, intent(IN) :: t_step
 
 
-        real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function 
+        real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
+
+
+
+ 
 
 
 
@@ -866,37 +901,20 @@ contains
             
             call nvtxStartRange("RHS-WENO")
             
-            iv%beg = 1; iv%end = adv_idx%end
+            iv%beg = 1; iv%end = sys_size
             !call nvtxStartRange("RHS-WENO")
-            call s_reconstruct_cell_boundary_values( &
+            call s_reconstruct_cell_boundary_values_alt( &
                q_prim_qp%vf(iv%beg:iv%end), &
-                qL_prim_n(id), &
-                qR_prim_n(id), &
+                qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
+                qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
                 id)
             call nvtxEndRange
 
 !           do j = 1, sys_size
-!!$acc update host(qL_prim_n(id)%vf(j)%sf, qR_prim_n(id)%vf(j)%sf )
+!!$acc update host( qL_rsz_vf_flat, qR_rsz_vf_flat)
 !            end do
 
- !           if(proc_rank == 0) then
- !             if(num_dims == 1) then
- !               print *, qL_prim_n(id)%vf(E_idx)%sf(102, 0, 0)
- !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(102, 0, 0)
- !               print *, qR_prim_n(id)%vf(E_idx)%sf(102, 0, 0)
- !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(102, 0, 0)
- !             elseif(num_dims == 2) then
- !               print *, qL_prim_n(id)%vf(E_idx)%sf(50, 50, 0)
- !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 0)
- !               print *, qR_prim_n(id)%vf(E_idx)%sf(50, 50, 0)
- !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 0)  
- !            elseif(num_dims == 3) then
- !               print *, qL_prim_n(id)%vf(E_idx)%sf(50, 50, 50)
- !               print *, qL_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50)
- !               print *, qR_prim_n(id)%vf(E_idx)%sf(50, 50, 50)
- !               print *, qR_prim_n(id)%vf(mom_idx%beg)%sf(50, 50, 50) 
- !             end if   
-  !          end if
+
 
 
     
@@ -914,12 +932,12 @@ contains
             ! ===============================================================
             call nvtxStartRange("RHS-Riemann")
             ! Computing Riemann Solver Flux and Source Flux =================
-            call s_riemann_solver(qR_prim_n(id)%vf, &
+            call s_riemann_solver(qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
                                   dqR_prim_dz_n(id)%vf, &
                                   gm_alphaR_n(id)%vf, &
-                                  qL_prim_n(id)%vf, &
+                                  qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
                                   dqL_prim_dx_n(id)%vf, &
                                   dqL_prim_dy_n(id)%vf, &
                                   dqL_prim_dz_n(id)%vf, &
@@ -935,7 +953,8 @@ contains
 
             ! ===============================================================
 
-              if (alt_soundspeed) then
+ 
+             if (alt_soundspeed) then
 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
@@ -1559,12 +1578,12 @@ contains
 
             ! Computing Riemann Solver Flux and Source Flux =================
             if (DEBUG) print *, 'about to call s_riemann_solver'
-            call s_riemann_solver(qR_prim_n(i)%vf, &
+            call s_riemann_solver(qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
                                   dqR_prim_dx_n(i)%vf, &
                                   dqR_prim_dy_n(i)%vf, &
                                   dqR_prim_dz_n(i)%vf, &
                                   gm_alphaR_n(i)%vf, &
-                                  qL_prim_n(i)%vf, &
+                                  qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
                                   dqL_prim_dx_n(i)%vf, &
                                   dqL_prim_dy_n(i)%vf, &
                                   dqL_prim_dz_n(i)%vf, &
@@ -2358,29 +2377,43 @@ contains
         integer, intent(IN) :: idir
         integer :: j, k, l !< Generic loop iterators
 
-        !contribute to divergence computation \div(u)
-        if (idir == 1) mydivu%sf(:, :, :) = 0d0
-
-        do j = 0, m
-            do k = 0, n
-                do l = 0, p
-                    if (idir == 1) then
-                        mydivu%sf(j, k, l) = &
-                            0.5d0/dx(j)*(q_prim_vf(cont_idx%end + idir)%sf(j + 1, k, l) - &
-                            q_prim_vf(cont_idx%end + idir)%sf(j - 1, k, l))
-                    else if (idir == 2) then
+        if(idir == 1) then
+!$acc parallel loop collapse(3) gang vector default(present)
+          do l = 0, p
+              do k = 0, n
+                  do j = 0, m
+                      mydivu%sf(j, k, l) = 0d0
+                      mydivu%sf(j, k, l) = &
+                          0.5d0/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                          q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+                      
+                  end do
+              end do
+          end do
+        else if(idir == 2) then
+!$acc parallel loop collapse(3) gang vector default(present)
+          do l = 0, p
+              do k = 0, n
+                  do j = 0, m
                         mydivu%sf(j, k, l) = mydivu%sf(j, k, l) + &
-                            0.5d0/dy(k)*(q_prim_vf(cont_idx%end + idir)%sf(j, k + 1, l) - &
-                            q_prim_vf(cont_idx%end + idir)%sf(j, k - 1, l))
-                    else if (idir == 3) then
-                        mydivu%sf(j, k, l) = mydivu%sf(j, k, l) + &
-                            0.5d0/dz(l)*(q_prim_vf(cont_idx%end + idir)%sf(j, k, l + 1) - &
-                            q_prim_vf(cont_idx%end + idir)%sf(j, k, l - 1))
-                    end if
-                end do
-            end do
-        end do
-
+                            0.5d0/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                            q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                  end do
+              end do
+          end do
+        else if(idir == 3) then
+!$acc parallel loop collapse(3) gang vector default(present)
+          do l = 0, p
+              do k = 0, n
+                  do j = 0, m
+                      mydivu%sf(j, k, l) = mydivu%sf(j, k, l) + &
+                          0.5d0/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                          q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                    
+                  end do
+              end do
+          end do
+        end if          
     end subroutine s_get_divergence
 
     !> The purpose of this procedure is to compute the source term
@@ -3966,12 +3999,12 @@ contains
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_qp, vR_qp, & ! -
+    subroutine s_reconstruct_cell_boundary_values_alt(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
-        type(vector_field), intent(INOUT) :: vL_qp, vR_qp
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat
 
         integer, intent(IN) :: norm_dir
 
@@ -3997,13 +4030,45 @@ contains
         end if
 
         call s_weno_alt(v_vf(iv%beg:iv%end), &  
-                    vL_qp%vf(iv%beg:iv%end), &
-                    vR_qp%vf(iv%beg:iv%end), &
+                    vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, &
                     norm_dir, weno_dir,  &
                     is1, is2, is3)
         ! ==================================================================
 
-    end subroutine s_reconstruct_cell_boundary_values ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values_alt ! --------------------
+
+     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_qp, vR_qp, & ! -
+                                                  norm_dir)
+
+        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
+
+        type(vector_field), intent(INOUT) :: vL_qp, vR_qp
+
+        integer, intent(IN) :: norm_dir
+
+        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+
+        type(bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
+
+        ! Reconstruction in s1-direction ===================================
+
+        if (norm_dir == 1) then
+            is1 = ix; is2 = iy; is3 = iz
+            weno_dir = 1; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+        elseif (norm_dir == 2) then
+            is1 = iy; is2 = ix; is3 = iz
+            weno_dir = 2; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+        else
+            is1 = iz; is2 = iy; is3 = ix
+            weno_dir = 3; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+        end if
+
+        ! ==================================================================
+
+    end subroutine s_reconstruct_cell_boundary_values ! --------------------   
 
 
     !>  The purpose of this subroutine is to employ the inputted
@@ -4133,6 +4198,18 @@ contains
 
         deallocate (q_cons_qp%vf, q_prim_qp%vf)
 
+        deallocate(qL_rsx_vf_flat,  qR_rsx_vf_flat)
+
+        if(n > 0) then
+          deallocate(qL_rsy_vf_flat,  qR_rsy_vf_flat)
+        end if
+
+        if(p > 0) then
+          deallocate(qL_rsz_vf_flat,  qR_rsz_vf_flat)
+        end if
+
+
+
         do i = num_dims, 1, -1
             do l = 1, cont_idx%end
                 nullify (qL_prim_n(i)%vf(l)%sf)
@@ -4207,6 +4284,7 @@ contains
         end do
 
         deallocate (qL_cons_n, qR_cons_n, qL_prim_n, qR_prim_n)
+
 
         if (any(Re_size > 0)) then
             do l = mom_idx%beg, mom_idx%end
