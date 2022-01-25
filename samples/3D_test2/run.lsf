@@ -1,7 +1,7 @@
 #!/bin/bash
 #BSUB -P CFD154
-#BSUB -W 10
-#BSUB -nnodes 2
+#BSUB -W 15
+#BSUB -nnodes 1
 
 
 
