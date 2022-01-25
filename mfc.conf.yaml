@@ -114,8 +114,7 @@ targets:
   - MFC_PreProcess
   - MFC_Simulation
   - MFC_PostProcess
-  source:
-    source: ${MFC_ROOT_PATH}
+  collection:
   build: []
   test:
   - ./tests/checks.sh
