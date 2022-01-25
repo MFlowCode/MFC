@@ -230,7 +230,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
             shutil.copytree(self.string_replace(name, conf["source"]["source"]),
                             self.get_source_path(name))
         elif conf["type"] == "collection":
-            pass
+            common.create_directory_safe(self.get_source_path(name))
         else:
             raise common.MFCException(f'Dependency type "{conf["type"]}" is unsupported.')
 
@@ -291,7 +291,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         common.clear_print(f'|--> Package {name}: Preparing build...', end='\r')
 
         common.create_file_safe(self.get_log_filepath(name))
-        
+
         with open(self.get_log_filepath(name), "r+") as logfile:
             self.build_target__clean_previous(name)          # Clean any old build artifacts
             self.build_target__fetch         (name, logfile) # Fetch Source Code
