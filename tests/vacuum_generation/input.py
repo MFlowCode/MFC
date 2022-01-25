@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
 
-
-# MFC v3.0 - Cases - Kapila model - Vacuum - 1D
-# Description: Vacuum.
-# Author: Kevin Schmidmayer
-# Date: 02/26/18
-
-
 # Dependencies and Logistics ===================================================
 
 # Command to navigate between directories
@@ -58,7 +51,7 @@ case_dict =                                                                    \
                     'p'                            : 0,                        \
                     'dt'                           : 5.E-08,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 1001,                    \
+                    't_step_stop'                  : 1001,                     \
                     't_step_save'                  : 1000,                     \
                     # ==========================================================
                                                                                \
@@ -91,16 +84,16 @@ case_dict =                                                                    \
                     'parallel_io'                  :'F',                       \
                     # ==========================================================
 
-		    # Patch 1: Left state ======================================
+                    # Patch 1: Left state ======================================
                     'patch_icpp(1)%geometry'       : 1,                        \
                     'patch_icpp(1)%x_centroid'     : 0.25E+00,                 \
                     'patch_icpp(1)%length_x'       : 0.5E+00,                  \
-                    'patch_icpp(1)%vel(1)'         : -100.E+00,                \
-                    'patch_icpp(1)%pres'           : 1.E+05,                   \
-                    'patch_icpp(1)%alpha_rho(1)'   : 1000.E+00*0.99E+00,       \
-                    'patch_icpp(1)%alpha_rho(2)'   : 10.E+00*0.01E+00,         \
-                    'patch_icpp(1)%alpha(1)'       : 0.99E+00,                 \
-                    'patch_icpp(1)%alpha(2)'       : 0.01E+00,                 \
+                    'patch_icpp(1)%vel(1)'         : -10.E+00,                 \
+                    'patch_icpp(1)%pres'           : 1.E+02,                   \
+                    'patch_icpp(1)%alpha_rho(1)'   : 10.E+00*0.99E+00,         \
+                    'patch_icpp(1)%alpha_rho(2)'   : 1.E+00*0.01E+00,          \
+                    'patch_icpp(1)%alpha(1)'       : 0.9E+00,                 \
+                    'patch_icpp(1)%alpha(2)'       : 0.1E+00,                 \
                     # ==========================================================
 
                     # Patch 2: Right state =====================================
@@ -108,15 +101,15 @@ case_dict =                                                                    \
                     'patch_icpp(2)%x_centroid'     : 0.75E+00,                 \
                     'patch_icpp(2)%length_x'       : 0.5E+00,                  \
                     'patch_icpp(2)%alter_patch(1)' : 'T',                      \
-                    'patch_icpp(2)%vel(1)'         : 100.E+00,                 \
-                    'patch_icpp(2)%pres'           : 1.E+05,                   \
-                    'patch_icpp(2)%alpha_rho(1)'   : 1000.E+00*0.99E+00,       \
-                    'patch_icpp(2)%alpha_rho(2)'   : 10.E+00*0.01E+00,         \
-                    'patch_icpp(2)%alpha(1)'       : 0.99E+00,                 \
-                    'patch_icpp(2)%alpha(2)'       : 0.01E+00,                 \
+                    'patch_icpp(2)%vel(1)'         : 10.E+00,                  \
+                    'patch_icpp(2)%pres'           : 1.E+02,                   \
+                    'patch_icpp(2)%alpha_rho(1)'   : 10.E+00*0.99E+00,         \
+                    'patch_icpp(2)%alpha_rho(2)'   : 1.E+00*0.01E+00,          \
+                    'patch_icpp(2)%alpha(1)'       : 0.9E+00,                 \
+                    'patch_icpp(2)%alpha(2)'       : 0.1E+00,                 \
                     # ==========================================================
 
-		    # Fluids Physical Parameters ===============================
+                    # Fluids Physical Parameters ===============================
                     'fluid_pp(1)%gamma'            : 1.E+00/(4.4E+00-1.E+00),  \
                     'fluid_pp(1)%pi_inf'           : 4.4E+00*6.E+08/(4.4E+00-1.E+00), \
                     'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),  \
