@@ -291,11 +291,12 @@ contains
         allocate (myflux_vf(1:num_dims))
         allocate (myflux_src_vf(1:num_dims))
 
-
-        allocate (alf_sum%sf( &
-                  ix%beg:ix%end, &
-                  iy%beg:iy%end, &
-                  iz%beg:iz%end))
+        if(mpp_lim .and. bubbles) then
+          allocate (alf_sum%sf( &
+                    ix%beg:ix%end, &
+                    iy%beg:iy%end, &
+                    iz%beg:iz%end))
+        end if
 
         do i = 1, num_dims
             allocate (qL_cons_n(i)%vf(1:sys_size))
@@ -311,184 +312,186 @@ contains
 !$acc enter data create(myflux_vf(i)%vf(1:sys_size))
 !$acc enter data create(myflux_src_vf(i)%vf(1:sys_size))
 
-            do l = 1, sys_size
-                allocate (myflux_vf(i)%vf(l)%sf( &
-                          ix%beg:ix%end, &
-                          iy%beg:iy%end, &
-                          iz%beg:iz%end))
-                allocate (myflux_src_vf(i)%vf(l)%sf( &
-                          ix%beg:ix%end, &
-                          iy%beg:iy%end, &
-                          iz%beg:iz%end))
-!$acc enter data create(myflux_vf(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(myflux_src_vf(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-            end do
+!!!!! Comment out qL_cons and qL_prim since we have flattened 
 
-            if (i == 1) then
+!            do l = 1, sys_size
+!                allocate (myflux_vf(i)%vf(l)%sf( &
+!                          ix%beg:ix%end, &
+!                          iy%beg:iy%end, &
+!                          iz%beg:iz%end))
+!                allocate (myflux_src_vf(i)%vf(l)%sf( &
+!                          ix%beg:ix%end, &
+!                          iy%beg:iy%end, &
+!                          iz%beg:iz%end))
+!!$acc enter data create(myflux_vf(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(myflux_src_vf(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!            end do
 
-                do l = 1, cont_idx%end
-                    allocate (qL_cons_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
-                    allocate (qR_cons_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
-!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                end do
+!           if (i == 1) then
 
-                if (weno_vars == 1) then
-                    do l = mom_idx%beg, E_idx
-                        allocate (qL_cons_n(i)%vf(l)%sf( &
-                                  ix%beg:ix%end, &
-                                  iy%beg:iy%end, &
-                                  iz%beg:iz%end))
-                        allocate (qR_cons_n(i)%vf(l)%sf( &
-                                  ix%beg:ix%end, &
-                                  iy%beg:iy%end, &
-                                  iz%beg:iz%end))
-!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                    end do
-                end if
+!                do l = 1, cont_idx%end
+!                    allocate (qL_cons_n(i)%vf(l)%sf( &
+!                              ix%beg:ix%end, &
+!                              iy%beg:iy%end, &
+!                              iz%beg:iz%end))
+!                    allocate (qR_cons_n(i)%vf(l)%sf( &
+!                              ix%beg:ix%end, &
+!                              iy%beg:iy%end, &
+!                              iz%beg:iz%end))
+!!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !               end do
 
-                do l = mom_idx%beg, E_idx
-                    allocate (qL_prim_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
-                    allocate (qR_prim_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
-!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                end do
+ !               if (weno_vars == 1) then
+ !                   do l = mom_idx%beg, E_idx
+ !                       allocate (qL_cons_n(i)%vf(l)%sf( &
+ !                                 ix%beg:ix%end, &
+ !                                 iy%beg:iy%end, &
+ !                                 iz%beg:iz%end))
+ !                       allocate (qR_cons_n(i)%vf(l)%sf( &
+ !                                 ix%beg:ix%end, &
+ !                                 iy%beg:iy%end, &
+ !                                 iz%beg:iz%end))
+!!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !                   end do
+ !               end if
 
-                if (model_eqns == 3) then
-                    do l = internalEnergies_idx%beg, internalEnergies_idx%end
-                        allocate (qL_prim_n(i)%vf(l)%sf( &
-                                  ix%beg:ix%end, &
-                                  iy%beg:iy%end, &
-                                  iz%beg:iz%end))
-                        allocate (qR_prim_n(i)%vf(l)%sf( &
-                                  ix%beg:ix%end, &
-                                  iy%beg:iy%end, &
-                                  iz%beg:iz%end))
-!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                    end do
-                end if
+ !               do l = mom_idx%beg, E_idx
+ !                   allocate (qL_prim_n(i)%vf(l)%sf( &
+ !                             ix%beg:ix%end, &
+ !                             iy%beg:iy%end, &
+ !                             iz%beg:iz%end))
+ !                   allocate (qR_prim_n(i)%vf(l)%sf( &
+ !                             ix%beg:ix%end, &
+ !                             iy%beg:iy%end, &
+ !                             iz%beg:iz%end))
+!!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !               end do
 
-                do l = adv_idx%beg, sys_size
-                    allocate (qL_cons_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
-                    allocate (qR_cons_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
-!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                end do
+ !               if (model_eqns == 3) then
+ !                   do l = internalEnergies_idx%beg, internalEnergies_idx%end
+ !                       allocate (qL_prim_n(i)%vf(l)%sf( &
+ !                                 ix%beg:ix%end, &
+ !                                 iy%beg:iy%end, &
+ !                                 iz%beg:iz%end))
+ !                       allocate (qR_prim_n(i)%vf(l)%sf( &
+ !                                 ix%beg:ix%end, &
+ !                                 iy%beg:iy%end, &
+ !                                 iz%beg:iz%end))
+!!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !                   end do
+ !               end if
 
-                if (bubbles) then
-                    do l = bub_idx%beg, bub_idx%end
-                        allocate (qL_prim_n(i)%vf(l)%sf( &
-                                  ix%beg:ix%end, &
-                                  iy%beg:iy%end, &
-                                  iz%beg:iz%end))
-                        allocate (qR_prim_n(i)%vf(l)%sf( &
-                                  ix%beg:ix%end, &
-                                  iy%beg:iy%end, &
-                                  iz%beg:iz%end))
-!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                    end do
-                end if
-            else
-                ! i /= 1
-                do l = 1, sys_size
-                    qL_cons_n(i)%vf(l)%sf => &
-                        qL_cons_n(1)%vf(l)%sf
-                    qR_cons_n(i)%vf(l)%sf => &
-                        qR_cons_n(1)%vf(l)%sf
-                    qL_prim_n(i)%vf(l)%sf => &
-                        qL_prim_n(1)%vf(l)%sf
-                    qR_prim_n(i)%vf(l)%sf => &
-                        qR_prim_n(1)%vf(l)%sf
-!$acc enter data attach(qL_cons_n(i)%vf(l)%sf,qR_cons_n(i)%vf(l)%sf,qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
+ !              do l = adv_idx%beg, sys_size
+ !                   allocate (qL_cons_n(i)%vf(l)%sf( &
+ !                             ix%beg:ix%end, &
+ !                             iy%beg:iy%end, &
+ !                             iz%beg:iz%end))
+ !                   allocate (qR_cons_n(i)%vf(l)%sf( &
+ !                             ix%beg:ix%end, &
+ !                             iy%beg:iy%end, &
+ !                             iz%beg:iz%end))
+!!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !               end do
+
+ !               if (bubbles) then
+ !                   do l = bub_idx%beg, bub_idx%end
+ !                       allocate (qL_prim_n(i)%vf(l)%sf( &
+ !                                 ix%beg:ix%end, &
+ !                                 iy%beg:iy%end, &
+ !                                 iz%beg:iz%end))
+ !                       allocate (qR_prim_n(i)%vf(l)%sf( &
+ !                                 ix%beg:ix%end, &
+ !                                 iy%beg:iy%end, &
+ !                                 iz%beg:iz%end))
+!!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !                   end do
+ !               end if
+ !           else
+ !               ! i /= 1
+ !               do l = 1, sys_size
+ !                   qL_cons_n(i)%vf(l)%sf => &
+ !                       qL_cons_n(1)%vf(l)%sf
+ !                   qR_cons_n(i)%vf(l)%sf => &
+ !                       qR_cons_n(1)%vf(l)%sf
+ !                   qL_prim_n(i)%vf(l)%sf => &
+ !                       qL_prim_n(1)%vf(l)%sf
+ !                   qR_prim_n(i)%vf(l)%sf => &
+ !                       qR_prim_n(1)%vf(l)%sf
+!!$acc enter data attach(qL_cons_n(i)%vf(l)%sf,qR_cons_n(i)%vf(l)%sf,qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
 ! #ifdef _OPENACC
 ! call acc_attach(qL_cons_n(i)%vf(l)%sf)
 ! #endif
 
-                end do
+  !              end do
 
-                if (any(Re_size > 0)) then
-                    if (weno_vars == 1) then
-                        do l = 1, mom_idx%end
-                            allocate (qL_cons_n(i)%vf(l)%sf( &
-                                      ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-                            allocate (qR_cons_n(i)%vf(l)%sf( &
-                                      ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                        end do
-                    else
-                        do l = mom_idx%beg, mom_idx%end
-                            allocate (qL_prim_n(i)%vf(l)%sf( &
-                                      ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-                            allocate (qR_prim_n(i)%vf(l)%sf( &
-                                      ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                        end do
-                        if (model_eqns == 3) then
-                            do l = internalEnergies_idx%beg, internalEnergies_idx%end
-                                allocate (qL_prim_n(i)%vf(l)%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-                                allocate (qR_prim_n(i)%vf(l)%sf( &
-                                          ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
-!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                            end do
-                        end if
-                    end if
-                end if
-            end if
+   !             if (any(Re_size > 0)) then
+   !                 if (weno_vars == 1) then
+   !                     do l = 1, mom_idx%end
+   !                         allocate (qL_cons_n(i)%vf(l)%sf( &
+   !                                   ix%beg:ix%end, &
+   !                                   iy%beg:iy%end, &
+   !                                   iz%beg:iz%end))
+   !                         allocate (qR_cons_n(i)%vf(l)%sf( &
+   !                                   ix%beg:ix%end, &
+   !                                   iy%beg:iy%end, &
+   !                                   iz%beg:iz%end))
+!!$acc enter data create(qL_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_cons_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !                       end do
+ !                   else
+ !                       do l = mom_idx%beg, mom_idx%end
+ !                           allocate (qL_prim_n(i)%vf(l)%sf( &
+ !                                     ix%beg:ix%end, &
+ !                                     iy%beg:iy%end, &
+ !                                     iz%beg:iz%end))
+ !                           allocate (qR_prim_n(i)%vf(l)%sf( &
+ !                                     ix%beg:ix%end, &
+ !                                     iy%beg:iy%end, &
+ !                                     iz%beg:iz%end))
+!!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !                       end do
+ !                       if (model_eqns == 3) then
+ !                           do l = internalEnergies_idx%beg, internalEnergies_idx%end
+ !                               allocate (qL_prim_n(i)%vf(l)%sf( &
+ !                                         ix%beg:ix%end, &
+ !                                         iy%beg:iy%end, &
+ !                                         iz%beg:iz%end))
+ !                               allocate (qR_prim_n(i)%vf(l)%sf( &
+ !                                         ix%beg:ix%end, &
+ !                                         iy%beg:iy%end, &
+ !                                         iz%beg:iz%end))
+!!$acc enter data create(qL_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!!$acc enter data create(qR_prim_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+ !                           end do
+ !                       end if
+ !                   end if
+ !               end if
+ !           end if
 
-            if (DEBUG) print*, 'pointing prim to cons!'
-            do l = 1, cont_idx%end
-                qL_prim_n(i)%vf(l)%sf => &
-                    qL_cons_n(i)%vf(l)%sf
-                qR_prim_n(i)%vf(l)%sf => &
-                    qR_cons_n(i)%vf(l)%sf
-!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
-            end do
+            !if (DEBUG) print*, 'pointing prim to cons!'
+    !        do l = 1, cont_idx%end
+    !            qL_prim_n(i)%vf(l)%sf => &
+    !                qL_cons_n(i)%vf(l)%sf
+    !            qR_prim_n(i)%vf(l)%sf => &
+    !                qR_cons_n(i)%vf(l)%sf
+!!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
+ !           end do
 
 
-            do l = adv_idx%beg, adv_idx%end
-                qL_prim_n(i)%vf(l)%sf => &
-                    qL_cons_n(i)%vf(l)%sf
-                qR_prim_n(i)%vf(l)%sf => &
-                    qR_cons_n(i)%vf(l)%sf
-!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
-            end do
+    !        do l = adv_idx%beg, adv_idx%end
+    !            qL_prim_n(i)%vf(l)%sf => &
+    !                qL_cons_n(i)%vf(l)%sf
+    !            qR_prim_n(i)%vf(l)%sf => &
+    !                qR_cons_n(i)%vf(l)%sf
+!!$acc enter data attach(qL_prim_n(i)%vf(l)%sf,qR_prim_n(i)%vf(l)%sf)
+ !           end do
 
 
         end do
@@ -4232,73 +4235,73 @@ contains
 
 
         do i = num_dims, 1, -1
-            do l = 1, cont_idx%end
-                nullify (qL_prim_n(i)%vf(l)%sf)
-                nullify (qR_prim_n(i)%vf(l)%sf)
-            end do
+        !    do l = 1, cont_idx%end
+        !        nullify (qL_prim_n(i)%vf(l)%sf)
+        !        nullify (qR_prim_n(i)%vf(l)%sf)
+        !    end do
 
-            do l = adv_idx%beg, adv_idx%end
-                nullify (qL_prim_n(i)%vf(l)%sf)
-                nullify (qR_prim_n(i)%vf(l)%sf)
-            end do
+         !   do l = adv_idx%beg, adv_idx%end
+         !       nullify (qL_prim_n(i)%vf(l)%sf)
+         !       nullify (qR_prim_n(i)%vf(l)%sf)
+         !   end do
 
-            if (i /= 1) then
-                if (any(Re_size > 0)) then
-                    if (weno_vars == 1) then
-                        do l = 1, mom_idx%end
-                            deallocate (qL_cons_n(i)%vf(l)%sf)
-                            deallocate (qR_cons_n(i)%vf(l)%sf)
-                        end do
-                    else
-                        do l = mom_idx%beg, mom_idx%end
-                            deallocate (qL_prim_n(i)%vf(l)%sf)
-                            deallocate (qR_prim_n(i)%vf(l)%sf)
-                        end do
-                        if (model_eqns == 3) then
-                            do l = internalEnergies_idx%beg, internalEnergies_idx%end
-                                deallocate (qL_prim_n(i)%vf(l)%sf)
-                                deallocate (qR_prim_n(i)%vf(l)%sf)
-                            end do
-                        end if
-                    end if
-                end if
+            !if (i /= 1) then
+                !if (any(Re_size > 0)) then
+                  !  if (weno_vars == 1) then
+                  !      do l = 1, mom_idx%end
+                  !          deallocate (qL_cons_n(i)%vf(l)%sf)
+                  !          deallocate (qR_cons_n(i)%vf(l)%sf)
+                  !      end do
+                  !  else
+                  !      do l = mom_idx%beg, mom_idx%end
+                  !          deallocate (qL_prim_n(i)%vf(l)%sf)
+                 !           deallocate (qR_prim_n(i)%vf(l)%sf)
+                 !       end do
+                 !       if (model_eqns == 3) then
+                 !           do l = internalEnergies_idx%beg, internalEnergies_idx%end
+                 !               deallocate (qL_prim_n(i)%vf(l)%sf)
+                !                deallocate (qR_prim_n(i)%vf(l)%sf)
+                !            end do
+                !        end if
+                !    end if
+                !end if
 
-                do l = 1, sys_size
-                    nullify (qL_cons_n(i)%vf(l)%sf)
-                    nullify (qR_cons_n(i)%vf(l)%sf)
-                    nullify (qL_prim_n(i)%vf(l)%sf)
-                    nullify (qR_prim_n(i)%vf(l)%sf)
-                end do
-            else
-                do l = 1, cont_idx%end
-                    deallocate (qL_cons_n(i)%vf(l)%sf)
-                    deallocate (qR_cons_n(i)%vf(l)%sf)
-                end do
+                !do l = 1, sys_size
+                !    nullify (qL_cons_n(i)%vf(l)%sf)
+                !    nullify (qR_cons_n(i)%vf(l)%sf)
+                !    nullify (qL_prim_n(i)%vf(l)%sf)
+                !    nullify (qR_prim_n(i)%vf(l)%sf)
+                !end do
+            !else
+            !    do l = 1, cont_idx%end
+            !        deallocate (qL_cons_n(i)%vf(l)%sf)
+            !        deallocate (qR_cons_n(i)%vf(l)%sf)
+            !    end do
 
-                if (weno_vars == 1) then
-                    do l = mom_idx%beg, E_idx
-                        deallocate (qL_cons_n(i)%vf(l)%sf)
-                        deallocate (qR_cons_n(i)%vf(l)%sf)
-                    end do
-                end if
+            !    if (weno_vars == 1) then
+            !        do l = mom_idx%beg, E_idx
+            !            deallocate (qL_cons_n(i)%vf(l)%sf)
+            !            deallocate (qR_cons_n(i)%vf(l)%sf)
+            !        end do
+            !    end if
 
-                do l = mom_idx%beg, E_idx
-                    deallocate (qL_prim_n(i)%vf(l)%sf)
-                    deallocate (qR_prim_n(i)%vf(l)%sf)
-                end do
+              !  do l = mom_idx%beg, E_idx
+              !      deallocate (qL_prim_n(i)%vf(l)%sf)
+              !      deallocate (qR_prim_n(i)%vf(l)%sf)
+              !  end do
 
-                if (model_eqns == 3) then
-                    do l = internalEnergies_idx%beg, internalEnergies_idx%end
-                        deallocate (qL_prim_n(i)%vf(l)%sf)
-                        deallocate (qR_prim_n(i)%vf(l)%sf)
-                    end do
-                end if
+                !if (model_eqns == 3) then
+                !    do l = internalEnergies_idx%beg, internalEnergies_idx%end
+                !        deallocate (qL_prim_n(i)%vf(l)%sf)
+                !        deallocate (qR_prim_n(i)%vf(l)%sf)
+                !    end do
+                !end if
 
-                do l = adv_idx%beg, adv_idx%end
-                    deallocate (qL_cons_n(i)%vf(l)%sf)
-                    deallocate (qR_cons_n(i)%vf(l)%sf)
-                end do
-            end if
+                !do l = adv_idx%beg, adv_idx%end
+                !    deallocate (qL_cons_n(i)%vf(l)%sf)
+                !    deallocate (qR_cons_n(i)%vf(l)%sf)
+                !end do
+            !end if
 
             deallocate (qL_cons_n(i)%vf, qL_prim_n(i)%vf)
             deallocate (qR_cons_n(i)%vf, qR_prim_n(i)%vf)
