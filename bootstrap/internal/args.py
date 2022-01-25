@@ -9,7 +9,7 @@ class MFCArgs:
 
         compiler_configuration_names = [e["name"] for e in conf["configurations"]]
 
-        parser.add_argument("--build", action="store_true", help="Build targets.")
+        parser.add_argument("--build", action="store_true", help="Build targets.", default=True)
         parser.add_argument("--test",  action="store_true", help="Test targets.")
         parser.add_argument("--clean", action="store_true", help="Clean the targets.")
         parser.add_argument("-sc", "--set-current", type=str, choices=compiler_configuration_names,
