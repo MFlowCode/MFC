@@ -23,9 +23,14 @@ class MFCConf:
     def get_target_configuration_name(self, name: str, default: str):
         target = self.get_target(name)
 
-        if "override" in target:
-            if "configuration" in target["override"]:
-                return target["override"]["configuration"]
+        if "common_configuration" in target:
+            return target["common_configuration"]
+
+        return default
+
+    def get_target_configuration_folder_name(self, name: str, default: str):
+        if "common_configuration" in self.get_target(name):
+            return "common"
 
         return default
 

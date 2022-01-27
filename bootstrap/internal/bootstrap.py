@@ -14,33 +14,35 @@ import internal.lock   as lock
 import internal.common as common
 
 class Bootstrap:
-    def get_base_path(self, cc: str = None):
+    def get_configuration_base_path(self, cc: str = None):
         if cc is None:
             cc = self.args["compiler_configuration"]
 
         return f'{common.MFC_SUBDIR}/{cc}'
 
+    def get_target_base_path(self, name: str):
+        default_cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
+        cc = self.conf.get_target_configuration_folder_name(name, default_cfg_name)
+
+        return f'{common.MFC_SUBDIR}/{cc}'
+
     def get_source_path(self, name: str):
-        cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
-        return f'{self.get_base_path(cfg_name)}/src/{name}'
+        return f'{self.get_target_base_path(name)}/src/{name}'
 
     def get_build_path(self, name: str):
-        cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
-        return f'{self.get_base_path(cfg_name)}/build'
+        return f'{self.get_target_base_path(name)}/build'
 
     def get_log_filepath(self, name: str):
-        cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
-        return f'{self.get_base_path(cfg_name)}/log/{name}.log'
+        return f'{self.get_target_base_path(name)}/log/{name}.log'
 
     def get_temp_path(self, name: str):
-        cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
-        return f'{self.get_base_path(cfg_name)}/temp/{name}'
+        return f'{self.get_target_base_path(name)}/temp/{name}'
 
     def setup_directories(self):
         common.create_directory_safe(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for cc in [ cc["name"] for cc in self.conf["configurations"] ]:
+            for cc in [ cc["name"] for cc in self.conf["configurations"] ] + ["common"]:
                 common.create_directory_safe(f"{common.MFC_SUBDIR}/{cc}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
@@ -362,11 +364,11 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.check_environment()
 
         if self.args["set_current"] is not None:
-            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_base_path(self.args["set_current"]))
+            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path(self.args["set_current"]))
 
         # Update symlink to current build
         if self.args["build"]:
-            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_base_path())
+            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
 
         for target_name in [ x["name"] for x in self.conf["targets"] ]:
             if target_name in self.args["targets"]:
