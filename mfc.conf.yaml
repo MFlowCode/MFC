@@ -23,17 +23,10 @@ configurations:
     c:       -O3
     c++:     -O3
     fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
-- name: ci-cpu
-  flags:
-    fortran: -cpp -w
-- name: ci-gpu
-  flags:
-    fortran: -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 targets:
 - name: FFTW3
   type: download
-  override:
-    configuration: release-cpu
+  common_configuration: release-cpu
   download:
     version: 3.3.10
     link:    http://www.fftw.org/fftw-${VERSION}.tar.gz
@@ -45,8 +38,7 @@ targets:
 
 - name: HDF5
   type: clone
-  override:
-    configuration: release-cpu
+  common_configuration: release-cpu
   clone:
     git:  https://github.com/HDFGroup/hdf5
     hash: 4aa40365623cf35643b262781f92578220c42bbb
@@ -58,8 +50,7 @@ targets:
 
 - name: SILO
   type: clone
-  override:
-    configuration: release-cpu
+  common_configuration: release-cpu
   depends:
   - HDF5
   clone:
