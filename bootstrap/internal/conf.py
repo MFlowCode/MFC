@@ -1,17 +1,9 @@
-import internal.common as common
+import internal.common      as common
+import internal.configfiles as configfiles
 
-class MFCConf:
+class MFCConf(configfiles.ConfigFileBase):
     def __init__(self):
-        self.data = common.file_load_yaml(common.MFC_CONF_FILEPATH)
-
-    def __getitem__(self, key: str, default=None):
-        if key not in self.data:
-            if default==None:
-                raise common.MFCException(f'MFCConf: Key "{key}" doesn\'t exist.')
-            else:
-                return default
-
-        return self.data[key]
+        super().__init__(common.MFC_CONF_FILEPATH, noexist_ok=False)
 
     def get_configuration(self, name: str):
         for configuration in self["configurations"]:
