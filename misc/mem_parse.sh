@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-FILENAME="output_185.txt"
+FILENAME="$1"
 
 COUNT=`cat $FILENAME | grep 'Present table' | wc -l`
 
@@ -21,6 +21,9 @@ for i in $(seq 1 $COUNT); do
 
     total_size=0
 
+    CURRENT_VAR_IDX=1
+    CURRENT_VARIABLE_COLS=""
+
     j=$((line_no+1)); while [ $j -le $line_count ]; do
         line=`cat $FILENAME | head -n $j | tail -n 1`
 
@@ -30,12 +33,27 @@ for i in $(seq 1 $COUNT); do
 
         if [[ "$(echo "$line" | grep '^allocated' | wc -l)" == "1" ]]; then
             TOTAL_MEMORY[$((i-1))]=`expr ${TOTAL_MEMORY[$((i-1))]} + $(echo "$line" | tr " " "\n" | head -n 4 | tail -n 1 | sed s/size://)`
+        elif [[ "$(echo "$line" | grep '^host' | wc -l)" == "1" ]]; then
+            var_name=`echo "$line" | tr " " "\n" | tail -n 1 | sed s/name://`
+            var_size=`echo "$line" | tr " " "\n" | tail -n 4 | head -n 1 | sed s/size://`
+            var_line=`echo "$line" | tr " " "\n" | tail -n 2 | head -n 1 | sed s/line://`
+
+            CURRENT_VARIABLE_COLS="$CURRENT_VARIABLE_COLS\n$CURRENT_VAR_IDX $var_line $var_name $(bc <<< "scale=5; $var_size/1000000000") $(bc <<< "scale=5; $var_size/1000000")"
+
+            CURRENT_VAR_IDX=$((CURRENT_VAR_IDX+1))
         fi
 
         j=$((j+1))
     done
 
     func="${FUNCTION_NAMES[$i-1]}"
+
+    echo -e ""
+    echo -e "---- Last Function Call: $func ----"
+    echo -e ""
+    echo -e "$CURRENT_VARIABLE_COLS" | column -t -N "#,Line #,Variable,Size (GB),Size (MB)" -o " | "
+    echo -e ""
+
     mem="${TOTAL_MEMORY[$i-1]}"
     delta="N/A"
     if [ "$i" -ne "1" ]; then
@@ -43,8 +61,10 @@ for i in $(seq 1 $COUNT); do
         delta=`expr $mem - $mem_prev`
     fi
 
-    TO_COLUMN_STR="$TO_COLUMN_STR\n$func $(bc <<< "scale=5; $mem/1000000000") $(bc <<< "scale=5; $delta/1000000000")"
+    TO_COLUMN_STR="$TO_COLUMN_STR\n$i $func $(bc <<< "scale=5; $mem/1000000000") $(bc <<< "scale=5; $delta/1000000000")"
 done
 
-echo -e "$TO_COLUMN_STR" | column -t -N "Last Function Called,ACC Program Memory (GB),Delta (GB)" -o " | "
+echo -e "\n\n"
+echo -e "$TO_COLUMN_STR" | column -t -N "#,Last Function Called,ACC Program Memory (GB),Delta (GB)" -o " | "
+echo -e "\n"
 

@@ -14,29 +14,35 @@ import internal.lock   as lock
 import internal.common as common
 
 class Bootstrap:
-    def get_base_path(self, cc: str = None):
+    def get_configuration_base_path(self, cc: str = None):
         if cc is None:
             cc = self.args["compiler_configuration"]
 
         return f'{common.MFC_SUBDIR}/{cc}'
 
-    def get_source_path(self, name: str):
-        return f'{self.get_base_path()}/src/{name}'
+    def get_target_base_path(self, name: str):
+        default_cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
+        cc = self.conf.get_target_configuration_folder_name(name, default_cfg_name)
 
-    def get_build_path(self):
-        return f'{self.get_base_path()}/build'
+        return f'{common.MFC_SUBDIR}/{cc}'
+
+    def get_source_path(self, name: str):
+        return f'{self.get_target_base_path(name)}/src/{name}'
+
+    def get_build_path(self, name: str):
+        return f'{self.get_target_base_path(name)}/build'
 
     def get_log_filepath(self, name: str):
-        return f'{self.get_base_path()}/log/{name}.log'
+        return f'{self.get_target_base_path(name)}/log/{name}.log'
 
     def get_temp_path(self, name: str):
-        return f'{self.get_base_path()}/temp/{name}'
+        return f'{self.get_target_base_path(name)}/temp/{name}'
 
     def setup_directories(self):
         common.create_directory_safe(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for cc in [ cc["name"] for cc in self.conf["configurations"] ]:
+            for cc in [ cc["name"] for cc in self.conf["configurations"] ] + ["common"]:
                 common.create_directory_safe(f"{common.MFC_SUBDIR}/{cc}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
@@ -66,17 +72,9 @@ class Bootstrap:
         dep       = self.conf.get_target(dependency_name)
         compilers = self.conf["compilers"]
 
-        compiler_cfg = None
-        for c_cfg in self.conf["configurations"]:
-            if c_cfg["name"] == self.args["compiler_configuration"]:
-                compiler_cfg = c_cfg
-                break
+        compiler_cfg = self.conf.get_target_configuration(dependency_name, self.args["compiler_configuration"])
 
-        if compiler_cfg is None:
-            raise common.MFCException(
-                f'Failed to locate the compiler configuration "{self.args["compiler_configuration"]}".')
-
-        install_path = self.get_build_path()
+        install_path = self.get_build_path (dependency_name)
         source_path  = self.get_source_path(dependency_name)
 
         flags = copy.deepcopy(compiler_cfg["flags"])
@@ -142,12 +140,13 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def is_build_satisfied(self, name: str, ignoreIfSource: bool = False):
         # Check if it hasn't been built before
-        if not self.lock.does_target_exist(name, self.args["compiler_configuration"]):
+        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
+        if not self.lock.does_target_exist(name, compiler_cfg["name"]):
             return False
 
         # Retrive CONF & LOCK descriptors
         conf_desc = self.conf.get_target(name)
-        lock_desc = self.lock.get_target(name, self.args["compiler_configuration"])
+        lock_desc = self.lock.get_target(name, compiler_cfg["name"])
 
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
         if conf_desc["type"] != lock_desc["type"]                or \
@@ -167,11 +166,12 @@ If you think MFC could (or should) be able to find it automatically for you syst
         return True
 
     def build_target__clean_previous(self, name: str):
-        if not self.lock.does_unique_target_exist(name, self.args["compiler_configuration"]):
+        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
+        if not self.lock.does_unique_target_exist(name, compiler_cfg["name"]):
             return
 
         conf_desc = self.conf.get_target(name)
-        lock_desc = self.lock.get_target(name, self.args["compiler_configuration"])
+        lock_desc = self.lock.get_target(name, compiler_cfg["name"])
 
         if ((    conf_desc["type"] != lock_desc["type"]
              and lock_desc["type"] in ["clone", "download"]
@@ -179,14 +179,15 @@ If you think MFC could (or should) be able to find it automatically for you syst
             common.delete_directory_recursive_safe(f'{common.MFC_SUBDIR}/{lock_desc["compiler_configuration"]}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase):
+        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
         conf = self.conf.get_target(name)
 
         if conf["type"] in ["clone", "download"]:
             if conf["type"] == "clone":
-                lock_matches = self.lock.get_target_matches(name, self.args["compiler_configuration"])
+                lock_matches = self.lock.get_target_matches(name, compiler_cfg["name"])
 
                 if ((   len(lock_matches)    == 1
-                    and conf["clone"]["git"] != self.lock.get_target(name, self.args["compiler_configuration"])["clone"]["git"])
+                    and conf["clone"]["git"] != self.lock.get_target(name, compiler_cfg["name"])["clone"]["git"])
                     or (self.args["scratch"])):
                     common.clear_print(f'|--> Package {name}: GIT repository changed. Updating...', end='\r')
 
@@ -263,13 +264,14 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
 
     def build_target__update_lock(self, name: str):
+        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
         conf = self.conf.get_target(name)
 
         common.clear_print(f'|--> Package {name}: Updating lock file...', end='\r')
 
-        new_entry = dict(conf, **{"compiler_configuration": self.args["compiler_configuration"]})
+        new_entry = dict(conf, **{"compiler_configuration": compiler_cfg["name"]})
 
-        if len(self.lock.get_target_matches(name, self.args["compiler_configuration"])) == 0:
+        if len(self.lock.get_target_matches(name, compiler_cfg["name"])) == 0:
             self.lock["targets"].append(new_entry)
         else:
             for index, dep in enumerate(self.lock["targets"]):
@@ -362,11 +364,11 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.check_environment()
 
         if self.args["set_current"] is not None:
-            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_base_path(self.args["set_current"]))
+            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path(self.args["set_current"]))
 
         # Update symlink to current build
         if self.args["build"]:
-            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_base_path())
+            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
 
         for target_name in [ x["name"] for x in self.conf["targets"] ]:
             if target_name in self.args["targets"]:
