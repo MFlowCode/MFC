@@ -13,6 +13,30 @@ class MFCConf:
 
         return self.data[key]
 
+    def get_configuration(self, name: str):
+        for configuration in self["configurations"]:
+            if configuration["name"] == name:
+                return configuration
+
+        return common.MFCException(f'MFCConf: Configuration "{name}" doesn\'t exist')
+
+    def get_target_configuration_name(self, name: str, default: str):
+        target = self.get_target(name)
+
+        if "common_configuration" in target:
+            return target["common_configuration"]
+
+        return default
+
+    def get_target_configuration_folder_name(self, name: str, default: str):
+        if "common_configuration" in self.get_target(name):
+            return "common"
+
+        return default
+
+    def get_target_configuration(self, name: str, default: str):
+        return self.get_configuration(self.get_target_configuration_name(name, default))
+
     def get_target_matches(self, name: str):
         return list(filter(lambda x: x["name"] == name, self["targets"]))
 

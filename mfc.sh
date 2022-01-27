@@ -4,7 +4,7 @@
 # Script Constants
 MFC_DIR="./.mfc"
 MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
-PYTHON_VENV_DIR="./.venv"
+PYTHON_VENV_DIR="$MFC_DIR/.venv"
 
 
 # Check whether this script was called from MFC's root directory.
