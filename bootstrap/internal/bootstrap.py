@@ -150,6 +150,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
         if conf_desc["type"] != lock_desc["type"]                or \
+           lock_desc["bCleaned"]                                 or \
            conf_desc["type"] == "source" and not(ignoreIfSource) or \
            conf_desc[conf_desc["type"]] != conf_desc[conf_desc["type"]]:
             return False
@@ -269,7 +270,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         common.clear_print(f'|--> Package {name}: Updating lock file...', end='\r')
 
-        new_entry = dict(conf, **{"compiler_configuration": compiler_cfg["name"]})
+        new_entry = dict(conf, **{"compiler_configuration": compiler_cfg["name"], "bCleaned": False})
 
         if len(self.lock.get_target_matches(name, compiler_cfg["name"])) == 0:
             self.lock["targets"].append(new_entry)
@@ -348,6 +349,19 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         common.clear_print(f'|--> Package {name}: Tested. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
 
     def clean_target(self, name: str):
+        for target in self.lock["targets"]:
+            if "clean" in target:
+                with open(self.get_log_filepath(name), "a") as log_file:
+                    for command in target["clean"]:
+                        command = self.string_replace(name, f"""\
+cd "${{SOURCE_PATH}}" && \
+stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
+
+                        log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
+                        log_file.flush()
+
+                target["bCleaned"] = True
+
         common.delete_directory_recursive_safe(self.get_source_path(name))
         common.delete_file_safe(self.get_log_filepath(name))
 

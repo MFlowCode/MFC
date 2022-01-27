@@ -1,18 +1,22 @@
 import argparse
 
-import internal.conf   as conf
-import internal.common as common
+import internal.conf       as conf
+import internal.common     as common
+import internal.objecttree as objecttree
 
-class MFCArgs:
+class MFCArgs(objecttree.ObjectTree):
     def __init__(self, conf: conf.MFCConf):
         parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", )
 
         compiler_configuration_names = [e["name"] for e in conf["configurations"]]
 
-        parser.add_argument("--build", action="store_true", help="Build targets.", default=True)
-        parser.add_argument("--test",  action="store_true", help="Test targets.")
-        parser.add_argument("--clean", action="store_true", help="Clean the targets.")
-        parser.add_argument("-sc", "--set-current", type=str, choices=compiler_configuration_names,
+        grp_func = parser.add_argument_group(title="Action")
+        grp_func = grp_func.add_mutually_exclusive_group()
+
+        grp_func.add_argument("--build", action="store_true", help="Build targets.")
+        grp_func.add_argument("--test",  action="store_true", help="Test targets.")
+        grp_func.add_argument("--clean", action="store_true", help="Clean MFC targets.")
+        grp_func.add_argument("--set-current", type=str, choices=compiler_configuration_names,
                             help="Select a compiler configuration to use when running MFC.")
 
         compiler_target_names = [e["name"] for e in conf["targets"]]
@@ -29,13 +33,7 @@ class MFCArgs:
         parser.add_argument("-s", "--scratch", action="store_true",
                             help="Build all targets from scratch.")
 
-        self.data = vars(parser.parse_args())
+        super().__init__(vars(parser.parse_args()))
 
-    def __getitem__(self, key: str, default=None):
-        if key not in self.data:
-            if default==None:
-                raise common.MFCException(f'MFCArgs: Key "{key}" doesn\'t exist.')
-            else:
-                return default
-
-        return self.data[key]
+        if not self.get("build") and not self.get("test") and not self.get("clean"):
+            self.set("build", True)

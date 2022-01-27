@@ -2,11 +2,9 @@
 
 BUILD_DIR="./.build"
 
-[ -d "$BUILD_DIR" ] && rm -rf "$BUILD_DIR"
-
 mkdir -p "$BUILD_DIR"
-cp *.f90 "$BUILD_DIR"
-cp Makefile "$BUILD_DIR"
+cp -u *.f90 "$BUILD_DIR"
+cp -u Makefile "$BUILD_DIR"
 
 for fpp_f in *.fpp; do
 	f90_f=$(echo "$fpp_f" | sed s/.fpp/.f90/g)

@@ -71,6 +71,8 @@ targets:
   depends: []
   source:
     source: ${MFC_ROOT_PATH}/src/pre_process_code
+  clean:
+  - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}" clean
   build:
   - >-
     /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}"
@@ -115,4 +117,3 @@ targets:
   build: []
   test:
   - cd "${MFC_ROOT_PATH}" && /usr/bin/env bash "tests/checks.sh"
-
