@@ -1,6 +1,5 @@
 tags
 .mfc/
-.venv/
 src/*/tags
 
 __pycache__
