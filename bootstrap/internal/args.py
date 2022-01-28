@@ -8,7 +8,7 @@ class MFCArgs(objecttree.ObjectTree):
     def __init__(self, conf: conf.MFCConf):
         parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", )
 
-        compiler_configuration_names = [e["name"] for e in conf["configurations"]]
+        compiler_configuration_names = [e.name for e in conf.configurations]
 
         grp_func = parser.add_argument_group(title="Action")
         grp_func = grp_func.add_mutually_exclusive_group()
@@ -19,7 +19,7 @@ class MFCArgs(objecttree.ObjectTree):
         grp_func.add_argument("--set-current", type=str, choices=compiler_configuration_names,
                             help="Select a compiler configuration to use when running MFC.")
 
-        compiler_target_names = [e["name"] for e in conf["targets"]]
+        compiler_target_names = [e.name for e in conf.targets]
         parser.add_argument("-t", "--targets", nargs="+", type=str,
                             choices=compiler_target_names, default=["MFC"],
                             help="The space-separated targets you wish to have built.")
@@ -35,5 +35,5 @@ class MFCArgs(objecttree.ObjectTree):
 
         super().__init__(vars(parser.parse_args()))
 
-        if not self.get("build") and not self.get("test") and not self.get("clean"):
-            self.set("build", True)
+        if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean"):
+            self.tree_set("build", True)

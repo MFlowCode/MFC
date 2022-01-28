@@ -1,35 +1,36 @@
 compilers:
   c:       mpicc
-  c++:     mpicxx
+  cpp:     mpicxx
   fortran: mpif90
 configurations:
 - name: release-cpu
   flags:
     c:       -O3
-    c++:     -O3
+    cpp:     -O3
     fortran: -O3 -cpp -w
 - name: release-gpu
   flags:
     c:       -O3
-    c++:     -O3
+    cpp:     -O3
     fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 - name: debug-cpu
   flags:
     c:       -Og -g
-    c++:     -Og -g
+    cpp:     -Og -g
     fortran: -Og -g -cpp -w
 - name: debug-gpu
   flags:
     c:       -O3
-    c++:     -O3
+    cpp:     -O3
     fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 targets:
 - name: FFTW3
-  type: download
   common_configuration: release-cpu
-  download:
-    version: 3.3.10
-    link:    http://www.fftw.org/fftw-${VERSION}.tar.gz
+  fetch:
+    method: download
+    params:
+      version: 3.3.10
+      link:    http://www.fftw.org/fftw-${VERSION}.tar.gz
   build:
   - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
   - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
@@ -37,11 +38,12 @@ targets:
   test: []
 
 - name: HDF5
-  type: clone
   common_configuration: release-cpu
-  clone:
-    git:  https://github.com/HDFGroup/hdf5
-    hash: 4aa40365623cf35643b262781f92578220c42bbb
+  fetch:
+    method: clone
+    params:
+      git:  https://github.com/HDFGroup/hdf5
+      hash: 4aa40365623cf35643b262781f92578220c42bbb
   build:
   - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
   - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
@@ -49,13 +51,14 @@ targets:
   test: []
 
 - name: SILO
-  type: clone
   common_configuration: release-cpu
   depends:
   - HDF5
-  clone:
-    git:  https://github.com/LLNL/Silo
-    hash: 9e3a31fbf661c4d26e9f5272287e5ff41971d117
+  fetch:
+    method: clone
+    params:
+      git:  https://github.com/LLNL/Silo
+      hash: 9e3a31fbf661c4d26e9f5272287e5ff41971d117
   build:
   - >-
     ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
@@ -67,10 +70,11 @@ targets:
   test: []
 
 - name: MFC_PreProcess
-  type: source
   depends: []
-  source:
-    source: ${MFC_ROOT_PATH}/src/pre_process_code
+  fetch:
+    method: source
+    params:
+      source: ${MFC_ROOT_PATH}/src/pre_process_code
   clean:
   - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}" clean
   build:
@@ -80,11 +84,12 @@ targets:
   test: []
 
 - name: MFC_Simulation
-  type: source
   depends:
   - FFTW3
-  source:
-    source: ${MFC_ROOT_PATH}/src/simulation_code
+  fetch:
+    method: source
+    params:
+      source: ${MFC_ROOT_PATH}/src/simulation_code
   build:
   - >-
     /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
@@ -93,13 +98,14 @@ targets:
   test: []
 
 - name: MFC_PostProcess
-  type: source
   depends:
   - FFTW3
   - HDF5
   - SILO
-  source:
-    source: ${MFC_ROOT_PATH}/src/post_process_code
+  fetch:
+    method: source
+    params:
+      source: ${MFC_ROOT_PATH}/src/post_process_code
   build:
   - >-
     /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}"
@@ -108,7 +114,10 @@ targets:
   test: []
 
 - name: MFC
-  type: collection
+  fetch:
+    method: collection
+    params:
+      test:
   depends:
   - MFC_PreProcess
   - MFC_Simulation
