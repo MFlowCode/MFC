@@ -27,7 +27,7 @@ class LockTargetHolder:
 
 @dataclass
 class MFCLock(configfiles.ConfigFileBase):
-    targets: list[LockTargetHolder]
+    targets: list
 
     def __init__(self):
         super().__init__(common.MFC_LOCK_FILEPATH, {"targets": []})
