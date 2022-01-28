@@ -6,6 +6,7 @@ import glob
 import copy
 import shutil
 import colorama
+import dataclasses
 import urllib.request
 
 import internal.args   as args
@@ -42,7 +43,7 @@ class Bootstrap:
         common.create_directory_safe(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for cc in [ cc["name"] for cc in self.conf["configurations"] ] + ["common"]:
+            for cc in [ cc.name for cc in self.conf.configurations ] + ["common"]:
                 common.create_directory_safe(f"{common.MFC_SUBDIR}/{cc}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
@@ -52,7 +53,7 @@ class Bootstrap:
         print("|--> Checking for the presence of required command-line utilities...", end='\r')
 
         required = ["python3", "python3-config", "make", "git"]
-        required += self.conf["compilers"].values()
+        required += vars(self.conf.compilers).values()
 
         for index, utility in enumerate(required):
             common.clear_print(f"|--> {index+1}/{len(required)} Checking for {utility}...", end='\r')
@@ -64,20 +65,19 @@ class Bootstrap:
         # TODO: MacOS Checks
         if sys.platform == "darwin": # MacOS
             pass
-            #mfc_state.conf["compilers"]["mpi"]["fortran"]
 
         common.clear_print(f"|--> Build environment: Passing. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
 
     def string_replace(self, dependency_name: str, string: str, recursive=True):
         dep       = self.conf.get_target(dependency_name)
-        compilers = self.conf["compilers"]
+        compilers = self.conf.compilers
 
-        compiler_cfg = self.conf.get_target_configuration(dependency_name, self.args["compiler_configuration"])
+        configuration = self.conf.get_target_configuration(dependency_name, self.args["compiler_configuration"])
 
         install_path = self.get_build_path (dependency_name)
         source_path  = self.get_source_path(dependency_name)
 
-        flags = copy.deepcopy(compiler_cfg["flags"])
+        flags = vars(copy.deepcopy(configuration.flags))
         for lang in flags.keys():
             lang: str
             if "${CUDA:INSTALL_PATH}" in flags[lang]:
@@ -85,11 +85,11 @@ class Bootstrap:
 
                 if len(matches) == 0:
                     raise common.MFCException(f'''\
-Failed to find where CUDA was installed for {dependency_name} with {compiler_cfg["name"]}/{lang}.
+Failed to find where CUDA was installed for {dependency_name} with {configuration.name}/{lang}.
 Please follow the instructions bellow:
 - Make sure CUDA is installed and properly configured.
 - Open mfc.conf.py.
-- Locate section compilers -> configurations -> {compiler_cfg["name"]} -> {lang}:
+- Locate section compilers -> configurations -> {configuration.name} -> {lang}:
 - Replace $(CUDA:INSTALL_PATH) with the root path to your CUDA installation.
   "include" and "lib" should be folders directly accessible from this folder.
 
@@ -107,8 +107,8 @@ If you think MFC could (or should) be able to find it automatically for you syst
             ("${INSTALL_PATH}",      install_path),
             ("${INSTALL_PATH}",      install_path),
             ("${MAKE_OPTIONS}",      f'-j {self.args["jobs"]}'),
-            ("${COMPILER_FLAGS}",    f'CFLAGS="{flags.get("c", "")}" CPPFLAGS="{flags.get("c++", "")}" FFLAGS="{flags.get("fortran", "")}"'),
-            ("${COMPILERS}",         f'CC="{compilers.get("c", "")}" CXX="{compilers.get ("c++", "")}" FC="{compilers.get("fortran", "")}"')
+            ("${COMPILER_FLAGS}",    f'CFLAGS="{flags.get("c")}" CPPFLAGS="{flags.get("cpp")}" FFLAGS="{flags.get("fortran")}"'),
+            ("${COMPILERS}",         f'CC="{compilers.c}" CXX="{compilers.cpp}" FC="{compilers.fortran}"')
         ]
 
         for e in replace_list:
@@ -132,27 +132,28 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         # Fetch
         if recursive:
-            for dep2_info in self.conf["targets"]:
-                string = string.replace("${" + dep2_info["name"] + ":", "${")
-                string = self.string_replace(dep2_info["name"], string, recursive=False)
+            for dep2_info in self.conf.targets:
+                string = string.replace("${" + dep2_info.name + ":", "${")
+                string = self.string_replace(dep2_info.name, string, recursive=False)
 
         return string
 
     def is_build_satisfied(self, name: str, ignoreIfSource: bool = False):
         # Check if it hasn't been built before
-        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
-        if not self.lock.does_target_exist(name, compiler_cfg["name"]):
+        compiler_cfg = self.conf.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
+
+        if not self.lock.does_target_exist(name, compiler_cfg.name):
             return False
 
         # Retrive CONF & LOCK descriptors
         conf_desc = self.conf.get_target(name)
-        lock_desc = self.lock.get_target(name, compiler_cfg["name"])
+        lock_desc = self.lock.get_target(name, compiler_cfg.name)
 
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
-        if conf_desc["type"] != lock_desc["type"]                or \
-           lock_desc["bCleaned"]                                 or \
-           conf_desc["type"] == "source" and not(ignoreIfSource) or \
-           conf_desc[conf_desc["type"]] != conf_desc[conf_desc["type"]]:
+        if conf_desc.fetch.method != lock_desc.target.fetch.method           or \
+           lock_desc.metadata.bCleaned                                or \
+           conf_desc.fetch.method == "source" and not(ignoreIfSource) or \
+           conf_desc.fetch.params != lock_desc.target.fetch.params:
             return False
 
         # Check if any of its dependencies needs updating
@@ -161,35 +162,35 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 return False
 
         # Check for "scratch" flag
-        if self.args["scratch"]:
+        if self.args.tree_get("scratch"):
             return False
 
         return True
 
     def build_target__clean_previous(self, name: str):
-        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
-        if not self.lock.does_unique_target_exist(name, compiler_cfg["name"]):
+        compiler_cfg = self.conf.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
+        if not self.lock.does_unique_target_exist(name, compiler_cfg.name):
             return
 
         conf_desc = self.conf.get_target(name)
-        lock_desc = self.lock.get_target(name, compiler_cfg["name"])
+        lock_desc = self.lock.get_target(name, compiler_cfg.name)
 
-        if ((    conf_desc["type"] != lock_desc["type"]
-             and lock_desc["type"] in ["clone", "download"]
-            ) or (self.args["scratch"])):
+        if ((    conf_desc.fetch.method != lock_desc.target.fetch.method
+             and lock_desc.target.fetch.method in ["clone", "download"]
+            ) or (self.args.tree_get("scratch"))):
             common.delete_directory_recursive_safe(f'{common.MFC_SUBDIR}/{lock_desc["compiler_configuration"]}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase):
-        compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
+        compiler_cfg = self.conf.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
         conf = self.conf.get_target(name)
 
-        if conf["type"] in ["clone", "download"]:
-            if conf["type"] == "clone":
-                lock_matches = self.lock.get_target_matches(name, compiler_cfg["name"])
+        if conf.fetch.method in ["clone", "download"]:
+            if conf.fetch.method == "clone":
+                lock_matches = self.lock.get_target_matches(name, compiler_cfg.name)
 
                 if ((   len(lock_matches)    == 1
-                    and conf["clone"]["git"] != self.lock.get_target(name, compiler_cfg["name"])["clone"]["git"])
-                    or (self.args["scratch"])):
+                    and conf.fetch.clone.git != self.lock.get_target(name, compiler_cfg.name).target.fetch.params.git)
+                    or (self.args.tree_get("scratch"))):
                     common.clear_print(f'|--> Package {name}: GIT repository changed. Updating...', end='\r')
 
                     common.delete_directory_recursive_safe(self.get_source_path(name))
@@ -198,18 +199,18 @@ If you think MFC could (or should) be able to find it automatically for you syst
                     common.clear_print(f'|--> Package {name}: Cloning repository...', end='\r')
 
                     common.execute_shell_command_safe(
-                        f'git clone --recursive "{conf["clone"]["git"]}" "{self.get_source_path(name)}" >> "{logfile.name}" 2>&1')
+                        f'git clone --recursive "{conf.fetch.params.git}" "{self.get_source_path(name)}" >> "{logfile.name}" 2>&1')
 
-                common.clear_print(f'|--> Package {name}: Checking out {conf["clone"]["hash"]}...', end='\r')
+                common.clear_print(f'|--> Package {name}: Checking out {conf.fetch.params.hash}...', end='\r')
 
                 common.execute_shell_command_safe(
-                    f'cd "{self.get_source_path(name)}" && git checkout "{conf["clone"]["hash"]}" >> "{logfile.name}" 2>&1')
-            elif conf["type"] == "download":
+                    f'cd "{self.get_source_path(name)}" && git checkout "{conf.fetch.params.hash}" >> "{logfile.name}" 2>&1')
+            elif conf.fetch.method == "download":
                 common.clear_print(f'|--> Package {name}: Removing previously downloaded version...', end='\r')
 
                 common.delete_directory_recursive_safe(self.get_source_path(name))
 
-                download_link = conf[conf["type"]]["link"].replace("${VERSION}", conf[conf["type"]]["version"])
+                download_link = conf.fetch.params.link.replace("${VERSION}", conf.fetch.params.version)
                 filename = download_link.split("/")[-1]
 
                 common.clear_print(f'|--> Package {name}: Downloading source...', end='\r')
@@ -225,22 +226,22 @@ If you think MFC could (or should) be able to find it automatically for you syst
                                       f'{self.get_source_path(name)}')
 
                 os.remove(download_path)
-        elif conf["type"] == "source":
+        elif conf.fetch.method == "source":
             if os.path.isdir(self.get_source_path(name)):
                 common.delete_directory_recursive_safe(self.get_source_path(name))
 
-            shutil.copytree(self.string_replace(name, conf["source"]["source"]),
+            shutil.copytree(self.string_replace(name, conf.fetch.params.source),
                             self.get_source_path(name))
-        elif conf["type"] == "collection":
+        elif conf.fetch.method == "collection":
             common.create_directory_safe(self.get_source_path(name))
         else:
-            raise common.MFCException(f'Dependency type "{conf["type"]}" is unsupported.')
+            raise common.MFCException(f'Dependency type "{conf.fetch.method}" is unsupported.')
 
     def build_target__build(self, name: str, logfile: io.IOBase):
         conf = self.conf.get_target(name)
 
-        if conf["type"] in ["clone", "download", "source"]:
-            for cmd_idx, command in enumerate(conf["build"]):
+        if conf.fetch.method in ["clone", "download", "source"]:
+            for cmd_idx, command in enumerate(conf.build):
                 command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 PYTHON="python3" PYTHON_CPPFLAGS="$PYTHON_CPPFLAGS $(python3-config --includes) $(python3-config --libs)" \
@@ -258,10 +259,10 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 cmd_exception_text=cmd_exception_text+f"You can also view it by running:\n\ncat \"{logfile.name}\"\n"
 
                 common.execute_shell_command_safe(command, exception_text=cmd_exception_text, on_error=cmd_on_error)
-        elif conf["type"] == "collection":
+        elif conf.fetch.method == "collection":
             pass
         else:
-            raise common.MFCException(f'Unknown target type "{conf["type"]}".')
+            raise common.MFCException(f'Unknown target type "{conf.fetch.method}".')
 
 
     def build_target__update_lock(self, name: str):
@@ -270,14 +271,22 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         common.clear_print(f'|--> Package {name}: Updating lock file...', end='\r')
 
-        new_entry = dict(conf, **{"compiler_configuration": compiler_cfg["name"], "bCleaned": False})
+        new_entry = lock.LockTargetHolder({
+            "target": dataclasses.asdict(conf),
+            "metadata": {
+                "compiler_configuration": compiler_cfg.name,
+                "bCleaned": False
+            }
+        })
 
-        if len(self.lock.get_target_matches(name, compiler_cfg["name"])) == 0:
-            self.lock["targets"].append(new_entry)
+        if len(self.lock.get_target_matches(name, compiler_cfg.name)) == 0:
+            self.lock.add_target(new_entry)
         else:
-            for index, dep in enumerate(self.lock["targets"]):
-                if dep["name"] == name:
-                    self.lock["targets"][index] = new_entry
+            for index, dep in enumerate(self.lock.targets):
+                if dep.target.name == name:
+                    self.lock.targets[index] = new_entry
+                    self.lock.flush()
+                    break
 
         self.lock.save()
 
@@ -334,7 +343,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             raise common.MFCException(f"Can't test {name} because its build isn't satisfied.")
 
         with open(self.get_log_filepath(name), "w") as logfile:
-            for command in self.conf.get_target(name)["test"]:
+            for command in self.conf.get_target(name).test:
                 command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 bash -c '{command}' >> "{logfile.name}" 2>&1""")
@@ -349,23 +358,22 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         common.clear_print(f'|--> Package {name}: Tested. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
 
     def clean_target(self, name: str):
-        for target in self.lock["targets"]:
-            if "clean" in target:
-                with open(self.get_log_filepath(name), "a") as log_file:
-                    for command in target["clean"]:
-                        command = self.string_replace(name, f"""\
+        for target in self.lock.targets:
+            with open(self.get_log_filepath(name), "a") as log_file:
+                for command in target.target.clean:
+                    command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
 
-                        log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
-                        log_file.flush()
+                    log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
+                    log_file.flush()
 
-                target["bCleaned"] = True
+            target.target.bCleaned = True
 
         common.delete_directory_recursive_safe(self.get_source_path(name))
         common.delete_file_safe(self.get_log_filepath(name))
 
-        self.lock["targets"] = list(filter(lambda x: x["name"] != name, self.lock["targets"]))
+        self.lock.targets = list(filter(lambda x: x.target.name != name, self.lock.targets))
         self.lock.save()
 
     def __init__(self):
@@ -384,7 +392,7 @@ stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
         if self.args["build"]:
             common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
 
-        for target_name in [ x["name"] for x in self.conf["targets"] ]:
+        for target_name in [ x.name for x in self.conf.targets ]:
             if target_name in self.args["targets"]:
                 if self.args["build"]: self.build_target(target_name)
                 if self.args["test"]:  self.test_target(target_name)

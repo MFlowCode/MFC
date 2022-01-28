@@ -24,7 +24,7 @@ class ObjectTree:
 
         return self.exists(key_sequence[1:], curr[key])
 
-    def set(self, key_sequence, value, curr=None):
+    def tree_set(self, key_sequence, value, curr=None):
         if curr is None:
             curr = self.data
 
@@ -39,12 +39,12 @@ class ObjectTree:
             curr[key] = value
             return
 
-        return self.set(key_sequence[1:], value, curr[key])
+        return self.tree_set(key_sequence[1:], value, curr[key])
 
     def __setitem__(self, key_sequence, value):
-        self.set(key_sequence, value)
+        self.tree_set(key_sequence, value)
 
-    def get(self, key_sequence, default=None, curr=None):
+    def tree_get(self, key_sequence, default=None, curr=None, no_exception=False):
         if curr is None:
             curr = self.data
 
@@ -54,7 +54,7 @@ class ObjectTree:
         key = key_sequence[0]
 
         if key not in curr:
-            if default is None:
+            if default is None and not no_exception:
                 raise common.MFCException(f'ObjectTree: Key "{key}" doesn\'t exist.')
 
             return default
@@ -62,7 +62,7 @@ class ObjectTree:
         if len(key_sequence) == 1:
             return curr[key]
 
-        return self.get(key_sequence[1:], default, curr[key])
+        return self.tree_get(key_sequence[1:], default, curr[key], no_exception)
 
-    def __getitem__(self, key_sequence, default=None):
-        return self.get(key_sequence, default)
+    def __getitem__(self, key_sequence):
+        return self.tree_get(key_sequence)
