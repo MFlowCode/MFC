@@ -126,7 +126,7 @@ class MFCConf:
     def get_target_configuration(self, name: str, default: str) -> Configuration:
         return self.get_configuration(self.get_target_configuration_name(name, default))
 
-    def get_target_matches(self, name: str) -> list[Target]:
+    def get_target_matches(self, name: str) -> list:
         return list(filter(lambda x: x.name == name, self.targets))
 
     def does_target_exist(self, name: str) -> bool:
