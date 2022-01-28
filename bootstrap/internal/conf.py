@@ -79,9 +79,9 @@ class Target_Fetch:
 @dataclass
 class Target:
     name:  str
-    build: list[str]
-    test:  list[str]
-    clean: list[str]
+    build: list
+    test:  list
+    clean: list
     fetch: Target_Fetch
     common_configuration: str
 
