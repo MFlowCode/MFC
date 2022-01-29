@@ -90,6 +90,8 @@ targets:
     method: source
     params:
       source: ${MFC_ROOT_PATH}/src/simulation_code
+  clean:
+  - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}" clean
   build:
   - >-
     /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
@@ -106,6 +108,8 @@ targets:
     method: source
     params:
       source: ${MFC_ROOT_PATH}/src/post_process_code
+  clean:
+  - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}" clean
   build:
   - >-
     /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}"

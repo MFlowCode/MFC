@@ -150,7 +150,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         lock_desc = self.lock.get_target(name, compiler_cfg.name)
 
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
-        if conf_desc.fetch.method != lock_desc.target.fetch.method           or \
+        if conf_desc.fetch.method != lock_desc.target.fetch.method    or \
            lock_desc.metadata.bCleaned                                or \
            conf_desc.fetch.method == "source" and not(ignoreIfSource) or \
            conf_desc.fetch.params != lock_desc.target.fetch.params:
@@ -178,7 +178,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         if ((    conf_desc.fetch.method != lock_desc.target.fetch.method
              and lock_desc.target.fetch.method in ["clone", "download"]
             ) or (self.args.tree_get("scratch"))):
-            common.delete_directory_recursive_safe(f'{common.MFC_SUBDIR}/{lock_desc["compiler_configuration"]}/src/{name}')
+            common.delete_directory_recursive_safe(f'{common.MFC_SUBDIR}/{lock_desc.metadata.compiler_configuration}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase):
         compiler_cfg = self.conf.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
@@ -189,7 +189,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 lock_matches = self.lock.get_target_matches(name, compiler_cfg.name)
 
                 if ((   len(lock_matches)    == 1
-                    and conf.fetch.clone.git != self.lock.get_target(name, compiler_cfg.name).target.fetch.params.git)
+                    and conf.fetch.params.git != self.lock.get_target(name, compiler_cfg.name).target.fetch.params.git)
                     or (self.args.tree_get("scratch"))):
                     common.clear_print(f'|--> Package {name}: GIT repository changed. Updating...', end='\r')
 
@@ -250,7 +250,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 logfile.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
                 logfile.flush()
 
-                common.clear_print(f'|--> Package {name}: Building (Logging to {logfile.name})...', end='\r')
+                common.clear_print(f'|--> Package {name}: Building [{cmd_idx+1}/{len(conf.build)}] (Logging to {logfile.name})...', end='\r')
 
                 def cmd_on_error():
                     print(logfile.read())
@@ -343,7 +343,9 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             raise common.MFCException(f"Can't test {name} because its build isn't satisfied.")
 
         with open(self.get_log_filepath(name), "w") as logfile:
-            for command in self.conf.get_target(name).test:
+            for cmd_idx,command in enumerate(self.conf.get_target(name).test):
+                common.clear_print(f'|--> Package {name}: Testing [{cmd_idx+1}/{len(self.conf.get_target(name).test)}] (Logging to {logfile.name})...', end='\r')
+
                 command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 bash -c '{command}' >> "{logfile.name}" 2>&1""")
@@ -353,27 +355,40 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
                 common.execute_shell_command_safe(command)
 
-                common.clear_print(f'|--> Package {name}: Testing (Logging to {logfile.name})...', end='\r')
-
         common.clear_print(f'|--> Package {name}: Tested. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
 
     def clean_target(self, name: str):
-        for target in self.lock.targets:
-            with open(self.get_log_filepath(name), "a") as log_file:
-                for command in target.target.clean:
-                    command = self.string_replace(name, f"""\
-cd "${{SOURCE_PATH}}" && \
-stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
+        if not self.is_build_satisfied(name, ignoreIfSource=True):
+            raise common.MFCException(f"Can't clean {name} because its build isn't satisfied.")
 
-                    log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
-                    log_file.flush()
+        for dependency_name in self.conf.get_dependency_names(name, recursive=False):
+            self.clean_target(dependency_name)
 
-            target.target.bCleaned = True
+        target = self.lock.get_target(name, self.args["compiler_configuration"])
+        
+        if not target.metadata.bCleaned:
+            if os.path.isdir(elf.string_replace(name, "${SOURCE_PATH}")):
+                with open(self.get_log_filepath(name), "a") as log_file:
+                    for cmd_idx, command in enumerate(target.target.clean):
+                        common.clear_print(f'|--> Package {name}: Cleaning [{cmd_idx+1}/{len(target.target.clean)}] (Logging to {log_file.name})...', end='\r')
+
+                        command = self.string_replace(name, f"""\
+        cd "${{SOURCE_PATH}}" && \
+        stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
+
+                        log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
+                        log_file.flush()
+
+                        common.execute_shell_command_safe(command)
+
+            target.metadata.bCleaned = True
+
+        common.clear_print(f'|--> Package {name}: Cleaned. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
 
         common.delete_directory_recursive_safe(self.get_source_path(name))
         common.delete_file_safe(self.get_log_filepath(name))
 
-        self.lock.targets = list(filter(lambda x: x.target.name != name, self.lock.targets))
+        self.lock.flush()
         self.lock.save()
 
     def __init__(self):
