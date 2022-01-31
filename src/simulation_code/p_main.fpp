@@ -93,7 +93,6 @@ program p_main
     call s_initialize_global_parameters_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    PRINT *, "[MEMORY-DUMP] After: s_initialize_global_parameters_module"
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     
@@ -103,14 +102,12 @@ program p_main
     call s_initialize_riemann_solvers_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    PRINT *, "[MEMORY-DUMP] After: s_initialize_riemann_solvers_module"
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
     call s_initialize_rhs_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    PRINT *, "[MEMORY-DUMP] After: s_initialize_rhs_module"
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     
@@ -119,7 +116,6 @@ program p_main
     call s_initialize_time_steppers_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    PRINT *, "[MEMORY-DUMP] After: s_initialize_time_steppers_module"
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)    
 
