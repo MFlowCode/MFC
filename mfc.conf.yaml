@@ -1,3 +1,9 @@
+# TODO:
+# - Add slug/name convention
+# - NVHPC version check
+# - Add tree to mfc.py output
+# - mfc.py refactor internal(s)/boostrap.py
+
 compilers:
   c:       mpicc
   cpp:     mpicxx
@@ -13,6 +19,8 @@ configurations:
     c:       -O3
     cpp:     -O3
     fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+  checks:
+
 - name: debug-cpu
   flags:
     c:       -Og -g
@@ -20,8 +28,8 @@ configurations:
     fortran: -Og -g -cpp -w
 - name: debug-gpu
   flags:
-    c:       -O3
-    cpp:     -O3
+    c:       -Og
+    cpp:     -Og
     fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 targets:
 - name: FFTW3
@@ -120,8 +128,7 @@ targets:
 - name: MFC
   fetch:
     method: collection
-    params:
-      test:
+    params: null
   depends:
   - MFC_PreProcess
   - MFC_Simulation
