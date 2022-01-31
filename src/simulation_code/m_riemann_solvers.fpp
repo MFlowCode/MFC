@@ -1594,7 +1594,7 @@ contains
 
                             ! Geometrical source flux for cylindrical coordinates
 
-    #:if (NORM_DIR == 2)
+#:if (NORM_DIR == 2)
                             if (cyl_coord) then
                                 ! Substituting the advective flux into the inviscid geometrical source flux
             !$acc loop seq
@@ -1619,9 +1619,9 @@ contains
                                     flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
                                 end do
                             end if
-    #:endif
-
-                            if (grid_geometry == 3 .and. norm_dir == 3) then
+#:endif
+#:if (NORM_DIR == 3)
+                            if (grid_geometry == 3) then
                                 !$acc loop seq 
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
@@ -1638,7 +1638,8 @@ contains
                                                                       (1d0 - dir_flg(dir_idx(1)))* &
                                                                       vel_R_acc(dir_idx(1))) - vel_R_acc(dir_idx(1)))))
                                         flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxe) = flux_rs${XYZ}$_vf_flat(j, k, l, momxb + 1)
-                           end if
+                            end if
+#:endif
                         end do
                     end do
                 end do
@@ -1971,7 +1972,8 @@ contains
                                     end do
                                 end if
 #:endif
-                                if (grid_geometry == 3 .and. norm_dir == 3) then
+#:if (NORM_DIR == 3)
+                                if (grid_geometry == 3) then
                                     !$acc loop seq 
                                     do i = 1, sys_size
                                         flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
@@ -1992,6 +1994,7 @@ contains
 
 
                                 end if
+#:endif
                             end do
                         end do
                     end do
@@ -2252,8 +2255,8 @@ contains
 
                                 ! Geometrical source flux for cylindrical coordinates
 
-
-                                if (cyl_coord .and. norm_dir == 2) then
+#:if (NORM_DIR == 2)
+                                if (cyl_coord) then
                                     !Substituting the advective flux into the inviscid geometrical source flux
     !$acc loop seq 
                                     do i = 1, E_idx
@@ -2276,9 +2279,10 @@ contains
                                     do i = advxb, advxe
                                         flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
                                     end do
-                                end if 
-                                
-                                if (grid_geometry == 3 .and. norm_dir == 3) then
+                                end if
+#:endif
+#:if (NORM_DIR == 3)                
+                                if (grid_geometry == 3) then
                                     !$acc loop seq 
                                     do i = 1, sys_size
                                         flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
@@ -2299,6 +2303,7 @@ contains
 
     
                                 end if
+#:endif
                             end do
                         end do
                     end do 
