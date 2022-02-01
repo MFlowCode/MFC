@@ -275,34 +275,34 @@ contains
             s = p; s_cb => z_cb; bc_s = bc_z
         end if
 
+#:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
         ! Computing WENO3 Coefficients =====================================
-        if(weno_dir == 1) then
+        if(weno_dir == ${WENO_DIR}$) then
             if (weno_order == 3) then
-
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_x(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_${XYZ}$(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i) - s_cb(i + 2))
-                    poly_coef_cbR_x(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
+                    poly_coef_cbR_${XYZ}$(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
                                                (s_cb(i - 1) - s_cb(i + 1))
 
-                    poly_coef_cbL_x(i + 1, 0, 0) = -poly_coef_cbR_x(i + 1, 0, 0 )
-                    poly_coef_cbL_x(i + 1, 1, 0) = -poly_coef_cbR_x(i + 1, 1, 0 )
+                    poly_coef_cbL_${XYZ}$(i + 1, 0, 0) = -poly_coef_cbR_${XYZ}$(i + 1, 0, 0 )
+                    poly_coef_cbL_${XYZ}$(i + 1, 1, 0) = -poly_coef_cbR_${XYZ}$(i + 1, 1, 0 )
 
-                    d_cbR_x(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
+                    d_cbR_${XYZ}$(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
-                    d_cbL_x(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
+                    d_cbL_${XYZ}$(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
                                     (s_cb(i - 1) - s_cb(i + 2))
 
-                    d_cbR_x( 1, i+1) = 1d0 - d_cbR_x(0, i + 1)
-                    d_cbL_x( 1, i+1) = 1d0 - d_cbL_x(0, i + 1)
+                    d_cbR_${XYZ}$( 1, i+1) = 1d0 - d_cbR_${XYZ}$(0, i + 1)
+                    d_cbL_${XYZ}$( 1, i+1) = 1d0 - d_cbL_${XYZ}$(0, i + 1)
 
-                    d_cbR_x( 2, i+1) = 0d0
-                    d_cbL_x( 2, i+1) = 0d0
+                    d_cbR_${XYZ}$( 2, i+1) = 0d0
+                    d_cbL_${XYZ}$( 2, i+1) = 0d0
 
-                    beta_coef_x(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_${XYZ}$(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i) - s_cb(i + 2))**2d0
-                    beta_coef_x(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
+                    beta_coef_${XYZ}$(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i - 1) - s_cb(i + 1))**2d0
 
                 end do
@@ -315,13 +315,13 @@ contains
                 ! the WENO reconstruction
                 if (null_weights) then
                     if (bc_s%beg == -4) then
-                        d_cbR_x(1, 0) = 0d0; d_cbR_x(0, 0) = 1d0
-                        d_cbL_x(1, 0) = 0d0; d_cbL_x(0, 0) = 1d0
+                        d_cbR_${XYZ}$(1, 0) = 0d0; d_cbR_${XYZ}$(0, 0) = 1d0
+                        d_cbL_${XYZ}$(1, 0) = 0d0; d_cbL_${XYZ}$(0, 0) = 1d0
                     end if
 
                     if (bc_s%end == -4) then
-                        d_cbR_x(0, s) = 0d0; d_cbR_x(1, s) = 1d0
-                        d_cbL_x(0, s) = 0d0; d_cbL_x(1, s) = 1d0
+                        d_cbR_${XYZ}$(0, s) = 0d0; d_cbR_${XYZ}$(1, s) = 1d0
+                        d_cbL_${XYZ}$(0, s) = 0d0; d_cbL_${XYZ}$(1, s) = 1d0
                     end if
                 end if
                 ! END: Computing WENO3 Coefficients ================================
@@ -331,71 +331,71 @@ contains
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                    poly_coef_cbR_x(i + 1, 0, 0) = &
+                    poly_coef_cbR_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbR_x(i + 1, 1, 0) = &
+                    poly_coef_cbR_${XYZ}$(i + 1, 1, 0) = &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
-                    poly_coef_cbR_x(i + 1, 1, 1) = &
+                    poly_coef_cbR_${XYZ}$(i + 1, 1, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbR_x(i + 1, 2, 1) = &
+                    poly_coef_cbR_${XYZ}$(i + 1, 2, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-                    poly_coef_cbL_x(i + 1, 0, 0) = &
+                    poly_coef_cbL_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbL_x(i + 1, 1, 0) = &
+                    poly_coef_cbL_${XYZ}$(i + 1, 1, 0) = &
                         ((s_cb(i) - s_cb(i - 1))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 2)))
-                    poly_coef_cbL_x(i + 1, 1, 1) = &
+                    poly_coef_cbL_${XYZ}$(i + 1, 1, 1) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbL_x(i + 1, 2, 1) = &
+                    poly_coef_cbL_${XYZ}$(i + 1, 2, 1) = &
                         ((s_cb(i - 1) - s_cb(i))*(s_cb(i) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
 
-                    poly_coef_cbR_x(i + 1, 0, 1) = &
+                    poly_coef_cbR_${XYZ}$(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i) - s_cb(i + 1)))
-                    poly_coef_cbR_x(i + 1, 2, 0) = &
+                    poly_coef_cbR_${XYZ}$(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i + 1)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 2)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_x(i + 1, 0, 1) = &
+                    poly_coef_cbL_${XYZ}$(i + 1, 0, 1) = &
                         ((s_cb(i) - s_cb(i + 2)) + (s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
                         ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_x(i + 1, 2, 0) = &
+                    poly_coef_cbL_${XYZ}$(i + 1, 2, 0) = &
                         ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))* &
                         ((s_cb(i) - s_cb(i + 1)))
 
-                    d_cbR_x(0, i+1) = &
+                    d_cbR_${XYZ}$(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbR_x(2, i+1) = &
+                    d_cbR_${XYZ}$(2, i+1) = &
                         ((s_cb(i + 1) - s_cb(i + 2))*(s_cb(i + 1) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-                    d_cbL_x(0, i+1) = &
+                    d_cbL_${XYZ}$(0, i+1) = &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbL_x(2, i+1) = &
+                    d_cbL_${XYZ}$(2, i+1) = &
                         ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
                         ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
 
-                    d_cbR_x(1, i+1) = 1d0 - d_cbR_x(0, i+1) - d_cbR_x(2, i+1)
-                    d_cbL_x(1, i+1) = 1d0 - d_cbL_x(0, i+1) - d_cbL_x(2, i+1)
+                    d_cbR_${XYZ}$(1, i+1) = 1d0 - d_cbR_${XYZ}$(0, i+1) - d_cbR_${XYZ}$(2, i+1)
+                    d_cbL_${XYZ}$(1, i+1) = 1d0 - d_cbL_${XYZ}$(0, i+1) - d_cbL_${XYZ}$(2, i+1)
 
-                    beta_coef_x(i + 1, 0, 0) = &
+                    beta_coef_${XYZ}$(i + 1, 0, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
                     s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
 
-                    beta_coef_x(i + 1, 0, 1) = &
+                    beta_coef_${XYZ}$(i + 1, 0, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
                     s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
@@ -403,20 +403,20 @@ contains
                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
                     s_cb(i + 1)))
 
-                    beta_coef_x(i + 1, 0, 2) = &
+                    beta_coef_${XYZ}$(i + 1, 0, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
                     s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
 
-                    beta_coef_x(i + 1, 1, 0) = &
+                    beta_coef_${XYZ}$(i + 1, 1, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
 
-                    beta_coef_x(i + 1, 1, 1) = &
+                    beta_coef_${XYZ}$(i + 1, 1, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
                     s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
                     s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
@@ -424,14 +424,14 @@ contains
                     s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
                     s_cb(i)))
 
-                    beta_coef_x(i + 1, 1, 2) = &
+                    beta_coef_${XYZ}$(i + 1, 1, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
                     ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 2))**2d0)
 
-                    beta_coef_x(i + 1, 2, 0) = &
+                    beta_coef_${XYZ}$(i + 1, 2, 0) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
                     s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
@@ -439,7 +439,7 @@ contains
                     ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                     s_cb(i + 1))**2d0)
 
-                    beta_coef_x(i + 1, 2, 1) = &
+                    beta_coef_${XYZ}$(i + 1, 2, 1) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
                     s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
@@ -447,7 +447,7 @@ contains
                     s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
                     s_cb(i - 1)))
 
-                    beta_coef_x(i + 1, 2, 2) = &
+                    beta_coef_${XYZ}$(i + 1, 2, 2) = &
                     4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
                     s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
@@ -462,425 +462,24 @@ contains
                 ! the WENO reconstruction
                 if (null_weights) then
                     if (bc_s%beg == -4) then
-                        d_cbR_x(1:2, 0) = 0d0; d_cbR_x(0, 0) = 1d0
-                        d_cbL_x(1:2, 0) = 0d0; d_cbL_x(0, 0) = 1d0
-                        d_cbR_x(2, 1) = 0d0; d_cbR_x(:, 1) = d_cbR_x(:, 1)/sum(d_cbR_x(:, 1))
-                        d_cbL_x(2, 1) = 0d0; d_cbL_x(:, 1) = d_cbL_x(:, 1)/sum(d_cbL_x(:, 1))
+                        d_cbR_${XYZ}$(1:2, 0) = 0d0; d_cbR_${XYZ}$(0, 0) = 1d0
+                        d_cbL_${XYZ}$(1:2, 0) = 0d0; d_cbL_${XYZ}$(0, 0) = 1d0
+                        d_cbR_${XYZ}$(2, 1) = 0d0; d_cbR_${XYZ}$(:, 1) = d_cbR_${XYZ}$(:, 1)/sum(d_cbR_${XYZ}$(:, 1))
+                        d_cbL_${XYZ}$(2, 1) = 0d0; d_cbL_${XYZ}$(:, 1) = d_cbL_${XYZ}$(:, 1)/sum(d_cbL_${XYZ}$(:, 1))
                     end if
 
                     if (bc_s%end == -4) then
-                        d_cbR_x(0, s - 1) = 0d0; d_cbR_x(:, s - 1) = d_cbR_x(:, s - 1)/sum(d_cbR_x(:, s - 1))
-                        d_cbL_x(0, s - 1) = 0d0; d_cbL_x(:, s - 1) = d_cbL_x(:, s - 1)/sum(d_cbL_x(:, s - 1))
-                        d_cbR_x(0:1, s) = 0d0; d_cbR_x(2, s) = 1d0
-                        d_cbL_x(0:1, s) = 0d0; d_cbL_x(2, s) = 1d0
+                        d_cbR_${XYZ}$(0, s - 1) = 0d0; d_cbR_${XYZ}$(:, s - 1) = d_cbR_${XYZ}$(:, s - 1)/sum(d_cbR_${XYZ}$(:, s - 1))
+                        d_cbL_${XYZ}$(0, s - 1) = 0d0; d_cbL_${XYZ}$(:, s - 1) = d_cbL_${XYZ}$(:, s - 1)/sum(d_cbL_${XYZ}$(:, s - 1))
+                        d_cbR_${XYZ}$(0:1, s) = 0d0; d_cbR_${XYZ}$(2, s) = 1d0
+                        d_cbL_${XYZ}$(0:1, s) = 0d0; d_cbL_${XYZ}$(2, s) = 1d0
                     end if
                 end if
-
             end if
-        elseif(weno_dir == 2) then
-            if (weno_order == 3) then
+        endif
+#:endfor
 
-                do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-
-                    poly_coef_cbR_y(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
-                                               (s_cb(i) - s_cb(i + 2))
-                    poly_coef_cbR_y(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
-                                               (s_cb(i - 1) - s_cb(i + 1))
-
-                    poly_coef_cbL_y(i + 1, 0, 0) = -poly_coef_cbR_y(i + 1, 0, 0 )
-                    poly_coef_cbL_y(i + 1, 1, 0) = -poly_coef_cbR_y(i + 1, 1, 0 )
-
-                    d_cbR_y(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
-                                    (s_cb(i - 1) - s_cb(i + 2))
-                    d_cbL_y(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
-                                    (s_cb(i - 1) - s_cb(i + 2))
-
-                    d_cbR_y( 1, i+1) = 1d0 - d_cbR_y(0, i + 1)
-                    d_cbL_y( 1, i+1) = 1d0 - d_cbL_y(0, i + 1)
-
-                    d_cbR_y( 2, i+1) = 0d0
-                    d_cbL_y( 2, i+1) = 0d0
-
-                    beta_coef_y(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
-                                             (s_cb(i) - s_cb(i + 2))**2d0
-                    beta_coef_y(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
-                                             (s_cb(i - 1) - s_cb(i + 1))**2d0
-
-                end do
-
-
-
-                ! Modifying the ideal weights coefficients in the neighborhood
-                ! of beginning and end Riemann state eytrapolation BC to avoid
-                ! any contributions from outside of the physical domain during
-                ! the WENO reconstruction
-                if (null_weights) then
-                    if (bc_s%beg == -4) then
-                        d_cbR_y(1, 0) = 0d0; d_cbR_y(0, 0) = 1d0
-                        d_cbL_y(1, 0) = 0d0; d_cbL_y(0, 0) = 1d0
-                    end if
-
-                    if (bc_s%end == -4) then
-                        d_cbR_y(0, s) = 0d0; d_cbR_y(1, s) = 1d0
-                        d_cbL_y(0, s) = 0d0; d_cbL_y(1, s) = 1d0
-                    end if
-                end if
-                ! END: Computing WENO3 Coefficients ================================
-
-                ! Computing WENO5 Coefficients =====================================
-            else
-
-                do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-
-                    poly_coef_cbR_y(i + 1, 0, 0) = &
-                        ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
-                        ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbR_y(i + 1, 1, 0) = &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
-                    poly_coef_cbR_y(i + 1, 1, 1) = &
-                        ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbR_y(i + 1, 2, 1) = &
-                        ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-                    poly_coef_cbL_y(i + 1, 0, 0) = &
-                        ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
-                        ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbL_y(i + 1, 1, 0) = &
-                        ((s_cb(i) - s_cb(i - 1))*(s_cb(i) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 2)))
-                    poly_coef_cbL_y(i + 1, 1, 1) = &
-                        ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbL_y(i + 1, 2, 1) = &
-                        ((s_cb(i - 1) - s_cb(i))*(s_cb(i) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-
-                    poly_coef_cbR_y(i + 1, 0, 1) = &
-                        ((s_cb(i) - s_cb(i + 2)) + (s_cb(i + 1) - s_cb(i + 3)))/ &
-                        ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
-                        ((s_cb(i) - s_cb(i + 1)))
-                    poly_coef_cbR_y(i + 1, 2, 0) = &
-                        ((s_cb(i - 2) - s_cb(i + 1)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 2)))* &
-                        ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_y(i + 1, 0, 1) = &
-                        ((s_cb(i) - s_cb(i + 2)) + (s_cb(i) - s_cb(i + 3)))/ &
-                        ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
-                        ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_y(i + 1, 2, 0) = &
-                        ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))* &
-                        ((s_cb(i) - s_cb(i + 1)))
-
-                    d_cbR_y(0, i+1) = &
-                        ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbR_y(2, i+1) = &
-                        ((s_cb(i + 1) - s_cb(i + 2))*(s_cb(i + 1) - s_cb(i + 3)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-                    d_cbL_y(0, i+1) = &
-                        ((s_cb(i - 2) - s_cb(i))*(s_cb(i) - s_cb(i - 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbL_y(2, i+1) = &
-                        ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-
-                    d_cbR_y(1, i+1) = 1d0 - d_cbR_y(0, i+1) - d_cbR_y(2, i+1)
-                    d_cbL_y(1, i+1) = 1d0 - d_cbL_y(0, i+1) - d_cbL_y(2, i+1)
-
-                    beta_coef_y(i + 1, 0, 0) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                    s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
-                    s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
-
-                    beta_coef_y(i + 1, 0, 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
-                    s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
-                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
-                    s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
-                    s_cb(i + 1)))
-
-                    beta_coef_y(i + 1, 0, 2) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
-                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
-                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
-                    s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
-
-                    beta_coef_y(i + 1, 1, 0) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
-                    s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
-
-                    beta_coef_y(i + 1, 1, 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
-                    s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
-                    s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
-                    s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
-                    s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
-                    s_cb(i)))
-
-                    beta_coef_y(i + 1, 1, 2) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                    s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
-                    ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                    s_cb(i + 2))**2d0)
-
-                    beta_coef_y(i + 1, 2, 0) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
-                    s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
-                    (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
-                    ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                    s_cb(i + 1))**2d0)
-
-                    beta_coef_y(i + 1, 2, 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
-                    s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
-                    s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
-                    s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
-                    s_cb(i - 1)))
-
-                    beta_coef_y(i + 1, 2, 2) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
-                    s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
-
-                end do
-
-
-                ! Modifying the ideal weights coefficients in the neighborhood
-                ! of beginning and end Riemann state eytrapolation BC to avoid
-                ! any contributions from outside of the physical domain during
-                ! the WENO reconstruction
-                if (null_weights) then
-                    if (bc_s%beg == -4) then
-                        d_cbR_y(1:2, 0) = 0d0; d_cbR_y(0, 0) = 1d0
-                        d_cbL_y(1:2, 0) = 0d0; d_cbL_y(0, 0) = 1d0
-                        d_cbR_y(2, 1) = 0d0; d_cbR_y(:, 1) = d_cbR_y(:, 1)/sum(d_cbR_y(:, 1))
-                        d_cbL_y(2, 1) = 0d0; d_cbL_y(:, 1) = d_cbL_y(:, 1)/sum(d_cbL_y(:, 1))
-                    end if
-
-                    if (bc_s%end == -4) then
-                        d_cbR_y(0, s - 1) = 0d0; d_cbR_y(:, s - 1) = d_cbR_y(:, s - 1)/sum(d_cbR_y(:, s - 1))
-                        d_cbL_y(0, s - 1) = 0d0; d_cbL_y(:, s - 1) = d_cbL_y(:, s - 1)/sum(d_cbL_y(:, s - 1))
-                        d_cbR_y(0:1, s) = 0d0; d_cbR_y(2, s) = 1d0
-                        d_cbL_y(0:1, s) = 0d0; d_cbL_y(2, s) = 1d0
-                    end if
-                end if
-
-            end if
-        else
-            if (weno_order == 3) then
-
-                do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-
-                    poly_coef_cbR_z(i + 1, 0, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
-                                               (s_cb(i) - s_cb(i + 2))
-                    poly_coef_cbR_z(i + 1, 1, 0 ) = (s_cb(i) - s_cb(i + 1))/ &
-                                               (s_cb(i - 1) - s_cb(i + 1))
-
-                    poly_coef_cbL_z(i + 1, 0, 0) = -poly_coef_cbR_z(i + 1, 0, 0 )
-                    poly_coef_cbL_z(i + 1, 1, 0) = -poly_coef_cbR_z(i + 1, 1, 0 )
-
-                    d_cbR_z(0, i+1) = (s_cb(i - 1) - s_cb(i + 1))/ &
-                                    (s_cb(i - 1) - s_cb(i + 2))
-                    d_cbL_z(0, i+1) = (s_cb(i - 1) - s_cb(i))/ &
-                                    (s_cb(i - 1) - s_cb(i + 2))
-
-                    d_cbR_z( 1, i+1) = 1d0 - d_cbR_z(0, i + 1)
-                    d_cbL_z( 1, i+1) = 1d0 - d_cbL_z(0, i + 1)
-
-                    d_cbR_z( 2, i+1) = 0d0
-                    d_cbL_z( 2, i+1) = 0d0
-
-                    beta_coef_z(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
-                                             (s_cb(i) - s_cb(i + 2))**2d0
-                    beta_coef_z(i+1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
-                                             (s_cb(i - 1) - s_cb(i + 1))**2d0
-
-                end do
-
-
-
-                ! Modifying the ideal weights coefficients in the neighborhood
-                ! of beginning and end Riemann state eztrapolation BC to avoid
-                ! any contributions from outside of the physical domain during
-                ! the WENO reconstruction
-                if (null_weights) then
-                    if (bc_s%beg == -4) then
-                        d_cbR_z(1, 0) = 0d0; d_cbR_z(0, 0) = 1d0
-                        d_cbL_z(1, 0) = 0d0; d_cbL_z(0, 0) = 1d0
-                    end if
-
-                    if (bc_s%end == -4) then
-                        d_cbR_z(0, s) = 0d0; d_cbR_z(1, s) = 1d0
-                        d_cbL_z(0, s) = 0d0; d_cbL_z(1, s) = 1d0
-                    end if
-                end if
-                ! END: Computing WENO3 Coefficients ================================
-
-                ! Computing WENO5 Coefficients =====================================
-            else
-
-                do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-
-                    poly_coef_cbR_z(i + 1, 0, 0) = &
-                        ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
-                        ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbR_z(i + 1, 1, 0) = &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
-                    poly_coef_cbR_z(i + 1, 1, 1) = &
-                        ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbR_z(i + 1, 2, 1) = &
-                        ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-                    poly_coef_cbL_z(i + 1, 0, 0) = &
-                        ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
-                        ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    poly_coef_cbL_z(i + 1, 1, 0) = &
-                        ((s_cb(i) - s_cb(i - 1))*(s_cb(i) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 2)))
-                    poly_coef_cbL_z(i + 1, 1, 1) = &
-                        ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i - 1) - s_cb(i + 2)))
-                    poly_coef_cbL_z(i + 1, 2, 1) = &
-                        ((s_cb(i - 1) - s_cb(i))*(s_cb(i) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-
-                    poly_coef_cbR_z(i + 1, 0, 1) = &
-                        ((s_cb(i) - s_cb(i + 2)) + (s_cb(i + 1) - s_cb(i + 3)))/ &
-                        ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
-                        ((s_cb(i) - s_cb(i + 1)))
-                    poly_coef_cbR_z(i + 1, 2, 0) = &
-                        ((s_cb(i - 2) - s_cb(i + 1)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 2)))* &
-                        ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_z(i + 1, 0, 1) = &
-                        ((s_cb(i) - s_cb(i + 2)) + (s_cb(i) - s_cb(i + 3)))/ &
-                        ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))* &
-                        ((s_cb(i + 1) - s_cb(i)))
-                    poly_coef_cbL_z(i + 1, 2, 0) = &
-                        ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))* &
-                        ((s_cb(i) - s_cb(i + 1)))
-
-                    d_cbR_z(0, i+1) = &
-                        ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbR_z(2, i+1) = &
-                        ((s_cb(i + 1) - s_cb(i + 2))*(s_cb(i + 1) - s_cb(i + 3)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-                    d_cbL_z(0, i+1) = &
-                        ((s_cb(i - 2) - s_cb(i))*(s_cb(i) - s_cb(i - 1)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
-                    d_cbL_z(2, i+1) = &
-                        ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
-                        ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
-
-                    d_cbR_z(1, i+1) = 1d0 - d_cbR_z(0, i+1) - d_cbR_z(2, i+1)
-                    d_cbL_z(1, i+1) = 1d0 - d_cbL_z(0, i+1) - d_cbL_z(2, i+1)
-
-                    beta_coef_z(i + 1, 0, 0) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                    s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
-                    s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
-
-                    beta_coef_z(i + 1, 0, 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
-                    s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
-                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
-                    s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
-                    s_cb(i + 1)))
-
-                    beta_coef_z(i + 1, 0, 2) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
-                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
-                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
-                    s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
-
-                    beta_coef_z(i + 1, 1, 0) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
-                    s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
-
-                    beta_coef_z(i + 1, 1, 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
-                    s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
-                    s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
-                    s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
-                    s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
-                    s_cb(i)))
-
-                    beta_coef_z(i + 1, 1, 2) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                    s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
-                    ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                    s_cb(i + 2))**2d0)
-
-                    beta_coef_z(i + 1, 2, 0) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
-                    s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
-                    (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
-                    ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                    s_cb(i + 1))**2d0)
-
-                    beta_coef_z(i + 1, 2, 1) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
-                    s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
-                    s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
-                    s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
-                    s_cb(i - 1)))
-
-                    beta_coef_z(i + 1, 2, 2) = &
-                    4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                    s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
-                    s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
-
-                end do
-
-
-                ! Modifying the ideal weights coefficients in the neighborhood
-                ! of beginning and end Riemann state eztrapolation BC to avoid
-                ! any contributions from outside of the physical domain during
-                ! the WENO reconstruction
-                if (null_weights) then
-                    if (bc_s%beg == -4) then
-                        d_cbR_z(1:2, 0) = 0d0; d_cbR_z(0, 0) = 1d0
-                        d_cbL_z(1:2, 0) = 0d0; d_cbL_z(0, 0) = 1d0
-                        d_cbR_z(2, 1) = 0d0; d_cbR_z(:, 1) = d_cbR_z(:, 1)/sum(d_cbR_z(:, 1))
-                        d_cbL_z(2, 1) = 0d0; d_cbL_z(:, 1) = d_cbL_z(:, 1)/sum(d_cbL_z(:, 1))
-                    end if
-
-                    if (bc_s%end == -4) then
-                        d_cbR_z(0, s - 1) = 0d0; d_cbR_z(:, s - 1) = d_cbR_z(:, s - 1)/sum(d_cbR_z(:, s - 1))
-                        d_cbL_z(0, s - 1) = 0d0; d_cbL_z(:, s - 1) = d_cbL_z(:, s - 1)/sum(d_cbL_z(:, s - 1))
-                        d_cbR_z(0:1, s) = 0d0; d_cbR_z(2, s) = 1d0
-                        d_cbL_z(0:1, s) = 0d0; d_cbL_z(2, s) = 1d0
-                    end if
-                end if
-
-            end if
-        end if
-        ! END: Computing WENO5 Coefficients ================================
+! END: Computing WENO5 Coefficients ================================
         if(weno_dir == 1) then
 !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
         elseif(weno_dir == 2) then
@@ -895,49 +494,6 @@ contains
         nullify (s_cb)
 
     end subroutine s_compute_weno_coefficients ! ---------------------------
-
-    !>  The purpose of the procedure is to associate the WENO
-        !!      coefficients' pointers with their appropriate targets,
-        !!      based on the coordinate direction and the location of
-        !!      the WENO reconstruction.
-        !! @param weno_dir Coordinate direction of the WENO reconstruction
-    subroutine s_associate_weno_coefficients_pointers(weno_dir)
-
-        integer, intent(IN) :: weno_dir
-
-        ! Associating WENO Coefficients in x-direction =====================
-        if (weno_dir == 1) then
-
-            poly_coef_L => poly_coef_cbL_x
-            poly_coef_R => poly_coef_cbR_x
-            d_L => d_cbL_x
-            d_R => d_cbR_x
-            beta_coef => beta_coef_x
-
-        ! Associating WENO Coefficients in y-direction =====================
-        elseif (weno_dir == 2) then
-
-            poly_coef_L => poly_coef_cbL_y
-            poly_coef_R => poly_coef_cbR_y
-            d_L => d_cbL_y
-            d_R => d_cbR_y
-            beta_coef => beta_coef_y
-
-        ! Associating WENO Coefficients in z-direction =====================
-        else
-
-            poly_coef_L => poly_coef_cbL_z
-            poly_coef_R => poly_coef_cbR_z
-            d_L => d_cbL_z
-            d_R => d_cbR_z
-            beta_coef => beta_coef_z
-
-        end if
-        ! ==================================================================
-
-
-    end subroutine s_associate_weno_coefficients_pointers ! ----------------
-
 
        subroutine s_weno_alt(v_vf,  vL_rs_vf_x_flat, vL_rs_vf_y_flat, vL_rs_vf_z_flat, vR_rs_vf_x_flat, vR_rs_vf_y_flat, vR_rs_vf_z_flat, & ! -------------------
                       norm_dir, weno_dir,  &
