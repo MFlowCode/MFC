@@ -66,7 +66,7 @@ fi
 source "$PYTHON_VENV_DIR"/bin/activate
 
 # Fetch required Python modules
-declare -a REQUIRED_PYTHON_MODULES=("yaml,pyyaml" "colorama,colorama" "fypp,fypp")
+declare -a REQUIRED_PYTHON_MODULES=("argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "colorama,colorama" "fypp,fypp")
 
 for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
     import_name=$(echo $module | tr ',' '\n' | head -n 1)
