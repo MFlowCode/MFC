@@ -5,6 +5,8 @@ import sys
 import glob
 import copy
 import shutil
+import filecmp
+import pathlib
 import colorama
 import dataclasses
 import urllib.request
@@ -167,7 +169,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         return True
 
-    def build_target__clean_previous(self, name: str):
+    def build_target__clean_previous(self, name: str, current_depth: int = 0):
         compiler_cfg = self.conf.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
         if not self.lock.does_unique_target_exist(name, compiler_cfg.name):
             return
@@ -180,7 +182,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
             ) or (self.args.tree_get("scratch"))):
             common.delete_directory_recursive_safe(f'{common.MFC_SUBDIR}/{lock_desc.metadata.compiler_configuration}/src/{name}')
 
-    def build_target__fetch(self, name: str, logfile: io.IOBase):
+    def build_target__fetch(self, name: str, logfile: io.IOBase, current_depth: int = 0):
         compiler_cfg = self.conf.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
         conf = self.conf.get_target(name)
 
@@ -237,11 +239,11 @@ If you think MFC could (or should) be able to find it automatically for you syst
         else:
             raise common.MFCException(f'Dependency type "{conf.fetch.method}" is unsupported.')
 
-    def build_target__build(self, name: str, logfile: io.IOBase):
+    def build_target__build(self, name: str, logfile: io.IOBase, current_depth: int = 0):
         conf = self.conf.get_target(name)
 
         if conf.fetch.method in ["clone", "download", "source"]:
-            for cmd_idx, command in enumerate(conf.build):
+            for cmd_idx, command in enumerate(conf.build.commands):
                 command = self.string_replace(name, f"""\
 cd "${{SOURCE_PATH}}" && \
 PYTHON="python3" PYTHON_CPPFLAGS="$PYTHON_CPPFLAGS $(python3-config --includes) $(python3-config --libs)" \
@@ -250,7 +252,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 logfile.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
                 logfile.flush()
 
-                common.clear_print(f'|--> Package {name}: Building [{cmd_idx+1}/{len(conf.build)}] (Logging to {logfile.name})...', end='\r')
+                common.clear_print(f'|--> Package {name}: Building [{cmd_idx+1}/{len(conf.build.commands)}] (Logging to {logfile.name})...', end='\r')
 
                 def cmd_on_error():
                     print(logfile.read())
@@ -265,7 +267,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             raise common.MFCException(f'Unknown target type "{conf.fetch.method}".')
 
 
-    def build_target__update_lock(self, name: str):
+    def build_target__update_lock(self, name: str, current_depth: int = 0):
         compiler_cfg = self.conf.get_target_configuration(name, self.args["compiler_configuration"])
         conf = self.conf.get_target(name)
 
@@ -290,25 +292,25 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         self.lock.save()
 
-    def build_target(self, name: str):
+    def build_target(self, name: str, current_depth: int = 0):
         # Check if it needs to be (re)built
         if self.is_build_satisfied(name):
             common.clear_print(f'|--> Package {name}: Nothing to do ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
             return False
 
         # Build its dependencies
-        for dependency_names in self.conf.get_dependency_names(name, recursive=False):
-            self.build_target(dependency_names)
+        for dependency_name in self.conf.get_dependency_names(name, recursive=False):
+            self.build_target(dependency_name, current_depth=current_depth+1)
 
         common.clear_print(f'|--> Package {name}: Preparing build...', end='\r')
 
         common.create_file_safe(self.get_log_filepath(name))
 
         with open(self.get_log_filepath(name), "r+") as logfile:
-            self.build_target__clean_previous(name)          # Clean any old build artifacts
-            self.build_target__fetch         (name, logfile) # Fetch Source Code
-            self.build_target__build         (name, logfile) # Build
-            self.build_target__update_lock   (name)          # Update LOCK
+            self.build_target__clean_previous(name,          current_depth) # Clean any old build artifacts
+            self.build_target__fetch         (name, logfile, current_depth) # Fetch Source Code
+            self.build_target__build         (name, logfile, current_depth) # Build
+            self.build_target__update_lock   (name,          current_depth) # Update LOCK
 
         common.clear_print(f'|--> Package {name}: Done. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
 
@@ -367,7 +369,7 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         target = self.lock.get_target(name, self.args["compiler_configuration"])
         
         if not target.metadata.bCleaned:
-            if os.path.isdir(elf.string_replace(name, "${SOURCE_PATH}")):
+            if os.path.isdir(self.string_replace(name, "${SOURCE_PATH}")):
                 with open(self.get_log_filepath(name), "a") as log_file:
                     for cmd_idx, command in enumerate(target.target.clean):
                         common.clear_print(f'|--> Package {name}: Cleaning [{cmd_idx+1}/{len(target.target.clean)}] (Logging to {log_file.name})...', end='\r')

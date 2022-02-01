@@ -1,9 +1,3 @@
-# TODO:
-# - Add slug/name convention
-# - NVHPC version check
-# - Add tree to mfc.py output
-# - mfc.py refactor internal(s)/boostrap.py
-
 compilers:
   c:       mpicc
   cpp:     mpicxx
@@ -19,8 +13,6 @@ configurations:
     c:       -O3
     cpp:     -O3
     fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
-  checks:
-
 - name: debug-cpu
   flags:
     c:       -Og -g
@@ -40,9 +32,10 @@ targets:
       version: 3.3.10
       link:    http://www.fftw.org/fftw-${VERSION}.tar.gz
   build:
-  - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-  - make install
+    commands:
+    - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
+    - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    - make install
   test: []
 
 - name: HDF5
@@ -53,9 +46,10 @@ targets:
       git:  https://github.com/HDFGroup/hdf5
       hash: 4aa40365623cf35643b262781f92578220c42bbb
   build:
-  - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
-  - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-  - make install prefix="${INSTALL_PATH}"
+    commands:
+    - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
+    - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    - make install prefix="${INSTALL_PATH}"
   test: []
 
 - name: SILO
@@ -68,13 +62,14 @@ targets:
       git:  https://github.com/LLNL/Silo
       hash: 9e3a31fbf661c4d26e9f5272287e5ff41971d117
   build:
-  - >-
-    ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
-    --disable-hzip --disable-fpzip --disable-silex
-    --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
-    ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
-  - make ${MAKE_OPTIONS}
-  - make install prefix="${INSTALL_PATH}"
+    commands:
+    - >-
+      ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
+      --disable-hzip --disable-fpzip --disable-silex
+      --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
+      ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
+    - make ${MAKE_OPTIONS}
+    - make install prefix="${INSTALL_PATH}"
   test: []
 
 - name: MFC_PreProcess
@@ -84,11 +79,12 @@ targets:
     params:
       source: ${MFC_ROOT_PATH}/src/pre_process_code
   clean:
-  - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}" clean
+  - make INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}" clean
   build:
-  - >-
-    /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}"
-    ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    commands:
+    - >-
+      make INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}"
+      ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
   test: []
 
 - name: MFC_Simulation
@@ -99,12 +95,13 @@ targets:
     params:
       source: ${MFC_ROOT_PATH}/src/simulation_code
   clean:
-  - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}" clean
+  - make INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}" clean
   build:
-  - >-
-    /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
-    ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-    FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+    commands:
+    - >-
+      make INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
+      ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+      FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
 - name: MFC_PostProcess
@@ -117,12 +114,13 @@ targets:
     params:
       source: ${MFC_ROOT_PATH}/src/post_process_code
   clean:
-  - /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}" clean
+  - make INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}" clean
   build:
-  - >-
-    /usr/bin/env bash "${MFC_ROOT_PATH}/bootstrap/prepare_make.sh" INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}"
-    ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-    FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+    commands:
+    - >-
+      make INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}"
+      ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+      FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
   test: []
 
 - name: MFC
@@ -134,6 +132,7 @@ targets:
   - MFC_Simulation
   - MFC_PostProcess
   collection:
-  build: []
+  build:
+    commands: []
   test:
   - cd "${MFC_ROOT_PATH}" && /usr/bin/env bash "tests/checks.sh"
