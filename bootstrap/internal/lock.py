@@ -1,35 +1,66 @@
 import os
 
-import internal.common as common
+import internal.common      as common
+import internal.configfiles as configfiles
+import internal.conf        as conf
 
-class MFCLock:
+from dataclasses import dataclass
+import dataclasses
+
+@dataclass
+class LockTargetMetadata:
+    bCleaned: bool
+    compiler_configuration: str
+
+    def __init__(self, data):
+        self.bCleaned = data.get("bCleaned", False)
+        self.compiler_configuration = data["compiler_configuration"]
+
+@dataclass
+class LockTargetHolder:
+    target:   conf.Target
+    metadata: LockTargetMetadata
+
+    def __init__(self, data):
+        self.target   = conf.Target(data["target"])
+        self.metadata = LockTargetMetadata(data["metadata"])
+
+@dataclass
+class MFCLock(configfiles.ConfigFileBase):
+    targets: list
+
     def __init__(self):
-        if not os.path.exists(common.MFC_LOCK_FILEPATH):
-            with open(common.MFC_LOCK_FILEPATH, 'w') as f:
-                f.write("targets: []")
+        super().__init__(common.MFC_LOCK_FILEPATH, {"targets": []})
 
-        self.data = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
+        self.data    = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
+        self.targets = []
 
-    def __getitem__(self, key: str, default=None):
-        if key not in self.data:
-            if default==None:
-                raise common.MFCException(f'MFCLock: Key "{key}" doesn\'t exist.')
-            else:
-                return default
+        for t in self.data["targets"]:
+            self.add_target(LockTargetHolder(t))
 
-        return self.data[key]
+        self.flush()
+
+    def flush(self):
+        self.data = dataclasses.asdict(self)
+
+    def add_target(self, target: LockTargetHolder):
+        self.targets.append(target)
+        self.flush()
+
+    def was_target_built(self, name: str, restrict_cc: str = None):
+        matches = self.get_target_matches(name, restrict_cc)
 
     def get_target_matches(self, name: str, restrict_cc: str = None):
         def peek_filter(e: dict):
-            if e["name"] != name:
+            if e.target.name != name:
                 return False
 
             if restrict_cc is None:
                 return True
 
-            return e.get("compiler_configuration", None) == restrict_cc
+            return e.metadata.compiler_configuration == restrict_cc
 
-        return list(filter(peek_filter, self["targets"]))
+        return list(filter(peek_filter, self.targets))
 
     def does_target_exist(self, name: str, restrict_cc: str = None):
         return len(self.get_target_matches(name, restrict_cc)) > 0
@@ -47,6 +78,3 @@ class MFCLock:
             raise common.MFCException(f'More than one dependency to choose from for "{name}" with restrict_cc="{restrict_cc}".')
 
         return matches[0]
-
-    def save(self):
-        common.file_dump_yaml(common.MFC_LOCK_FILEPATH, self.data)
