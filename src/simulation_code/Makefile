@@ -1,36 +1,37 @@
-# Find all source files, create a list of corresponding object files
-SRCS=$(wildcard *.f90)
-OBJS=$(patsubst %.f90,%.o,$(SRCS))
+FYPPS=$(wildcard *.fpp)
+F90S=$(patsubst %.fpp,%.f90,$(wildcard *.f90 *.fpp))
+OBJS=$(patsubst %.f90,%.o,$(F90S))
 
-# Ditto for mods (They will be in both lists)
-MODS=$(wildcard m*.f90)
-MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
+MOD_OBJS=$(patsubst %.fpp,%.o,$(patsubst %.f90,%.o,$(wildcard m*.f90 m*.fpp)))
 
-# Compiler/Linker settings
-EXEC = ../../.mfc/___current___/build/bin/MFC_Simulation
+EXEC = $(INSTALL_PATH)/bin/MFC_Simulation
 PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 
-# make without parameters will make first target found.
 all : $(PROGRAM)
 
-# Compiler steps for all objects
-$(OBJS) : %.o : %.f90
-	$(FC) $(FFLAGS) -c -o $@ $<
+define CREATE_FYPP_RULE
+$(2) : $(1)
+	fypp $(FYPPFLAGS) $(1) $(2)
+endef
 
-# Linker
+define CREATE_FC_RULE
+$(2) : $(1)
+	$(FC) $(FFLAGS) -c -o $(2) $< $(1)
+endef
+
+$(foreach l,$(FYPPS),$(eval $(call CREATE_FYPP_RULE,$(l),$(patsubst %.fpp,%.f90,$(l)))))
+$(foreach l,$(F90S), $(eval $(call CREATE_FC_RULE,  $(l),$(patsubst %.f90,%.o,  $(l)))))
+
 $(PROGRAM) : $(OBJS)
 	$(FC) $(OBJS) $(FFLAGS) -o $(EXEC)
+
+$(PRG_OBJ) : $(MOD_OBJS)
 
 .PHONY: all clean
 
 clean:
-	rm -rf $(OBJS) $(PROGRAM) $(EXEC)  $(patsubst %.o,%.mod,$(MOD_OBJS))
-
-# Dependencies
-
-# Main program depends on all modules
-$(PRG_OBJ) : $(MOD_OBJS)
+	rm -rf $(OBJS) $(PROGRAM) $(EXEC) $(patsubst %.o,%.mod,$(MOD_OBJS))
 
 # Modules depend on each other
 m_rhs.o :                  m_derived_types.o m_global_parameters.o m_variables_conversion.o m_mpi_proxy.o m_weno.o m_riemann_solvers.o m_cbc.o m_bubbles.o m_qbmm.o nvtx.o
