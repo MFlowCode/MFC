@@ -75,11 +75,24 @@ class Target_Fetch:
         else:
             raise MFCException(f"[mfc.conf.yaml]: '{target}' - Unrecognized fetch method '{method}'.")
 
+@dataclass
+class Target_Build_Options:
+    def __init__(self, data) -> None:
+        pass
+
+@dataclass
+class Target_Build:
+    commands: list
+    options:  Target_Build_Options
+
+    def __init__(self, data):
+        self.commands = data.get("commands", [])
+        self.options  = Target_Build_Options(data.get("options",  {}))
 
 @dataclass
 class Target:
     name:  str
-    build: list
+    build: Target_Build
     test:  list
     clean: list
     fetch: Target_Fetch
@@ -87,7 +100,7 @@ class Target:
 
     def __init__(self, data):
         self.name    = data["name"]
-        self.build   = data["build"]
+        self.build   = Target_Build(data.get("build", {}))
         self.depends = data.get("depends", [])
         self.test    = data.get("test",    [])
         self.clean   = data.get("clean",   [])
