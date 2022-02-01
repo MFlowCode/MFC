@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 
+
+# Script Constants
+MFC_DIR="./.mfc"
+MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
+PYTHON_VENV_DIR="$MFC_DIR/.venv"
+
+
 # Check whether this script was called from MFC's root directory.
 if [ ! -f ./bootstrap/delegate.py ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
     exit 1
 fi
+
+# Make bootstrap files executable
+chmod +x ./bootstrap/delegate.py
 
 # Check whether python3 is in the $PATH / is accessible.
 which python3 > /dev/null 2>&1
@@ -14,14 +24,20 @@ if (($?)); then
 fi
 
 # Check if Python is at least minimally functionnal.
-python3 -c 'print("")' > /dev/null
+python3 -c 'print("")' > /dev/null 2>&1
 if (($?)); then
     echo "[mfc.sh] Error: Python3 is present but can't execute a simple program. Please ensure that python3 is working."
     exit 1
 fi
 
-MFC_DIR="./.mfc"
-MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
+# CHeck Python's version for compatibility with bootstrap/*.py scripts
+PYTHON_MIN_MAJOR=3
+PYTHON_MIN_MINOR=6
+python3 -c "import sys; exit(int(not (sys.version_info[0]==$PYTHON_MIN_MAJOR and sys.version_info[1] >= $PYTHON_MIN_MINOR)))"
+if (($?)); then
+    echo "[mfc.sh] Error: $(python3 --version) is incompatible. Python v$PYTHON_MIN_MAJOR.$PYTHON_MIN_MINOR or higher is required."
+    exit 1
+fi
 
 # (Re)-Install Pip via get-pip to make sure it is properly configured and working.
 # Note: Some supercomputers require(d) this workaround to install and import python packages.
@@ -45,45 +61,41 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
     fi
 fi
 
-# Optional: Use a Python virtual environment (venv)
-#
-#python3 -m venv ./venv
-#if (($?)); then
-#    echo "[mfc.sh] Error: Failed to create a Python virtual environment."
-#    exit 1
-#fi
-#
-#source ./venv/bin/activate
-#if (($?)); then
-#    echo "[mfc.sh] Error: Faild to activate the Python virtual environment."
-#    exit 1
-#fi
-
-# Install PyYAML if it isn't installed
-python3 -c 'import yaml'
-if (($?)); then
-    python3 -m pip install pyyaml
+# Create a Python virtualenv if it hasn't already been created
+if [ ! -d "$PYTHON_VENV_DIR" ]; then
+    python3 -m venv "$PYTHON_VENV_DIR"
     if (($?)); then
-        echo "[mfc.sh] Error: Failed to install PyYAML through Python3's pip."
+        echo "[mfc.sh] Error: Failed to create a Python virtual environment."
         exit 1
     fi
 fi
 
-# Install Colorama if it isn't installed
-python3 -c 'import colorama'
-if (($?)); then
-    python3 -m pip install colorama
+# Activate the Python venv
+source "$PYTHON_VENV_DIR"/bin/activate
+
+# Fetch required Python modules
+declare -a REQUIRED_PYTHON_MODULES=("argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "colorama,colorama" "fypp,fypp")
+
+for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
+    import_name=$(echo $module | tr ',' '\n' | head -n 1)
+    install_name=$(echo $module | tr ',' '\n' | tail -n 1)
+
+    python3 -c "import $import_name" > /dev/null 2>&1
     if (($?)); then
-        echo "[mfc.sh] Error: Failed to install Colorama through Python3's pip."
-        exit 1
+        python3 -m pip install $install_name
+        if (($?)); then
+            echo "[mfc.sh] Error: Failed to install $import_name/$install_name through Python3's pip."
+            exit 1
+        fi
     fi
-fi
+done
 
 # Run the mfc.py bootstrap script
-cd bootstrap
-python3 ./delegate.py $@
+python3 ./bootstrap/delegate.py "$@"
 code=$?
 
-cd ..
+# Deactivate the Python virtualenv in case the user "source"'d this script
+deactivate
 
+# Exit with ./bootstrap/delegate.py's exit code
 exit $code
