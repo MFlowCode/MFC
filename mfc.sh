@@ -15,7 +15,6 @@ fi
 
 # Make bootstrap files executable
 chmod +x ./bootstrap/delegate.py
-chmod +x ./bootstrap/prepare_make.sh
 
 # Check whether python3 is in the $PATH / is accessible.
 which python3 > /dev/null 2>&1
@@ -28,6 +27,15 @@ fi
 python3 -c 'print("")' > /dev/null 2>&1
 if (($?)); then
     echo "[mfc.sh] Error: Python3 is present but can't execute a simple program. Please ensure that python3 is working."
+    exit 1
+fi
+
+# CHeck Python's version for compatibility with bootstrap/*.py scripts
+PYTHON_MIN_MAJOR=3
+PYTHON_MIN_MINOR=6
+python3 -c "import sys; exit(int(not (sys.version_info[0]==$PYTHON_MIN_MAJOR and sys.version_info[1] >= $PYTHON_MIN_MINOR)))"
+if (($?)); then
+    echo "[mfc.sh] Error: $(python3 --version) is incompatible. Python v$PYTHON_MIN_MAJOR.$PYTHON_MIN_MINOR or higher is required."
     exit 1
 fi
 
