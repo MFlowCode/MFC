@@ -22,6 +22,7 @@ if [ "$response" == "s" ]; then # For Summit
     module list
 elif [ "$response" == "b" ]; then # Bridges2
     module purge
+    module load python/3.8.6
     module load openmpi/4.0.5-nvhpc21.7
     module load cuda/11.1.1
     module list
