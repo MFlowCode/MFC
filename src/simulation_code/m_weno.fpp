@@ -275,8 +275,7 @@ contains
             s = p; s_cb => z_cb; bc_s = bc_z
         end if
 
-#:set COMPONENTS = [(1, 'x'), (2, 'y'), (3, 'z')]
-#:for WENO_DIR, XYZ in COMPONENTS
+#:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
         ! Computing WENO3 Coefficients =====================================
         if(weno_dir == ${WENO_DIR}$) then
             if (weno_order == 3) then
@@ -495,49 +494,6 @@ contains
         nullify (s_cb)
 
     end subroutine s_compute_weno_coefficients ! ---------------------------
-
-    !>  The purpose of the procedure is to associate the WENO
-        !!      coefficients' pointers with their appropriate targets,
-        !!      based on the coordinate direction and the location of
-        !!      the WENO reconstruction.
-        !! @param weno_dir Coordinate direction of the WENO reconstruction
-    subroutine s_associate_weno_coefficients_pointers(weno_dir)
-
-        integer, intent(IN) :: weno_dir
-
-        ! Associating WENO Coefficients in x-direction =====================
-        if (weno_dir == 1) then
-
-            poly_coef_L => poly_coef_cbL_x
-            poly_coef_R => poly_coef_cbR_x
-            d_L => d_cbL_x
-            d_R => d_cbR_x
-            beta_coef => beta_coef_x
-
-        ! Associating WENO Coefficients in y-direction =====================
-        elseif (weno_dir == 2) then
-
-            poly_coef_L => poly_coef_cbL_y
-            poly_coef_R => poly_coef_cbR_y
-            d_L => d_cbL_y
-            d_R => d_cbR_y
-            beta_coef => beta_coef_y
-
-        ! Associating WENO Coefficients in z-direction =====================
-        else
-
-            poly_coef_L => poly_coef_cbL_z
-            poly_coef_R => poly_coef_cbR_z
-            d_L => d_cbL_z
-            d_R => d_cbR_z
-            beta_coef => beta_coef_z
-
-        end if
-        ! ==================================================================
-
-
-    end subroutine s_associate_weno_coefficients_pointers ! ----------------
-
 
        subroutine s_weno_alt(v_vf,  vL_rs_vf_x_flat, vL_rs_vf_y_flat, vL_rs_vf_z_flat, vR_rs_vf_x_flat, vR_rs_vf_y_flat, vR_rs_vf_z_flat, & ! -------------------
                       norm_dir, weno_dir,  &

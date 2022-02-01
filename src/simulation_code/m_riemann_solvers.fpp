@@ -514,9 +514,9 @@ contains
                                          flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
                                              norm_dir, ix, iy, iz)
-#:set COMPONENTS = [(1, 'x'), (2, 'y'), (3, 'z')]
-#:for NORM_DIR, XYZ in COMPONENTS
-          if (norm_dir == ${NORM_DIR}$) then
+#:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+
+        if (norm_dir == ${NORM_DIR}$) then
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L_acc, alpha_rho_R_acc, vel_L_acc, vel_R_acc, alpha_L_acc, alpha_R_acc, vel_avg_acc)
             do l = is3%beg, is3%end
               do k = is2%beg, is2%end
@@ -830,6 +830,7 @@ contains
               end do
             end do
           end if
+
 #:endfor
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
@@ -960,9 +961,8 @@ contains
                                          flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
                                              norm_dir, ix, iy, iz)
+#:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
-#:set COMPONENTS = [(1, 'x'), (2, 'y'), (3, 'z')]
-#:for NORM_DIR, XYZ in COMPONENTS
             if (norm_dir == ${NORM_DIR}$) then
                 if(model_eqns == 3) then
                     !ME3
