@@ -2,7 +2,7 @@
 
 echo -e "\nPlease run this file with \"source\": \"source load.sh\"\n".
 
-echo "Which computer would like to laod submodules for?"
+echo "Which computer would you like to load submodules for?"
 echo " - Summit   (s)"
 echo " - Bridges2 (b)"
 echo " - Ascent   (a)"
