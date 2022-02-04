@@ -35,7 +35,5 @@ class MFCArgs(objecttree.ObjectTree):
 
         super().__init__(vars(parser.parse_args()))
 
-        print(self)
-
         if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean"):
             self.tree_set("build", True)
