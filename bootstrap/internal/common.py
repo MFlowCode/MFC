@@ -9,7 +9,8 @@ import tarfile
 
 MFC_ROOTDIR       = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
 MFC_SUBDIR        = f"{MFC_ROOTDIR}/.mfc"
-MFC_CONF_FILEPATH = f"{MFC_ROOTDIR}/mfc.conf.yaml"
+MFC_DEV_FILEPATH  = f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml"
+MFC_USER_FILEPATH = f"{MFC_ROOTDIR}/mfc.user.yaml"
 MFC_LOCK_FILEPATH = f"{MFC_SUBDIR}/mfc.lock.yaml"
 
 

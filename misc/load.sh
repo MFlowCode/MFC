@@ -2,7 +2,7 @@
 
 echo -e "\nPlease run this file with \"source\": \"source load.sh\"\n".
 
-echo "Which computer would like to laod submodules for?"
+echo "Which computer would you like to load submodules for?"
 echo " - Summit   (s)"
 echo " - Bridges2 (b)"
 echo " - Ascent   (a)"
@@ -22,6 +22,7 @@ if [ "$response" == "s" ]; then # For Summit
     module list
 elif [ "$response" == "b" ]; then # Bridges2
     module purge
+    module load python/3.8.6
     module load openmpi/4.0.5-nvhpc21.7
     module load cuda/11.1.1
     module list
