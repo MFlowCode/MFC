@@ -1,5 +1,3 @@
-import traceback
-
 import internal.common      as common
 import internal.configfiles as configfiles
 
@@ -7,24 +5,17 @@ from typing      import Any
 from dataclasses import dataclass
 
 @dataclass
-class Compilers:
-    c:       str
-    cpp:     str
-    fortran: str
+class CompilerVersion:
+    name:    str
+    is_used: str
+    fetch:   str
+    minimum: str
 
-    def __init__(self, data):
-        self.c       = data["c"]
-        self.cpp     = data["cpp"]
-        self.fortran = data["fortran"]
-
-@dataclass
-class Configuration:
-    name:  str
-    flags: Compilers
-
-    def __init__(self, data):
-        self.name  = data["name"]
-        self.flags = Compilers(data["flags"])
+    def __init__(self, data) -> None:
+        self.name    = data.get("name")
+        self.is_used = data.get("is_used")
+        self.fetch   = data.get("fetch")
+        self.minimum = data.get("minimum")
 
 @dataclass
 class Target_Download:
@@ -73,7 +64,7 @@ class Target_Fetch:
         elif self.method == "collection":
             self.params = Target_Collection(data["params"])
         else:
-            raise MFCException(f"[mfc.conf.yaml]: '{target}' - Unrecognized fetch method '{method}'.")
+            raise common.MFCException(f"[mfc.conf.yaml]: Unrecognized fetch method '{self.method}'.")
 
 @dataclass
 class Target_Build_Options:
@@ -81,18 +72,9 @@ class Target_Build_Options:
         pass
 
 @dataclass
-class Target_Build:
-    commands: list
-    options:  Target_Build_Options
-
-    def __init__(self, data):
-        self.commands = data.get("commands", [])
-        self.options  = Target_Build_Options(data.get("options",  {}))
-
-@dataclass
 class Target:
     name:  str
-    build: Target_Build
+    build: str
     test:  list
     clean: list
     fetch: Target_Fetch
@@ -100,7 +82,7 @@ class Target:
 
     def __init__(self, data):
         self.name    = data["name"]
-        self.build   = Target_Build(data.get("build", {}))
+        self.build   = data.get("build",   [])
         self.depends = data.get("depends", [])
         self.test    = data.get("test",    [])
         self.clean   = data.get("clean",   [])
@@ -109,18 +91,10 @@ class Target:
 
 class MFCConf:
     def __init__(self):
-        data = configfiles.ConfigFileBase(common.MFC_CONF_FILEPATH, noexist_ok=False)
+        data = configfiles.ConfigFileBase(common.MFC_DEV_FILEPATH, noexist_ok=False)
 
-        self.compilers      = Compilers(data.tree_get("compilers"))
-        self.configurations = [ Configuration(e) for e in data.tree_get("configurations") ]
-        self.targets        = [ Target       (e) for e in data.tree_get("targets")        ]
-
-    def get_configuration(self, name: str) -> Configuration:
-        for configuration in self.configurations:
-            if configuration.name == name:
-                return configuration
-
-        raise common.MFCException(f'MFCConf: Configuration "{name}" doesn\'t exist')
+        self.compiler_verions = [ CompilerVersion(e) for e in data.tree_get("compiler_versions") ]
+        self.targets          = [ Target(e)          for e in data.tree_get("targets")           ]
 
     def get_target_configuration_name(self, name: str, default: str) -> str:
         target = self.get_target(name)
@@ -135,10 +109,7 @@ class MFCConf:
             return "common"
 
         return default
-
-    def get_target_configuration(self, name: str, default: str) -> Configuration:
-        return self.get_configuration(self.get_target_configuration_name(name, default))
-
+    
     def get_target_matches(self, name: str) -> list:
         return list(filter(lambda x: x.name == name, self.targets))
 
