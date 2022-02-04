@@ -1,0 +1,23 @@
+#
+# This configuration file is geared towards users of MFC.
+# More information can be found in the README.
+# 
+
+defaults:
+  threads:       1
+  configuration: release-cpu
+compilers:
+  c:       mpicc
+  cpp:     mpicxx
+  fortran: mpif90
+configurations:
+  - name:    release-cpu
+    c:       -O3
+    cpp:     -O3
+    fortran: -O3 -cpp -w
+  - name:    release-gpu
+    fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+  - name:    debug-cpu
+    fortran: -Og -g -cpp -w
+  - name:    debug-gpu
+    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
