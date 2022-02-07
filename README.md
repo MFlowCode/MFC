@@ -118,7 +118,7 @@ Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS:
 ### Fetch and build MFC
 
 The following commands fetch and build MFC and its required dependencies. 
-The dependencies are built to the `.mfc/` directory within your MFC installation. 
+The dependencies are built to the `build/` directory within your MFC installation. 
 This should have no impact on your local installation(s) of these packages.
 
 + Fetch MFC
@@ -189,7 +189,7 @@ for the flow variables via
 
 MFC uses [Fypp](https://github.com/aradi/fypp), a Python-based Fortran preprocessor to reduce code duplication. `.fpp` files are converted into regular `.f90` files as part of the build process. Documentation for Fypp can be found [here](https://fypp.readthedocs.io/en/stable/). 
 
-You can inspect the generated `.f90` files located in `.mfc/___current___/src/<name of target>/src`.
+You can inspect the generated `.f90` files located in `build/___current___/src/<name of target>/src`.
 
 # License
  

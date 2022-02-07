@@ -1634,7 +1634,7 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
         print('\n' + comp_name + '>> Serial job in progress ...' + '\n')
         #cmd_status = Popen('mpirun -n '+str(pbs_dict[ 'ppn' ])+' ./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
 
-        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../.mfc/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
+        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../build/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../build/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print('\n' + output)
         print(comp_name + '>> Serial job completed!' + '\n')
@@ -1754,7 +1754,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
         print( '\n' + comp_name + '>> Serial job in progress ...' + '\n')
         #cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
 
-        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../.mfc/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
+        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../build/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../build/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
         output, errors = cmd_status.communicate()
         #print '\n' + output
         print( comp_name + '>> Serial job completed!' + '\n')
@@ -2002,7 +2002,7 @@ def f_create_batch_file_SHB(comp_name, case_dict, mfc_dir,sub_name): # ---------
         #                               + '_code' + '/' + comp_name      + '\n' \
         # (Richardson)
         'mpirun '                                                               \
-            + f"{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"
+            + f"{mfc_dir}/../build/___current___/build/bin/{comp_name}"
             + '\n' \
         # Stopping the timer for the job
         't_stop=$(date +%s)' + '\n' + 'echo'                            + '\n' \
@@ -2151,7 +2151,7 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
                                                                                \
         # Executing job:
         'mpirun '                                                               \
-            + f"{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"
+            + f"{mfc_dir}/../build/___current___/build/bin/{comp_name}"
             + '\n' \
         # Stopping the timer for the job
         't_stop=$(date +%s)' + '\n' + 'echo'                            + '\n' \
