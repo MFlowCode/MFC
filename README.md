@@ -1,43 +1,41 @@
-# Multi-component Flow Code (MFC)
+# <image src="https://mflowcode.github.io/logo.png">
 
 [![DOI](https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg)](http://dx.doi.org/10.1016/j.cpc.2020.107396)
 [![YourActionName Actions Status](https://github.com/ComputationalFlowPhysics/MFC-develop/workflows/CI/badge.svg)](https://github.com/ComputationalFlowPhysics/MFC-develop/actions)
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
 [![GitHub latest commit](https://badgen.net/github/last-commit/MFlowCode/MFC-develop)](https://github.com/MFlowCode/MFC-develop/commit/)
-
-
+ 
 Welcome to MFC! 
 The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows.
 
-# Authors
+<p align="center">
+ <a href="#installing-mfc">Authors</a> | 
+ <a href="">Publications</a> | 
+ <a href="#installing-mfc">Installing MFC</a> | 
+ <a href="https://github.com/MFlowCode/MFC/raw/master/doc/MFC_user_guide.pdf">User's Guide</a> | 
+ <a href="https://mflowcode.github.io/">Documentation</a>
+</p>
 
+## Authors
+
+<p align="justify">
 This is the documentation for the MFC (Multicomponent Flow Code).
 The MFC is a simulation software for multi-component, multi-phase, and bubbly flows. 
 MFC was first developed by the Colonius research group at Caltech.
 Now it is developed and maintained by the groups of Professors <a href="https://colonius.caltech.edu/">Tim Colonius</a>, <a href="https://comp-physics.group">Spencer Bryngelson</a>, and <a href="https://vivo.brown.edu/display/mrodri97">Mauro Rodriguez</a>.
-We try to maintain a list of current and past developers in the `AUTHORS` file!
-
-# Documentation
+ We try to maintain a list of current and past developers in the <a href="AUTHORS">AUTHORS</a> file!
+ </p>
  
-  The following codes are documented, please follow the links to see their Doxygen:
-* <a href="https://mflowcode.github.io/pre_process/namespaces.html">Pre_process</a> 
-* <a href="https://mflowcode.github.io/simulation/namespaces.html">Simulation</a> 
-* <a href="https://mflowcode.github.io/post_process/namespaces.html">Post_process</a>
+## Publications
  
-
-## User's guide
- 
-  A user's guide is included 
-  <a href="https://github.com/MFlowCode/MFC/raw/master/doc/MFC_user_guide.pdf">here.</a>
- 
-## MFC paper
+### Primary Paper
  
   The paper that describes the MFC's capabilities:
 * <a href="https://doi.org/10.1016/j.cpc.2020.107396">
         S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications 4655, 107396
         </a>
   
-## Related publications
+### Related publications
  
   Several publications have used the MFC in various stages of its 
   development. A partial list is included here.
@@ -90,14 +88,16 @@ Ph.D. Disserations:
 
 ## Installing MFC
 
+<p align="justify">
 To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its developement headers and libraries, a C/C++ compiler
 (GCC, NVHPC, etc., but *not Clang*), and an MPI wrapper (like Open MPI). 
 Below are some commands for popular operating systems and package managers.
-
+<p>
+ 
 ### \*nix
 
 * Via [Aptitude](https://wiki.debian.org/Aptitude)
-```
+```console
 sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-dev python3-dev python3-venv libopenmpi-dev
 ```
 
@@ -107,7 +107,7 @@ sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-d
 
 You can modify the assignment on the first line to have the GCC major version you wish to have installed and use.
 
-```
+```console
 USE_GCC_VERSION=11
 brew install wget make python make cmake gcc@$USE_GCC_VERSION
 HOMEBREW_CC=gcc-$USE_GCC_VERSION; HOMEBREW_CXX=g++-$USE_GCC_VERSION; brew install open-mpi
@@ -123,7 +123,7 @@ This should have no impact on your local installation(s) of these packages.
 
 + Fetch MFC
 
-```
+```console
 git clone --recursive https://github.com/MFlowCode/MFC
 cd MFC
 ```
@@ -136,14 +136,14 @@ cd MFC
 | Target(s)    | `-t` | `MFC` | `MFC_PreProcess` / `MFC_Simulation` / `MFC_PostProcess` / `FFTW3` / `HDF5` / `SILO` |
 | Configuration | `-cc` | `release-cpu` | `release-cpu` / `release-gpu` / `debug-cpu` / `debug-gpu` |
 
-```
+```console
 chmod +x ./mfc.sh
 ./mfc.sh -j 8 -t release-cpu
 ```
 
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
 
-```
+```console
 ./mfc.sh --test
 ```
 
@@ -164,14 +164,14 @@ in the user manual. A commented, tutorial script
 can also be found in [example_cases/3d_sphbubcollapse/](example_cases/3D_sphbubcollapse/)
 MFC can be executed as  
 
-```
+```console
 ./input.py MFC_PreProcess
 ```
 
 which will generate the restart and grid files that will be read 
 by the simulation code. Then  
 
-```
+```console
 ./input.py MFC_Simulation
 ```
 
@@ -179,7 +179,7 @@ will execute the flow solver. The last (optional) step
 is to post treat the data files and output HDF5 databases
 for the flow variables via  
 
-```
+```console
 ./input.py MFC_PostProcess
 ```
 
@@ -198,5 +198,7 @@ MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 # Acknowledgements
  
+<p align="justify">
 The development of the MFC  was supported in part by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
 MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and ORNL Summit under allocation CFD154 (PI Bryngelson).
+ </p>
