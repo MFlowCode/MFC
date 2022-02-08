@@ -71,7 +71,7 @@ class Bootstrap:
             if shutil.which(utility) is None:
                 raise common.MFCException(
                     f'Failed to find the command line utility "{utility}". Please install it or make it visible.')
-        
+
         common.clear_line()
         self.tree.print(f"Found {len(required)}/{len(required)}. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
         self.tree.unindent()
@@ -106,7 +106,7 @@ class Bootstrap:
 
             if version_num_fetched >= version_num_minimum:
                 self.tree.print(f'{check.name}: v{version_fetch_cmd_out} >= v{check.minimum}. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
-    
+
         self.tree.unindent()
 
         # TODO: MacOS Checks
@@ -299,7 +299,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
                 logfile.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
                 logfile.flush()
-                
+
                 def cmd_on_error():
                     print(logfile.read())
 
@@ -327,16 +327,23 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             }
         })
 
+        # If the target - in the selected configuration - isn't already
+        # in the lock file, we add a new target/metdata entry into it.
         if len(self.lock.get_target_matches(name, compiler_cfg.name)) == 0:
             self.lock.add_target(new_entry)
-        else:
-            for index, dep in enumerate(self.lock.targets):
-                if dep.target.name == name:
-                    self.lock.targets[index] = new_entry
-                    self.lock.flush()
-                    break
+            self.lock.save()
+            return
 
-        self.lock.save()
+        # Otherwise, we simply need to update the existing entry.
+        for index, dep in enumerate(self.lock.targets):
+            if dep.target.name == name and dep.metadata.compiler_configuration == compiler_cfg.name:
+                self.lock.targets[index] = new_entry
+                self.lock.flush()
+                self.lock.save()
+                return
+
+        # If for some reason we can't find the target, throw.
+        raise common.MFCException(f"Failed to update the lock file for {name} in the {compiler_cfg.name} configuration.")
 
     def build_target(self, name: str):
         possible_colors = [colorama.Fore.BLUE, colorama.Fore.CYAN, colorama.Fore.GREEN, colorama.Fore.YELLOW]
@@ -428,7 +435,7 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
             self.clean_target(dependency_name)
 
         target = self.lock.get_target(name, self.args["compiler_configuration"])
-        
+
         if not target.metadata.bCleaned:
             if os.path.isdir(self.string_replace(name, "${SOURCE_PATH}")):
                 with open(self.get_log_filepath(name), "a") as log_file:
