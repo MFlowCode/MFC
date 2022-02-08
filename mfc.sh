@@ -48,7 +48,7 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
         exit 1
     fi
 
-    wget -O "$MFC_GET_PIP_PATH" https://bootstrap.pypa.io/get-pip.py
+    wget -O "$MFC_GET_PIP_PATH" https://bootstrap.pypa.io/pip/3.6/get-pip.py
     if (($?)); then
         echo "[mfc.sh] Error: Couldn't download get-pip.py using wget to '$MFC_GET_PIP_PATH'."
         exit 1
