@@ -2,7 +2,7 @@
 
 
 # Script Constants
-MFC_DIR="./.mfc"
+MFC_DIR="./build"
 MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
 PYTHON_VENV_DIR="$MFC_DIR/.venv"
 
