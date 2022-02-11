@@ -1580,9 +1580,9 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
 
 
     # Checking whether the MFC component selected by the user exists
-    if (comp_name != 'MFC_PreProcess' ) and \
-       (comp_name != 'MFC_Simulation'  ) and \
-       (comp_name != 'MFC_PostProcess'):
+    if (comp_name != 'pre_process' ) and \
+       (comp_name != 'simulation'  ) and \
+       (comp_name != 'post_process'):
         print('\n' + 'Unsupported choice of MFC component to execute. ' \
                    + 'Exiting ...' + '\n')
         exit(0)
@@ -1619,7 +1619,7 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
         makefile = 'makefile'
 
     # Compiling the MFC component's code if necessary
-    cmd_status = Popen('make -C ' + comp_dir + ' all', shell=True, stdout=PIPE)
+    cmd_status = Popen('make -C ' + comp_dir + ' all', shell=True, stdout=PIPE, universal_newlines=True)
     output, errors = cmd_status.communicate()
 
 
@@ -1632,28 +1632,28 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
     # a bash script is generated and the job is submitted to a queue via PBS.
     if engine == 'serial':
         print('\n' + comp_name + '>> Serial job in progress ...' + '\n')
-        #cmd_status = Popen('mpirun -n '+str(pbs_dict[ 'ppn' ])+' ./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
+        #cmd_status = Popen('mpirun -n '+str(pbs_dict[ 'ppn' ])+' ./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
 
-        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../.mfc/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"', shell=True )
+        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../build/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../build/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print('\n' + output)
         print(comp_name + '>> Serial job completed!' + '\n')
-        cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE)
+        cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
     #else if engine == 'interactive':
     #    print '\n' + comp_name + '>> Interactive job in progress ...' + '\n'
-    #    cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
+    #    cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
     #    output, errors = cmd_status.communicate()
     #    print '\n' + output
     #    print comp_name + '>> Serial job completed!' + '\n'
-    #    cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE)
+    #    cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE, universal_newlines=True)
     #    output, errors = cmd_status.communicate()
     else:
         f_create_batch_file_SHB(comp_name, case_dict, mfc_dir, sub_name)
         # Submit job to queue (Hooke/Thomson/Darter)
         #cmd_status = Popen('qsub ' + comp_name + '.sh', shell=True, stdout=PIPE)
         # submit job to queue (Stampede)
-        cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE)
+        cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print('\n' + output)
         print(comp_name + '>> Parallel job submitted to queue!' + '\n')
@@ -1684,9 +1684,9 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
 
 
     # Checking whether the MFC component selected by the user exists
-    if (comp_name != 'MFC_PreProcess' ) and \
-       (comp_name != 'MFC_Simulation'  ) and \
-       (comp_name != 'MFC_PostProcess'):
+    if (comp_name != 'pre_process' ) and \
+       (comp_name != 'simulation'  ) and \
+       (comp_name != 'post_process'):
         print( '\n' + 'Unsupported choice of MFC component to execute. ' \
                    + 'Exiting ...' + '\n')
         exit(0)
@@ -1739,7 +1739,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     comp_dir = mfc_dir + '/' + comp_name + '_code'
 
     # Compiling the MFC component's code if necessary
-    #cmd_status = Popen(f'./mfc.py --build {comp_dir} all', shell=True, stdout=PIPE)
+    #cmd_status = Popen(f'./mfc.py --build {comp_dir} all', shell=True, stdout=PIPE, universal_newlines=True)
     #output, errors = cmd_status.communicate()
 
 
@@ -1752,20 +1752,20 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     # a bash script is generated and the job is submitted to a queue via PBS.
     if engine == 'serial':
         print( '\n' + comp_name + '>> Serial job in progress ...' + '\n')
-        #cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE)
+        #cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
 
-        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../.mfc/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../.mfc/___current___/build/bin/{comp_name}"', shell=True )
+        cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../build/release-cpu/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../build/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
         output, errors = cmd_status.communicate()
         #print '\n' + output
         print( comp_name + '>> Serial job completed!' + '\n')
-        #cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE)
+        #cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE, universal_newlines=True)
         #output, errors = cmd_status.communicate()
     else:
         f_create_batch_file(comp_name, case_dict, mfc_dir)
         # Submit job to queue (qsub)
-        # cmd_status = Popen('qsub ' + comp_name + '.sh', shell=True, stdout=PIPE)
+        # cmd_status = Popen('qsub ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
         # submit job to queue (sbatch)
-        cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE)
+        cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print( '\n' + output)
         print( comp_name + '>> Parallel job submitted to queue!' + '\n')
@@ -1785,12 +1785,12 @@ def f_create_input_file(comp_name, case_dict): # -------------------------------
 
     # Updating the values in the relevant MFC component dictionary using the
     # values provided by the user in the case dictionary
-    if comp_name == 'MFC_PreProcess':
+    if comp_name == 'pre_process':
         for parameter in case_dict:
             if parameter in pre_process_dict:
                 pre_process_dict[parameter] = case_dict[parameter]
         comp_dict = pre_process_dict
-    elif comp_name == 'MFC_Simulation':
+    elif comp_name == 'simulation':
         for parameter in case_dict:
             if parameter in simulation_dict:
                 simulation_dict[parameter] = case_dict[parameter]
@@ -2002,8 +2002,8 @@ def f_create_batch_file_SHB(comp_name, case_dict, mfc_dir,sub_name): # ---------
         #                               + '_code' + '/' + comp_name      + '\n' \
         # (Richardson)
         'mpirun '                                                               \
-                                       + mfc_dir + '/' + comp_name             \
-                                       + '_code' + '/' + comp_name      + '\n' \
+            + f"{mfc_dir}/../build/___current___/build/bin/{comp_name}"
+            + '\n' \
         # Stopping the timer for the job
         't_stop=$(date +%s)' + '\n' + 'echo'                            + '\n' \
         #'t_stop=$(date +"%T.%3N")' + '\n' + 'echo'                            + '\n' \
@@ -2029,7 +2029,7 @@ def f_create_batch_file_SHB(comp_name, case_dict, mfc_dir,sub_name): # ---------
 
 
     # Giving the batch file the permission to be executed
-    cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE)
+    cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
     output, errors = cmd_status.communicate()
 
 
@@ -2151,8 +2151,8 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
                                                                                \
         # Executing job:
         'mpirun '                                                               \
-                                       + mfc_dir + '/' + comp_name             \
-                                       + '_code' + '/' + comp_name      + '\n' \
+            + f"{mfc_dir}/../build/___current___/build/bin/{comp_name}"
+            + '\n' \
         # Stopping the timer for the job
         't_stop=$(date +%s)' + '\n' + 'echo'                            + '\n' \
                                                                                \
@@ -2177,7 +2177,7 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
 
 
     # Giving the batch file the permission to be executed
-    cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE)
+    cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
     output, errors = cmd_status.communicate()
 # END: def f_create_batch_file -------------------------------------------------
 

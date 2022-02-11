@@ -2,7 +2,7 @@
 
 
 # Script Constants
-MFC_DIR="./.mfc"
+MFC_DIR="./build"
 MFC_GET_PIP_PATH="$MFC_DIR/get-pip.py"
 PYTHON_VENV_DIR="$MFC_DIR/.venv"
 
@@ -48,7 +48,7 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
         exit 1
     fi
 
-    wget -O "$MFC_GET_PIP_PATH" https://bootstrap.pypa.io/get-pip.py
+    wget -O "$MFC_GET_PIP_PATH" https://bootstrap.pypa.io/pip/3.6/get-pip.py
     if (($?)); then
         echo "[mfc.sh] Error: Couldn't download get-pip.py using wget to '$MFC_GET_PIP_PATH'."
         exit 1
@@ -62,7 +62,10 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
 fi
 
 # Create a Python virtualenv if it hasn't already been created
+bVenvIsNew=0
 if [ ! -d "$PYTHON_VENV_DIR" ]; then
+    bVenvIsNew=1
+
     python3 -m venv "$PYTHON_VENV_DIR"
     if (($?)); then
         echo "[mfc.sh] Error: Failed to create a Python virtual environment."
@@ -73,7 +76,18 @@ fi
 # Activate the Python venv
 source "$PYTHON_VENV_DIR"/bin/activate
 
-# Fetch required Python modules
+# Upgrade Pip
+if [ "$bVenvIsNew" == "1" ]; then
+    python3 -m pip install --upgrade pip > /dev/null
+    if (($?)); then
+        echo "[mfc.sh] Error: Failed to update Pip."
+        exit 1
+    fi
+fi
+
+# Fetch required Python modules.
+# Some modules which are now in Python's standard library
+#                    are imported as backports to support Python v3.6.
 declare -a REQUIRED_PYTHON_MODULES=("argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "colorama,colorama" "fypp,fypp")
 
 for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
