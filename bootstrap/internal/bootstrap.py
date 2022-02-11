@@ -430,9 +430,11 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
             raise common.MFCException(f"Can't clean {name} because its build isn't satisfied.")
 
         self.tree.print(f"Cleaning Package {name}")
+        self.tree.indent()
 
         for dependency_name in self.conf.get_dependency_names(name, recursive=False):
-            self.clean_target(dependency_name)
+            if not self.conf.is_target_common(dependency_name):
+                self.clean_target(dependency_name)
 
         target = self.lock.get_target(name, self.args["compiler_configuration"])
 
@@ -453,14 +455,12 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
             target.metadata.bCleaned = True
 
-        self.tree.print(f"Cleaning done. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
-
-        common.delete_directory_recursive_safe(self.get_source_path(name))
         common.delete_file_safe(self.get_log_filepath(name))
 
         self.lock.flush()
         self.lock.save()
 
+        self.tree.print(f"Cleaning done. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
     def __init__(self):

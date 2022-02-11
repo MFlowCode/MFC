@@ -96,16 +96,19 @@ class MFCConf:
         self.compiler_verions = [ CompilerVersion(e) for e in data.tree_get("compiler_versions") ]
         self.targets          = [ Target(e)          for e in data.tree_get("targets")           ]
 
+    def is_target_common(self, name: str) -> bool:
+        return self.get_target(name).common_configuration is not None
+
     def get_target_configuration_name(self, name: str, default: str) -> str:
         target = self.get_target(name)
 
-        if target.common_configuration is not None:
+        if self.is_target_common(name):
             return target.common_configuration
 
         return default
 
     def get_target_configuration_folder_name(self, name: str, default: str) -> str:
-        if self.get_target(name).common_configuration is not None:
+        if self.is_target_common(name):
             return "common"
 
         return default
