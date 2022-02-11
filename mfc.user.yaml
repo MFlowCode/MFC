@@ -14,7 +14,7 @@ configurations:
   - name:    release-cpu
     c:       -O3
     cpp:     -O3
-    fortran: -O3 -cpp -w
+    fortran: -O3 -cpp -w                   -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
   - name:    release-gpu
     fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
   - name:    debug-cpu
