@@ -18,8 +18,8 @@ cd tests
 for mytest in "${mytests[@]}"; do
     cd $mytest
         #Run test case
-        /usr/bin/env python3 ./input.py MFC_PreProcess > MFC_PreProcess.out
-        /usr/bin/env python3 ./input.py MFC_Simulation > MFC_Simulation.out
+        /usr/bin/env python3 ./input.py pre_process > pre_process.out
+        /usr/bin/env python3 ./input.py simulation  > simulation.out
 
         cd check
             check_file=$(echo *)
