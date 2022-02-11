@@ -1580,9 +1580,9 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
 
 
     # Checking whether the MFC component selected by the user exists
-    if (comp_name != 'MFC_PreProcess' ) and \
-       (comp_name != 'MFC_Simulation'  ) and \
-       (comp_name != 'MFC_PostProcess'):
+    if (comp_name != 'pre_process' ) and \
+       (comp_name != 'simulation'  ) and \
+       (comp_name != 'post_process'):
         print('\n' + 'Unsupported choice of MFC component to execute. ' \
                    + 'Exiting ...' + '\n')
         exit(0)
@@ -1684,9 +1684,9 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
 
 
     # Checking whether the MFC component selected by the user exists
-    if (comp_name != 'MFC_PreProcess' ) and \
-       (comp_name != 'MFC_Simulation'  ) and \
-       (comp_name != 'MFC_PostProcess'):
+    if (comp_name != 'pre_process' ) and \
+       (comp_name != 'simulation'  ) and \
+       (comp_name != 'post_process'):
         print( '\n' + 'Unsupported choice of MFC component to execute. ' \
                    + 'Exiting ...' + '\n')
         exit(0)
@@ -1785,12 +1785,12 @@ def f_create_input_file(comp_name, case_dict): # -------------------------------
 
     # Updating the values in the relevant MFC component dictionary using the
     # values provided by the user in the case dictionary
-    if comp_name == 'MFC_PreProcess':
+    if comp_name == 'pre_process':
         for parameter in case_dict:
             if parameter in pre_process_dict:
                 pre_process_dict[parameter] = case_dict[parameter]
         comp_dict = pre_process_dict
-    elif comp_name == 'MFC_Simulation':
+    elif comp_name == 'simulation':
         for parameter in case_dict:
             if parameter in simulation_dict:
                 simulation_dict[parameter] = case_dict[parameter]

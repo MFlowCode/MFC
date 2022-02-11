@@ -81,9 +81,9 @@ class Target:
     common_configuration: str
 
     def __init__(self, data):
-        self.name    = data["name"]
+        self.name    = str.lower(data["name"])
         self.build   = data.get("build",   [])
-        self.depends = data.get("depends", [])
+        self.depends = [str.lower(dep) for dep in data.get("depends", [])]
         self.test    = data.get("test",    [])
         self.clean   = data.get("clean",   [])
         self.fetch   = Target_Fetch(data["fetch"])
