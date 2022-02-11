@@ -23,7 +23,7 @@ module m_start_up
 
 contains
 
-    !>  Reads the configuration file MFC_PostProcess.inp, in order
+    !>  Reads the configuration file post_process.inp, in order
         !!      to populate parameters in module m_global_parameters.f90
         !!      with the user provided inputs
     subroutine s_read_input_file() ! ---------------------------------------
@@ -53,8 +53,8 @@ contains
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma
 
-        ! Inquiring the status of the MFC_PostProcess.inp file
-        file_loc = 'MFC_PostProcess.inp'
+        ! Inquiring the status of the post_process.inp file
+        file_loc = 'post_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
         ! Checking whether the input file is there. If it is, the input file
@@ -69,7 +69,7 @@ contains
             n_glb = n
             p_glb = p
         else
-            print '(A)', 'File MFC_PostProcess.inp is missing. Exiting ...'
+            print '(A)', 'File post_process.inp is missing. Exiting ...'
             call s_mpi_abort()
         end if
 

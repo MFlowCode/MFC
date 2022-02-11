@@ -71,7 +71,7 @@ module m_start_up
 
 contains
 
-    !>  Reads the configuration file MFC_PreProcess.inp, in order to
+    !>  Reads the configuration file pre_process.inp, in order to
         !!      populate the parameters in module m_global_parameters.f90
         !!      with the user provided inputs
     subroutine s_read_input_file() ! ---------------------------------------
@@ -101,8 +101,8 @@ contains
             polydisperse, poly_sigma, qbmm, &
             nnode, sigR, sigV, dist_type, rhoRV, R0_type
 
-        ! Inquiring the status of the MFC_PreProcess.inp file
-        file_loc = 'MFC_PreProcess.inp'
+        ! Inquiring the status of the pre_process.inp file
+        file_loc = 'pre_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
         ! Checking whether the input file is there. If it is, the input file
@@ -117,7 +117,7 @@ contains
             n_glb = n
             p_glb = p
         else
-            print '(A)', 'File MFC_PreProcess.inp is missing. Exiting ...'
+            print '(A)', 'File pre_process.inp is missing. Exiting ...'
             call s_mpi_abort()
         end if
 
