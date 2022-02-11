@@ -774,7 +774,6 @@ contains
 
         ! Boundary condition at the beginning
         if (proc_coords(1) > 0 .or. bc_x%beg == -1) then
-            print *, "Hello"
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1

@@ -1247,7 +1247,7 @@ contains
                                                          vL_UL, &
                                                          vL_LC))
 
-                                        vL_rs_vf_x_flat(j, k, l) = vL_rs_vf_x_flat(j, k, l, i) &
+                                        vL_rs_vf_x_flat(j, k, l, i) = vL_rs_vf_x_flat(j, k, l, i) &
                                                                   + (sign(5d-1, vL_min - vL_rs_vf_x_flat(j, k, l, i)) &
                                                                      + sign(5d-1, vL_max - vL_rs_vf_x_flat(j, k, l, i))) &
                                                                   *min(abs(vL_min - vL_rs_vf_x_flat(j, k, l, i)), &
@@ -1292,19 +1292,19 @@ contains
                                                 + (v_rs_ws_x_flat(j, k, l, i) &
                                                    - v_rs_ws_x_flat(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
 
-                                        vL_min = max(min(v_rs_ws_x_flat(j, k, l, i), &
+                                        vR_min = max(min(v_rs_ws_x_flat(j, k, l, i), &
                                                          v_rs_ws_x_flat(j + 1, k, l, i), &
-                                                         vL_MD), &
+                                                         vR_MD), &
                                                      min(v_rs_ws_x_flat(j, k, l, i), &
-                                                         vL_UL, &
-                                                         vL_LC))
+                                                         vR_UL, &
+                                                         vR_LC))
 
-                                        vL_max = min(max(v_rs_ws_x_flat(j, k, l, i), &
+                                        vR_max = min(max(v_rs_ws_x_flat(j, k, l, i), &
                                                          v_rs_ws_x_flat(j + 1, k, l, i), &
-                                                         vL_MD), &
+                                                         vR_MD), &
                                                      max(v_rs_ws_x_flat(j, k, l, i), &
-                                                         vL_UL, &
-                                                         vL_LC))
+                                                         vR_UL, &
+                                                         vR_LC))
 
                                         vR_rs_vf_x_flat(j, k, l, i) = vR_rs_vf_x_flat(j, k, l, i) &
                                                                   + (sign(5d-1, vR_min - vR_rs_vf_x_flat(j, k, l, i)) &
@@ -1540,7 +1540,7 @@ contains
                                                          vL_UL, &
                                                          vL_LC))
 
-                                        vL_rs_vf_y_flat(j, k, l) = vL_rs_vf_y_flat(j, k, l, i) &
+                                        vL_rs_vf_y_flat(j, k, l, i) = vL_rs_vf_y_flat(j, k, l, i) &
                                                                   + (sign(5d-1, vL_min - vL_rs_vf_y_flat(j, k, l, i)) &
                                                                      + sign(5d-1, vL_max - vL_rs_vf_y_flat(j, k, l, i))) &
                                                                   *min(abs(vL_min - vL_rs_vf_y_flat(j, k, l, i)), &
@@ -1585,19 +1585,19 @@ contains
                                                 + (v_rs_ws_y_flat(j, k, l, i) &
                                                    - v_rs_ws_y_flat(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
 
-                                        vL_min = max(min(v_rs_ws_y_flat(j, k, l, i), &
+                                        vR_min = max(min(v_rs_ws_y_flat(j, k, l, i), &
                                                          v_rs_ws_y_flat(j + 1, k, l, i), &
-                                                         vL_MD), &
+                                                         vR_MD), &
                                                      min(v_rs_ws_y_flat(j, k, l, i), &
-                                                         vL_UL, &
-                                                         vL_LC))
+                                                         vR_UL, &
+                                                         vR_LC))
 
-                                        vL_max = min(max(v_rs_ws_y_flat(j, k, l, i), &
+                                        vR_max = min(max(v_rs_ws_y_flat(j, k, l, i), &
                                                          v_rs_ws_y_flat(j + 1, k, l, i), &
-                                                         vL_MD), &
+                                                         vR_MD), &
                                                      max(v_rs_ws_y_flat(j, k, l, i), &
-                                                         vL_UL, &
-                                                         vL_LC))
+                                                         vR_UL, &
+                                                         vR_LC))
 
                                         vR_rs_vf_y_flat(j, k, l, i) = vR_rs_vf_y_flat(j, k, l, i) &
                                                                   + (sign(5d-1, vR_min - vR_rs_vf_y_flat(j, k, l, i)) &
@@ -1833,7 +1833,7 @@ contains
                                                          vL_UL, &
                                                          vL_LC))
 
-                                        vL_rs_vf_z_flat(j, k, l) = vL_rs_vf_z_flat(j, k, l, i) &
+                                        vL_rs_vf_z_flat(j, k, l, i) = vL_rs_vf_z_flat(j, k, l, i) &
                                                                   + (sign(5d-1, vL_min - vL_rs_vf_z_flat(j, k, l, i)) &
                                                                      + sign(5d-1, vL_max - vL_rs_vf_z_flat(j, k, l, i))) &
                                                                   *min(abs(vL_min - vL_rs_vf_z_flat(j, k, l, i)), &
@@ -1878,19 +1878,19 @@ contains
                                                 + (v_rs_ws_z_flat(j, k, l, i) &
                                                    - v_rs_ws_z_flat(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
 
-                                        vL_min = max(min(v_rs_ws_z_flat(j, k, l, i), &
+                                        vR_min = max(min(v_rs_ws_z_flat(j, k, l, i), &
                                                          v_rs_ws_z_flat(j + 1, k, l, i), &
-                                                         vL_MD), &
+                                                         vR_MD), &
                                                      min(v_rs_ws_z_flat(j, k, l, i), &
-                                                         vL_UL, &
-                                                         vL_LC))
+                                                         vR_UL, &
+                                                         vR_LC))
 
-                                        vL_max = min(max(v_rs_ws_z_flat(j, k, l, i), &
+                                        vR_max = min(max(v_rs_ws_z_flat(j, k, l, i), &
                                                          v_rs_ws_z_flat(j + 1, k, l, i), &
-                                                         vL_MD), &
+                                                         vR_MD), &
                                                      max(v_rs_ws_z_flat(j, k, l, i), &
-                                                         vL_UL, &
-                                                         vL_LC))
+                                                         vR_UL, &
+                                                         vR_LC))
 
                                         vR_rs_vf_z_flat(j, k, l, i) = vR_rs_vf_z_flat(j, k, l, i) &
                                                                   + (sign(5d-1, vR_min - vR_rs_vf_z_flat(j, k, l, i)) &
