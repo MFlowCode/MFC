@@ -4,7 +4,7 @@ OBJS=$(patsubst %.f90,%.o,$(F90S))
 
 MOD_OBJS=$(patsubst %.fpp,%.o,$(patsubst %.f90,%.o,$(wildcard m*.f90 m*.fpp)))
 
-EXEC = $(INSTALL_PATH)/bin/MFC_Simulation
+EXEC = $(INSTALL_PATH)/bin/simulation
 PROGRAM = p_main
 PRG_OBJ = $(PROGRAM).o
 

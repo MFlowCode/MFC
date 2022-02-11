@@ -133,7 +133,7 @@ cd MFC
 | Argument     | Flag | Default Value | Possible values |
 | ------------ | ---- | ------------- | --------------- |
 | Threads      | `-j` | `1` | From `1` to the maximum logical thread count of your processor. |
-| Target(s)    | `-t` | `MFC` | `MFC_PreProcess` / `MFC_Simulation` / `MFC_PostProcess` / `FFTW3` / `HDF5` / `SILO` |
+| Target(s)    | `-t` | `MFC` | `pre_process` / `simulation` / `post_process` / `FFTW3` / `HDF5` / `SILO` |
 | Configuration | `-cc` | `release-cpu` | `release-cpu` / `release-gpu` / `debug-cpu` / `debug-gpu` |
 
 ```console
@@ -165,14 +165,14 @@ can also be found in [example_cases/3d_sphbubcollapse/](example_cases/3D_sphbubc
 MFC can be executed as  
 
 ```console
-./input.py MFC_PreProcess
+./input.py pre_process
 ```
 
 which will generate the restart and grid files that will be read 
 by the simulation code. Then  
 
 ```console
-./input.py MFC_Simulation
+./input.py simulation
 ```
 
 will execute the flow solver. The last (optional) step
@@ -180,7 +180,7 @@ is to post treat the data files and output HDF5 databases
 for the flow variables via  
 
 ```console
-./input.py MFC_PostProcess
+./input.py post_process
 ```
 
 # Development

@@ -9,7 +9,7 @@ compiler_versions:
     minimum: 21.7.0
 
 targets:
-  - name: FFTW3
+  - name: fftw3
     common_configuration: release-cpu
     fetch:
       method: download
@@ -22,7 +22,7 @@ targets:
       - make install
     test: []
 
-  - name: HDF5
+  - name: hdf5
     common_configuration: release-cpu
     fetch:
       method: clone
@@ -35,7 +35,7 @@ targets:
       - make install prefix="${INSTALL_PATH}"
     test: []
 
-  - name: SILO
+  - name: silo
     common_configuration: release-cpu
     depends:
       - HDF5
@@ -54,21 +54,21 @@ targets:
       - make install prefix="${INSTALL_PATH}"
     test: []
 
-  - name: MFC_PreProcess
+  - name: pre_process
     depends: []
     fetch:
       method: source
       params:
         source: ${MFC_ROOT_PATH}/src/pre_process_code
     clean:
-      - make INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}" clean
+      - make INSTALL_PATH="${pre_process:INSTALL_PATH}" clean
     build:
       - >-
-        make INSTALL_PATH="${MFC_PreProcess:INSTALL_PATH}"
+        make INSTALL_PATH="${pre_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
     test: []
 
-  - name: MFC_Simulation
+  - name: simulation
     depends:
       - FFTW3
     fetch:
@@ -76,15 +76,15 @@ targets:
       params:
         source: ${MFC_ROOT_PATH}/src/simulation_code
     clean:
-      - make INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}" clean
+      - make INSTALL_PATH="${simulation:INSTALL_PATH}" clean
     build:
       - >-
-        make INSTALL_PATH="${MFC_Simulation:INSTALL_PATH}"
+        make INSTALL_PATH="${simulation:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
     test: []
 
-  - name: MFC_PostProcess
+  - name: post_process
     depends:
       - FFTW3
       - HDF5
@@ -94,19 +94,19 @@ targets:
       params:
         source: ${MFC_ROOT_PATH}/src/post_process_code
     clean:
-      - make INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}" clean
+      - make INSTALL_PATH="${post_process:INSTALL_PATH}" clean
     build:
       - >-
-        make INSTALL_PATH="${MFC_PostProcess:INSTALL_PATH}"
+        make INSTALL_PATH="${post_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
     test: []
 
-  - name: MFC
+  - name: mfc
     depends:
-      - MFC_PreProcess
-      - MFC_Simulation
-      - MFC_PostProcess
+      - pre_process
+      - simulation
+      - post_process
     fetch:
       method: collection
       params: null

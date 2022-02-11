@@ -181,7 +181,8 @@ If you think MFC could (or should) be able to find it automatically for you syst
         # Fetch
         if recursive:
             for dep2_info in self.conf.targets:
-                string = string.replace("${" + dep2_info.name + ":", "${")
+                string = string.replace("${" + dep2_info.name         + ":", "${")
+                string = string.replace("${" + dep2_info.name.upper() + ":", "${")
                 string = self.string_replace(dep2_info.name, string, recursive=False)
 
         return string
