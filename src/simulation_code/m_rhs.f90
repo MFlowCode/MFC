@@ -148,6 +148,8 @@ module m_rhs
     ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: mom_sp
     ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:,:) :: mom_3d
 
+
+
     type(scalar_field) :: divu !< matrix for div(u)
     !> @}
 
@@ -189,6 +191,9 @@ module m_rhs
 !$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat)
 
 
+        real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
+        real(kind(0d0)), allocatable, dimension(:) :: rs, vs, ps, ms        
+!$acc declare create(nbub, rs, vs, ps, ms)
 
 
 contains
@@ -242,6 +247,12 @@ contains
         end do
 
         do l = mom_idx%beg, E_idx
+          allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+!$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        end do
+
+
+        do l = adv_idx%end + 1, sys_size
           allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
 !$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
@@ -783,7 +794,33 @@ contains
         contxe = cont_idx%end
         bubxb = bub_idx%beg
         bubxe = bub_idx%end
+
+        if(bubbles) then
+            allocate(rs(1:nb))
+            allocate(vs(1:nb))
+            if(.not. polytropic) then
+                allocate(ps(1:nb))
+                allocate(ms(1:nb))
+            end if
+            
+            rs = bub_idx%rs
+            vs = bub_idx%vs
+            if(.not. polytropic) then
+                ps = bub_idx%ps
+                ms = bub_idx%ms
+            end if
+
+!$acc update device(rs, vs)
+            if(.not. polytropic) then
+!$acc update device(ps, ms)
+            end if 
+            
+        end if
+
 !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, sys_size, buff_size, E_idx, alf_idx)
+        
+
+
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
@@ -826,6 +863,10 @@ contains
                 end do
             end do
 
+        if(bubbles) then
+            allocate(nbub(0:m, 0:n, 0:p))
+        end if
+
     end subroutine s_initialize_rhs_module ! -------------------------------
 
 
@@ -846,12 +887,24 @@ contains
 
 
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
+        real(kind(0d0)), dimension(3) :: myalpha_rho, myalpha
 
 
+        real(kind(0d0)) ::  tmp1, tmp2, tmp3, tmp4, &
+                           c_gas, c_liquid, &
+                           Cpbw, Cpinf, Cpinf_dot, &
+                           myH, myHdot, rddot, alf_gas
 
- 
+        real(kind(0d0))   :: pb, mv, vflux, pldot, pbdot
 
+        real(kind(0d0)) :: n_tait, B_tait
 
+        real(kind(0d0)), dimension(3)  :: Rtmp, Vtmp
+        real(kind(0d0))   :: myR, myV, alf, myP, myRho, R2Vav
+        integer :: ndirs
+
+        real(kind(0d0)) :: mytime, sound
+        real(kind(0d0)) :: s2, const_sos
 
         integer :: i, j, k, l, r, q,  ii, id !< Generic loop iterators
 
@@ -890,7 +943,28 @@ contains
 
         ! Converting Conservative to Primitive Variables ==================
 
+        if (mpp_lim .and. bubbles) then
+!$acc parallel loop collapse(3) gang vector default(present)
+          do l = iz%beg, iz%end
+            do k = iy%beg, iy%end
+             do j = ix%beg, ix%end    
+                         alf_sum%sf(j, k, l) = 0d0
+!$acc loop seq           
+                         do i = advxb, advxe - 1
+                                alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
+                         end do
+!$acc loop seq
+                        do i = advxb, advxe - 1
+                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1.d0 - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
+                                         /alf_sum%sf(j, k, l)
+                        end do
+                end do
+              end do
+            end do
 
+        end if
+
+  
 
         !convert conservative variables to primitive
         !   (except first and last, \alpha \rho and \alpha)
@@ -904,6 +978,7 @@ contains
 
 
 
+       
 
         if (t_step == t_step_stop) return
         ! ==================================================================
@@ -928,22 +1003,13 @@ contains
             iv%beg = 1; iv%end = sys_size
             !call nvtxStartRange("RHS-WENO")
             call s_reconstruct_cell_boundary_values_alt( &
-               q_prim_qp%vf(iv%beg:iv%end), &
+               q_prim_qp%vf(1:sys_size), &
                 qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
                 qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
                 id)
             call nvtxEndRange
-
-!           do j = 1, sys_size
-!!$acc update host( qL_rsz_vf_flat, qR_rsz_vf_flat)
-!            end do
-
-
-
-
     
-
-            ! Configuring Coordinate Direction Indexes ======================
+             ! Configuring Coordinate Direction Indexes ======================
             if (id == 1) then
                 ix%beg = -1; iy%beg = 0; iz%beg = 0
             elseif (id == 2) then
@@ -973,11 +1039,11 @@ contains
                                   id, ix, iy, iz)
             call nvtxEndRange
 
-            iv%beg = 1; iv%end = adv_idx%end
 
-            ! ===============================================================
 
- 
+                ! ===============================================================
+
+
              if (alt_soundspeed) then
 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
@@ -1082,6 +1148,305 @@ contains
                   end if
                 end if
 
+ 
+                if (bubbles) then
+                    if (qbmm) then
+                        ! advection source
+
+                        ! bubble sources
+                        
+!$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 0, p
+                            do q = 0, n
+                                do i =  0, m 
+
+                                    rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
+                                    j = bubxb
+!$acc loop seq
+                                    do k = 1, nb
+                                        rhs_vf(j)%sf(i, q, l) = & 
+                                            rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
+                                        rhs_vf(j + 1)%sf(i, q, l) = & 
+                                            rhs_vf(j + 1)%sf(i, q, l) + mom_3d(1, 0, k)%sf(i, q, l)
+                                        rhs_vf(j + 2)%sf(i, q, l) = & 
+                                            rhs_vf(j + 2)%sf(i, q, l) + mom_3d(0, 1, k)%sf(i, q, l)
+                                        rhs_vf(j + 3)%sf(i, q, l) = & 
+                                            rhs_vf(j + 3)%sf(i, q, l) + mom_3d(2, 0, k)%sf(i, q, l)
+                                        rhs_vf(j + 4)%sf(i, q, l) = & 
+                                            rhs_vf(j + 4)%sf(i, q, l) + mom_3d(1, 1, k)%sf(i, q, l)
+                                        rhs_vf(j + 5)%sf(i, q, l) = & 
+                                            rhs_vf(j + 5)%sf(i, q, l) + mom_3d(0, 2, k)%sf(i, q, l)
+                                        j = j + 6
+                                    end do
+                                end do
+                            end do
+                        end do
+                    else
+
+!$acc parallel loop collapse(3) gang vector default(present)
+                          do l = 0, p
+                              do k = 0, n
+                                  do j = 0, m
+                                      divu%sf(j, k, l) = 0d0
+                                      divu%sf(j, k, l) = &
+                                          0.5d0/dx(j)*(q_prim_qp%vf(contxe + id)%sf(j + 1, k, l) - &
+                                          q_prim_qp%vf(contxe + id)%sf(j - 1, k, l))
+                                      
+                                  end do
+                              end do
+                          end do
+
+                        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+                        if (id == ndirs) then
+                            
+!$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
+                          do l = 0, p
+                              do k = 0, n
+                                  do j = 0, m
+                                    bub_adv_src(j, k, l) = 0d0
+
+!$acc loop seq
+                                    do q = 1, nb
+                                        bub_r_src(j, k, l, q) = 0d0
+                                        bub_v_src(j, k, l, q) = 0d0
+                                        bub_p_src(j, k, l, q) = 0d0
+                                        bub_m_src(j, k, l, q) = 0d0
+                                    end do
+
+!$acc loop seq                                    
+                                    do q = 1, nb
+                                        Rtmp(q) = q_prim_qp%vf(rs(q))%sf(j, k, l)
+                                        Vtmp(q) = q_prim_qp%vf(vs(q))%sf(j, k, l)
+                                    end do
+
+                                    call s_comp_n_from_prim(q_prim_qp%vf(alf_idx)%sf(j, k, l), &
+                                                            Rtmp, nbub(j, k, l))
+
+                                    call s_quad((Rtmp**2.d0)*Vtmp, R2Vav)
+                                    bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
+                                      
+                                  end do
+                              end do
+                          end do
+
+!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+!$acc loop seq  
+                                        do q = 1, nb
+
+                                            bub_r_src( j, k, l, q) = q_cons_qp%vf(vs(q))%sf(j, k, l)
+
+!$acc loop seq
+                                            do ii = 1, num_fluids
+                                                myalpha_rho(ii) = q_cons_qp%vf(ii)%sf(j, k, l)
+                                                myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
+                                            end do 
+
+                                            call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+
+                                            n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+
+                                            myRho = q_prim_qp%vf(1)%sf(j, k, l)
+                                            myP = q_prim_qp%vf(E_idx)%sf(j, k, l)
+                                            alf = q_prim_qp%vf(alf_idx)%sf(j, k, l)
+                                            myR = q_prim_qp%vf(rs(q))%sf(j, k, l)
+                                            myV = q_prim_qp%vf(vs(q))%sf(j, k, l)
+
+                                            if (.not. polytropic) then
+                                                pb = q_prim_qp%vf(ps(q))%sf(j, k, l)
+                                                mv = q_prim_qp%vf(ms(q))%sf(j, k, l)
+                                                call s_bwproperty(pb, q)
+                                                vflux = f_vflux(myR, myV, mv, q)
+                                                pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
+
+                                                bub_p_src( j, k, l, q) = nbub(j, k, l)*pbdot
+                                                bub_m_src( j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
+                                            else
+                                                pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
+                                            end if
+
+                                            if (bubble_model == 1) then
+                                                ! Gilmore bubbles
+                                                Cpinf = myP - pref
+                                                Cpbw = f_cpbw(R0(q), myR, myV, pb)
+                                                myH = f_H(Cpbw, Cpinf, n_tait, B_tait)
+                                                c_gas = f_cgas(Cpinf, n_tait, B_tait, myH)
+                                                Cpinf_dot = f_cpinfdot(myRho, myP, alf, n_tait, B_tait, bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                myHdot = f_Hdot(Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, myR, myV, R0(q), pbdot)
+                                                rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
+                                            else if (bubble_model == 2) then
+                                                ! Keller-Miksis bubbles
+                                                Cpinf = myP
+                                                Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                                ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
+                                                c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
+                                                rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
+                                            else if (bubble_model == 3) then
+                                                ! Rayleigh-Plesset bubbles
+                                                Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                                rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
+                                            end if
+
+                                            bub_v_src( j, k, l, q) = nbub(j, k, l)*rddot
+
+                                            if (alf < 1.d-11) then
+                                                bub_adv_src(j, k, l) = 0d0
+                                                bub_r_src( j, k, l, q) = 0d0
+                                                bub_v_src( j, k, l, q) = 0d0
+                                                if (.not. polytropic) then
+                                                    bub_p_src( j, k, l, q) = 0d0
+                                                    bub_m_src( j, k, l, q) = 0d0
+                                                end if
+                                            end if
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end if
+
+!$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 0, p
+                            do q = 0, n
+                                do i =  0, m 
+                                    rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
+                                    if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
+                                        rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
+!$acc loop seq
+                                    do k = 1, nb
+                                        rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
+                                        rhs_vf(vs(k))%sf(i, q, l) = rhs_vf(vs(k))%sf(i, q, l) + bub_v_src(i, q, l, k)
+                                        if (polytropic .neqv. .true.) then
+                                            rhs_vf(ps(k))%sf(i, q, l) = rhs_vf(ps(k))%sf(i, q, l) + bub_p_src(i, q, l, k)
+                                            rhs_vf(ms(k))%sf(i, q, l) = rhs_vf(ms(k))%sf(i, q, l) + bub_m_src(i, q, l, k)
+                                        end if
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end if
+                end if
+
+                !do l = 1, sys_size
+!!$acc update host(rhs_vf(l)%sf)
+                !end do
+
+                !print *, rhs_vf(3)%sf(40,0,0)
+
+                if (monopole) then
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j =  0, m
+                                mono_mass_src(j, k, l) = 0d0; mono_mom_src(1, j, k, l) = 0d0; mono_e_src(j, k, l) = 0d0; 
+                                if(n > 0) then
+                                    mono_mom_src(2, j, k, l) = 0d0
+                                end if
+                                if(p > 0) then
+                                    mono_mom_src(3, j, k, l) = 0d0
+                                end if
+                            end do
+                        end do
+                    end do
+
+
+
+                    ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+                    if (id == ndirs) then
+
+!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+                        do l = 0, p
+                            do k = 0, n
+                                do j =  0, m
+!$acc loop seq                                    
+                                    do q = 1, num_mono
+
+                                        mytime = t_step*dt
+                                        if ((mytime >= mono(q)%delay) .or. (mono(q)%delay == dflt_real)) then
+
+
+!$acc loop seq
+                                            do ii = 1, num_fluids
+                                                myalpha_rho(ii) = q_cons_qp%vf(ii)%sf(j, k, l)
+                                                myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
+                                            end do 
+
+                                            if(bubbles) then
+                                                call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+                                            else
+                                                call s_convert_species_to_mixture_variables_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+                                            end if
+                                            n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+
+                                            sound = n_tait*(q_prim_qp%vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                                            sound = dsqrt(sound)
+
+                                            const_sos = dsqrt(n_tait)
+
+                                            s2 = f_g(mytime, sound, const_sos, mono(q)) * &
+                                                f_delta(j, k, l, mono(q)%loc, mono(q)%length, mono(q))
+
+                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
+                                            if (n == 0) then
+
+                                                ! 1D
+                                                if (mono(q)%dir < -0.1d0) then
+                                                    !left-going wave
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
+                                                else
+                                                    !right-going wave
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2
+                                                end if
+                                            else if (p == 0) then
+                                                ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
+                                                !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mono(q))
+
+                                                if (mono(q)%dir .ne. dflt_real) then
+                                                    ! 2d
+                                                    !mono_mom_src(1,j,k,l) = s2
+                                                    !mono_mom_src(2,j,k,l) = s2
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                end if
+                                            else
+                                                ! 3D
+                                                if (mono(q)%dir .ne. dflt_real) then
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                end if
+                                            end if
+
+                                            if (model_eqns .ne. 4) then
+                                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                            end if
+
+                                        end if
+                                    end do
+                                end do 
+                            end do 
+                        end do
+                        
+                    end if
+
+
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j =  0, m
+!$acc loop seq
+                                do q = contxb, contxe
+                                    rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mass_src(j, k, l)
+                                end do
+!$acc loop seq
+                                do q = momxb, momxe
+                                    rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mom_src(q - contxe, j, k, l)
+                                end do
+                                rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + mono_e_src(j, k, l)
+                            end do
+                        end do
+                    end do
+                end if
 
 
             elseif (id == 2) then
@@ -2522,7 +2887,7 @@ contains
         !! @param mysos Alternative speed of sound for testing
         !! @param mymono Monopole parameterrs
     function f_g(mytime, sos, mysos, mymono)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: mytime, sos, mysos
         type(mono_parameters), intent(IN) :: mymono
         real(kind(0d0)) :: period, t0, sigt, pa
@@ -2553,8 +2918,6 @@ contains
                 f_g = mymono%mag
             end if
         else
-            print '(A)', 'No pulse type detected. Exiting ...'
-            call s_mpi_abort()
         end if
 
     end function f_g
@@ -2567,7 +2930,7 @@ contains
         !! @param mono_leng Length of source term in space
         !! @param mymono Monopole parameters
     function f_delta(j, k, l, mono_loc, mono_leng, mymono)
-
+!$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
         type(mono_parameters), intent(IN) :: mymono
         real(kind(0d0)), intent(IN) :: mono_leng
@@ -2658,8 +3021,6 @@ contains
                     f_delta = 0d0
                 end if
             else
-                print '(a)', 'Monopole support not properly defined'
-                call s_mpi_abort()
             end if
         end if
 
