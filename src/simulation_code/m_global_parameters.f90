@@ -28,17 +28,17 @@ module m_global_parameters
     integer, parameter :: path_len = 400   !< Maximum path length
     integer, parameter :: name_len = 50    !< Maximum name length
     character, parameter :: dflt_char = ' '   !< Default string value
-    real(kind(0d0)), parameter :: dflt_real = -1d6  !< Default real value
-    integer, parameter :: dflt_int = -100  !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
+    real(kind(0d0)) :: dflt_real = -1d6  !< Default real value
+    integer :: dflt_int = -100  !< Default integer value
+    real(kind(0d0)):: sgm_eps = 1d-16 !< Segmentation tolerance
     integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
     character(LEN=path_len)  :: case_dir              !< Case folder location
     logical                    :: run_time_info         !< Run-time output flag
     logical                    :: debug                 !< Debug mode print statements
     integer                    :: t_step_old            !< Existing IC/grid folder
-    real(kind(0d0)), parameter :: small_alf = 1d-7 !< Small alf tolerance
+    real(kind(0d0)):: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
-
+!$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps)
     ! Computational Domain Parameters ==========================================
 
     integer :: proc_rank !< Rank of the local processor
@@ -246,11 +246,12 @@ module m_global_parameters
     integer         :: nmomtot !< Total number of carried moments moments/transport equations
     integer         :: R0_type
 
-!$acc declare create(nb,weight,bubbles)
+!$acc declare create(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
     !> @}
+!$acc declare create(mom_sp, mom_3d)
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
@@ -261,16 +262,19 @@ module m_global_parameters
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
-
+!$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     !> @name Acoustic monopole parameters
     !> @{
     logical         :: monopole !< Monopole switch
     type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
     integer         :: num_mono !< Number of monopoles
     !> @}
+!$acc declare create(monopole, mono, num_mono)
+
 
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
+
 
     logical :: weno_flat, riemann_flat, cu_mpi
 
@@ -436,7 +440,7 @@ contains
         ! Determining the degree of the WENO polynomials
         weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
-
+!$acc update device(nb)
 
 
         ! Initializing the number of fluids for which viscous effects will
@@ -1002,6 +1006,15 @@ contains
         real(kind(0.d0)) :: R3
 
         call s_quad(Rtmp**3d0, R3)
+
+        IF ( R3 < 0d0 ) THEN
+            !PRINT*, vftmp, R3, Rtmp(:)
+            STOP 'R3 is negative'
+        END IF
+        IF (vftmp < 0d0) THEN
+            !PRINT*, vftmp, R3, Rtmp(:)
+            STOP 'vf negative'
+        END IF
 
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
 

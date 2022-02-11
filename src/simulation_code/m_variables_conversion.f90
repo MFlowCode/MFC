@@ -348,9 +348,6 @@ contains
         ! their physical bounds to make sure that any mixture variables that
         ! are derived from them result within the limits that are set by the
         ! fluids physical parameters that make up the mixture
-
-
-
         rho_K = 0d0
         gamma_K = 0d0
         pi_inf_K = 0d0
@@ -372,16 +369,32 @@ contains
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
 
 
-        real(kind(0d0)), dimension(10), intent(IN) :: alpha_rho_K, alpha_K !<
+        real(kind(0d0)), dimension(:), intent(IN) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
-
         integer, intent(IN) :: k, l, r
-
         integer :: i, j !< Generic loop iterators
 
-        rho_K = alpha_rho_K(1)
-        gamma_K = gammas(1)
-        pi_inf_K = pi_infs(1)
+        rho_K = 0d0
+        gamma_K = 0d0
+        pi_inf_K = 0d0
+
+        if(mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+            do i = 1, num_fluids
+                rho_K = rho_K + alpha_rho_K(i)
+                gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+            end do
+        else if((model_eqns == 2) .and. (num_fluids > 2)) then
+            do i = 1, num_fluids - 1
+                rho_K = rho_K + alpha_rho_K(i)
+                gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+            end do 
+        else           
+            rho_K = alpha_rho_K(1)
+            gamma_K = gammas(1)
+            pi_inf_K = pi_infs(1)
+        end if
 
     end subroutine s_convert_species_to_mixture_variables_bubbles_acc
 
@@ -508,7 +521,18 @@ contains
 
         allocate(nRtmp(1:nb))
 
-!$acc update device(sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, nbub, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+
+
+        
+!$acc update device(small_alf, dflt_real, dflt_int)
+!$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, nbub, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, mom_sp, mom_3d, sgm_eps)
+
+
+!$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
+
+!$acc update device(monopole, mono, num_mono)
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -556,6 +580,7 @@ contains
 
         real(kind(0d0)),   dimension(10) :: alpha_K, alpha_rho_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K, alpha_K_sum
+        real(kind(0d0)), dimension(nb) :: nRtmp
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -582,7 +607,7 @@ contains
                                 alpha_K_sum = alpha_K_sum + alpha_K(i)
                             end do
 
-                            alpha_K = alpha_K/max(alpha_K_sum,1d-16)
+                            alpha_K = alpha_K/max(alpha_K_sum,sgm_eps)
 
                         end if
 
@@ -593,7 +618,7 @@ contains
 !$acc loop seq
                         do i = momxb, momxe
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                            /max( rho_K, 1d-16)
+                                                            /max( rho_K, sgm_eps)
                                 dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
                                              *qK_prim_vf(i)%sf(j, k, l)
                         end do 
@@ -621,7 +646,7 @@ contains
 !$acc loop seq
                         do i = momxb, momxe
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                            /max(rho_K, 1d-16)
+                                                            /max(rho_K, sgm_eps)
                                 dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
                                              *qK_prim_vf(i)%sf(j, k, l)
                         end do 
@@ -635,7 +660,6 @@ contains
 !$acc loop seq 
                         do i = 1, nb
                             nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
-                            !IF (nRtmp(i) < 0.d0) nRtmp(i) = 1.d-12 !stop 'nR < 0'
                         end do
 
 
