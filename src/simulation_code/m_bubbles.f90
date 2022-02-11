@@ -25,6 +25,7 @@ module m_bubbles
     real(kind(0.d0)) :: chi_vw  !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: rho_mw  !< Bubble wall properties (Ando 2010)
+!$acc declare create(chi_vw, k_mw, rho_mw)
 
 contains
 
@@ -165,7 +166,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     function f_cpbw(fR0, fR, fV, fpb)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
 
         real(kind(0d0))             :: f_cpbw
@@ -184,7 +185,7 @@ contains
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
     function f_H(fCpbw, fCpinf, fntait, fBtait)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fntait, fBtait
 
         real(kind(0d0))             :: tmp1, tmp2, tmp3
@@ -204,7 +205,7 @@ contains
         !! @param fBtait Tait EOS parameter
         !! @param fH Bubble enthalpy
     function f_cgas(fCpinf, fntait, fBtait, fH)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpinf, fntait, fBtait, fH
 
         real(kind(0d0))             :: tmp
@@ -227,7 +228,7 @@ contains
         !!  @param advsrc Advection equation source term
         !!  @param divu Divergence of velocity
     function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
         real(kind(0d0))             :: c2_liquid
@@ -257,7 +258,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpbdot Time derivative of the internal bubble pressure
     function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
         real(kind(0d0)), intent(IN) :: fR, fV, fR0, fpbdot
 
@@ -293,7 +294,7 @@ contains
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
     function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fCp, fRho, fR, fV, fR0, fCpbw
         real(kind(0d0))             :: f_rddot_RP
 
@@ -317,7 +318,7 @@ contains
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
     function f_rddot(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpbw, fR, fV, fH, fHdot
         real(kind(0d0)), intent(IN) :: fcgas, fntait, fBtait
 
@@ -340,7 +341,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     function f_cpbw_KM(fR0, fR, fV, fpb)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
         real(kind(0d0))             :: f_cpbw_KM
 
@@ -367,7 +368,7 @@ contains
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fC Current sound speed
     function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
-
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fpbdot, fCp, fCpbw
         real(kind(0d0)), intent(IN) :: fRho, fR, fV, fR0, fC
 
@@ -402,7 +403,7 @@ contains
     !>  @param pb Internal bubble pressure
     !>  @param iR0 Current bubble size index
     subroutine s_bwproperty(pb, iR0)
-
+!$acc routine seq
         real(kind(0.d0)), intent(IN) :: pb
         integer, intent(IN) :: iR0
 
@@ -425,7 +426,7 @@ contains
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index
     function f_vflux(fR, fV, fmass_v, iR0)
-
+!$acc routine seq
         real(kind(0.d0)), intent(IN) :: fR
         real(kind(0.d0)), intent(IN) :: fV
         real(kind(0.d0)), intent(IN) :: fmass_v
@@ -456,7 +457,7 @@ contains
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index
     function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0)
-
+!$acc routine seq
         real(kind(0.d0)), intent(IN) :: fvflux
         real(kind(0.d0)), intent(IN) :: fR
         real(kind(0.d0)), intent(IN) :: fV
