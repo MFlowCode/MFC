@@ -7,7 +7,7 @@ configurations:
   flags:
     c:       -O3
     cpp:     -O3
-    fortran: -O1 -r8 -cpp -w -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+    fortran: -O3 -r8 -cpp -w -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 - name: release-gpu
   flags:
     c:       -O3
