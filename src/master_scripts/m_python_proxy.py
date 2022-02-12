@@ -13,6 +13,7 @@
 
 # Command used to query the path of the current working directory
 from os import getcwd
+import os
 
 # Command used to query the name of the current working directory
 from os.path import basename
@@ -1571,7 +1572,6 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
     # Enabling access to the MFC component and PBS dictionaries
     global pre_process_dict, simulation_dict, post_process_dict, pbs_dict
 
-
     # Checking the validity of the configuration of the engine
     if (engine != 'parallel') and (engine != 'serial'):
         print('\n' + comp_name + '>> Unsupported engine configuration. ' \
@@ -1676,6 +1676,7 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     # Enabling access to the MFC component and PBS dictionaries
     global pre_process_dict, simulation_dict, post_process_dict, pbs_dict
 
+    mfc_dir=os.path.abspath(mfc_dir)
 
     # Checking the validity of the configuration of the engine
     if (engine != 'parallel') and (engine != 'serial'):
@@ -2042,7 +2043,6 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
 
     # Enabling access to the PBS dictionary
     global pbs_dict
-
 
     # Setting the location of the batch file
     file_loc = comp_name + '.sh'
