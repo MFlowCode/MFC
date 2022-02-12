@@ -15,6 +15,7 @@ import internal.lock      as lock
 import internal.common    as common
 import internal.user      as user
 import internal.treeprint as treeprint
+import internal.test      as test
 
 class Bootstrap:
     def get_configuration_base_path(self, cc: str = None):
@@ -483,10 +484,12 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         if self.args["build"]:
             common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
 
+        if self.args["test"]:
+            test.test(self.tree)
+
         for target_name in [ x.name for x in self.conf.targets ]:
             if target_name in self.args["targets"]:
                 if self.args["build"]: self.build_target(target_name)
-                if self.args["test"]:  self.test_target(target_name)
                 if self.args["clean"]: self.clean_target(target_name)
 
         self.lock.save()
