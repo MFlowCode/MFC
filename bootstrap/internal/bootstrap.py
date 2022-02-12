@@ -255,6 +255,10 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
                 common.execute_shell_command_safe(
                     f'cd "{self.get_source_path(name)}" && git checkout "{conf.fetch.params.hash}" >> "{logfile.name}" 2>&1')
+
+                self.tree.print(f'Deleting .git/ to save space...')
+
+                common.delete_directory_recursive_safe(f"{self.get_source_path(name)}/.git")
             elif conf.fetch.method == "download":
                 self.tree.print(f'Removing previously downloaded version...')
 
