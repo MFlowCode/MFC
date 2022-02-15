@@ -385,7 +385,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         return True
 
     def print_header(self):
-        print(common.center_ansi_escaped_text(f"""{colorama.Fore.BLUE}
+        print(f"""{colorama.Fore.BLUE}
      ___            ___          ___
     /__/\          /  /\        /  /\\
    |  |::\        /  /:/_      /  /:/
@@ -397,16 +397,14 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
   \  \:\         \  \:\       \  \:\/:/
    \  \:\         \  \:\       \  \::/
     \__\/          \__\/        \__\/
-{colorama.Style.RESET_ALL}"""))
+{colorama.Style.RESET_ALL}\
 
-        print(common.center_ansi_escaped_text("""
-+----------------------------------+
-|    Multi-component Flow Code     |
-|                                  |
-| https://github.com/MFlowCode/MFC |
-+----------------------------------+
-
-"""))
+   +----------------------------------+
+   |    Multi-component Flow Code     |
+   |                                  |
+   | https://github.com/MFlowCode/MFC |
+   +----------------------------------+
+""")
 
     def test_target(self, name: str):
         self.tree.print(f"Testing Package {name}")
