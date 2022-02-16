@@ -138,7 +138,7 @@ cd MFC
 
 ```console
 chmod +x ./mfc.sh
-./mfc.sh -j 8 -t release-cpu
+./mfc.sh --build -j 8 -t release-cpu
 ```
 
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
