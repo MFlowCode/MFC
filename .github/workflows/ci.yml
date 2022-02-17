@@ -52,14 +52,15 @@ jobs:
           ./mfc.sh --build -cc release-gpu -j $(nproc)
 
       - name: Test MFC
-        ./mfc.sh --test -cc release-cpu
-        ./mfc.sh --test -cc release-gpu
+        run: |
+          ./mfc.sh --test -cc release-cpu
+          ./mfc.sh --test -cc release-gpu
 
       - name: Upload logs
         uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: Ubuntu-logs
+          name: ${{ matrix.os }}
           path: |
             build/**/*.log
             tests/**/*.dat
