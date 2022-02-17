@@ -1659,7 +1659,7 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
         print(comp_name + '>> Parallel job submitted to queue!' + '\n')
 # END: def f_execute_mfc_component ---------------------------------------------
 
-def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
+def f_execute_mfc_component(comp_name: str, case_dict, mfc_dir, engine): # ----------
     # Description: The following function receives the name of the MFC component
     #              the user wishes to execute, the case dictionary, the location
     #              of the MFC folder and lastly, the configuration of the engine
@@ -1677,6 +1677,10 @@ def f_execute_mfc_component(comp_name, case_dict, mfc_dir, engine): # ----------
     global pre_process_dict, simulation_dict, post_process_dict, pbs_dict
 
     mfc_dir=os.path.abspath(mfc_dir)
+    
+    if "pre"  in comp_name.lower(): comp_name = "pre_process"
+    if "sim"  in comp_name.lower(): comp_name = "simulation"
+    if "post" in comp_name.lower(): comp_name = "post_process"
 
     # Checking the validity of the configuration of the engine
     if (engine != 'parallel') and (engine != 'serial'):

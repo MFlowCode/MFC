@@ -1,4 +1,5 @@
 import argparse
+from internal.common import MFCException
 
 import internal.user       as user
 import internal.conf       as conf
@@ -34,3 +35,10 @@ class MFCArgs(objecttree.ObjectTree):
                             help="Build all targets from scratch.")
 
         super().__init__(vars(parser.parse_args()))
+<<<<<<< HEAD
+=======
+
+        if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean"):
+            parser.print_help()
+            exit(-1)
+>>>>>>> 0a10c0e (Shorter code names for jobs & --build no longer default MFlowCode#85)
