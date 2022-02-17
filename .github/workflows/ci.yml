@@ -40,7 +40,7 @@ jobs:
           pip3 install pyyaml colorama fypp
 
       - name: Install Nvidia HPC SDK
-        if: contains(matrix.cc, 'nvidia')
+        if: contains(matrix.c, 'nvidia')
         run: |
           echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
           sudo apt-get update  -y
