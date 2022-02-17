@@ -13,7 +13,7 @@ class MFCArgs(objecttree.ObjectTree):
 
         action = parser.add_argument_group(title="Action")
         grp = action.add_mutually_exclusive_group(required=True)
-        
+
         grp.add_argument("--build", action="store_true", help="Build targets.")
         grp.add_argument("--test",  action="store_true", help="Test targets.")
         grp.add_argument("--clean", action="store_true", help="Clean MFC targets.")
@@ -35,10 +35,8 @@ class MFCArgs(objecttree.ObjectTree):
                             help="Build all targets from scratch.")
 
         super().__init__(vars(parser.parse_args()))
-<<<<<<< HEAD
-=======
 
         if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean"):
             parser.print_help()
             exit(-1)
->>>>>>> 0a10c0e (Shorter code names for jobs & --build no longer default MFlowCode#85)
+
