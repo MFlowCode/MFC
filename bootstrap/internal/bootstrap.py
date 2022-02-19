@@ -406,28 +406,9 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
    +----------------------------------+
 """)
 
-    def test_target(self, name: str):
-        self.tree.print(f"Testing Package {name}")
-        self.tree.indent()
-
-        if not self.is_build_satisfied(name, ignoreIfSource=True):
-            raise common.MFCException(f"Can't test {name} because its build isn't satisfied.")
-
-        with open(self.get_log_filepath(name), "w") as logfile:
-            for cmd_idx,command in enumerate(self.conf.get_target(name).test):
-                self.tree.print(f'|--> Package {name}: Testing [{cmd_idx+1}/{len(self.conf.get_target(name).test)}] (Logging to {logfile.name})...')
-
-                command = self.string_replace(name, f"""\
-cd "${{SOURCE_PATH}}" && \
-bash -c '{command}' >> "{logfile.name}" 2>&1""")
-
-                logfile.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
-                logfile.flush()
-
-                common.execute_shell_command_safe(command)
-
-        self.tree.print(f"Testing done. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
-        self.tree.unindent()
+    def test_target(self, name: str): 
+        # TODO: ERROR if name is not MFC
+        self.test.test()
 
     def clean_target(self, name: str):
         if not self.is_build_satisfied(name, ignoreIfSource=True):
@@ -475,6 +456,7 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.setup_directories()
         self.lock = lock.MFCLock()
         self.args = args.MFCArgs(self.conf, self.user)
+        self.test = test.MFCTest(self)
 
         self.print_header()
         self.check_environment()
@@ -487,7 +469,7 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
             common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
 
         if self.args["test"]:
-            test.test(self.tree)
+            self.test.test()
 
         for target_name in [ x.name for x in self.conf.targets ]:
             if target_name in self.args["targets"]:
@@ -495,3 +477,4 @@ bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 if self.args["clean"]: self.clean_target(target_name)
 
         self.lock.save()
+        self.test.save()

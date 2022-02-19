@@ -20,7 +20,6 @@ targets:
       - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
       - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
       - make install
-    test: []
 
   - name: hdf5
     common_configuration: release-cpu
@@ -33,7 +32,6 @@ targets:
       - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
       - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
       - make install prefix="${INSTALL_PATH}"
-    test: []
 
   - name: silo
     common_configuration: release-cpu
@@ -52,7 +50,6 @@ targets:
         ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
       - make ${MAKE_OPTIONS}
       - make install prefix="${INSTALL_PATH}"
-    test: []
 
   - name: pre_process
     depends: []
@@ -66,7 +63,6 @@ targets:
       - >-
         make INSTALL_PATH="${pre_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-    test: []
 
   - name: simulation
     depends:
@@ -82,7 +78,6 @@ targets:
         make INSTALL_PATH="${simulation:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
-    test: []
 
   - name: post_process
     depends:
@@ -100,8 +95,7 @@ targets:
         make INSTALL_PATH="${post_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
-    test: []
-
+               
   - name: mfc
     depends:
       - pre_process
@@ -112,5 +106,3 @@ targets:
       params: null
     collection: null
     build: []
-    test:
-      - cd "${MFC_ROOT_PATH}" && /usr/bin/env bash "tests/checks.sh"
