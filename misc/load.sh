@@ -6,7 +6,8 @@ echo "Which computer would you like to load submodules for?"
 echo " - Summit   (s)"
 echo " - Bridges2 (b)"
 echo " - Ascent   (a)"
-echo -n "(s/b/a): "
+echo " - Wombat   (w)"
+echo -n "(s/b/a/w): "
 read response
 
 if [ "$response" == "s" ]; then # For Summit
@@ -33,6 +34,11 @@ elif [ "$response" == "a" ]; then # For Ascent
     module load cuda/11.2.0
     module load nsight-compute
     module load nsight-systems
+    module list
+elif [ "$response" == "w" ]; then # For Wombat
+    module purge
+    module load python/3.9.9
+    module load /sw/wombat/Nvidia_HPC_SDK/modulefiles/nvhpc/22.1
     module list
 else
     echo "Error: Requested system is not supported"
