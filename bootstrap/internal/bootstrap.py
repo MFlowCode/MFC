@@ -74,7 +74,7 @@ class Bootstrap:
                     f'Failed to find the command line utility "{utility}". Please install it or make it visible.')
 
         common.clear_line()
-        self.tree.print(f"Found {len(required)}/{len(required)}. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
+        self.tree.print(f"Found {len(required)}/{len(required)}. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
         # Run checks on the user's current compilers
@@ -106,7 +106,7 @@ class Bootstrap:
             version_num_minimum = get_ver_from_str(check.minimum)
 
             if version_num_fetched >= version_num_minimum:
-                self.tree.print(f'{check.name}: v{version_fetch_cmd_out} >= v{check.minimum}. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
+                self.tree.print(f'{check.name}: v{version_fetch_cmd_out} >= v{check.minimum}. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})')
 
         self.tree.unindent()
 
@@ -114,7 +114,7 @@ class Bootstrap:
         if sys.platform == "darwin": # MacOS
             pass
 
-        self.tree.print(f'Passing. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
+        self.tree.print(f'Passing. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})')
         self.tree.unindent()
 
     def string_replace(self, dependency_name: str, string: str, recursive=True):
@@ -361,7 +361,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         # Check if it needs to be (re)built
         if self.is_build_satisfied(name):
-            self.tree.print(f'Nothing to do ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
+            self.tree.print(f'Nothing to do ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})')
             self.tree.unindent()
             return False
 
@@ -379,7 +379,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             self.build_target__build         (name, logfile) # Build
             self.build_target__update_lock   (name)          # Update LOCK
 
-        self.tree.print(f'Done. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})')
+        self.tree.print(f'Done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})')
         self.tree.unindent()
 
         return True
@@ -445,7 +445,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.lock.flush()
         self.lock.save()
 
-        self.tree.print(f"Cleaning done. ({colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL})")
+        self.tree.print(f"Cleaning done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
     def __init__(self):
