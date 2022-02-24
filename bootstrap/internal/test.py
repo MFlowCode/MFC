@@ -2,7 +2,7 @@
 
 import os
 import copy
-import json
+import hashlib
 import colorama
 import random
 import dataclasses
@@ -12,15 +12,6 @@ import internal.common      as common
 import internal.treeprint   as treeprint
 import internal.configfiles as configfiles
 
-@dataclasses.dataclass
-class TestParameter:
-    name:  str
-    value: str
-
-    def __init__(self, data: tuple) -> None:
-        self.name  = data[0]
-        self.value = data[1]
-
 
 @dataclasses.dataclass
 class Case:
@@ -29,13 +20,14 @@ class Case:
 
     def __init__(self, data: dict) -> None:
         self.name       = data.get("name")
-        self.parameters = [ TestParameter(p) for p in list(data.get("parameters").items()) ]
+        self.parameters = {}
+        
+        for p in list(data.get("parameters").items()):
+            self.parameters[p[0]] = p[1]
 
     def get_keys(self):
         keys = []
         for param in self.parameters:
-            param: TestParameter
-
             keys.append(param.name)
         
         return keys
@@ -44,31 +36,19 @@ class Case:
         return key in self.get_keys()
 
     def __getitem__(self, key: str) -> str:
-        for param in self.parameters:
-            param: TestParameter
-
-            if param.name == key:
-                return param.value
+        if key not in self.parameters:
+            raise common.MFCException(f"Case: Parameter {key} does not exist.")
         
-        raise common.MFCException(f"Case: Parameter {key} does not exist.")
+        return self.parameters[key]
 
     def __setitem__(self, key: str, val: str):
-        for param in self.parameters:
-            param: TestParameter
-
-            if param.name == key:
-                param.value = val
-                break
-        
-        self.parameters.append(TestParameter((key, val)))
+        self.parameters[key] = val
 
     def create_case_dict(self) -> str: 
         result: str = "{\n"
 
-        for param in self.parameters:
-            param: TestParameter
-
-            result = f'{result}"{param.name}": "{param.value}",\n'
+        for key,val in self.parameters.items():
+            result = f'{result}"{key}": "{val}",\n'
 
         return result + "}"
 
@@ -149,14 +129,14 @@ BASE_CASE = Case({
 })
 
 
-class MFCTest:
+class MFCTest(configfiles.ConfigFileBase):
     def __init__(self, bootstrap):
-        data = configfiles.ConfigFileBase(common.MFC_TEST_FILEPATH, {
+        super().__init__(common.MFC_TEST_FILEPATH, {
             "base": dataclasses.asdict(BASE_CASE)
         })
 
-        self.base      = data.tree_get("base", {})
-        self.tests     = [ Test(e) for e in data.tree_get("tests", []) ]
+        self.base      = self.tree_get("base", {})
+        self.tests     = [ Test(e) for e in self.tree_get("tests", []) ]
         self.bootstrap = bootstrap
 
         # Aliases
@@ -193,13 +173,13 @@ class MFCTest:
 def get_case_dir(mods: dict):
     case_dir = f"{common.MFC_TESTDIR}/"
 
-    
+    return case_dir + hashlib.md5(str(mods).encode()).hexdigest()
 
-    return case_dir + str(random.randint(0, 100000))
-
-def create_case(mods: dict):
+def create_case_dir(mods: dict):
     case     = copy.deepcopy(BASE_CASE)
     case_dir = get_case_dir(mods)
+
+    common.delete_directory_recursive_safe(case_dir)
 
     for key, val in mods.items():
         case[key] = val
@@ -237,7 +217,7 @@ text_id = 1
 def handle_case(tree: treeprint.TreePrinter, parameters: dict):
     global text_id
 
-    create_case(parameters)
+    create_case_dir(parameters)
     
     tree.print_progress(f"Running test #{text_id}", text_id, 26)
 
