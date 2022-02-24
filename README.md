@@ -138,11 +138,7 @@ cd MFC
 
 ```console
 chmod +x ./mfc.sh
-<<<<<<< HEAD
-./mfc.sh --build -j 8 -t release-cpu
-=======
 ./mfc.sh --build -j 8 -cc release-cpu
->>>>>>> 0a10c0e (Shorter code names for jobs & --build no longer default MFlowCode#85)
 ```
 
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
