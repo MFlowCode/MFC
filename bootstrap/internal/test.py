@@ -4,9 +4,10 @@ import os
 import re
 import copy
 import math
-import hashlib
 import colorama
 import dataclasses
+
+from pathlib import Path
 
 import internal.common      as common
 import internal.treeprint   as treeprint
@@ -134,6 +135,7 @@ class MFCTest:
 
         # Aliases
         self.tree = self.bootstrap.tree
+        self.args = self.bootstrap.args
 
     def test(self):
         self.tree.print(f"Testing mfc")
@@ -142,15 +144,12 @@ class MFCTest:
         self.text_id = 1
         self.test_acc_packed = ""
 
+        if self.args["generate"]:
+            common.delete_directory_recursive_safe(common.MFC_TESTDIR)
+            common.create_directory_safe(common.MFC_TESTDIR)
+
         if not self.bootstrap.is_build_satisfied("mfc", ignoreIfSource=True):
             raise common.MFCException(f"Can't test mfc because its build isn't satisfied.")
-
-        # Find golden file (if exists), otherwise None
-        if os.path.isfile(common.MFC_GOLDEN_FILEPATH):
-            with open(common.MFC_GOLDEN_FILEPATH) as f:
-                self.golden = f.read()
-        else:
-            self.golden = None 
 
         # TODO: 1d, 2d, 3d
 
@@ -190,8 +189,6 @@ class MFCTest:
         case     = copy.deepcopy(BASE_CASE)
         case_dir = self.get_case_dir(mods)
 
-        common.delete_directory_recursive_safe(case_dir)
-
         for key, val in mods.items():
             case[key] = val
 
@@ -219,12 +216,15 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         f.write(content)
         f.close()
 
-    def golden_file_check_match(self, candidate: str):
+    def golden_file_check_match(self, truth: str, candidate: str):
         for candidate_line in candidate.splitlines():
+            if candidate_line == "":
+                continue
+
             file_subpath: str = candidate_line.split(' ')[0]
             
             line_trusted: str = ""
-            for l in self.golden.splitlines():
+            for l in truth.splitlines():
                 if l.startswith(file_subpath):
                     line_trusted = l
                     break
@@ -257,27 +257,41 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         def on_test_errror():
             common.clear_line()
-            tree.print(f"Test #{self.text_id} Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            tree.print(f"Test #{self.text_id}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
             tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
             raise common.MFCException("Testing failed (view above).")
 
         common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1", on_error=on_test_errror)
 
         pack = self.pack_case_output(parameters)
-        self.test_acc_packed += pack
+        
+        golden_filepath = f"{self.get_case_dir(parameters)}/golden.txt"
 
-        if (self.golden is not None) and (not self.golden_file_check_match(pack)):
+        if self.args["generate"]:
+            common.delete_file_safe(golden_filepath)
+            with open(golden_filepath, "w") as f:
+                f.write(pack)
+        
+        if not os.path.isfile(golden_filepath):
+            common.clear_line()
+            tree.print(f"Test #{self.text_id}: Golden file doesn't exist! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
             on_test_errror()
+
+        with open(golden_filepath, "r") as f:                
+            if not self.golden_file_check_match(f.read(), pack):
+                on_test_errror()
 
         self.text_id+=1
 
     def pack_case_output(self, params: dict):
         result: str = ""
 
-        D_dir = f'{self.get_case_dir(params)}/D'
-        for filename in list(filter(lambda x: x.endswith('.dat'), os.listdir(D_dir))):
-            filepath = f'{D_dir}/{filename}'
+        case_dir = self.get_case_dir(params)
+        D_dir    = f"{case_dir}/D/"
+
+        for filepath in list(Path(D_dir).rglob("*.dat")): # list(filter(lambda x: x.endswith('.dat'), os.listdir(D_dir))):
+            short_filepath = str(filepath).replace(f'{case_dir}/', '')
             with open(filepath, "r") as file:
-                result += f"{self.get_case_dir_name(params)}/D/{filename} " + re.sub(r' +', ' ', file.read().replace('\n', ' ')).strip() + '\n'
+                result += f"{short_filepath} " + re.sub(r' +', ' ', file.read().replace('\n', ' ')).strip() + '\n'
         
         return result
