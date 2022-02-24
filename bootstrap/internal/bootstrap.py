@@ -477,4 +477,3 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 if self.args["clean"]: self.clean_target(target_name)
 
         self.lock.save()
-        self.test.save()
