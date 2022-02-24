@@ -173,7 +173,7 @@ class MFCTest:
 
 
     def get_case_dir_name(self, mods: dict):
-        return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}," for x in mods.items()])[:-1]
+        return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}_" for x in mods.items()])[:-1]
 
     def get_case_dir(self, mods: dict):
         return f"{common.MFC_TESTDIR}/{self.get_case_dir_name(mods)}"
@@ -209,7 +209,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         f.write(content)
         f.close()
 
-    def golden_file_check_match(self, truth: str, candidate: str):
+    def golden_file_compare_match(self, truth: str, candidate: str):
         for candidate_line in candidate.splitlines():
             if candidate_line == "":
                 continue
@@ -230,16 +230,18 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
             # Different amount of spaces, means that there are more entires in one than in the other
             if len(numbers_cand) != len(numbers_trust):
-                return False
+                return (False, "Variable count didn't match.")
 
             # check values one by one
             for i in range(len(numbers_cand)):
                 # FIXME: set abs_tol
                 if not math.isclose(numbers_cand[i], numbers_trust[i], rel_tol=1e-13):
-                    return False
+                    abs_delta    = abs(numbers_cand[i]-numbers_trust[i])
+                    percent_diff = abs_delta/numbers_trust[i]
+                    return (False, f"Error margin is too high for value at position #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
 
         # Both tests gave the same results within an acceptable tolerance
-        return True
+        return (True, "")
 
     def handle_case(self, tree: treeprint.TreePrinter, parameters: dict):
         global text_id
@@ -248,13 +250,15 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         
         tree.print_progress(f"Running test #{self.text_id}", self.text_id, 26)
 
-        def on_test_errror():
+        def on_test_errror(msg: str = ""):
             common.clear_line()
             tree.print(f"Test #{self.text_id}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            if msg != "":
+                tree.print(msg)
             tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
             raise common.MFCException("Testing failed (view above).")
 
-        common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1", on_error=on_test_errror)
+        common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1", on_error=lambda: on_test_errror("MFC Execution Failed. Please refer to tests/test.log"))
 
         pack = self.pack_case_output(parameters)
         
@@ -272,8 +276,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             on_test_errror()
 
         with open(golden_filepath, "r") as f:                
-            if not self.golden_file_check_match(f.read(), pack):
-                on_test_errror()
+            bSuccess, errorMsg = self.golden_file_compare_match(f.read(), pack)
+            if not bSuccess:
+                on_test_errror(errorMsg)
 
         self.text_id+=1
 
@@ -283,7 +288,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         case_dir = self.get_case_dir(params)
         D_dir    = f"{case_dir}/D/"
 
-        for filepath in list(Path(D_dir).rglob("*.dat")): # list(filter(lambda x: x.endswith('.dat'), os.listdir(D_dir))):
+        for filepath in list(Path(D_dir).rglob("*.dat")):
             short_filepath = str(filepath).replace(f'{case_dir}/', '')
             with open(filepath, "r") as file:
                 result += f"{short_filepath} " + re.sub(r' +', ' ', file.read().replace('\n', ' ')).strip() + '\n'
