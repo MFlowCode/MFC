@@ -66,4 +66,9 @@ jobs:
             tests/**/*.dat
             tests/**/*.out
             tests/**/*.inp
+<<<<<<< HEAD
 
+=======
+            tests/**/*.txt
+            tests/test.log
+>>>>>>> fad1994 (Add test.log and golden files to uploaded logs in CI)
