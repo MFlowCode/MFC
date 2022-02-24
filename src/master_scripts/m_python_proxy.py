@@ -1622,6 +1622,9 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
     cmd_status = Popen('make -C ' + comp_dir + ' all', shell=True, stdout=PIPE, universal_newlines=True)
     output, errors = cmd_status.communicate()
 
+    if (cmd_status.returncode != 0):
+        exit(cmd_status.returncode)
+
 
     # Generating input file to be read in by the MFC component's executable
     f_create_input_file(comp_name, case_dict)
@@ -1637,9 +1640,17 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
         cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../build/common/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../build/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print('\n' + output)
+
+        if (cmd_status.returncode != 0):
+            exit(cmd_status.returncode)
+
         print(comp_name + '>> Serial job completed!' + '\n')
         cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
+
+        if (cmd_status.returncode != 0):
+            exit(cmd_status.returncode)
+        
     #else if engine == 'interactive':
     #    print '\n' + comp_name + '>> Interactive job in progress ...' + '\n'
     #    cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
@@ -1656,6 +1667,10 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
         cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print('\n' + output)
+
+        if (cmd_status.returncode != 0):
+            exit(cmd_status.returncode)
+
         print(comp_name + '>> Parallel job submitted to queue!' + '\n')
 # END: def f_execute_mfc_component ---------------------------------------------
 
@@ -1761,6 +1776,8 @@ def f_execute_mfc_component(comp_name: str, case_dict, mfc_dir, engine): # -----
 
         cmd_status = Popen(f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pathlib.Path(__file__).parent.resolve()}/../../build/common/build/lib" mpirun -n {str(pbs_dict["ppn"])} "{mfc_dir}/../build/___current___/build/bin/{comp_name}"', shell=True, universal_newlines=True)
         output, errors = cmd_status.communicate()
+        if (cmd_status.returncode != 0):
+            exit(cmd_status.returncode)
         #print '\n' + output
         print( comp_name + '>> Serial job completed!' + '\n')
         #cmd_status = Popen('rm -f '+ comp_name +'.inp', shell=True, stdout=PIPE, universal_newlines=True)
@@ -1773,6 +1790,10 @@ def f_execute_mfc_component(comp_name: str, case_dict, mfc_dir, engine): # -----
         cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print( '\n' + output)
+        
+        if (cmd_status.returncode != 0):
+            exit(cmd_status.returncode)
+
         print( comp_name + '>> Parallel job submitted to queue!' + '\n')
 # END: def f_execute_mfc_component ---------------------------------------------
 
@@ -2037,6 +2058,9 @@ def f_create_batch_file_SHB(comp_name, case_dict, mfc_dir,sub_name): # ---------
     cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
     output, errors = cmd_status.communicate()
 
+    if (cmd_status.returncode != 0):
+        exit(cmd_status.returncode)
+
 
 def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
     # Description: The following function generates a batch file given the name
@@ -2183,6 +2207,10 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
     # Giving the batch file the permission to be executed
     cmd_status = Popen('chmod +x ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
     output, errors = cmd_status.communicate()
+
+    if (cmd_status.returncode != 0):
+        exit(cmd_status.returncode)
+    
 # END: def f_create_batch_file -------------------------------------------------
 
 

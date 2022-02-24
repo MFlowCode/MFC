@@ -8,10 +8,8 @@ import hashlib
 import colorama
 import dataclasses
 
-import internal.bootstrap   as boot
 import internal.common      as common
 import internal.treeprint   as treeprint
-import internal.configfiles as configfiles
 
 
 @dataclasses.dataclass
@@ -257,17 +255,19 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         
         tree.print_progress(f"Running test #{self.text_id}", self.text_id, 26)
 
-        common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1")
+        def on_test_errror():
+            common.clear_line()
+            tree.print(f"Test #{self.text_id} Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
+            raise common.MFCException("Testing failed (view above).")
+
+        common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1", on_error=on_test_errror)
 
         pack = self.pack_case_output(parameters)
         self.test_acc_packed += pack
 
-        if self.golden is not None:
-            if not self.golden_file_check_match(pack):
-                common.clear_line()
-                tree.print(f"Test #{self.text_id} Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
-                tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
-                raise common.MFCException("Testing failed (view above).")
+        if (self.golden is not None) and (not self.golden_file_check_match(pack)):
+            on_test_errror()
 
         self.text_id+=1
 
