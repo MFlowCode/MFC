@@ -1,17 +1,15 @@
 import os
-import re
 import sys
 import yaml     # *: PyYAML package
 import shutil
-import colorama # *: Colorama package
 import tarfile
+import colorama # *: Colorama package
 
 
 MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
 MFC_TESTDIR         = f"{MFC_ROOTDIR}/tests"
 MFC_SUBDIR          = f"{MFC_ROOTDIR}/build"
 MFC_DEV_FILEPATH    = f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml"
-MFC_GOLDEN_FILEPATH = f"{MFC_ROOTDIR}/tests/golden.txt"
 MFC_USER_FILEPATH   = f"{MFC_ROOTDIR}/mfc.user.yaml"
 MFC_LOCK_FILEPATH   = f"{MFC_SUBDIR}/mfc.lock.yaml"
 
