@@ -11,7 +11,13 @@ class MFCArgs(objecttree.ObjectTree):
 
         compiler_configuration_names = [e.name for e in user.configurations]
 
-        action = parser.add_argument_group(title="Action")
+        action  = parser.add_argument_group(title="Action")
+        general = parser.add_argument_group(title="General")
+        build   = parser.add_argument_group(title="Build")
+        test    = parser.add_argument_group(title="Test")
+
+        test.add_argument("-g", "--generate", action="store_true", help="Generate golden files.")
+
         grp = action.add_mutually_exclusive_group(required=True)
 
         grp.add_argument("--build", action="store_true", help="Build targets.")
@@ -21,17 +27,17 @@ class MFCArgs(objecttree.ObjectTree):
                             help="Select a compiler configuration to use when running MFC.")
 
         compiler_target_names = [e.name for e in conf.targets]
-        parser.add_argument("-t", "--targets", nargs="+", type=str.lower,
+        general.add_argument("-t", "--targets", nargs="+", type=str.lower,
                             choices=compiler_target_names, default=["mfc"],
                             help="The space-separated targets you wish to have built.")
 
-        parser.add_argument("-cc", "--compiler-configuration", type=str.lower,
+        general.add_argument("-cc", "--compiler-configuration", type=str.lower,
                             choices=compiler_configuration_names, default=user.defaults.configuration)
 
-        parser.add_argument("-j", "--jobs", metavar="N", type=int,
+        build.add_argument("-j", "--jobs", metavar="N", type=int,
                             help="Allows for N concurrent jobs.", default=int(user.defaults.threads))
 
-        parser.add_argument("-s", "--scratch", action="store_true",
+        build.add_argument("-s", "--scratch", action="store_true",
                             help="Build all targets from scratch.")
 
         super().__init__(vars(parser.parse_args()))

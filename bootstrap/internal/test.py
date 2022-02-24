@@ -181,7 +181,7 @@ class MFCTest:
 
 
     def get_case_dir_name(self, mods: dict):
-        return hashlib.md5(str(mods).encode()).hexdigest()
+        return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}," for x in mods.items()])[:-1]
 
     def get_case_dir(self, mods: dict):
         return f"{common.MFC_TESTDIR}/{self.get_case_dir_name(mods)}"
