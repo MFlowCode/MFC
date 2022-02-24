@@ -168,13 +168,6 @@ class MFCTest:
 
             # TODO: mpi_rank
         
-        # Write golden file if it doesn't exist
-        if self.golden is None:
-            with open(common.MFC_GOLDEN_FILEPATH, "w") as f:
-                f.write(self.test_acc_packed)
-            
-            self.tree.print(f"No golden file present... Generated from current runs @ {common.MFC_GOLDEN_FILEPATH}.")
-
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
@@ -275,6 +268,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         if not os.path.isfile(golden_filepath):
             common.clear_line()
             tree.print(f"Test #{self.text_id}: Golden file doesn't exist! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            tree.print(f"To generate golden files, use the '-g' flag.")
             on_test_errror()
 
         with open(golden_filepath, "r") as f:                
