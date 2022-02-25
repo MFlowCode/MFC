@@ -128,7 +128,6 @@ BASE_CASE = Case({
     }
 })
 
-
 class MFCTest:
     def __init__(self, bootstrap):
         self.bootstrap = bootstrap
@@ -166,8 +165,10 @@ class MFCTest:
 
                 # TODO: num_comp
 
-            # TODO: mpi_rank
+            for ppn in [2, 4]:
+                self.handle_case(self.tree, {'ppn': ppn})
         
+        common.clear_line()
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
@@ -248,7 +249,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         self.create_case_dir(parameters)
         
-        tree.print_progress(f"Running test #{self.text_id}", self.text_id, 26)
+        tree.print_progress(f"Running test #{self.text_id} - {self.get_case_dir_name(parameters)}", self.text_id, 26)
 
         def on_test_errror(msg: str = ""):
             common.clear_line()
