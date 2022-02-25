@@ -61,10 +61,8 @@ class Test:
         self.case = data.get("case", {})
 
 
-Nx   = 299
-dx   = 1./(1.*(Nx+1))
 Tend = 0.25
-Nt   = 2500
+Nt   = 500
 mydt = Tend/(1.*Nt)
 
 BASE_CASE = Case({
@@ -79,7 +77,11 @@ BASE_CASE = Case({
         'mail_list'                    : '',
         'x_domain%beg'                 : 0.E+00,   
         'x_domain%end'                 : 1.E+00,   
-        'm'                            : Nx,       
+        'y_domain%beg'                 : 0.E+00,   
+        'y_domain%end'                 : 1.E+00,   
+        'z_domain%beg'                 : 0.E+00,   
+        'z_domain%end'                 : 1.E+00,   
+        'm'                            : 0,       
         'n'                            : 0,        
         'p'                            : 0,        
         'dt'                           : mydt,     
@@ -105,21 +107,37 @@ BASE_CASE = Case({
         'avg_state'                    : 2,
         'bc_x%beg'                     : -3, 
         'bc_x%end'                     : -3,
+        'bc_y%beg'                     : -3, 
+        'bc_y%end'                     : -3,
+        'bc_z%beg'                     : -3, 
+        'bc_z%end'                     : -3,
         'format'                       : 1,
         'precision'                    : 2,
         'prim_vars_wrt'                :'T',
         'parallel_io'                  :'F',
         'patch_icpp(1)%geometry'       : 1,
         'patch_icpp(1)%x_centroid'     : 0.25,
+        'patch_icpp(1)%y_centroid'     : 0.5,
+        'patch_icpp(1)%z_centroid'     : 0.5,
         'patch_icpp(1)%length_x'       : 0.5,
+        'patch_icpp(1)%length_y'       : 1,
+        'patch_icpp(1)%length_z'       : 1,
         'patch_icpp(1)%vel(1)'         : 0.0,
+        'patch_icpp(1)%vel(2)'         : 0.0,
+        'patch_icpp(1)%vel(3)'         : 0.0,
         'patch_icpp(1)%pres'           : 1.0,
         'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
         'patch_icpp(1)%alpha(1)'       : 1.,
         'patch_icpp(2)%geometry'       : 1,
         'patch_icpp(2)%x_centroid'     : 0.75,
+        'patch_icpp(2)%y_centroid'     : 0.5,
+        'patch_icpp(2)%z_centroid'     : 0.5,
         'patch_icpp(2)%length_x'       : 0.5,
+        'patch_icpp(2)%length_y'       : 1,
+        'patch_icpp(2)%length_z'       : 1,
         'patch_icpp(2)%vel(1)'         : 0.0,
+        'patch_icpp(2)%vel(2)'         : 0.0,
+        'patch_icpp(2)%vel(3)'         : 0.0,
         'patch_icpp(2)%pres'           : 0.1,
         'patch_icpp(2)%alpha_rho(1)'   : 0.125E+00,
         'patch_icpp(2)%alpha(1)'       : 1.,
@@ -147,27 +165,29 @@ class MFCTest:
             common.delete_directory_recursive_safe(common.MFC_TESTDIR)
             common.create_directory_safe(common.MFC_TESTDIR)
 
-        if not self.bootstrap.is_build_satisfied("mfc", ignoreIfSource=True):
+        if not self.bootstrap.is_build_satisfied("mfc"):
             raise common.MFCException(f"Can't test mfc because its build isn't satisfied.")
+        
+        for dimId, dimParams in enumerate([ #{'patch_icpp(1)%geometry': 1, 'patch_icpp(2)%geometry': 1, 'm': 299},
+                                            {'patch_icpp(1)%geometry': 3, 'patch_icpp(2)%geometry': 3, 'm': 49, 'n': 39},
+                                            #{'patch_icpp(1)%geometry': 9, 'patch_icpp(2)%geometry': 9, 'm': 39, 'n': 29, 'p': 19}
+                                            ]):
+            for weno_order in [3, 5]:
+                for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
+                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
 
-        # TODO: 1d, 2d, 3d
-
-        for weno_order in [3, 5]:
-            for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                self.handle_case(self.tree, {'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno})
-
-            for riemann_solver in [1, 2]:
-                self.handle_case(self.tree, {'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'})
-                self.handle_case(self.tree, {'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'})
-                self.handle_case(self.tree, {'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'})
-                self.handle_case(self.tree, {'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1})
-                self.handle_case(self.tree, {'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2})
+                for riemann_solver in [1, 2]:
+                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
+                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
+                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
+                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
+                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
 
                 # TODO: num_comp
 
             for ppn in [2, 4]:
-                self.handle_case(self.tree, {'ppn': ppn})
-        
+                self.handle_case(self.tree, {**dimParams, **{'ppn': ppn}})
+    
         common.clear_line()
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()

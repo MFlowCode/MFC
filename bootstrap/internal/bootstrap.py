@@ -188,7 +188,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         return string
 
-    def is_build_satisfied(self, name: str, ignoreIfSource: bool = False):
+    def is_build_satisfied(self, name: str):
         # Check if it hasn't been built before
         compiler_cfg = self.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
 
@@ -202,13 +202,17 @@ If you think MFC could (or should) be able to find it automatically for you syst
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
         if conf_desc.fetch.method != lock_desc.target.fetch.method    or \
            lock_desc.metadata.bCleaned                                or \
-           conf_desc.fetch.method == "source" and not(ignoreIfSource) or \
            conf_desc.fetch.params != lock_desc.target.fetch.params:
             return False
 
+        if conf_desc.fetch.method == "source":
+            # TODO:
+            # FIXME:
+            pass
+
         # Check if any of its dependencies needs updating
         for dependency_name in self.conf.get_dependency_names(name, recursive=True):
-            if not self.is_build_satisfied(dependency_name, ignoreIfSource=ignoreIfSource):
+            if not self.is_build_satisfied(dependency_name):
                 return False
 
         # Check for "scratch" flag
@@ -411,7 +415,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.test.test()
 
     def clean_target(self, name: str):
-        if not self.is_build_satisfied(name, ignoreIfSource=True):
+        if not self.is_build_satisfied(name):
             raise common.MFCException(f"Can't clean {name} because its build isn't satisfied.")
 
         self.tree.print(f"Cleaning Package {name}")
