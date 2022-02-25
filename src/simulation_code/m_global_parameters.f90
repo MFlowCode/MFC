@@ -18,6 +18,8 @@ module m_global_parameters
 
     use m_derived_types        !< Definitions of the derived types
 
+    use openacc
+
     ! ==========================================================================
 
     implicit none
@@ -282,7 +284,9 @@ module m_global_parameters
 
     ! Mathematical and Physical Constants ======================================
     ! REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
-    real(kind(0d0)), parameter :: pi = 3.14159265358979311599796 !< Pi
+    real(kind(0d0)) :: pi = 3.141592653589793d0 !< Pi
+    !$acc declare create(pi)
+
     ! ==========================================================================
 
 contains
@@ -964,15 +968,19 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
 !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
+
+        real(kind(0d0)), intent(IN) :: vftmp
+        real(kind(0d0)), dimension(:), intent(IN) :: nRtmp
+        real(kind(0d0)), intent(OUT) :: ntmp
+        real(kind(0d0)) :: nR3
         integer :: i
 
-        call s_quad(nRtmp**3d0, nR3)
+        nR3 = 0d0
+        do i = 1, nb
+            nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
+        end do
 
-        if (nR3 < 0d0) then
+        !if (nR3 < 0d0) then
             ! DO i = 1,nb
             ! IF (nRtmp(i) < small_alf) THEN
             ! nRtmp(i) = small_alf
@@ -980,16 +988,16 @@ contains
             ! END DO
             ! nR3 = 1.d-12
             !print *, vftmp, nR3, nRtmp(:)
-            stop 'nR3 is negative'
-        end if
-        if (vftmp < 0d0) then
+         !   stop 'nR3 is negative'
+        !end if
+        !if (vftmp < 0d0) then
             ! vftmp = small_alf
             ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
             !print *, vftmp, nR3, nRtmp(:)
-            stop 'vf negative'
-        end if
+         !   stop 'vf negative'
+        !end if
 
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+        ntmp = DSQRT((4.d0*3.141592653589793d0/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
 
@@ -1000,12 +1008,17 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
 !$acc routine seq
+
         real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
+        real(kind(0.d0)), dimension(:), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
         real(kind(0.d0)) :: R3
+        integer :: i
 
-        call s_quad(Rtmp**3d0, R3)
+        R3 = 0d0
+        do i = 1, nb
+            R3 = R3 + weight(i)*(Rtmp(i)**3d0)
+        end do
 
         IF ( R3 < 0d0 ) THEN
             !PRINT*, vftmp, R3, Rtmp(:)
@@ -1016,7 +1029,7 @@ contains
             STOP 'vf negative'
         END IF
 
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
+        ntmp = (3.d0/(4.d0*3.141592653589793d0))*vftmp/R3
 
     end subroutine s_comp_n_from_prim
 
@@ -1025,10 +1038,15 @@ contains
         !! @param mom is the computed moment
     subroutine s_quad(func, mom)
 !$acc routine seq
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
 
-        mom = dot_product(weight, func)
+        real(kind(0.d0)), dimension(:), intent(IN) :: func
+        real(kind(0.d0)), intent(OUT) :: mom
+        integer :: i
+
+        mom = 0d0
+        do i = 1, nb
+            mom = mom + weight(i)*func(i)
+        end do
 
     end subroutine s_quad
 
