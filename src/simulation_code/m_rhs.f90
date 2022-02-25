@@ -899,7 +899,7 @@ contains
 
         real(kind(0d0)) :: n_tait, B_tait
 
-        real(kind(0d0)), dimension(3)  :: Rtmp, Vtmp
+        real(kind(0d0)), dimension(1)  :: Rtmp, Vtmp
         real(kind(0d0))   :: myR, myV, alf, myP, myRho, R2Vav
         integer :: ndirs
 
@@ -964,6 +964,11 @@ contains
 
         end if
 
+        !do i = 1, sys_size
+        !!$acc update host(q_cons_qp%vf(i)%sf)
+        !end do
+
+       !print *, "DEBUG1" ,q_cons_qp%vf(1)%sf(48,0,0), q_cons_qp%vf(2)%sf(48,0,0), q_cons_qp%vf(3)%sf(48,0,0), q_cons_qp%vf(4)%sf(48,0,0), q_cons_qp%vf(5)%sf(48, 0, 0), q_cons_qp%vf(6)%sf(48,0,0)
   
 
         !convert conservative variables to primitive
@@ -976,6 +981,11 @@ contains
             ix, iy, iz)
         call nvtxEndRange
 
+        !do i = 1, sys_size
+        !!$acc update host(q_prim_qp%vf(i)%sf)
+        !end do
+
+        !print *, "DEBUG1" ,q_prim_qp%vf(1)%sf(48,0,0), q_prim_qp%vf(2)%sf(48,0,0), q_prim_qp%vf(3)%sf(48,0,0), q_prim_qp%vf(4)%sf(48,0,0), q_prim_qp%vf(5)%sf(48, 0, 0), q_prim_qp%vf(6)%sf(48,0,0)
 
 
        
@@ -1042,6 +1052,10 @@ contains
 
 
                 ! ===============================================================
+
+                !!$acc update host(flux_n(1)%vf(3)%sf, flux_n(1)%vf(5)%sf)
+
+                !print *, "DEBUG2", flux_n(1)%vf(3)%sf(48,0,0), flux_n(1)%vf(5)%sf(48,0,0)
 
 
              if (alt_soundspeed) then
@@ -1189,12 +1203,16 @@ contains
                                   do j = 0, m
                                       divu%sf(j, k, l) = 0d0
                                       divu%sf(j, k, l) = &
-                                          0.5d0/dx(j)*(q_prim_qp%vf(contxe + id)%sf(j + 1, k, l) - &
+                                          5d-1/dx(j)*(q_prim_qp%vf(contxe + id)%sf(j + 1, k, l) - &
                                           q_prim_qp%vf(contxe + id)%sf(j - 1, k, l))
                                       
                                   end do
                               end do
                           end do
+
+                          !!$acc update host(divu%sf)
+
+                          !print *, "DEBUG3", divu%sf(48,0,0)
 
                         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                         if (id == ndirs) then
@@ -1222,12 +1240,21 @@ contains
                                     call s_comp_n_from_prim(q_prim_qp%vf(alf_idx)%sf(j, k, l), &
                                                             Rtmp, nbub(j, k, l))
 
+                                    !nbub(j, k, l) = (3.d0/(4.d0*3.141592653589793d0))*q_prim_qp%vf(alf_idx)%sf(j, k, l)/(Rtmp(1)**3d0)
+
                                     call s_quad((Rtmp**2.d0)*Vtmp, R2Vav)
-                                    bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
+
+                                    !R2Vav = weight(1)*(Rtmp(1)**2.d0)*Vtmp(1)
+
+                                    bub_adv_src(j, k, l) = 4.d0*3.141592653589793d0*nbub(j, k, l)*R2Vav
                                       
                                   end do
                               end do
                           end do
+
+                            !!$acc update host(bub_adv_src)
+
+                         ! print *, "DEBUG4", bub_adv_src(48,0,0)
 
 !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
                             do l = 0, p
@@ -1244,7 +1271,31 @@ contains
                                                 myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
                                             end do 
 
-                                            call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+                                            !call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+
+                                            myRho = 0d0
+                                            n_tait = 0d0
+                                            B_tait = 0d0
+
+                                            if(mpp_lim .and. (num_fluids > 2)) then
+!$acc loop seq
+                                                do ii = 1, num_fluids
+                                                    myRho = myRho + myalpha_rho(ii)
+                                                    n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                                    B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                                end do
+                                            else if(num_fluids > 2) then
+!$acc loop seq
+                                                do ii = 1, num_fluids - 1
+                                                    myRho = myRho + myalpha_rho(ii)
+                                                    n_tait = n_tait+ myalpha(ii)*gammas(ii)
+                                                    B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                                end do
+                                            else
+                                                myRho = myalpha_rho(1)
+                                                n_tait = gammas(1)
+                                                B_tait = pi_infs(1)
+                                            end if
 
                                             n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
@@ -1262,7 +1313,7 @@ contains
                                                 pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
                                                 bub_p_src( j, k, l, q) = nbub(j, k, l)*pbdot
-                                                bub_m_src( j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
+                                                bub_m_src( j, k, l, q) = nbub(j, k, l)*vflux*4.d0*3.141592653589793d0*(myR**2.d0)
                                             else
                                                 pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
                                             end if
@@ -1306,6 +1357,11 @@ contains
                             end do
                         end if
 
+                            !!$acc update host(bub_r_src, bub_v_src)
+
+                          !print *, "DEBUG5", bub_r_src(48,0,0, 1), bub_v_src(48,0,0, 1)
+
+
 !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do q = 0, n
@@ -1328,11 +1384,11 @@ contains
                     end if
                 end if
 
-                !do l = 1, sys_size
-!!$acc update host(rhs_vf(l)%sf)
-                !end do
 
-                !print *, rhs_vf(3)%sf(40,0,0)
+                !!$acc update host(rhs_vf(3)%sf, rhs_vf(5)%sf)
+
+
+                !print *, "DEBUG6", rhs_vf(3)%sf(48,0,0), rhs_vf(5)%sf(48, 0, 0)
 
                 if (monopole) then
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -1372,10 +1428,37 @@ contains
                                                 myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
                                             end do 
 
+                                            myRho = 0d0
+                                            n_tait = 0d0
+                                            B_tait = 0d0
+
                                             if(bubbles) then
-                                                call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+                                                if(mpp_lim .and. (num_fluids > 2)) then
+    !$acc loop seq
+                                                    do ii = 1, num_fluids
+                                                        myRho = myRho + myalpha_rho(ii)
+                                                        n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                                        B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                                    end do
+                                                else if(num_fluids > 2) then
+    !$acc loop seq
+                                                    do ii = 1, num_fluids - 1
+                                                        myRho = myRho + myalpha_rho(ii)
+                                                        n_tait = n_tait+ myalpha(ii)*gammas(ii)
+                                                        B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                                    end do
+                                                else
+                                                    myRho = myalpha_rho(1)
+                                                    n_tait = gammas(1)
+                                                    B_tait = pi_infs(1)
+                                                end if
                                             else
-                                                call s_convert_species_to_mixture_variables_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
+    !$acc loop seq
+                                                    do ii = 1, num_fluids
+                                                        myRho = myRho + myalpha_rho(ii)
+                                                        n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                                        B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                                    end do
                                             end if
                                             n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
@@ -1384,8 +1467,8 @@ contains
 
                                             const_sos = dsqrt(n_tait)
 
-                                            s2 = f_g(mytime, sound, const_sos, mono(q)) * &
-                                                f_delta(j, k, l, mono(q)%loc, mono(q)%length, mono(q))
+                                            s2 = f_g(mytime, sound, const_sos, q) * &
+                                                f_delta(j, k, l, mono(q)%loc, mono(q)%length, q)
 
                                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
                                             if (n == 0) then
@@ -2135,7 +2218,7 @@ contains
                 if (monopole) then
                     mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0; 
                     do j = 1, num_mono
-                        call s_get_monopole(i, q_prim_vf, t_step, mono(j))
+                        !call s_get_monopole(i, q_prim_vf, t_step, mono(j))
                     end do
                     do k = cont_idx%beg, cont_idx%end
                         rhs_vf(k)%sf(:, :, :) = rhs_vf(k)%sf(:, :, :) + mono_mass_src(:, :, :)
@@ -2271,7 +2354,7 @@ contains
                 if (monopole) then
                     mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0; 
                     do j = 1, num_mono
-                        call s_get_monopole(i, q_prim_vf, t_step, mono(j))
+                        !call s_get_monopole(i, q_prim_vf, t_step, mono(j))
                     end do
 
                     do k = cont_idx%beg, cont_idx%end
@@ -2527,7 +2610,7 @@ contains
                 if (monopole) then
                     mono_mass_src = 0d0; mono_mom_src = 0d0; mono_e_src = 0d0; 
                     do j = 1, num_mono
-                        call s_get_monopole(i, q_prim_vf, t_step, mono(j))
+                        !call s_get_monopole(i, q_prim_vf, t_step, mono(j))
                     end do
                     do k = cont_idx%beg, cont_idx%end
                         rhs_vf(k)%sf(:, :, :) = rhs_vf(k)%sf(:, :, :) + mono_mass_src(:, :, :)
@@ -2805,117 +2888,43 @@ contains
         end if          
     end subroutine s_get_divergence
 
-    !> The purpose of this procedure is to compute the source term
-        !! that are needed for generating one-way acoustic waves
-        !! @param idir Coordinate direction
-        !! @param q_prim_vf Primitive variables
-        !! @param t_step Current time-step
-        !! @param mymono Monopole parameters
-    subroutine s_get_monopole(idir, q_prim_vf, t_step, mymono) ! ------------------------------
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(mono_parameters), intent(IN) :: mymono
-        integer, intent(IN) :: idir, t_step
 
-        integer :: ndirs, j, k, l
-
-        real(kind(0d0)) :: mytime, sound, n_tait, B_tait
-        real(kind(0d0)) :: s2, myRho, const_sos
-
-        real(kind(0d0)), dimension(2) :: Re
-
-        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-
-        if (idir == ndirs) then
-            mytime = t_step*dt
-            if (proc_rank == 0) print *, 'time', mytime, 'delay', mymono%delay, dflt_real
-            if ((mytime < mymono%delay) .and. mymono%delay /= dflt_real) return
-
-            do j = 0, m; do k = 0, n; do l = 0, p
-                    call s_convert_to_mixture_variables(q_prim_vf, myRho, n_tait, B_tait, Re, j, k, l)
-                    n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
-
-                    sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
-                    sound = dsqrt(sound)
-
-                    const_sos = dsqrt(n_tait)
-
-                    s2 = f_g(mytime, sound, const_sos, mymono) * &
-                        f_delta(j, k, l, mymono%loc, mymono%length, mymono)
-
-                    mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
-                    if (n == 0) then
-
-                        ! 1D
-                        if (mymono%dir < -0.1d0) then
-                            !left-going wave
-                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
-                        else
-                            !right-going wave
-                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2
-                        end if
-                    else if (p == 0) then
-                        ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
-                        !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mymono)
-
-                        if (mymono%dir .ne. dflt_real) then
-                            ! 2d
-                            !mono_mom_src(1,j,k,l) = s2
-                            !mono_mom_src(2,j,k,l) = s2
-                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mymono%dir)
-                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mymono%dir)
-                        end if
-                    else
-                        ! 3D
-                        if (mymono%dir .ne. dflt_real) then
-                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mymono%dir)
-                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mymono%dir)
-                        end if
-                    end if
-
-                    if (model_eqns .ne. 4) then
-                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
-                    end if
-                end do; end do; end do
-        end if
-
-    end subroutine s_get_monopole
 
     !> This function gives the temporally varying amplitude of the pulse
         !! @param mytime Simulation time
         !! @param sos Sound speed
         !! @param mysos Alternative speed of sound for testing
-        !! @param mymono Monopole parameterrs
-    function f_g(mytime, sos, mysos, mymono)
+    function f_g(mytime, sos, mysos, nm)
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: mytime, sos, mysos
-        type(mono_parameters), intent(IN) :: mymono
+        integer, intent(IN) :: nm
         real(kind(0d0)) :: period, t0, sigt, pa
         real(kind(0d0)) :: offset
         real(kind(0d0)) :: f_g
 
         offset = 0d0
-        if (mymono%delay /= dflt_real) offset = mymono%delay
+        if (mono(nm)%delay /= dflt_real) offset = mono(nm)%delay
 
-        if (mymono%pulse == 1) then
+        if (mono(nm)%pulse == 1) then
             ! Sine wave
-            period = mymono%length/sos
+            period = mono(nm)%length/sos
             f_g = 0d0
-            if (mytime <= (mymono%npulse*period + offset)) then
-                f_g = mymono%mag*sin((mytime + offset)*2.d0*pi/period)
+            if (mytime <= (mono(nm)%npulse*period + offset)) then
+                f_g = mono(nm)%mag*sin((mytime + offset)*2.d0*3.141592653589793d0/period)
             end if
-        else if (mymono%pulse == 2) then
+        else if (mono(nm)%pulse == 2) then
             ! Gaussian pulse
-            sigt = mymono%length/sos/7.d0
+            sigt = mono(nm)%length/sos/7.d0
             t0 = 3.5d0*sigt
-            f_g = mymono%mag/(dsqrt(2.d0*pi)*sigt)* &
+            f_g = mono(nm)%mag/(dsqrt(2.d0*3.141592653589793d0)*sigt)* &
                   dexp(-0.5d0*((mytime - t0)**2.d0)/(sigt**2.d0))
-        else if (mymono%pulse == 3) then
+        else if (mono(nm)%pulse == 3) then
             ! Square wave
-            sigt = mymono%length/sos
+            sigt = mono(nm)%length/sos
             t0 = 0d0; f_g = 0d0
             if (mytime > t0 .and. mytime < sigt) then
-                f_g = mymono%mag
+                f_g = mono(nm)%mag
             end if
         else
         end if
@@ -2928,11 +2937,10 @@ contains
         !! @param l Third coordinate-direction location index
         !! @param mono_loc Nominal source term location
         !! @param mono_leng Length of source term in space
-        !! @param mymono Monopole parameters
-    function f_delta(j, k, l, mono_loc, mono_leng, mymono)
+    function f_delta(j, k, l, mono_loc, mono_leng, nm)
 !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
-        type(mono_parameters), intent(IN) :: mymono
+        real(kind(0d0)), dimension(:), intent(IN) :: mono_loc
+        integer, intent(IN) :: nm
         real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l
 
@@ -2954,55 +2962,55 @@ contains
         end if
 
         if (n == 0) then      !1D
-            if (mymono%support == 1) then
+            if (mono(nm)%support == 1) then
                 ! 1D delta function
                 hx = abs(mono_loc(1) - x_cc(j))
 
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                f_delta = 1.d0/(dsqrt(2.d0*3.141592653589793d0)*sig/2.d0)* &
                           dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
-            else if (mymono%support == 0) then
+            else if (mono(nm)%support == 0) then
                 ! Support for all x
                 f_delta = 1.d0
             end if
         else if (p == 0) then !2D
             hx = mono_loc(1) - x_cc(j)
             hy = mono_loc(2) - y_cc(k)
-            if (mymono%support == 1) then
+            if (mono(nm)%support == 1) then
                 ! 2D delta function
                 sig = mono_leng/20.d0
                 h = dsqrt(hx**2.d0 + hy**2.d0)
 
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                f_delta = 1.d0/(dsqrt(2.d0*3.141592653589793d0)*sig/2.d0)* &
                           dexp(-0.5d0*((h/(sig/2.d0))**2.d0))
-            else if (mymono%support == 2) then
+            else if (mono(nm)%support == 2) then
                 !only support for y \pm some value
-                if (abs(hy) < mymono%length) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                if (abs(hy) < mono(nm)%length) then
+                    f_delta = 1.d0/(dsqrt(2.d0*3.141592653589793d0)*sig/2.d0)* &
                               dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
-            else if (mymono%support == 3) then
+            else if (mono(nm)%support == 3) then
                 ! Only support along some line
                 hx = x_cc(j) - mono_loc(1)
                 hy = y_cc(k) - mono_loc(2)
 
                 ! Rotate actual point by -theta
-                hxnew = cos(mymono%dir)*hx + sin(mymono%dir)*hy
-                hynew = -1.d0*sin(mymono%dir)*hx + cos(mymono%dir)*hy
-                if (abs(hynew) < mymono%loc(3)/2.d0) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                hxnew = cos(mono(nm)%dir)*hx + sin(mono(nm)%dir)*hy
+                hynew = -1.d0*sin(mono(nm)%dir)*hx + cos(mono(nm)%dir)*hy
+                if (abs(hynew) < mono(nm)%loc(3)/2.d0) then
+                    f_delta = 1.d0/(dsqrt(2.d0*3.141592653589793d0)*sig/2.d0)* &
                               dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
-            else if (mymono%support == 4) then
+            else if (mono(nm)%support == 4) then
                 ! Support for all y
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
+                f_delta = 1.d0/(dsqrt(2.d0*3.141592653589793d0)*sig)* &
                           dexp(-0.5d0*(hx/sig)**2.d0)
             end if
         else !3D
-            if (mymono%support == 3) then
+            if (mono(nm)%support == 3) then
                 ! Only support along some patch
 
                 hx = x_cc(j) - mono_loc(1)
@@ -3010,12 +3018,12 @@ contains
                 hz = z_cc(l) - mono_loc(3)
 
                 ! Rotate actual point by -theta
-                hxnew = cos(mymono%dir)*hx + sin(mymono%dir)*hy
-                hynew = -1.d0*sin(mymono%dir)*hx + cos(mymono%dir)*hy
+                hxnew = cos(mono(nm)%dir)*hx + sin(mono(nm)%dir)*hy
+                hynew = -1.d0*sin(mono(nm)%dir)*hx + cos(mono(nm)%dir)*hy
 
-                if (abs(hynew) < mymono%length/2. .and. &
-                    abs(hz) < mymono%length/2.) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                if (abs(hynew) < mono(nm)%length/2. .and. &
+                    abs(hz) < mono(nm)%length/2.) then
+                    f_delta = 1.d0/(dsqrt(2.d0*3.141592653589793d0)*sig/2.d0)* &
                               dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
@@ -4558,6 +4566,9 @@ contains
         ! END: First-Order Spatial Derivatives in z-direction ==============
 
     end subroutine s_apply_scalar_divergence_theorem ! ---------------------
+
+
+
 
 
 
