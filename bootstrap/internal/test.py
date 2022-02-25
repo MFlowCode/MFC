@@ -75,12 +75,6 @@ BASE_CASE = Case({
         'queue'                        : 'normal',
         'walltime'                     : '24:00:00',
         'mail_list'                    : '',
-        'x_domain%beg'                 : 0.E+00,   
-        'x_domain%end'                 : 1.E+00,   
-        'y_domain%beg'                 : 0.E+00,   
-        'y_domain%end'                 : 1.E+00,   
-        'z_domain%beg'                 : 0.E+00,   
-        'z_domain%end'                 : 1.E+00,   
         'm'                            : 0,       
         'n'                            : 0,        
         'p'                            : 0,        
@@ -168,26 +162,31 @@ class MFCTest:
         if not self.bootstrap.is_build_satisfied("mfc"):
             raise common.MFCException(f"Can't test mfc because its build isn't satisfied.")
         
-        for dimId, dimParams in enumerate([ #{'patch_icpp(1)%geometry': 1, 'patch_icpp(2)%geometry': 1, 'm': 299},
-                                            {'patch_icpp(1)%geometry': 3, 'patch_icpp(2)%geometry': 3, 'm': 49, 'n': 39},
-                                            #{'patch_icpp(1)%geometry': 9, 'patch_icpp(2)%geometry': 9, 'm': 39, 'n': 29, 'p': 19}
-                                            ]):
+        all_run_params = []
+
+        for dimParams in [ {'patch_icpp(1)%geometry': 1, 'patch_icpp(2)%geometry': 1, 'm': 299},
+                           {'patch_icpp(1)%geometry': 3, 'patch_icpp(2)%geometry': 3, 'm': 49, 'n': 39},
+                           {'patch_icpp(1)%geometry': 9, 'patch_icpp(2)%geometry': 9, 'm': 39, 'n': 29, 'p': 19}]:
             for weno_order in [3, 5]:
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
+                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
 
                 for riemann_solver in [1, 2]:
-                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
-                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
-                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
-                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
-                    self.handle_case(self.tree, {**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
+                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
+                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
+                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
+                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
+                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
 
                 # TODO: num_comp
 
             for ppn in [2, 4]:
-                self.handle_case(self.tree, {**dimParams, **{'ppn': ppn}})
+                all_run_params.append({**dimParams, **{'ppn': ppn}})
     
+        for i, run_params in enumerate(all_run_params):
+            self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i, len(all_run_params))
+            self.handle_case(i, run_params)
+
         common.clear_line()
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
@@ -264,19 +263,15 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         # Both tests gave the same results within an acceptable tolerance
         return (True, "")
 
-    def handle_case(self, tree: treeprint.TreePrinter, parameters: dict):
-        global text_id
-
+    def handle_case(self, testID, parameters: dict):
         self.create_case_dir(parameters)
         
-        tree.print_progress(f"Running test #{self.text_id} - {self.get_case_dir_name(parameters)}", self.text_id, 26)
-
         def on_test_errror(msg: str = ""):
             common.clear_line()
-            tree.print(f"Test #{self.text_id}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            self.tree.print(f"Test #{testID}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
             if msg != "":
-                tree.print(msg)
-            tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
+                self.tree.print(msg)
+            self.tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
             raise common.MFCException("Testing failed (view above).")
 
         common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1", on_error=lambda: on_test_errror("MFC Execution Failed. Please refer to tests/test.log"))
@@ -292,16 +287,14 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         
         if not os.path.isfile(golden_filepath):
             common.clear_line()
-            tree.print(f"Test #{self.text_id}: Golden file doesn't exist! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
-            tree.print(f"To generate golden files, use the '-g' flag.")
+            self.tree.print(f"Test #{testID}: Golden file doesn't exist! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            self.tree.print(f"To generate golden files, use the '-g' flag.")
             on_test_errror()
 
         with open(golden_filepath, "r") as f:                
             bSuccess, errorMsg = self.golden_file_compare_match(f.read(), pack)
             if not bSuccess:
                 on_test_errror(errorMsg)
-
-        self.text_id+=1
 
     def pack_case_output(self, params: dict):
         result: str = ""
