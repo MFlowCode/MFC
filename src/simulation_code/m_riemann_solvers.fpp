@@ -906,20 +906,20 @@ contains
         type(bounds_info), intent(IN) :: ix, iy, iz
 
 
-        real(kind(0d0)),dimension(2)   :: alpha_rho_L_acc, alpha_rho_R_acc = 0d0
+        real(kind(0d0)),dimension(2)   :: alpha_rho_L_acc, alpha_rho_R_acc 
         real(kind(0d0))                              ::       rho_L_acc, rho_R_acc
-        real(kind(0d0)), dimension(3)   :: vel_L_acc, vel_R_acc = 0d0
+        real(kind(0d0)), dimension(3)   :: vel_L_acc, vel_R_acc 
         real(kind(0d0))                              ::      pres_L_acc, pres_R_acc
         real(kind(0d0))                              ::         E_L_acc, E_R_acc
         real(kind(0d0))                              ::         H_L_acc, H_R_acc
-        real(kind(0d0)), dimension(2)   :: alpha_L_acc, alpha_R_acc = 0d0
+        real(kind(0d0)), dimension(2)   :: alpha_L_acc, alpha_R_acc 
         real(kind(0d0))                              ::         Y_L_acc, Y_R_acc
         real(kind(0d0))                              ::     gamma_L_acc, gamma_R_acc
         real(kind(0d0))                              ::    pi_inf_L_acc, pi_inf_R_acc
         real(kind(0d0))                              ::         c_L_acc, c_R_acc
 
         real(kind(0d0))                                 :: rho_avg_acc
-        real(kind(0d0)),dimension(3)   :: vel_avg_acc = 0d0
+        real(kind(0d0)),dimension(3)   :: vel_avg_acc 
         real(kind(0d0))                                 :: H_avg_acc
         real(kind(0d0))                                 :: gamma_avg_acc
         real(kind(0d0))                                 :: c_avg_acc
@@ -930,10 +930,10 @@ contains
 
 
         real(kind(0d0))                              ::       nbub_L_acc, nbub_R_acc
-        real(kind(0d0)), dimension(nb)  ::         R0_L_acc, R0_R_acc
-        real(kind(0d0)), dimension(nb)   ::         V0_L_acc, V0_R_acc
-        real(kind(0d0)), dimension(nb)   ::         P0_L_acc, P0_R_acc
-        real(kind(0d0)), dimension(nb)  ::        pbw_L_acc, pbw_R_acc
+        real(kind(0d0)), dimension(1)  ::         R0_L_acc, R0_R_acc
+        real(kind(0d0)), dimension(1)   ::         V0_L_acc, V0_R_acc
+        real(kind(0d0)), dimension(1)   ::         P0_L_acc, P0_R_acc
+        real(kind(0d0)), dimension(1)  ::        pbw_L_acc, pbw_R_acc
         real(kind(0d0)), dimension(3,6) ::       moms_L_acc, moms_R_acc
         real(kind(0d0))                              ::     ptilde_L_acc, ptilde_R_acc
 
@@ -1764,6 +1764,10 @@ contains
 
                                         call s_comp_n_from_prim(alpha_L_acc(num_fluids), R0_L_acc, nbub_L_acc)
                                         call s_comp_n_from_prim(alpha_R_acc(num_fluids), R0_R_acc, nbub_R_acc)
+
+                                        !nbub_L_acc = (3.d0/(4.d0*3.141592653589793d0))*alpha_L_acc(num_fluids)/(0d0 + weight(1)*(R0_L_acc(1)**3d0))
+                                        !nbub_R_acc = (3.d0/(4.d0*3.141592653589793d0))*alpha_R_acc(num_fluids)/(0d0 + weight(1)*(R0_R_acc(1)**3d0))
+
 !$acc loop seq
                                         do i = 1, nb
                                             if (.not. qbmm) then
@@ -1795,6 +1799,18 @@ contains
 
                                             call s_quad((R0_L_acc**3.d0)*(V0_L_acc**2.d0), R3V2Lbar_acc)
                                             call s_quad((R0_R_acc**3.d0)*(V0_R_acc**2.d0), R3V2Rbar_acc)
+
+                                            !PbwR3Lbar_acc = pbw_L_acc(1)*(R0_L_acc(1)**3.d0)
+                                            !PbwR3Rbar_acc = pbw_R_acc(1)*(R0_R_acc(1)**3.d0)
+
+                                            !R3Lbar_acc = (R0_L_acc(1)**3.d0)
+                                            !R3Rbar_acc = (R0_R_acc(1)**3.d0)
+
+                                            !R3V2Lbar_acc = (R0_L_acc(1)**3.d0)*(V0_L_acc(1)**2.d0)
+                                            !R3V2Rbar_acc = (R0_R_acc(1)**3.d0)*(V0_R_acc(1)**2.d0)
+
+
+
                                         end if
 
                                         !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} )
@@ -2434,6 +2450,9 @@ contains
                                        norm_dir, ix, iy, iz)
 
         end subroutine s_hllc_riemann_solver_acc
+
+
+
 
 
 
@@ -3256,6 +3275,8 @@ contains
 
             call s_comp_n_from_prim(alpha_L(num_fluids), R0_L, nbub_L)
             call s_comp_n_from_prim(alpha_R(num_fluids), R0_R, nbub_R)
+
+
 
             do i = 1, nb
                 if (.not. qbmm) then
