@@ -57,6 +57,7 @@ targets:
       method: source
       params:
         source: ${MFC_ROOT_PATH}/src/pre_process_code
+        check:  ${simulation:INSTALL_PATH}/bin/pre_process
     clean:
       - make INSTALL_PATH="${pre_process:INSTALL_PATH}" clean
     build:
@@ -71,6 +72,7 @@ targets:
       method: source
       params:
         source: ${MFC_ROOT_PATH}/src/simulation_code
+        check:  ${simulation:INSTALL_PATH}/bin/simulation
     clean:
       - make INSTALL_PATH="${simulation:INSTALL_PATH}" clean
     build:
@@ -88,6 +90,7 @@ targets:
       method: source
       params:
         source: ${MFC_ROOT_PATH}/src/post_process_code
+        check:  ${simulation:INSTALL_PATH}/bin/post_process
     clean:
       - make INSTALL_PATH="${post_process:INSTALL_PATH}" clean
     build:

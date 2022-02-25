@@ -199,16 +199,25 @@ If you think MFC could (or should) be able to find it automatically for you syst
         conf_desc = self.conf.get_target(name)
         lock_desc = self.lock.get_target(name, compiler_cfg.name)
 
+        # Check if any source file is newer than the previously built executable
+        if conf_desc.fetch.method == "source":
+            check_filepath = self.string_replace(conf_desc.name, conf_desc.fetch.params.check)
+            if not os.path.isfile(check_filepath):
+                return False
+            
+            last_check_date = os.path.getmtime(check_filepath)
+            for subdir, dirs, files in os.walk(self.string_replace(conf_desc.name, conf_desc.fetch.params.source)):
+                for file in files:
+                    if os.path.getmtime(os.path.join(subdir, file)) > last_check_date:
+                        return False
+            
+            return True
+
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
         if conf_desc.fetch.method != lock_desc.target.fetch.method    or \
            lock_desc.metadata.bCleaned                                or \
            conf_desc.fetch.params != lock_desc.target.fetch.params:
             return False
-
-        if conf_desc.fetch.method == "source":
-            # TODO:
-            # FIXME:
-            pass
 
         # Check if any of its dependencies needs updating
         for dependency_name in self.conf.get_dependency_names(name, recursive=True):

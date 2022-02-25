@@ -180,8 +180,7 @@ class MFCTest:
 
                 # TODO: num_comp
 
-            for ppn in [2, 4]:
-                all_run_params.append({**dimParams, **{'ppn': ppn}})
+            all_run_params.append({**dimParams, **{'ppn': 2}})
     
         for i, run_params in enumerate(all_run_params):
             self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i, len(all_run_params))
@@ -255,10 +254,11 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             # check values one by one
             for i in range(len(numbers_cand)):
                 # FIXME: set abs_tol
-                if not math.isclose(numbers_cand[i], numbers_trust[i], rel_tol=1e-13):
-                    abs_delta    = abs(numbers_cand[i]-numbers_trust[i])
-                    percent_diff = abs_delta/numbers_trust[i]
-                    return (False, f"Error margin is too high for value at position #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
+                abs_delta = abs(numbers_cand[i]-numbers_trust[i])
+                rel_diff  = abs_delta/numbers_trust[i]
+                if abs(abs_delta) > 1e-12 and rel_diff > 1e-12:
+                    percent_diff = rel_diff*100
+                    return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
 
         # Both tests gave the same results within an acceptable tolerance
         return (True, "")
