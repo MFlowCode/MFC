@@ -389,7 +389,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         self.tree.print(f'Preparing build...')
 
-        common.create_file_safe(self.get_log_filepath(name))
+        common.create_file(self.get_log_filepath(name))
 
         with open(self.get_log_filepath(name), "r+") as logfile:
             self.build_target__clean_previous(name)          # Clean any old build artifacts
@@ -458,7 +458,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
             target.metadata.bCleaned = True
 
-        common.delete_file_safe(self.get_log_filepath(name))
+        common.delete_file(self.get_log_filepath(name))
 
         self.lock.flush()
         self.lock.save()

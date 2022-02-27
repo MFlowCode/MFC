@@ -204,8 +204,9 @@ class MFCTest:
             self.tree.print("MFC needs rebuilding...")
             self.bootstrap.build_target("mfc")
         
-        for i, run_params in enumerate(self.get_test_params()):
-            self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i+1, len(all_run_params))
+        all_test_params = self.get_test_params()
+        for i, run_params in enumerate(all_test_params):
+            self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i+1, len(all_test_params))
             self.handle_case(i, run_params)
 
         common.clear_line()
@@ -249,7 +250,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 """
 
         common.create_directory(case_dir)
-        
+
         common.file_write(f"{case_dir}/input.py", content)
 
     def golden_file_compare_match(self, truth: str, candidate: str):
@@ -278,10 +279,11 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             # check values one by one
             for i in range(len(numbers_cand)):
                 abs_delta = abs(numbers_cand[i]-numbers_trust[i])
-                rel_diff  = abs_delta/numbers_trust[i] if numbers_trust[i] != 0 else 0
-                if abs(abs_delta) > 1e-12 and rel_diff > 1e-12:
+                rel_diff  = abs(abs_delta/numbers_trust[i]) if numbers_trust[i] != 0 else 0
+                if    (abs_delta > 1e-12 and rel_diff > 1e-12) \
+                   or (numbers_cand[i] * numbers_trust[i] < 0): # Check if sign matches
                     percent_diff = rel_diff*100
-                    return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{abs(round(percent_diff, 5))}% (~{abs(round(abs_delta, 5))}).")
+                    return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
 
         # Both tests gave the same results within an acceptable tolerance
         return (True, "")
