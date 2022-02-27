@@ -99,39 +99,15 @@ BASE_CASE = Case({
         'riemann_solver'               : 2,
         'wave_speeds'                  : 1,
         'avg_state'                    : 2,
-        'bc_x%beg'                     : -3, 
-        'bc_x%end'                     : -3,
-        'bc_y%beg'                     : -3, 
-        'bc_y%end'                     : -3,
-        'bc_z%beg'                     : -3, 
-        'bc_z%end'                     : -3,
         'format'                       : 1,
         'precision'                    : 2,
         'prim_vars_wrt'                :'T',
         'parallel_io'                  :'F',
-        'patch_icpp(1)%geometry'       : 1,
-        'patch_icpp(1)%x_centroid'     : 0.25,
-        'patch_icpp(1)%y_centroid'     : 0.5,
-        'patch_icpp(1)%z_centroid'     : 0.5,
-        'patch_icpp(1)%length_x'       : 0.5,
-        'patch_icpp(1)%length_y'       : 1,
-        'patch_icpp(1)%length_z'       : 1,
-        'patch_icpp(1)%vel(1)'         : 0.0,
-        'patch_icpp(1)%vel(2)'         : 0.0,
-        'patch_icpp(1)%vel(3)'         : 0.0,
+
         'patch_icpp(1)%pres'           : 1.0,
         'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
         'patch_icpp(1)%alpha(1)'       : 1.,
-        'patch_icpp(2)%geometry'       : 1,
-        'patch_icpp(2)%x_centroid'     : 0.75,
-        'patch_icpp(2)%y_centroid'     : 0.5,
-        'patch_icpp(2)%z_centroid'     : 0.5,
-        'patch_icpp(2)%length_x'       : 0.5,
-        'patch_icpp(2)%length_y'       : 1,
-        'patch_icpp(2)%length_z'       : 1,
-        'patch_icpp(2)%vel(1)'         : 0.0,
-        'patch_icpp(2)%vel(2)'         : 0.0,
-        'patch_icpp(2)%vel(3)'         : 0.0,
+        
         'patch_icpp(2)%pres'           : 0.1,
         'patch_icpp(2)%alpha_rho(1)'   : 0.125E+00,
         'patch_icpp(2)%alpha(1)'       : 1.,
@@ -164,17 +140,48 @@ class MFCTest:
         
         all_run_params = []
 
-        for dimParams in [ {'patch_icpp(1)%geometry': 1, 'patch_icpp(2)%geometry': 1, 'm': 299},
-                           {'patch_icpp(1)%geometry': 3, 'patch_icpp(2)%geometry': 3, 'm': 49, 'n': 39},
-                           {'patch_icpp(1)%geometry': 9, 'patch_icpp(2)%geometry': 9, 'm': 39, 'n': 29, 'p': 19}]:
+        for dimInfo in [ (["x"],           {'m': 299},                  {"geometry": 1}),
+                         (["x", "y"],      {'m': 49, 'n': 39},          {"geometry": 3}),
+                         (["x", "y", "z"], {'m': 39, 'n': 29, 'p': 19}, {"geometry": 9}) ]:
+            dimParams = {**dimInfo[1]}
+
+            for dimCmp in dimInfo[0]:
+                dimParams[f"{dimCmp}_domain%beg"] = 0.E+00
+                dimParams[f"{dimCmp}_domain%end"] = 1.E+00
+
+                dimParams[f"bc_{dimCmp}%beg"] = -3
+                dimParams[f"bc_{dimCmp}%end"] = -3
+
+            for patchID in [1,2]:
+                dimParams[f"patch_icpp({patchID})%geometry"] = dimInfo[2].get("geometry")
+                
+                if "x" in dimInfo[0]:
+                    dimParams[f"patch_icpp({1})%x_centroid"] = 0.25
+                    dimParams[f"patch_icpp({2})%x_centroid"] = 0.75
+                    dimParams[f"patch_icpp({patchID})%length_x"] = 0.5
+                    dimParams[f"patch_icpp({patchID})%vel(1)"] = 0.0
+                
+                if "y" in dimInfo[0]:
+                    dimParams[f"patch_icpp({patchID})%y_centroid"] = 0.5
+                    dimParams[f"patch_icpp({patchID})%length_y"]   = 1
+                    dimParams[f"patch_icpp({patchID})%vel(2)"]     = 0.0
+                
+                if "z" in dimInfo[0]:
+                    dimParams[f"patch_icpp({patchID})%z_centroid"] = 0.5
+                    dimParams[f"patch_icpp({patchID})%length_z"]   = 1
+                    dimParams[f"patch_icpp({patchID})%vel(3)"]     = 0.0
+
             for weno_order in [3, 5]:
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
+                    if not (mp_weno and weno_order != 5):
+                        all_run_params.append({**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
 
                 for riemann_solver in [1, 2]:
-                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
+                    # FIXME: alt_soundspeed not supported for a single fluid
+                    # all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
                     all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
-                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
+                    # FIXME: mpp_lim not supported for a single fluid
+                    # all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
                     all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
                     all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
 
@@ -183,7 +190,7 @@ class MFCTest:
             all_run_params.append({**dimParams, **{'ppn': 2}})
     
         for i, run_params in enumerate(all_run_params):
-            self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i, len(all_run_params))
+            self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i+1, len(all_run_params))
             self.handle_case(i, run_params)
 
         common.clear_line()
@@ -253,9 +260,8 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
             # check values one by one
             for i in range(len(numbers_cand)):
-                # FIXME: set abs_tol
                 abs_delta = abs(numbers_cand[i]-numbers_trust[i])
-                rel_diff  = abs_delta/numbers_trust[i]
+                rel_diff  = abs_delta/numbers_trust[i] if numbers_trust[i] != 0 else 0
                 if abs(abs_delta) > 1e-12 and rel_diff > 1e-12:
                     percent_diff = rel_diff*100
                     return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
