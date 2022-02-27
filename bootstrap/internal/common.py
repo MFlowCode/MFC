@@ -18,7 +18,7 @@ class MFCException(Exception):
     pass
 
 
-def execute_shell_command_safe(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
+def execute_shell_command(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
     status = os.system(command)
 
     if status != 0:
@@ -32,16 +32,30 @@ def execute_shell_command_safe(command: str, no_exception: bool = False, excepti
 
     return status
 
-
 def clear_line() -> None:
     sys.stdout.write("\033[K")
+
+
+def file_write(filepath: str, content: str):
+    try:
+        with open(filepath, "w") as f:
+            f.write(content)
+    except IOError as exc:
+        raise MFCException(f'Failed to write to "{filepath}": {exc}')
+
+
+def file_read(filepath: str, content: str):
+    try:
+        with open(filepath, "r") as f:
+            return f.read(content)
+    except IOError as exc:
+        raise MFCException(f'Failed to read from "{filepath}": {exc}')
 
 
 def file_load_yaml(filepath: str):
     try:
         with open(filepath, "r") as f:
             return yaml.safe_load(f)
-
     except (IOError, yaml.YAMLError) as exc:
         raise MFCException(f'Failed to load YAML from "{filepath}": {exc}')
 
@@ -50,7 +64,6 @@ def file_dump_yaml(filepath: str, data) -> None:
     try:
         with open(filepath, "w") as f:
             yaml.dump(data, f)
-
     except (IOError, yaml.YAMLError) as exc:
         raise MFCException(f'Failed to dump YAML to "{filepath}": {exc}.')
 
@@ -66,22 +79,24 @@ def uncompress_archive_to(archive_filepath: str, destination: str) -> None:
     os.rename(src, destination)
 
 
-def delete_file_safe(filepath: str) -> None:
+def delete_file(filepath: str) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
 
 
-def create_file_safe(filepath: str) -> None:
+def create_file(filepath: str) -> None:
     if not os.path.exists(filepath):
-        open(filepath, "w").close()
+        try:
+            open(filepath, "w").close()
+        except IOError as exc:
+            raise MFCException(f"Failed to create file {filepath}: {exc}")
 
-
-def delete_directory_recursive_safe(directory_path: str) -> None:
+def delete_directory_recursive(directory_path: str) -> None:
     if os.path.isdir(directory_path):
         shutil.rmtree(directory_path)
 
 
-def create_directory_safe(directory_path: str) -> None:
+def create_directory(directory_path: str) -> None:
     os.makedirs(directory_path, exist_ok=True)
 
 
