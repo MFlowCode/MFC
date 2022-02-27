@@ -49,6 +49,7 @@ contains
         ! Initializing the MPI environment
         call MPI_INIT(ierr)
 
+<<<<<<< HEAD
         ! Checking whether the MPI environment has been properly intialized
         if (ierr /= MPI_SUCCESS) then
             print '(A)', 'Unable to initialize MPI environment. Exiting ...'
@@ -72,6 +73,17 @@ contains
     end subroutine s_mpi_abort ! -------------------------------------------
 
     !> The subroutine that initializes MPI data structures
+=======
+            ! Terminating the MPI environment
+            CALL MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+            
+        END SUBROUTINE s_mpi_abort ! -------------------------------------------
+        
+        
+        
+        
+        !> The subroutine that initializes MPI data structures
+>>>>>>> 92b3b28 (Fix bugs found while creating the testing infrastructure)
         !!  @param q_cons_vf Conservative variables
     subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
 

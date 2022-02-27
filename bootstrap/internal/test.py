@@ -3,8 +3,9 @@
 import os
 import re
 import copy
-import math
+import hashlib
 import colorama
+import subprocess
 import dataclasses
 
 from pathlib import Path
@@ -178,18 +179,32 @@ class MFCTest:
 
                 for riemann_solver in [1, 2]:
                     # FIXME: alt_soundspeed not supported for a single fluid
-                    # all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
+                    #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
                     all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
                     # FIXME: mpp_lim not supported for a single fluid
-                    # all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
+                    #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
                     all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
                     all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
 
                 # TODO: num_comp
 
             all_run_params.append({**dimParams, **{'ppn': 2}})
+        
+        return all_run_params
 
-        for i, run_params in enumerate(all_run_params):
+    def test(self):
+        self.tree.print(f"Testing mfc")
+        self.tree.indent()
+
+        if self.args["generate"]:
+            common.delete_directory_recursive(common.MFC_TESTDIR)
+            common.create_directory(common.MFC_TESTDIR)
+
+        if not self.bootstrap.is_build_satisfied("mfc"):
+            self.tree.print("MFC needs rebuilding...")
+            self.bootstrap.build_target("mfc")
+        
+        for i, run_params in enumerate(self.get_test_params()):
             self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i+1, len(all_run_params))
             self.handle_case(i, run_params)
 
@@ -197,19 +212,23 @@ class MFCTest:
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
-
     def get_case_dir_name(self, mods: dict):
-        return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}_" for x in mods.items()])[:-1]
+        return hashlib.sha1("".join([f"{x[0]}{x[1]}" for x in mods.items()]).encode()).hexdigest()[:20]
 
     def get_case_dir(self, mods: dict):
         return f"{common.MFC_TESTDIR}/{self.get_case_dir_name(mods)}"
 
-    def create_case_dir(self, mods: dict):
-        case     = copy.deepcopy(BASE_CASE)
-        case_dir = self.get_case_dir(mods)
+    def get_case_from_mods(self, mods: dict):
+        case = copy.deepcopy(BASE_CASE)
 
         for key, val in mods.items():
             case[key] = val
+        
+        return case
+
+    def create_case_dir(self, mods: dict):
+        case     = self.get_case_from_mods(mods)
+        case_dir = self.get_case_dir(mods)
 
         content = f"""\
 #!/usr/bin/env python3
@@ -229,11 +248,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
 """
 
-        os.makedirs(case_dir, exist_ok=True)
-
-        f = open(f"{case_dir}/input.py", "w")
-        f.write(content)
-        f.close()
+        common.create_directory(case_dir)
+        
+        common.file_write(f"{case_dir}/input.py", content)
 
     def golden_file_compare_match(self, truth: str, candidate: str):
         for candidate_line in candidate.splitlines():
@@ -264,43 +281,64 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
                 rel_diff  = abs_delta/numbers_trust[i] if numbers_trust[i] != 0 else 0
                 if abs(abs_delta) > 1e-12 and rel_diff > 1e-12:
                     percent_diff = rel_diff*100
-                    return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
+                    return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{abs(round(percent_diff, 5))}% (~{abs(round(abs_delta, 5))}).")
 
         # Both tests gave the same results within an acceptable tolerance
         return (True, "")
 
+    def get_test_summary(self, mods: dict):
+        return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}_" for x in mods.items()])[:-1]
+
     def handle_case(self, testID, parameters: dict):
         self.create_case_dir(parameters)
-
-        def on_test_errror(msg: str = ""):
+        
+        def on_test_errror(msg: str = "", term_out: str = ""):
             common.clear_line()
             self.tree.print(f"Test #{testID}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
             if msg != "":
                 self.tree.print(msg)
-            self.tree.print(f"The test is available at: {self.get_case_dir(parameters)}/input.py")
+            
+            common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
+(1/3) Test #{testID}:
+  - Summary:  {self.get_test_summary(parameters)}
+  - Location: {self.get_case_dir(parameters)}
+  - Error:    {msg}
+
+(2/3) Test case:
+{self.get_case_from_mods(parameters).create_case_dict_str()}
+
+(3/3) Terminal output:
+{term_out}
+""")
+
+            self.tree.print(f"Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
-        common.execute_shell_command_safe(f"cd '{self.get_case_dir(parameters)}' && python3 input.py >> '../test.log' 2>&1", on_error=lambda: on_test_errror("MFC Execution Failed. Please refer to tests/test.log"))
+        cmd = subprocess.run(f"cd '{self.get_case_dir(parameters)}' && python3 input.py",
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             universal_newlines=True, shell=True)        
+        common.file_write(f"{self.get_case_dir(parameters)}/out.txt", cmd.stdout)
+        
+        if cmd.returncode != 0:
+            on_test_errror("MFC Execution Failed.", cmd.stdout)
 
         pack = self.pack_case_output(parameters)
+        common.file_write(f"{self.get_case_dir(parameters)}/pack.txt", pack)
 
         golden_filepath = f"{self.get_case_dir(parameters)}/golden.txt"
 
         if self.args["generate"]:
-            common.delete_file_safe(golden_filepath)
-            with open(golden_filepath, "w") as f:
-                f.write(pack)
-
+            common.delete_file(golden_filepath)
+            common.file_write(golden_filepath, pack)
+        
         if not os.path.isfile(golden_filepath):
             common.clear_line()
-            self.tree.print(f"Test #{testID}: Golden file doesn't exist! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
-            self.tree.print(f"To generate golden files, use the '-g' flag.")
-            on_test_errror()
-
-        with open(golden_filepath, "r") as f:
-            bSuccess, errorMsg = self.golden_file_compare_match(f.read(), pack)
-            if not bSuccess:
-                on_test_errror(errorMsg)
+            on_test_errror("Golden file doesn't exist! To generate golden files, use the '-g' flag.", cmd.stdout)
+        
+        golden_file_content = common.file_read(golden_filepath)
+        bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack)
+        if not bSuccess:
+            on_test_errror(errorMsg, cmd.stdout)
 
     def pack_case_output(self, params: dict):
         result: str = ""
@@ -309,8 +347,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         D_dir    = f"{case_dir}/D/"
 
         for filepath in list(Path(D_dir).rglob("*.dat")):
+            file_content   = common.file_read(filepath)
             short_filepath = str(filepath).replace(f'{case_dir}/', '')
-            with open(filepath, "r") as file:
-                result += f"{short_filepath} " + re.sub(r' +', ' ', file.read().replace('\n', ' ')).strip() + '\n'
-
+            
+            result += f"{short_filepath} " + re.sub(r' +', ' ', file_content.replace('\n', ' ')).strip() + '\n'
+        
         return result

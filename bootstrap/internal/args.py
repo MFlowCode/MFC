@@ -21,7 +21,7 @@ class MFCArgs(objecttree.ObjectTree):
         grp = action.add_mutually_exclusive_group(required=True)
 
         grp.add_argument("--build", action="store_true", help="Build targets.")
-        grp.add_argument("--test",  action="store_true", help="Test targets.")
+        grp.add_argument("--test",  action="store_true", help="Test MFC.")
         grp.add_argument("--clean", action="store_true", help="Clean MFC targets.")
         grp.add_argument("--set-current", type=str.lower, choices=compiler_configuration_names,
                             help="Select a compiler configuration to use when running MFC.")
