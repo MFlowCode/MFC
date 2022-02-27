@@ -44,10 +44,10 @@ def file_write(filepath: str, content: str):
         raise MFCException(f'Failed to write to "{filepath}": {exc}')
 
 
-def file_read(filepath: str, content: str):
+def file_read(filepath: str):
     try:
         with open(filepath, "r") as f:
-            return f.read(content)
+            return f.read()
     except IOError as exc:
         raise MFCException(f'Failed to read from "{filepath}": {exc}')
 
