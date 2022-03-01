@@ -38,7 +38,7 @@ elif [ "$response" == "a" ]; then # For Ascent
 elif [ "$response" == "w" ]; then # For Wombat
     module purge
     module load python/3.9.9
-    module load /sw/wombat/Nvidia_HPC_SDK/modulefiles/nvhpc/22.1
+    module load nvhpc/22.1
     module list
 else
     echo "Error: Requested system is not supported"
