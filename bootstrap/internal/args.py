@@ -27,7 +27,7 @@ class MFCArgs(objecttree.ObjectTree):
                             help="Select a compiler configuration to use when running MFC.")
 
         compiler_target_names = [e.name for e in conf.targets]
-        general.add_argument("-t", "--targets", nargs="+", type=str.lower,
+        action.add_argument("-t", "--targets", nargs="+", type=str.lower,
                             choices=compiler_target_names, default=["mfc"],
                             help="The space-separated targets you wish to have built.")
 
@@ -42,7 +42,7 @@ class MFCArgs(objecttree.ObjectTree):
 
         super().__init__(vars(parser.parse_args()))
 
-        if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean"):
+        if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean") and not self.tree_get("set_current"):
             parser.print_help()
             exit(-1)
 
