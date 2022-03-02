@@ -17,6 +17,7 @@ cases/
 .DS_Store
 
 tests/**/*.log
+tests/*.txt
 tests/*/**
 !**/golden.txt
 

@@ -46,14 +46,14 @@ class Bootstrap:
         return self.user.get_configuration(self.conf.get_target_configuration_name(name, default))
 
     def setup_directories(self):
-        common.create_directory_safe(common.MFC_SUBDIR)
+        common.create_directory(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
             for cc in [ cc.name for cc in self.user.configurations ] + ["common"]:
-                common.create_directory_safe(f"{common.MFC_SUBDIR}/{cc}/{d}")
+                common.create_directory(f"{common.MFC_SUBDIR}/{cc}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
-                        common.create_directory_safe(f"{common.MFC_SUBDIR}/{cc}/{d}/{build_subdir}")
+                        common.create_directory(f"{common.MFC_SUBDIR}/{cc}/{d}/{build_subdir}")
 
     def check_environment(self):
         self.tree.print("Environment Checks")
@@ -93,7 +93,7 @@ class Bootstrap:
 
             # Check if used
             is_used_cmd = compiler_str_replace(check.is_used)
-            if 0 != common.execute_shell_command_safe(is_used_cmd, no_exception=True):
+            if 0 != common.execute_shell_command(is_used_cmd, no_exception=True):
                 continue
 
             version_fetch_cmd     = compiler_str_replace(check.fetch)
@@ -219,6 +219,11 @@ If you think MFC could (or should) be able to find it automatically for you syst
            conf_desc.fetch.params != lock_desc.target.fetch.params:
             return False
 
+        if conf_desc.fetch.method == "source":
+            # TODO:
+            # FIXME:
+            pass
+
         # Check if any of its dependencies needs updating
         for dependency_name in self.conf.get_dependency_names(name, recursive=True):
             if not self.is_build_satisfied(dependency_name):
@@ -241,7 +246,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         if ((    conf_desc.fetch.method != lock_desc.target.fetch.method
              and lock_desc.target.fetch.method in ["clone", "download"]
             ) or (self.args.tree_get("scratch"))):
-            common.delete_directory_recursive_safe(f'{common.MFC_SUBDIR}/{lock_desc.metadata.compiler_configuration}/src/{name}')
+            common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.compiler_configuration}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase):
         compiler_cfg = self.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
@@ -256,33 +261,33 @@ If you think MFC could (or should) be able to find it automatically for you syst
                     or (self.args.tree_get("scratch"))):
                     self.tree.print(f'GIT repository changed. Updating...')
 
-                    common.delete_directory_recursive_safe(self.get_source_path(name))
+                    common.delete_directory_recursive(self.get_source_path(name))
 
                 if not os.path.isdir(self.get_source_path(name)):
                     self.tree.print(f'Cloning repository...')
 
-                    common.execute_shell_command_safe(
+                    common.execute_shell_command(
                         f'git clone --recursive "{conf.fetch.params.git}" "{self.get_source_path(name)}" >> "{logfile.name}" 2>&1')
 
                 self.tree.print(f'Checking out {conf.fetch.params.hash}...')
 
-                common.execute_shell_command_safe(
+                common.execute_shell_command(
                     f'cd "{self.get_source_path(name)}" && git checkout "{conf.fetch.params.hash}" >> "{logfile.name}" 2>&1')
 
                 self.tree.print(f'Deleting .git/ to save space...')
 
-                common.delete_directory_recursive_safe(f"{self.get_source_path(name)}/.git")
+                common.delete_directory_recursive(f"{self.get_source_path(name)}/.git")
             elif conf.fetch.method == "download":
                 self.tree.print(f'Removing previously downloaded version...')
 
-                common.delete_directory_recursive_safe(self.get_source_path(name))
+                common.delete_directory_recursive(self.get_source_path(name))
 
                 download_link = conf.fetch.params.link.replace("${VERSION}", conf.fetch.params.version)
                 filename = download_link.split("/")[-1]
 
                 self.tree.print(f'Downloading source...')
 
-                common.create_directory_safe(self.get_temp_path(name))
+                common.create_directory(self.get_temp_path(name))
 
                 download_path = f'{self.get_temp_path(name)}/{filename}'
                 urllib.request.urlretrieve(download_link, download_path)
@@ -295,12 +300,12 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 os.remove(download_path)
         elif conf.fetch.method == "source":
             if os.path.isdir(self.get_source_path(name)):
-                common.delete_directory_recursive_safe(self.get_source_path(name))
+                common.delete_directory_recursive(self.get_source_path(name))
 
             shutil.copytree(self.string_replace(name, conf.fetch.params.source),
                             self.get_source_path(name))
         elif conf.fetch.method == "collection":
-            common.create_directory_safe(self.get_source_path(name))
+            common.create_directory(self.get_source_path(name))
         else:
             raise common.MFCException(f'Dependency type "{conf.fetch.method}" is unsupported.')
 
@@ -325,7 +330,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 cmd_exception_text=f"Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.conf.yaml)"
                 cmd_exception_text=cmd_exception_text+f"You can also view it by running:\n\ncat \"{logfile.name}\"\n"
 
-                common.execute_shell_command_safe(command, exception_text=cmd_exception_text, on_error=cmd_on_error)
+                common.execute_shell_command(command, exception_text=cmd_exception_text, on_error=cmd_on_error)
         elif conf.fetch.method == "collection":
             pass
         else:
@@ -384,7 +389,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         self.tree.print(f'Preparing build...')
 
-        common.create_file_safe(self.get_log_filepath(name))
+        common.create_file(self.get_log_filepath(name))
 
         with open(self.get_log_filepath(name), "r+") as logfile:
             self.build_target__clean_previous(name)          # Clean any old build artifacts
@@ -449,11 +454,11 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                         log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
                         log_file.flush()
 
-                        common.execute_shell_command_safe(command)
+                        common.execute_shell_command(command)
 
             target.metadata.bCleaned = True
 
-        common.delete_file_safe(self.get_log_filepath(name))
+        common.delete_file(self.get_log_filepath(name))
 
         self.lock.flush()
         self.lock.save()
