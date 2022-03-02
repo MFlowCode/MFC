@@ -78,7 +78,7 @@ source "$PYTHON_VENV_DIR"/bin/activate
 
 # Upgrade Pip
 if [ "$bVenvIsNew" == "1" ]; then
-    python3 -m pip install --upgrade pip > /dev/null
+    python3 -m pip install --no-warn-script-location --upgrade pip > /dev/null
     if (($?)); then
         echo "[mfc.sh] Error: Failed to update Pip."
         exit 1
@@ -96,7 +96,7 @@ for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
 
     python3 -c "import $import_name" > /dev/null 2>&1
     if (($?)); then
-        python3 -m pip install $install_name
+        python3 -m pip install --no-warn-script-location $install_name
         if (($?)); then
             echo "[mfc.sh] Error: Failed to install $import_name/$install_name through Python3's pip."
             exit 1
