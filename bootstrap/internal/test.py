@@ -22,7 +22,7 @@ class Case:
     def __init__(self, data: dict) -> None:
         self.name       = data.get("name")
         self.parameters = {}
-
+        
         for p in list(data.get("parameters").items()):
             self.parameters[p[0]] = p[1]
 
@@ -30,7 +30,7 @@ class Case:
         keys = []
         for param in self.parameters:
             keys.append(param.name)
-
+        
         return keys
 
     def has_parameter(self, key: str):
@@ -39,13 +39,13 @@ class Case:
     def __getitem__(self, key: str) -> str:
         if key not in self.parameters:
             raise common.MFCException(f"Case: Parameter {key} does not exist.")
-
+        
         return self.parameters[key]
 
     def __setitem__(self, key: str, val: str):
         self.parameters[key] = val
 
-    def create_case_dict_str(self) -> str:
+    def create_case_dict_str(self) -> str: 
         result: str = "{\n"
 
         for key,val in self.parameters.items():
@@ -76,23 +76,23 @@ BASE_CASE = Case({
         'queue'                        : 'normal',
         'walltime'                     : '24:00:00',
         'mail_list'                    : '',
-        'm'                            : 0,
-        'n'                            : 0,
-        'p'                            : 0,
-        'dt'                           : mydt,
-        't_step_start'                 : 0,
+        'm'                            : 0,       
+        'n'                            : 0,        
+        'p'                            : 0,        
+        'dt'                           : mydt,     
+        't_step_start'                 : 0,        
         't_step_stop'                  : int(Nt+1),
-        't_step_save'                  : int(Nt),
-        'num_patches'                  : 2,
-        'model_eqns'                   : 2,
-        'alt_soundspeed'               : 'F',
-        'num_fluids'                   : 1,
-        'adv_alphan'                   : 'T',
-        'mpp_lim'                      : 'F',
-        'mixture_err'                  : 'F',
-        'time_stepper'                 : 3,
-        'weno_vars'                    : 2,
-        'weno_order'                   : 5,
+        't_step_save'                  : int(Nt),  
+        'num_patches'                  : 2,     
+        'model_eqns'                   : 2,     
+        'alt_soundspeed'               : 'F',   
+        'num_fluids'                   : 1,     
+        'adv_alphan'                   : 'T',   
+        'mpp_lim'                      : 'F',   
+        'mixture_err'                  : 'F',   
+        'time_stepper'                 : 3,     
+        'weno_vars'                    : 2,     
+        'weno_order'                   : 5,     
         'weno_eps'                     : 1.E-16,
         'mapped_weno'                  : 'T',
         'null_weights'                 : 'F',
@@ -108,7 +108,7 @@ BASE_CASE = Case({
         'patch_icpp(1)%pres'           : 1.0,
         'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
         'patch_icpp(1)%alpha(1)'       : 1.,
-
+        
         'patch_icpp(2)%pres'           : 0.1,
         'patch_icpp(2)%alpha_rho(1)'   : 0.125E+00,
         'patch_icpp(2)%alpha(1)'       : 1.,
@@ -125,20 +125,7 @@ class MFCTest:
         self.tree = self.bootstrap.tree
         self.args = self.bootstrap.args
 
-    def test(self):
-        self.tree.print(f"Testing mfc")
-        self.tree.indent()
-
-        self.text_id = 1
-        self.test_acc_packed = ""
-
-        if self.args["generate"]:
-            common.delete_directory_recursive_safe(common.MFC_TESTDIR)
-            common.create_directory_safe(common.MFC_TESTDIR)
-
-        if not self.bootstrap.is_build_satisfied("mfc"):
-            raise common.MFCException(f"Can't test mfc because its build isn't satisfied.")
-
+    def get_test_params(self):
         all_run_params = []
 
         for dimInfo in [ (["x"],           {'m': 299},                  {"geometry": 1}),
@@ -155,18 +142,18 @@ class MFCTest:
 
             for patchID in [1,2]:
                 dimParams[f"patch_icpp({patchID})%geometry"] = dimInfo[2].get("geometry")
-
+                
                 if "x" in dimInfo[0]:
                     dimParams[f"patch_icpp({1})%x_centroid"] = 0.25
                     dimParams[f"patch_icpp({2})%x_centroid"] = 0.75
                     dimParams[f"patch_icpp({patchID})%length_x"] = 0.5
                     dimParams[f"patch_icpp({patchID})%vel(1)"] = 0.0
-
+                
                 if "y" in dimInfo[0]:
                     dimParams[f"patch_icpp({patchID})%y_centroid"] = 0.5
                     dimParams[f"patch_icpp({patchID})%length_y"]   = 1
                     dimParams[f"patch_icpp({patchID})%vel(2)"]     = 0.0
-
+                
                 if "z" in dimInfo[0]:
                     dimParams[f"patch_icpp({patchID})%z_centroid"] = 0.5
                     dimParams[f"patch_icpp({patchID})%length_z"]   = 1
@@ -259,16 +246,16 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
                 continue
 
             file_subpath: str = candidate_line.split(' ')[0]
-
+            
             line_trusted: str = ""
             for l in truth.splitlines():
                 if l.startswith(file_subpath):
                     line_trusted = l
                     break
-
+            
             if len(line_trusted) == 0:
                 continue
-
+            
             numbers_cand  = [ float(x) for x in candidate_line.strip().split(' ')[1:] ]
             numbers_trust = [ float(x) for x in line_trusted.strip().split(' ')[1:]   ]
 
