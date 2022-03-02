@@ -38,9 +38,11 @@ class Target_Clone:
 @dataclass
 class Target_Source:
     source: str
+    check:  str
 
-    def __init__(self, data):
-        self.source = data["source"]
+    def __init__(self, data: dict):
+        self.source = data.get("source")
+        self.check  = data.get("check")
 
 @dataclass
 class Target_Collection:
