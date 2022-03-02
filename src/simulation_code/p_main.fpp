@@ -46,6 +46,10 @@ program p_main
 
     use m_qbmm                 !< Quadrature MOM
 
+#IFDEF _OPENACC 
+    use openacc
+#ENDIF
+
     use nvtx
 
     ! ==========================================================================
@@ -57,13 +61,32 @@ program p_main
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
     logical :: file_exists
 
+    integer :: num_devices, num_nodes, ppn, my_device_num
+    integer :: dev, devNum, local_rank, local_comm
+#IFDEF _OPENACC 
+    integer(acc_device_kind) :: devtype
+#ENDIF
+
+! FIXME:
+integer :: err_code, ierr
+
     
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
     ! Initializing MPI execution environment
     
     call s_mpi_initialize()
-   
+
+#IFDEF _OPENACC 
+      call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
+           MPI_INFO_NULL, local_comm, ierr)
+      call MPI_Comm_rank(local_comm, local_rank, ierr)
+      devtype = acc_get_device_type()
+      devNum = acc_get_num_devices(devtype)
+      dev = mod(local_rank,devNum)
+      call acc_set_device_num(dev, devtype)   
+ #ENDIF
+
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
