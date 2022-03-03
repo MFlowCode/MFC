@@ -161,17 +161,17 @@ class MFCTest:
 
             for weno_order in [3, 5]:
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                    if not (mp_weno and weno_order != 5):
+                    if not (mp_weno == 'T' and weno_order != 5):
                         all_run_params.append({**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
 
-                for riemann_solver in [1, 2]:
-                    # FIXME: alt_soundspeed not supported for a single fluid
-                    #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
-                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
-                    # FIXME: mpp_lim not supported for a single fluid
-                    #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
-                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
-                    all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
+            for riemann_solver in [1, 2]:
+                # FIXME: alt_soundspeed not supported for a single fluid
+                #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
+                all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
+                # FIXME: mpp_lim not supported for a single fluid
+                #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
+                all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
+                all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
 
                 # TODO: num_comp
 
@@ -187,9 +187,10 @@ class MFCTest:
             common.delete_directory_recursive(common.MFC_TESTDIR)
             common.create_directory(common.MFC_TESTDIR)
 
-        if not self.bootstrap.is_build_satisfied("mfc"):
-            self.tree.print("MFC needs rebuilding...")
-            self.bootstrap.build_target("mfc")
+        for target in ["pre_process", "simulation"]:
+            if not self.bootstrap.is_build_satisfied(target):
+                self.tree.print(f"{target} needs (re)building...")
+                self.bootstrap.build_target(f"{target}")
         
         all_test_params = self.get_test_params()
         for i, run_params in enumerate(all_test_params):
