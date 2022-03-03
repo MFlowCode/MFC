@@ -23,7 +23,7 @@ class Case:
     def __init__(self, data: dict) -> None:
         self.name       = data.get("name")
         self.parameters = {}
-        
+
         for p in list(data.get("parameters").items()):
             self.parameters[p[0]] = p[1]
 
@@ -31,7 +31,7 @@ class Case:
         keys = []
         for param in self.parameters:
             keys.append(param.name)
-        
+
         return keys
 
     def has_parameter(self, key: str):
@@ -40,13 +40,13 @@ class Case:
     def __getitem__(self, key: str) -> str:
         if key not in self.parameters:
             raise common.MFCException(f"Case: Parameter {key} does not exist.")
-        
+
         return self.parameters[key]
 
     def __setitem__(self, key: str, val: str):
         self.parameters[key] = val
 
-    def create_case_dict_str(self) -> str: 
+    def create_case_dict_str(self) -> str:
         result: str = "{\n"
 
         for key,val in self.parameters.items():
@@ -77,23 +77,23 @@ BASE_CASE = Case({
         'queue'                        : 'normal',
         'walltime'                     : '24:00:00',
         'mail_list'                    : '',
-        'm'                            : 0,       
-        'n'                            : 0,        
-        'p'                            : 0,        
-        'dt'                           : mydt,     
-        't_step_start'                 : 0,        
+        'm'                            : 0,
+        'n'                            : 0,
+        'p'                            : 0,
+        'dt'                           : mydt,
+        't_step_start'                 : 0,
         't_step_stop'                  : int(Nt+1),
-        't_step_save'                  : int(Nt),  
-        'num_patches'                  : 2,     
-        'model_eqns'                   : 2,     
-        'alt_soundspeed'               : 'F',   
-        'num_fluids'                   : 1,     
-        'adv_alphan'                   : 'T',   
-        'mpp_lim'                      : 'F',   
-        'mixture_err'                  : 'F',   
-        'time_stepper'                 : 3,     
-        'weno_vars'                    : 2,     
-        'weno_order'                   : 5,     
+        't_step_save'                  : int(Nt),
+        'num_patches'                  : 2,
+        'model_eqns'                   : 2,
+        'alt_soundspeed'               : 'F',
+        'num_fluids'                   : 1,
+        'adv_alphan'                   : 'T',
+        'mpp_lim'                      : 'F',
+        'mixture_err'                  : 'F',
+        'time_stepper'                 : 3,
+        'weno_vars'                    : 2,
+        'weno_order'                   : 5,
         'weno_eps'                     : 1.E-16,
         'mapped_weno'                  : 'T',
         'null_weights'                 : 'F',
@@ -109,7 +109,7 @@ BASE_CASE = Case({
         'patch_icpp(1)%pres'           : 1.0,
         'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
         'patch_icpp(1)%alpha(1)'       : 1.,
-        
+
         'patch_icpp(2)%pres'           : 0.1,
         'patch_icpp(2)%alpha_rho(1)'   : 0.125E+00,
         'patch_icpp(2)%alpha(1)'       : 1.,
@@ -156,18 +156,18 @@ class MFCTest:
 
             for patchID in [1,2]:
                 dimParams[f"patch_icpp({patchID})%geometry"] = dimInfo[2].get("geometry")
-                
+
                 if "x" in dimInfo[0]:
                     dimParams[f"patch_icpp({1})%x_centroid"] = 0.25
                     dimParams[f"patch_icpp({2})%x_centroid"] = 0.75
                     dimParams[f"patch_icpp({patchID})%length_x"] = 0.5
                     dimParams[f"patch_icpp({patchID})%vel(1)"] = 0.0
-                
+
                 if "y" in dimInfo[0]:
                     dimParams[f"patch_icpp({patchID})%y_centroid"] = 0.5
                     dimParams[f"patch_icpp({patchID})%length_y"]   = 1
                     dimParams[f"patch_icpp({patchID})%vel(2)"]     = 0.0
-                
+
                 if "z" in dimInfo[0]:
                     dimParams[f"patch_icpp({patchID})%z_centroid"] = 0.5
                     dimParams[f"patch_icpp({patchID})%length_z"]   = 1
@@ -183,7 +183,7 @@ class MFCTest:
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
                     traceback.append (f"(mapped_weno={mapped_weno},mp_weno={mp_weno})")
                     parameters.append({'mapped_weno': mapped_weno, 'mp_weno': mp_weno})
-                    if not (mp_weno == 'T' and weno_order != 5): 
+                    if not (mp_weno == 'T' and weno_order != 5):
                         tests.append(TestCaseConfiguration(parameters, traceback))
                     traceback.pop()
                     parameters.pop()
@@ -196,9 +196,9 @@ class MFCTest:
 
                 # FIXME: alt_soundspeed not supported for a single fluid
                 #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
-                
+
                 tests.append(TestCaseConfiguration(parameters + [{'mixture_err': 'T'}], traceback + ['mixture_err=T']))
-                
+
                 # FIXME: mpp_lim not supported for a single fluid
                 #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
                 tests.append(TestCaseConfiguration(parameters + [{'avg_state':   '1'}], traceback + ['avg_state=1']))
@@ -226,12 +226,12 @@ class MFCTest:
                         if testID == int(o):
                             doKeep = True
                             break
-                    
+
                     testHash = self.get_case_dir_name(test.parameters)
                     if str(o) == testHash:
                         doKeep = True
                         break
-                    
+
                 if not doKeep:
                     tests.remove(test)
         return tests
@@ -248,9 +248,9 @@ class MFCTest:
             if not self.bootstrap.is_build_satisfied(target):
                 self.tree.print(f"{target} needs (re)building...")
                 self.bootstrap.build_target(f"{target}")
-        
+
         tests = self.filter_tests(self.get_test_params())
-        
+
         for i, test in enumerate(tests):
             test: TestCaseConfiguration
             parameters = test.parameters
@@ -279,7 +279,7 @@ class MFCTest:
 
         for key, val in mods.items():
             case[key] = val
-        
+
         return case
 
     def create_case_dir(self, mods: dict):
@@ -317,16 +317,16 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
                 continue
 
             file_subpath: str = candidate_line.split(' ')[0]
-            
+
             line_trusted: str = ""
             for l in truth.splitlines():
                 if l.startswith(file_subpath):
                     line_trusted = l
                     break
-            
+
             if len(line_trusted) == 0:
                 continue
-            
+
             numbers_cand  = [ float(x) for x in candidate_line.strip().split(' ')[1:] ]
             numbers_trust = [ float(x) for x in line_trusted.strip().split(' ')[1:]   ]
 
@@ -351,13 +351,13 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
     def handle_case(self, testID, test: TestCaseConfiguration):
         self.create_case_dir(test.parameters)
-        
+
         def on_test_errror(msg: str = "", term_out: str = ""):
             common.clear_line()
             self.tree.print(f"Test #{testID}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
             if msg != "":
                 self.tree.print(msg)
-            
+
             common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
 (1/3) Test #{testID}:
   - Test ID:  {testID}
@@ -378,9 +378,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         cmd = subprocess.run(f"cd '{self.get_case_dir(test.parameters)}' && python3 input.py",
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             universal_newlines=True, shell=True)        
+                             universal_newlines=True, shell=True)
         common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
-        
+
         if cmd.returncode != 0:
             on_test_errror("MFC Execution Failed.", cmd.stdout)
 
@@ -392,11 +392,11 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         if self.args["generate"]:
             common.delete_file(golden_filepath)
             common.file_write(golden_filepath, pack)
-        
+
         if not os.path.isfile(golden_filepath):
             common.clear_line()
             on_test_errror("Golden file doesn't exist! To generate golden files, use the '-g' flag.", cmd.stdout)
-        
+
         golden_file_content = common.file_read(golden_filepath)
         bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack)
         if not bSuccess:
@@ -411,7 +411,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         for filepath in list(Path(D_dir).rglob("*.dat")):
             file_content   = common.file_read(filepath)
             short_filepath = str(filepath).replace(f'{case_dir}/', '')
-            
+
             result += f"{short_filepath} " + re.sub(r' +', ' ', file_content.replace('\n', ' ')).strip() + '\n'
-        
+
         return result
