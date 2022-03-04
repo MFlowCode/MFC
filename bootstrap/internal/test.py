@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
+import base64
 from inspect import trace
 import os
 import re
 import copy
-import hashlib
 import colorama
 import subprocess
 import dataclasses
 
 from pathlib     import Path
 from collections import ChainMap
+from datetime    import datetime
 
-import internal.common      as common
-import internal.treeprint   as treeprint
+import internal.common as common
 
 
 @dataclasses.dataclass
@@ -143,7 +143,7 @@ class MFCTest:
 
         for dimInfo in [ (["x"],           {'m': 299},                  {"geometry": 1}),
                          (["x", "y"],      {'m': 49, 'n': 39},          {"geometry": 3}),
-                         (["x", "y", "z"], {'m': 39, 'n': 29, 'p': 19}, {"geometry": 9}) ]:
+                         (["x", "y", "z"], {'m': 24, 'n': 24, 'p': 24}, {"geometry": 9}) ]:
             dimParams = {**dimInfo[1]}
 
             for dimCmp in dimInfo[0]:
@@ -172,7 +172,7 @@ class MFCTest:
                     dimParams[f"patch_icpp({patchID})%length_z"]   = 1
                     dimParams[f"patch_icpp({patchID})%vel(3)"]     = 0.0
 
-            traceback.append (f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')} | n={dimInfo[1].get('n')} | p={dimInfo[1].get('p')})")
+            traceback.append (f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')},n={dimInfo[1].get('n')},p={dimInfo[1].get('p')})")
             parameters.append(dimParams)
 
             weno_order_vary = [3, 5]
@@ -180,7 +180,7 @@ class MFCTest:
                 traceback.append (f"weno_order={weno_order}")
                 parameters.append({'weno_order': weno_order})
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                    traceback.append (f"mapped_weno={mapped_weno} | mp_weno={mp_weno}")
+                    traceback.append (f"(mapped_weno={mapped_weno},mp_weno={mp_weno})")
                     parameters.append({'mp_weno': mp_weno})
                     if not (mp_weno == 'T' and weno_order != 5): 
                         tests.append(TestCaseConfiguration(parameters, traceback))
@@ -261,14 +261,14 @@ class MFCTest:
             common.clear_line()
             self.tree.print(test.traceback)
             self.tree.print_progress(f"Running test #{testID} - {self.get_case_dir_name(parameters)}", i+1, len(tests))
-            self.handle_case(i, parameters)
+            self.handle_case(testID, test)
 
         common.clear_line()
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
     def get_case_dir_name(self, mods: dict):
-        return hashlib.sha1("".join([f"{x[0]}{x[1]}" for x in mods.items()]).encode()).hexdigest()[:20]
+        return base64.b64encode(str(mods.items()).encode()).decode()[:30]
 
     def get_case_dir(self, mods: dict):
         return f"{common.MFC_TESTDIR}/{self.get_case_dir_name(mods)}"
@@ -345,8 +345,8 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
     def get_test_summary(self, mods: dict):
         return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}_" for x in mods.items()])[:-1]
 
-    def handle_case(self, testID, parameters: dict):
-        self.create_case_dir(parameters)
+    def handle_case(self, testID, test: TestCaseConfiguration):
+        self.create_case_dir(test.parameters)
         
         def on_test_errror(msg: str = "", term_out: str = ""):
             common.clear_line()
@@ -354,14 +354,18 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             if msg != "":
                 self.tree.print(msg)
             
+
+            
             common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
 (1/3) Test #{testID}:
-  - Summary:  {self.get_test_summary(parameters)}
-  - Location: {self.get_case_dir(parameters)}
+  - Test ID:  {testID}
+  - Summary:  {test.traceback}
+  - Location: {self.get_case_dir(test.parameters)}
   - Error:    {msg}
+  - When:     {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} (dd/mm/yyyy) - (hh:mm:ss)
 
 (2/3) Test case:
-{self.get_case_from_mods(parameters).create_case_dict_str()}
+{self.get_case_from_mods(test.parameters).create_case_dict_str()}
 
 (3/3) Terminal output:
 {term_out}
@@ -370,18 +374,18 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             self.tree.print(f"Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
-        cmd = subprocess.run(f"cd '{self.get_case_dir(parameters)}' && python3 input.py",
+        cmd = subprocess.run(f"cd '{self.get_case_dir(test.parameters)}' && python3 input.py",
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              universal_newlines=True, shell=True)        
-        common.file_write(f"{self.get_case_dir(parameters)}/out.txt", cmd.stdout)
+        common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
         
         if cmd.returncode != 0:
             on_test_errror("MFC Execution Failed.", cmd.stdout)
 
-        pack = self.pack_case_output(parameters)
-        common.file_write(f"{self.get_case_dir(parameters)}/pack.txt", pack)
+        pack = self.pack_case_output(test.parameters)
+        common.file_write(f"{self.get_case_dir(test.parameters)}/pack.txt", pack)
 
-        golden_filepath = f"{self.get_case_dir(parameters)}/golden.txt"
+        golden_filepath = f"{self.get_case_dir(test.parameters)}/golden.txt"
 
         if self.args["generate"]:
             common.delete_file(golden_filepath)
