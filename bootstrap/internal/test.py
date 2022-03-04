@@ -174,10 +174,10 @@ class MFCTest:
             parameters.append(dimParams)
 
             for bc in [-4, -3, -2, -1]:
-                trace, params = [], []
+                trace, params = "", {}
                 for dimCmp in dimInfo[0]:
                     trace  += f"(bc_{dimCmp}%beg={bc},bc_{dimCmp}%end={bc})"
-                    params = {**params, **{'bc_{dimCmp}%beg': bc, 'bc_{dimCmp}%end': bc}}
+                    params = {**params, **{f'bc_{dimCmp}%beg': bc, f'bc_{dimCmp}%end': bc}}
 
                 traceback.append(trace)
                 parameters.append(params)
