@@ -144,15 +144,12 @@ class MFCTest:
 
         for dimInfo in [ (["x"],           {'m': 299, 'n': 0,  'p': 0},  {"geometry": 1}),
                          (["x", "y"],      {'m': 49,  'n': 39, 'p': 0},  {"geometry": 3}),
-                         (["x", "y", "z"], {'m': 29,  'n': 29, 'p': 49}, {"geometry": 9}) ]:
+                         (["x", "y", "z"], {'m': 24,  'n': 24, 'p': 24}, {"geometry": 9}) ]:
             dimParams = {**dimInfo[1]}
 
             for dimCmp in dimInfo[0]:
                 dimParams[f"{dimCmp}_domain%beg"] = 0.E+00
                 dimParams[f"{dimCmp}_domain%end"] = 1.E+00
-
-                dimParams[f"bc_{dimCmp}%beg"] = -3
-                dimParams[f"bc_{dimCmp}%end"] = -3
 
             for patchID in [1,2]:
                 dimParams[f"patch_icpp({patchID})%geometry"] = dimInfo[2].get("geometry")
@@ -161,7 +158,7 @@ class MFCTest:
                     dimParams[f"patch_icpp({1})%x_centroid"] = 0.25
                     dimParams[f"patch_icpp({2})%x_centroid"] = 0.75
                     dimParams[f"patch_icpp({patchID})%length_x"] = 0.5
-                    dimParams[f"patch_icpp({patchID})%vel(1)"] = 0.0
+                    dimParams[f"patch_icpp({patchID})%vel(1)"]   = 0.0
 
                 if "y" in dimInfo[0]:
                     dimParams[f"patch_icpp({patchID})%y_centroid"] = 0.5
@@ -176,8 +173,22 @@ class MFCTest:
             traceback.append (f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')},n={dimInfo[1].get('n')},p={dimInfo[1].get('p')})")
             parameters.append(dimParams)
 
-            weno_order_vary = [3, 5]
-            for weno_order in weno_order_vary:
+            for bc in [-4, -3, -2, -1]:
+                trace, params = [], []
+                for dimCmp in dimInfo[0]:
+                    trace  += f"(bc_{dimCmp}%beg={bc},bc_{dimCmp}%end={bc})"
+                    params = {**params, **{'bc_{dimCmp}%beg': bc, 'bc_{dimCmp}%end': bc}}
+
+                traceback.append(trace)
+                parameters.append(params)
+
+                tests.append(TestCaseConfiguration(parameters, traceback))
+
+                if bc != -1: # Keep only this boundary condition for all other tests
+                    traceback.pop()
+                    parameters.pop()
+
+            for weno_order in [3, 5]:
                 traceback.append (f"weno_order={weno_order}")
                 parameters.append({'weno_order': weno_order})
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
@@ -190,26 +201,42 @@ class MFCTest:
                 traceback.pop()
                 parameters.pop()
 
-            for riemann_solver in [1, 2]:
-                traceback.append(f"riemann_solver={riemann_solver}")
-                parameters.append({'riemann_solver': riemann_solver})
+            for num_fluids in [1, 2]:
+                traceback.append(f"num_fluids={num_fluids}")
+                parameters.append({"num_fluids": num_fluids})
 
-                # FIXME: alt_soundspeed not supported for a single fluid
-                #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
+                if num_fluids == 2:
+                    parameters.append({'fluid_pp(2)%gamma': 3.5, 'fluid_pp(2)%pi_inf': 0.0,'patch_icpp(1)%alpha_rho(1)': 0.81, 'patch_icpp(1)%alpha(1)': 0.9, 'patch_icpp(1)%alpha_rho(2)': 0.08, 'patch_icpp(1)%alpha(2)': 0.1, 'patch_icpp(2)%alpha_rho(1)': 0.18, 'patch_icpp(2)%alpha(1)': 0.2, 'patch_icpp(2)%alpha_rho(2)': 0.64, 'patch_icpp(2)%alpha(2)': 0.8})
 
-                tests.append(TestCaseConfiguration(parameters + [{'mixture_err': 'T'}], traceback + ['mixture_err=T']))
+                for riemann_solver in [1, 2]:
+                    traceback.append(f"riemann_solver={riemann_solver}")
+                    parameters.append({'riemann_solver': riemann_solver})
 
-                # FIXME: mpp_lim not supported for a single fluid
-                #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
-                tests.append(TestCaseConfiguration(parameters + [{'avg_state':   '1'}], traceback + ['avg_state=1']))
-                tests.append(TestCaseConfiguration(parameters + [{'wave_speeds': '2'}], traceback + ['wave_speeds=2']))
+                    tests.append(TestCaseConfiguration(parameters + [{'mixture_err': 'T'}], traceback + ['mixture_err=T']))
+                    tests.append(TestCaseConfiguration(parameters + [{'avg_state':   '1'}], traceback + ['avg_state=1']))
+                    tests.append(TestCaseConfiguration(parameters + [{'wave_speeds': '2'}], traceback + ['wave_speeds=2']))
 
-                # FIXME: num_comp
+                    if num_fluids == 2:
+                        if riemann_solver == 2:
+                            tests.append(TestCaseConfiguration(parameters + [{'alt_soundspeed': 'T'}], traceback + ['alt_soundspeed=T']))
+
+                        tests.append(TestCaseConfiguration(parameters + [{'avg_state':     1}], traceback + ['avg_state=1']))
+                        tests.append(TestCaseConfiguration(parameters + [{'wave_speeds':   2}], traceback + ['wave_speeds=2']))
+                        tests.append(TestCaseConfiguration(parameters + [{'mpp_lim':     'T'}], traceback + ['mpp_lim=T']))
+
+                    traceback.pop()
+                    parameters.pop()
+
+                if num_fluids == 2:
+                    parameters.pop()
 
                 traceback.pop()
                 parameters.pop()
 
-            tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + [f'ppn=2']))
+            if len(dimInfo[0]) == 3:
+                tests.append(TestCaseConfiguration(parameters + [{'ppn': 2, 'm': 29, 'n': 29, 'p': 49}], traceback + [f'ppn=2,m=29,n=29,p=49']))
+            else:
+                tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + [f'ppn=2']))
 
             traceback.pop()
             parameters.pop()
