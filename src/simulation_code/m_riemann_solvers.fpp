@@ -3785,8 +3785,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                    qL_prim_rsx_vf_flat(m + 1, k, l, i) = &
-                        qR_prim_rsx_vf_flat(m, k, l, i)
+                    qR_prim_rsx_vf_flat(m + 1, k, l, i) = &
+                        qL_prim_rsx_vf_flat(m, k, l, i)
                         end do
                     end do
                 end do
@@ -3840,8 +3840,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                    qL_prim_rsy_vf_flat(k, -1, l, i) = &
-                        qR_prim_rsy_vf_flat(k, 0, l, i)
+                    qL_prim_rsy_vf_flat(-1, k, l, i) = &
+                        qR_prim_rsy_vf_flat(0, k, l, i)
                         end do
                     end do
                 end do
@@ -3886,8 +3886,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                    qL_prim_rsy_vf_flat(k, n + 1, l, i) = &
-                        qR_prim_rsy_vf_flat(k, n, l, i)
+                    qR_prim_rsy_vf_flat(n+1, k, l, i) = &
+                        qL_prim_rsy_vf_flat(n, k, l, i)
                         end do
                     end do
                 end do
@@ -3933,10 +3933,10 @@ contains
             if (bc_z%beg == -4) then    ! Riemann state extrap. BC at beginning
 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
+                   do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
-                        do l = is3%beg, is3%end
-                    qL_prim_rsz_vf_flat(l, k, -1, i) = &
-                        qR_prim_rsz_vf_flat(l, k, 0, i)
+                    qL_prim_rsz_vf_flat(-1, k, l, i) = &
+                        qR_prim_rsz_vf_flat(0, k, l, i)
                         end do
                     end do
                 end do
@@ -3970,10 +3970,10 @@ contains
 
 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
+                   do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
-                        do l = is3%beg, is3%end
-                    qL_prim_rsz_vf_flat(l, k, p + 1, i) = &
-                        qR_prim_rsz_vf_flat(l, k, p, i)
+                    qR_prim_rsz_vf_flat(p + 1, k, l, i) = &
+                        qL_prim_rsz_vf_flat(p, k, l, i)
                         end do
                     end do
                 end do
