@@ -20,7 +20,7 @@ class TreePrinter:
         if len(self.indents) == 0:
             self.indents.append(Indent(color, '├─ '))
         else:
-            self.indents[-1].s = '|  '
+            self.indents[-1].s = '│  '
             self.indents.append(Indent(color, '├─ '))
         
     def unindent(self):

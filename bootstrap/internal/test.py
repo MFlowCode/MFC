@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import base64
 import os
 import re
 import copy
@@ -124,7 +123,9 @@ class TestCaseConfiguration:
     traceback:  str  = ""
 
     def __init__(self, parameters: list, traceback: list) -> None:
-        self.parameters = ChainMap(*parameters)
+        self.parameters = {}
+        for e in parameters:
+            self.parameters.update(e)
         self.traceback  = ' -> '.join(traceback)
 
 class MFCTest:
@@ -143,7 +144,7 @@ class MFCTest:
 
         for dimInfo in [ (["x"],           {'m': 299, 'n': 0,  'p': 0},  {"geometry": 1}),
                          (["x", "y"],      {'m': 49,  'n': 39, 'p': 0},  {"geometry": 3}),
-                         (["x", "y", "z"], {'m': 24,  'n': 24, 'p': 24}, {"geometry": 9}) ]:
+                         (["x", "y", "z"], {'m': 29,  'n': 29, 'p': 49}, {"geometry": 9}) ]:
             dimParams = {**dimInfo[1]}
 
             for dimCmp in dimInfo[0]:
@@ -208,7 +209,7 @@ class MFCTest:
                 traceback.pop()
                 parameters.pop()
 
-            tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + ['ppn=2']))
+            tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + [f'ppn=2']))
 
             traceback.pop()
             parameters.pop()
@@ -308,6 +309,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         common.file_write(f"{case_dir}/input.py", content)
 
     def golden_file_compare_match(self, truth: str, candidate: str):
+        if truth.count('\n') != candidate.count('\n'):
+            return (False, "Line count didn't match.")
+
         for candidate_line in candidate.splitlines():
             if candidate_line == "":
                 continue
