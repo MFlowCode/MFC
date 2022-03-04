@@ -23,6 +23,8 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use openacc
+
     use nvtx
     ! ==========================================================================
 
@@ -127,9 +129,6 @@ module m_variables_conversion
     ! function, liquid stiffness function, shear and volume Reynolds
     ! numbers and the Weber numbers
 
-    real(kind(0d0))                                   ::       nbub
-    real(kind(0d0)), allocatable, dimension(:) :: nRtmp
-!$acc declare create(nbub, nRtmp)
 
 
 
@@ -369,7 +368,7 @@ contains
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
 
 
-        real(kind(0d0)), dimension(:), intent(IN) :: alpha_rho_K, alpha_K !<
+        real(kind(0d0)), dimension(10), intent(IN) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
         integer, intent(IN) :: k, l, r
         integer :: i, j !< Generic loop iterators
@@ -479,7 +478,7 @@ contains
     subroutine s_initialize_variables_conversion_module() ! ----------------
 
 
-        integer :: i
+        integer :: i, j
         
         momxb = mom_idx%beg; momxe = mom_idx%end
         bubxb = bub_idx%beg; bubxe = bub_idx%end
@@ -519,20 +518,42 @@ contains
         end do
 !$acc update device(bubrs)
 
-        allocate(nRtmp(1:nb))
 
 
+        pi = 3.14159265358979311599796
 
         
 !$acc update device(small_alf, dflt_real, dflt_int)
-!$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, nbub, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+!$acc update device(pi, dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
 !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, mom_sp, mom_3d, sgm_eps)
 
 
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
 
-!$acc update device(monopole, mono, num_mono)
+!$acc update device(monopole, num_mono, mono)
+        do i = 1, num_mono
+!$acc update device(mono(i)%mag)
+!$acc update device(mono(i)%length)
+!$acc update device(mono(i)%npulse)
+!$acc update device(mono(i)%dir)
+!$acc update device(mono(i)%delay)
+
+        end do
+
+        do i = 1, num_mono
+!$acc update host(mono(i)%mag)
+!$acc update host(mono(i)%length)
+!$acc update host(mono(i)%npulse)
+!$acc update host(mono(i)%dir)
+!$acc update host(mono(i)%delay)
+        end do
+
+        print *, "Monopole DEBUG"
+        print *, mono(1)%loc(1)
+        print *, mono(1)%length
+        print *, mono(1)%mag
+
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -580,7 +601,8 @@ contains
 
         real(kind(0d0)),   dimension(10) :: alpha_K, alpha_rho_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K, alpha_K_sum
-        real(kind(0d0)), dimension(nb) :: nRtmp
+        real(kind(0d0)), dimension(1) :: nRtmp
+        real(kind(0d0)) :: vftmp, nR3, nbub_sc
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -643,6 +665,8 @@ contains
                         end do
 
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K,  alpha_K, alpha_rho_K, j, k, l)
+
+
 !$acc loop seq
                         do i = momxb, momxe
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -651,23 +675,22 @@ contains
                                              *qK_prim_vf(i)%sf(j, k, l)
                         end do 
 
-                       qK_prim_vf(E_idx)%sf(j, k, l) = &
-                            ((qK_cons_vf(E_idx)%sf(j, k, l) &
-                              - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) &
-                             - pi_inf_K &
-                            )/gamma_K
+                       qK_prim_vf(E_idx)%sf(j, k, l) = (((qK_cons_vf(E_idx)%sf(j, k, l) - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)))  - pi_inf_K )/gamma_K
 
 !$acc loop seq 
                         do i = 1, nb
                             nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
                         end do
 
+                        vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(qK_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
+                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
+
+                        !nbub_sc = DSQRT((4.d0*3.141592653589793d0/3.d0)*(nRtmp(1)**3d0)/vftmp)
 
 !$acc loop seq 
                         do i = bubxb, bubxe
-                            qk_prim_vf(i)%sf(j, k, l) = qk_cons_vf(i)%sf(j, k, l)/nbub
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
                         end do
 
                     end do
@@ -746,6 +769,8 @@ contains
         end do
 
     end subroutine s_convert_primitive_to_conservative_variables ! ---------
+
+
 
 
     !>  The following subroutine handles the conversion between
@@ -855,7 +880,6 @@ contains
     subroutine s_finalize_variables_conversion_module() ! ------------------
 
         deallocate(gammas, pi_infs)
-        deallocate(nRtmp)
         deallocate(bubrs)
 
         s_convert_to_mixture_variables => null()

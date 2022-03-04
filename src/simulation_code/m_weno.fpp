@@ -1948,7 +1948,7 @@ contains
                     do j = 1, v_size
                         do m = is3%beg, is3%end
                             do l = is2%beg, is2%end
-                                do k = is1%beg , is1%end 
+                                do k = is1%beg - weno_polyn , is1%end + weno_polyn
                                     v_rs_ws_x_flat(k, l, m, j) = v_vf(j)%sf(k , l, m)
                                 end do 
                             end do
@@ -1966,7 +1966,7 @@ contains
                     do j = 1, v_size
                         do m = is3%beg, is3%end
                             do l = is2%beg, is2%end
-                                do k = is1%beg  , is1%end  
+                                do k = is1%beg - weno_polyn  , is1%end  + weno_polyn
                                     v_rs_ws_y_flat(k, l, m, j) = v_vf(j)%sf(l, k, m)
                                 end do 
                             end do
@@ -1987,7 +1987,7 @@ contains
                     do j = 1, v_size
                         do m = is3%beg, is3%end
                             do l = is2%beg, is2%end
-                                do k = is1%beg  , is1%end 
+                                do k = is1%beg - weno_polyn , is1%end + weno_polyn
                                     v_rs_ws_z_flat(k, l, m, j) = v_vf(j)%sf(m, l, k)
                                 end do 
                             end do
