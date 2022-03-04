@@ -17,6 +17,7 @@ class MFCArgs(objecttree.ObjectTree):
         test    = parser.add_argument_group(title="Test")
 
         test.add_argument("-g", "--generate", action="store_true", help="Generate golden files.")
+        test.add_argument("-o", "--only",     nargs="+", type=str, default=[], metavar="L", help="Only run tests with ids or hashes L.")
 
         grp = action.add_mutually_exclusive_group(required=True)
 
@@ -27,7 +28,7 @@ class MFCArgs(objecttree.ObjectTree):
                             help="Select a compiler configuration to use when running MFC.")
 
         compiler_target_names = [e.name for e in conf.targets]
-        action.add_argument("-t", "--targets", nargs="+", type=str.lower,
+        general.add_argument("-t", "--targets", nargs="+", type=str.lower,
                             choices=compiler_target_names, default=["mfc"],
                             help="The space-separated targets you wish to have built.")
 
