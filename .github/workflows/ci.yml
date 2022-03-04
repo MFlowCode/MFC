@@ -27,6 +27,9 @@ jobs:
         os: [ubuntu-20.04]
 
     steps:
+      - name: Clone MFC
+        uses: actions/checkout@v2
+
       - name: Install (Aptitude) Package
         run: |
           sudo apt update
@@ -43,10 +46,7 @@ jobs:
         run: |
           pip3 install pyyaml colorama fypp
 
-      - name: Clone MFC
-        uses: actions/checkout@v2
-
-      - name: Build MFC
+      - name: Build MFC and its dependencies
         run: |
           chmod +x ./mfc.sh
           ./mfc.sh --build -cc release-cpu -j $(nproc)
@@ -68,4 +68,4 @@ jobs:
             tests/**/*.out
             tests/**/*.inp
             tests/**/*.txt
-            tests/test.log
+            tests/*.txt
