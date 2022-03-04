@@ -98,14 +98,14 @@ Below are some commands for popular operating systems and package managers.
  
 ### \*nix
 
-* Via [Aptitude](https://wiki.debian.org/Aptitude)
+* **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 ```console
 sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-dev python3-dev python3-venv libopenmpi-dev
 ```
 
 ### MacOS (including x86 and M1/Apple Silicon)
 
-* Via [Homebrew](https://brew.sh/)
+* **Via [Homebrew](https://brew.sh/):**
 
 You can modify the assignment on the first line to have the GCC major version you wish to have installed and use.
 
@@ -123,19 +123,23 @@ The following commands fetch and build MFC and its required dependencies.
 The dependencies are built to the `build/` directory within your MFC installation. 
 This should have no impact on your local installation(s) of these packages.
 
-+ Fetch MFC
++ **Fetch MFC:**
 
 ```console
 git clone --recursive https://github.com/MFlowCode/MFC
 cd MFC
 ```
 
-+ Build MFC and its dependencies with 8 threads in `release-cpu` mode:
++ **(Optional) Configure MFC defaults in [mfc.user.yaml](mfc.user.yaml):**
 
-| Argument     | Flag | Default Value | Possible values |
+If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customisation. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
+
++ **Build MFC and its dependencies with 8 threads in `release-cpu` mode:**
+
+| Argument     | Flag | Default Value (from [mfc.user.yaml](mfc.user.yaml)) | Possible values |
 | ------------ | ---- | ------------- | --------------- |
 | Threads      | `-j` | `1` | From `1` to the maximum logical thread count of your processor. |
-| Target(s)    | `-t` | `MFC` | `pre_process` / `simulation` / `post_process` / `FFTW3` / `HDF5` / `SILO` |
+| Target(s)    | `-t` | `MFC` | `MFC` / `pre_process` / `simulation` / `post_process` / `FFTW3` / `HDF5` / `SILO` |
 | Configuration | `-cc` | `release-cpu` | `release-cpu` / `release-gpu` / `debug-cpu` / `debug-gpu` |
 
 ```console
@@ -149,7 +153,7 @@ chmod +x ./mfc.sh
 ./mfc.sh --test
 ```
 
-More information about `mfc.sh` can be found in its help page (`./mfc.sh -h`).
+Please refer to the <a href="#testing">Testing</a> section of this document for more information. 
 
 ## User Configuration (`mfc.user.yaml`)
 
@@ -190,6 +194,15 @@ for the flow variables via
 To run MFC's test suite, simply run `./mfc.sh --test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
  
 Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh --test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
+
+If you want to only run certain tests, you can pass the argument `-o` (`--only`) along with the associated test ID or hash:
+- **Test ID:** It is the execution order of a test. The first test is `#1`, the next one is `#2`, and so on. If a test is added or removed, it could modify the test IDs of all tests executed after it.
+- **Hash:** It is a hash of the parameters given to MFC by a certain test. They look like `5340bc2a`. They are used to refer to a specific test, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content. However, if a test's parameters change, its hash also changes (ignoring collisions).
+
+An example of running targeted tests:
+```console
+./mfc.sh --test -o 7 5b486221
+```
 
 # Development
 
