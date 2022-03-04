@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 import base64
-from inspect import trace
 import os
 import re
 import copy
 import colorama
+import binascii
 import subprocess
 import dataclasses
 
@@ -141,9 +141,9 @@ class MFCTest:
         traceback  = []
         parameters = []
 
-        for dimInfo in [ (["x"],           {'m': 299},                  {"geometry": 1}),
-                         (["x", "y"],      {'m': 49, 'n': 39},          {"geometry": 3}),
-                         (["x", "y", "z"], {'m': 24, 'n': 24, 'p': 24}, {"geometry": 9}) ]:
+        for dimInfo in [ (["x"],           {'m': 299, 'n': 0,  'p': 0},  {"geometry": 1}),
+                         (["x", "y"],      {'m': 49,  'n': 39, 'p': 0},  {"geometry": 3}),
+                         (["x", "y", "z"], {'m': 24,  'n': 24, 'p': 24}, {"geometry": 9}) ]:
             dimParams = {**dimInfo[1]}
 
             for dimCmp in dimInfo[0]:
@@ -181,7 +181,7 @@ class MFCTest:
                 parameters.append({'weno_order': weno_order})
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
                     traceback.append (f"(mapped_weno={mapped_weno},mp_weno={mp_weno})")
-                    parameters.append({'mp_weno': mp_weno})
+                    parameters.append({'mapped_weno': mapped_weno, 'mp_weno': mp_weno})
                     if not (mp_weno == 'T' and weno_order != 5): 
                         tests.append(TestCaseConfiguration(parameters, traceback))
                     traceback.pop()
@@ -259,7 +259,7 @@ class MFCTest:
                 testID = self.args["only"][i]
 
             common.clear_line()
-            self.tree.print(test.traceback)
+            self.tree.print(f"#{testID}: {test.traceback}")
             self.tree.print_progress(f"Running test #{testID} - {self.get_case_dir_name(parameters)}", i+1, len(tests))
             self.handle_case(testID, test)
 
@@ -268,7 +268,7 @@ class MFCTest:
         self.tree.unindent()
 
     def get_case_dir_name(self, mods: dict):
-        return base64.b64encode(str(mods.items()).encode()).decode()[:30]
+        return hex(binascii.crc32(str(mods.items()).encode()))[2:]
 
     def get_case_dir(self, mods: dict):
         return f"{common.MFC_TESTDIR}/{self.get_case_dir_name(mods)}"
@@ -353,8 +353,6 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             self.tree.print(f"Test #{testID}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
             if msg != "":
                 self.tree.print(msg)
-            
-
             
             common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
 (1/3) Test #{testID}:
