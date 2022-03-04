@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from inspect import trace
 import os
 import re
 import copy
@@ -8,7 +9,8 @@ import colorama
 import subprocess
 import dataclasses
 
-from pathlib import Path
+from pathlib     import Path
+from collections import ChainMap
 
 import internal.common      as common
 import internal.treeprint   as treeprint
@@ -117,6 +119,14 @@ BASE_CASE = Case({
     }
 })
 
+class TestCaseConfiguration:
+    parameters: dict = {}
+    traceback:  str  = ""
+
+    def __init__(self, parameters: list, traceback: list) -> None:
+        self.parameters = ChainMap(*parameters)
+        self.traceback  = ' -> '.join(traceback)
+
 class MFCTest:
     def __init__(self, bootstrap):
         self.bootstrap = bootstrap
@@ -126,7 +136,10 @@ class MFCTest:
         self.args = self.bootstrap.args
 
     def get_test_params(self):
-        all_run_params = []
+        tests = []
+
+        traceback  = []
+        parameters = []
 
         for dimInfo in [ (["x"],           {'m': 299},                  {"geometry": 1}),
                          (["x", "y"],      {'m': 49, 'n': 39},          {"geometry": 3}),
@@ -159,25 +172,68 @@ class MFCTest:
                     dimParams[f"patch_icpp({patchID})%length_z"]   = 1
                     dimParams[f"patch_icpp({patchID})%vel(3)"]     = 0.0
 
-            for weno_order in [3, 5]:
+            traceback.append (f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')} | n={dimInfo[1].get('n')} | p={dimInfo[1].get('p')})")
+            parameters.append(dimParams)
+
+            weno_order_vary = [3, 5]
+            for weno_order in weno_order_vary:
+                traceback.append (f"weno_order={weno_order}")
+                parameters.append({'weno_order': weno_order})
                 for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                    if not (mp_weno == 'T' and weno_order != 5):
-                        all_run_params.append({**dimParams, **{'weno_order': weno_order, 'mapped_weno': mapped_weno, 'mp_weno': mp_weno}})
+                    traceback.append (f"mapped_weno={mapped_weno} | mp_weno={mp_weno}")
+                    parameters.append({'mp_weno': mp_weno})
+                    if not (mp_weno == 'T' and weno_order != 5): 
+                        tests.append(TestCaseConfiguration(parameters, traceback))
+                    traceback.pop()
+                    parameters.pop()
+                traceback.pop()
+                parameters.pop()
 
             for riemann_solver in [1, 2]:
+                traceback.append(f"riemann_solver={riemann_solver}")
+                parameters.append({'riemann_solver': riemann_solver})
+
                 # FIXME: alt_soundspeed not supported for a single fluid
                 #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'alt_soundspeed': 'T'}})
-                all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mixture_err':    'T'}})
+                
+                tests.append(TestCaseConfiguration(parameters + [{'mixture_err': 'T'}], traceback + ['mixture_err=T']))
+                
                 # FIXME: mpp_lim not supported for a single fluid
                 #all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'mpp_lim':        'T'}})
-                all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'avg_state':      1}})
-                all_run_params.append({**dimParams, **{'weno_order': weno_order, 'riemann_solver': riemann_solver, 'wave_speeds':    2}})
+                tests.append(TestCaseConfiguration(parameters + [{'avg_state':   '1'}], traceback + ['avg_state=1']))
+                tests.append(TestCaseConfiguration(parameters + [{'wave_speeds': '2'}], traceback + ['wave_speeds=2']))
 
-                # TODO: num_comp
+                # FIXME: num_comp
 
-            all_run_params.append({**dimParams, **{'ppn': 2}})
-        
-        return all_run_params
+                traceback.pop()
+                parameters.pop()
+
+            tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + ['ppn=2']))
+
+            traceback.pop()
+            parameters.pop()
+
+        return tests
+
+    def filter_tests(self, tests: list):
+        if len(self.args["only"]) > 0:
+            for i, test in enumerate(tests[:]):
+                doKeep = False
+                for o in self.args["only"]:
+                    if str(o).isnumeric():
+                        testID = i+1
+                        if testID == int(o):
+                            doKeep = True
+                            break
+                    
+                    testHash = self.get_case_dir_name(test.parameters)
+                    if str(o) == testHash:
+                        doKeep = True
+                        break
+                    
+                if not doKeep:
+                    tests.remove(test)
+        return tests
 
     def test(self):
         self.tree.print(f"Testing mfc")
@@ -192,10 +248,20 @@ class MFCTest:
                 self.tree.print(f"{target} needs (re)building...")
                 self.bootstrap.build_target(f"{target}")
         
-        all_test_params = self.get_test_params()
-        for i, run_params in enumerate(all_test_params):
-            self.tree.print_progress(f"Running test #{i+1} - {self.get_case_dir_name(run_params)}", i+1, len(all_test_params))
-            self.handle_case(i, run_params)
+        tests = self.filter_tests(self.get_test_params())
+        
+        for i, test in enumerate(tests):
+            test: TestCaseConfiguration
+            parameters = test.parameters
+
+            testID = i+1
+            if len(self.args["only"]):
+                testID = self.args["only"][i]
+
+            common.clear_line()
+            self.tree.print(test.traceback)
+            self.tree.print_progress(f"Running test #{testID} - {self.get_case_dir_name(parameters)}", i+1, len(tests))
+            self.handle_case(i, parameters)
 
         common.clear_line()
         self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
