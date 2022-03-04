@@ -158,13 +158,6 @@ integer :: err_code, ierr
     call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
     
-!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
-!$acc update device(sys_size, buff_size)
-!$acc update device(m, n, p)
-    do i = 1, sys_size
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
-    end do
-
 
     ! Populating the buffers of the grid variables using the boundary conditions
     call s_populate_grid_variables_buffers()
@@ -187,6 +180,13 @@ integer :: err_code, ierr
 
     allocate(proc_time(0:num_procs - 1))
 
+
+!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
+!$acc update device(sys_size, buff_size)
+!$acc update device(m, n, p)
+    do i = 1, sys_size
+!$acc update device(q_cons_ts(1)%vf(i)%sf)
+    end do
 
     
     ! Setting the time-step iterator to the first time-step
