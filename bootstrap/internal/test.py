@@ -174,20 +174,17 @@ class MFCTest:
             parameters.append(dimParams)
 
             for bc in [-4, -3, -2, -1]:
-                trace, params = "", {}
+                params = {}
                 for dimCmp in dimInfo[0]:
-                    trace  += f"(bc_{dimCmp}%beg={bc},bc_{dimCmp}%end={bc})"
                     params = {**params, **{f'bc_{dimCmp}%beg': bc, f'bc_{dimCmp}%end': bc}}
 
-                traceback.append(trace)
-                parameters.append(params)
+                trace = f"bc={bc}"
+                tests.append(TestCaseConfiguration(parameters + [params], traceback + [trace]))
 
-                tests.append(TestCaseConfiguration(parameters, traceback))
-
-                if bc != -1: # Keep only this boundary condition for all other tests
-                    traceback.pop()
-                    parameters.pop()
-
+                if bc == -1:
+                    parameters.append(params)
+                    traceback.append(trace)
+            
             for weno_order in [3, 5]:
                 traceback.append (f"weno_order={weno_order}")
                 parameters.append({'weno_order': weno_order})
@@ -238,8 +235,9 @@ class MFCTest:
             else:
                 tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + [f'ppn=2']))
 
-            traceback.pop()
-            parameters.pop()
+            for i in range(2):
+                traceback.pop()
+                parameters.pop()
 
         return tests
 
