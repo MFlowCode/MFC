@@ -6,44 +6,56 @@ import internal.conf       as conf
 import internal.objecttree as objecttree
 
 class MFCArgs(objecttree.ObjectTree):
+    def get_command(self):
+        return self.tree_get("command")
+
     def __init__(self, conf: conf.MFCConf, user: user.MFCUser):
-        parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", )
+        parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", prog="./mfc.sh",
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         compiler_configuration_names = [e.name for e in user.configurations]
 
-        action  = parser.add_argument_group(title="Action")
-        general = parser.add_argument_group(title="General")
-        build   = parser.add_argument_group(title="Build")
-        test    = parser.add_argument_group(title="Test")
+        parsers = parser.add_subparsers(dest="command")
 
+        build = parsers.add_parser(name="build", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        run   = parsers.add_parser(name="run",   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        test  = parsers.add_parser(name="test",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        def add_common_arguments(p):
+            compiler_target_names = [e.name for e in conf.targets]
+
+            p.add_argument("-t", "--targets", nargs="+", type=str.lower,
+                             choices=compiler_target_names, default=["mfc"], help="")
+
+            p.add_argument("-cc", "--compiler-configuration", type=str.lower,
+                     choices=compiler_configuration_names, default=user.general.configuration, help="")
+
+        # === BUILD ===
+        add_common_arguments(build)
+        build.add_argument("-j", "--jobs", metavar="N", type=int,
+                           help="Allows for N concurrent jobs.", default=int(user.build.threads))
+        build.add_argument("-s", "--scratch", action="store_true",
+                           help="Build all targets from scratch.")
+
+        # === TEST ===
+        add_common_arguments(test)
         test.add_argument("-g", "--generate", action="store_true", help="Generate golden files.")
         test.add_argument("-o", "--only",     nargs="+", type=str, default=[], metavar="L", help="Only run tests with ids or hashes L.")
 
-        grp = action.add_mutually_exclusive_group(required=True)
-
-        grp.add_argument("--build", action="store_true", help="Build targets.")
-        grp.add_argument("--test",  action="store_true", help="Test MFC.")
-        grp.add_argument("--clean", action="store_true", help="Clean MFC targets.")
-        grp.add_argument("--set-current", type=str.lower, choices=compiler_configuration_names,
-                            help="Select a compiler configuration to use when running MFC.")
-
-        compiler_target_names = [e.name for e in conf.targets]
-        general.add_argument("-t", "--targets", nargs="+", type=str.lower,
-                            choices=compiler_target_names, default=["mfc"],
-                            help="The space-separated targets you wish to have built.")
-
-        general.add_argument("-cc", "--compiler-configuration", type=str.lower,
-                            choices=compiler_configuration_names, default=user.defaults.configuration)
-
-        build.add_argument("-j", "--jobs", metavar="N", type=int,
-                            help="Allows for N concurrent jobs.", default=int(user.defaults.threads))
-
-        build.add_argument("-s", "--scratch", action="store_true",
-                            help="Build all targets from scratch.")
-
+        # === RUN ===
+        add_common_arguments(run)
+        run.add_argument("-e", "--engine", choices=["serial", "parallel"], default="serial",
+                           help="Job execution/submission engine choice.")
+        run.add_argument("-i", "--input",                               type=str, required=True,                   help="Input file for run.")
+        run.add_argument("-m", "--e-mail",         metavar="MAIL",      type=str, default=user.run.email,          help="(Parrallel) Email     for job submission.")
+        run.add_argument("-p", "--partition",      metavar="PARTITION", type=str, default=user.run.partition,      help="(Parrallel) Partition for job submission.")
+        run.add_argument("-N", "--nodes",          metavar="NODES",     type=int, default=user.run.nodes,          help="(Parrallel) Number of nodes.")
+        run.add_argument("-n", "--tasks-per-node", metavar="TASKS",     type=int, default=user.run.tasks_per_node, help="            Number of tasks per node.")
+        run.add_argument("-g", "--gpus-per-node",  metavar="GPUS",      type=int, default=user.run.gpus_per_node,  help="(Parrallel) Number of GPUs  per node.")
+        
         super().__init__(vars(parser.parse_args()))
 
-        if not self.tree_get("build") and not self.tree_get("test") and not self.tree_get("clean") and not self.tree_get("set_current"):
+        if self.tree_get("command") is None:
             parser.print_help()
             exit(-1)
 

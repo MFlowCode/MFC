@@ -420,10 +420,6 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
    +----------------------------------+
 """)
 
-    def test_target(self, name: str): 
-        # TODO: ERROR if name is not MFC
-        self.test.test()
-
     def clean_target(self, name: str):
         if not self.is_build_satisfied(name):
             raise common.MFCException(f"Can't clean {name} because its build isn't satisfied.")
@@ -462,6 +458,57 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.tree.print(f"Cleaning done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
+    def create_input_file(component: str, obj: dict):
+        pass
+
+    def run(self):
+        cc:      str = self.args["compiler_configuration"]
+        input:   str = self.args["input"]
+        engine:  str = self.args["engine"]
+        targets: str = self.args["targets"]
+
+        if targets[0] == "mfc":
+            targets = ["pre_process", "simulation", "post_process"]
+
+        self.tree.print(f"Running MFC:")
+        self.tree.indent()
+        self.tree.print(f"Target(s) (-t)  {', '.join(targets)}")
+        self.tree.print(f"Engine    (-e)  {engine}")
+        self.tree.print(f"Config    (-cc) {cc}")
+        self.tree.print(f"Input     (-i)  {input}")
+
+        for target_name in targets:
+            self.tree.print(f"Running {target_name}:")
+            self.tree.indent()
+            
+            if not self.is_build_satisfied(target_name):
+                self.tree.print(f"Target {target_name} needs (re)building...")
+                self.build_target(target_name)
+
+            self.tree.print("TODO: Creating input file...")
+
+            # TODO: mpirun -n
+            if engine == 'serial':
+                build_path: str = self.get_build_path(target_name)
+
+                date: str = f"{colorama.Fore.CYAN}[{common.get_datetime_str()}]{colorama.Style.RESET_ALL}"
+                bin:  str = f'{build_path}/bin/{target_name}'
+
+                command = f'LD_LIBRARY_PATH="{build_path}/lib" mpirun {bin}'
+
+                self.tree.print(f"{date} Running...")
+                #TODO: common.execute_shell_command(command)
+
+                self.tree.print(f"Done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
+            elif engine == 'parallel':
+                pass
+            else:
+                raise common.MFCException(f"Unsupported engine {engine}.")
+
+            self.tree.unindent()
+
+        self.tree.unindent()
+
     def __init__(self):
         self.tree = treeprint.TreePrinter()
 
@@ -475,19 +522,16 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.print_header()
         self.check_environment()
 
-        if self.args["set_current"] is not None:
-            common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path(self.args["set_current"]))
-
         # Update symlink to current build
-        if self.args["build"]:
+        if self.args["command"] == "build":
             common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
 
-        if self.args["test"]:
-            self.test.test()
+        if self.args["command"] == "test": self.test.test()
+        if self.args["command"] == "run":  self.run()
 
         for target_name in [ x.name for x in self.conf.targets ]:
             if target_name in self.args["targets"]:
-                if self.args["build"]: self.build_target(target_name)
-                if self.args["clean"]: self.clean_target(target_name)
+                if self.args["command"] == "build": self.build_target(target_name)
+                if self.args["command"] == "clean": self.clean_target(target_name)
 
         self.lock.save()

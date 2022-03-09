@@ -10,7 +10,6 @@ import dataclasses
 
 from pathlib     import Path
 from collections import ChainMap
-from datetime    import datetime
 
 import internal.common as common
 
@@ -389,7 +388,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
   - Summary:  {test.traceback}
   - Location: {self.get_case_dir(test.parameters)}
   - Error:    {msg}
-  - When:     {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} (dd/mm/yyyy) - (hh:mm:ss)
+  - When:     {common.get_datetime_str()}
 
 (2/3) Test case:
 {self.get_case_from_mods(test.parameters).create_case_dict_str()}

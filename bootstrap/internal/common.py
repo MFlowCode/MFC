@@ -5,6 +5,8 @@ import shutil
 import tarfile
 import colorama # *: Colorama package
 
+from datetime import datetime
+
 
 MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
 MFC_TESTDIR         = f"{MFC_ROOTDIR}/tests"
@@ -31,6 +33,9 @@ def execute_shell_command(command: str, no_exception: bool = False, exception_te
             raise MFCException(exception_text)
 
     return status
+
+def get_datetime_str() -> str:
+    return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
 def clear_line() -> None:
     sys.stdout.write("\033[K")
