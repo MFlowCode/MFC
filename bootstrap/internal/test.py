@@ -380,6 +380,12 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
         if truth.count('\n') != candidate.count('\n'):
             return (False, "Line count didn't match.")
 
+        if "NaN" in truth:
+            return (False, "NaN in golden file")
+        
+        if "NaN" in candidate:
+            return (False, "NaN in packed file")
+
         for candidate_line in candidate.splitlines():
             if candidate_line == "":
                 continue
