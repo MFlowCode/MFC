@@ -1650,7 +1650,7 @@ def f_execute_mfc_component_SHB(comp_name, case_dict, mfc_dir, engine, sub_name)
 
         if (cmd_status.returncode != 0):
             exit(cmd_status.returncode)
-        
+
     #else if engine == 'interactive':
     #    print '\n' + comp_name + '>> Interactive job in progress ...' + '\n'
     #    cmd_status = Popen('./'+comp_dir+'/'+comp_name, shell=True, stdout=PIPE, universal_newlines=True)
@@ -1692,7 +1692,7 @@ def f_execute_mfc_component(comp_name: str, case_dict, mfc_dir, engine): # -----
     global pre_process_dict, simulation_dict, post_process_dict, pbs_dict
 
     mfc_dir=os.path.abspath(mfc_dir)
-    
+
     if "pre"  in comp_name.lower(): comp_name = "pre_process"
     if "sim"  in comp_name.lower(): comp_name = "simulation"
     if "post" in comp_name.lower(): comp_name = "post_process"
@@ -1791,7 +1791,7 @@ def f_execute_mfc_component(comp_name: str, case_dict, mfc_dir, engine): # -----
         cmd_status = Popen('sbatch ' + comp_name + '.sh', shell=True, stdout=PIPE, universal_newlines=True)
         output, errors = cmd_status.communicate()
         print( '\n' + output)
-        
+
         if (cmd_status.returncode != 0):
             exit(cmd_status.returncode)
 
@@ -2211,7 +2211,7 @@ def f_create_batch_file(comp_name, case_dict, mfc_dir): # ----------------------
 
     if (cmd_status.returncode != 0):
         exit(cmd_status.returncode)
-    
+
 # END: def f_create_batch_file -------------------------------------------------
 
 
