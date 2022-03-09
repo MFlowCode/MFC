@@ -144,13 +144,13 @@ If you wish, you can override MFC's default build parameters in [mfc.user.yaml](
 
 ```console
 chmod +x ./mfc.sh
-./mfc.sh --build -j 8 -cc release-cpu
+./mfc.sh build -j 8 -cc release-cpu
 ```
 
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
 
 ```console
-./mfc.sh --test
+./mfc.sh test
 ```
 
 Please refer to the <a href="#testing">Testing</a> section of this document for more information. 
@@ -191,9 +191,9 @@ for the flow variables via
  
 # Testing MFC
  
-To run MFC's test suite, simply run `./mfc.sh --test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
+To run MFC's test suite, simply run `./mfc.sh test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
  
-Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh --test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
+Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
 
 If you want to only run certain tests, you can pass the argument `-o` (`--only`) along with the associated test ID or hash:
 - **Test ID:** It is the execution order of a test. The first test is `#1`, the next one is `#2`, and so on. If a test is added or removed, it could modify the test IDs of all tests executed after it.
@@ -201,7 +201,7 @@ If you want to only run certain tests, you can pass the argument `-o` (`--only`)
 
 An example of running targeted tests:
 ```console
-./mfc.sh --test -o 7 5b486221
+./mfc.sh test -o 7 5b486221
 ```
 
 # Development
