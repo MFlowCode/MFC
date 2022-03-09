@@ -63,7 +63,7 @@ class Bootstrap:
         self.tree.indent()
 
         required = ["python3", "python3-config", "make", "git"]
-        required += [ compiler for compiler in list(vars(self.user.compilers).values()) ]
+        required += [ compiler for compiler in list(vars(self.user.build.compilers).values()) ]
 
         for index, utility in enumerate(required):
             common.clear_line()
@@ -79,9 +79,9 @@ class Bootstrap:
 
         # Run checks on the user's current compilers
         def compiler_str_replace(s: str):
-            s = s.replace("${C}",       self.user.compilers.c)
-            s = s.replace("${CPP}",     self.user.compilers.cpp)
-            s = s.replace("${FORTRAN}", self.user.compilers.fortran)
+            s = s.replace("${C}",       self.user.build.compilers.c)
+            s = s.replace("${CPP}",     self.user.build.compilers.cpp)
+            s = s.replace("${FORTRAN}", self.user.build.compilers.fortran)
 
             return s
 
@@ -119,7 +119,7 @@ class Bootstrap:
 
     def string_replace(self, dependency_name: str, string: str, recursive=True):
         dep       = self.conf.get_target(dependency_name)
-        compilers = self.user.compilers
+        compilers = self.user.build.compilers
 
         configuration = self.get_target_configuration(dependency_name, self.args["compiler_configuration"])
 
