@@ -55,8 +55,16 @@ class MFCArgs(objecttree.ObjectTree):
 
         super().__init__(vars(parser.parse_args()))
 
-        # FIXME: fix the udnerlyuing issue
-        self.data["jobs"] = 8
+        # Add default arguments of other subparsers
+        def append_defaults_to_data(name: str, parser):
+            if self.data["command"] != name:
+                vals, errs = parser.parse_known_args(["-i None"])
+                for key,val in vars(vals).items():
+                    if not self.exists(key):
+                        self.data[key] = val
+
+        for a, b in [("run", run), ("test", test), ("build", build)]:
+            append_defaults_to_data(a, b)
 
         if self.tree_get("command") is None:
             parser.print_help()
