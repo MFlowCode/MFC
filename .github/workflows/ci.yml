@@ -49,14 +49,14 @@ jobs:
       - name: Build MFC and its dependencies
         run: |
           chmod +x ./mfc.sh
-          ./mfc.sh --build -cc release-cpu -j $(nproc)
-          ./mfc.sh --build -cc release-gpu -j $(nproc)
+          ./mfc.sh build -cc release-cpu -j $(nproc)
+          ./mfc.sh build -cc release-gpu -j $(nproc)
 
       - name: Test MFC
         run: |
-          ./mfc.sh --test -cc release-cpu
-          ./mfc.sh --test -cc release-gpu
-
+          ./mfc.sh test -cc release-cpu
+          ./mfc.sh test -cc release-gpu
+      
       - name: Upload logs
         uses: actions/upload-artifact@v2
         if: always()
