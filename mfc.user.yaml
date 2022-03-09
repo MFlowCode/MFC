@@ -3,21 +3,31 @@
 # More information can be found in the README.
 # 
 
-defaults:
-  threads:       1
+general:
   configuration: release-cpu
-compilers:
-  c:       mpicc
-  cpp:     mpicxx
-  fortran: mpif90
+build:
+  threads:   1
+  compilers:
+    c:       mpicc
+    cpp:     mpicxx
+    fortran: mpif90
+run:
+  e-mail:
+  nodes:          1
+  partition:
+  tasks-per-node: 1
+  gpus-per-node:  0
 configurations:
   - name:    release-cpu
     c:       -O3
     cpp:     -O3
     fortran: -O3 -cpp -w                   -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+
   - name:    release-gpu
     fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+
   - name:    debug-cpu
     fortran: -Og -g -cpp -w
+
   - name:    debug-gpu
     fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
