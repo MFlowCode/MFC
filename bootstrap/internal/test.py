@@ -64,7 +64,7 @@ class Test:
 
 Tend = 0.25
 Nt   = 50
-mydt = 0.0005
+mydt = Tend/(1.*Nt)
 
 BASE_CASE = Case({
     "name": "Base Case",
@@ -82,8 +82,8 @@ BASE_CASE = Case({
         'dt'                           : mydt,
         't_step_start'                 : 0,
         't_step_stop'                  : int(Nt+1),
-        't_step_save'                  : int(Nt),
-        'num_patches'                  : 3,
+        't_step_save'                  : 10,
+        'num_patches'                  : 2,
         'model_eqns'                   : 2,
         'alt_soundspeed'               : 'F',
         'num_fluids'                   : 1,
@@ -113,8 +113,8 @@ BASE_CASE = Case({
         'patch_icpp(2)%alpha_rho(1)'   : 0.5,
         'patch_icpp(2)%alpha(1)'       : 1.,
 
-        'patch_icpp(3)%pres'           : 0.1,
-        'patch_icpp(3)%alpha_rho(1)'   : 0.125,
+        'patch_icpp(3)%pres'           : 1.0,
+        'patch_icpp(3)%alpha_rho(1)'   : 1.0,
         'patch_icpp(3)%alpha(1)'       : 1.,
 
         'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
@@ -155,7 +155,7 @@ class MFCTest:
                 dimParams[f"{dimCmp}_domain%beg"] = 0.E+00
                 dimParams[f"{dimCmp}_domain%end"] = 1.E+00
 
-            for patchID in [1,2]:
+            for patchID in range(1, 3+1):
                 dimParams[f"patch_icpp({patchID})%geometry"] = dimInfo[2].get("geometry")
 
                 if "z" in dimInfo[0]:
@@ -198,19 +198,12 @@ class MFCTest:
                     dimParams[f"patch_icpp({3})%length_x"]   = 0.2
 
                 if "x" in dimInfo[0]:
-                    dimParams[f"patch_icpp({1})%x_centroid"] = 0.25
-                    dimParams[f"patch_icpp({2})%x_centroid"] = 0.75
-                    dimParams[f"patch_icpp({patchID})%length_x"] = 0.5
-                    dimParams[f"patch_icpp({patchID})%vel(1)"]   = 0.0
+                    dimParams[f"patch_icpp({patchID})%vel(1)"]     = 0.0
 
                 if "y" in dimInfo[0]:
-                    dimParams[f"patch_icpp({patchID})%y_centroid"] = 0.5
-                    dimParams[f"patch_icpp({patchID})%length_y"]   = 1
                     dimParams[f"patch_icpp({patchID})%vel(2)"]     = 0.0
 
                 if "z" in dimInfo[0]:
-                    dimParams[f"patch_icpp({patchID})%z_centroid"] = 0.5
-                    dimParams[f"patch_icpp({patchID})%length_z"]   = 1
                     dimParams[f"patch_icpp({patchID})%vel(3)"]     = 0.0
 
             traceback.append (f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')},n={dimInfo[1].get('n')},p={dimInfo[1].get('p')})")
@@ -246,7 +239,8 @@ class MFCTest:
                 parameters.append({"num_fluids": num_fluids})
 
                 if num_fluids == 2:
-                    parameters.append({'fluid_pp(2)%gamma': 3.5, 'fluid_pp(2)%pi_inf': 0.0,'patch_icpp(1)%alpha_rho(1)': 0.81, 'patch_icpp(1)%alpha(1)': 0.9, 'patch_icpp(1)%alpha_rho(2)': 0.08, 'patch_icpp(1)%alpha(2)': 0.1, 'patch_icpp(2)%alpha_rho(1)': 0.45, 'patch_icpp(2)%alpha(1)': 0.5, 'patch_icpp(2)%alpha_rho(2)': 0.4, 'patch_icpp(2)%alpha(2)': 0.5, 'patch_icpp(3)%alpha_rho(1)': 0.18, 'patch_icpp(3)%alpha(1)': 0.2, 'patch_icpp(3)%alpha_rho(2)': 0.64, 'patch_icpp(3)%alpha(2)': 0.8,})
+
+                    parameters.append({'fluid_pp(2)%gamma': 3.5, 'fluid_pp(2)%pi_inf': 0.0,'patch_icpp(1)%alpha_rho(1)': 0.81, 'patch_icpp(1)%alpha(1)': 0.9, 'patch_icpp(1)%alpha_rho(2)': 0.08, 'patch_icpp(1)%alpha(2)': 0.1, 'patch_icpp(2)%alpha_rho(1)': 0.18, 'patch_icpp(2)%alpha(1)': 0.2, 'patch_icpp(2)%alpha_rho(2)': 0.64, 'patch_icpp(2)%alpha(2)': 0.8, 'patch_icpp(3)%alpha_rho(1)': 0.81, 'patch_icpp(3)%alpha(1)': 0.9, 'patch_icpp(3)%alpha_rho(2)': 0.08, 'patch_icpp(3)%alpha(2)': 0.1,})
 
                 for riemann_solver in [1, 2]:
                     traceback.append(f"riemann_solver={riemann_solver}")
@@ -382,7 +376,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         if "NaN" in truth:
             return (False, "NaN in golden file")
-        
+
         if "NaN" in candidate:
             return (False, "NaN in packed file")
 
