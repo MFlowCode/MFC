@@ -16,6 +16,7 @@ run:
   partition:      not selected
   tasks-per-node: 1
   gpus-per-node:  0
+  walltime:       "24:00:00"
 configurations:
   - name:    release-cpu
     c:       -O3
