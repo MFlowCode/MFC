@@ -51,6 +51,7 @@ class MFCArgs(objecttree.ObjectTree):
         run.add_argument("-N", "--nodes",          metavar="NODES",     type=int, default=user.run.nodes,          help="(Parrallel) Number of nodes.")
         run.add_argument("-n", "--tasks-per-node", metavar="TASKS",     type=int, default=user.run.tasks_per_node, help="            Number of tasks per node.")
         run.add_argument("-g", "--gpus-per-node",  metavar="GPUS",      type=int, default=user.run.gpus_per_node,  help="(Parrallel) Number of GPUs  per node.")
+        run.add_argument("-w", "--walltime",       metavar="WALLTIME",  type=str, default=user.run.walltime,       help="(Parrallel) Walltime.")
 
         super().__init__(vars(parser.parse_args()))
 

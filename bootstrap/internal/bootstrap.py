@@ -503,6 +503,79 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         
         return case_dir
 
+    def run__find_queue_system(self) -> str:
+        SYSTEMS = {"PBS":   ["echo"], #FIXME: #qsub
+                   "SGE":   ["qsub"], #FIXME: hmm
+                   "SLURM": ["sbatch"]}
+        for system,cmds in SYSTEMS.items():
+            for cmd in cmds:
+                if 0 == os.system(f"{cmd} -h > /dev/null 2>&1"):
+                    self.tree.print(f"Detected the {colorama.Fore.MAGENTA}{system}{colorama.Style.RESET_ALL} queueing system.")
+                    return system
+        
+        raise common.MFCException(f"Failed to detect a queueing system.")
+
+    def run__get_bin(self, target: str) -> str:
+        return f'{self.get_build_path(target)}/bin/{target}'
+
+    def run__get_ld(self) -> str:
+        return f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{common.MFC_SUBDIR}/common/build/lib"'
+
+    def run__get_case_dirpath(self) -> str:
+        return os.path.abspath(os.path.dirname(self.args["input"]))
+
+    def run__create_batch_file(self, system: str, target: str):
+        case_dirpath = self.run__get_case_dirpath()
+
+        if system == "PBS":
+            BATCH_CONTENT: str = f"""\
+#!/bin/sh -l
+#PBS -l nodes={self.args["nodes"]}:ppn={self.args["tasks_per_node"]}
+#PBS -l walltime={self.args["walltime"]}
+#PBS -q {self.args["partition"]}
+#PBS -N {target}
+
+echo "================================================="
+echo "| Starting job #{target}"
+echo "| - Start-date: `date +%D`"
+echo "| - Start-time: `date +%T`"
+echo "================================================="
+
+t_start=$(date +%s)
+
+{self.run__get_ld()} \\
+    mpiexec "{self.run__get_bin(target)}"
+
+code=$?
+
+status_msg="{colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL}"
+if [ "$code" -ne "0" ]; then
+    status_msg="{colorama.Fore.RED}FAILED{colorama.Style.RESET_ALL}"
+fi
+
+t_stop=$(date +%s)
+
+echo "================================================="
+echo "| Finished job {target}: $status_msg"
+echo "| - End-date: `date +%D`"
+echo "| - End-time: `date +%T`"
+echo "| - Total-time: $(expr $t_stop - $t_start)s"
+echo "================================================="
+
+exit $code
+"""
+
+            common.file_write(f"{case_dirpath}/{target}.sh", BATCH_CONTENT)
+        else:
+            raise common.MFCException(f"Can't create batch file for {system}.")
+
+    def run__execute_batch_file(self, system: str):
+        if system == "PBS":
+            # handle
+            pass
+        else:
+            raise common.MFCException(f"Running batch file for {system} is not supported.")
+
     def run(self):
         cc       = self.args["compiler_configuration"]
         input    = self.args["input"].strip()
@@ -515,6 +588,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         self.tree.print(f"Running MFC:")
         self.tree.indent()
+
         self.tree.print(f"Target(s)     (-t)  {', '.join(targets)}")
         self.tree.print(f"Engine        (-e)  {engine}")
         self.tree.print(f"Config        (-cc) {cc}")
@@ -522,7 +596,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.tree.print(f"Tasks (/node) (-n)  {tasks_pn}")
 
         for target_name in targets:
-            self.tree.print(f"Running {target_name}:")
+            self.tree.print(f"Running {colorama.Fore.MAGENTA}{target_name}{colorama.Style.RESET_ALL}:")
             self.tree.indent()
             
             if not self.is_build_satisfied(target_name):
@@ -531,24 +605,24 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
             self.run__create_input_file(target_name, self.run__get_case_dir())
 
-            self.tree.print("TODO: Creating input file...")
-
             if engine == 'serial':
-                build_path = self.get_build_path(target_name)
-
                 date = f"{colorama.Fore.CYAN}[{common.get_datetime_str()}]{colorama.Style.RESET_ALL}"
-                bin  = f'{build_path}/bin/{target_name}'
+                bin  = self.run__get_bin(target_name)
                 
-                cd   = f'cd {os.path.abspath(os.path.dirname(input))}'
-                ld   = f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{common.MFC_SUBDIR}/common/build/lib"'
-                exec = f'mpiexec -np {tasks_pn} {bin}'
+                cd   = f'cd {self.run__get_case_dirpath()}'
+                ld   = self.run__get_ld()
+                exec = f'mpiexec -np {tasks_pn} "{bin}"'
 
                 self.tree.print(f"{date} Running...")
                 common.execute_shell_command(f"{cd} && {ld} {exec}")
 
                 self.tree.print(f"Done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
             elif engine == 'parallel':
-                pass
+                queue_sys = self.run__find_queue_system()
+
+                self.run__create_batch_file(queue_sys, target_name)
+
+                self.run__execute_batch_file(queue_sys)
             else:
                 raise common.MFCException(f"Unsupported engine {engine}.")
 

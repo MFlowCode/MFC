@@ -43,18 +43,18 @@ class Build:
 
 @dataclass
 class Run:
-    email:          str
     nodes:          int
     partition:      str
     tasks_per_node: int
     gpus_per_node:  int
+    walltime:       str
 
     def __init__(self, data: dict) -> None:
-        self.email          = data.get("e-mail")
         self.nodes          = int(data.get("nodes"))
         self.partition      = data.get("partition")
         self.tasks_per_node = int(data.get("tasks-per-node"))
         self.gpus_per_node  = int(data.get("gpus-per-node"))
+        self.walltime       = data.get("walltime")
 
 class MFCUser:
     def __init__(self) -> None:
