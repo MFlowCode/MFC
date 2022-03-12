@@ -3,19 +3,22 @@ import os
 import re
 import sys
 import copy
+import json
 import shutil
 import colorama
 import subprocess
 import dataclasses
 import urllib.request
 
-import internal.args      as args
-import internal.conf      as conf
-import internal.lock      as lock
-import internal.common    as common
-import internal.user      as user
-import internal.treeprint as treeprint
-import internal.test      as test
+
+import internal.args        as args
+import internal.conf        as conf
+import internal.lock        as lock
+import internal.common      as common
+import internal.user        as user
+import internal.treeprint   as treeprint
+import internal.test        as test
+import internal.input_dicts as input_dicts
 
 class Bootstrap:
     def get_configuration_base_path(self, cc: str = None):
@@ -458,24 +461,65 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         self.tree.print(f"Cleaning done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
         self.tree.unindent()
 
-    def create_input_file(component: str, obj: dict):
-        pass
+    def run__create_input_file(self, target_name: str, case_dict: dict):
+        MASTER_KEYS: list = input_dicts.get_keys(target_name)
+
+        # Create Fortran-style input file content string
+        
+        dict_str = '\n'.join([f'{key} = {val}' for key,val in case_dict.items() if key in MASTER_KEYS])
+        
+        contents = f"""\
+&user_inputs
+{dict_str}
+&end
+/
+"""
+
+        # Save .inp input file
+        dirpath  = os.path.abspath(os.path.dirname(self.args["input"]))
+        filename = f"{target_name}.inp"
+        common.file_write(f"{dirpath}/{filename}", contents)
+
+    def run__get_case_dir(self) -> dict:
+        case_dir: dict = {}
+        input:    str  = self.args["input"].strip()
+
+        self.tree.print(f"Fetching case dir from {input}...")
+
+        if input.endswith(".py"):
+            (output, err) = common.get_py_program_output(input)
+
+            if err != 0:
+                self.tree.print(f"Input file {input} terminated with a non-zero exit code. View the output bellow: ({colorama.Fore.RED}ERROR{colorama.Style.RESET_ALL})")
+                for line in output.splitlines():
+                    self.tree.print(line)
+
+                raise common.MFCException(f"Input file {input} terminated with a non-zero exit code. View above.")
+
+            case_dir = json.loads(output)
+        else:
+            self.tree.print(f"Unrecognized input file format for '{input}'. Please check the extension. ({colorama.Fore.RED}ERROR{colorama.Style.RESET_ALL})")
+            raise common.MFCException("Unrecognized input file format.")
+        
+        return case_dir
 
     def run(self):
-        cc:      str = self.args["compiler_configuration"]
-        input:   str = self.args["input"]
-        engine:  str = self.args["engine"]
-        targets: str = self.args["targets"]
+        cc       = self.args["compiler_configuration"]
+        input    = self.args["input"].strip()
+        engine   = self.args["engine"]
+        targets  = self.args["targets"]
+        tasks_pn = self.args["tasks_per_node"]
 
         if targets[0] == "mfc":
             targets = ["pre_process", "simulation", "post_process"]
 
         self.tree.print(f"Running MFC:")
         self.tree.indent()
-        self.tree.print(f"Target(s) (-t)  {', '.join(targets)}")
-        self.tree.print(f"Engine    (-e)  {engine}")
-        self.tree.print(f"Config    (-cc) {cc}")
-        self.tree.print(f"Input     (-i)  {input}")
+        self.tree.print(f"Target(s)     (-t)  {', '.join(targets)}")
+        self.tree.print(f"Engine        (-e)  {engine}")
+        self.tree.print(f"Config        (-cc) {cc}")
+        self.tree.print(f"Input         (-i)  {input}")
+        self.tree.print(f"Tasks (/node) (-n)  {tasks_pn}")
 
         for target_name in targets:
             self.tree.print(f"Running {target_name}:")
@@ -485,19 +529,22 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 self.tree.print(f"Target {target_name} needs (re)building...")
                 self.build_target(target_name)
 
+            self.run__create_input_file(target_name, self.run__get_case_dir())
+
             self.tree.print("TODO: Creating input file...")
 
-            # TODO: mpirun -n
             if engine == 'serial':
-                build_path: str = self.get_build_path(target_name)
+                build_path = self.get_build_path(target_name)
 
-                date: str = f"{colorama.Fore.CYAN}[{common.get_datetime_str()}]{colorama.Style.RESET_ALL}"
-                bin:  str = f'{build_path}/bin/{target_name}'
-
-                command = f'LD_LIBRARY_PATH="{build_path}/lib" mpirun {bin}'
+                date = f"{colorama.Fore.CYAN}[{common.get_datetime_str()}]{colorama.Style.RESET_ALL}"
+                bin  = f'{build_path}/bin/{target_name}'
+                
+                cd   = f'cd {os.path.abspath(os.path.dirname(input))}'
+                ld   = f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{common.MFC_SUBDIR}/common/build/lib"'
+                exec = f'mpiexec -np {tasks_pn} {bin}'
 
                 self.tree.print(f"{date} Running...")
-                #TODO: common.execute_shell_command(command)
+                common.execute_shell_command(f"{cd} && {ld} {exec}")
 
                 self.tree.print(f"Done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
             elif engine == 'parallel':
