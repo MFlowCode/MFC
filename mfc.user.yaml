@@ -12,9 +12,8 @@ build:
     cpp:     mpicxx
     fortran: mpif90
 run:
-  e-mail:
   nodes:          1
-  partition:
+  partition:      not selected
   tasks-per-node: 1
   gpus-per-node:  0
 configurations:

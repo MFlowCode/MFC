@@ -1,19 +1,20 @@
 import os
 import sys
-import yaml     # *: PyYAML package
+import yaml       # *: PyYAML package
 import shutil
 import tarfile
-import colorama # *: Colorama package
+import colorama   # *: Colorama package
+import subprocess
 
 from datetime import datetime
 
 
 MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
-MFC_TESTDIR         = f"{MFC_ROOTDIR}/tests"
-MFC_SUBDIR          = f"{MFC_ROOTDIR}/build"
-MFC_DEV_FILEPATH    = f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml"
-MFC_USER_FILEPATH   = f"{MFC_ROOTDIR}/mfc.user.yaml"
-MFC_LOCK_FILEPATH   = f"{MFC_SUBDIR}/mfc.lock.yaml"
+MFC_TESTDIR         = os.path.abspath(f"{MFC_ROOTDIR}/tests")
+MFC_SUBDIR          = os.path.abspath(f"{MFC_ROOTDIR}/build")
+MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml")
+MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
+MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
 
 
 class MFCException(Exception):
@@ -117,3 +118,13 @@ def update_symlink(at: str, to: str) -> None:
     # Use a relative symlink so that users can
     # move and rename MFC's root folder
     os.symlink(os.path.relpath(to, MFC_SUBDIR), at)
+
+def get_py_program_output(filepath: str):
+    dirpath:  str = os.path.abspath (os.path.dirname(filepath))
+    filename: str = os.path.basename(filepath)
+
+    command: str = f"cd {dirpath} && python3 {filename} 2>&1"
+
+    proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
+
+    return (proc.stdout, proc.returncode)

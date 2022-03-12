@@ -47,7 +47,6 @@ class MFCArgs(objecttree.ObjectTree):
         run.add_argument("-e", "--engine", choices=["serial", "parallel"], default="serial",
                            help="Job execution/submission engine choice.")
         run.add_argument("-i", "--input",                               type=str, required=True,                   help="Input file for run.")
-        run.add_argument("-m", "--e-mail",         metavar="MAIL",      type=str, default=user.run.email,          help="(Parrallel) Email     for job submission.")
         run.add_argument("-p", "--partition",      metavar="PARTITION", type=str, default=user.run.partition,      help="(Parrallel) Partition for job submission.")
         run.add_argument("-N", "--nodes",          metavar="NODES",     type=int, default=user.run.nodes,          help="(Parrallel) Number of nodes.")
         run.add_argument("-n", "--tasks-per-node", metavar="TASKS",     type=int, default=user.run.tasks_per_node, help="            Number of tasks per node.")
