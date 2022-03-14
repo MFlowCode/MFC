@@ -29,7 +29,7 @@ targets:
         git: https://github.com/HDFGroup/hdf5
         hash: 4aa40365623cf35643b262781f92578220c42bbb
     build:
-      - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols
+      - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols --disable-sharedlib-rpath
       - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
       - make install prefix="${INSTALL_PATH}"
 
