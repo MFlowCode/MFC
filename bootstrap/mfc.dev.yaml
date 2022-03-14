@@ -97,7 +97,7 @@ targets:
       - >-
         make INSTALL_PATH="${post_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-        FFLAGS="-lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+        FFLAGS="-O0 -lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
                
   - name: mfc
     depends:
