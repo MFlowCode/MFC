@@ -24,10 +24,17 @@ The MFC is a fully-documented parallel simulation software for multi-component, 
 This is the documentation for the MFC (Multicomponent Flow Code).
 The MFC is a simulation software for multi-component, multi-phase, and bubbly flows. 
 MFC was first developed by the Colonius research group at Caltech.
-Now it is developed and maintained by the groups of Professors <a href="https://colonius.caltech.edu/">Tim Colonius</a>, <a href="https://comp-physics.group">Spencer Bryngelson</a>, and <a href="https://vivo.brown.edu/display/mrodri97">Mauro Rodriguez</a>.
- We try to maintain a list of current and past developers in the <a href="AUTHORS">AUTHORS</a> file!
- </p>
- 
+Now it is developed and maintained by the groups of Professors <a href="https://comp-physics.group">Spencer Bryngelson</a>, <a href="https://colonius.caltech.edu/">Tim Colonius</a>, and <a href="https://vivo.brown.edu/display/mrodri97">Mauro Rodriguez</a> (alphabetical).
+</p>
+
+| Name                 | Active             | Links                                                                                                  | Name                 | Active             | Links                                                                                                       | 
+| -------------------- | ------------------ | -------                                                                                                | -------------------- | ------------------ | -------                                                                                                     | 
+| **S. Bryngelson**    | :white_check_mark: | [Personal](https://comp-physics.group/)             \| [Research Group](https://comp-physics.group/)   | **J. Meng**          | :x:                | TBD                                                                                                         |
+| **T. Colonius**      | :white_check_mark: | [Personal](https://eas.caltech.edu/people/colonius) \| [Research Group](https://colonius.caltech.edu/) | **A. Radhakrishnan** | :white_check_mark: | [Personal](https://anandrdbz.github.io)             \| [Research Group](https://comp-physics.group/)        |
+| **V. Coralic**       | :x:                | TBD                                                                                                    | **M. Rodriguez**     | :white_check_mark: | [Personal](https://vivo.brown.edu/display/mrodri97) \| [Research Group](https://sites.brown.edu/rodriguez/) |
+| **H. Le Berre**      | :white_check_mark: | [Personal](https://henryleberre.github.io/)         \| [Research Group](https://comp-physics.group/)   | **K. Schmidmayer**   | :x:                | TBD                                                                                                         |
+| **K. Maeda**         | :x:                | TBD                                                                                                    | **J. Spratt**        | :white_check_mark: | TBD                                                                                                         |
+
 ## Publications
  
 ### Primary Paper
