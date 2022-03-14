@@ -29,11 +29,13 @@ class MFCArgs(objecttree.ObjectTree):
 
             p.add_argument("-cc", "--compiler-configuration", type=str.lower,
                      choices=compiler_configuration_names, default=user.general.configuration, help="")
+            
+            p.add_argument("-j", "--jobs", metavar="N", type=int,
+                     help="Allows for N concurrent jobs.", default=int(user.build.threads))
 
         # === BUILD ===
         add_common_arguments(build)
-        build.add_argument("-j", "--jobs", metavar="N", type=int,
-                           help="Allows for N concurrent jobs.", default=int(user.build.threads))
+        
         build.add_argument("-s", "--scratch", action="store_true",
                            help="Build all targets from scratch.")
 
@@ -54,9 +56,6 @@ class MFCArgs(objecttree.ObjectTree):
         run.add_argument("-w", "--walltime",       metavar="WALLTIME",  type=str, default=user.run.walltime,       help="(Parrallel) Walltime.")
 
         super().__init__(vars(parser.parse_args()))
-
-        # FIXME: fix the udnerlyuing issue
-        self.data["jobs"] = 1
 
         if self.tree_get("command") is None:
             parser.print_help()
