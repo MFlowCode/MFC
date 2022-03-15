@@ -126,7 +126,7 @@ This should have no impact on your local installation(s) of these packages.
 + **Fetch MFC:**
 
 ```console
-git clone --recursive https://github.com/MFlowCode/MFC
+git clone https://github.com/MFlowCode/MFC
 cd MFC
 ```
 
