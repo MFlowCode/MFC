@@ -48,22 +48,43 @@ program p_main
 
     use nvtx
 
+#ifdef _OPENACC
+   use openacc
+  #endif
     ! ==========================================================================
 
     implicit none
+
+    integer :: err_code, ierr
 
     integer :: t_step, i !< Iterator for the time-stepping loop
     real(kind(0d0)) :: time_avg, time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
     logical :: file_exists
 
-    
-    call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
+#ifdef _OPENACC
+    real(kind(0d0)) :: starttime, endtime
+    integer :: num_devices, num_nodes, ppn, my_device_num
+    integer :: dev, devNum, local_rank, local_comm
+    integer(acc_device_kind) :: devtype
+#endif
 
-    ! Initializing MPI execution environment
+    CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
     
-    call s_mpi_initialize()
-   
+    ! Initializing MPI execution environment
+    CALL s_mpi_initialize()
+      
+#ifdef _OPENACC
+    call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
+           MPI_INFO_NULL, local_comm, ierr)
+      call MPI_Comm_rank(local_comm, local_rank, ierr)
+            print *,"RANK", local_rank
+      devtype = acc_get_device_type()
+      devNum = acc_get_num_devices(devtype)
+     dev = mod(local_rank, devNum)
+      print *,"DEV", dev
+      call acc_set_device_num(dev, devtype)   
+#endif   
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
@@ -241,12 +262,12 @@ program p_main
         ! Backing up the grid and conservative variables data
         if (mod(t_step - t_step_start, t_step_save) == 0) then
             
-            call nvtxStartRange("I/O")
+          !  call nvtxStartRange("I/O")
                 do i = 1, sys_size
 !$acc update host(q_cons_ts(1)%vf(i)%sf)
                 end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
-            call nvtxEndRange
+          !  call nvtxEndRange
         end if
 
         call system_clock(cpu_end)
