@@ -29,8 +29,8 @@ targets:
         git: https://github.com/HDFGroup/hdf5
         hash: 4aa40365623cf35643b262781f92578220c42bbb
     build:
-      - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols --disable-sharedlib-rpath
-      - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+      - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols --disable-sharedlib-rpath CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
+      - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
       - make install prefix="${INSTALL_PATH}"
 
   - name: silo
@@ -47,7 +47,7 @@ targets:
         ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
         --disable-hzip --disable-fpzip --disable-silex
         --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
-        ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O0" CPPFLAGS="-O0" FFLAGS="-O0"
+        ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
       - make ${MAKE_OPTIONS}
       - make install prefix="${INSTALL_PATH}"
 
