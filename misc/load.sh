@@ -3,11 +3,12 @@
 echo -e "\nPlease run this file with \"source\": \"source load.sh\"\n".
 
 echo "Which computer would you like to load submodules for?"
-echo " - Summit   (s)"
-echo " - Bridges2 (b)"
-echo " - Ascent   (a)"
-echo " - Wombat   (w)"
-echo -n "(s/b/a/w): "
+echo " - Summit     (s)"
+echo " - Bridges2   (b)"
+echo " - Ascent     (a)"
+echo " - Wombat     (w)"
+echo " - Richardson (r)"
+echo -n "(s/b/a/w/r): "
 read response
 
 if [ "$response" == "s" ]; then # For Summit
@@ -34,6 +35,12 @@ elif [ "$response" == "a" ]; then # For Ascent
     module load cuda/11.2.0
     module load nsight-compute
     module load nsight-systems
+    module list
+elif [ "$response" == "r" ]; then # Richardson
+    module purge
+    module load gcc/9.3.0
+    module load openmpi-2.0/gcc-9.3.0
+    module load python/3.7
     module list
 elif [ "$response" == "w" ]; then # For Wombat
     module purge
