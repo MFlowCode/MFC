@@ -1,10 +1,10 @@
 compiler_versions:
   - name:    GNU Fortran
-    is_used: exit $(expr $(${FORTRAN} --version | grep 'GNU Fortran' | wc -l) \=\= 0)
+    is_used: exit $(expr $(${FORTRAN} --version | grep 'GNU Fortran' | wc -l) \= 0)
     fetch:   ${FORTRAN} --version | grep 'GNU Fortran' | tr ' ' '\n' | tail -n 1
     minimum: 5.0.0
   - name:    NVHPC (NVFortran)
-    is_used: exit $(expr $(${FORTRAN} --version | grep 'nvfortran' | wc -l) \=\= 0)
+    is_used: exit $(expr $(${FORTRAN} --version | grep 'nvfortran' | wc -l) \= 0)
     fetch:   ${FORTRAN} --version | grep 'nvfortran' | tr ' ' '\n' | head -n 2 | tail -n 1
     minimum: 21.7.0
 
