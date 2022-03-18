@@ -41,15 +41,11 @@ jobs:
           echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
           sudo apt-get update  -y
           sudo apt-get install -y nvhpc-22-2
-          echo "NVARCH=`uname -s`_`uname -m`" >> $GITHUB_ENV
-          echo "NVCOMPILERS=/opt/nvidia/hpc_sdk" >> $GITHUB_ENV
-          echo "MANPATH=\$MANPATH:\$NVCOMPILERS/\$NVARCH/22.2/compilers/man" >> $GITHUB_ENV
-          echo "PATH=\$NVCOMPILERS/\$NVARCH/22.2/compilers/bin:\$PATH" >> $GITHUB_ENV
-          echo "PATH=\$NVCOMPILERS/\$NVARCH/22.2/comm_libs/mpi/bin:\$PATH" >> $GITHUB_ENV
-          echo "MANPATH=\$MANPATH:\$NVCOMPILERS/\$NVARCH/22.2/comm_libs/mpi/man" >> $GITHUB_ENV
-          echo "CUDA_HOME=/opt/nvidia/hpc_sdk/Linux_x86_64/22.1/cuda/" >> $GITHUB_ENV
-          echo "CUDA_DIR=\$CUDA_HOME" >> $GITHUB_ENV
-          echo $GITHUB_SHA_SHORT
+          NVARCH=`uname -s`_`uname -m`
+          NVCOMPILERS=/opt/nvidia/hpc_sdk"
+          echo "PATH=$NVCOMPILERS/$NVARCH/22.2/compilers/bin:$NVCOMPILERS/$NVARCH/22.2/comm_libs/mpi/bin:$PATH" >> $GITHUB_ENV
+          echo "CUDA_HOME=$NVCOMPILERS/$NVARCH/22.2/cuda/" >> $GITHUB_ENV
+          echo "CUDA_DIR=$NVCOMPILERS/$NVARCH/22.2/cuda/" >> $GITHUB_ENV
 
       - name: Install Pip Dependencies
         run: |
