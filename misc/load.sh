@@ -21,10 +21,10 @@ on_error() {
     exit 1
 }
 
-LLNL="$GREEN""LLNL$COLOR_RESET"
-SUMMIT="$LLNL/Summit"
-ASCENT="$LLNL/Ascent"
-WOMBAT="$LLNL/Wombat"
+ORNL="$GREEN""ORNL$COLOR_RESET"
+SUMMIT="$ORNL/Summit"
+ASCENT="$ORNL/Ascent"
+WOMBAT="$ORNL/Wombat"
 
 XSEDE="$CYAN""XSEDE$COLOR_RESET"
 BRIDGES2="$XSEDE/Bridges2"
@@ -32,7 +32,7 @@ EXPANSE="$XSEDE/Expanse"
 
 RICHARDSON="Richardson"
 
-C_LLNL=$GREEN"s$COLOR_RESET/$GREEN""a$COLOR_RESET/$GREEN""w$COLOR_RESET"
+C_ORNL=$GREEN"s$COLOR_RESET/$GREEN""a$COLOR_RESET/$GREEN""w$COLOR_RESET"
 C_XSEDE=$CYAN"b$COLOR_RESET/$CYAN""e$COLOR_RESET"
 C_OTHER="r"
 
@@ -40,7 +40,7 @@ echo -e "$MAGENTA[Q 1/2]$COLOR_RESET Which computer would you like to load submo
 echo -e " - $SUMMIT (s) - $BRIDGES2 (b) - $RICHARDSON (r)"
 echo -e " - $ASCENT (a) - $EXPANSE  (e)"
 echo -e " - $WOMBAT (w)"
-echo -en "($C_LLNL/$C_XSEDE/$C_OTHER): "
+echo -en "($C_ORNL/$C_XSEDE/$C_OTHER): "
 read u_computer
 
 echo -e "$MAGENTA[Q 2/2]$COLOR_RESET Would you like to run solely on CPUs or GPUs as well?"
@@ -70,17 +70,13 @@ if [ "$u_computer" == "s" ]; then # For Summit
     COMPUTER="$SUMMIT"
 
     if [ "$u_cg" == "c" ]; then
-        echo -e $RED"Error: CPU modules not (yet) supported on Summit."$COLOR_RESET
-        on_error
+        MODULES=("gcc/11.1.0" "spectrum-mpi/10.4.0.3-20210112")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("lsf-tools/2.0"
-                 "darshan-runtime/3.3.1-lite"
-                 "spectrum-mpi/10.4.0.3-20210112"
-                 "hsi/5.0.2.p5"
-                 "xalt/1.2.1"
-                 "nvhpc/21.9"
-                 "cuda/11.4.2")
+        MODULES=("spectrum-mpi/10.4.0.3-20210112" "nvhpc/21.9" "cuda/11.4.2")
     fi
+
+    MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
+             "hsi/5.0.2.p5"  "xalt/1.2.1"    "lsf-tools/2.0")
 elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
@@ -101,7 +97,6 @@ elif [ "$u_computer" == "a" ]; then # For Ascent
         MODULES=("nvhpc/21.9"     "spectrum-mpi"   "cuda/11.2.0"
                  "nsight-compute" "nsight-systems")
     fi
-    
 elif [ "$u_computer" == "r" ]; then # Richardson
     COMPUTER="$RICHARDSON"
 
@@ -189,4 +184,4 @@ for module_name in ${MODULES[@]}; do
     fi
 done
 
-echo -e "[MFC] You should now be able to build MFC on $COMPUTER!"
+echo -e "[MFC] You should now be able to build MFC on $COMPUTER ($CG mode)!"
