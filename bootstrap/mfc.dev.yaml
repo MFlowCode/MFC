@@ -40,7 +40,7 @@ targets:
     fetch:
       method: clone
       params:
-        git: https://github.com/LLNL/Silo
+        git:  https://github.com/LLNL/Silo
         hash: 9e3a31fbf661c4d26e9f5272287e5ff41971d117
     build:
       - >-
@@ -50,6 +50,20 @@ targets:
         ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
       - make ${MAKE_OPTIONS}
       - make install prefix="${INSTALL_PATH}"
+
+  - name: zfp
+    common_configuration: release-cpu
+    fetch:
+      method: clone
+      params:
+        git:  https://github.com/LLNL/zfp
+        hash: e8edaced12f139ddf16167987ded15e5da1b98da
+    build:
+      - mkdir -p build
+      - ${COMPILERS} cmake --clean-first -DZFP_WITH_OPENMP=OFF BUILD_UTILITIES=OFF BUILD_ZFORP=ON -DZFP_WITH_CUDA=ON "-S$(pwd)" "-B$(pwd)/build"
+      - cd build && cmake --build . --config Release
+      - rsync -a "$(pwd)/build/bin/" "${INSTALL_PATH}/bin"
+      - rsync -a "$(pwd)/build/lib/" "${INSTALL_PATH}/lib"
 
   - name: pre_process
     depends: []
@@ -68,6 +82,7 @@ targets:
   - name: simulation
     depends:
       - FFTW3
+      - ZFP
     fetch:
       method: source
       params:
