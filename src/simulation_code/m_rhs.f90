@@ -1107,8 +1107,8 @@ contains
                           rhs_vf(j)%sf(k, l, q) = &
                               rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
                               q_prim_qp%vf(contxe + id)%sf(k, l, q)* &
-                              (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                               - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
+                              (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
+                               - flux_src_n(1)%vf(j)%sf(k , l, q))
                         end do
                       end do 
                     end do
@@ -1559,8 +1559,8 @@ contains
                         rhs_vf(j)%sf(q, k, l) = &
                               rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
                               q_prim_qp%vf(contxe + id)%sf(q, k, l)* &
-                              (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                               - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                              (flux_src_n(2)%vf(j)%sf(q, k-1, l) &
+                               - flux_src_n(2)%vf(j)%sf(q, k , l))
                         end do
                       end do
                     end do
@@ -1643,8 +1643,8 @@ contains
                             rhs_vf(j)%sf(l, q, k) = &
                                 rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)/y_cc(q)* &
                                 q_prim_qp%vf(contxe + id)%sf(l, q, k)* &
-                                (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                 - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
+                                (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
+                                 - flux_src_n(3)%vf(j)%sf(l, q, k))
                             end do
                         end do
                       end do 
@@ -1723,8 +1723,8 @@ contains
                             rhs_vf(j)%sf(l, q, k) = &
                                 rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
                                 q_prim_qp%vf(contxe + id)%sf(l, q, k)* &
-                                (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                 - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
+                                (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
+                                 - flux_src_n(3)%vf(j)%sf(l, q, k))
                             end do
                         end do
                       end do 

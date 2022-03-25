@@ -799,19 +799,19 @@ contains
                   !$acc loop seq
                   do i = advxb, advxe
                     flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                      (qL_prim_rsx_vf_flat(j, k, l, i) &
-                       - qR_prim_rsx_vf_flat(j + 1, k, l, i)) &
+                      (qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                       - qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)) &
                       *s_M_acc*s_P_acc/(s_M_acc - s_P_acc)
-                    flux_src_rsx_vf_flat(j, k, l, i) = &
-                      (s_M_acc*qR_prim_rsx_vf_flat(j + 1, k, l, i) &
-                       - s_P_acc*qL_prim_rsx_vf_flat(j, k, l, i)) &
+                    flux_src_rs${XYZ}$_vf_flat(j, k, l, i) = &
+                      (s_M_acc*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                       - s_P_acc*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)) &
                       /(s_M_acc - s_P_acc)
                   end do
 
                   ! Div(U)?
                   !$acc loop seq
                   do i = 1, num_dims
-                      vel_src_rsx_vf_flat(j, k, l, dir_idx(i)) = &
+                      vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = &
                           (xi_M_acc*(rho_L_acc*vel_L_acc(dir_idx(i))* &
                                  (s_L_acc - vel_L_acc(dir_idx(1))) - &
                                  pres_L_acc*dir_flg(dir_idx(i))) - &

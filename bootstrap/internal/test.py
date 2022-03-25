@@ -104,6 +104,7 @@ BASE_CASE = Case({
         'precision'                    : 2,
         'prim_vars_wrt'                :'T',
         'parallel_io'                  :'F',
+        'cu_mpi'                       :'F',
 
         'patch_icpp(1)%pres'           : 1.0,
         'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
@@ -217,7 +218,7 @@ class MFCTest:
                 trace = f"bc={bc}"
                 tests.append(TestCaseConfiguration(parameters + [params], traceback + [trace]))
 
-                if bc == -1:
+                if bc == -3:
                     parameters.append(params)
                     traceback.append(trace)
 
@@ -239,7 +240,7 @@ class MFCTest:
                 parameters.append({"num_fluids": num_fluids})
 
                 if num_fluids == 2:
-                    parameters.append({'fluid_pp(2)%gamma': 3.5, 'fluid_pp(2)%pi_inf': 0.0,'patch_icpp(1)%alpha_rho(1)': 0.81, 'patch_icpp(1)%alpha(1)': 0.9, 'patch_icpp(1)%alpha_rho(2)': 0.08, 'patch_icpp(1)%alpha(2)': 0.1, 'patch_icpp(2)%alpha_rho(1)': 0.45, 'patch_icpp(2)%alpha(1)': 0.5, 'patch_icpp(2)%alpha_rho(2)': 0.4, 'patch_icpp(2)%alpha(2)': 0.5, 'patch_icpp(3)%alpha_rho(1)': 0.18, 'patch_icpp(3)%alpha(1)': 0.2, 'patch_icpp(3)%alpha_rho(2)': 0.64, 'patch_icpp(3)%alpha(2)': 0.8,})
+                    parameters.append({'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0,'patch_icpp(1)%alpha_rho(1)': 0.81, 'patch_icpp(1)%alpha(1)': 0.9, 'patch_icpp(1)%alpha_rho(2)': 0.19, 'patch_icpp(1)%alpha(2)': 0.1, 'patch_icpp(2)%alpha_rho(1)': 0.25, 'patch_icpp(2)%alpha(1)': 0.5, 'patch_icpp(2)%alpha_rho(2)': 0.25, 'patch_icpp(2)%alpha(2)': 0.5, 'patch_icpp(3)%alpha_rho(1)': 0.08, 'patch_icpp(3)%alpha(1)': 0.2, 'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)': 0.8,})
 
                 for riemann_solver in [1, 2]:
                     traceback.append(f"riemann_solver={riemann_solver}")
@@ -405,8 +406,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             for i in range(len(numbers_cand)):
                 abs_delta = abs(numbers_cand[i]-numbers_trust[i])
                 rel_diff  = abs(abs_delta/numbers_trust[i]) if numbers_trust[i] != 0 else 0
-                if    (abs_delta > 1e-12 and rel_diff > 1e-12) \
-                   or (numbers_cand[i] * numbers_trust[i] < 0): # Check if sign matches
+                if    (abs_delta > 1e-12 and rel_diff > 1e-12):
                     percent_diff = rel_diff*100
                     return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
 
