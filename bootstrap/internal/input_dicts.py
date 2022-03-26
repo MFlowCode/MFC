@@ -108,7 +108,8 @@ for f_id in range(1,10+1):
         # FIXME: Add all fluid_pp({f_id})%...(...)
         # I don't get how some indices are selected
 
-        print("FIX THIS")
+        #print("FIX THIS")
+        pass
 
 POST_PROCESS = ['case_dir', 'cyl_coord', 'm', 'n', 'p', 't_step_start',
                 't_step_stop', 't_step_save', 'model_eqns', 'num_fluids',

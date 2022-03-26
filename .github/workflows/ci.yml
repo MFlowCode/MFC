@@ -35,10 +35,7 @@ jobs:
           sudo apt update
           sudo apt upgrade -y
           sudo apt install -y tar wget make cmake gcc g++ python3 openmpi-* python python-dev python3-dev python3-venv libopenmpi-dev
-
-      - name: Install Pip Dependencies
-        run: |
-          pip3 install pyyaml colorama fypp
+          pip3 install pyyaml rich fypp
 
       - name: Install Nvidia HPC SDK
         run: |

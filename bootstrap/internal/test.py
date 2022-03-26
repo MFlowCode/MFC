@@ -3,10 +3,14 @@
 import os
 import re
 import copy
-import colorama
 import binascii
 import subprocess
 import dataclasses
+
+
+import rich
+import rich.progress
+
 
 from pathlib     import Path
 from collections import ChainMap
@@ -138,8 +142,8 @@ class MFCTest:
         self.bootstrap = bootstrap
 
         # Aliases
-        self.tree = self.bootstrap.tree
-        self.args = self.bootstrap.args
+        self.console = self.bootstrap.console
+        self.args    = self.bootstrap.args
 
     def get_test_params(self):
         tests = []
@@ -299,36 +303,27 @@ class MFCTest:
         return tests
 
     def test(self):
-        self.tree.print(f"Testing mfc")
-        self.tree.indent()
-
         if self.args["generate"]:
             common.delete_directory_recursive(common.MFC_TESTDIR)
             common.create_directory(common.MFC_TESTDIR)
 
         for target in ["pre_process", "simulation"]:
             if not self.bootstrap.is_build_satisfied(target):
-                self.tree.print(f"{target} needs (re)building...")
-                self.bootstrap.build_target(f"{target}")
+                self.console.print(f"> {target} needs (re)building...")
+                self.bootstrap.build_target(f"{target}", "> ")
 
         tests = self.filter_tests(self.get_test_params())
 
-        for i, test in enumerate(tests):
+        for i, test in enumerate(rich.progress.track(tests, "Testing [bold blue]mfc[/bold blue]...", console=self.console, )):
             test: TestCaseConfiguration
-            parameters = test.parameters
 
             testID = i+1
             if len(self.args["only"]):
                 testID = self.args["only"][i]
 
-            common.clear_line()
-            self.tree.print(f"#{testID}: {test.traceback}")
-            self.tree.print_progress(f"Running test #{testID} - {self.get_case_dir_name(parameters)}", i+1, len(tests))
             self.handle_case(testID, test)
 
-        common.clear_line()
-        self.tree.print(f"Tested. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
-        self.tree.unindent()
+        self.console.print(f"> Tested [bold green]✓[/bold green]")
 
     def get_case_dir_name(self, mods: dict):
         return hex(binascii.crc32(str(mods.items()).encode()))[2:]
@@ -421,9 +416,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         def on_test_errror(msg: str = "", term_out: str = ""):
             common.clear_line()
-            self.tree.print(f"Test #{testID}: Failed! ({colorama.Fore.RED}FAILURE{colorama.Style.RESET_ALL})")
+            self.console.print(f"> Test #{testID}: Failed! [bold green]✓[/bold green]")
             if msg != "":
-                self.tree.print(msg)
+                self.console.print(f"> {msg}")
 
             common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
 (1/3) Test #{testID}:
@@ -440,7 +435,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 {term_out}
 """)
 
-            self.tree.print(f"Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
+            self.console.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
         cmd = subprocess.run(f"cd '{self.get_case_dir(test.parameters)}' && python3 input.py 2>&1",

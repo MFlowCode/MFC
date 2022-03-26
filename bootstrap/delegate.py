@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-import colorama
+import sys
+import rich
+import signal
 import traceback
 
 import internal.common    as common
@@ -8,14 +10,14 @@ import internal.bootstrap as bootstrap
 
 def main():
     try:
-        common.colorama.init()
-
         bootstrap.Bootstrap()
     except common.MFCException as exc:
-        print(f"{colorama.Fore.RED}|--> {str(exc)}{colorama.Style.RESET_ALL}")
+        rich.print(f"[red]> {str(exc)}[/red]")
         exit(1)
 
 
 if __name__ == "__main__":
-    main()
-
+    try:
+        main()
+    except KeyboardInterrupt as exc:
+        exit(0)

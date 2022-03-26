@@ -1,6 +1,6 @@
 import os
 import json
-import colorama
+import rich
 
 import internal.common      as common
 import internal.input_dicts as input_dicts
@@ -10,28 +10,28 @@ class MFCRun:
         self.bootstrap = bootstrap
 
         # Aliases
-        self.tree = self.bootstrap.tree
-        self.args = self.bootstrap.args
+        self.console = self.bootstrap.console
+        self.args    = self.bootstrap.args
 
     def get_case_dict(self):
         case:  dict = {}
         input: str  = self.args["input"].strip()
 
-        self.tree.print(f"Fetching case dir from {input}...")
+        self.console.print(f"> > Fetching case dir from {input}...")
 
         if input.endswith(".py"):
             (output, err) = common.get_py_program_output(input)
 
             if err != 0:
-                self.tree.print(f"Input file {input} terminated with a non-zero exit code. View the output bellow: ({colorama.Fore.RED}ERROR{colorama.Style.RESET_ALL})")
+                self.console.print(f"> > Input file {input} terminated with a non-zero exit code. View the output bellow: [bold red]❌[/bold red]")
                 for line in output.splitlines():
-                    self.tree.print(line)
+                    self.console.print(line)
 
-                raise common.MFCException(f"Input file {input} terminated with a non-zero exit code. View above.")
+                raise common.MFCException(f"> > Input file {input} terminated with a non-zero exit code. View above.")
 
             case = json.loads(output)
         else:
-            self.tree.print(f"Unrecognized input file format for '{input}'. Please check the extension. ({colorama.Fore.RED}ERROR{colorama.Style.RESET_ALL})")
+            self.console.print(f"> > Unrecognized input file format for '{input}'. Please check the extension. [bold red]✘[/bold red]")
             raise common.MFCException("Unrecognized input file format.")
         
         return case
@@ -59,7 +59,7 @@ class MFCRun:
         for system,cmds in SYSTEMS.items():
             for cmd in cmds:
                 if 0 == os.system(f"{cmd} -h > /dev/null 2>&1"):
-                    self.tree.print(f"Detected the {colorama.Fore.MAGENTA}{system}{colorama.Style.RESET_ALL} queueing system.")
+                    self.console.print(f"Detected the [bold magenta]{system}[/bold magenta] queueing system.")
                     return system
         
         raise common.MFCException(f"Failed to detect a queueing system.")
@@ -97,7 +97,7 @@ t_start=$(date +%s)
 
 code=$?
 
-status_msg="{colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL}"
+status_msg="{rich.pri}{colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL}"
 if [ "$code" -ne "0" ]; then
     status_msg="{colorama.Fore.RED}FAILED{colorama.Style.RESET_ALL}"
 fi
@@ -135,37 +135,35 @@ exit $code
         if targets[0] == "mfc":
             targets = ["pre_process", "simulation", "post_process"]
 
-        self.tree.print(f"Running MFC:")
-        self.tree.indent()
+            self.console.print("[bold][u]Run:[/u][/bold]")
 
-        self.tree.print(f"Target(s)     (-t)  {', '.join(targets)}")
-        self.tree.print(f"Engine        (-e)  {engine}")
-        self.tree.print(f"Config        (-cc) {cc}")
-        self.tree.print(f"Input         (-i)  {input}")
-        self.tree.print(f"Tasks (/node) (-n)  {tasks_pn}")
+        self.console.print(f"> Targets       (-t)  {', '.join(targets)}")
+        self.console.print(f"> Engine        (-e)  {engine}")
+        self.console.print(f"> Config        (-cc) {cc}")
+        self.console.print(f"> Input         (-i)  {input}")
+        self.console.print(f"> Tasks (/node) (-n)  {tasks_pn}")
 
         for target_name in targets:
-            self.tree.print(f"Running {colorama.Fore.MAGENTA}{target_name}{colorama.Style.RESET_ALL}:")
-            self.tree.indent()
+            self.console.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
             
             if not self.bootstrap.is_build_satisfied(target_name):
-                self.tree.print(f"Target {target_name} needs (re)building...")
+                self.console.print(f"> > Target {target_name} needs (re)building...")
                 self.build_target(target_name)
 
             self.create_input_file(target_name, self.get_case_dict())
 
             if engine == 'serial':
-                date = f"{colorama.Fore.CYAN}[{common.get_datetime_str()}]{colorama.Style.RESET_ALL}"
+                date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
                 bin  = self.get_binpath(target_name)
                 
                 cd   = f'cd {self.get_case_dirpath()}'
                 ld   = self.get_ld()
                 exec = f'mpiexec -np {tasks_pn} "{bin}"'
 
-                self.tree.print(f"{date} Running...")
+                self.console.print(f"{date} Running...")
                 common.execute_shell_command(f"{cd} && {ld} {exec}")
 
-                self.tree.print(f"Done. ({colorama.Fore.GREEN}SUCCESS{colorama.Style.RESET_ALL})")
+                self.console.print(f"> > Done [bold green]✓[/bold green]")
             elif engine == 'parallel':
                 queue_sys = self.detect_queue_system()
 
@@ -175,6 +173,3 @@ exit $code
             else:
                 raise common.MFCException(f"Unsupported engine {engine}.")
 
-            self.tree.unindent()
-
-        self.tree.unindent()
