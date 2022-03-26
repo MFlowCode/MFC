@@ -40,12 +40,6 @@ jobs:
         run: |
           pip3 install pyyaml colorama fypp
 
-      - name: Build & Test MFC (CPU)
-        run: |
-          chmod +x ./mfc.sh
-          ./mfc.sh build -cc release-cpu -j $(nproc)
-          ./mfc.sh test
-
       - name: Install Nvidia HPC SDK
         run: |
           echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
@@ -56,6 +50,12 @@ jobs:
           echo "PATH=$NVCOMPILERS/$NVARCH/22.2/compilers/bin:$NVCOMPILERS/$NVARCH/22.2/comm_libs/mpi/bin:$PATH" >> $GITHUB_ENV
           echo "CUDA_HOME=$NVCOMPILERS/$NVARCH/22.2/cuda/" >> $GITHUB_ENV
           echo "CUDA_DIR=$NVCOMPILERS/$NVARCH/22.2/cuda/" >> $GITHUB_ENV
+
+      - name: Build & Test MFC (CPU)
+        run: |
+          chmod +x ./mfc.sh
+          ./mfc.sh build -cc release-cpu -j $(nproc)
+          ./mfc.sh test
 
       - name: Test MFC
         run: |
