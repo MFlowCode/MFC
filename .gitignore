@@ -15,16 +15,11 @@ src/master_scripts/__*
 make_doc.sh
 cases/
 .DS_Store
-tests/*/D/*
-tests/*/p*
-tests/*/D_*
-tests/*/*.inp
-tests/*/*.inf
-tests/*/*.dat
-tests/*/silo*
-tests/*/restart*
-tests/*/*.out
-tests/*/binary
+
+tests/**/*.log
+tests/*.txt
+tests/*/**
+!**/golden.txt
 
 samples/*batch/*/
 samples/*/D/*
