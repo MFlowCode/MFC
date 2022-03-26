@@ -82,7 +82,7 @@ targets:
   - name: simulation
     depends:
       - FFTW3
-      - ZFP
+#      - ZFP
     fetch:
       method: source
       params:
