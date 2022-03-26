@@ -3,7 +3,6 @@ import sys
 import yaml       # *: PyYAML package
 import shutil
 import tarfile
-import colorama   # *: Colorama package
 import subprocess
 
 from datetime import datetime
