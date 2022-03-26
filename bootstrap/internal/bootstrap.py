@@ -294,11 +294,13 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
                 os.remove(download_path)
         elif conf.fetch.method == "source":
-            if os.path.isdir(self.get_source_path(name)):
-                common.delete_directory_recursive(self.get_source_path(name))
+            dest_src: str = self.get_source_path(name)
+            if os.path.isdir(dest_src):
+                common.delete_directory_recursive(dest_src)
 
+            # Copy files over
             shutil.copytree(self.string_replace(name, conf.fetch.params.source),
-                            self.get_source_path(name))
+                            dest_src)
         elif conf.fetch.method == "collection":
             common.create_directory(self.get_source_path(name))
         else:
