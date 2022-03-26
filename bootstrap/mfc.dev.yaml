@@ -60,10 +60,10 @@ targets:
         hash: e8edaced12f139ddf16167987ded15e5da1b98da
     build:
       - mkdir -p build
-      - ${COMPILERS} cmake -DZFP_WITH_OPENMP=OFF BUILD_UTILITIES=OFF BUILD_ZFORP=ON -DZFP_WITH_CUDA=ON "-S$(pwd)" "-B$(pwd)/build"
-      - cd build && cmake --build . --config Release
-      - rsync -a "$(pwd)/build/bin/" "${INSTALL_PATH}/bin"
-      - rsync -a "$(pwd)/build/lib/" "${INSTALL_PATH}/lib"
+      - cd build && ${COMPILERS} cmake -DZFP_WITH_OPENMP=OFF BUILD_UTILITIES=OFF BUILD_ZFORP=ON -DZFP_WITH_CUDA=ON ..
+      - cd build && ${COMPILERS} cmake --build . --config Release
+      - rsync -avh --progress "$(pwd)/build/bin/" "${INSTALL_PATH}/bin"
+      - rsync -avh --progress "$(pwd)/build/"lib*/ "${INSTALL_PATH}/lib"
 
   - name: pre_process
     depends: []
