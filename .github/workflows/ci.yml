@@ -57,7 +57,7 @@ jobs:
           ./mfc.sh build -cc release-cpu -j $(nproc)
           ./mfc.sh test
 
-      - name: Test MFC
+      - name: Build & Test MFC (GPU)
         run: |
           chmod +x ./mfc.sh
           ./mfc.sh build -cc release-gpu -j $(nproc)
