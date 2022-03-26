@@ -1940,7 +1940,7 @@ contains
         ! y- and z-directions to those in the s1-, s2- and s3-directions
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
-        v_size = ubound(v_vf, 1)
+        v_size = sys_size
 
 
             if(weno_dir == 1) then

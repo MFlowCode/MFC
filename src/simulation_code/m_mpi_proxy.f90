@@ -52,7 +52,7 @@ contains
         ! Checking whether the MPI environment has been properly intialized
         if (ierr /= MPI_SUCCESS) then
             print '(A)', 'Unable to initialize MPI environment. Exiting ...'
-            call MPI_ABORT(MPI_COMM_WORLD, err_code, ierr)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end if
 
         ! Querying the number of processors available for the job
@@ -67,7 +67,7 @@ contains
     subroutine s_mpi_abort() ! ---------------------------------------------
 
         ! Terminating the MPI environment
-        call MPI_ABORT(MPI_COMM_WORLD, err_code, ierr)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
 
     end subroutine s_mpi_abort ! -------------------------------------------
 

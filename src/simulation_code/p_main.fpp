@@ -46,6 +46,10 @@ program p_main
 
     use m_qbmm                 !< Quadrature MOM
 
+#IFDEF _OPENACC 
+    use openacc
+#ENDIF
+
     use nvtx
 
 #ifdef _OPENACC
@@ -69,8 +73,8 @@ program p_main
     integer(acc_device_kind) :: devtype
 #endif
 
-    CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
-    
+    CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate) 
+
     ! Initializing MPI execution environment
     CALL s_mpi_initialize()
       

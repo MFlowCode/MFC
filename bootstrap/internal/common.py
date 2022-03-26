@@ -1,24 +1,26 @@
 import os
-import re
 import sys
-import yaml     # *: PyYAML package
+import yaml       # *: PyYAML package
 import shutil
-import colorama # *: Colorama package
 import tarfile
+import subprocess
+
+from datetime import datetime
 
 
-MFC_ROOTDIR       = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
-MFC_SUBDIR        = f"{MFC_ROOTDIR}/build"
-MFC_DEV_FILEPATH  = f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml"
-MFC_USER_FILEPATH = f"{MFC_ROOTDIR}/mfc.user.yaml"
-MFC_LOCK_FILEPATH = f"{MFC_SUBDIR}/mfc.lock.yaml"
+MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
+MFC_TESTDIR         = os.path.abspath(f"{MFC_ROOTDIR}/tests")
+MFC_SUBDIR          = os.path.abspath(f"{MFC_ROOTDIR}/build")
+MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml")
+MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
+MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
 
 
 class MFCException(Exception):
     pass
 
 
-def execute_shell_command_safe(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
+def execute_shell_command(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
     status = os.system(command)
 
     if status != 0:
@@ -32,16 +34,33 @@ def execute_shell_command_safe(command: str, no_exception: bool = False, excepti
 
     return status
 
+def get_datetime_str() -> str:
+    return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
 def clear_line() -> None:
     sys.stdout.write("\033[K")
+
+
+def file_write(filepath: str, content: str):
+    try:
+        with open(filepath, "w") as f:
+            f.write(content)
+    except IOError as exc:
+        raise MFCException(f'Failed to write to "{filepath}": {exc}')
+
+
+def file_read(filepath: str):
+    try:
+        with open(filepath, "r") as f:
+            return f.read()
+    except IOError as exc:
+        raise MFCException(f'Failed to read from "{filepath}": {exc}')
 
 
 def file_load_yaml(filepath: str):
     try:
         with open(filepath, "r") as f:
             return yaml.safe_load(f)
-
     except (IOError, yaml.YAMLError) as exc:
         raise MFCException(f'Failed to load YAML from "{filepath}": {exc}')
 
@@ -50,7 +69,6 @@ def file_dump_yaml(filepath: str, data) -> None:
     try:
         with open(filepath, "w") as f:
             yaml.dump(data, f)
-
     except (IOError, yaml.YAMLError) as exc:
         raise MFCException(f'Failed to dump YAML to "{filepath}": {exc}.')
 
@@ -66,38 +84,25 @@ def uncompress_archive_to(archive_filepath: str, destination: str) -> None:
     os.rename(src, destination)
 
 
-def delete_file_safe(filepath: str) -> None:
+def delete_file(filepath: str) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
 
 
-def create_file_safe(filepath: str) -> None:
+def create_file(filepath: str) -> None:
     if not os.path.exists(filepath):
-        open(filepath, "w").close()
+        try:
+            open(filepath, "w").close()
+        except IOError as exc:
+            raise MFCException(f"Failed to create file {filepath}: {exc}")
 
-
-def delete_directory_recursive_safe(directory_path: str) -> None:
+def delete_directory_recursive(directory_path: str) -> None:
     if os.path.isdir(directory_path):
         shutil.rmtree(directory_path)
 
 
-def create_directory_safe(directory_path: str) -> None:
+def create_directory(directory_path: str) -> None:
     os.makedirs(directory_path, exist_ok=True)
-
-
-def center_ansi_escaped_text(message: str) -> str:
-    nCols = shutil.get_terminal_size((80, 20)).columns
-
-    to_escape = [re.escape(colorama.Style.RESET_ALL)]
-    for key in dir(colorama.Fore):
-        if not callable(getattr(colorama.Fore, key)) and not key.startswith("__"):
-            to_escape.append(re.escape(getattr(colorama.Fore, key)))
-
-    longest_string_len = max([len(re.compile("|".join(to_escape), flags=re.DOTALL).sub("", line)) for line in message.splitlines()])
-
-    padding = " "*((nCols - longest_string_len) // 2)
-
-    return "\n".join([f'{padding}{line}{padding}' for line in message.splitlines()])
 
 
 def clear_print(message, end='\n') -> None:
@@ -112,3 +117,13 @@ def update_symlink(at: str, to: str) -> None:
     # Use a relative symlink so that users can
     # move and rename MFC's root folder
     os.symlink(os.path.relpath(to, MFC_SUBDIR), at)
+
+def get_py_program_output(filepath: str):
+    dirpath:  str = os.path.abspath (os.path.dirname(filepath))
+    filename: str = os.path.basename(filepath)
+
+    command: str = f"cd {dirpath} && python3 {filename} 2>&1"
+
+    proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
+
+    return (proc.stdout, proc.returncode)
