@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ master, GPU-3D-unmanaged ]
+    branches: [ master, GPU ]
     paths:
       - '**.f90'
       - '**.fpp'
@@ -15,7 +15,7 @@ on:
       - 'makefile'
 
   pull_request:
-    branches: [ master, GPU-3D-unmanaged ]
+    branches: [ master, GPU ]
 
   workflow_dispatch:
 
