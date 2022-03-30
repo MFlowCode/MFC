@@ -1,0 +1,33 @@
+# CI Workflow for MFC running Ascent @ ORNL through GitLab.
+
+stages:
+  - build
+  - test
+
+build-job:
+  stage: build
+  script:
+    - . ./misc/load.sh -c a -m g
+    - ./mfc.sh build -j 8 -cc release-gpu
+  artifacts:
+    paths:
+      - build/**/*.log
+  tags:
+    - nobatch
+
+unit-test-job:
+  stage: test
+  script:
+    - . ./misc/load.sh -c a -m g
+    - ./mfc.sh test
+  variables:
+    SCHEDULER_PARAMETERS: "-P CFD154 -nnodes 1 -W 01:00"
+  artifacts:
+    paths:
+      - tests/**/*.dat
+      - tests/**/*.out
+      - tests/**/*.inp
+      - tests/**/*.txt
+      - tests/*.txt
+  tags:
+    - batch
