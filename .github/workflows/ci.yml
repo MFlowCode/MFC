@@ -52,14 +52,14 @@ jobs:
       - name: Build & Test MFC (CPU)
         run: |
           chmod +x ./mfc.sh
-          ./mfc.sh build -cc release-cpu -j $(nproc)
-          ./mfc.sh test
+          ./mfc.sh build -c release-cpu -j $(nproc)
+          ./mfc.sh test  -c release-cpu
 
       - name: Build & Test MFC (GPU)
         run: |
           chmod +x ./mfc.sh
-          ./mfc.sh build -cc release-gpu -j $(nproc)
-          ./mfc.sh test
+          ./mfc.sh build -c release-gpu -j $(nproc)
+          ./mfc.sh test  -c release-gpu
 
       - name: Upload logs
         uses: actions/upload-artifact@v2

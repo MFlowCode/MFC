@@ -1,0 +1,124 @@
+# CI Workflow for MFC running Ascent @ ORNL through GitLab.
+
+# GitLab: https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+#  - User Set:
+#    - $GIT_STRATEGY: none -> Runner should not clone repository before executing script
+#  - User Read:
+#    - $CI_PROJECT_NAME   -> e.g MFC, MFC-develop, ...
+#    - $CI_REPOSITORY_URL -> e.g https://gitlab-ci-token:[MASKED]@code.ornl.gov/ecpcitest/cfd154/MFC-develop.git
+#    - $CI_COMMIT_BRANCH  -> e.g GPU, master, ...
+# ORNL's Ascent:
+#  - User Set:
+#    - $SCHEDULER_PARAMETERS
+#  - User Read:
+#    - $MEMBERWORK -> e.g /gpfs/wolf/scratch/henrylb
+
+stages:
+  - clone # Clone MFC after removing artifacts from previous run(s). 
+  - cpu   # Build MFC & Test it on/with CPUs
+  - gpu   # Build MFC & Test it on/with GPUs
+
+# This script runs before each job's main script is executed.
+# It defines useful environment variables used at runtime.
+before_script:
+  # Always fail if an error occurs
+  - set -e          
+  - set -o pipefail
+
+  # Print environment variables for debugging
+  - echo "CI_PROJECT_NAME   - $CI_PROJECT_NAME"
+  - echo "MEMBERWORK        - $MEMBERWORK"
+  - echo "CI_REPOSITORY_URL - $CI_REPOSITORY_URL"
+  - echo "CI_COMMIT_BRANCH  - $CI_COMMIT_BRANCH"
+
+  # Check "$CI_PROJECT_NAME" contains "MFC" so we are sure
+  # we won't clone into or delete from an unsuspecting directory
+  # due to an unfortunate error.
+  - echo "[CI] Running fin $(pwd):"
+  - if [[ ! "$CI_PROJECT_NAME" == *"MFC"* ]]; then exit 1; fi;
+
+  # Define MFC directory path
+  - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME"
+
+  # Print environment variables for debugging
+  - echo "CI_CI_DIR         - $CI_CI_DIR"
+  - echo "CI_MFC_DIR        - $CI_MFC_DIR"
+
+# Clone MFC after removing artifacts from previous run(s). 
+clone-job:
+  stage: clone
+  variables:
+    GIT_STRATEGY: none
+  script:
+    # Clean MFC directory if it exists (from a previous run)
+    - if [ -d "$CI_MFC_DIR" ]; then rm -rf "$CI_MFC_DIR"; fi 
+    # Create empty MFC directory
+    - mkdir -p "$CI_MFC_DIR"
+    # Enter MFC directory
+    - cd "$CI_MFC_DIR"
+    - echo "[CI] Running in $(pwd):"
+
+    # Clone MFC into MFC directory
+    - git clone --single-branch --branch "$CI_COMMIT_BRANCH" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/"
+    - cd "$CI_MFC_DIR"
+    - echo "[CI] Running in $(pwd):"
+  tags:
+    - nobatch
+
+cpu-build-job:
+  stage: cpu
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - cd "$CI_MFC_DIR"
+    - echo "[CI] Running in $(pwd):"
+
+    - . ./misc/load.sh -c a -m g
+    - ./mfc.sh build -j 8 -c release-cpu
+  tags:
+    - nobatch
+
+cpu-test-job:
+  stage: cpu
+  needs:
+    - cpu-build-job
+  variables:
+    GIT_STRATEGY: none
+    SCHEDULER_PARAMETERS: "-P CFD154 -nnodes 1 -W 00:30"
+  script:
+    - cd "$CI_MFC_DIR"
+    - echo "[CI] Running in $(pwd):"
+
+    - . ./misc/load.sh -c a -m g
+    - ./mfc.sh test -c release-cpu
+  tags:
+    - batch
+
+gpu-build-job:
+  stage: gpu
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - cd "$CI_MFC_DIR"
+    - echo "[CI] Running in $(pwd):"
+
+    - . ./misc/load.sh -c a -m g
+    - ./mfc.sh build -j 8 -c release-gpu
+  tags:
+    - nobatch
+
+gpu-test-job:
+  stage: gpu
+  needs:
+    - gpu-build-job
+  variables:
+    GIT_STRATEGY: none
+    SCHEDULER_PARAMETERS: "-P CFD154 -nnodes 1 -W 00:30"
+  script:
+    - cd "$CI_MFC_DIR"
+    - echo "[CI] Running in $(pwd):"
+
+    - . ./misc/load.sh -c a -m g
+    - ./mfc.sh test -c release-gpu
+  tags:
+    - batch
