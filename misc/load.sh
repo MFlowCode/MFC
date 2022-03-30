@@ -9,7 +9,7 @@ COLOR_RESET="\033[m"
 
 echo -en "$YELLOW"
 echo -e "Please source this script:"
-echo -e "$ source load.sh\n"
+echo -e "$ source ./misc/load.sh\n"
 echo -en "$COLOR_RESET"
 
 on_error() {
@@ -17,8 +17,6 @@ on_error() {
     echo -e "We would welcome your contribution:"
     echo -e " - Github: https://github.com/MFlowCode/MFC"
     echo -en "$COLOR_RESET"
-
-    exit 1
 }
 
 ORNL="$GREEN""ORNL$COLOR_RESET"
@@ -36,17 +34,46 @@ C_ORNL=$GREEN"s$COLOR_RESET/$GREEN""a$COLOR_RESET/$GREEN""w$COLOR_RESET"
 C_XSEDE=$CYAN"b$COLOR_RESET/$CYAN""e$COLOR_RESET"
 C_OTHER="r"
 
-echo -e "$MAGENTA[Q 1/2]$COLOR_RESET Which computer would you like to load submodules for?"
-echo -e " - $SUMMIT (s) - $BRIDGES2 (b) - $RICHARDSON (r)"
-echo -e " - $ASCENT (a) - $EXPANSE  (e)"
-echo -e " - $WOMBAT (w)"
-echo -en "($C_ORNL/$C_XSEDE/$C_OTHER): "
-read u_computer
+# Reset u_computer & u_cg to known values since this script is run with "source"
+# Therefore, values of variables defined here are kept when the script runs again.
+u_computer=""
+u_cg=""
 
-echo -e "$MAGENTA[Q 2/2]$COLOR_RESET Would you like to run solely on CPUs or GPUs as well?"
-echo -e " - CPU (c) - GPU (g)"
-echo -n "(c/g): " 
-read u_cg
+# If there are command-line arguments, parse them:
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    -c|--computer)
+      u_computer="$2"
+      shift; shift
+      ;;
+    -m|--mode)
+      u_cg="$2"
+      shift; shift
+      ;;
+    -*|--*)
+        echo "Unknown option $1"
+        on_error
+        ;;
+    esac
+done
+
+# Get computer (if not supplied in command-line)
+if [ -v $u_computer ]; then
+    echo -e "$MAGENTA[Q 1/2]$COLOR_RESET Which computer would you like to load submodules for?"
+    echo -e " - $SUMMIT (s) - $BRIDGES2 (b) - $RICHARDSON (r)"
+    echo -e " - $ASCENT (a) - $EXPANSE  (e)"
+    echo -e " - $WOMBAT (w)"
+    echo -en "($C_ORNL/$C_XSEDE/$C_OTHER): "
+    read u_computer
+fi
+
+# Get CPU/GPU (if not supplied in command-line)
+if [ -v $u_cg ]; then
+    echo -e "$MAGENTA[Q 2/2]$COLOR_RESET Would you like to run solely on CPUs or GPUs as well?"
+    echo -e " - CPU (c) - GPU (g)"
+    echo -n "(c/g): " 
+    read u_cg
+fi
 
 # User input to lowercase
 u_computer=$(echo "$u_computer" | tr '[:upper:]' '[:lower:]')
@@ -94,7 +121,7 @@ elif [ "$u_computer" == "a" ]; then # For Ascent
         echo -e $RED"Error: CPU modules not (yet) supported on Ascent."$COLOR_RESET
         on_error
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("nvhpc/21.9"     "spectrum-mpi"   "cuda/11.2.0"
+        MODULES=("nvhpc/21.11"    "spectrum-mpi"   "cuda/nvhpc"
                  "nsight-compute" "nsight-systems")
     fi
 elif [ "$u_computer" == "r" ]; then # Richardson
@@ -184,4 +211,4 @@ for module_name in ${MODULES[@]}; do
     fi
 done
 
-echo -e "[MFC] You should now be able to build MFC on $COMPUTER ($CG mode)!"
+echo -e "$MAGENTA[ MFC ]$COLOR_RESET You should now be able to build MFC on $COMPUTER ($CG mode)!"
