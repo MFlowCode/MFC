@@ -118,8 +118,7 @@ elif [ "$u_computer" == "a" ]; then # For Ascent
     COMPUTER="$ASCENT"
 
     if [ "$u_cg" == "c" ]; then
-        echo -e $RED"Error: CPU modules not (yet) supported on Ascent."$COLOR_RESET
-        on_error
+        MODULES=("gcc/11.1.0" "spectrum-mpi")
     elif [ "$u_cg" == "g" ]; then
         MODULES=("nvhpc/21.11"    "spectrum-mpi"   "cuda/nvhpc"
                  "nsight-compute" "nsight-systems")

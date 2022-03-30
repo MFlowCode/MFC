@@ -283,10 +283,10 @@ class MFCTest:
         return tests
 
     def filter_tests(self, tests: list):
-        if len(self.args["only"]) > 0:
+        if len(self.args["o"]) > 0:
             for i, test in enumerate(tests[:]):
                 doKeep = False
-                for o in self.args["only"]:
+                for o in self.args["o"]:
                     if str(o).isnumeric():
                         testID = i+1
                         if testID == int(o):
@@ -303,14 +303,15 @@ class MFCTest:
         return tests
 
     def test(self):
-        if self.args["generate"]:
+        if self.args["g"]:
             common.delete_directory_recursive(common.MFC_TESTDIR)
             common.create_directory(common.MFC_TESTDIR)
 
         for target in ["pre_process", "simulation"]:
             if not self.bootstrap.is_build_satisfied(target):
                 self.console.print(f"> {target} needs (re)building...")
-                self.bootstrap.build_target(f"{target}", "> ")
+                self.console.print(f"> > Please (re)build target {target}.")
+                raise common.MFCException(f"Can't test mfc. {target} needs rebuilding.")
 
         tests = self.filter_tests(self.get_test_params())
 
@@ -318,8 +319,8 @@ class MFCTest:
             test: TestCaseConfiguration
 
             testID = i+1
-            if len(self.args["only"]):
-                testID = self.args["only"][i]
+            if len(self.args["o"]):
+                testID = self.args["o"][i]
 
             self.handle_case(testID, test)
 
@@ -451,7 +452,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         golden_filepath = f"{self.get_case_dir(test.parameters)}/golden.txt"
 
-        if self.args["generate"]:
+        if self.args["g"]:
             common.delete_file(golden_filepath)
             common.file_write(golden_filepath, pack)
 

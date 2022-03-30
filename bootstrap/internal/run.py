@@ -15,7 +15,7 @@ class MFCRun:
 
     def get_case_dict(self):
         case:  dict = {}
-        input: str  = self.args["input"].strip()
+        input: str  = self.args["i"].strip()
 
         self.console.print(f"> > Fetching case dir from {input}...")
 
@@ -48,7 +48,7 @@ class MFCRun:
         contents = f"&user_inputs\n{dict_str}&end/"
 
         # Save .inp input file
-        dirpath  = os.path.abspath(os.path.dirname(self.args["input"]))
+        dirpath  = os.path.abspath(os.path.dirname(self.args["i"]))
         filename = f"{target_name}.inp"
         common.file_write(f"{dirpath}/{filename}", contents)
 
@@ -71,7 +71,7 @@ class MFCRun:
         return f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{common.MFC_SUBDIR}/common/build/lib"'
 
     def get_case_dirpath(self) -> str:
-        return os.path.abspath(os.path.dirname(self.args["input"]))
+        return os.path.abspath(os.path.dirname(self.args["i"]))
 
     def create_batch_file(self, system: str, target: str):
         case_dirpath = self.get_case_dirpath()
@@ -79,9 +79,9 @@ class MFCRun:
         if system == "PBS":
             BATCH_CONTENT: str = f"""\
 #!/bin/sh -l
-#PBS -l nodes={self.args["nodes"]}:ppn={self.args["tasks_per_node"]}
-#PBS -l walltime={self.args["walltime"]}
-#PBS -q {self.args["partition"]}
+#PBS -l nodes={self.args["N"]}:ppn={self.args["n"]}
+#PBS -l walltime={self.args["w"]}
+#PBS -q {self.args["p"]}
 #PBS -N {target}
 
 echo "================================================="
@@ -126,11 +126,12 @@ exit $code
             raise common.MFCException(f"Running batch file for {system} is not supported.")
 
     def run(self):
-        cc       = self.args["compiler_configuration"]
-        input    = self.args["input"].strip()
-        engine   = self.args["engine"]
-        targets  = self.args["targets"]
-        tasks_pn = self.args["tasks_per_node"]
+        cc       = self.args["c"]
+        input    = self.args["i"].strip()
+        engine   = self.args["e"]
+        targets  = self.args["t"]
+        nodes    = self.args["N"]
+        tasks_pn = self.args["n"]
 
         if targets[0] == "mfc":
             targets = ["pre_process", "simulation", "post_process"]
@@ -139,8 +140,9 @@ exit $code
 
         self.console.print(f"> Targets       (-t)  {', '.join(targets)}")
         self.console.print(f"> Engine        (-e)  {engine}")
-        self.console.print(f"> Config        (-cc) {cc}")
+        self.console.print(f"> Config        (-c)  {cc}")
         self.console.print(f"> Input         (-i)  {input}")
+        self.console.print(f"> Nodes         (-N)  {nodes}")
         self.console.print(f"> Tasks (/node) (-n)  {tasks_pn}")
 
         for target_name in targets:
@@ -148,7 +150,8 @@ exit $code
             
             if not self.bootstrap.is_build_satisfied(target_name):
                 self.console.print(f"> > Target {target_name} needs (re)building...")
-                self.build_target(target_name)
+                self.console.print(f"> > Please (re)build target {target_name}.")
+                raise common.MFCException(f"Can't run mfc. {target_name} needs rebuilding.")
 
             self.create_input_file(target_name, self.get_case_dict())
 

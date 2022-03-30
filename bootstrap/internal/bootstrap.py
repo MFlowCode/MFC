@@ -27,12 +27,12 @@ import internal.common as common
 class Bootstrap:
     def get_configuration_base_path(self, cc: str = None):
         if cc is None:
-            cc = self.args["compiler_configuration"]
+            cc = self.args["c"]
 
         return f'{common.MFC_SUBDIR}/{cc}'
 
     def get_target_base_path(self, name: str):
-        default_cfg_name = self.conf.get_target_configuration_name(name, self.args["compiler_configuration"])
+        default_cfg_name = self.conf.get_target_configuration_name(name, self.args["c"])
         cc = self.conf.get_target_configuration_folder_name(name, default_cfg_name)
 
         return f'{common.MFC_SUBDIR}/{cc}'
@@ -116,7 +116,7 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
         dep       = self.conf.get_target(dependency_name)
         compilers = self.user.build.compilers
 
-        configuration = self.get_target_configuration(dependency_name, self.args["compiler_configuration"])
+        configuration = self.get_target_configuration(dependency_name, self.args["c"])
 
         install_path = self.get_build_path (dependency_name)
         source_path  = self.get_source_path(dependency_name)
@@ -150,7 +150,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
             ("${SOURCE_PATH}",       source_path),
             ("${INSTALL_PATH}",      install_path),
             ("${INSTALL_PATH}",      install_path),
-            ("${MAKE_OPTIONS}",      f'-j {self.args["jobs"]}'),
+            ("${MAKE_OPTIONS}",      f'-j {self.args["j"]}'),
             ("${COMPILER_FLAGS}",    f'CFLAGS="{flags.get("c")}" CPPFLAGS="{flags.get("cpp")}" FFLAGS="{flags.get("fortran")}"'),
             ("${COMPILERS}",         f'CC="{compilers.c}" CXX="{compilers.cpp}" FC="{compilers.fortran}"')
         ]
@@ -185,7 +185,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def is_build_satisfied(self, name: str):
         # Check if it hasn't been built before
-        compiler_cfg = self.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
+        compiler_cfg = self.get_target_configuration(name, self.args.tree_get("c"))
 
         if not self.lock.does_target_exist(name, compiler_cfg.name):
             return False
@@ -222,13 +222,13 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 return False
 
         # Check for "scratch" flag
-        if self.args.tree_get("scratch"):
+        if self.args.tree_get("s"):
             return False
 
         return True
 
     def build_target__clean_previous(self, name: str, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
+        compiler_cfg = self.get_target_configuration(name, self.args.tree_get("c"))
         if not self.lock.does_unique_target_exist(name, compiler_cfg.name):
             return
 
@@ -237,11 +237,11 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         if ((    conf_desc.fetch.method != lock_desc.target.fetch.method
              and lock_desc.target.fetch.method in ["clone", "download"]
-            ) or (self.args.tree_get("scratch"))):
+            ) or (self.args.tree_get("s"))):
             common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.compiler_configuration}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.args.tree_get("compiler_configuration"))
+        compiler_cfg = self.get_target_configuration(name, self.args.tree_get("c"))
         conf = self.conf.get_target(name)
 
         if conf.fetch.method in ["clone", "download"]:
@@ -250,7 +250,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
                 if ((   len(lock_matches)    == 1
                     and conf.fetch.params.git != self.lock.get_target(name, compiler_cfg.name).target.fetch.params.git)
-                    or (self.args.tree_get("scratch"))):
+                    or (self.args.tree_get("s"))):
                     self.console.print(f'{depth}GIT repository changed. Updating...')
 
                     common.delete_directory_recursive(self.get_source_path(name))
@@ -326,7 +326,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
 
     def build_target__update_lock(self, name: str, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.args["compiler_configuration"])
+        compiler_cfg = self.get_target_configuration(name, self.args["c"])
         conf = self.conf.get_target(name)
 
         self.console.print(f'{depth}Updating lock file...')
@@ -413,7 +413,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             if not self.conf.is_target_common(dependency_name):
                 self.clean_target(dependency_name)
 
-        target = self.lock.get_target(name, self.args["compiler_configuration"])
+        target = self.lock.get_target(name, self.args["c"])
 
         if not target.metadata.bCleaned:
             if os.path.isdir(self.string_replace(name, "${SOURCE_PATH}")):
@@ -465,7 +465,7 @@ stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
             self.run.run()
 
         for target_name in [ x.name for x in self.conf.targets ]:
-            if target_name in self.args["targets"]:
+            if target_name in self.args["t"]:
                 if self.args["command"] == "build":
                     self.console.print("[bold][u]Build:[/u][/bold]")
                     self.build_target(target_name)
