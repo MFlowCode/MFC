@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
 
-import os
-import re
-import copy
-import binascii
-import subprocess
-import dataclasses
+import common
 
+import os, re, copy, binascii, subprocess, dataclasses
+from pathlib import Path
 
-import rich
-import rich.progress
-
-
-from pathlib     import Path
-from collections import ChainMap
-
-import internal.common as common
-
+import rich, rich.progress
 
 @dataclasses.dataclass
 class Case:
@@ -138,12 +127,8 @@ class TestCaseConfiguration:
         self.traceback  = ' -> '.join(traceback)
 
 class MFCTest:
-    def __init__(self, bootstrap):
-        self.bootstrap = bootstrap
-
-        # Aliases
-        self.console = self.bootstrap.console
-        self.args    = self.bootstrap.args
+    def __init__(self, mfc):
+        self.mfc = mfc
 
     def get_test_params(self):
         tests = []
@@ -283,10 +268,10 @@ class MFCTest:
         return tests
 
     def filter_tests(self, tests: list):
-        if len(self.args["o"]) > 0:
+        if len(self.mfc.args["only"]) > 0:
             for i, test in enumerate(tests[:]):
                 doKeep = False
-                for o in self.args["o"]:
+                for o in self.mfc.args["only"]:
                     if str(o).isnumeric():
                         testID = i+1
                         if testID == int(o):
@@ -303,28 +288,27 @@ class MFCTest:
         return tests
 
     def test(self):
-        if self.args["g"]:
+        if self.mfc.args["generate"]:
             common.delete_directory_recursive(common.MFC_TESTDIR)
             common.create_directory(common.MFC_TESTDIR)
 
         for target in ["pre_process", "simulation"]:
-            if not self.bootstrap.is_build_satisfied(target):
-                self.console.print(f"> {target} needs (re)building...")
-                self.console.print(f"> > Please (re)build target {target}.")
-                raise common.MFCException(f"Can't test mfc. {target} needs rebuilding.")
+            if not self.mfc.build.is_build_satisfied(target):
+                rich.print(f"> {target} needs (re)building...")
+                self.mfc.build.build_target(f"{target}", "> ")
 
         tests = self.filter_tests(self.get_test_params())
 
-        for i, test in enumerate(rich.progress.track(tests, "Testing [bold blue]mfc[/bold blue]...", console=self.console, )):
+        for i, test in enumerate(rich.progress.track(tests, "Testing [bold blue]mfc[/bold blue]...")):
             test: TestCaseConfiguration
 
             testID = i+1
-            if len(self.args["o"]):
-                testID = self.args["o"][i]
+            if len(self.mfc.args["only"]):
+                testID = self.mfc.args["only"][i]
 
             self.handle_case(testID, test)
 
-        self.console.print(f"> Tested [bold green]✓[/bold green]")
+        rich.print(f"> Tested [bold green]✓[/bold green]")
 
     def get_case_dir_name(self, mods: dict):
         return hex(binascii.crc32(str(mods.items()).encode()))[2:]
@@ -417,9 +401,9 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         def on_test_errror(msg: str = "", term_out: str = ""):
             common.clear_line()
-            self.console.print(f"> Test #{testID}: Failed! [bold green]✓[/bold green]")
+            rich.print(f"> Test #{testID}: Failed! [bold green]✓[/bold green]")
             if msg != "":
-                self.console.print(f"> {msg}")
+                rich.print(f"> {msg}")
 
             common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
 (1/3) Test #{testID}:
@@ -436,7 +420,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 {term_out}
 """)
 
-            self.console.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
+            rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
         cmd = subprocess.run(f"cd '{self.get_case_dir(test.parameters)}' && python3 input.py 2>&1",
@@ -452,7 +436,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
 
         golden_filepath = f"{self.get_case_dir(test.parameters)}/golden.txt"
 
-        if self.args["g"]:
+        if self.mfc.args["generate"]:
             common.delete_file(golden_filepath)
             common.file_write(golden_filepath, pack)
 

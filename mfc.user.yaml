@@ -13,10 +13,11 @@ build:
     fortran: mpif90
 run:
   nodes:          1
-  partition:      not selected
+  partition:      not specified
   tasks-per-node: 1
   gpus-per-node:  0
   walltime:       "24:00:00"
+  account:        not specified
 configurations:
   - name:    release-cpu
     c:       -O3

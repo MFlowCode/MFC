@@ -1,19 +1,27 @@
-import os
-import sys
-import yaml       # *: PyYAML package
-import shutil
-import tarfile
-import subprocess
-
-from datetime import datetime
+import os, sys, yaml, shutil, tarfile, subprocess, datetime
 
 
-MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
+MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/..")
 MFC_TESTDIR         = os.path.abspath(f"{MFC_ROOTDIR}/tests")
 MFC_SUBDIR          = os.path.abspath(f"{MFC_ROOTDIR}/build")
 MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml")
 MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
 MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
+
+MFC_HEADER = f"""[bold blue]
+     ___            ___          ___
+    /__/\          /  /\        /  /\\
+   |  |::\        /  /:/_      /  /:/
+   |  |:|:\      /  /:/ /\    /  /:/
+ __|__|:|\:\    /  /:/ /:/   /  /:/  ___
+/__/::::| \:\  /__/:/ /:/   /__/:/  /  /\\
+\  \:\~~\__\/  \  \:\/:/    \  \:\ /  /:/
+ \  \:\         \  \::/      \  \:\  /:/
+  \  \:\         \  \:\       \  \:\/:/
+   \  \:\         \  \:\       \  \::/
+    \__\/          \__\/        \__\/
+[/bold blue]\
+"""
 
 
 class MFCException(Exception):
@@ -35,7 +43,7 @@ def execute_shell_command(command: str, no_exception: bool = False, exception_te
     return status
 
 def get_datetime_str() -> str:
-    return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    return datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
 def clear_line() -> None:
     sys.stdout.write("\033[K")
