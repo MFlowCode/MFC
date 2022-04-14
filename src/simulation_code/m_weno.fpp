@@ -1967,16 +1967,16 @@ contains
                 if(cu_tensor) then
                     if(p == 0) then
                                 block
-                                use CuTensorEx 
+                                !use CuTensorEx 
                                 !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
-                                v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
+                                !v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
                                 !$acc end host_data
                                 end block          
                     else
                                 block
-                                use CuTensorEx 
+                                !use CuTensorEx 
                                 !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
-                                v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
+                                !v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
                                 !$acc end host_data
                                 end block          
                     end if
@@ -2005,9 +2005,9 @@ contains
             if(weno_dir == 3) then 
                 if(cu_tensor) then
                         block
-                        use CuTensorEx     
+                        !use CuTensorEx     
                         !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_z_flat)        
-                        v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
+                        !v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
                         !$acc end host_data
                         end block
                 else
