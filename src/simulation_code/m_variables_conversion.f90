@@ -672,8 +672,6 @@ contains
 
                         call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
 
-                        !nbub_sc = DSQRT((4.d0*pi/3.d0)*(nRtmp(1)**3d0)/vftmp)
-
 !$acc loop seq 
                         do i = bubxb, bubxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc

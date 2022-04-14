@@ -824,9 +824,9 @@ contains
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
-            s_riemann_solver => s_hll_riemann_solver_acc
+            s_riemann_solver => s_hll_riemann_solver
         elseif (riemann_solver == 2) then
-            s_riemann_solver => s_hllc_riemann_solver_acc
+            s_riemann_solver => s_hllc_riemann_solver
         else
             s_riemann_solver => s_exact_riemann_solver
         end if
@@ -1244,8 +1244,6 @@ contains
                                                 myalpha_rho(ii) = q_cons_qp%vf(ii)%sf(j, k, l)
                                                 myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
                                             end do 
-
-                                            !call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
 
                                             myRho = 0d0
                                             n_tait = 0d0
@@ -1674,8 +1672,6 @@ contains
                                             myalpha_rho(ii) = q_cons_qp%vf(ii)%sf(j, k, l)
                                             myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
                                         end do 
-
-                                        !call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
 
                                         myRho = 0d0
                                         n_tait = 0d0
@@ -2185,8 +2181,6 @@ contains
                                             myalpha_rho(ii) = q_cons_qp%vf(ii)%sf(j, k, l)
                                             myalpha(ii) = q_cons_qp%vf(advxb + ii - 1)%sf(j, k, l)
                                         end do 
-
-                                        !call s_convert_species_to_mixture_variables_bubbles_acc( myRho, n_tait, B_tait, myalpha, myalpha_rho, j, k, l)
 
                                         myRho = 0d0
                                         n_tait = 0d0
