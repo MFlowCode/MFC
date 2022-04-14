@@ -24,7 +24,7 @@ configurations:
     fortran: -O3 -cpp -w                   -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 
   - name:    release-gpu
-    fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+    fortran: -O3 -cpp -w -acc -Minfo=accel -cudalib=cutensor -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 
   - name:    debug-cpu
     fortran: -Og -g -cpp -w

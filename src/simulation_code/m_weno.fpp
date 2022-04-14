@@ -499,7 +499,7 @@ contains
                       norm_dir, weno_dir,  &
                       is1_d, is2_d, is3_d)
 
-        type(scalar_field), dimension(:), intent(IN) :: v_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: v_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) ::  vL_rs_vf_x_flat, vL_rs_vf_y_flat, vL_rs_vf_z_flat, vR_rs_vf_x_flat, vR_rs_vf_y_flat, vR_rs_vf_z_flat
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
@@ -533,9 +533,11 @@ contains
         integer :: is1b, is2b, is3b, is1e, is2e, is3e
 
 
+
         is1 = is1_d
         is2 = is2_d
         is3 = is3_d
+
 
 !$acc update device(is1, is2, is3)
 
@@ -1933,7 +1935,7 @@ contains
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
-        integer :: i, j, k, l, m !< Generic loop iterators
+        integer :: i, j, k, l, q !< Generic loop iterators
 
         ! Determining the number of cell-average variables which will be
         ! WENO-reconstructed and mapping their indical bounds in the x-,
@@ -1946,15 +1948,15 @@ contains
             if(weno_dir == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)                  
                     do j = 1, v_size
-                        do m = is3%beg, is3%end
+                        do q = is3%beg, is3%end
                             do l = is2%beg, is2%end
                                 do k = is1%beg - weno_polyn , is1%end + weno_polyn
-                                    v_rs_ws_x_flat(k, l, m, j) = v_vf(j)%sf(k , l, m)
-                                end do 
+                                    v_rs_ws_x_flat(k, l, q, j) = v_vf(j)%sf(k , l, q)
+                                end do
                             end do
                         end do
                     end do
-!$acc end parallel loop  
+!$acc end parallel loop 
             end if 
 
                 ! ==================================================================
@@ -1962,18 +1964,36 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
             if(n == 0) return
             if(weno_dir == 2) then
+                if(cu_tensor) then
+                    if(p == 0) then
+                                block
+                                use CuTensorEx 
+                                !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
+                                v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
+                                !$acc end host_data
+                                end block          
+                    else
+                                block
+                                use CuTensorEx 
+                                !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
+                                v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
+                                !$acc end host_data
+                                end block          
+                    end if
+                else
 !$acc parallel loop collapse(4) gang vector default(present)                 
                     do j = 1, v_size
-                        do m = is3%beg, is3%end
+                        do q = is3%beg, is3%end
                             do l = is2%beg, is2%end
                                 do k = is1%beg - weno_polyn  , is1%end  + weno_polyn
-                                    v_rs_ws_y_flat(k, l, m, j) = v_vf(j)%sf(l, k, m)
-                                end do 
+                                    v_rs_ws_y_flat(k, l, q, j) = v_vf(j)%sf(l, k, q)
+                                end do
                             end do
                         end do
                     end do
 !$acc end parallel loop 
-            end if 
+                end if
+            end if
 
 
 
@@ -1982,18 +2002,27 @@ contains
              
                 ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
             if(p == 0) return 
-            if(weno_dir == 3) then  
+            if(weno_dir == 3) then 
+                if(cu_tensor) then
+                        block
+                        use CuTensorEx     
+                        !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_z_flat)        
+                        v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
+                        !$acc end host_data
+                        end block
+                else
 !$acc parallel loop collapse(4) gang vector default(present)               
                     do j = 1, v_size
-                        do m = is3%beg, is3%end
+                        do q = is3%beg, is3%end
                             do l = is2%beg, is2%end
                                 do k = is1%beg - weno_polyn , is1%end + weno_polyn
-                                    v_rs_ws_z_flat(k, l, m, j) = v_vf(j)%sf(m, l, k)
-                                end do 
+                                    v_rs_ws_z_flat(k, l, q, j) = v_vf(j)%sf(q, l, k)
+                                end do
                             end do
                         end do
                     end do
-!$acc end parallel loop  
+!$acc end parallel loop                 
+                end if  
             end if 
 
 
