@@ -195,8 +195,6 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles(qK_vf, rho_K, &
                                                               gamma_K, pi_inf_K, &
                                                               Re_K, i, j, k)
-!$acc routine seq
-
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
@@ -267,7 +265,7 @@ contains
     subroutine s_convert_species_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
                                                       Re_K,  k, l, r)
-!$acc routine seq
+
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
@@ -520,7 +518,6 @@ contains
 
 
 
-        pi = 3.14159265358979311599796
 
         
 !$acc update device(small_alf, dflt_real, dflt_int)
@@ -541,18 +538,6 @@ contains
 
         end do
 
-        do i = 1, num_mono
-!$acc update host(mono(i)%mag)
-!$acc update host(mono(i)%length)
-!$acc update host(mono(i)%npulse)
-!$acc update host(mono(i)%dir)
-!$acc update host(mono(i)%delay)
-        end do
-
-        print *, "Monopole DEBUG"
-        print *, mono(1)%loc(1)
-        print *, mono(1)%length
-        print *, mono(1)%mag
 
 
         ! Associating the procedural pointer to the appropriate subroutine
@@ -612,7 +597,8 @@ contains
             do l = izb, ize
                 do k = iyb, iye
                     do j = ixb, ixe
-                        dyn_pres_K = 0d0                       
+                        dyn_pres_K = 0d0  
+                   
 !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
@@ -675,7 +661,7 @@ contains
                                              *qK_prim_vf(i)%sf(j, k, l)
                         end do 
 
-                       qK_prim_vf(E_idx)%sf(j, k, l) = (((qK_cons_vf(E_idx)%sf(j, k, l) - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)))  - pi_inf_K )/gamma_K
+                       qK_prim_vf(E_idx)%sf(j, k, l) = (((qK_cons_vf(E_idx)%sf(j, k, l) - dyn_pres_K)/(1.d0 - qK_cons_vf(alf_idx)%sf(j, k, l)))  - pi_inf_K  )/gamma_K
 
 !$acc loop seq 
                         do i = 1, nb
@@ -686,7 +672,7 @@ contains
 
                         call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
 
-                        !nbub_sc = DSQRT((4.d0*3.141592653589793d0/3.d0)*(nRtmp(1)**3d0)/vftmp)
+                        !nbub_sc = DSQRT((4.d0*pi/3.d0)*(nRtmp(1)**3d0)/vftmp)
 
 !$acc loop seq 
                         do i = bubxb, bubxe

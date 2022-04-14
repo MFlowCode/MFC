@@ -543,8 +543,7 @@ contains
                     vel_R_rms_acc = vel_R_rms_acc + vel_R_acc(i)**2d0
                   end do
 
-                  vel_L_rms_acc = sqrt(vel_L_rms_acc)
-                  vel_R_rms_acc = sqrt(vel_R_rms_acc)
+
 
                   !$acc loop seq
                   do i = 1, num_fluids
@@ -577,8 +576,8 @@ contains
                     pi_inf_R_acc = pi_inf_R_acc + alpha_R_acc(i)*pi_infs(i)
                   end do
 
-                  E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc**2d0
-                  E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc**2d0
+                  E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc
+                  E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc
 
                   H_L_acc = (E_L_acc + pres_L_acc)/rho_L_acc
                   H_R_acc = (E_R_acc + pres_R_acc)/rho_R_acc
@@ -617,16 +616,16 @@ contains
                     vel_avg_rms_acc = vel_avg_rms_acc + vel_avg_acc(i)**2d0
                   end do
 
-                  vel_avg_rms_acc = sqrt(vel_avg_rms_acc)
+
 
                   if (mixture_err) then
-                    if ((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0) < 0d0) then
+                    if ((H_avg_acc - 5d-1*vel_avg_rms_acc) < 0d0) then
                         c_avg_acc = sgm_eps
                     else
-                        c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                        c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                     end if
                   else
-                      c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                      c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                   end if
 
                   if (alt_soundspeed) then
@@ -679,21 +678,21 @@ contains
                         (rho_R_acc*(1d0 - alpha_R_acc(num_fluids)))
                     end if
                   else
-                    c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc**2d0)/gamma_L_acc)
+                    c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc)/gamma_L_acc)
 
-                    c_R_acc = ((H_R_acc - 5d-1*vel_R_rms_acc**2d0)/gamma_R_acc)
+                    c_R_acc = ((H_R_acc - 5d-1*vel_R_rms_acc)/gamma_R_acc)
                   end if
 
                   if (mixture_err .and. c_L_acc < 0d0) then
                     c_L_acc = 100.d0*sgm_eps
                   else
-                    c_L_acc = sqrt(c_L_acc)
+                    c_L_acc = SQRT(c_L_acc)
                   end if
 
                   if (mixture_err .and. c_R_acc < 0d0) then
                     c_R_acc = 100.d0*sgm_eps
                   else
-                    c_R_acc = sqrt(c_R_acc)
+                    c_R_acc = SQRT(c_R_acc)
                   end if
 
                   if(wave_speeds == 1) then
@@ -713,10 +712,10 @@ contains
 
                     pres_SR = pres_SL
 
-                    Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
+                    Ms_L = max(1d0, SQRT(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
                                          (pres_SL/pres_L_acc - 1d0)*pres_L_acc/ &
                                          ((pres_L_acc + pi_inf_L_acc/(1d0 + gamma_L_acc)))))
-                    Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
+                    Ms_R = max(1d0, SQRT(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
                                          (pres_SR/pres_R_acc - 1d0)*pres_R_acc/ &
                                          ((pres_R_acc + pi_inf_R_acc/(1d0 + gamma_R_acc)))))
 
@@ -950,6 +949,10 @@ contains
 
 
 
+!$acc update device(is1, is2, is3)
+
+
+
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers( &
@@ -997,8 +1000,7 @@ contains
                                 vel_L_rms_acc = vel_L_rms_acc + vel_L_acc(i)**2d0
                                 vel_R_rms_acc = vel_R_rms_acc + vel_R_acc(i)**2d0
                             end do
-                            vel_L_rms_acc = sqrt(vel_L_rms_acc)
-                            vel_R_rms_acc = sqrt(vel_R_rms_acc)
+
 
 
                 !$acc loop seq
@@ -1031,9 +1033,9 @@ contains
                             end do
 
 
-                            E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc**2d0
+                            E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc
 
-                            E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc**2d0
+                            E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc
 
                             H_L_acc = (E_L_acc + pres_L_acc)/rho_L_acc
                             H_R_acc = (E_R_acc + pres_R_acc)/rho_R_acc
@@ -1070,18 +1072,18 @@ contains
                             do i = 1, num_dims
                                 vel_avg_rms_acc = vel_avg_rms_acc + vel_avg_acc(i)**2d0
                             end do
-                            vel_avg_rms_acc = sqrt(vel_avg_rms_acc)
+
 
                             if (mixture_err) then
-                                if ((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0) < 0d0) then
+                                if ((H_avg_acc - 5d-1*vel_avg_rms_acc) < 0d0) then
                                     c_avg_acc = sgm_eps
                                 else
 
-                                    c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                    c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                                 end if
                             else
 
-                                c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                             end if
 
                             if (alt_soundspeed) then
@@ -1117,12 +1119,12 @@ contains
                             if (mixture_err .and. c_L_acc < 0d0) then
                                 c_L_acc = 100.d0*sgm_eps
                             else
-                                c_L_acc = sqrt(c_L_acc)
+                                c_L_acc = SQRT(c_L_acc)
                             end if
                             if (mixture_err .and. c_R_acc < 0d0) then
                                 c_R_acc = 100.d0*sgm_eps
                             else
-                                c_R_acc = sqrt(c_R_acc)
+                                c_R_acc = SQRT(c_R_acc)
                             end if
 
                             if(wave_speeds == 1) then
@@ -1142,10 +1144,10 @@ contains
 
                                 pres_SR = pres_SL
 
-                                Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
+                                Ms_L = max(1d0, SQRT(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
                                                     (pres_SL/pres_L_acc - 1d0)*pres_L_acc/ &
                                                     ((pres_L_acc + pi_inf_L_acc/(1d0 + gamma_L_acc)))))
-                                Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
+                                Ms_R = max(1d0, SQRT(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
                                                     (pres_SR/pres_R_acc - 1d0)*pres_R_acc/ &
                                                     ((pres_R_acc + pi_inf_R_acc/(1d0 + gamma_R_acc)))))
 
@@ -1332,8 +1334,7 @@ contains
                                 vel_L_rms_acc = vel_L_rms_acc + vel_L_acc(i)**2d0
                                 vel_R_rms_acc = vel_R_rms_acc + vel_R_acc(i)**2d0
                             end do
-                            vel_L_rms_acc = sqrt(vel_L_rms_acc)
-                            vel_R_rms_acc = sqrt(vel_R_rms_acc)
+
 
 
                 !$acc loop seq
@@ -1366,9 +1367,9 @@ contains
                             end do
 
 
-                            E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc**2d0
+                            E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc
 
-                            E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc**2d0
+                            E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc
 
                             H_L_acc = (E_L_acc + pres_L_acc)/rho_L_acc
                             H_R_acc = (E_R_acc + pres_R_acc)/rho_R_acc
@@ -1405,18 +1406,18 @@ contains
                             do i = 1, num_dims
                                 vel_avg_rms_acc = vel_avg_rms_acc + vel_avg_acc(i)**2d0
                             end do
-                            vel_avg_rms_acc = sqrt(vel_avg_rms_acc)
+
 
                             if (mixture_err) then
-                                if ((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0) < 0d0) then
+                                if ((H_avg_acc - 5d-1*vel_avg_rms_acc) < 0d0) then
                                     c_avg_acc = sgm_eps
                                 else
 
-                                    c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                    c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                                 end if
                             else
 
-                                c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                             end if
 
                             if (alt_soundspeed) then
@@ -1458,12 +1459,12 @@ contains
                             if (mixture_err .and. c_L_acc < 0d0) then
                                 c_L_acc = 100.d0*sgm_eps
                             else
-                                c_L_acc = sqrt(c_L_acc)
+                                c_L_acc = SQRT(c_L_acc)
                             end if
                             if (mixture_err .and. c_R_acc < 0d0) then
                                 c_R_acc = 100.d0*sgm_eps
                             else
-                                c_R_acc = sqrt(c_R_acc)
+                                c_R_acc = SQRT(c_R_acc)
                             end if
 
                             if(wave_speeds == 1) then
@@ -1483,10 +1484,10 @@ contains
 
                                 pres_SR = pres_SL
 
-                                Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
+                                Ms_L = max(1d0, SQRT(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
                                                     (pres_SL/pres_L_acc - 1d0)*pres_L_acc/ &
                                                     ((pres_L_acc + pi_inf_L_acc/(1d0 + gamma_L_acc)))))
-                                Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
+                                Ms_R = max(1d0, SQRT(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
                                                     (pres_SR/pres_R_acc - 1d0)*pres_R_acc/ &
                                                     ((pres_R_acc + pi_inf_R_acc/(1d0 + gamma_R_acc)))))
 
@@ -1676,8 +1677,7 @@ contains
                                     vel_L_rms_acc = vel_L_rms_acc + vel_L_acc(i)**2d0
                                     vel_R_rms_acc = vel_R_rms_acc + vel_R_acc(i)**2d0
                                 end do
-                                vel_L_rms_acc = sqrt(vel_L_rms_acc)
-                                vel_R_rms_acc = sqrt(vel_R_rms_acc)
+
 
 
                 !$acc loop seq
@@ -1686,8 +1686,12 @@ contains
                                     alpha_R_acc(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
                                 end do
 
+                                alpha_L_acc(1) = 0d0
+                                alpha_R_acc(1) = 0d0
+
                                 pres_L_acc = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
                                 pres_R_acc = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
+
 
                                 rho_L_acc = 0d0
                                 gamma_L_acc = 0d0
@@ -1735,12 +1739,12 @@ contains
                                     rho_R_acc = alpha_rho_R_acc(1)
                                     gamma_R_acc = gammas(1)
                                     pi_inf_R_acc = pi_infs(1)
-                                end if
+                                end if                              
 
 
-                                E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc**2d0
+                                E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc
 
-                                E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc**2d0
+                                E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc
 
                                 H_L_acc = (E_L_acc + pres_L_acc)/rho_L_acc
                                 H_R_acc = (E_R_acc + pres_R_acc)/rho_R_acc
@@ -1765,8 +1769,8 @@ contains
                                         call s_comp_n_from_prim(alpha_L_acc(num_fluids), R0_L_acc, nbub_L_acc)
                                         call s_comp_n_from_prim(alpha_R_acc(num_fluids), R0_R_acc, nbub_R_acc)
 
-                                        !nbub_L_acc = (3.d0/(4.d0*3.141592653589793d0))*alpha_L_acc(num_fluids)/(0d0 + weight(1)*(R0_L_acc(1)**3d0))
-                                        !nbub_R_acc = (3.d0/(4.d0*3.141592653589793d0))*alpha_R_acc(num_fluids)/(0d0 + weight(1)*(R0_R_acc(1)**3d0))
+                                        !nbub_L_acc = (3.d0/(4.d0*pi))*alpha_L_acc(num_fluids)/(0d0 + weight(1)*(R0_L_acc(1)**3d0))
+                                        !nbub_R_acc = (3.d0/(4.d0*pi))*alpha_R_acc(num_fluids)/(0d0 + weight(1)*(R0_R_acc(1)**3d0))
 
 !$acc loop seq
                                         do i = 1, nb
@@ -1800,20 +1804,8 @@ contains
                                             call s_quad((R0_L_acc**3.d0)*(V0_L_acc**2.d0), R3V2Lbar_acc)
                                             call s_quad((R0_R_acc**3.d0)*(V0_R_acc**2.d0), R3V2Rbar_acc)
 
-                                            !PbwR3Lbar_acc = pbw_L_acc(1)*(R0_L_acc(1)**3.d0)
-                                            !PbwR3Rbar_acc = pbw_R_acc(1)*(R0_R_acc(1)**3.d0)
-
-                                            !R3Lbar_acc = (R0_L_acc(1)**3.d0)
-                                            !R3Rbar_acc = (R0_R_acc(1)**3.d0)
-
-                                            !R3V2Lbar_acc = (R0_L_acc(1)**3.d0)*(V0_L_acc(1)**2.d0)
-                                            !R3V2Rbar_acc = (R0_R_acc(1)**3.d0)*(V0_R_acc(1)**2.d0)
-
-
-
                                         end if
 
-                                        !ptilde = \alf( pl - \bar{ pbw R^3)/\bar{R^3} - rho \bar{R^3 \Rdot^2}/\bar{R^3} )
                                         if (alpha_L_acc(num_fluids) < small_alf .or. R3Lbar_acc < small_alf) then
                                             ptilde_L_acc = alpha_L_acc(num_fluids)*pres_L_acc
                                         else
@@ -1865,19 +1857,21 @@ contains
                                 do i = 1, num_dims
                                     vel_avg_rms_acc = vel_avg_rms_acc + vel_avg_acc(i)**2d0
                                 end do
-                                vel_avg_rms_acc = sqrt(vel_avg_rms_acc)
+
 
                                 if (mixture_err) then
-                                    if ((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0) < 0d0) then
+                                    if ((H_avg_acc - 5d-1*vel_avg_rms_acc) < 0d0) then
                                         c_avg_acc = sgm_eps
                                     else
 
-                                        c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                        c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                                     end if
                                 else
 
-                                    c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                    c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                                 end if
+
+
 
                                 if (alt_soundspeed) then
 
@@ -1918,12 +1912,12 @@ contains
                                 if (mixture_err .and. c_L_acc < 0d0) then
                                     c_L_acc = 100.d0*sgm_eps
                                 else
-                                    c_L_acc = sqrt(c_L_acc)
+                                    c_L_acc = SQRT(c_L_acc)
                                 end if
                                 if (mixture_err .and. c_R_acc < 0d0) then
                                     c_R_acc = 100.d0*sgm_eps
                                 else
-                                    c_R_acc = sqrt(c_R_acc)
+                                    c_R_acc = SQRT(c_R_acc)
                                 end if
 
                                 if(wave_speeds == 1) then
@@ -1943,10 +1937,10 @@ contains
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
+                                    Ms_L = max(1d0, SQRT(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
                                                         (pres_SL/pres_L_acc - 1d0)*pres_L_acc/ &
                                                         ((pres_L_acc + pi_inf_L_acc/(1d0 + gamma_L_acc)))))
-                                    Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
+                                    Ms_R = max(1d0, SQRT(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
                                                         (pres_SR/pres_R_acc - 1d0)*pres_R_acc/ &
                                                         ((pres_R_acc + pi_inf_R_acc/(1d0 + gamma_R_acc)))))
 
@@ -1974,6 +1968,9 @@ contains
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M_acc = (5d-1 + sign(5d-1, s_S_acc))
                                 xi_P_acc = (5d-1 - sign(5d-1, s_S_acc))
+
+
+
 
                 !$acc loop seq
                                 do i = 1, contxe
@@ -2007,7 +2004,7 @@ contains
                                                     s_P_acc*(xi_R_acc*(dir_flg(dir_idx(i))*s_S_acc + &
                                                                 (1d0 - dir_flg(dir_idx(i)))* &
                                                                 vel_R_acc(dir_idx(i))) - vel_R_acc(dir_idx(i)))) + &
-                                                dir_flg(dir_idx(i))*(pres_R_acc - ptilde_R_acc))
+                                                dir_flg(dir_idx(i))*(pres_R_acc - ptilde_R_acc ))
                                     ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                 end do
 
@@ -2017,14 +2014,16 @@ contains
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
 
                                 flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
-                                    xi_M_acc*(vel_L_acc(dir_idx(1))*(E_L_acc + pres_L_acc - ptilde_L_acc) + &
+                                    xi_M_acc*(vel_L_acc(dir_idx(1))*(E_L_acc + pres_L_acc - ptilde_L_acc ) + &
                                         s_M_acc*(xi_L_acc*(E_L_acc + (s_S_acc - vel_L_acc(dir_idx(1)))* &
-                                                    (rho_L_acc*s_S_acc + (pres_L_acc - ptilde_L_acc)/ &
+                                                    (rho_L_acc*s_S_acc + (pres_L_acc - ptilde_L_acc )/ &
                                                     (s_L_acc - vel_L_acc(dir_idx(1))))) - E_L_acc)) &
-                                    + xi_P_acc*(vel_R_acc(dir_idx(1))*(E_R_acc + pres_R_acc - ptilde_R_acc) + &
+                                    + xi_P_acc*(vel_R_acc(dir_idx(1))*(E_R_acc + pres_R_acc - ptilde_R_acc ) + &
                                             s_P_acc*(xi_R_acc*(E_R_acc + (s_S_acc - vel_R_acc(dir_idx(1)))* &
-                                                    (rho_R_acc*s_S_acc + (pres_R_acc - ptilde_R_acc)/ &
+                                                    (rho_R_acc*s_S_acc + (pres_R_acc - ptilde_R_acc )/ &
                                                         (s_R_acc - vel_R_acc(dir_idx(1))))) - E_R_acc))
+
+
 
 
                                 ! Volume fraction flux
@@ -2138,8 +2137,7 @@ contains
                                     vel_L_rms_acc = vel_L_rms_acc + vel_L_acc(i)**2d0
                                     vel_R_rms_acc = vel_R_rms_acc + vel_R_acc(i)**2d0
                                 end do
-                                vel_L_rms_acc = sqrt(vel_L_rms_acc)
-                                vel_R_rms_acc = sqrt(vel_R_rms_acc)
+
 
                                 pres_L_acc = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
                                 pres_R_acc = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
@@ -2161,9 +2159,9 @@ contains
                                     pi_inf_R_acc = pi_inf_R_acc + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
                                 end do        
 
-                                E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc**2d0
+                                E_L_acc = gamma_L_acc*pres_L_acc + pi_inf_L_acc + 5d-1*rho_L_acc*vel_L_rms_acc
 
-                                E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc**2d0
+                                E_R_acc = gamma_R_acc*pres_R_acc + pi_inf_R_acc + 5d-1*rho_R_acc*vel_R_rms_acc
 
                                 H_L_acc = (E_L_acc + pres_L_acc)/rho_L_acc
                                 H_R_acc = (E_R_acc + pres_R_acc)/rho_R_acc
@@ -2203,18 +2201,18 @@ contains
                                     gamma_avg_acc = (sqrt(rho_L_acc)*gamma_L_acc + sqrt(rho_R_acc)*gamma_R_acc)/ &
                                         (sqrt(rho_L_acc) + sqrt(rho_R_acc))
                                 end if
-                                vel_avg_rms_acc = sqrt(vel_avg_rms_acc)
+
 
                                 if (mixture_err) then
-                                    if ((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0) < 0d0) then
+                                    if ((H_avg_acc - 5d-1*vel_avg_rms_acc) < 0d0) then
                                         c_avg_acc = sgm_eps
                                     else
 
-                                        c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                        c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                                     end if
                                 else
 
-                                    c_avg_acc = sqrt((H_avg_acc - 5d-1*vel_avg_rms_acc**2d0)/gamma_avg_acc)
+                                    c_avg_acc = SQRT((H_avg_acc - 5d-1*vel_avg_rms_acc)/gamma_avg_acc)
                                 end if
 
                                 if (alt_soundspeed) then
@@ -2235,20 +2233,20 @@ contains
                                                             + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, e_idx + 2)/blkmod2_acc))
 
                                 else
-                                    c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc**2d0)/gamma_L_acc)
+                                    c_L_acc = ((H_L_acc - 5d-1*vel_L_rms_acc)/gamma_L_acc)
 
-                                    c_R_acc = ((H_R_acc - 5d-1*vel_R_rms_acc**2d0)/gamma_R_acc)
+                                    c_R_acc = ((H_R_acc - 5d-1*vel_R_rms_acc)/gamma_R_acc)
                                 end if
                                     
                                 if (mixture_err .and. c_L_acc < 0d0) then
                                     c_L_acc = 100.d0*sgm_eps
                                 else
-                                    c_L_acc = sqrt(c_L_acc)
+                                    c_L_acc = SQRT(c_L_acc)
                                 end if
                                 if (mixture_err .and. c_R_acc < 0d0) then
                                     c_R_acc = 100.d0*sgm_eps
                                 else
-                                    c_R_acc = sqrt(c_R_acc)
+                                    c_R_acc = SQRT(c_R_acc)
                                 end if
 
                                 if(wave_speeds == 1) then
@@ -2268,10 +2266,10 @@ contains
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
+                                    Ms_L = max(1d0, SQRT(1d0 + ((5d-1 + gamma_L_acc)/(1d0 + gamma_L_acc))* &
                                                         (pres_SL/pres_L_acc - 1d0)*pres_L_acc/ &
                                                         ((pres_L_acc + pi_inf_L_acc/(1d0 + gamma_L_acc)))))
-                                    Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
+                                    Ms_R = max(1d0, SQRT(1d0 + ((5d-1 + gamma_R_acc)/(1d0 + gamma_R_acc))* &
                                                         (pres_SR/pres_R_acc - 1d0)*pres_R_acc/ &
                                                         ((pres_R_acc + pi_inf_R_acc/(1d0 + gamma_R_acc)))))
 
@@ -2728,12 +2726,12 @@ contains
         if (mixture_err .and. c_L < 0d0) then
             c_L = 100.d0*sgm_eps
         else
-            c_L = sqrt(c_L)
+            c_L = SQRT(c_L)
         end if
         if (mixture_err .and. c_R < 0d0) then
             c_R = 100.d0*sgm_eps
         else
-            c_R = sqrt(c_R)
+            c_R = SQRT(c_R)
         end if
 
     end subroutine s_compute_mixture_sound_speeds ! ------------------------
@@ -3467,7 +3465,6 @@ contains
                 ms = bub_idx%ms
             end if
 
-            print *, "Rad Index", rs(1)
 
 !$acc update device(rs, vs)
             if(.not. polytropic) then
