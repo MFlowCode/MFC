@@ -229,16 +229,88 @@ class SLURMSystem(QueueSystem):
 QUEUE_SYSTEMS = [ PBSSystem(), LSFSystem(), SLURMSystem() ]
 
 
+@dataclasses.dataclass
 class Engine:
     name: str
+    slug: str
 
-    def run(self, target: str) -> None:
+    def run(self, mfc, target_name: str) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
 
-#class 
+class SerialEngine(Engine):
+    def __init__(self) -> None:
+        super().__init__("Serial", "serial")
 
-ENGINES = []
+    def run(self, mfc, target_name: str) -> None:
+        self.mfc = mfc
+
+        date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
+        rich.print(f"{date} Running...")
+        common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name))
+
+        rich.print(f"> > Done [bold green]✓[/bold green]")
+
+class ParallelEngine(Engine):
+    def __init__(self) -> None:
+        super().__init__("Parallel", "parallel")
+
+    def run(self, mfc, target_name: str) -> None:
+        self.mfc = mfc
+
+        queue_sys = self.mfc.run.detect_queue_system()
+
+        self.create_batch_file(queue_sys, target_name)
+
+        self.execute_batch_file(queue_sys)
+    
+    def create_batch_file(self, system: QueueSystem, target_name: str):
+        case_dirpath = self.mfc.run.get_case_dirpath()
+
+        BATCH_CONTENT: str = f"""\
+#!/bin/sh -l
+{system.gen_batch_header(self.mfc.args, target_name)}
+
+echo "================================================="
+echo "| Starting job #{target_name}"
+echo "| - Start-date: `date +%D`"
+echo "| - Start-time: `date +%T`"
+echo "================================================="
+
+t_start=$(date +%s)
+
+{self.mfc.run.get_exec_cmd(target_name)}
+
+code=$?
+
+status_msg="SUCCESS"
+if [ "$code" -ne "0" ]; then
+    status_msg="FAILURE"
+fi
+
+t_stop=$(date +%s)
+
+echo "================================================="
+echo "| Finished job {target_name}: $status_msg"
+echo "| - End-date: `date +%D`"
+echo "| - End-time: `date +%T`"
+echo "| - Total-time: $(expr $t_stop - $t_start)s"
+echo "================================================="
+
+exit $code
+"""
+
+        common.file_write(f"{case_dirpath}/{target_name}.sh", BATCH_CONTENT)
+
+    def execute_batch_file(self, system: QueueSystem):
+        if system == "PBS":
+            # handle
+            pass
+        else:
+            raise common.MFCException(f"Running batch file for {system.name} is not supported.")
+
+
+ENGINES = [ SerialEngine(), ParallelEngine() ]
 
 
 class MFCRun:
@@ -287,7 +359,7 @@ class MFCRun:
     def detect_queue_system(self) -> str:
         for system in QUEUE_SYSTEMS:
             if system.is_active():
-                rich.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queueing system.")
+                rich.print(f"> > Detected the [bold magenta]{system.name}[/bold magenta] queueing system.")
                 return system
         
         raise common.MFCException(f"Failed to detect a queueing system.")
@@ -301,51 +373,16 @@ class MFCRun:
     def get_case_dirpath(self) -> str:
         return os.path.abspath(os.path.dirname(self.mfc.args["input"]))
 
-    def create_batch_file(self, system: QueueSystem, target: str):
-        case_dirpath = self.get_case_dirpath()
+    def get_exec_cmd(self, target_name: str):
+        bin  = self.get_binpath(target_name)
+        
+        cd   = f'cd {self.get_case_dirpath()}'
+        ld   = self.get_ld()
 
-        BATCH_CONTENT: str = f"""\
-#!/bin/sh -l
-{system.gen_batch_header(self.mfc.args, target)}
-
-echo "================================================="
-echo "| Starting job #{target}"
-echo "| - Start-date: `date +%D`"
-echo "| - Start-time: `date +%T`"
-echo "================================================="
-
-t_start=$(date +%s)
-
-{self.get_ld()} \\
-    mpiexec "{self.get_binpath(target)}"
-
-code=$?
-
-status_msg="SUCCESS"
-if [ "$code" -ne "0" ]; then
-    status_msg="FAILURE"
-fi
-
-t_stop=$(date +%s)
-
-echo "================================================="
-echo "| Finished job {target}: $status_msg"
-echo "| - End-date: `date +%D`"
-echo "| - End-time: `date +%T`"
-echo "| - Total-time: $(expr $t_stop - $t_start)s"
-echo "================================================="
-
-exit $code
-"""
-
-        common.file_write(f"{case_dirpath}/{target}.sh", BATCH_CONTENT)
-
-    def execute_batch_file(self, system: QueueSystem):
-        if system == "PBS":
-            # handle
-            pass
+        if os.system("jsrun -h > /dev/null 2>&1") == 0:
+            return f'{cd} && {ld} jsrun -r{self.mfc.args["tasks_per_node"]} -g1 -c1 -a1 "{bin}"'
         else:
-            raise common.MFCException(f"Running batch file for {system.name} is not supported.")
+            return f'{cd} && {ld} mpiexec -np {self.mfc.args["tasks_per_node"]} "{bin}"'
 
     def run(self):
         targets = self.mfc.args["targets"]
@@ -372,25 +409,16 @@ exit $code
 
             self.create_input_file(target_name, self.get_case_dict())
 
-            engine = self.mfc.args["engine"]
-            if engine == 'serial':
-                date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
-                bin  = self.get_binpath(target_name)
-                
-                cd   = f'cd {self.get_case_dirpath()}'
-                ld   = self.get_ld()
-                exec = f'mpiexec -np {self.mfc.args["tasks_per_node"]} "{bin}"'
+            engine_slug = self.mfc.args["engine"]
+            engine: Engine = None
+            for candidate in ENGINES:
+                candidate: Engine
 
-                rich.print(f"{date} Running...")
-                common.execute_shell_command(f"{cd} && {ld} {exec}")
+                if candidate.slug == engine_slug:
+                    engine = candidate
+                    break
+            
+            if engine == None:
+                raise common.MFCException(f"Unsupported engine {engine_slug}.")
 
-                rich.print(f"> > Done [bold green]✓[/bold green]")
-            elif engine == 'parallel':
-                queue_sys = self.detect_queue_system()
-
-                self.create_batch_file(queue_sys, target_name)
-
-                self.execute_batch_file(queue_sys)
-            else:
-                raise common.MFCException(f"Unsupported engine {engine}.")
-
+            engine.run(self.mfc, target_name)
