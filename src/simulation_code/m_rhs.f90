@@ -746,7 +746,7 @@ contains
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => &
                             flux_src_n(i)%vf(adv_idx%beg)%sf
-!$acc enter data create(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+!$acc enter data attach(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
                     end do
                     !END IF
                 end if
@@ -794,6 +794,8 @@ contains
         contxe = cont_idx%end
         bubxb = bub_idx%beg
         bubxe = bub_idx%end
+
+
 
         if(bubbles) then
             allocate(rs(1:nb))
@@ -1069,6 +1071,17 @@ contains
  
             call nvtxStartRange("RHS_Flux_Add")
             if (id == 1) then
+
+                if (bc_x%beg <= -5) then
+                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
+                               flux_src_n(id)%vf, id, -1, ix, iy, iz)
+                end if
+
+                if (bc_x%end <= -5) then
+                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
+                               flux_src_n(id)%vf, id, 1, ix, iy, iz)
+                end if
+
 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                   do q = 0, p
@@ -1501,6 +1514,17 @@ contains
             elseif (id == 2) then
             ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
+
+                if (bc_y%beg <= -5 .and. bc_y%beg /= -13) then
+                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
+                               flux_src_n(id)%vf, id, -1, ix, iy, iz)
+                end if
+
+                if (bc_y%end <= -5 ) then
+                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
+                               flux_src_n(id)%vf, id, 1, ix, iy, iz)
+                end if
+
 !$acc parallel loop collapse(4) gang vector default(present)                
                 do j = 1, sys_size
                   do l = 0, p
@@ -1941,6 +1965,16 @@ contains
             ! RHS Contribution in z-direction ===============================
 
                 ! Applying the Riemann fluxes
+
+                if (bc_z%beg <= -5) then
+                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
+                               flux_src_n(id)%vf, id, -1, ix, iy, iz)
+                end if
+
+                if (bc_z%end <= -5) then
+                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
+                               flux_src_n(id)%vf, id, 1, ix, iy, iz)
+                end if
 
 
                 if(grid_geometry == 3) then
