@@ -89,7 +89,7 @@ module m_riemann_solvers
                                              flux_gsrc_vf, &
                                              norm_dir, ix, iy, iz)
 
-            import :: scalar_field, bounds_info, sys_size
+            import :: scalar_field, bounds_info, sys_size, startx, starty, startz
 
             real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat
             type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -202,15 +202,6 @@ module m_riemann_solvers
 
     !> @}
 
-
-    !> The cell-boundary values of the fluxes (src - source) that are computed
-    !! through the chosen Riemann problem solver, and the direct evaluation of
-    !! source terms, by using the left and right states given in qK_prim_rs_vf,
-    !! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
-    !> @{
-    type(scalar_field), allocatable, dimension(:) :: flux_rsx_vf, flux_src_rsx_vf
-   type(scalar_field), allocatable, dimension(:) :: flux_rsy_vf, flux_src_rsy_vf
-   type(scalar_field), allocatable, dimension(:) :: flux_rsz_vf, flux_src_rsz_vf
 
     !> @}
 
@@ -408,7 +399,7 @@ module m_riemann_solvers
     type(bounds_info) :: is1, is2, is3
     !> @}
 !$acc declare create(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
-!$acc    is1, is2, is3, flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf, vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
+!$acc    is1, is2, is3,  vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
 !$acc    flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf)
 
 !$acc declare create(&
@@ -3474,9 +3465,6 @@ contains
         allocate (qL_prim_rsy_vf(1:sys_size), qR_prim_rsy_vf(1:sys_size))
         allocate (qL_prim_rsz_vf(1:sys_size), qR_prim_rsz_vf(1:sys_size))
 
-        allocate (flux_rsx_vf(1:sys_size), flux_src_rsx_vf(1:sys_size))
-        allocate (flux_rsy_vf(1:sys_size), flux_src_rsy_vf(1:sys_size))
-        allocate (flux_rsz_vf(1:sys_size), flux_src_rsz_vf(1:sys_size))
 
         allocate (flux_gsrc_rsx_vf(1:sys_size))
         allocate (flux_gsrc_rsy_vf(1:sys_size))
