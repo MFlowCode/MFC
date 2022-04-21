@@ -922,7 +922,7 @@ contains
         real(kind(0d0)), dimension(nb)   ::         V0_L, V0_R
         real(kind(0d0)), dimension(nb)   ::         P0_L, P0_R
         real(kind(0d0)), dimension(nb)  ::        pbw_L, pbw_R
-        real(kind(0d0)), dimension(3,6) ::       moms_L, moms_R
+        real(kind(0d0)), dimension(nb, nmom) ::       moms_L, moms_R
         real(kind(0d0))                              ::     ptilde_L, ptilde_R
 
         real(kind(0d0)) :: PbwR3Lbar, Pbwr3Rbar
