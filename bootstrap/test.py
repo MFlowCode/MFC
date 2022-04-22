@@ -331,24 +331,15 @@ class MFCTest:
         content = f"""\
 #!/usr/bin/env python3
 
-from pathlib import Path
-from sys     import path
+import json
 
-path.insert(0, f"{{Path(__file__).parent.resolve()}}/../../src/master_scripts")
-
-# Let Python find MFC's module
-from m_python_proxy import f_execute_mfc_component
-
-case_dict = {case.create_case_dict_str()}
-
-f_execute_mfc_component('pre_process', case_dict, '..', 'serial')
-f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
+print(json.dumps({case.create_case_dict_str()}))
 
 """
 
         common.create_directory(case_dir)
 
-        common.file_write(f"{case_dir}/input.py", content)
+        common.file_write(f"{case_dir}/case.py", content)
 
     def golden_file_compare_match(self, truth: str, candidate: str):
         if truth.count('\n') != candidate.count('\n'):
@@ -423,7 +414,7 @@ f_execute_mfc_component('simulation',  case_dict, '..', 'serial')
             rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
-        cmd = subprocess.run(f"cd '{self.get_case_dir(test.parameters)}' && python3 input.py 2>&1",
+        cmd = subprocess.run(f'./mfc.sh -m {self.mfc.args["mode"]} -i "{self.get_case_dir(test.parameters)}/case.py -t pre_process simulation" 2>&1',
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              universal_newlines=True, shell=True)
         common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
