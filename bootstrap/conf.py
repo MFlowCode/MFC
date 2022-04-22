@@ -1,41 +1,39 @@
-import internal.common      as common
-import internal.configfiles as configfiles
+import os, typing, dataclasses
 
-from typing      import Any
-from dataclasses import dataclass
+import common
 
-@dataclass
+@dataclasses.dataclass
 class CompilerVersion:
     name:    str
     is_used: str
     fetch:   str
     minimum: str
 
-    def __init__(self, data) -> None:
+    def __init__(self, data: dict) -> None:
         self.name    = data.get("name")
         self.is_used = data.get("is_used")
         self.fetch   = data.get("fetch")
         self.minimum = data.get("minimum")
 
-@dataclass
+@dataclasses.dataclass
 class Target_Download:
     link:    str
     version: str
 
-    def __init__(self, data):
+    def __init__(self, data: dict):
         self.link    = data["link"]
         self.version = data["version"]
 
-@dataclass
+@dataclasses.dataclass
 class Target_Clone:
     git:  str
     hash: str
 
-    def __init__(self, data):
+    def __init__(self, data: dict):
         self.git  = data["git"]
         self.hash = data["hash"]
 
-@dataclass
+@dataclasses.dataclass
 class Target_Source:
     source: str
     check:  str
@@ -44,15 +42,15 @@ class Target_Source:
         self.source = data.get("source")
         self.check  = data.get("check")
 
-@dataclass
+@dataclasses.dataclass
 class Target_Collection:
     def __init__(self, data):
         pass
 
-@dataclass
+@dataclasses.dataclass
 class Target_Fetch:
     method: str
-    params: Any
+    params: typing.Any
 
     def __init__(self, data):
         self.method = data["method"]
@@ -68,19 +66,19 @@ class Target_Fetch:
         else:
             raise common.MFCException(f"[mfc.conf.yaml]: Unrecognized fetch method '{self.method}'.")
 
-@dataclass
+@dataclasses.dataclass
 class Target_Build_Options:
     def __init__(self, data) -> None:
         pass
 
-@dataclass
+@dataclasses.dataclass
 class Target:
     name:  str
     build: str
     test:  list
     clean: list
     fetch: Target_Fetch
-    common_configuration: str
+    common_mode: str
 
     def __init__(self, data):
         self.name    = str.lower(data["name"])
@@ -89,23 +87,23 @@ class Target:
         self.test    = data.get("test",    [])
         self.clean   = data.get("clean",   [])
         self.fetch   = Target_Fetch(data["fetch"])
-        self.common_configuration = data.get("common_configuration", None)
+        self.common_mode = data.get("common_mode", None)
 
 class MFCConf:
     def __init__(self):
-        data = configfiles.ConfigFileBase(common.MFC_DEV_FILEPATH, noexist_ok=False)
+        data = common.file_load_yaml(common.MFC_DEV_FILEPATH)
 
-        self.compiler_verions = [ CompilerVersion(e) for e in data.tree_get("compiler_versions") ]
-        self.targets          = [ Target(e)          for e in data.tree_get("targets")           ]
+        self.compiler_verions = [ CompilerVersion(e) for e in data["compiler_versions"] ]
+        self.targets          = [ Target(e)          for e in data["targets"]           ]
 
     def is_target_common(self, name: str) -> bool:
-        return self.get_target(name).common_configuration is not None
+        return self.get_target(name).common_mode is not None
 
     def get_target_configuration_name(self, name: str, default: str) -> str:
         target = self.get_target(name)
 
         if self.is_target_common(name):
-            return target.common_configuration
+            return target.common_mode
 
         return default
 
