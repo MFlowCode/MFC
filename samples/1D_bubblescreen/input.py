@@ -138,21 +138,24 @@ case_dict =                                                                     
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
+                    'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
-                    'bc_x%beg'                     : -8,                       \
-                    'bc_x%end'                     : -8,                       \
+                    'commute_err'                  : 'F',                      \
+                    'split_err'                    : 'F',                      \
+                    'bc_x%beg'                     : -3,                       \
+                    'bc_x%end'                     : -3,                       \
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
                     'format'                       : 1,                        \
                     'precision'                    : 2,                        \
                     'prim_vars_wrt'                :'T',                       \
-		    'parallel_io'                  :'T',                       \
+		    'parallel_io'                  :'F',                       \
 	            'fd_order'                     : 1,                       \
                     #'schlieren_wrt'                :'T',                      \
 		    'probe_wrt'                    :'T',                   \

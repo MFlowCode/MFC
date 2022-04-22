@@ -32,13 +32,13 @@ module m_global_parameters
     character, parameter :: dflt_char = ' '   !< Default string value
     real(kind(0d0)) :: dflt_real = -1d6  !< Default real value
     integer :: dflt_int = -100  !< Default integer value
-    real(kind(0d0)):: sgm_eps = 1d-16 !< Segmentation tolerance
+    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
     character(LEN=path_len)  :: case_dir              !< Case folder location
     logical                    :: run_time_info         !< Run-time output flag
     logical                    :: debug                 !< Debug mode print statements
     integer                    :: t_step_old            !< Existing IC/grid folder
-    real(kind(0d0)):: small_alf = 1d-7 !< Small alf tolerance
+    real(kind(0d0)), PARAMETER :: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
 !$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps)
     ! Computational Domain Parameters ==========================================
@@ -109,6 +109,7 @@ module m_global_parameters
     logical         :: alt_soundspeed !< Alternate mixture sound speed
     logical         :: null_weights   !< Null undesired WENO weights
     logical         :: mixture_err    !< Mixture properties correction
+    logical         :: cu_tensor   
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
@@ -284,7 +285,7 @@ module m_global_parameters
 
     ! Mathematical and Physical Constants ======================================
     ! REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
-    real(kind(0d0)) :: pi = 3.141592653589793d0 !< Pi
+    real(kind(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
     !$acc declare create(pi)
 
     ! ==========================================================================
@@ -384,6 +385,8 @@ contains
         ! Monopole source
         monopole = .false.
         num_mono = 1
+
+        cu_tensor = .false.
 
         do j = 1, num_probes_max
             do i = 1, 3
@@ -716,17 +719,9 @@ contains
             buff_size = weno_polyn + 2
         end if
 
-        startx = -buff_size
-        starty = 0
-        startz = 0
-        if(n > 0) then
-            starty = -buff_size
-        end if
-        if(p > 0) then
-            startz = -buff_size
-        end if
 
-!$acc update device(startx, starty, startz)
+
+
 
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
@@ -742,6 +737,19 @@ contains
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
+
+
+        startx = -buff_size
+        starty = 0
+        startz = 0
+        if(n > 0) then
+            starty = -buff_size
+        end if
+        if(p > 0) then
+            startz = -buff_size
+        end if
+
+!$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -997,7 +1005,7 @@ contains
          !   stop 'vf negative'
         !end if
 
-        ntmp = DSQRT((4.d0*3.141592653589793d0/3.d0)*nR3/vftmp)
+        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
 
@@ -1029,7 +1037,7 @@ contains
             STOP 'vf negative'
         END IF
 
-        ntmp = (3.d0/(4.d0*3.141592653589793d0))*vftmp/R3
+        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
 
     end subroutine s_comp_n_from_prim
 
