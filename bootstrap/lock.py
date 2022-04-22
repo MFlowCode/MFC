@@ -5,11 +5,11 @@ import conf, common
 @dataclasses.dataclass
 class LockTargetMetadata:
     bCleaned: bool
-    compiler_configuration: str
+    mode: str
 
     def __init__(self, data: dict):
         self.bCleaned               = data.get("bCleaned", False)
-        self.compiler_configuration = data["compiler_configuration"]
+        self.mode = data["mode"]
 
 @dataclasses.dataclass
 class LockTargetHolder:
@@ -59,7 +59,7 @@ class MFCLock:
             if restrict_cc is None:
                 return True
 
-            return e.metadata.compiler_configuration == restrict_cc
+            return e.metadata.mode == restrict_cc
 
         return list(filter(peek_filter, self.targets))
 

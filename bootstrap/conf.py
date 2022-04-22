@@ -78,7 +78,7 @@ class Target:
     test:  list
     clean: list
     fetch: Target_Fetch
-    common_configuration: str
+    common_mode: str
 
     def __init__(self, data):
         self.name    = str.lower(data["name"])
@@ -87,7 +87,7 @@ class Target:
         self.test    = data.get("test",    [])
         self.clean   = data.get("clean",   [])
         self.fetch   = Target_Fetch(data["fetch"])
-        self.common_configuration = data.get("common_configuration", None)
+        self.common_mode = data.get("common_mode", None)
 
 class MFCConf:
     def __init__(self):
@@ -97,13 +97,13 @@ class MFCConf:
         self.targets          = [ Target(e)          for e in data["targets"]           ]
 
     def is_target_common(self, name: str) -> bool:
-        return self.get_target(name).common_configuration is not None
+        return self.get_target(name).common_mode is not None
 
     def get_target_configuration_name(self, name: str, default: str) -> str:
         target = self.get_target(name)
 
         if self.is_target_common(name):
-            return target.common_configuration
+            return target.common_mode
 
         return default
 

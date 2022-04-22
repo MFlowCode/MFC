@@ -9,12 +9,12 @@ class MFCBuild:
 
     def get_configuration_base_path(self, cc: str = None):
         if cc is None:
-            cc = self.mfc.args["compiler_configuration"]
+            cc = self.mfc.args["mode"]
 
         return f'{common.MFC_SUBDIR}/{cc}'
 
     def get_target_base_path(self, name: str):
-        default_cfg_name = self.mfc.conf.get_target_configuration_name(name, self.mfc.args["compiler_configuration"])
+        default_cfg_name = self.mfc.conf.get_target_configuration_name(name, self.mfc.args["mode"])
         cc = self.mfc.conf.get_target_configuration_folder_name(name, default_cfg_name)
 
         return f'{common.MFC_SUBDIR}/{cc}'
@@ -98,7 +98,7 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
         dep       = self.mfc.conf.get_target(dependency_name)
         compilers = self.mfc.user.build.compilers
 
-        configuration = self.get_target_configuration(dependency_name, self.mfc.args["compiler_configuration"])
+        configuration = self.get_target_configuration(dependency_name, self.mfc.args["mode"])
 
         install_path = self.get_build_path (dependency_name)
         source_path  = self.get_source_path(dependency_name)
@@ -166,7 +166,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def is_build_satisfied(self, name: str):
         # Check if it hasn't been built before
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["compiler_configuration"])
+        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
 
         if not self.mfc.lock.does_target_exist(name, compiler_cfg.name):
             return False
@@ -209,7 +209,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         return True
 
     def build_target__clean_previous(self, name: str, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["compiler_configuration"])
+        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
         if not self.mfc.lock.does_unique_target_exist(name, compiler_cfg.name):
             return
 
@@ -219,10 +219,10 @@ If you think MFC could (or should) be able to find it automatically for you syst
         if ((    conf_desc.fetch.method != lock_desc.target.fetch.method
              and lock_desc.target.fetch.method in ["clone", "download"]
             ) or (self.mfc.args["scratch"])):
-            common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.compiler_configuration}/src/{name}')
+            common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.mode}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["compiler_configuration"])
+        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
         conf = self.mfc.conf.get_target(name)
 
         if conf.fetch.method in ["clone", "download"]:
@@ -307,7 +307,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
 
     def build_target__update_lock(self, name: str, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["compiler_configuration"])
+        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
         conf = self.mfc.conf.get_target(name)
 
         rich.print(f'{depth}Updating lock file...')
@@ -315,7 +315,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         new_entry = lock.LockTargetHolder({
             "target": dataclasses.asdict(conf),
             "metadata": {
-                "compiler_configuration": compiler_cfg.name,
+                "mode": compiler_cfg.name,
                 "bCleaned": False
             }
         })
@@ -329,7 +329,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
         # Otherwise, we simply need to update the existing entry.
         for index, dep in enumerate(self.mfc.lock.targets):
-            if dep.target.name == name and dep.metadata.compiler_configuration == compiler_cfg.name:
+            if dep.target.name == name and dep.metadata.mode == compiler_cfg.name:
                 self.mfc.lock.targets[index] = new_entry
                 self.mfc.lock.flush()
                 self.mfc.lock.save()
@@ -382,7 +382,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             if not self.mfc.conf.is_target_common(dependency_name):
                 self.clean_target(dependency_name)
 
-        target = self.mfc.lock.get_target(name, self.mfc.args["compiler_configuration"])
+        target = self.mfc.lock.get_target(name, self.mfc.args["mode"])
 
         if not target.metadata.bCleaned:
             if os.path.isdir(self.string_replace(name, "${SOURCE_PATH}")):

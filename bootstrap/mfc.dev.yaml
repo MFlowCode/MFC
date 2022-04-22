@@ -10,7 +10,7 @@ compiler_versions:
 
 targets:
   - name: fftw3
-    common_configuration: release-cpu
+    common_mode: release-cpu
     fetch:
       method: download
       params:
@@ -22,7 +22,7 @@ targets:
       - make install
 
   - name: hdf5
-    common_configuration: release-cpu
+    common_mode: release-cpu
     fetch:
       method: clone
       params:
@@ -34,7 +34,7 @@ targets:
       - make install prefix="${INSTALL_PATH}"
 
   - name: silo
-    common_configuration: release-cpu
+    common_mode: release-cpu
     depends:
       - HDF5
     fetch:
@@ -52,7 +52,7 @@ targets:
       - make install prefix="${INSTALL_PATH}"
 
   - name: zfp
-    common_configuration: release-cpu
+    common_mode: release-cpu
     fetch:
       method: clone
       params:
