@@ -1,44 +1,45 @@
-import os
+import os, dataclasses
 
-import internal.common      as common
-import internal.configfiles as configfiles
-import internal.conf        as conf
+import conf, common
 
-from dataclasses import dataclass
-import dataclasses
-
-@dataclass
+@dataclasses.dataclass
 class LockTargetMetadata:
     bCleaned: bool
-    compiler_configuration: str
+    mode: str
 
-    def __init__(self, data):
-        self.bCleaned = data.get("bCleaned", False)
-        self.compiler_configuration = data["compiler_configuration"]
+    def __init__(self, data: dict):
+        self.bCleaned               = data.get("bCleaned", False)
+        self.mode = data["mode"]
 
-@dataclass
+@dataclasses.dataclass
 class LockTargetHolder:
     target:   conf.Target
     metadata: LockTargetMetadata
 
-    def __init__(self, data):
+    def __init__(self, data: dict):
         self.target   = conf.Target(data["target"])
         self.metadata = LockTargetMetadata(data["metadata"])
 
-@dataclass
-class MFCLock(configfiles.ConfigFileBase):
+@dataclasses.dataclass
+class MFCLock:
     targets: list
 
     def __init__(self):
-        super().__init__(common.MFC_LOCK_FILEPATH, {"targets": []})
+        if not os.path.exists(common.MFC_LOCK_FILEPATH):
+            common.create_file(common.MFC_LOCK_FILEPATH)
+            common.file_dump_yaml(common.MFC_LOCK_FILEPATH, {"targets": []})
 
-        self.data    = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
+        self.data: dict = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
+
         self.targets = []
 
         for t in self.data["targets"]:
             self.add_target(LockTargetHolder(t))
 
         self.flush()
+    
+    def save(self):
+        common.file_dump_yaml(common.MFC_LOCK_FILEPATH, self.data)
 
     def flush(self):
         self.data = dataclasses.asdict(self)
@@ -58,7 +59,7 @@ class MFCLock(configfiles.ConfigFileBase):
             if restrict_cc is None:
                 return True
 
-            return e.metadata.compiler_configuration == restrict_cc
+            return e.metadata.mode == restrict_cc
 
         return list(filter(peek_filter, self.targets))
 
