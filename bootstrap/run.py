@@ -15,10 +15,10 @@ PRE_PROCESS = ['case_dir', 'old_grid', 'old_ic', 't_step_old', 'm', 'n', 'p',
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
         PRE_PROCESS.append(f"{cmp}_{prepend}")
-    
+
     for append in ["stretch", "a", "loops"]:
         PRE_PROCESS.append(f"{append}_{cmp}")
-    
+
     PRE_PROCESS.append(f"bc_{cmp}%beg")
     PRE_PROCESS.append(f"bc_{cmp}%end")
 
@@ -47,7 +47,7 @@ for p_id in range(1, 10+1):
     for arho_id in range(1, 10+1):
         PRE_PROCESS.append(f'patch_icpp({p_id})%alpha({arho_id})')
         PRE_PROCESS.append(f'patch_icpp({p_id})%alpha_rho({arho_id})')
-    
+
     for taue_id in range(1, 6+1):
         PRE_PROCESS.append(f'patch_icpp({p_id})%tau_e({arho_id})')
 
@@ -98,7 +98,7 @@ for f_id in range(1,10+1):
         for attribute in ["mag", "length", "dir", "npulse", "pulse", "support",
                           "delay"]:
             SIMULATION.append(f"Mono({mono_id})%{attribute}")
-        
+
         for cmp_id in range(1,3+1):
             SIMULATION.append(f"Mono({mono_id})%loc({cmp_id})")
 
@@ -149,7 +149,7 @@ def get_input_dict_keys(target_name: str) -> list:
     if target_name == "pre_process":  return PRE_PROCESS.copy()
     if target_name == "simulation":   return SIMULATION.copy()
     if target_name == "post_process": return POST_PROCESS.copy()
-    
+
     raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
 
 
@@ -162,7 +162,7 @@ class QueueSystem:
 
     def gen_batch_header(self, args: dict, target_name: str) -> str:
         raise common.MFCException("QueueSystem::gen_batch_header: not implemented.")
-    
+
     def gen_submit_cmd(self, filename: str) -> None:
         raise common.MFCException("QueueSystem::gen_submit_cmd: not implemented.")
 
@@ -170,7 +170,7 @@ class QueueSystem:
 class PBSSystem(QueueSystem):
     def __init__(self) -> None:
         super().__init__("PBS")
-    
+
     def is_active(self) -> bool:
         return 0 == os.system(f"qsub -h > /dev/null 2>&1")
 
@@ -190,10 +190,10 @@ class PBSSystem(QueueSystem):
 class LSFSystem(QueueSystem):
     def __init__(self) -> None:
         super().__init__("LSF")
-    
+
     def is_active(self) -> bool:
         return 0 == os.system(f"bsub -h > /dev/null 2>&1")
-    
+
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return f"""\
 #BSUB -P {args["account"]}
@@ -209,10 +209,10 @@ class LSFSystem(QueueSystem):
 class SLURMSystem(QueueSystem):
     def __init__(self) -> None:
         super().__init__("SLURM")
-    
+
     def is_active(self) -> bool:
         return 0 == os.system(f"sbatch -h > /dev/null 2>&1")
-    
+
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return f"""\
 #SBATCH --job-name="{job_name}"
@@ -270,7 +270,7 @@ class ParallelEngine(Engine):
         self.execute_batch_file(queue_sys, target_name)
 
         self.remove_batch_file(queue_sys, target_name)
-    
+
     def get_batch_filepath(self, system: QueueSystem, target_name: str):
         case_dirpath = self.mfc.run.get_case_dirpath()
 
@@ -374,7 +374,7 @@ class MFCRun:
         else:
             rich.print(f"> > Unrecognized input file format for '{input}'. Please check the extension. [bold red]✘[/bold red]")
             raise common.MFCException("Unrecognized input file format.")
-        
+
         return case
 
     def get_job_name(self, target_name: str):
@@ -394,7 +394,7 @@ class MFCRun:
         for key,val in case_dict.items():
             if key in MASTER_KEYS:
                 dict_str += f"{key} = {val}\n"
-        
+
         contents = f"&user_inputs\n{dict_str}&end/"
 
         # Save .inp input file
@@ -408,7 +408,7 @@ class MFCRun:
             if system.is_active():
                 rich.print(f"> > Detected the [bold magenta]{system.name}[/bold magenta] queueing system.")
                 return system
-        
+
         raise common.MFCException(f"Failed to detect a queueing system.")
 
     def get_binpath(self, target: str) -> str:
@@ -422,15 +422,15 @@ class MFCRun:
 
     def get_exec_cmd(self, target_name: str):
         bin = self.get_binpath(target_name)
-        
+
         cd = f'cd "{self.get_case_dirpath()}"'
         ld = self.get_ld()
 
         if os.system("jsrun -h > /dev/null 2>&1") == 0:
             # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
-            rs=2*self.mfc.args["cpus_per_node"]
-            cpus_per_rs=max(int(self.mfc.args["cpus_per_node"]/2), 1)
-            gpus_per_rs=max(int(self.mfc.args["gpus_per_node"]/2), 1)
+            rs=2*int(self.mfc.args["cpus_per_node"])
+            cpus_per_rs=max(int(self.mfc.args["cpus_per_node"])/2, 1)
+            gpus_per_rs=max(int(self.mfc.args["gpus_per_node"])/2, 1)
             tasks_per_rs=cpus_per_rs
 
             return f'{cd} && {ld} jsrun --smpiargs="-gpu" -r{rs} -c{cpus_per_rs} -g{gpus_per_rs} -a{tasks_per_rs} "{bin}"'
@@ -459,7 +459,7 @@ class MFCRun:
 
         for target_name in targets:
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
-            
+
             if not self.mfc.build.is_build_satisfied(target_name):
                 rich.print(f"> > Target {target_name} needs (re)building...")
                 self.mfc.build.build_target(target_name)
@@ -474,7 +474,7 @@ class MFCRun:
                 if candidate.slug == engine_slug:
                     engine = candidate
                     break
-            
+
             if engine == None:
                 raise common.MFCException(f"Unsupported engine {engine_slug}.")
 
