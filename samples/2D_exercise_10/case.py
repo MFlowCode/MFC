@@ -13,6 +13,9 @@ mydt    = Tend/(1.*Nt)
 
 
 print(json.dumps({                                              \
+                    'case_dir'                     : '\'.\'',                   \
+                    'run_time_info'                : 'T',                       \
+
     # Computational Domain Parameters ==========================
     'x_domain%beg'                 : 0.E+00,                    \
     'y_domain%beg'                 : 0.E+00,                    \
@@ -57,7 +60,7 @@ print(json.dumps({                                              \
     'prim_vars_wrt'                :'T',                        \
     'parallel_io'                  :'T',                        \
     # ==========================================================
-                                                                
+
     # Patch 1 L ================================================
     # 'patch_icpp(1)%geometry'       : 1,                         \
     # 'patch_icpp(1)%x_centroid'     : 0.25,                      \
