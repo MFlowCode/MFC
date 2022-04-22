@@ -9,7 +9,7 @@ def parse(mfc):
     parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", prog="./mfc.sh",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    compiler_configuration_names = [e.name for e in mfc.user.configurations]
+    mode_names = [e.name for e in mfc.user.configurations]
 
     parsers = parser.add_subparsers(dest="command")
 
@@ -23,8 +23,8 @@ def parse(mfc):
         p.add_argument("-t", "--targets", nargs="+", type=str.lower,
                             choices=compiler_target_names, default=["mfc"], help="")
 
-        p.add_argument("-cc", "--compiler-configuration", type=str.lower,
-                    choices=compiler_configuration_names, default=mfc.user.general.configuration, help="")
+        p.add_argument("-m", "--mode", type=str.lower,
+                    choices=mode_names, default=mfc.user.general.configuration, help="")
         
         p.add_argument("-j", "--jobs", metavar="N", type=int,
                     help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
@@ -42,15 +42,16 @@ def parse(mfc):
 
     # === RUN ===
     add_common_arguments(run)
-    run.add_argument("-e", "--engine", choices=["serial", "parallel"], default="serial",
-                        help="Job execution/submission engine choice.")
+    run.add_argument("-e", "--engine", choices=["serial", "parallel"], default="serial", help="Job execution/submission engine choice.")
     run.add_argument("-i", "--input",                               type=str, required=True,                       help="Input file for run.")
     run.add_argument("-p", "--partition",      metavar="PARTITION", type=str, default=mfc.user.run.partition,      help="(Parallel) Partition for job submission.")
-    run.add_argument("-N", "--nodes",          metavar="NODES",     type=int, default=mfc.user.run.nodes,          help="(Parallel) Number of nodes.")
-    run.add_argument("-n", "--tasks-per-node", metavar="TASKS",     type=int, default=mfc.user.run.tasks_per_node, help="           Number of tasks per node.")
+    run.add_argument("-n", "--nodes",          metavar="NODES",     type=int, default=mfc.user.run.nodes,          help="(Parallel) Number of nodes.")
+    run.add_argument("-c", "--cpus-per-node",  metavar="CPUS",      type=int, default=mfc.user.run.cpus_per_node,  help="           Number of tasks per node.")
     run.add_argument("-g", "--gpus-per-node",  metavar="GPUS",      type=int, default=mfc.user.run.gpus_per_node,  help="(Parallel) Number of GPUs  per node.")
     run.add_argument("-w", "--walltime",       metavar="WALLTIME",  type=str, default=mfc.user.run.walltime,       help="(Parallel) Walltime.")
     run.add_argument("-a", "--account",        metavar="ACCOUNT",   type=str, default=mfc.user.run.account,        help="(Parallel) Account to charge.")
+    run.add_argument(      "--email",          metavar="EMAIL",     type=str, default=mfc.user.run.email,          help="(Parallel) Email for job notification.")
+    run.add_argument(      "--name",           metavar="NAME",      type=str, default=None,                        help="(Parallel) Job name.")
 
     args: dict = vars(parser.parse_args())
 

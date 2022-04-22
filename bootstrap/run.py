@@ -1,4 +1,5 @@
 import os, json, rich, typing, dataclasses
+from queue import Queue
 
 import common
 
@@ -157,10 +158,13 @@ class QueueSystem:
     name: str
 
     def is_active(self) -> bool:
-        raise common.MFCException("is_active: not implemented.")
+        raise common.MFCException("QueueSystem::is_active: not implemented.")
 
-    def gen_batch_header(self, args: dict, target: str) -> str:
-        raise common.MFCException("gen_batch_header: not implemented.")
+    def gen_batch_header(self, args: dict, target_name: str) -> str:
+        raise common.MFCException("QueueSystem::gen_batch_header: not implemented.")
+    
+    def gen_submit_cmd(self, filename: str) -> None:
+        raise common.MFCException("QueueSystem::gen_submit_cmd: not implemented.")
 
 
 class PBSSystem(QueueSystem):
@@ -168,20 +172,18 @@ class PBSSystem(QueueSystem):
         super().__init__("PBS")
     
     def is_active(self) -> bool:
-        return True
-        #FIXME:
-        #return 0 == os.system(f"qsub -h > /dev/null 2>&1")
+        return 0 == os.system(f"qsub -h > /dev/null 2>&1")
 
-    def gen_batch_header(self, args: dict, target: str) -> str:
+    def gen_batch_header(self, args: dict, job_name: str) -> str:
         return f"""\
-#PBS -l nodes={args["nodes"]}:ppn={args["tasks_per_node"]}
+#PBS -l nodes={args["nodes"]}:ppn={args["cpus_per_node"]}
 #PBS -l walltime={args["walltime"]}
 #PBS -q {args["partition"]}
-#PBS -N {target}\
-# """
+#PBS -N {job_name}
+"""
 
-    def gen_batch_cmd(self):
-        pass
+    def gen_submit_cmd(self, filename: str) -> None:
+        return f"qsub {filename}"
 
 
 class LSFSystem(QueueSystem):
@@ -189,24 +191,18 @@ class LSFSystem(QueueSystem):
         super().__init__("LSF")
     
     def is_active(self) -> bool:
-        return True
-        #FIXME:
-        #return 0 == os.system(f"bsub -h > /dev/null 2>&1")
+        return 0 == os.system(f"bsub -h > /dev/null 2>&1")
     
-    def gen_batch_header(self, args: dict, target: str) -> str:
+    def gen_batch_header(self, args: dict, job_name: str) -> str:
         return f"""\
-#SBATCH --job-name="{target}"
-#SBATCH --time={args["walltime"]}
-#SBATCH --ntasks={0}
-#SBATCH --nodes={args["nodes"]}
-#SBATCH --ntasks-per-node={args["tasks_per_node"]}
-#SBATCH --cpus-per-task={1}
-#SBATCH --partition={args["partition"]}
-#SBATCH --account={args["account"]}
+#BSUB -P {args["account"]}
+#BSUB -W {args["walltime"]}
+#BSUB -J {job_name}
+#BSUB -nnodes {args["nodes"]}
 """
 
-    def gen_batch_cmd(self):
-        pass
+    def gen_submit_cmd(self, filename: str) -> None:
+        return f"bsub {filename}"
 
 
 class SLURMSystem(QueueSystem):
@@ -214,16 +210,23 @@ class SLURMSystem(QueueSystem):
         super().__init__("SLURM")
     
     def is_active(self) -> bool:
-        return True
-        #FIXME:
-        #return 0 == os.system(f"sbatch -h > /dev/null 2>&1")
+        return 0 == os.system(f"sbatch -h > /dev/null 2>&1")
     
-    def gen_batch_header(self, args: dict, target: str) -> str:
-        pass
+    def gen_batch_header(self, args: dict, job_name: str) -> str:
+        return f"""\
+#SBATCH --job-name="{job_name}"
+#SBATCH --time={args["walltime"]}
+#SBATCH --nodes={args["nodes"]}
+#SBATCH --ntasks-per-node={args["cpus_per_node"]}
+#SBATCH --cpus-per-task={1}
+#SBATCH --partition={args["partition"]}
+#SBATCH --account={args["account"]}
+#SBATCH --mail-user={args["email"]}
+#SBATCH --mail-type=BEGIN, END, FAIL
+"""
 
-    def gen_batch_cmd(self):
-        pass
-
+    def gen_submit_cmd(self, filename: str) -> None:
+        return f"sbatch {filename}"
 
 
 QUEUE_SYSTEMS = [ PBSSystem(), LSFSystem(), SLURMSystem() ]
@@ -251,6 +254,7 @@ class SerialEngine(Engine):
 
         rich.print(f"> > Done [bold green]✓[/bold green]")
 
+
 class ParallelEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Parallel", "parallel")
@@ -262,24 +266,52 @@ class ParallelEngine(Engine):
 
         self.create_batch_file(queue_sys, target_name)
 
-        self.execute_batch_file(queue_sys)
+        self.execute_batch_file(queue_sys, target_name)
+
+        self.remove_batch_file(queue_sys, target_name)
     
-    def create_batch_file(self, system: QueueSystem, target_name: str):
+    def get_batch_filepath(self, system: QueueSystem, target_name: str):
         case_dirpath = self.mfc.run.get_case_dirpath()
+
+        return os.path.abspath(f"{case_dirpath}/{target_name}.sh")
+
+    def create_batch_file(self, system: QueueSystem, target_name: str):
+        job_name = self.mfc.run.get_job_name(target_name)
 
         BATCH_CONTENT: str = f"""\
 #!/bin/sh -l
-{system.gen_batch_header(self.mfc.args, target_name)}
+{system.gen_batch_header(self.mfc.args, job_name)}
 
-echo "================================================="
-echo "| Starting job #{target_name}"
-echo "| - Start-date: `date +%D`"
-echo "| - Start-time: `date +%T`"
-echo "================================================="
+RED="\\u001b[31m";   CYAN="\\u001b[36m";   BLUE="\\u001b[34m";    WHITE="\\u001b[37m"
+GREEN="\\u001b[32m"; YELLOW="\\u001b[33m"; MAGENTA="\\u001b[35m"; COLOR_RESET="\\033[m"
+
+TABLE_FORMAT_LINE="| - %-14s %-25s - %-14s %-25s |\\n"
+TABLE_HEADER="/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ \\n"
+TABLE_FOOTER="\_______________________________________________________________________________________/\\n"
+TABLE_TITLE_FORMAT="| %8s $MAGENTA%-51s$COLOR_RESET                          |\\n"
+TABLE_CONTENT=$(cat <<-END
+$(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                       "Start-date:"    "$(date +%T)")
+$(printf "$TABLE_FORMAT_LINE" "Partition:"     "{self.mfc.args["partition"]}"      "Walltime:"      "{self.mfc.args["walltime"]}")
+$(printf "$TABLE_FORMAT_LINE" "Account:"       "{self.mfc.args["account"]}"        "Nodes:"         "{self.mfc.args["nodes"]}")
+$(printf "$TABLE_FORMAT_LINE" "CPUs (/node):"  "{self.mfc.args["cpus_per_node"]}"  "GPUs (/node):"  "{self.mfc.args["gpus_per_node"]}")
+$(printf "$TABLE_FORMAT_LINE" "Input File:"    "{self.mfc.args["input"]}"          "Engine"         "{self.mfc.args["engine"]}")
+$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Mode:"          "{self.mfc.args["mode"]}")
+$(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          "Job Name:"      "{job_name}")\\n
+END
+)
+
+printf "$TABLE_HEADER"
+printf "$TABLE_TITLE_FORMAT" "Starting" "{job_name}"
+printf "$TABLE_CONTENT"
+printf "$TABLE_FOOTER"
 
 t_start=$(date +%s)
 
+echo ""
+
 {self.mfc.run.get_exec_cmd(target_name)}
+
+echo ""
 
 code=$?
 
@@ -288,26 +320,30 @@ if [ "$code" -ne "0" ]; then
     status_msg="FAILURE"
 fi
 
-t_stop=$(date +%s)
+t_stop="$(date +%s)"
 
-echo "================================================="
-echo "| Finished job {target_name}: $status_msg"
-echo "| - End-date: `date +%D`"
-echo "| - End-time: `date +%T`"
-echo "| - Total-time: $(expr $t_stop - $t_start)s"
-echo "================================================="
+printf "$TABLE_HEADER"
+printf "$TABLE_TITLE_FORMAT" "Finished" "{job_name}"
+printf "$TABLE_FORMAT_LINE" "Total-time:"  "$(expr $t_stop - $t_start)s"  "Status:"    "$status_msg"
+printf "$TABLE_CONTENT"
+printf "$TABLE_FORMAT_LINE" "End-time:"    "$(date +%T)"                  "End-date:"  "$(date +%T)"
+printf "$TABLE_FOOTER"
+
+printf "\\nThank you for using MFC !\\n\\n"
 
 exit $code
 """
 
-        common.file_write(f"{case_dirpath}/{target_name}.sh", BATCH_CONTENT)
+        filepath = self.get_batch_filepath(system, target_name)
 
-    def execute_batch_file(self, system: QueueSystem):
-        if system == "PBS":
-            # handle
-            pass
-        else:
-            raise common.MFCException(f"Running batch file for {system.name} is not supported.")
+        common.file_write(filepath, BATCH_CONTENT)
+
+    def remove_batch_file(self, system: QueueSystem, target_name: str):
+        os.remove(self.get_batch_filepath(system, target_name))
+
+    def execute_batch_file(self, system: QueueSystem, target_name: str):
+        if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(system, target_name))):
+            raise common.MFCException(f"Running batch file for {system.name} failed.")
 
 
 ENGINES = [ SerialEngine(), ParallelEngine() ]
@@ -321,7 +357,7 @@ class MFCRun:
         case:  dict = {}
         input: str  = self.mfc.args["input"].strip()
 
-        rich.print(f"> > Fetching case dir from {input}...")
+        rich.print(f"> > Fetching case dictionary from {input}...")
 
         if input.endswith(".py"):
             (output, err) = common.get_py_program_output(input)
@@ -340,6 +376,15 @@ class MFCRun:
         
         return case
 
+    def get_job_name(self, target_name: str):
+        return f'MFC-{str(self.mfc.args["name"])}-{target_name}'
+
+    def get_input_filepath(self, target_name: str):
+        dirpath  = os.path.abspath(os.path.dirname(self.mfc.args["input"]))
+        filename = f"{target_name}.inp"
+
+        return f"{dirpath}/{filename}"
+
     def create_input_file(self, target_name: str, case_dict: dict):
         MASTER_KEYS: list = get_input_dict_keys(target_name)
 
@@ -352,9 +397,10 @@ class MFCRun:
         contents = f"&user_inputs\n{dict_str}&end/"
 
         # Save .inp input file
-        dirpath  = os.path.abspath(os.path.dirname(self.mfc.args["input"]))
-        filename = f"{target_name}.inp"
-        common.file_write(f"{dirpath}/{filename}", contents)
+        common.file_write(self.get_input_filepath(target_name), contents)
+
+    def remove_input_file(self, target_name: str):
+        os.remove(self.get_input_filepath(target_name))
 
     def detect_queue_system(self) -> str:
         for system in QUEUE_SYSTEMS:
@@ -374,15 +420,15 @@ class MFCRun:
         return os.path.abspath(os.path.dirname(self.mfc.args["input"]))
 
     def get_exec_cmd(self, target_name: str):
-        bin  = self.get_binpath(target_name)
+        bin = self.get_binpath(target_name)
         
-        cd   = f'cd {self.get_case_dirpath()}'
-        ld   = self.get_ld()
+        cd = f'cd "{self.get_case_dirpath()}"'
+        ld = self.get_ld()
 
         if os.system("jsrun -h > /dev/null 2>&1") == 0:
-            return f'{cd} && {ld} jsrun -r{self.mfc.args["tasks_per_node"]} -g1 -c1 -a1 "{bin}"'
+            return f'{cd} && {ld} jsrun -r{self.mfc.args["cpus_per_node"]} -g1 -c1 -a1 "{bin}"'
         else:
-            return f'{cd} && {ld} mpiexec -np {self.mfc.args["tasks_per_node"]} "{bin}"'
+            return f'{cd} && {ld} mpiexec -np {self.mfc.args["cpus_per_node"]} "{bin}"'
 
     def run(self):
         targets = self.mfc.args["targets"]
@@ -393,19 +439,23 @@ class MFCRun:
 [bold][u]Run:[/u][/bold]
 > Targets       (-t)  {self.mfc.args['targets']}
 > Engine        (-e)  {self.mfc.args['engine']}
-> Config        (-cc) {self.mfc.args['compiler_configuration']}
+> Mode          (-m)  {self.mfc.args['mode']}
 > Input         (-i)  {self.mfc.args['input']}
 > Nodes         (-N)  {self.mfc.args['nodes']}
-> Tasks (/node) (-n)  {self.mfc.args['tasks_per_node']}
+> CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
+> GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
+> Walltime      (-w)  {self.mfc.args["walltime"]}
+> Partition     (-p)  {self.mfc.args["partition"]}
+> Account       (-a)  {self.mfc.args["account"]}
+> Email         (??)  {self.mfc.args["email"]}
 """)
 
         for target_name in targets:
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
             
-            #FIXME:
-            #if not self.mfc.build.is_build_satisfied(target_name):
-            #    rich.print(f"> > Target {target_name} needs (re)building...")
-            #    self.mfc.build.build_target(target_name)
+            if not self.mfc.build.is_build_satisfied(target_name):
+                rich.print(f"> > Target {target_name} needs (re)building...")
+                self.mfc.build.build_target(target_name)
 
             self.create_input_file(target_name, self.get_case_dict())
 
@@ -422,3 +472,5 @@ class MFCRun:
                 raise common.MFCException(f"Unsupported engine {engine_slug}.")
 
             engine.run(self.mfc, target_name)
+
+            self.remove_input_file(target_name)

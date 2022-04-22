@@ -47,18 +47,20 @@ class Build:
 class Run:
     nodes:          int
     partition:      str
-    tasks_per_node: int
+    cpus_per_node:  int
     gpus_per_node:  int
     walltime:       str
     account:        str
+    email:          str
 
     def __init__(self, data: dict) -> None:
         self.nodes          = int(data.get("nodes"))
         self.partition      = data.get("partition")
-        self.tasks_per_node = int(data.get("tasks-per-node"))
+        self.cpus_per_node  = int(data.get("cpus-per-node"))
         self.gpus_per_node  = int(data.get("gpus-per-node"))
         self.walltime       = data.get("walltime")
         self.account        = data.get("account")
+        self.email          = data.get("email")
 
 
 class MFCUser:
@@ -71,7 +73,7 @@ class MFCUser:
         self.general        = General(data["general"])
         self.build          = Build  (data["build"])
         self.run            = Run    (data["run"])
-        self.configurations = [ Configuration(e) for e in data["configurations"] ]
+        self.configurations = [ Configuration(e) for e in data["modes"] ]
 
     def get_configuration(self, name: str) -> Configuration:
         for configuration in self.configurations:
