@@ -76,6 +76,7 @@ program p_main
     CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate) 
 
     ! Initializing MPI execution environment
+
     CALL s_mpi_initialize()
       
 #ifdef _OPENACC
@@ -95,6 +96,7 @@ program p_main
     ! their consistency is checked. The identification of any inconsistencies
  
    ! will result in the termination of the simulation.
+
     if (proc_rank == 0) then
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
@@ -106,9 +108,12 @@ program p_main
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
 
+ 
+
     call s_mpi_bcast_user_inputs()
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
+
 
 
 
@@ -126,11 +131,13 @@ program p_main
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
 
+
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
     call s_initialize_rhs_module()
+
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -139,6 +146,7 @@ program p_main
     call s_initialize_data_output_module()
     call s_initialize_derived_variables_module()
     call s_initialize_time_steppers_module()
+
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -159,6 +167,7 @@ program p_main
     ! Reading in the user provided initial condition and grid data
     call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+
     
 
     ! Populating the buffers of the grid variables using the boundary conditions
@@ -175,8 +184,11 @@ program p_main
     PRINT *, "[MEM-INST] After: s_initialize_weno_module"
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+    
+
 
     call s_initialize_cbc_module()
+
 
     call s_initialize_derived_variables()
 
