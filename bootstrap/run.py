@@ -230,7 +230,7 @@ class SLURMSystem(QueueSystem):
         return f"sbatch {filename}"
 
 
-QUEUE_SYSTEMS = [ LSFSystem(), PBSSystem(), SLURMSystem() ]
+QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
 
 
 @dataclasses.dataclass
@@ -428,14 +428,36 @@ class MFCRun:
 
         if os.system("jsrun -h > /dev/null 2>&1") == 0:
             # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
-            rs=2*int(self.mfc.args["cpus_per_node"])
-            cpus_per_rs=max(int(self.mfc.args["cpus_per_node"])/2, 1)
-            gpus_per_rs=max(int(self.mfc.args["gpus_per_node"])/2, 1)
-            tasks_per_rs=cpus_per_rs
+                        
+            if int(self.mfc.args["cpus_per_node"]) != int(self.mfc.args["gpus_per_node"]) \
+               and int(self.mfc.args["gpus_per_node"]) != 0:
+               raise common.MFCException("JSRUN: Conflicting job execution parameters. If using GPUs, CPUs per node and GPUs per node must match.")
 
-            return f'{cd} && {ld} jsrun --smpiargs="-gpu" -r{rs} -c{cpus_per_rs} -g{gpus_per_rs} -a{tasks_per_rs} "{bin}"'
+            # One resource set per CPU(Core)/GPU pair.
+            rs=int(self.mfc.args["cpus_per_node"])
+            cpus_per_rs=1
+            gpus_per_rs=min(int(self.mfc.args["gpus_per_node"]), 1)
+            tasks_per_rs=1
+
+            return f'''\
+{cd} && {ld}                           \ 
+    jsrun --smpiargs="-gpu"            \ 
+          --nrs{rs}                    \ 
+          --cpu_per_rs{cpus_per_rs}    \ 
+          --gpu_per_rs{gpus_per_rs}    \ 
+          --tasks_per_rs{tasks_per_rs} \ 
+          "{bin}"\
+'''
+        elif os.system("srun -h > /dev/null 2>&1") == 0:
+            raise common.MFCException("srun not implemented")
+#            return f'{cd} && {ld} srun --nodes={self.mfc.args["nodes"]} -n  "{bin}"'
         else:
-            return f'{cd} && {ld} mpiexec -np {self.mfc.args["cpus_per_node"]} "{bin}"'
+            return f'''\
+{cd} && {ld}                                    \ 
+    mpiexec -N {self.mfc.args["nodes"]}         \ 
+            -n {self.mfc.args["cpus_per_node"]} \ 
+            "{bin}"\
+'''
 
     def run(self):
         targets = self.mfc.args["targets"]
