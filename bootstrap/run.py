@@ -197,7 +197,7 @@ class LSFSystem(QueueSystem):
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return f"""\
 #BSUB -P {args["account"]}
-#BSUB -W {args["walltime"]}
+#BSUB -W {args["walltime"][:-3]}
 #BSUB -J {job_name}
 #BSUB -nnodes {args["nodes"]}
 """
@@ -280,7 +280,7 @@ class ParallelEngine(Engine):
         job_name = self.mfc.run.get_job_name(target_name)
 
         BATCH_CONTENT: str = f"""\
-#!/bin/sh -l
+#!/usr/bin/env bash
 {system.gen_batch_header(self.mfc.args, job_name)}
 
 RED="\\u001b[31m";   CYAN="\\u001b[36m";   BLUE="\\u001b[34m";    WHITE="\\u001b[37m"
