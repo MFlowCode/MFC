@@ -41,11 +41,11 @@ class MFCState:
         common.create_directory(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for cc in [ cc.name for cc in self.user.configurations ] + ["common"]:
-                common.create_directory(f"{common.MFC_SUBDIR}/{cc}/{d}")
+            for mode in [ mode.name for mode in self.user.modes ] + ["common"]:
+                common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
-                        common.create_directory(f"{common.MFC_SUBDIR}/{cc}/{d}/{build_subdir}")
+                        common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}/{build_subdir}")
 
 def main():
     mfc = MFCState()

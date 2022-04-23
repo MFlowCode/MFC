@@ -4,10 +4,10 @@ import common
 
 @dataclasses.dataclass
 class General:
-    configuration: str
+    modes: str
 
     def __init__(self, data: dict):
-        self.configuration = data.get("configuration")
+        self.modes = data.get("modes")
 
 
 @dataclasses.dataclass
@@ -23,7 +23,7 @@ class Compilers:
 
 
 @dataclasses.dataclass
-class Configuration:
+class Mode:
     name:    str
     c:       str
     cpp:     str
@@ -70,14 +70,14 @@ class MFCUser:
         
         data: dict = common.file_load_yaml(common.MFC_USER_FILEPATH)
 
-        self.general        = General(data["general"])
-        self.build          = Build  (data["build"])
-        self.run            = Run    (data["run"])
-        self.configurations = [ Configuration(e) for e in data["modes"] ]
+        self.general = General(data["general"])
+        self.build   = Build  (data["build"])
+        self.run     = Run    (data["run"])
+        self.modes   = [ Mode(e) for e in data["modes"] ]
 
-    def get_configuration(self, name: str) -> Configuration:
-        for configuration in self.configurations:
-            if configuration.name == name:
-                return configuration
+    def get_mode(self, name: str) -> Mode:
+        for mode in self.modes:
+            if mode.name == name:
+                return mode
 
-        raise common.MFCException(f'MFCConf: Configuration "{name}" doesn\'t exist')
+        raise common.MFCException(f'MFCConf: Mode "{mode}" doesn\'t exist')
