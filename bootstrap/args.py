@@ -9,7 +9,7 @@ def parse(mfc):
     parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", prog="./mfc.sh",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    mode_names = [e.name for e in mfc.user.configurations]
+    mode_names = [e.name for e in mfc.user.modes]
 
     parsers = parser.add_subparsers(dest="command")
 

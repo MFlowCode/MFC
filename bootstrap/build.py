@@ -7,15 +7,15 @@ class MFCBuild:
     def __init__(self, mfc: mfc.MFCState) -> None:
         self.mfc = mfc
 
-    def get_configuration_base_path(self, cc: str = None):
+    def get_mode_base_path(self, cc: str = None):
         if cc is None:
             cc = self.mfc.args["mode"]
 
         return f'{common.MFC_SUBDIR}/{cc}'
 
     def get_target_base_path(self, name: str):
-        default_cfg_name = self.mfc.conf.get_target_configuration_name(name, self.mfc.args["mode"])
-        cc = self.mfc.conf.get_target_configuration_folder_name(name, default_cfg_name)
+        default_cfg_name = self.mfc.conf.get_target_mode_name(name, self.mfc.args["mode"])
+        cc = self.mfc.conf.get_target_mode_folder_name(name, default_cfg_name)
 
         return f'{common.MFC_SUBDIR}/{cc}'
 
@@ -31,18 +31,18 @@ class MFCBuild:
     def get_temp_path(self, name: str):
         return f'{self.get_target_base_path(name)}/temp/{name}'
 
-    def get_target_configuration(self, name: str, default: str) -> user.Configuration:
-        return self.mfc.user.get_configuration(self.mfc.conf.get_target_configuration_name(name, default))
+    def get_target_mode(self, name: str, default: str) -> user.Mode:
+        return self.mfc.user.get_mode(self.mfc.conf.get_target_mode_name(name, default))
 
     def setup_directories(self):
         common.create_directory(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for cc in [ cc.name for cc in self.mfc.user.configurations ] + ["common"]:
-                common.create_directory(f"{common.MFC_SUBDIR}/{cc}/{d}")
+            for mode in [ mode.name for mode in self.mfc.user.modes ] + ["common"]:
+                common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
-                        common.create_directory(f"{common.MFC_SUBDIR}/{cc}/{d}/{build_subdir}")
+                        common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}/{build_subdir}")
 
     def check_environment(self):
         rich.print("[bold][u]Check Environment:[/u][/bold]")
@@ -98,12 +98,12 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
         dep       = self.mfc.conf.get_target(dependency_name)
         compilers = self.mfc.user.build.compilers
 
-        configuration = self.get_target_configuration(dependency_name, self.mfc.args["mode"])
+        mode = self.get_target_mode(dependency_name, self.mfc.args["mode"])
 
         install_path = self.get_build_path (dependency_name)
         source_path  = self.get_source_path(dependency_name)
 
-        flags = vars(copy.deepcopy(configuration))
+        flags = vars(copy.deepcopy(mode))
         for lang in flags.keys():
             lang: str
             if "${CUDA:INSTALL_PATH}" in flags[lang]:
@@ -111,11 +111,11 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
 
                 if len(matches) == 0:
                     raise common.MFCException(f'''\
-Failed to find where CUDA was installed for {dependency_name} with {configuration.name}/{lang}.
+Failed to find where CUDA was installed for {dependency_name} with {mode.name}/{lang}.
 Please follow the instructions bellow:
 - Make sure CUDA is installed and properly configured.
 - Open mfc.conf.py.
-- Locate section compilers -> configurations -> {configuration.name} -> {lang}:
+- Locate section compilers -> modes -> {mode.name} -> {lang}:
 - Replace $(CUDA:INSTALL_PATH) with the root path to your CUDA installation.
   "include" and "lib" should be folders directly accessible from this folder.
 If you think MFC could (or should) be able to find it automatically for you system, you are welcome to file an issue on GitHub or a pull request with your changes to mfc.py at https://github.com/MFlowCode/MFC.
@@ -166,7 +166,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def is_build_satisfied(self, name: str):
         # Check if it hasn't been built before
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
 
         if not self.mfc.lock.does_target_exist(name, compiler_cfg.name):
             return False
@@ -209,7 +209,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         return True
 
     def build_target__clean_previous(self, name: str, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
         if not self.mfc.lock.does_unique_target_exist(name, compiler_cfg.name):
             return
 
@@ -222,7 +222,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
             common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.mode}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
         conf = self.mfc.conf.get_target(name)
 
         if conf.fetch.method in ["clone", "download"]:
@@ -307,7 +307,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
 
 
     def build_target__update_lock(self, name: str, depth: str):
-        compiler_cfg = self.get_target_configuration(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
         conf = self.mfc.conf.get_target(name)
 
         rich.print(f'{depth}Updating lock file...')
@@ -320,7 +320,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             }
         })
 
-        # If the target - in the selected configuration - isn't already
+        # If the target - in the selected mode - isn't already
         # in the lock file, we add a new target/metdata entry into it.
         if len(self.mfc.lock.get_target_matches(name, compiler_cfg.name)) == 0:
             self.mfc.lock.add_target(new_entry)
@@ -336,10 +336,10 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 return
 
         # If for some reason we can't find the target, throw.
-        raise common.MFCException(f"Failed to update the lock file for {name} in the {compiler_cfg.name} configuration.")
+        raise common.MFCException(f"Failed to update the lock file for {name} in the {compiler_cfg.name} mode.")
 
     def build_target(self, name: str, depth=""):
-        common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_configuration_base_path())
+        common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_mode_base_path())
 
         
 
