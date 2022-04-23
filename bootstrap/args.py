@@ -24,7 +24,7 @@ def parse(mfc):
                             choices=compiler_target_names, default=["mfc"], help="")
 
         p.add_argument("-m", "--mode", type=str.lower,
-                    choices=mode_names, default=mfc.user.general.configuration, help="")
+                    choices=mode_names, default=mfc.user.general.mode, help="")
         
         p.add_argument("-j", "--jobs", metavar="N", type=int,
                     help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
