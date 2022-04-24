@@ -19,11 +19,11 @@ class MFCState:
         self.run   = run.MFCRun(self)
 
         rich.print(common.MFC_HEADER)
-        
+
         if self.args["command"] == "test":
             rich.print("[bold][u]Test:[/u][/bold]")
             self.test.test()
-        
+
         if self.args["command"] == "run":
             self.run.run()
 
@@ -38,7 +38,7 @@ class MFCState:
                     self.build.build_target(target_name)
 
         self.lock.save()
-    
+
     def setup_directories(self):
         common.create_directory(common.MFC_SUBDIR)
 
