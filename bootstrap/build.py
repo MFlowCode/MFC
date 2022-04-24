@@ -180,16 +180,15 @@ If you think MFC could (or should) be able to find it automatically for you syst
             check_filepath = self.string_replace(conf_desc.name, conf_desc.fetch.params.check)
             if not os.path.isfile(check_filepath):
                 return False
-            
+
             last_check_date = os.path.getmtime(check_filepath)
             for subdir, dirs, files in os.walk(self.string_replace(conf_desc.name, conf_desc.fetch.params.source)):
                 for file in files:
                     if os.path.getmtime(os.path.join(subdir, file)) > last_check_date:
                         return False
-            
+
         # Check if it needs updating (LOCK & CONFIG descriptions don't match)
         if conf_desc.fetch.method != lock_desc.target.fetch.method    or \
-           lock_desc.metadata.bCleaned                                or \
            conf_desc.fetch.params != lock_desc.target.fetch.params:
             return False
 
@@ -201,6 +200,10 @@ If you think MFC could (or should) be able to find it automatically for you syst
         for dependency_name in self.mfc.conf.get_dependency_names(name, recursive=True):
             if not self.is_build_satisfied(dependency_name):
                 return False
+
+        # Check if target was cleaned
+        if self.mfc.lock.get_target(name, self.mfc.args["mode"]).metadata.bCleaned:
+            return False
 
         # Check for "scratch" flag
         if self.mfc.args["scratch"]:
@@ -296,8 +299,10 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
                 def cmd_on_error():
                     print(logfile.read())
 
-                cmd_exception_text=f"Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.conf.yaml)"
-                cmd_exception_text=cmd_exception_text+f"You can also view it by running:\n\ncat \"{logfile.name}\"\n"
+                cmd_exception_text=f"""\
+Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.conf.yaml)
+  You can also view it by running:\n\ncat \"{logfile.name}\"\n\
+"""
 
                 common.execute_shell_command(command, exception_text=cmd_exception_text, on_error=cmd_on_error)
         elif conf.fetch.method == "collection":
@@ -315,7 +320,7 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         new_entry = lock.LockTargetHolder({
             "target": dataclasses.asdict(conf),
             "metadata": {
-                "mode": compiler_cfg.name,
+                "mode":     compiler_cfg.name,
                 "bCleaned": False
             }
         })
@@ -331,7 +336,6 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
         for index, dep in enumerate(self.mfc.lock.targets):
             if dep.target.name == name and dep.metadata.mode == compiler_cfg.name:
                 self.mfc.lock.targets[index] = new_entry
-                self.mfc.lock.flush()
                 self.mfc.lock.save()
                 return
 
@@ -341,19 +345,16 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
     def build_target(self, name: str, depth=""):
         common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_mode_base_path())
 
-        
-
-        prepend  =f"{depth}Package [bold blue]{name}[/bold blue]"
-        prepend_u=f"{depth}[u]Package [bold blue]{name}[/bold blue][/u]"
+        prepend=f"{depth}Package [bold blue]{name}[/bold blue]"
         # Check if it needs to be (re)built
         if self.is_build_satisfied(name):
-            rich.print(f"{prepend_u} - satisfied [bold green]✓[/bold green]")
+            rich.print(f"{prepend} - satisfied [bold green]✓[/bold green]")
             return False
 
         dependencies = self.mfc.conf.get_dependency_names(name, recursive=False)
         if len(dependencies) > 0:
             rich.print(f"{prepend} requires {', '.join([ f'[bold blue]{x}[/bold blue]' for x in dependencies ])}.")
-            
+
             # Build its dependencies
             for dependency in dependencies:
                 self.build_target(dependency, depth+"> ")
@@ -368,42 +369,6 @@ stdbuf -oL bash -c '{command}' >> "{logfile.name}" 2>&1""")
             self.build_target__build         (name, logfile, depth+"> ") # Build
             self.build_target__update_lock   (name,          depth+"> ") # Update LOCK
 
-        rich.print(f"{prepend_u} - Built [bold green]✓[/bold green]")
+        rich.print(f"{prepend} - Built [bold green]✓[/bold green]")
 
         return True
-    
-    def clean_target(self, name: str):
-        if not self.is_build_satisfied(name):
-            raise common.MFCException(f"Can't clean {name} because its build isn't satisfied.")
-
-        rich.print(f"Cleaning Package {name}")
-
-        for dependency_name in self.mfc.conf.get_dependency_names(name, recursive=False):
-            if not self.mfc.conf.is_target_common(dependency_name):
-                self.clean_target(dependency_name)
-
-        target = self.mfc.lock.get_target(name, self.mfc.args["mode"])
-
-        if not target.metadata.bCleaned:
-            if os.path.isdir(self.string_replace(name, "${SOURCE_PATH}")):
-                with open(self.get_log_filepath(name), "a") as log_file:
-                    for cmd_idx, command in enumerate(target.target.clean):
-                        rich.print(f'> Cleaning [{cmd_idx+1}/{len(target.target.clean)}] (Logging to {log_file.name})...')
-
-                        command = self.string_replace(name, f"""\
-cd "${{SOURCE_PATH}}" && \
-stdbuf -oL bash -c '{command}' >> "{log_file.name}" 2>&1""")
-
-                        log_file.write(f'\n--- ./mfc.py ---\n{command}\n--- ./mfc.py ---\n\n')
-                        log_file.flush()
-
-                        common.execute_shell_command(command)
-
-            target.metadata.bCleaned = True
-
-        common.delete_file(self.get_log_filepath(name))
-
-        self.mfc.lock.flush()
-        self.mfc.lock.save()
-
-        rich.print(f"Cleaning done [bold green]✓[/bold green]")

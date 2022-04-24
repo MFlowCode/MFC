@@ -4,12 +4,12 @@ import conf, common
 
 @dataclasses.dataclass
 class LockTargetMetadata:
+    mode:     str
     bCleaned: bool
-    mode: str
 
     def __init__(self, data: dict):
-        self.bCleaned               = data.get("bCleaned", False)
-        self.mode = data["mode"]
+        self.mode     = data["mode"]
+        self.bCleaned = data["bCleaned"]
 
 @dataclasses.dataclass
 class LockTargetHolder:
@@ -37,8 +37,9 @@ class MFCLock:
             self.add_target(LockTargetHolder(t))
 
         self.flush()
-    
+
     def save(self):
+        self.flush()
         common.file_dump_yaml(common.MFC_LOCK_FILEPATH, self.data)
 
     def flush(self):
@@ -48,10 +49,7 @@ class MFCLock:
         self.targets.append(target)
         self.flush()
 
-    def was_target_built(self, name: str, restrict_cc: str = None):
-        matches = self.get_target_matches(name, restrict_cc)
-
-    def get_target_matches(self, name: str, restrict_cc: str = None):
+    def get_target_matches(self, name: str, restrict_cc: str = None) -> list:
         def peek_filter(e: dict):
             if e.target.name != name:
                 return False
@@ -63,13 +61,13 @@ class MFCLock:
 
         return list(filter(peek_filter, self.targets))
 
-    def does_target_exist(self, name: str, restrict_cc: str = None):
+    def does_target_exist(self, name: str, restrict_cc: str = None) -> bool:
         return len(self.get_target_matches(name, restrict_cc)) > 0
 
-    def does_unique_target_exist(self, name: str, restrict_cc: str = None):
+    def does_unique_target_exist(self, name: str, restrict_cc: str = None) -> bool:
         return len(self.get_target_matches(name, restrict_cc)) == 1
 
-    def get_target(self, name: str, restrict_cc: str = None):
+    def get_target(self, name: str, restrict_cc: str = None) -> LockTargetHolder:
         matches = self.get_target_matches(name, restrict_cc)
 
         if len(matches) == 0:

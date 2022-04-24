@@ -23,13 +23,13 @@ modes:
   - name:    release-cpu
     c:       -O3
     cpp:     -O3
-    fortran: -O3 -cpp -w                   -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+    fortran: -O3 -cpp -w -DCPU_MODE      -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 
   - name:    release-gpu
-    fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+    fortran: -O3 -cpp -w -DGPU_MODE -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 
   - name:    debug-cpu
-    fortran: -Og -g -cpp -w
+    fortran: -Og -g -cpp -w -DCPU_MODE
 
   - name:    debug-gpu
-    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+    fortran: -Og -cpp -w -DGPU_MODE -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt

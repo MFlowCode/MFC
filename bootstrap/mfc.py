@@ -2,7 +2,7 @@
 
 import rich
 
-import user, conf, lock, args, test, common, run
+import user, conf, lock, args, test, clean, common, run
 
 class MFCState:
     def __init__(self) -> None:
@@ -13,30 +13,32 @@ class MFCState:
         self.setup_directories()
         self.lock  = lock.MFCLock()
         self.args  = args.parse(self)
+        self.clean = clean.MFCClean(self)
         self.build = MFCBuild(self)
         self.test  = test.MFCTest(self)
         self.run   = run.MFCRun(self)
 
         rich.print(common.MFC_HEADER)
-        
+
         if self.args["command"] == "test":
             rich.print("[bold][u]Test:[/u][/bold]")
             self.test.test()
-        
+
         if self.args["command"] == "run":
             self.run.run()
+
+        if self.args["command"] == "clean":
+            rich.print("[bold][u]Clean:[/u][/bold]")
+            self.clean.run()
 
         for target_name in [ x.name for x in self.conf.targets ]:
             if target_name in self.args["targets"]:
                 if self.args["command"] == "build":
                     rich.print("[bold][u]Build:[/u][/bold]")
                     self.build.build_target(target_name)
-                if self.args["command"] == "clean":
-                    rich.print("[bold][u]Clean:[/u][/bold]")
-                    self.build.clean_target(target_name)
 
         self.lock.save()
-    
+
     def setup_directories(self):
         common.create_directory(common.MFC_SUBDIR)
 
