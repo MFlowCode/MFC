@@ -99,7 +99,7 @@ class MFCConf:
     def is_target_common(self, name: str) -> bool:
         return self.get_target(name).common_mode is not None
 
-    def get_target_configuration_name(self, name: str, default: str) -> str:
+    def get_target_mode_name(self, name: str, default: str) -> str:
         target = self.get_target(name)
 
         if self.is_target_common(name):
@@ -107,7 +107,7 @@ class MFCConf:
 
         return default
 
-    def get_target_configuration_folder_name(self, name: str, default: str) -> str:
+    def get_target_mode_folder_name(self, name: str, default: str) -> str:
         if self.is_target_common(name):
             return "common"
 
