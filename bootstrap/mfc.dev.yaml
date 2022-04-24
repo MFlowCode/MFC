@@ -20,6 +20,8 @@ targets:
       - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
       - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
       - make install
+    clean:
+      - make clean
 
   - name: hdf5
     common_mode: release-cpu
@@ -32,6 +34,8 @@ targets:
       - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols --disable-sharedlib-rpath CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
       - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
       - make install prefix="${INSTALL_PATH}"
+    clean:
+      - make clean
 
   - name: silo
     common_mode: release-cpu
@@ -50,6 +54,8 @@ targets:
         ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
       - make ${MAKE_OPTIONS}
       - make install prefix="${INSTALL_PATH}"
+    clean:
+      - make clean
 
   - name: zfp
     common_mode: release-cpu
@@ -64,7 +70,9 @@ targets:
       - cd build && ${COMPILERS} cmake --build . --config Release
       - rsync -avh --progress "$(pwd)/build/bin/" "${INSTALL_PATH}/bin"
       - rsync -avh --progress "$(pwd)/build/"lib*/ "${INSTALL_PATH}/lib"
-
+    clean:
+      - cd build && ${COMPILERS} && make clean
+  
   - name: pre_process
     depends: []
     fetch:
@@ -78,6 +86,8 @@ targets:
       - >-
         make INSTALL_PATH="${pre_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
+    clean:
+      - make clean
 
   - name: simulation
     depends:
@@ -95,6 +105,8 @@ targets:
         make INSTALL_PATH="${simulation:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+    clean:
+      - make clean
 
   - name: post_process
     depends:
@@ -113,7 +125,9 @@ targets:
         make INSTALL_PATH="${post_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-O0 -lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
-               
+    clean:
+      - make clean
+ 
   - name: mfc
     depends:
       - pre_process
@@ -124,3 +138,4 @@ targets:
       params: null
     collection: null
     build: []
+    clean: []

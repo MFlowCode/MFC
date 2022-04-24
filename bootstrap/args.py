@@ -14,26 +14,34 @@ def parse(mfc):
     parsers = parser.add_subparsers(dest="command")
 
     build = parsers.add_parser(name="build", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean = parsers.add_parser(name="clean", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     run   = parsers.add_parser(name="run",   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test  = parsers.add_parser(name="test",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    def add_common_arguments(p):
+    def add_common_arguments(p, mask=""):
         compiler_target_names = [e.name for e in mfc.conf.targets]
 
-        p.add_argument("-t", "--targets", nargs="+", type=str.lower,
-                            choices=compiler_target_names, default=["mfc"], help="")
+        if "t" not in mask:
+            p.add_argument("-t", "--targets", nargs="+", type=str.lower,
+                           choices=compiler_target_names, default=["mfc"], help="")
 
-        p.add_argument("-m", "--mode", type=str.lower,
-                    choices=mode_names, default=mfc.user.general.mode, help="")
+        if "m" not in mask:
+            p.add_argument("-m", "--mode", type=str.lower,
+                           choices=mode_names, default=mfc.user.general.mode, help="")
         
-        p.add_argument("-j", "--jobs", metavar="N", type=int,
-                    help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
+        if "j" not in mask:
+            p.add_argument("-j", "--jobs", metavar="N", type=int,
+                           help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
 
     # === BUILD ===
     add_common_arguments(build)
     
-    build.add_argument("-s", "--scratch", action="store_true",
-                        help="Build all targets from scratch.")
+    build.add_argument("-s", "--scratch", action="store_true", help="Build from scratch.")
+    
+    # === CLEAN ===
+    add_common_arguments(clean, "j")
+    
+    clean.add_argument("-r", "--recursive", default=False, action="store_true", help="Clean specified targets and their dependencies recursively.")
 
     # === TEST ===
     add_common_arguments(test)

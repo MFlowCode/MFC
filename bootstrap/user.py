@@ -4,10 +4,10 @@ import common
 
 @dataclasses.dataclass
 class General:
-    modes: str
+    mode: str
 
     def __init__(self, data: dict):
-        self.modes = data.get("modes")
+        self.mode = data.get("mode")
 
 
 @dataclasses.dataclass
