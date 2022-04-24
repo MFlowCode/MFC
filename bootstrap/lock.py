@@ -37,8 +37,9 @@ class MFCLock:
             self.add_target(LockTargetHolder(t))
 
         self.flush()
-    
+
     def save(self):
+        self.flush()
         common.file_dump_yaml(common.MFC_LOCK_FILEPATH, self.data)
 
     def flush(self):
