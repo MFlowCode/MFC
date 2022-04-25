@@ -14,7 +14,7 @@ class MFCBuild:
         return f'{common.MFC_SUBDIR}/{cc}'
 
     def get_target_base_path(self, name: str):
-        default_cfg_name = self.mfc.conf.get_target_mode_name(name, self.mfc.args["mode"])
+        default_cfg_name = self.mfc.conf.get_desired_target_mode_name(name)
         cc = self.mfc.conf.get_target_mode_folder_name(name, default_cfg_name)
 
         return f'{common.MFC_SUBDIR}/{cc}'
@@ -31,8 +31,8 @@ class MFCBuild:
     def get_temp_path(self, name: str):
         return f'{self.get_target_base_path(name)}/temp/{name}'
 
-    def get_target_mode(self, name: str, default: str) -> user.Mode:
-        return self.mfc.user.get_mode(self.mfc.conf.get_target_mode_name(name, default))
+    def get_desired_target_mode(self, name: str) -> user.Mode:
+        return self.mfc.user.get_mode(self.mfc.conf.get_desired_target_mode_name(name))
 
     def setup_directories(self):
         common.create_directory(common.MFC_SUBDIR)
@@ -98,7 +98,7 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
         dep       = self.mfc.conf.get_target(dependency_name)
         compilers = self.mfc.user.build.compilers
 
-        mode = self.get_target_mode(dependency_name, self.mfc.args["mode"])
+        mode = self.get_desired_target_mode(dependency_name)
 
         install_path = self.get_build_path (dependency_name)
         source_path  = self.get_source_path(dependency_name)
@@ -166,7 +166,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def is_build_satisfied(self, name: str):
         # Check if it hasn't been built before
-        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_desired_target_mode(name)
 
         if not self.mfc.lock.does_target_exist(name, compiler_cfg.name):
             return False
@@ -212,7 +212,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
         return True
 
     def build_target__clean_previous(self, name: str, depth: str):
-        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_desired_target_mode(name)
         if not self.mfc.lock.does_unique_target_exist(name, compiler_cfg.name):
             return
 
@@ -225,7 +225,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
             common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.mode}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase, depth: str):
-        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_desired_target_mode(name)
         conf = self.mfc.conf.get_target(name)
 
         if conf.fetch.method in ["clone", "download"]:
@@ -312,7 +312,7 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
 
 
     def build_target__update_lock(self, name: str, depth: str):
-        compiler_cfg = self.get_target_mode(name, self.mfc.args["mode"])
+        compiler_cfg = self.get_desired_target_mode(name)
         conf = self.mfc.conf.get_target(name)
 
         rich.print(f'{depth}Updating lock file...')

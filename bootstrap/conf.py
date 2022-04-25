@@ -90,22 +90,23 @@ class Target:
         self.common_mode = data.get("common_mode", None)
 
 class MFCConf:
-    def __init__(self):
+    def __init__(self, mfc):
         data = common.file_load_yaml(common.MFC_DEV_FILEPATH)
 
         self.compiler_verions = [ CompilerVersion(e) for e in data["compiler_versions"] ]
         self.targets          = [ Target(e)          for e in data["targets"]           ]
+        self.mfc              = mfc
 
     def is_target_common(self, name: str) -> bool:
         return self.get_target(name).common_mode is not None
 
-    def get_target_mode_name(self, name: str, default: str) -> str:
+    def get_desired_target_mode_name(self, name: str) -> str:
         target = self.get_target(name)
 
         if self.is_target_common(name):
             return target.common_mode
 
-        return default
+        return self.mfc.args["mode"]
 
     def get_target_mode_folder_name(self, name: str, default: str) -> str:
         if self.is_target_common(name):
