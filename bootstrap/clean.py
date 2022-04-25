@@ -33,7 +33,7 @@ class MFCClean:
             if os.path.exists(src_path):
                 common.execute_shell_command(f'cd "{self.mfc.build.get_source_path(name)}" && {clean_cmd} > /dev/null 2>&1')
                 # Set "bCleaned" flag
-                self.mfc.lock.get_target(name, self.mfc.args["mode"]).metadata.bCleaned=True
+                self.mfc.lock.get_target(name, self.mfc.build. self.mfc.conf.get_desired_target_mode_name(name)).metadata.bCleaned=True
                 self.mfc.lock.save()
 
     def run(self) -> None:

@@ -8,7 +8,7 @@ class MFCState:
     def __init__(self) -> None:
         from build import MFCBuild
 
-        self.conf  = conf.MFCConf()
+        self.conf  = conf.MFCConf(self)
         self.user  = user.MFCUser()
         self.setup_directories()
         self.lock  = lock.MFCLock()
