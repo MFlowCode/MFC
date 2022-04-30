@@ -505,11 +505,11 @@ contains
         integer, intent(IN) :: weno_dir
         type(bounds_info), intent(IN) :: is1_d, is2_d, is3_d
 
-        real(kind(0d0)), dimension(-2:1) :: dvd = 0d0
-        real(kind(0d0)), dimension(0:2) ::  poly = 0d0
-        real(kind(0d0)), dimension(0:2) :: alpha = 0d0
-        real(kind(0d0)), dimension(0:2) :: omega = 0d0
-        real(kind(0d0)), dimension(0:2) :: beta = 0d0
+        real(kind(0d0)), dimension(-2:1) :: dvd 
+        real(kind(0d0)), dimension(0:2) ::  poly 
+        real(kind(0d0)), dimension(0:2) :: alpha 
+        real(kind(0d0)), dimension(0:2) :: omega 
+        real(kind(0d0)), dimension(0:2) :: beta 
         real(kind(0d0)), pointer :: beta_p(:)
 
         integer :: i, j, k, l, r, s
@@ -567,8 +567,8 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                    vL_rs_vf_y_flat(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                    vR_rs_vf_y_flat(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                    vL_rs_vf_y_flat(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                    vR_rs_vf_y_flat(j, k, l, i) = v_vf(i)%sf(k, j, l)
                                 end do
                             end do
                         end do
@@ -580,8 +580,8 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                    vL_rs_vf_z_flat(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                    vR_rs_vf_z_flat(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                    vL_rs_vf_z_flat(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                    vR_rs_vf_z_flat(j, k, l, i) = v_vf(i)%sf(l, k, j)
                                 end do
                             end do
                         end do
@@ -2062,9 +2062,9 @@ contains
     !$acc routine seq
 
         ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(:), intent(IN)    ::     d_K
-        real(kind(0d0)), dimension(:), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(:), intent(INOUT) :: omega_K
+        real(kind(0d0)), dimension(0:1), intent(IN)    ::     d_K
+        real(kind(0d0)), dimension(0:1), intent(INOUT) :: alpha_K
+        real(kind(0d0)), dimension(0:1), intent(INOUT) :: omega_K
 
         ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
         if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
@@ -2250,6 +2250,7 @@ contains
     subroutine s_finalize_weno_module() ! ----------------------------------
 
         integer :: i, j
+        
         if (weno_order == 1) return
 
 

@@ -526,7 +526,6 @@ contains
                     allocate (weight(nb), R0(nb), V0(nb))
                     allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                     allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-!$acc enter data create(bub_idx%rs(nb), bub_idx%vs(nb), bub_idx%ps(nb), bub_idx%ms(nb))
 
                     if (num_fluids == 1) then
                         gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
@@ -536,7 +535,6 @@ contains
 
                     if (qbmm) then
                         allocate (bub_idx%moms(nb, nmom))
-!$acc enter data create(bub_idx%moms(nb,nmom))
                         do i = 1, nb
                             do j = 1, nmom
                                 bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
@@ -562,7 +560,6 @@ contains
                         end do
                     end if
 
-!$acc update device(bub_idx%rs, bub_idx%vs, bub_idx%ps, bub_idx%ms) 
 
                     if (nb == 1) then
                         weight(:) = 1d0
@@ -625,7 +622,6 @@ contains
                     allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                     allocate (bub_idx%ps(nb), bub_idx%ms(nb))
                     allocate (weight(nb), R0(nb), V0(nb))
-!$acc enter data create(bub_idx%rs(nb), bub_idx%rs(nb), bub_idx%ps(nb), bub_idx%ms(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -642,7 +638,6 @@ contains
                             bub_idx%ms(i) = bub_idx%ps(i) + 1
                         end if
                     end do
-!$acc update device(bub_idx%rs, bub_idx%vs, bub_idx%ps, bub_idx%ms) 
                     if (nb == 1) then
                         weight(:) = 1d0
                         R0(:) = 1d0
@@ -988,6 +983,7 @@ contains
             nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
         end do
 
+
         !if (nR3 < 0d0) then
             ! DO i = 1,nb
             ! IF (nRtmp(i) < small_alf) THEN
@@ -1055,6 +1051,7 @@ contains
         do i = 1, nb
             mom = mom + weight(i)*func(i)
         end do
+
 
     end subroutine s_quad
 
