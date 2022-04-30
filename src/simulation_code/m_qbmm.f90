@@ -35,16 +35,17 @@ module m_qbmm
     real(kind(0d0)) :: bubxb, bubxe
     real(kind(0d0)) :: advxb, advxe
     real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs, bubrs
+    real(kind(0d0)), allocatable, dimension(:, :) :: bubmoms
 
 !$acc declare create(verysmall, momrhs, nterms, is1, is2, is3)
-!$acc declare create(momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, gammas, pi_infs, bubrs)
+!$acc declare create(momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, gammas, pi_infs, bubrs, bubmoms)
 
 
 contains
 
     subroutine s_initialize_qbmm_module()
 
-        integer :: i1, i2, q, i
+        integer :: i1, i2, q, i, j
 
         if (bubble_model == 2) then
             ! Keller-Miksis without viscosity/surface tension
@@ -161,6 +162,8 @@ contains
 
         allocate(bubrs(1:nb))
 
+        allocate(bubmoms(1:nb, 1:nmom))
+
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
@@ -171,6 +174,13 @@ contains
             bubrs(i) = bub_idx%rs(i)
         end do
 !$acc update device(bubrs)
+
+        do j = 1, nmom
+            do i = 1, nb
+                bubmoms(i,j) = bub_idx%moms(i,j)
+            end do
+        end do
+!$acc update device(bubmoms)
 
 
     end subroutine s_initialize_qbmm_module
@@ -277,7 +287,7 @@ contains
                     do q = 1, nb
                         !$acc loop seq
                         do r = 1, nmom
-                            moms(r) = q_prim_vf(bub_idx%moms(q, r))%sf(id1, id2, id3)
+                            moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                         end do
 
                         ! IF(id1==0) THEN
