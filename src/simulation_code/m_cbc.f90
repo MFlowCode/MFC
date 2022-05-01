@@ -2729,18 +2729,24 @@ contains
 
         ! Deallocating the cell-average primitive variables
         deallocate (q_prim_rsx_vf)
-        deallocate (F_rsx_vf, F_src_rsx_vf)
+        if(weno_order > 1) then
+            deallocate (F_rsx_vf, F_src_rsx_vf)
+        end if
         deallocate (flux_rsx_vf, flux_src_rsx_vf)
 
 
         if(n > 0) then
             deallocate (q_prim_rsy_vf)
-            deallocate (F_rsy_vf, F_src_rsy_vf)
+            if(weno_order > 1) then
+                deallocate (F_rsy_vf, F_src_rsy_vf)
+            end if
             deallocate (flux_rsy_vf, flux_src_rsy_vf)
         end if
         if(p > 0) then
             deallocate (q_prim_rsz_vf)
-            deallocate (F_rsz_vf, F_src_rsz_vf)
+            if(weno_order > 1) then
+                deallocate (F_rsz_vf, F_src_rsz_vf)
+            end if
             deallocate (flux_rsz_vf, flux_src_rsz_vf)
         end if
 
