@@ -540,7 +540,7 @@ contains
         
 !$acc update device(small_alf, dflt_real, dflt_int)
 !$acc update device(pi, dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, mpp_lim, bubbles, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
-!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, mom_sp, mom_3d, sgm_eps)
+!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, sgm_eps)
 
 
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
@@ -602,9 +602,9 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
-        real(kind(0d0)),   dimension(10) :: alpha_K, alpha_rho_K
+        real(kind(0d0)),   dimension(2) :: alpha_K, alpha_rho_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
-        real(kind(0d0)), dimension(1) :: nRtmp
+        real(kind(0d0)), dimension(nb) :: nRtmp
         real(kind(0d0)) :: vftmp, nR3, nbub_sc
 
         integer :: i, j, k, l !< Generic loop iterators
