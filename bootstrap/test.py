@@ -293,7 +293,7 @@ class MFCTest:
             common.create_directory(common.MFC_TESTDIR)
 
         for target in ["pre_process", "simulation"]:
-            if not self.mfc.build.is_build_satisfied(target):
+            if not self.mfc.build.is_built(target):
                 rich.print(f"> {target} needs (re)building...")
                 self.mfc.build.build_target(f"{target}", "> ")
 
