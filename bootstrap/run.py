@@ -251,6 +251,17 @@ class SerialEngine(Engine):
 
         date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
         rich.print(f"{date} Running...")
+        print(f"""
+
+
+
+WE ARE ABOUT TO RUN
+
+{self.mfc.run.get_exec_cmd(target_name)}
+
+
+
+""")
         common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name))
 
         rich.print(f"> > Done [bold green]✓[/bold green]")
@@ -439,25 +450,14 @@ class MFCRun:
             gpus_per_rs=min(int(self.mfc.args["gpus_per_node"]), 1)
             tasks_per_rs=1
 
-            return f'''\
-{cd} && {ld}                           \ 
-    jsrun --smpiargs="-gpu"            \ 
-          --nrs{rs}                    \ 
-          --cpu_per_rs{cpus_per_rs}    \ 
-          --gpu_per_rs{gpus_per_rs}    \ 
-          --tasks_per_rs{tasks_per_rs} \ 
-          "{bin}"\
-'''
+            options = f'--smpiargs="-gpu" --nrs{rs} --cpu_per_rs{cpus_per_rs} --gpu_per_rs{gpus_per_rs} --tasks_per_rs{tasks_per_rs}'
+
+            return f'{cd} && {ld} jsrun {options} "{bin}"'
         elif os.system("srun -h > /dev/null 2>&1") == 0:
             raise common.MFCException("srun not implemented")
 #            return f'{cd} && {ld} srun --nodes={self.mfc.args["nodes"]} -n  "{bin}"'
         else:
-            return f'''\
-{cd} && {ld}                                    \ 
-    mpiexec -N {self.mfc.args["nodes"]}         \ 
-            -n {self.mfc.args["cpus_per_node"]} \ 
-            "{bin}"\
-'''
+            return f'{cd} && {ld} mpiexec -N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]} "{bin}"'
 
     def run(self):
         targets = self.mfc.args["targets"]
