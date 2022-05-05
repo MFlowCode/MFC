@@ -164,7 +164,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         return string
 
-    def is_build_satisfied(self, name: str):
+    def check_build_status(self, name: str, bIgnoreCleans: bool):
         # Check if it hasn't been built before
         target_mode = self.get_desired_target_mode(name)
 
@@ -198,18 +198,25 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
         # Check if any of its dependencies needs updating
         for dependency_name in self.mfc.conf.get_dependency_names(name, recursive=True):
-            if not self.is_build_satisfied(dependency_name):
+            if not self.check_build_status(dependency_name, bIgnoreCleans):
                 return False
 
         # Check if target was cleaned
-        if self.mfc.lock.get_target(name, target_mode.name).metadata.bCleaned:
-            return False
+        if not bIgnoreCleans:
+            if self.mfc.lock.get_target(name, target_mode.name).metadata.bCleaned:
+                return False
 
         # Check for "scratch" flag
         if self.mfc.args["scratch"]:
             return False
 
         return True
+
+    def is_built(self, name: str):
+        return self.check_build_status(name, bIgnoreCleans=True)
+
+    def build_should_rebuild(self, name: str):
+        return not self.check_build_status(name, bIgnoreCleans=False)
 
     def build_target__clean_previous(self, name: str, depth: str):
         target_mode = self.get_desired_target_mode(name)
@@ -347,7 +354,7 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
 
         prepend=f"{depth}Package [bold blue]{name}[/bold blue]"
         # Check if it needs to be (re)built
-        if self.is_build_satisfied(name):
+        if not self.build_should_rebuild(name):
             rich.print(f"{prepend} - satisfied [bold green]✓[/bold green]")
             return False
 

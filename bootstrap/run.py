@@ -251,17 +251,7 @@ class SerialEngine(Engine):
 
         date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
         rich.print(f"{date} Running...")
-        print(f"""
 
-
-
-WE ARE ABOUT TO RUN
-
-{self.mfc.run.get_exec_cmd(target_name)}
-
-
-
-""")
         common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name))
 
         rich.print(f"> > Done [bold green]✓[/bold green]")
@@ -482,7 +472,7 @@ class MFCRun:
         for target_name in targets:
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
 
-            if not self.mfc.build.is_build_satisfied(target_name):
+            if not self.mfc.build.is_built(target_name):
                 rich.print(f"> > Target {target_name} needs (re)building...")
                 self.mfc.build.build_target(target_name)
 
