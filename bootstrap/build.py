@@ -166,14 +166,14 @@ If you think MFC could (or should) be able to find it automatically for you syst
 
     def is_build_satisfied(self, name: str):
         # Check if it hasn't been built before
-        compiler_cfg = self.get_desired_target_mode(name)
+        target_mode = self.get_desired_target_mode(name)
 
-        if not self.mfc.lock.does_target_exist(name, compiler_cfg.name):
+        if not self.mfc.lock.does_target_exist(name, target_mode.name):
             return False
 
         # Retrive CONF & LOCK descriptors
         conf_desc = self.mfc.conf.get_target(name)
-        lock_desc = self.mfc.lock.get_target(name, compiler_cfg.name)
+        lock_desc = self.mfc.lock.get_target(name, target_mode.name)
 
         # Check if any source file is newer than the previously built executable
         if conf_desc.fetch.method == "source":
@@ -202,7 +202,7 @@ If you think MFC could (or should) be able to find it automatically for you syst
                 return False
 
         # Check if target was cleaned
-        if self.mfc.lock.get_target(name, self.mfc.args["mode"]).metadata.bCleaned:
+        if self.mfc.lock.get_target(name, target_mode.name).metadata.bCleaned:
             return False
 
         # Check for "scratch" flag
@@ -212,12 +212,12 @@ If you think MFC could (or should) be able to find it automatically for you syst
         return True
 
     def build_target__clean_previous(self, name: str, depth: str):
-        compiler_cfg = self.get_desired_target_mode(name)
-        if not self.mfc.lock.does_unique_target_exist(name, compiler_cfg.name):
+        target_mode = self.get_desired_target_mode(name)
+        if not self.mfc.lock.does_unique_target_exist(name, target_mode.name):
             return
 
         conf_desc = self.mfc.conf.get_target(name)
-        lock_desc = self.mfc.lock.get_target(name, compiler_cfg.name)
+        lock_desc = self.mfc.lock.get_target(name, target_mode.name)
 
         if ((    conf_desc.fetch.method != lock_desc.target.fetch.method
              and lock_desc.target.fetch.method in ["clone", "download"]
@@ -225,15 +225,15 @@ If you think MFC could (or should) be able to find it automatically for you syst
             common.delete_directory_recursive(f'{common.MFC_SUBDIR}/{lock_desc.metadata.mode}/src/{name}')
 
     def build_target__fetch(self, name: str, logfile: io.IOBase, depth: str):
-        compiler_cfg = self.get_desired_target_mode(name)
+        target_mode = self.get_desired_target_mode(name)
         conf = self.mfc.conf.get_target(name)
 
         if conf.fetch.method in ["clone", "download"]:
             if conf.fetch.method == "clone":
-                lock_matches = self.mfc.lock.get_target_matches(name, compiler_cfg.name)
+                lock_matches = self.mfc.lock.get_target_matches(name, target_mode.name)
 
                 if ((   len(lock_matches)    == 1
-                    and conf.fetch.params.git != self.mfc.lock.get_target(name, compiler_cfg.name).target.fetch.params.git)
+                    and conf.fetch.params.git != self.mfc.lock.get_target(name, target_mode.name).target.fetch.params.git)
                     or (self.mfc.args["scratch"])):
                     rich.print(f'{depth}GIT repository changed. Updating...')
 
@@ -312,7 +312,7 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
 
 
     def build_target__update_lock(self, name: str, depth: str):
-        compiler_cfg = self.get_desired_target_mode(name)
+        target_mode = self.get_desired_target_mode(name)
         conf = self.mfc.conf.get_target(name)
 
         rich.print(f'{depth}Updating lock file...')
@@ -320,27 +320,27 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
         new_entry = lock.LockTargetHolder({
             "target": dataclasses.asdict(conf),
             "metadata": {
-                "mode":     compiler_cfg.name,
+                "mode":     target_mode.name,
                 "bCleaned": False
             }
         })
 
         # If the target - in the selected mode - isn't already
         # in the lock file, we add a new target/metdata entry into it.
-        if len(self.mfc.lock.get_target_matches(name, compiler_cfg.name)) == 0:
+        if len(self.mfc.lock.get_target_matches(name, target_mode.name)) == 0:
             self.mfc.lock.add_target(new_entry)
             self.mfc.lock.save()
             return
 
         # Otherwise, we simply need to update the existing entry.
         for index, dep in enumerate(self.mfc.lock.targets):
-            if dep.target.name == name and dep.metadata.mode == compiler_cfg.name:
+            if dep.target.name == name and dep.metadata.mode == target_mode.name:
                 self.mfc.lock.targets[index] = new_entry
                 self.mfc.lock.save()
                 return
 
         # If for some reason we can't find the target, throw.
-        raise common.MFCException(f"Failed to update the lock file for {name} in the {compiler_cfg.name} mode.")
+        raise common.MFCException(f"Failed to update the lock file for {name} in the {target_mode.name} mode.")
 
     def build_target(self, name: str, depth=""):
         common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_mode_base_path())

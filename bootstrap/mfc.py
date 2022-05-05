@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import rich
+#import traceback
 
 import user, conf, lock, args, test, clean, common, run
 
@@ -56,6 +57,7 @@ if __name__ == "__main__":
     try:
         main()
     except common.MFCException as exc:
+#        traceback.print_exc()
         rich.print(f"[red]> {str(exc)}[/red]")
         exit(1)
     except KeyboardInterrupt as exc:
