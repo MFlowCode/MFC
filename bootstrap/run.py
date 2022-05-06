@@ -396,7 +396,7 @@ class MFCRun:
             if key in MASTER_KEYS:
                 dict_str += f"{key} = {val}\n"
 
-        contents = f"&user_inputs\n{dict_str}&end/"
+        contents = f"&user_inputs\n{dict_str}&end/\n"
 
         # Save .inp input file
         common.file_write(self.get_input_filepath(target_name), contents)
