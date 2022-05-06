@@ -589,7 +589,7 @@ contains
         integer :: i, j, k, l, ii !< Generic loop iterators
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub                         !< Temporary bubble number density
+        real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)), dimension(2)                   :: Re !< Temporary Reynolds number
@@ -717,7 +717,18 @@ contains
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
-                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+                            
+                            !call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+
+                            vftmp = q_cons_vf(alf_idx)%sf(j, 0, 0)
+
+                            nR3 = 0d0
+                            
+                            do k = 1, nb
+                                nR3 = nR3 + weight(k)*(nRtmp(k)**3d0)
+                            end do
+
+                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
 
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if
@@ -1610,6 +1621,7 @@ contains
         real(kind(0d0))                                   :: M00, M10, M01, M20, M11, M02
         real(kind(0d0))                                   :: varR, varV
         real(kind(0d0)), dimension(Nb)                    :: nR, R, nRdot, Rdot
+        real(kind(0d0))                                   :: nR3
         real(kind(0d0))                                   :: accel
         real(kind(0d0))                                   :: int_pres
         real(kind(0d0))                                   :: max_pres
@@ -1719,7 +1731,16 @@ contains
                             nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
                             nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
                         end do
-                        call s_comp_n_from_cons(alf, nR, nbub)
+                        !call s_comp_n_from_cons(alf, nR, nbub)
+
+
+                        nR3 = 0d0
+                        do s = 1, nb
+                            nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                        end do
+
+                        nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+
                         if (DEBUG) print *, 'In probe, nbub: ', nbub
 
                         if (qbmm) then
@@ -1827,7 +1848,16 @@ contains
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
                                 nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
-                            call s_comp_n_from_cons(alf, nR, nbub)
+                            !call s_comp_n_from_cons(alf, nR, nbub)
+
+
+                            nR3 = 0d0
+                            do s = 1, nb
+                                nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                            end do
+
+                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+
 
                             R(:) = nR(:)/nbub
                             Rdot(:) = nRdot(:)/nbub
