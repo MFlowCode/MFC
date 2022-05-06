@@ -307,7 +307,7 @@ class MFCTest:
 
             if len(dimInfo[0]) > 0:
                 traceback.append(f"bubbles={'T'}")
-                parameters.append({"bubbles": 'T'}) 
+                parameters.append({"bubbles": 'T'})
 
 
                 parameters.append({'nb' : 3,  'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002, 'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05, 'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.999999999999, 'patch_icpp(1)%alpha(1)': 1e-12, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.999999999999, 'patch_icpp(3)%alpha(1)': 1e-12, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0 })
@@ -321,12 +321,12 @@ class MFCTest:
 
                 if len(dimInfo[0]) >= 3:
                     parameters.append({'Mono(1)%loc(3)': 0.5, 'Mono(1)%support': 3})
-                
+
                 for polytropic in ['T', 'F']:
-                    
+
                     for bubble_model in [3, 2]:
 
-                    
+
                         traceback.append(f"polytropic={polytropic}")
                         parameters.append({'polytropic' : polytropic})
 
@@ -342,7 +342,7 @@ class MFCTest:
                         traceback.pop()
                         parameters.pop()
 
-            
+
                 parameters.append({'polytropic' : 'T'})
                 parameters.append({'bubble_model' : 2})
 
@@ -372,7 +372,7 @@ class MFCTest:
 
                 if len(dimInfo[0]) >= 3:
                     parameters.pop()
-            
+
                 parameters.pop()
                 traceback.pop()
 
@@ -536,7 +536,7 @@ print(json.dumps({case.create_case_dict_str()}))
             rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
-        cmd = subprocess.run(f'./mfc.sh run -m "{self.mfc.args["mode"]}" -i "{self.get_case_dir(test.parameters)}/case.py" -t pre_process simulation 2>&1',
+        cmd = subprocess.run(f'./mfc.sh run -m "{self.mfc.args["mode"]}" -i "{self.get_case_dir(test.parameters)}/case.py" -c {self.get_case_from_mods(test.parameters).parameters["ppn"]} -t pre_process simulation 2>&1',
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              universal_newlines=True, shell=True)
         common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
