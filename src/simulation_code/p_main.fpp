@@ -131,6 +131,8 @@ program p_main
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
 
+    if (qbmm) call s_initialize_qbmm_module()
+
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -152,7 +154,7 @@ program p_main
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)    
 
-    if (qbmm) call s_initialize_qbmm_module()
+    
     
 
     ! Associate pointers for serial or parallel I/O

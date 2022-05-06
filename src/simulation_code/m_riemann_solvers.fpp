@@ -250,6 +250,10 @@ module m_riemann_solvers
    real(kind(0d0)), allocatable, dimension(:,:,:,:) :: vel_src_rsz_vf_flat
 
 
+    real(kind(0d0)), allocatable, dimension(:,:,:,:) :: mom_sp_rsx_vf_flat
+   real(kind(0d0)), allocatable, dimension(:,:,:,:) :: mom_sp_rsy_vf_flat
+   real(kind(0d0)), allocatable, dimension(:,:,:,:) :: mom_sp_rsz_vf_flat
+
     !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
     !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
     !! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
@@ -404,7 +408,7 @@ module m_riemann_solvers
 
 !$acc declare create(&
 !$acc    flux_rsx_vf_flat, flux_src_rsx_vf_flat, flux_rsy_vf_flat, flux_src_rsy_vf_flat, flux_rsz_vf_flat, flux_src_rsz_vf_flat, vel_src_rsx_vf_flat, vel_src_rsy_vf_flat, vel_src_rsz_vf_flat, &
-!$acc    flux_gsrc_rsx_vf_flat, flux_gsrc_rsy_vf_flat, flux_gsrc_rsz_vf_flat)
+!$acc    flux_gsrc_rsx_vf_flat, flux_gsrc_rsy_vf_flat, flux_gsrc_rsz_vf_flat, mom_sp_rsx_vf_flat, mom_sp_rsy_vf_flat, mom_sp_rsz_vf_flat)
 
     real(kind(0d0)) :: momxb, momxe
     real(kind(0d0)) :: contxb, contxe
@@ -922,7 +926,7 @@ contains
         real(kind(0d0)), dimension(nb)   ::         V0_L, V0_R
         real(kind(0d0)), dimension(nb)   ::         P0_L, P0_R
         real(kind(0d0)), dimension(nb)  ::        pbw_L, pbw_R
-        real(kind(0d0)), dimension(3,6) ::       moms_L, moms_R
+        real(kind(0d0)), dimension(nb, nmom) ::       moms_L, moms_R
         real(kind(0d0))                              ::     ptilde_L, ptilde_R
 
         real(kind(0d0)) :: PbwR3Lbar, Pbwr3Rbar
@@ -936,9 +940,6 @@ contains
         integer :: i, j, k, l !< Generic loop iterators
         integer :: idx1, idxi
 
-
-
-!$acc update device(is1, is2, is3)
 
 
 
@@ -1675,8 +1676,6 @@ contains
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
                                 end do
 
-                                alpha_L(1) = 0d0
-                                alpha_R(1) = 0d0
 
                                 pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
@@ -1753,7 +1752,7 @@ contains
                                                 P0_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, ps(i))
                                                 P0_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, ps(i))
                                             end if
-                                        end do
+                                        end do 
 
                                         call s_comp_n_from_prim(alpha_L(num_fluids), R0_L, nbub_L)
                                         call s_comp_n_from_prim(alpha_R(num_fluids), R0_R, nbub_R)
@@ -1773,14 +1772,14 @@ contains
                                         end do
 
                                         if (qbmm) then
-                                            PbwR3Lbar = mom_sp(4)%sf(j, k, l)
-                                            PbwR3Rbar = mom_sp(4)%sf(j + 1, k, l)
+                                            PbwR3Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 4)
+                                            PbwR3Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 4)
 
-                                            R3Lbar = mom_sp(1)%sf(j, k, l)
-                                            R3Rbar = mom_sp(1)%sf(j + 1, k, l)
+                                            R3Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 1)
+                                            R3Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 1)
 
-                                            R3V2Lbar = mom_sp(3)%sf(j, k, l)
-                                            R3V2Rbar = mom_sp(3)%sf(j + 1, k, l)
+                                            R3V2Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 3)
+                                            R3V2Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 3)
                                         else
                                             call s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
                                             call s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
@@ -1810,7 +1809,7 @@ contains
                                         if ((ptilde_L .ne. ptilde_L) .or. (ptilde_R .ne. ptilde_R)) then
                                         end if
 
-                                        ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
+                                        !ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
                                     end if
 
                                     rho_avg = 5d-1*(rho_L + rho_R)
@@ -2025,6 +2024,8 @@ contains
                                 end do
 
 
+
+
                                 ! Source for volume fraction advection equation
                 !$acc loop seq
                                 do i = 1, num_dims
@@ -2041,6 +2042,7 @@ contains
 
                                 flux_src_rs${XYZ}$_vf_flat(j, k, l, advxb) = vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(1))
 
+
                                 ! Add advection flux for bubble variables
 
                 !$acc loop seq
@@ -2051,7 +2053,6 @@ contains
                                         + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
-
 
 
                                 ! Geometrical source flux for cylindrical coordinates
@@ -3445,12 +3446,14 @@ contains
                 allocate(ms(1:nb))
             end if
             
-            rs = bub_idx%rs
-            vs = bub_idx%vs
-            if(.not. polytropic) then
-                ps = bub_idx%ps
-                ms = bub_idx%ms
-            end if
+            do i = 1, nb
+                rs(i) = bub_idx%rs(i)
+                vs(i) = bub_idx%vs(i)
+                if(.not. polytropic) then
+                    ps(i) = bub_idx%ps(i)
+                    ms(i) = bub_idx%ms(i)
+                end if
+            end do
 
 
 !$acc update device(rs, vs)
@@ -3473,6 +3476,7 @@ contains
         allocate (vel_src_rsx_vf(1:num_dims))
         allocate (vel_src_rsy_vf(1:num_dims))
         allocate (vel_src_rsz_vf(1:num_dims))
+
 
         if (any(Re_size > 0)) allocate (Re_avg_rsx_vf(1:2))
         if (any(Re_size > 0)) allocate (Re_avg_rsy_vf(1:2))
@@ -3577,6 +3581,10 @@ contains
         allocate (vel_src_rsx_vf_flat(is1%beg:is1%end, &
                                                is2%beg:is2%end, &
                                                is3%beg:is3%end, 1:num_dims))
+        if(qbmm) then
+            allocate(mom_sp_rsx_vf_flat(is1%beg:is1%end+1,is2%beg:is2%end, is3%beg:is3%end, 1:4))
+        end if
+
         if(Re_size(1) > 0) then
             allocate (Re_avg_rsx_vf_flat(is1%beg:is1%end, &
                                              is2%beg:is2%end, &
@@ -3605,6 +3613,11 @@ contains
         allocate (vel_src_rsy_vf_flat(is1%beg:is1%end, &
                                                is2%beg:is2%end, &
                                              is3%beg:is3%end, 1:num_dims))
+        
+        if(qbmm) then
+            allocate(mom_sp_rsy_vf_flat(is1%beg:is1%end+1,is2%beg:is2%end, is3%beg:is3%end, 1:4))
+        end if
+
         if(Re_size(1) > 0) then
             allocate (Re_avg_rsy_vf_flat(is1%beg:is1%end, &
                                              is2%beg:is2%end, &
@@ -3632,6 +3645,11 @@ contains
         allocate (vel_src_rsz_vf_flat(is1%beg:is1%end, &
                                                is2%beg:is2%end, &
                                                is3%beg:is3%end, 1:num_dims))
+        
+        if(qbmm) then
+            allocate(mom_sp_rsz_vf_flat(is1%beg:is1%end+1,is2%beg:is2%end, is3%beg:is3%end, 1:4))
+        end if
+
         if(Re_size(1) > 0) then
             allocate (Re_avg_rsz_vf_flat(is1%beg:is1%end, &
                                              is2%beg:is2%end, &
@@ -4025,12 +4043,13 @@ contains
         integer :: i, j, k, l ! Generic loop iterators
 
 
+
         ! Reshaping Inputted Data in x-direction ===========================
 
             if (norm_dir == 1) then
 
                 if (any(Re_size > 0)) then
-    !$acc parallel loop collapse(4) gang vector default(present)
+!$acc parallel loop collapse(4) gang vector default(present)
                                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -4042,42 +4061,82 @@ contains
                     end do
                 end if
 
+            if(qbmm) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, 4
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end+1
+                                mom_sp_rsx_vf_flat(j, k, l, i) = mom_sp(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do                
+            end if
+
                 ! ==================================================================
 
                 ! Reshaping Inputted Data in y-direction ===========================
-            elseif (norm_dir == 2) then
+        elseif (norm_dir == 2) then
 
-                if (any(Re_size > 0)) then
-    !$acc parallel loop collapse(4) gang vector default(present)
-                                do i = momxb, E_idx
+            if (any(Re_size > 0)) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
-                                    flux_src_vf(i)%sf(k, j, l) = 0d0
-                                end do
+                                flux_src_vf(i)%sf(k, j, l) = 0d0
                             end do
                         end do
                     end do
-                end if
+                end do
+            end if
+
+            if(qbmm) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, 4
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end+1
+                                mom_sp_rsy_vf_flat(j, k, l, i) = mom_sp(i)%sf(k, j, l)
+                            end do
+                        end do
+                    end do
+                end do                
+            end if
+
                 ! ==================================================================
 
                 ! Reshaping Inputted Data in z-direction ===========================
-            else
+        else
 
-                if (any(Re_size > 0)) then
-    !$acc parallel loop collapse(4) gang vector default(present)
-                                do i = momxb, E_idx
+            if (any(Re_size > 0)) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = momxb, E_idx
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
-                                    flux_src_vf(i)%sf(l, k, j) = 0d0
-                                end do
+                                flux_src_vf(i)%sf(l, k, j) = 0d0
                             end do
                         end do
                     end do
-                end if
-
+                end do
             end if
+
+            if(qbmm) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, 4
+                    do l = is3%beg, is3%end 
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end+1
+                                mom_sp_rsz_vf_flat(j, k, l, i) = mom_sp(i)%sf(l, k, j)
+                            end do
+                        end do
+                    end do
+                end do                
+            end if
+
+        end if
 
         ! ==================================================================
 
@@ -5301,6 +5360,9 @@ contains
         deallocate(flux_rsx_vf_flat)
         deallocate(flux_src_rsx_vf_flat)
         deallocate(flux_gsrc_rsx_vf_flat)
+        if(qbmm) then
+            deallocate(mom_sp_rsx_vf_flat)
+        end if
         !deallocate(qL_prim_rsx_vf_flat)
         !deallocate(qR_prim_rsx_vf_flat)
 
@@ -5315,6 +5377,9 @@ contains
         deallocate(flux_rsy_vf_flat)
         deallocate(flux_src_rsy_vf_flat)
         deallocate(flux_gsrc_rsy_vf_flat)
+        if(qbmm) then
+            deallocate(mom_sp_rsy_vf_flat)
+        end if
         !deallocate(qL_prim_rsy_vf_flat)
         !deallocate(qR_prim_rsy_vf_flat)
 
@@ -5332,6 +5397,9 @@ contains
         deallocate(flux_rsz_vf_flat)
         deallocate(flux_src_rsz_vf_flat)
         deallocate(flux_gsrc_rsz_vf_flat)
+        if(qbmm) then
+            deallocate(mom_sp_rsz_vf_flat)
+        end if
         !deallocate(qL_prim_rsz_vf_flat)
         !deallocate(qR_prim_rsz_vf_flat)
 

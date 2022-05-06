@@ -8,7 +8,7 @@
 !> @brief The module contains the subroutines used to calculate the right-
 !!              hand-side (RHS) in the quasi-conservative, shock- and interface-
 !!              capturing finite-volume framework for the multicomponent Navier-
-!!              Stokes equations supplemented by appropriate advection equations
+!!       f       Stokes equations supplemented by appropriate advection equations
 !!              used to capture the material interfaces. The system of equations
 !!              is closed by the stiffened gas equation of state, as well as any
 !!              required mixture relationships. Capillarity effects are included
@@ -145,8 +145,7 @@ module m_rhs
     real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: bub_mom_src
-    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:) :: mom_sp
-    ! REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:,:,:,:) :: mom_3d
+
 
 
 
@@ -805,12 +804,14 @@ contains
                 allocate(ms(1:nb))
             end if
             
-            rs = bub_idx%rs
-            vs = bub_idx%vs
-            if(.not. polytropic) then
-                ps = bub_idx%ps
-                ms = bub_idx%ms
-            end if
+            do l = 1, nb
+                rs(l) = bub_idx%rs(l)
+                vs(l) = bub_idx%vs(l)
+                if(.not. polytropic) then
+                    ps(l) = bub_idx%ps(l)
+                    ms(l) = bub_idx%ms(l)
+                end if
+            end do
 
 !$acc update device(rs, vs)
             if(.not. polytropic) then
@@ -901,7 +902,7 @@ contains
 
         real(kind(0d0)) :: n_tait, B_tait
 
-        real(kind(0d0)), dimension(1)  :: Rtmp, Vtmp
+        real(kind(0d0)), dimension(nb)  :: Rtmp, Vtmp
         real(kind(0d0))   :: myR, myV, alf, myP, myRho, R2Vav
         integer :: ndirs
 
@@ -981,6 +982,9 @@ contains
 
         if (t_step == t_step_stop) return
         ! ==================================================================
+
+
+        if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
 
 
         ! Dimensional Splitting Loop =======================================
@@ -1208,9 +1212,7 @@ contains
                               end do
                           end do
 
-                        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                        if (id == ndirs) then
-                            
+                          
 !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
                           do l = 0, p
                               do k = 0, n
@@ -1224,6 +1226,18 @@ contains
                                         bub_p_src(j, k, l, q) = 0d0
                                         bub_m_src(j, k, l, q) = 0d0
                                     end do
+                                 end do
+                              end do
+                          end do    
+
+                        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+                        if (id == ndirs) then
+                            
+!$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
+                          do l = 0, p
+                              do k = 0, n
+                                  do j = 0, m
+
 
 !$acc loop seq                                    
                                     do q = 1, nb
@@ -1342,6 +1356,7 @@ contains
                             end do
                         end if
 
+
 !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do q = 0, n
@@ -1363,6 +1378,7 @@ contains
                         end do
                     end if
                 end if
+
 
                 if (monopole) then
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -1633,7 +1649,7 @@ contains
                   end if
                 end if
 
-                if(bubbles) then
+                if(bubbles .AND. (.NOT. qbmm)) then
 
 !$acc parallel loop collapse(3) gang vector default(present)
                       do l = 0, p
@@ -1654,15 +1670,6 @@ contains
                       do l = 0, p
                           do k = 0, n
                               do j = 0, m
-                                bub_adv_src(j, k, l) = 0d0
-
-!$acc loop seq
-                                do q = 1, nb
-                                    bub_r_src(j, k, l, q) = 0d0
-                                    bub_v_src(j, k, l, q) = 0d0
-                                    bub_p_src(j, k, l, q) = 0d0
-                                    bub_m_src(j, k, l, q) = 0d0
-                                end do
 
 !$acc loop seq                                    
                                 do q = 1, nb
@@ -2152,7 +2159,7 @@ contains
                 end if 
 
 
-                if(bubbles) then
+                if(bubbles .AND. (.NOT. qbmm)) then
 
 !$acc parallel loop collapse(3) gang vector default(present)
                       do l = 0, p
@@ -2173,15 +2180,6 @@ contains
                       do l = 0, p
                           do k = 0, n
                               do j = 0, m
-                                bub_adv_src(j, k, l) = 0d0
-
-!$acc loop seq
-                                do q = 1, nb
-                                    bub_r_src(j, k, l, q) = 0d0
-                                    bub_v_src(j, k, l, q) = 0d0
-                                    bub_p_src(j, k, l, q) = 0d0
-                                    bub_m_src(j, k, l, q) = 0d0
-                                end do
 
 !$acc loop seq                                    
                                 do q = 1, nb

@@ -87,7 +87,7 @@ BASE_CASE = Case({
         'weno_vars'                    : 2,
         'weno_order'                   : 5,
         'weno_eps'                     : 1.E-16,
-        'mapped_weno'                  : 'T',
+        'mapped_weno'                  : 'F',
         'null_weights'                 : 'F',
         'mp_weno'                      : 'F',
         'riemann_solver'               : 2,
@@ -97,7 +97,6 @@ BASE_CASE = Case({
         'precision'                    : 2,
         'prim_vars_wrt'                :'T',
         'parallel_io'                  :'F',
-        'cu_mpi'                       :'F',
 
         'patch_icpp(1)%pres'           : 1.0,
         'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
@@ -113,6 +112,44 @@ BASE_CASE = Case({
 
         'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
         'fluid_pp(1)%pi_inf'           : 0.0,
+
+        'bubbles'                       : 'F',
+        'Ca'                            : 0.9769178386380458,
+        'Web'                           : 13.927835051546392,
+        'Re_inv'                        : 0.009954269975623245,
+        'pref'                          : 101325.0,
+        'rhoref'                        : 1000.0,
+        'bubble_model'                  :  3,
+        'polytropic'                    : 'T',
+        'polydisperse'                  : 'F',
+        'thermal'                       :  3,
+        'R0ref'                         : 1e-05,
+        'patch_icpp(1)%r0'              :  1,
+        'patch_icpp(1)%v0'              :  0,
+        'patch_icpp(2)%r0'              :  1,
+        'patch_icpp(2)%v0'              :  0,
+        'patch_icpp(3)%r0'              :  1,
+        'patch_icpp(3)%v0'              :  0,
+
+        'qbmm'                          : 'F',
+        'dist_type'                     : 2,
+        'poly_sigma'                    : 0.3,
+        'R0_type'                       : 1,
+        'nnode'                         : 4,
+        'sigR'                          : 0.1,
+        'sigV'                          : 0.1,
+        'rhoRV'                         : 0.0,
+
+
+        'Monopole'                      : 'F',
+        'num_mono'                      : 1,
+        'Mono(1)%loc(1)'                : 0.5,
+        'Mono(1)%mag'                   : 1.0,
+        'Mono(1)%length'                : 0.25,
+        'Mono(1)%dir'                   : 1.0,
+        'Mono(1)%npulse'                : 1,
+        'Mono(1)%pulse'                 : 1,
+        'cu_mpi'                        :'F',
     }
 })
 
@@ -199,7 +236,7 @@ class MFCTest:
             traceback.append (f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')},n={dimInfo[1].get('n')},p={dimInfo[1].get('p')})")
             parameters.append(dimParams)
 
-            for bc in [-4, -3, -2, -1]:
+            for bc in [ -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12]:
                 params = {}
                 for dimCmp in dimInfo[0]:
                     params = {**params, **{f'bc_{dimCmp}%beg': bc, f'bc_{dimCmp}%end': bc}}
@@ -260,6 +297,91 @@ class MFCTest:
                 tests.append(TestCaseConfiguration(parameters + [{'ppn': 2, 'm': 29, 'n': 29, 'p': 49}], traceback + [f'ppn=2,m=29,n=29,p=49']))
             else:
                 tests.append(TestCaseConfiguration(parameters + [{'ppn': 2}], traceback + [f'ppn=2']))
+
+            if len(dimInfo[0]) == 1:
+                parameters.append({'dt': 1e-07})
+            elif len(dimInfo[0]) == 2:
+                parameters.append({'dt': 1e-06})
+            else:
+                parameters.append({'dt':1e-06})
+
+            if len(dimInfo[0]) > 0:
+                traceback.append(f"bubbles={'T'}")
+                parameters.append({"bubbles": 'T'}) 
+
+
+                parameters.append({'nb' : 3,  'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002, 'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05, 'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.999999999999, 'patch_icpp(1)%alpha(1)': 1e-12, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.999999999999, 'patch_icpp(3)%alpha(1)': 1e-12, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0 })
+
+                traceback.append(f"Monopole={'T'}")
+                parameters.append({"Monopole": 'T'})
+
+                if len(dimInfo[0]) >= 2:
+                    parameters.append({'Mono(1)%loc(2)': 0.5})
+
+
+                if len(dimInfo[0]) >= 3:
+                    parameters.append({'Mono(1)%loc(3)': 0.5, 'Mono(1)%support': 3})
+                
+                for polytropic in ['T', 'F']:
+                    
+                    for bubble_model in [3, 2]:
+
+                    
+                        traceback.append(f"polytropic={polytropic}")
+                        parameters.append({'polytropic' : polytropic})
+
+                        traceback.append(f"bubble_model={bubble_model}")
+                        parameters.append({'bubble_model' : bubble_model})
+
+                        if not (polytropic == 'F' and bubble_model == 3):
+                            tests.append(TestCaseConfiguration(parameters, traceback))
+
+                        traceback.pop()
+                        parameters.pop()
+
+                        traceback.pop()
+                        parameters.pop()
+
+            
+                parameters.append({'polytropic' : 'T'})
+                parameters.append({'bubble_model' : 2})
+
+                parameters.append({'nb':1})
+                traceback.append(f"nb={'1'}")
+                tests.append(TestCaseConfiguration(parameters, traceback))
+
+                traceback.pop()
+                parameters.pop()
+
+                traceback.append(f"qbmm={'T'}")
+                parameters.append({'qbmm': 'T'})
+
+                tests.append(TestCaseConfiguration(parameters, traceback))
+
+                parameters.append({'bubble_model' : 3})
+
+                tests.append(TestCaseConfiguration(parameters, traceback))
+
+                traceback.pop()
+                for i in range(4):
+                    parameters.pop()
+
+                if len(dimInfo[0]) >= 2:
+                    parameters.pop()
+
+
+                if len(dimInfo[0]) >= 3:
+                    parameters.pop()
+            
+                parameters.pop()
+                traceback.pop()
+
+                parameters.pop()
+
+                parameters.pop()
+                traceback.pop()
+
+            parameters.pop()
 
             for i in range(2):
                 traceback.pop()
