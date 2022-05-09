@@ -1,5 +1,7 @@
-import os, json, rich, typing, dataclasses
-from queue import Queue
+import os, json, rich, typing, time, dataclasses
+
+from queue    import Queue
+from datetime import timedelta
 
 import common
 
@@ -252,9 +254,11 @@ class SerialEngine(Engine):
         date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
         rich.print(f"{date} Running...")
 
+        start_time = time.monotonic()
         common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name))
+        end_time   = time.monotonic()
 
-        rich.print(f"> > Done [bold green]✓[/bold green]")
+        rich.print(f"> > Done [bold green]✓[/bold green] (in {timedelta(seconds=end_time - start_time)})")
 
 
 class ParallelEngine(Engine):
@@ -427,7 +431,10 @@ class MFCRun:
         cd = f'cd "{self.get_case_dirpath()}"'
         ld = self.get_ld()
 
-        if os.system("jsrun -h > /dev/null 2>&1") == 0:
+        def is_used(cmd: str):
+            return os.system(f"{cmd} -h > /dev/null 2>&1") == 0
+
+        if is_used("jsrun"):
             # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
                         
             if int(self.mfc.args["cpus_per_node"]) != int(self.mfc.args["gpus_per_node"]) \
@@ -443,16 +450,25 @@ class MFCRun:
             options = f'--smpiargs="-gpu" --nrs{rs} --cpu_per_rs{cpus_per_rs} --gpu_per_rs{gpus_per_rs} --tasks_per_rs{tasks_per_rs}'
 
             return f'{cd} && {ld} jsrun {options} "{bin}"'
-        elif os.system("srun -h > /dev/null 2>&1") == 0:
-            raise common.MFCException("srun not implemented")
-#            return f'{cd} && {ld} srun --nodes={self.mfc.args["nodes"]} -n  "{bin}"'
+        elif is_used("srun"):
+            options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]} -G {self.mfc.args["gpus_per_node"]}'
+
+            return f'{cd} && {ld} srun {options} "{bin}"'
+        elif is_used("mpiexec"):
+            options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]}'
+            
+            return f'{cd} && {ld} mpiexec {options} "{bin}"'
+        elif is_used("mpirun"):
+            options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]}'
+            
+            return f'{cd} && {ld} mpiexec {options} "{bin}"'
         else:
-            return f'{cd} && {ld} mpiexec -N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]} "{bin}"'
+            raise common.MFCException("Not program capable of running an MPI program could be located.")
 
     def run(self):
         targets = self.mfc.args["targets"]
         if targets[0] == "mfc":
-            targets = self.mfc.conf.get_dependency_names(targets[0], recursive=False)
+            targets = ["pre_process", "simulation", "post_process"]
 
         rich.print(f"""\
 [bold][u]Run:[/u][/bold]
