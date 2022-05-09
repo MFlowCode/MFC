@@ -136,21 +136,20 @@ If you wish, you can override MFC's default build parameters in [mfc.user.yaml](
 
 + **Build MFC and its dependencies with 8 threads in `release-cpu` mode:**
 
-| Argument     | Flag | Default Value (from [mfc.user.yaml](mfc.user.yaml)) | Possible values |
-| ------------ | ---- | ------------- | --------------- |
-| Threads      | `-j` | `1` | From `1` to the maximum logical thread count of your processor. |
-| Target(s)    | `-t` | `MFC` | `MFC` / `pre_process` / `simulation` / `post_process` / `FFTW3` / `HDF5` / `SILO` |
-| Configuration | `-cc` | `release-cpu` | `release-cpu` / `release-gpu` / `debug-cpu` / `debug-gpu` |
-
 ```console
-chmod +x ./mfc.sh
-./mfc.sh --build -j 8 -cc release-cpu
+./mfc.sh build -j 8
 ```
+
+To build MFC in different configurations (herein, *modes*), the `-m <mode>` option
+can be specified to each call to `mfc.sh`. A full list of modes is located in
+[mfc.user.yaml](mfc.user.yaml). It can be modified to work with system, and additional
+modes can be created at your discretion. The default mode is `release-cpu` but
+you can use others such as `release-gpu`.
 
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
 
 ```console
-./mfc.sh --test
+./mfc.sh test <-m mode>
 ```
 
 Please refer to the <a href="#testing">Testing</a> section of this document for more information. 
@@ -161,39 +160,34 @@ The `mfc.sh` script used in the previous section is configured through the file 
 
 # Running MFC
 
-The MFC can be run by changing into
-a case directory and executing the appropriate Python input file.
-Example Python input files can be found in the 
-`example_cases` directories, and they are called `input.py`.
-Their contents, and a guide to filling them out, are documented
+The MFC can be run using `mfc.sh`'s `run` command. It supports both serial and
+parallel execution, the latter being designed for multi-socket systems such as supercomputers,
+equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
+of available arguments can be acquired with `./mfc.sh -h`. Example Python input
+files can be found in the `samples` directories, and they are often called `input.py`
+or `case.py`. They print a Python dictionary containing input parameters for the
+MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in [example_cases/3d_sphbubcollapse/](example_cases/3D_sphbubcollapse/)
-MFC can be executed as  
+can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/)
+
+To run pre_process, simulation, and post_process on `2D_exercise_10` with `4` *processors*
+(effectively physical threads) on your system, in GPU mode,
 
 ```console
-./input.py pre_process
+./mfc.sh run samples/2D_exercise_10/case.py -c 4 -m release-gpu
 ```
 
-which will generate the restart and grid files that will be read 
-by the simulation code. Then  
+If a rebuild is required, it will be done automatically, with the number of threads
+specified with the `-j` option. Most parameters have sensible defaults which can
+be overridden in [mfc.user.yaml](mfc.user.yaml).
 
-```console
-./input.py simulation
-```
-
-will execute the flow solver. The last (optional) step
-is to post treat the data files and output HDF5 databases
-for the flow variables via  
-
-```console
-./input.py post_process
-```
+Please refer to the `./mfc.sh -h` for information on parallel execution.
  
 # Testing MFC
  
-To run MFC's test suite, simply run `./mfc.sh --test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
+To run MFC's test suite, simply run `./mfc.sh test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
  
-Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh --test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
+Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
 
 If you want to only run certain tests, you can pass the argument `-o` (`--only`) along with the associated test ID or hash:
 - **Test ID:** It is the execution order of a test. The first test is `#1`, the next one is `#2`, and so on. If a test is added or removed, it could modify the test IDs of all tests executed after it.
@@ -201,7 +195,7 @@ If you want to only run certain tests, you can pass the argument `-o` (`--only`)
 
 An example of running targeted tests:
 ```console
-./mfc.sh --test -o 7 5b486221
+./mfc.sh test -m release-gpu -o 7 5b486221
 ```
 
 # Development
