@@ -10,7 +10,7 @@ def parse(mfc):
     parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", prog="./mfc.sh",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    mode_names = [e.name for e in mfc.user.modes]
+    mode_names = [ e.name for e in mfc.user.general.modes ]
 
     parsers = parser.add_subparsers(dest="command")
 
@@ -25,11 +25,11 @@ def parse(mfc):
         if "t" not in mask:
             p.add_argument("-t", "--targets", nargs="+", type=str.lower,
                            choices=compiler_target_names, default=["mfc"], help="")
-
-        if "m" not in mask:
-            p.add_argument("-m", "--mode", type=str.lower,
-                           choices=mode_names, default=mfc.user.general.mode, help="")
         
+        if "m" not in mask:
+            p.add_argument("-m", "--mode",    type=str.lower, choices=mode_names,
+                           default=mfc.user.general.mode, help="Mode used to compile, run, and test MFC.")
+
         if "j" not in mask:
             p.add_argument("-j", "--jobs", metavar="N", type=int,
                            help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
