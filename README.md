@@ -146,10 +146,12 @@ can be specified to each call to `mfc.sh`. A full list of modes is located in
 modes can be created at your discretion. The default mode is `release-cpu` but
 you can use others such as `release-gpu`.
 
+**IMPORTANT NOTE**: This same mode will be used for any future commands such as `./mfc.sh test` and `./mfc.sh run` until you specify `-m` again (in any of these commands).
+
 + Run MFC's tests to make sure it was correctly built and your environment is adequate
 
 ```console
-./mfc.sh test <-m mode>
+./mfc.sh test
 ```
 
 Please refer to the <a href="#testing">Testing</a> section of this document for more information. 
@@ -181,7 +183,7 @@ If a rebuild is required, it will be done automatically, with the number of thre
 specified with the `-j` option. Most parameters have sensible defaults which can
 be overridden in [mfc.user.yaml](mfc.user.yaml).
 
-Please refer to the `./mfc.sh -h` for information on parallel execution.
+Please refer to `./mfc.sh -h` for information on parallel execution.
  
 # Testing MFC
  
@@ -204,7 +206,7 @@ An example of running targeted tests:
 
 MFC uses [Fypp](https://github.com/aradi/fypp), a Python-based Fortran preprocessor to reduce code duplication. `.fpp` files are converted into regular `.f90` files as part of the build process. Documentation for Fypp can be found [here](https://fypp.readthedocs.io/en/stable/). 
 
-You can inspect the generated `.f90` files located in `build/___current___/src/<name of target>/src`.
+You can inspect the generated `.f90` files located in `build/<mode name>/src/<name of target>/src`.
 
 # License
  
