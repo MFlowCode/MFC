@@ -1,35 +1,32 @@
+#
+# This configuration file is geared towards users of MFC.
+# More information can be found in the README.
+# 
+
 build:
+  threads:   1
   compilers:
-    c: mpicc
-    cpp: mpicxx
+    c:       mpicc
+    cpp:     mpicxx
     fortran: mpif90
-  threads: 1
-general:
-  mode: release-cpu
-  modes:
-  - c: -O3
-    cpp: -O3
-    fortran: -O3 -cpp -w -DCPU_MODE -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
-    name: release-cpu
-  - c: ''
-    cpp: ''
-    fortran: -O3 -cpp -w -DGPU_MODE -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64
-      -lnvToolsExt
-    name: release-gpu
-  - c: ''
-    cpp: ''
-    fortran: -Og -g -cpp -w -DCPU_MODE
-    name: debug-cpu
-  - c: ''
-    cpp: ''
-    fortran: -Og -cpp -w -DGPU_MODE -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64
-      -lnvToolsExt
-    name: debug-gpu
 run:
-  account: ''
-  cpus_per_node: 1
-  email: ''
-  gpus_per_node: 0
-  nodes: 1
-  partition: ''
-  walltime: '24:00:00'
+  nodes:         1
+  partition:     not selected
+  cpus-per-node: 0
+  cpus-per-node: 1
+  gpus-per-node: 0
+  walltime:      "01:00:00"
+modes:
+  - name:    release-cpu
+    c:       -O3
+    cpp:     -O3
+    fortran: -O3 -cpp -w -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+
+  - name:    release-gpu
+    fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+
+  - name:    debug-cpu
+    fortran: -Og -g -cpp -w
+
+  - name:    debug-gpu
+    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt

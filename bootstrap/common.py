@@ -135,3 +135,6 @@ def get_py_program_output(filepath: str):
     proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
 
     return (proc.stdout, proc.returncode)
+
+def is_string_whitespace(s: str) -> bool:
+    return len(s.strip()) == 0
