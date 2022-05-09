@@ -467,7 +467,7 @@ print(json.dumps({case.create_case_dict_str()}))
 
         common.file_write(f"{case_dir}/case.py", content)
 
-    def golden_file_compare_match(self, truth: str, candidate: str):
+    def golden_file_compare_match(self, truth: str, candidate: str, tol):
         if truth.count('\n') != candidate.count('\n'):
             return (False, "Line count didn't match.")
 
@@ -503,7 +503,7 @@ print(json.dumps({case.create_case_dict_str()}))
             for i in range(len(numbers_cand)):
                 abs_delta = abs(numbers_cand[i]-numbers_trust[i])
                 rel_diff  = abs(abs_delta/numbers_trust[i]) if numbers_trust[i] != 0 else 0
-                if    (abs_delta > 1e-12 and rel_diff > 1e-12):
+                if    (abs_delta > tol and rel_diff > tol):
                     percent_diff = rel_diff*100
                     return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
 
@@ -515,6 +515,12 @@ print(json.dumps({case.create_case_dict_str()}))
 
     def handle_case(self, testID, test: TestCaseConfiguration):
         self.create_case_dir(test.parameters)
+        if('qbmm' in test.parameters):
+            tol = 1e-7
+        elif('bubbles' in test.parameters):
+            tol = 1e-10
+        else:
+            tol = 1e-12
 
         def on_test_errror(msg: str = "", term_out: str = ""):
             common.clear_line()
@@ -562,7 +568,7 @@ print(json.dumps({case.create_case_dict_str()}))
             on_test_errror("Golden file doesn't exist! To generate golden files, use the '-g' flag.", cmd.stdout)
 
         golden_file_content = common.file_read(golden_filepath)
-        bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack)
+        bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack, tol)
         if not bSuccess:
             on_test_errror(errorMsg, cmd.stdout)
 
