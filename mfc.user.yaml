@@ -16,7 +16,7 @@ run:
   partition:     ""
   cpus-per-node: 1
   gpus-per-node: 0
-  walltime:      "24:00:00"
+  walltime:      "01:00:00"
   account:       ""
   email:         ""
 modes:

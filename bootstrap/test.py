@@ -540,7 +540,7 @@ print(json.dumps({case.create_case_dict_str()}))
             rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
             raise common.MFCException("Testing failed (view above).")
 
-        cmd = subprocess.run(f'./mfc.sh run -m "{self.mfc.args["mode"]}" -i "{self.get_case_dir(test.parameters)}/case.py" -c {self.get_case_from_mods(test.parameters).parameters["ppn"]} -t pre_process simulation 2>&1',
+        cmd = subprocess.run(f'./mfc.sh run "{self.get_case_dir(test.parameters)}/case.py" -m "{self.mfc.args["mode"]}" -c {self.get_case_from_mods(test.parameters).parameters["ppn"]} -t pre_process simulation 2>&1',
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              universal_newlines=True, shell=True)
         common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
