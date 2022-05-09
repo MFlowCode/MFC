@@ -407,6 +407,7 @@ class MFCTest:
 
                 if not doKeep:
                     tests.remove(test)
+        
         return tests
 
     def test(self):
@@ -423,10 +424,13 @@ class MFCTest:
 
         for i, test in enumerate(rich.progress.track(tests, "Testing [bold blue]mfc[/bold blue]...")):
             test: TestCaseConfiguration
-
+            
+            # Use the correct test ID if --only is selected
             testID = i+1
             if len(self.mfc.args["only"]):
                 testID = self.mfc.args["only"][i]
+
+            rich.print(f"Test #{str(testID).zfill(2)}: {test.traceback}...")
 
             self.handle_case(testID, test)
 
