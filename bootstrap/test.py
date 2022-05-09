@@ -418,7 +418,7 @@ class MFCTest:
         for target in ["pre_process", "simulation"]:
             if not self.mfc.build.is_built(target):
                 rich.print(f"> {target} needs (re)building...")
-                self.mfc.build.build_target(f"{target}", "> ")
+                self.mfc.build.build_target(f"{target}", "> > ")
 
         tests = self.filter_tests(self.get_test_params())
 

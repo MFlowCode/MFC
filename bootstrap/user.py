@@ -2,13 +2,6 @@ import os, dataclasses
 
 import common
 
-@dataclasses.dataclass
-class General:
-    mode: str
-
-    def __init__(self, data: dict):
-        self.mode = data.get("mode")
-
 
 @dataclasses.dataclass
 class Compilers:
@@ -37,7 +30,20 @@ class Mode:
 
 
 @dataclasses.dataclass
+class General:
+    mode:  str
+    modes: list
+
+    def __init__(self, data: dict):
+        self.mode  = data.get("mode")
+        self.modes = [ Mode(e) for e in data["modes"] ]
+
+
+@dataclasses.dataclass
 class Build:
+    threads:   int
+    compilers: Compilers
+
     def __init__(self, data: dict) -> None:
         self.threads   = data.get("threads")
         self.compilers = Compilers(data.get("compilers"))
@@ -56,14 +62,19 @@ class Run:
     def __init__(self, data: dict) -> None:
         self.nodes          = int(data.get("nodes"))
         self.partition      = data.get("partition")
-        self.cpus_per_node  = int(data.get("cpus-per-node"))
-        self.gpus_per_node  = int(data.get("gpus-per-node"))
+        self.cpus_per_node  = int(data.get("cpus_per_node"))
+        self.gpus_per_node  = int(data.get("gpus_per_node"))
         self.walltime       = data.get("walltime")
         self.account        = data.get("account")
         self.email          = data.get("email")
 
 
+@dataclasses.dataclass
 class MFCUser:
+    general: General
+    build:   Build
+    run:     Run
+
     def __init__(self) -> None:
         if not os.path.exists(common.MFC_USER_FILEPATH):
             common.create_file(common.MFC_USER_FILEPATH)
@@ -73,10 +84,16 @@ class MFCUser:
         self.general = General(data["general"])
         self.build   = Build  (data["build"])
         self.run     = Run    (data["run"])
-        self.modes   = [ Mode(e) for e in data["modes"] ]
+
+    def save(self):
+        self.flush()
+        common.file_dump_yaml(common.MFC_USER_FILEPATH, self.data)
+
+    def flush(self):
+        self.data = dataclasses.asdict(self)
 
     def get_mode(self, name: str) -> Mode:
-        for mode in self.modes:
+        for mode in self.general.modes:
             if mode.name == name:
                 return mode
 

@@ -349,9 +349,9 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
         # If for some reason we can't find the target, throw.
         raise common.MFCException(f"Failed to update the lock file for {name} in the {target_mode.name} mode.")
 
-    def build_target(self, name: str, depth=""):
-        common.update_symlink(f"{common.MFC_SUBDIR}/___current___", self.get_mode_base_path())
 
+    def build_target(self, name: str, depth=""):
+        # Proceed to build target
         prepend=f"{depth}Package [bold blue]{name}[/bold blue]"
         # Check if it needs to be (re)built
         if not self.build_should_rebuild(name):

@@ -345,7 +345,7 @@ class MFCRun:
 
             if not self.mfc.build.is_built(target_name):
                 rich.print(f"> > Target {target_name} needs (re)building...")
-                self.mfc.build.build_target(target_name)
+                self.mfc.build.build_target(target_name, "> > > ")
 
             self.create_input_file(target_name, self.get_case_dict())
 

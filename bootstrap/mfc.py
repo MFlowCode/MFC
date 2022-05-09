@@ -21,30 +21,65 @@ class MFCState:
 
         rich.print(common.MFC_HEADER)
 
+        self.handle_changed_mode()
+
+        rich.print(f"[yellow]You are currently in the [bold green]{self.user.general.mode}[/bold green] mode.[/yellow]")
+
         if self.args["command"] == "test":
             rich.print("[bold][u]Test:[/u][/bold]")
             self.test.test()
-
-        if self.args["command"] == "run":
+        elif self.args["command"] == "run":
             self.run.run()
-
-        if self.args["command"] == "clean":
+        elif self.args["command"] == "clean":
             rich.print("[bold][u]Clean:[/u][/bold]")
             self.clean.run()
 
-        for target_name in [ x.name for x in self.conf.targets ]:
-            if target_name in self.args["targets"]:
-                if self.args["command"] == "build":
+        if self.args["command"] == "build":
+            for target_name in [ x.name for x in self.conf.targets ]:
+                if target_name in self.args["targets"]:
                     rich.print("[bold][u]Build:[/u][/bold]")
                     self.build.build_target(target_name)
 
         self.lock.save()
+        self.user.save()
+
+    def handle_changed_mode(self):
+        def onNewMode():
+            if onNewMode.flag:
+                return
+            
+            onNewMode.flag = True
+
+            rich.print(f'[yellow]Switching to mode [bold green]{self.args["mode"]}[/bold green]. Purging references to other modes...[/yellow]')
+            
+            # Update mode in mfc.user.yaml
+            self.user.general.mode = self.args["mode"]
+            self.user.save()
+
+            for mode in self.user.general.modes:
+                mode: user.Mode
+                if mode.name == self.user.general.mode:
+                    return
+
+                common.delete_directory_recursive(self.build.get_mode_base_path(mode.name))
+        
+        onNewMode.flag = False
+
+        for idx, entry in enumerate(self.lock.targets):
+            entry: lock.LockTargetHolder
+
+            if entry.target.common_mode == None and entry.metadata.mode != self.args["mode"]:
+                onNewMode()
+                
+                del self.lock.targets[idx]
+            
+            self.lock.save()
 
     def setup_directories(self):
         common.create_directory(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for mode in [ mode.name for mode in self.user.modes ] + ["common"]:
+            for mode in [ mode.name for mode in self.user.general.modes ] + ["common"]:
                 common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:
