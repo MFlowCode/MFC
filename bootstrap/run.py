@@ -281,37 +281,41 @@ class MFCRun:
         cd = f'cd "{self.get_case_dirpath()}"'
         ld = self.get_ld()
 
-        def is_used(cmd: str):
+        def cmd_exists(cmd: str):
             return os.system(f"{cmd} -h > /dev/null 2>&1") == 0
 
-        if is_used("jsrun"):
+        np = self.mfc.args["cpus_per_node"]*self.mfc.args["nodes"]
+
+        if cmd_exists("jsrun"):
             # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
                         
-            if int(self.mfc.args["cpus_per_node"]) != int(self.mfc.args["gpus_per_node"]) \
-               and int(self.mfc.args["gpus_per_node"]) != 0:
+            if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \
+               and self.mfc.args["gpus_per_node"] != 0:
                raise common.MFCException("JSRUN: Conflicting job execution parameters. If using GPUs, CPUs per node and GPUs per node must match.")
 
             # One resource set per CPU(Core)/GPU pair.
-            rs=int(self.mfc.args["cpus_per_node"])
+            rs=np
             cpus_per_rs=1
-            gpus_per_rs=min(int(self.mfc.args["gpus_per_node"]), 1)
+            gpus_per_rs=min(self.mfc.args["gpus_per_node"], 1)
             tasks_per_rs=1
 
             options = f'--smpiargs="-gpu" --nrs{rs} --cpu_per_rs{cpus_per_rs} --gpu_per_rs{gpus_per_rs} --tasks_per_rs{tasks_per_rs}'
 
             return f'{cd} && {ld} jsrun {options} "{bin}"'
-        elif is_used("srun"):
+        elif cmd_exists("srun"):
             options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]} -G {self.mfc.args["gpus_per_node"]}'
+            
+            if not self.mfc.args["account"].isspace():
+                options += f' -A "{self.mfc.args["account"]}"'
+
+            if not self.mfc.args["partition"].isspace():
+                options += f' -p "{self.mfc.args["partition"]}"'
 
             return f'{cd} && {ld} srun {options} "{bin}"'
-        elif is_used("mpiexec"):
-            options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]}'
-            
-            return f'{cd} && {ld} mpiexec {options} "{bin}"'
-        elif is_used("mpirun"):
-            options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]}'
-            
-            return f'{cd} && {ld} mpirun {options} "{bin}"'
+        elif cmd_exists("mpiexec"):            
+            return f'{cd} && {ld} mpiexec -np {np} "{bin}"'
+        elif cmd_exists("mpirun"):            
+            return f'{cd} && {ld} mpirun -np {np} "{bin}"'
         else:
             raise common.MFCException("Not program capable of running an MPI program could be located.")
 
