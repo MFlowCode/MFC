@@ -1,4 +1,4 @@
-import os, json, rich, typing, time, dataclasses
+import os, re, json, rich, typing, time, dataclasses
 
 from queue    import Queue
 from datetime import timedelta
@@ -93,6 +93,8 @@ class Engine:
     def run(self, mfc, target_name: str) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
+    def validate_job_options(self, mfc) -> None:
+        raise common.MFCException(f"MFCEngine::validate_job_options: not implemented for {self.name}.")
 
 class SerialEngine(Engine):
     def __init__(self) -> None:
@@ -109,6 +111,10 @@ class SerialEngine(Engine):
         end_time   = time.monotonic()
 
         rich.print(f"> > Done [bold green]✓[/bold green] (in {timedelta(seconds=end_time - start_time)})")
+
+    def validate_job_options(self, mfc) -> None:
+        if mfc.args["nodes"] != 1:
+            raise common.MFCException("SerialEngine: In serial mode, only node can be used.")
 
 
 class ParallelEngine(Engine):
@@ -201,6 +207,9 @@ exit $code
         if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(system, target_name))):
             raise common.MFCException(f"Running batch file for {system.name} failed.")
 
+    def validate_job_options(self, mfc) -> None:
+        pass
+
 
 ENGINES = [ SerialEngine(), ParallelEngine() ]
 
@@ -288,12 +297,7 @@ class MFCRun:
 
         if cmd_exists("jsrun"):
             # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
-                        
-            if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \
-               and self.mfc.args["gpus_per_node"] != 0:
-               raise common.MFCException("JSRUN: Conflicting job execution parameters. If using GPUs, CPUs per node and GPUs per node must match.")
-
-            # One resource set per CPU(Core)/GPU pair.
+            # We create one resource-set per CPU(Core)/GPU pair.
             rs=np
             cpus_per_rs=1
             gpus_per_rs=min(self.mfc.args["gpus_per_node"], 1)
@@ -303,12 +307,23 @@ class MFCRun:
 
             return f'{cd} && {ld} jsrun {options} "{bin}"'
         elif cmd_exists("srun"):
-            options = f'-N {self.mfc.args["nodes"]} -n {self.mfc.args["cpus_per_node"]} -G {self.mfc.args["gpus_per_node"]}'
+            options = f'-n {self.mfc.args["cpus_per_node"]}'
             
-            if not self.mfc.args["account"].isspace():
+            if self.mfc.args["nodes"] != 1:
+                options += f' -N {self.mfc.args["nodes"]}'
+            
+            # MFC binds its GPUs on its own, as long as they have been allocated
+            # by the system's scheduler, or are present on your local machine,
+            # if running in serial mode.
+            # 
+            # if self.mfc.args["gpus_per_node"] != 0:
+            #    options += f' -G {self.mfc.args["gpus_per_node"]}'
+            
+            
+            if len(self.mfc.args["account"].strip()) != 0:
                 options += f' -A "{self.mfc.args["account"]}"'
 
-            if not self.mfc.args["partition"].isspace():
+            if len(self.mfc.args["partition"].strip()) != 0:
                 options += f' -p "{self.mfc.args["partition"]}"'
 
             return f'{cd} && {ld} srun {options} "{bin}"'
@@ -319,10 +334,48 @@ class MFCRun:
         else:
             raise common.MFCException("Not program capable of running an MPI program could be located.")
 
+
+    def validate_job_options(self) -> None:
+        if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \
+            and self.mfc.args["gpus_per_node"] != 0:
+            raise common.MFCException("RUN: Conflicting job execution parameters. If using GPUs, CPUs per node and GPUs per node must match.")
+
+        if self.mfc.args["nodes"] <= 0:
+            raise common.MFCException("RUN: At least one node must be requested.")
+        
+        if self.mfc.args["cpus_per_node"] <= 0:
+            raise common.MFCException("RUN: At least one CPU per node must be requested.")
+
+        if len(self.mfc.args["email"].strip()) != 0:
+            # https://stackoverflow.com/questions/8022530/how-to-check-for-valid-email-address
+            if not re.match(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?", self.mfc.args["email"]):
+                raise common.MFCException(f'RUN: {self.mfc.args["email"]} is not a valid e-mail address.')
+
+        self.get_engine().validate_job_options(self.mfc)
+
+    def get_engine(self) -> Engine:
+        engine: Engine = None
+        for candidate in ENGINES:
+            candidate: Engine
+
+            if candidate.slug == self.mfc.args["engine"]:
+                engine = candidate
+                break
+
+        if engine == None:
+            raise common.MFCException(f"Unsupported engine {self.mfc.args['engine']}.")
+        
+        return engine
+
+
     def run(self):
         targets = self.mfc.args["targets"]
         if targets[0] == "mfc":
             targets = ["pre_process", "simulation", "post_process"]
+
+        if len(targets) == 0:
+            rich.print(f"> No target selected.")
+            return
 
         rich.print(f"""\
 [bold][u]Run:[/u][/bold]
@@ -340,6 +393,10 @@ class MFCRun:
 > Email         (-@)  {self.mfc.args["email"]}
 """)
 
+        self.validate_job_options()
+
+        engine = self.get_engine()
+
         for target_name in targets:
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
 
@@ -348,18 +405,6 @@ class MFCRun:
                 self.mfc.build.build_target(target_name, "> > > ")
 
             self.create_input_file(target_name, self.get_case_dict())
-
-            engine_slug = self.mfc.args["engine"]
-            engine: Engine = None
-            for candidate in ENGINES:
-                candidate: Engine
-
-                if candidate.slug == engine_slug:
-                    engine = candidate
-                    break
-
-            if engine == None:
-                raise common.MFCException(f"Unsupported engine {engine_slug}.")
 
             engine.run(self.mfc, target_name)
 
