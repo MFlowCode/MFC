@@ -12,7 +12,7 @@ class MFCState:
         self.conf  = conf.MFCConf(self)
         self.user  = user.MFCUser()
         self.setup_directories()
-        self.lock  = lock.MFCLock()
+        self.lock  = lock.MFCLock(self)
         self.args  = args.parse(self)
         self.clean = clean.MFCClean(self)
         self.build = MFCBuild(self)
@@ -23,7 +23,7 @@ class MFCState:
 
         self.handle_changed_mode()
 
-        rich.print(f"[yellow]You are currently in the [bold green]{self.user.general.mode}[/bold green] mode.[/yellow]")
+        rich.print(f"[yellow]You are currently in the [bold green]{self.lock.mode}[/bold green] mode.[/yellow]")
 
         if self.args["command"] == "test":
             rich.print("[bold][u]Test:[/u][/bold]")
@@ -53,12 +53,13 @@ class MFCState:
             rich.print(f'[yellow]Switching to mode [bold green]{self.args["mode"]}[/bold green]. Purging references to other modes...[/yellow]')
             
             # Update mode in mfc.user.yaml
-            self.user.general.mode = self.args["mode"]
-            self.user.save()
+            self.lock.mode = self.args["mode"]
+            self.lock.save()
 
-            for mode in self.user.general.modes:
+            for mode in self.user.modes:
                 mode: user.Mode
-                if mode.name == self.user.general.mode:
+
+                if mode.name == self.lock.mode:
                     return
 
                 common.delete_directory_recursive(self.build.get_mode_base_path(mode.name))
@@ -79,7 +80,7 @@ class MFCState:
         common.create_directory(common.MFC_SUBDIR)
 
         for d in ["src", "build", "log", "temp"]:
-            for mode in [ mode.name for mode in self.user.general.modes ] + ["common"]:
+            for mode in [ mode.name for mode in self.user.modes ] + ["common"]:
                 common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}")
                 if d == "build":
                     for build_subdir in ["bin", "include", "lib", "share"]:

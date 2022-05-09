@@ -320,10 +320,10 @@ class MFCRun:
             #    options += f' -G {self.mfc.args["gpus_per_node"]}'
             
             
-            if len(self.mfc.args["account"].strip()) != 0:
+            if not common.is_string_whitespace(self.mfc.args["account"]):
                 options += f' -A "{self.mfc.args["account"]}"'
 
-            if len(self.mfc.args["partition"].strip()) != 0:
+            if not common.is_string_whitespace(self.mfc.args["partition"]):
                 options += f' -p "{self.mfc.args["partition"]}"'
 
             return f'{cd} && {ld} srun {options} "{bin}"'
@@ -346,7 +346,7 @@ class MFCRun:
         if self.mfc.args["cpus_per_node"] <= 0:
             raise common.MFCException("RUN: At least one CPU per node must be requested.")
 
-        if len(self.mfc.args["email"].strip()) != 0:
+        if not common.is_string_whitespace(self.mfc.args["email"]):
             # https://stackoverflow.com/questions/8022530/how-to-check-for-valid-email-address
             if not re.match(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?", self.mfc.args["email"]):
                 raise common.MFCException(f'RUN: {self.mfc.args["email"]} is not a valid e-mail address.')
