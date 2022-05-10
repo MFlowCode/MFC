@@ -75,7 +75,7 @@ class MFCState:
 
             # There exists a (built) target, which is not a common one, that has different mode
             if entry.target.common_mode == None and entry.metadata.mode != self.args["mode"]:
-                onNewMode()
+                update_mode()
                 
                 # Remove it
                 del self.lock.targets[idx]
