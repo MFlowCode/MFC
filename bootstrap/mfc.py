@@ -3,7 +3,7 @@
 import rich
 #import traceback
 
-import user, conf, lock, args, test, clean, common, run
+import user, conf, lock, args, test, clean, common, run.run as run
 
 class MFCState:
     def __init__(self) -> None:

@@ -3,7 +3,7 @@ import argparse
 
 def parse(mfc):
     from mfc import MFCState
-    from run import ENGINES
+    from run.engines import ENGINES
 
     mfc: MFCState
 
