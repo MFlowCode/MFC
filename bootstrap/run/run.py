@@ -96,18 +96,18 @@ class MFCRun:
             return f'{cd} && {ld} jsrun {options} "{bin}"'
         elif cmd_exists("srun"):
             options = f'-n {self.mfc.args["cpus_per_node"]}'
-            
+
             if self.mfc.args["nodes"] != 1:
                 options += f' -N {self.mfc.args["nodes"]}'
-            
+
             # MFC binds its GPUs on its own, as long as they have been allocated
             # by the system's scheduler, or are present on your local machine,
             # if running in serial mode.
-            # 
+            #
             # if self.mfc.args["gpus_per_node"] != 0:
             #    options += f' -G {self.mfc.args["gpus_per_node"]}'
-            
-            
+
+
             if not common.isspace(self.mfc.args["account"]):
                 options += f' -A "{self.mfc.args["account"]}"'
 
@@ -115,9 +115,9 @@ class MFCRun:
                 options += f' -p "{self.mfc.args["partition"]}"'
 
             return f'{cd} && {ld} srun {options} "{bin}"'
-        elif cmd_exists("mpiexec"):            
+        elif cmd_exists("mpiexec"):
             return f'{cd} && {ld} mpiexec -np {np} "{bin}"'
-        elif cmd_exists("mpirun"):            
+        elif cmd_exists("mpirun"):
             return f'{cd} && {ld} mpirun -np {np} "{bin}"'
         else:
             raise common.MFCException("Not program capable of running an MPI program could be located.")
@@ -130,7 +130,7 @@ class MFCRun:
 
         if self.mfc.args["nodes"] <= 0:
             raise common.MFCException("RUN: At least one node must be requested.")
-        
+
         if self.mfc.args["cpus_per_node"] <= 0:
             raise common.MFCException("RUN: At least one CPU per node must be requested.")
 
@@ -152,7 +152,7 @@ class MFCRun:
 
         if engine == None:
             raise common.MFCException(f"Unsupported engine {self.mfc.args['engine']}.")
-        
+
         return engine
 
 

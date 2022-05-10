@@ -32,13 +32,13 @@ class PBSSystem(QueueSystem):
 
         if not common.isspace(args["account"]):
             header += f'#PBS -A {args["account"]}\n'
-        
+
         if not common.isspace(args["walltime"]):
             header += f'#PBS -l walltime={args["walltime"]}\n'
-        
+
         if not common.isspace(args["walltime"]):
             header += f'#PBS -q {args["partition"]}\n'
-        
+
         return header
 
     def gen_submit_cmd(self, filename: str) -> None:
@@ -60,7 +60,7 @@ class LSFSystem(QueueSystem):
 
         if not common.isspace(args["account"]):
             header += f'#BSUB -P {args["account"]}\n'
-        
+
         if not common.isspace(args["walltime"][:-3]):
             header += f'#BSUB -W {args["walltime"][:-3]}\n'
 
@@ -90,15 +90,18 @@ class SLURMSystem(QueueSystem):
 
         if not common.isspace(args["partition"]):
             header += f'#SBATCH --partition={args["partition"]}\n'
-        
+
         if not common.isspace(args["account"]):
             header += f'#SBATCH --account={args["account"]}\n'
 
         if not common.isspace(args["email"]):
             header += f"""\
-#SBATCH --mail-user={args["email"]}
-#SBATCH --mail-type=BEGIN, END, FAIL
+#SBATCH --mail-user="{args["email"]}"
+#SBATCH --mail-type="BEGIN, END, FAIL"
 """
+
+        if args["gpus_per_node"] != 0:
+            header += f'#SBATCH --gpus=v100-16:{args["gpus_per_node"]}\n'
 
         return header
 
