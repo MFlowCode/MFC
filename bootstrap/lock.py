@@ -28,7 +28,10 @@ class MFCLock:
     def __init__(self, mfc):
         if not os.path.exists(common.MFC_LOCK_FILEPATH):
             common.create_file(common.MFC_LOCK_FILEPATH)
-            common.file_dump_yaml(common.MFC_LOCK_FILEPATH, {"targets": []})
+            common.file_dump_yaml(common.MFC_LOCK_FILEPATH, {
+                "mode": mfc.user.modes[0].name,
+                "targets": []
+            })
 
         self.data: dict = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
 

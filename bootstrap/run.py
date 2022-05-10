@@ -309,7 +309,7 @@ class MFCRun:
             gpus_per_rs=min(self.mfc.args["gpus_per_node"], 1)
             tasks_per_rs=1
 
-            options = f'--smpiargs="-gpu" --nrs{rs} --cpu_per_rs{cpus_per_rs} --gpu_per_rs{gpus_per_rs} --tasks_per_rs{tasks_per_rs}'
+            options = f'--smpiargs="-gpu" --nrs {rs} --cpu_per_rs {cpus_per_rs} --gpu_per_rs {gpus_per_rs} --tasks_per_rs {tasks_per_rs}'
 
             return f'{cd} && {ld} jsrun {options} "{bin}"'
         elif cmd_exists("srun"):

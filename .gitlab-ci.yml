@@ -68,7 +68,7 @@ cpu-test-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./misc/load.sh -c a -m g
-    - ./mfc.sh test -m release-cpu
+    - ./mfc.sh test
   tags:
     - batch
 
@@ -88,6 +88,6 @@ gpu-test-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./misc/load.sh -c a -m g
-    - ./mfc.sh test -m release-gpu
+    - ./mfc.sh test
   tags:
     - batch
