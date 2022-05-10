@@ -25,7 +25,7 @@ def parse(mfc):
         if "t" not in mask:
             p.add_argument("-t", "--targets", nargs="+", type=str.lower,
                            choices=compiler_target_names, default=["mfc"], help="")
-        
+
         if "m" not in mask:
             p.add_argument("-m", "--mode",        type=str.lower, choices=mode_names,
                            default=mfc.lock.mode, help="Mode used to compile, run, and test MFC.")
@@ -36,12 +36,12 @@ def parse(mfc):
 
     # === BUILD ===
     add_common_arguments(build)
-    
+
     build.add_argument("-s", "--scratch", action="store_true", help="Build from scratch.")
-    
+
     # === CLEAN ===
     add_common_arguments(clean, "j")
-    
+
     clean.add_argument("-r", "--recursive", default=False, action="store_true", help="Clean specified targets and their dependencies recursively.")
 
     # === TEST ===
