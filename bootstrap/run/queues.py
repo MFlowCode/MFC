@@ -25,13 +25,21 @@ class PBSSystem(QueueSystem):
         return 0 == os.system(f"qsub -h > /dev/null 2>&1")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
-        return f"""\
-#PBS -A {args["account"]}
-#PBS -l nodes={args["nodes"]}:ppn={args["cpus_per_node"]}
-#PBS -l walltime={args["walltime"]}
-#PBS -q {args["partition"]}
+        header = f"""\
 #PBS -N {job_name}
+#PBS -l nodes={args["nodes"]}:ppn={args["cpus_per_node"]}
 """
+
+        if not common.isspace(args["account"]):
+            header += f'#PBS -A {args["account"]}\n'
+        
+        if not common.isspace(args["walltime"]):
+            header += f'#PBS -l walltime={args["walltime"]}\n'
+        
+        if not common.isspace(args["walltime"]):
+            header += f'#PBS -q {args["partition"]}\n'
+        
+        return header
 
     def gen_submit_cmd(self, filename: str) -> None:
         return f"qsub {filename}"
@@ -45,12 +53,18 @@ class LSFSystem(QueueSystem):
         return 0 == os.system(f"bsub -h > /dev/null 2>&1")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
-        return f"""\
-#BSUB -P {args["account"]}
-#BSUB -W {args["walltime"][:-3]}
+        header = f"""\
 #BSUB -J {job_name}
 #BSUB -nnodes {args["nodes"]}
 """
+
+        if not common.isspace(args["account"]):
+            header += f'#BSUB -P {args["account"]}\n'
+        
+        if not common.isspace(args["walltime"][:-3]):
+            header += f'#BSUB -W {args["walltime"][:-3]}\n'
+
+        return header
 
     def gen_submit_cmd(self, filename: str) -> None:
         return f"bsub {filename}"
@@ -64,17 +78,29 @@ class SLURMSystem(QueueSystem):
         return 0 == os.system(f"sbatch -h > /dev/null 2>&1")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
-        return f"""\
+        header = f"""\
 #SBATCH --job-name="{job_name}"
-#SBATCH --time={args["walltime"]}
 #SBATCH --nodes={args["nodes"]}
 #SBATCH --ntasks-per-node={args["cpus_per_node"]}
 #SBATCH --cpus-per-task={1}
-#SBATCH --partition={args["partition"]}
-#SBATCH --account={args["account"]}
+"""
+
+        if not common.isspace(args["walltime"]):
+            header += f'#SBATCH --time={args["walltime"]}\n'
+
+        if not common.isspace(args["partition"]):
+            header += f'#SBATCH --partition={args["partition"]}\n'
+        
+        if not common.isspace(args["account"]):
+            header += f'#SBATCH --account={args["account"]}\n'
+
+        if not common.isspace(args["email"]):
+            header += f"""\
 #SBATCH --mail-user={args["email"]}
 #SBATCH --mail-type=BEGIN, END, FAIL
 """
+
+        return header
 
     def gen_submit_cmd(self, filename: str) -> None:
         return f"sbatch {filename}"

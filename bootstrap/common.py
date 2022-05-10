@@ -136,5 +136,5 @@ def get_py_program_output(filepath: str):
 
     return (proc.stdout, proc.returncode)
 
-def is_string_whitespace(s: str) -> bool:
+def isspace(s: str) -> bool:
     return len(s.strip()) == 0
