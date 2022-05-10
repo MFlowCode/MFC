@@ -48,6 +48,8 @@ class Run:
     walltime:       str
     account:        str
     email:          str
+    name:           str
+    flags:          list
 
     def __init__(self, data: dict) -> None:
         self.nodes          = int(data.get("nodes",         ""))
@@ -57,6 +59,8 @@ class Run:
         self.walltime       =     data.get("walltime",      "")
         self.account        =     data.get("account",       "")
         self.email          =     data.get("email",         "")
+        self.name           =     data.get("name",          "")
+        self.flags          =     data.get("flags",         [])
 
 
 @dataclasses.dataclass
