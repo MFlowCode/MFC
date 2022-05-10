@@ -18,6 +18,8 @@ run:
   gpus-per-node: 0
   walltime:      "01:00:00"
   email:         ""
+  name:          "unnamed"
+  flags:         []
 modes:
   - name:    release-cpu
     c:       -O3

@@ -83,6 +83,11 @@ class MFCRun:
 
         np = self.mfc.args["cpus_per_node"]*self.mfc.args["nodes"]
 
+        options = ""
+        if self.mfc.args["engine"] == "serial":
+            for flag in self.mfc.args["flags"]:
+                options += f"\"{flag}\" "
+
         if cmd_exists("jsrun"):
             # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
             # We create one resource-set per CPU(Core)/GPU pair.
@@ -91,11 +96,11 @@ class MFCRun:
             gpus_per_rs=min(self.mfc.args["gpus_per_node"], 1)
             tasks_per_rs=1
 
-            options = f'--smpiargs="-gpu" --nrs {rs} --cpu_per_rs {cpus_per_rs} --gpu_per_rs {gpus_per_rs} --tasks_per_rs {tasks_per_rs}'
+            options += f'--smpiargs="-gpu" --nrs {rs} --cpu_per_rs {cpus_per_rs} --gpu_per_rs {gpus_per_rs} --tasks_per_rs {tasks_per_rs}'
 
             return f'{cd} && {ld} jsrun {options} "{bin}"'
         elif cmd_exists("srun"):
-            options = f'-n {self.mfc.args["cpus_per_node"]}'
+            options += f' -n {self.mfc.args["cpus_per_node"]}'
 
             if self.mfc.args["nodes"] != 1:
                 options += f' -N {self.mfc.args["nodes"]}'
@@ -116,9 +121,13 @@ class MFCRun:
 
             return f'{cd} && {ld} srun {options} "{bin}"'
         elif cmd_exists("mpiexec"):
-            return f'{cd} && {ld} mpiexec -np {np} "{bin}"'
+            options += f" -np {np}"
+
+            return f'{cd} && {ld} mpiexec {options} "{bin}"'
         elif cmd_exists("mpirun"):
-            return f'{cd} && {ld} mpirun -np {np} "{bin}"'
+            options += f" -np {np}"
+            
+            return f'{cd} && {ld} mpirun {options} "{bin}"'
         else:
             raise common.MFCException("Not program capable of running an MPI program could be located.")
 
