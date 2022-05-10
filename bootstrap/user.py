@@ -10,9 +10,9 @@ class Compilers:
     fortran: str
 
     def __init__(self, data: dict) -> None:
-        self.c       = data["c"]
-        self.cpp     = data["cpp"]
-        self.fortran = data["fortran"]
+        self.c       = data.get("c",       "")
+        self.cpp     = data.get("cpp",     "")
+        self.fortran = data.get("fortran", "")
 
 
 @dataclasses.dataclass
@@ -23,7 +23,7 @@ class Mode:
     fortran: str
 
     def __init__(self, data: dict) -> None:
-        self.name    = data["name"]
+        self.name    = data.get("name",    "")
         self.c       = data.get("c",       "")
         self.cpp     = data.get("cpp",     "")
         self.fortran = data.get("fortran", "")
@@ -35,8 +35,8 @@ class Build:
     compilers: Compilers
 
     def __init__(self, data: dict) -> None:
-        self.threads   = data.get("threads")
-        self.compilers = Compilers(data.get("compilers"))
+        self.threads   = data.get("threads", "")
+        self.compilers = Compilers(data.get("compilers", ""))
 
 
 @dataclasses.dataclass
@@ -50,13 +50,13 @@ class Run:
     email:          str
 
     def __init__(self, data: dict) -> None:
-        self.nodes          = int(data.get("nodes"))
-        self.partition      = data.get("partition")
-        self.cpus_per_node  = int(data.get("cpus-per-node"))
-        self.gpus_per_node  = int(data.get("gpus-per-node"))
-        self.walltime       = data.get("walltime")
-        self.account        = data.get("account")
-        self.email          = data.get("email")
+        self.nodes          = int(data.get("nodes",         ""))
+        self.partition      =     data.get("partition",     "")
+        self.cpus_per_node  = int(data.get("cpus-per-node", ""))
+        self.gpus_per_node  = int(data.get("gpus-per-node", ""))
+        self.walltime       =     data.get("walltime",      "")
+        self.account        =     data.get("account",       "")
+        self.email          =     data.get("email",         "")
 
 
 @dataclasses.dataclass
