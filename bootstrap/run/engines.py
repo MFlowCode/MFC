@@ -13,15 +13,25 @@ class Engine:
     name: str
     slug: str
 
+    def get_targets(self, targets: list) -> list:
+        raise common.MFCException(f"MFCEngine::get_targets: not implemented for {self.name}.")
+
     def run(self, mfc, target_name: str) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
     def validate_job_options(self, mfc) -> None:
         raise common.MFCException(f"MFCEngine::validate_job_options: not implemented for {self.name}.")
 
+
 class SerialEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Serial", "serial")
+
+    def get_targets(self, targets: list) -> list:
+        if targets[0] == "mfc":
+            return ["pre_process", "simulation", "post_process"]
+        
+        return targets
 
     def run(self, mfc, target_name: str) -> None:
         self.mfc = mfc
@@ -43,6 +53,12 @@ class SerialEngine(Engine):
 class ParallelEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Parallel", "parallel")
+
+    def get_targets(self, targets: list) -> list:
+        if targets[0] == "mfc" or len(targets) != 1:
+            raise common.MFCException("The parallel engine requires a unique target to run.")
+        
+        return targets
 
     def run(self, mfc, target_name: str) -> None:
         self.mfc = mfc
@@ -136,3 +152,17 @@ exit $code
 
 
 ENGINES = [ SerialEngine(), ParallelEngine() ]
+
+def get_engine(slug: str) -> Engine:
+    engine: Engine = None
+    for candidate in ENGINES:
+        candidate: Engine
+
+        if candidate.slug == slug:
+            engine = candidate
+            break
+
+    if engine == None:
+        raise common.MFCException(f"Unsupported engine {slug}.")
+
+    return engine
