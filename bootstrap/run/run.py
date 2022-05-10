@@ -148,29 +148,11 @@ class MFCRun:
             if not re.match(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?", self.mfc.args["email"]):
                 raise common.MFCException(f'RUN: {self.mfc.args["email"]} is not a valid e-mail address.')
 
-        self.get_engine().validate_job_options(self.mfc)
-
-    def get_engine(self) -> engines.Engine:
-        engine: engines.Engine = None
-        for candidate in engines.ENGINES:
-            candidate: engines.Engine
-
-            if candidate.slug == self.mfc.args["engine"]:
-                engine = candidate
-                break
-
-        if engine == None:
-            raise common.MFCException(f"Unsupported engine {self.mfc.args['engine']}.")
-
-        return engine
+        engines.get_engine(self.mfc.args["engine"]).validate_job_options(self.mfc)
 
 
-    def run(self):
-        targets = self.mfc.args["targets"]
-        if targets[0] == "mfc":
-            targets = ["pre_process", "simulation", "post_process"]
-
-        if len(targets) == 0:
+    def run(self) -> None:
+        if len(self.mfc.args["targets"]) == 0:
             rich.print(f"> No target selected.")
             return
 
@@ -192,9 +174,9 @@ class MFCRun:
 
         self.validate_job_options()
 
-        engine = self.get_engine()
-
-        for target_name in targets:
+        engine = engines.get_engine(self.mfc.args["engine"])
+        
+        for target_name in engine.get_targets(self.mfc.args["targets"]):
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
 
             if not self.mfc.build.is_built(target_name):
