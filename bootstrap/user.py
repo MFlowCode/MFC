@@ -50,7 +50,6 @@ class Run:
     email:          str
 
     def __init__(self, data: dict) -> None:
-        print(data)
         self.nodes          = int(data.get("nodes"))
         self.partition      = data.get("partition")
         self.cpus_per_node  = int(data.get("cpus-per-node"))

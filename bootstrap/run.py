@@ -291,7 +291,13 @@ class MFCRun:
         ld = self.get_ld()
 
         def cmd_exists(cmd: str):
-            return os.system(f"{cmd} -h > /dev/null 2>&1") == 0
+            if os.system(f"{cmd} --help > /dev/null 2>&1") == 0:
+                return True
+
+            if os.system(f"{cmd} --h > /dev/null 2>&1") == 0:
+                return True
+
+            return False
 
         np = self.mfc.args["cpus_per_node"]*self.mfc.args["nodes"]
 

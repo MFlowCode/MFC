@@ -21,7 +21,7 @@ class MFCState:
 
         rich.print(common.MFC_HEADER)
 
-        self.handle_changed_mode()
+        self.check_mode()
 
         rich.print(f"[yellow]You are currently in the [bold green]{self.lock.mode}[/bold green] mode.[/yellow]")
 
@@ -41,16 +41,15 @@ class MFCState:
                     self.build.build_target(target_name)
 
         self.lock.save()
-        self.user.save()
 
-    def handle_changed_mode(self):
-        def onNewMode():
-            if onNewMode.flag:
+    def check_mode(self):
+        def update_mode():
+            if update_mode.triggered:
                 return
             
-            onNewMode.flag = True
+            update_mode.triggered = True
 
-            rich.print(f'[yellow]Switching to mode [bold green]{self.args["mode"]}[/bold green]. Purging references to other modes...[/yellow]')
+            rich.print(f'[yellow]Switching to [bold green]{self.args["mode"]}[/bold green] from [bold magenta]{self.lock.mode}[/bold magenta]. Purging references to other modes...[/yellow]')
             
             # Update mode in mfc.user.yaml
             self.lock.mode = self.args["mode"]
@@ -62,16 +61,23 @@ class MFCState:
                 if mode.name == self.lock.mode:
                     return
 
+                # Delete the build directory of other modes
                 common.delete_directory_recursive(self.build.get_mode_base_path(mode.name))
         
-        onNewMode.flag = False
+        update_mode.triggered = False
+
+        # User requested a new mode using -m as a command-line argument
+        if self.args["mode"] != self.lock.mode:
+            update_mode()
 
         for idx, entry in enumerate(self.lock.targets):
             entry: lock.LockTargetHolder
 
+            # There exists a (built) target, which is not a common one, that has different mode
             if entry.target.common_mode == None and entry.metadata.mode != self.args["mode"]:
                 onNewMode()
                 
+                # Remove it
                 del self.lock.targets[idx]
             
             self.lock.save()

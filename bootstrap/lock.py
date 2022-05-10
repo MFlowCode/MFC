@@ -33,7 +33,7 @@ class MFCLock:
         self.data: dict = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
 
         self.targets = []
-        self.mode    = mfc.user.modes[0].name
+        self.mode    = self.data["mode"]
 
         for t in self.data["targets"]:
             self.add_target(LockTargetHolder(t))

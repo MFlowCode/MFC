@@ -27,7 +27,7 @@ def parse(mfc):
                            choices=compiler_target_names, default=["mfc"], help="")
         
         if "m" not in mask:
-            p.add_argument("-m", "--mode",    type=str.lower, choices=mode_names,
+            p.add_argument("-m", "--mode",        type=str.lower, choices=mode_names,
                            default=mfc.lock.mode, help="Mode used to compile, run, and test MFC.")
 
         if "j" not in mask:
