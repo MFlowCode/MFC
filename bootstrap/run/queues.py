@@ -35,7 +35,8 @@ class PBSSystem(QueueSystem):
               f"-l nodes={args['nodes']}:ppn={args['cpus_per_node']}" ],
             [ (f'-A {args["account"]}',           not common.isspace(args["account"])),
               (f'-l walltime={args["walltime"]}', not common.isspace(args["walltime"])),
-              (f'-q {args["partition"]}',         not common.isspace(args["partition"])) ],
+              (f'-q {args["partition"]}',         not common.isspace(args["partition"])),
+              (f'-M {args["email"]}',             not common.isspace(args["email"])) ],
             args
         )
 
@@ -54,7 +55,8 @@ class LSFSystem(QueueSystem):
         return queue_helper(
             f"#BSUB",
             [ f"-J {job_name}",
-              f'-nnodes {args["nodes"]}' ],
+              f'-nnodes {args["nodes"]}',
+              f'-N' ],
             [ (f'-P {args["account"]}',       not common.isspace(args["account"])),
               (f'-W {args["walltime"][:-3]}', not common.isspace(args["walltime"][:-3])) ],
             args
@@ -77,7 +79,7 @@ class SLURMSystem(QueueSystem):
             [ f'--job-name="{job_name}"',
               f'--nodes={args["nodes"]}',
               f'--ntasks-per-node={args["cpus_per_node"]}',
-              f'--cpus-per-task={1}'],
+              f'--cpus-per-task={1}' ],
             [ (f'--time={args["walltime"]}',       not common.isspace(args["walltime"])), 
               (f'--partition={args["partition"]}', not common.isspace(args["partition"])),
               (f'--account={args["account"]}',     not common.isspace(args["account"])),

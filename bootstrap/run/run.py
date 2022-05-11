@@ -54,9 +54,6 @@ class MFCRun:
         # Save .inp input file
         common.file_write(self.get_input_filepath(target_name), contents)
 
-    def remove_input_file(self, target_name: str):
-        os.remove(self.get_input_filepath(target_name))
-
     def get_binpath(self, target: str) -> str:
         return f'{self.mfc.build.get_build_path(target)}/bin/{target}'
 
@@ -186,5 +183,3 @@ class MFCRun:
             self.create_input_file(target_name, self.get_case_dict())
 
             engine.run(self.mfc, target_name)
-
-            self.remove_input_file(target_name)
