@@ -56,7 +56,7 @@ cpu-build-job:
   stage: cpu
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./misc/load.sh -c a -m g
+    - . ./mfc.sh load -c a -m g
     - ./mfc.sh build -j 8 -m release-cpu
   tags:
     - nobatch
@@ -67,7 +67,7 @@ cpu-test-job:
     - cpu-build-job
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./misc/load.sh -c a -m g
+    - . ./mfc.sh load -c a -m g
     - ./mfc.sh test
   tags:
     - batch
@@ -76,7 +76,7 @@ gpu-build-job:
   stage: gpu
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./misc/load.sh -c a -m g
+    - . ./mfc.sh load -c a -m g
     - ./mfc.sh build -j 8 -m release-gpu
   tags:
     - nobatch
@@ -87,7 +87,7 @@ gpu-test-job:
     - gpu-build-job
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./misc/load.sh -c a -m g
+    - . ./mfc.sh load -c a -m g
     - ./mfc.sh test
   tags:
     - batch

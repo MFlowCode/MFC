@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# If the user wishes to run the "load" script
+if [ "$1" == "load" ]; then
+    shift;
+    source ./bootstrap/load.sh "$@"
+    return
+fi
 
 # Script Constants
 MFC_DIR="./build"
