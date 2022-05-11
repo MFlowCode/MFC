@@ -81,7 +81,7 @@ class SLURMSystem(QueueSystem):
             [ (f'--time={args["walltime"]}',       not common.isspace(args["walltime"])), 
               (f'--partition={args["partition"]}', not common.isspace(args["partition"])),
               (f'--account={args["account"]}',     not common.isspace(args["account"])),
-              (f'--mail-user="{args["email"]}',    not common.isspace(args["email"])),
+              (f'--mail-user="{args["email"]}"',   not common.isspace(args["email"])),
               (f'--mail-type="BEGIN, END, FAIL"',  not common.isspace(args["email"])) ],            
             args
         )
@@ -90,7 +90,7 @@ class SLURMSystem(QueueSystem):
         return f"sbatch {filename}"
 
 
-QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
+QUEUE_SYSTEMS = [ SLURMSystem(), LSFSystem(), PBSSystem() ]
 
 def get_system() -> QueueSystem:
     for system in QUEUE_SYSTEMS:
