@@ -17,6 +17,7 @@ on_error() {
     echo -e "We would welcome your contribution:"
     echo -e " - Github: https://github.com/MFlowCode/MFC"
     echo -en "$COLOR_RESET"
+    return
 }
 
 ORNL="$GREEN""ORNL$COLOR_RESET"
@@ -28,11 +29,16 @@ XSEDE="$CYAN""XSEDE$COLOR_RESET"
 BRIDGES2="$XSEDE/Bridges2"
 EXPANSE="$XSEDE/Expanse"
 
-RICHARDSON="Richardson"
+GT="$YELLOW""GATECH$COLOR_RESET"
+PHOENIX="$GT/Phoenix"
+
+CALTECH=$RED"CALTECH$COLOR_RESET"
+RICHARDSON="$CALTECH/Richardson"
 
 C_ORNL=$GREEN"s$COLOR_RESET/$GREEN""a$COLOR_RESET/$GREEN""w$COLOR_RESET"
 C_XSEDE=$CYAN"b$COLOR_RESET/$CYAN""e$COLOR_RESET"
-C_OTHER="r"
+C_GT=$YELLOW"p$COLOR_RESET"
+C_OTHER=$RED"r$COLOR_RESET"
 
 # Reset u_computer & u_cg to known values since this script is run with "source"
 # Therefore, values of variables defined here are kept when the script runs again.
@@ -53,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     -*|--*)
         echo "Unknown option $1"
         on_error
+        return
         ;;
     esac
 done
@@ -60,10 +67,10 @@ done
 # Get computer (if not supplied in command-line)
 if [ -v $u_computer ]; then
     echo -e "$MAGENTA[Q 1/2]$COLOR_RESET Which computer would you like to load submodules for?"
-    echo -e " - $SUMMIT (s) - $BRIDGES2 (b) - $RICHARDSON (r)"
-    echo -e " - $ASCENT (a) - $EXPANSE  (e)"
-    echo -e " - $WOMBAT (w)"
-    echo -en "($C_ORNL/$C_XSEDE/$C_OTHER): "
+    echo -e " | $SUMMIT ($GREEN""s$COLOR_RESET) | $BRIDGES2 ($CYAN""b$COLOR_RESET) | $RICHARDSON ($RED""r$COLOR_RESET)"
+    echo -e " | $ASCENT ($GREEN""a$COLOR_RESET) | $EXPANSE  ($CYAN""e$COLOR_RESET) |"
+    echo -e " | $WOMBAT ($GREEN""w$COLOR_RESET) | $PHOENIX ($YELLOW""p$COLOR_RESET) |"
+    echo -en "($C_ORNL/$C_XSEDE/$C_GT/$C_OTHER): "
     read u_computer
 fi
 
@@ -91,6 +98,7 @@ else
     echo -e $RED"Error: Invalid choice \"$u_cg\" for Q2."$COLOR_RESET
 
     on_error
+    return
 fi
 
 if [ "$u_computer" == "s" ]; then # For Summit
@@ -131,6 +139,7 @@ elif [ "$u_computer" == "r" ]; then # Richardson
     elif [ "$u_cg" == "g" ]; then
         echo -e $RED"Error: GPU not supported on Richardson."$COLOR_RESET
         on_error
+        return
     fi
     
     MODULES=("${MODULES[@]}" "python/3.7")
@@ -154,10 +163,24 @@ elif [ "$u_computer" == "e" ]; then # Expanse
     fi
 
     MODULES=("${MODULES[@]}" "python/3.8.5" "slurm/expanse/current")
+elif [ "$u_computer" == "p" ]; then # Phoenix
+    COMPUTER="$PHOENIX"
+
+    if [ "$u_cg" == "c" ]; then
+        echo -e $RED"Error: CPU not supported on Phoenix."$COLOR_RESET
+        
+        on_error
+        return
+    elif [ "$u_cg" == "g" ]; then
+        MODULES=("cuda/11.2" "nvhpc/22.1")
+    fi
+
+    MODULES=("${MODULES[@]}" "python/3.7.4")
 else
     echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
     
     on_error
+    return
 fi
 
 echo -e "$MAGENTA[ MFC ]$COLOR_RESET Loading modules for $COMPUTER ($CG mode):"
@@ -207,6 +230,7 @@ for module_name in ${MODULES[@]}; do
         module load "$module_name"
 
         on_error
+        return
     fi
 done
 

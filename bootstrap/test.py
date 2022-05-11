@@ -430,7 +430,7 @@ class MFCTest:
             if len(self.mfc.args["only"]):
                 testID = self.mfc.args["only"][i]
 
-            rich.print(f"Test #{str(testID).zfill(2)}: {test.traceback} @ {self.get_case_dir(test.parameters)}")
+            rich.print(f"Test #{str(testID).zfill(2)}: {test.traceback} @ tests/{self.get_case_dir_name(test.parameters)}")
 
             self.handle_case(testID, test)
 
