@@ -100,7 +100,7 @@ if __name__ == "__main__":
         main()
     except common.MFCException as exc:
 #        traceback.print_exc()
-        rich.print(f"[red]> {str(exc)}[/red]")
+        rich.print(f"[bold red]ERROR[/bold red]> {str(exc)}")
         exit(1)
     except KeyboardInterrupt as exc:
         exit(1)
