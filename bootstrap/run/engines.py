@@ -70,8 +70,6 @@ class ParallelEngine(Engine):
 
         self.execute_batch_file(system, target_name)
 
-        self.remove_batch_file(system, target_name)
-
     def get_batch_filepath(self, system: queues.QueueSystem, target_name: str):
         case_dirpath = self.mfc.run.get_case_dirpath()
 
@@ -139,9 +137,6 @@ exit $code
         filepath = self.get_batch_filepath(system, target_name)
 
         common.file_write(filepath, BATCH_CONTENT)
-
-    def remove_batch_file(self, system: queues.QueueSystem, target_name: str):
-        os.remove(self.get_batch_filepath(system, target_name))
 
     def execute_batch_file(self, system: queues.QueueSystem, target_name: str):
         if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(system, target_name))):
