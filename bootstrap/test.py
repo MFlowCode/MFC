@@ -2,7 +2,16 @@
 
 import common
 
-import os, re, copy, binascii, subprocess, dataclasses
+import os
+import re
+import copy
+import time
+import signal
+import binascii
+import threading
+import subprocess
+import dataclasses
+
 from pathlib import Path
 
 import rich, rich.progress
@@ -53,6 +62,12 @@ class Test:
 
     def __init__(self, data: dict) -> None:
         self.case = data.get("case", {})
+
+
+@dataclasses.dataclass
+class TestThreadHolder:
+    thread: threading.Thread
+    ppn:    int
 
 
 Tend = 0.25
@@ -422,7 +437,10 @@ class MFCTest:
 
         tests = self.filter_tests(self.get_test_params())
 
-        for i, test in enumerate(rich.progress.track(tests, "Testing [bold blue]mfc[/bold blue]...")):
+        nAvailableThreads = self.mfc.args["jobs"]
+        threads           = []
+
+        for i, test in enumerate(rich.progress.track(tests, "Queue Tests [bold blue]mfc[/bold blue]...")):
             test: TestCaseConfiguration
             
             # Use the correct test ID if --only is selected
@@ -430,9 +448,45 @@ class MFCTest:
             if len(self.mfc.args["only"]):
                 testID = self.mfc.args["only"][i]
 
-            rich.print(f"Test #{str(testID).zfill(2)}: {test.traceback} @ tests/{self.get_case_dir_name(test.parameters)}")
+            ppn = self.get_case_from_mods(test.parameters)["ppn"]
 
-            self.handle_case(testID, test)
+            # Wait until there are threads available
+            while nAvailableThreads < ppn:
+                # This is important if "-j 1" is used (the default) since there
+                # are test cases that require ppn=2
+                if ppn > self.mfc.args["jobs"] and nAvailableThreads > 0:
+                    break
+
+                # Keep track of threads that are done
+                for threadID, threadHolder in enumerate(threads):
+                    threadHolder: TestThreadHolder
+
+                    if not threadHolder.thread.is_alive():
+                        nAvailableThreads += threadHolder.ppn
+                        del threads[threadID]
+                        break
+                
+                # Do not overwhelm this core with this loop
+                time.sleep(0.2)
+
+            # nMaxAvailableThreads >= ppn
+
+            rich.print(f"Submit [T{len(threads)}] #{i}/{len(tests)} - {test.traceback}")
+            thread = threading.Thread(target=self.handle_case, args=(testID, test))
+            thread.start()
+            threads.append(TestThreadHolder(thread, ppn))
+            nAvailableThreads -= ppn
+
+        # Join remaining threads
+        while len(threads) != 0:
+            for threadID, threadHolder in enumerate(threads):
+                threadHolder: TestThreadHolder
+
+                if not threadHolder.thread.is_alive():
+                    del threads[threadID]
+                    break
+            
+            time.sleep(0.2)
 
         rich.print(f"> Tested [bold green]✓[/bold green]")
 
@@ -514,27 +568,28 @@ print(json.dumps({case.create_case_dict_str()}))
         return "".join([f"{str(x[0]).split('_')[0][:4]}-{str(x[1])[:4]}_" for x in mods.items()])[:-1]
 
     def handle_case(self, testID, test: TestCaseConfiguration):
-        self.create_case_dir(test.parameters)
-        if('qbmm' in test.parameters):
-            tol = 1e-7
-        elif('bubbles' in test.parameters):
-            tol = 1e-10
-        else:
-            tol = 1e-12
+        try:
+            self.create_case_dir(test.parameters)
+            if('qbmm' in test.parameters):
+                tol = 1e-7
+            elif('bubbles' in test.parameters):
+                tol = 1e-10
+            else:
+                tol = 1e-12
 
-        def on_test_errror(msg: str = "", term_out: str = ""):
-            common.clear_line()
-            rich.print(f"> Test #{testID}: Failed! [bold green]✓[/bold green]")
-            if msg != "":
-                rich.print(f"> {msg}")
+            def on_test_errror(msg: str = "", term_out: str = ""):
+                common.clear_line()
+                rich.print(f"> Test #{testID}: Failed! [bold green]✓[/bold green]")
+                if msg != "":
+                    rich.print(f"> {msg}")
 
-            common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
+                common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
 (1/3) Test #{testID}:
-  - Test ID:  {testID}
-  - Summary:  {test.traceback}
-  - Location: {self.get_case_dir(test.parameters)}
-  - Error:    {msg}
-  - When:     {common.get_datetime_str()}
+- Test ID:  {testID}
+- Summary:  {test.traceback}
+- Location: {self.get_case_dir(test.parameters)}
+- Error:    {msg}
+- When:     {common.get_datetime_str()}
 
 (2/3) Test case:
 {self.get_case_from_mods(test.parameters).create_case_dict_str()}
@@ -543,34 +598,39 @@ print(json.dumps({case.create_case_dict_str()}))
 {term_out}
 """)
 
-            rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
-            raise common.MFCException("Testing failed (view above).")
+                rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
+                raise common.MFCException("Testing failed (view above).")
 
-        cmd = subprocess.run(f'./mfc.sh run "{self.get_case_dir(test.parameters)}/case.py" -m "{self.mfc.args["mode"]}" -c {self.get_case_from_mods(test.parameters).parameters["ppn"]} -t pre_process simulation 2>&1',
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             universal_newlines=True, shell=True)
-        common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
+            cmd = subprocess.run(f'./mfc.sh run "{self.get_case_dir(test.parameters)}/case.py" -m "{self.mfc.args["mode"]}" -c {self.get_case_from_mods(test.parameters).parameters["ppn"]} -t pre_process simulation 2>&1',
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True, shell=True)
+            common.file_write(f"{self.get_case_dir(test.parameters)}/out.txt", cmd.stdout)
 
-        if cmd.returncode != 0:
-            on_test_errror("MFC Execution Failed.", cmd.stdout)
+            if cmd.returncode != 0:
+                on_test_errror("MFC Execution Failed.", cmd.stdout)
 
-        pack = self.pack_case_output(test.parameters)
-        common.file_write(f"{self.get_case_dir(test.parameters)}/pack.txt", pack)
+            pack = self.pack_case_output(test.parameters)
+            common.file_write(f"{self.get_case_dir(test.parameters)}/pack.txt", pack)
 
-        golden_filepath = f"{self.get_case_dir(test.parameters)}/golden.txt"
+            golden_filepath = f"{self.get_case_dir(test.parameters)}/golden.txt"
 
-        if self.mfc.args["generate"]:
-            common.delete_file(golden_filepath)
-            common.file_write(golden_filepath, pack)
+            if self.mfc.args["generate"]:
+                common.delete_file(golden_filepath)
+                common.file_write(golden_filepath, pack)
 
-        if not os.path.isfile(golden_filepath):
-            common.clear_line()
-            on_test_errror("Golden file doesn't exist! To generate golden files, use the '-g' flag.", cmd.stdout)
+            if not os.path.isfile(golden_filepath):
+                common.clear_line()
+                on_test_errror("Golden file doesn't exist! To generate golden files, use the '-g' flag.", cmd.stdout)
 
-        golden_file_content = common.file_read(golden_filepath)
-        bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack, tol)
-        if not bSuccess:
-            on_test_errror(errorMsg, cmd.stdout)
+            golden_file_content = common.file_read(golden_filepath)
+            bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack, tol)
+            if not bSuccess:
+                on_test_errror(errorMsg, cmd.stdout)
+        except BaseException as exc:
+            print(exc)
+            
+            # Exit
+            os.kill(os.getpid(), signal.SIGTERM)
 
     def pack_case_output(self, params: dict):
         result: str = ""

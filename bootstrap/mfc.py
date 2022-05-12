@@ -40,8 +40,6 @@ class MFCState:
                     rich.print("[bold][u]Build:[/u][/bold]")
                     self.build.build_target(target_name)
 
-        self.lock.save()
-
     def check_mode(self):
         def update_mode():
             if update_mode.triggered:
@@ -79,8 +77,8 @@ class MFCState:
                 
                 # Remove it
                 del self.lock.targets[idx]
-            
-            self.lock.save()
+
+                self.lock.save()
 
     def setup_directories(self):
         common.create_directory(common.MFC_SUBDIR)
@@ -99,7 +97,7 @@ if __name__ == "__main__":
     try:
         main()
     except common.MFCException as exc:
-#        traceback.print_exc()
+        #traceback.print_exc()
         rich.print(f"[bold red]ERROR[/bold red]> {str(exc)}")
         exit(1)
     except KeyboardInterrupt as exc:
