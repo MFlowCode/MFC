@@ -57,7 +57,7 @@ cpu-build-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m g
-    - ./mfc.sh build -j 8 -m release-cpu
+    - ./mfc.sh build -j 64 -m release-cpu
   tags:
     - nobatch
 
@@ -68,7 +68,7 @@ cpu-test-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m g
-    - ./mfc.sh test -j $(nproc)
+    - ./mfc.sh test -j 64
   tags:
     - batch
 
@@ -77,7 +77,7 @@ gpu-build-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m g
-    - ./mfc.sh build -j 8 -m release-gpu
+    - ./mfc.sh build -j 64 -m release-gpu
   tags:
     - nobatch
 
@@ -88,6 +88,6 @@ gpu-test-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m g
-    - ./mfc.sh test -j $(nproc)
+    - ./mfc.sh test -j 64
   tags:
     - batch
