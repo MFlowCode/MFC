@@ -26,17 +26,19 @@ class MFCLock:
     mode:    str
 
     def __init__(self, mfc):
+        default_mode: str = mfc.user.modes[0].name
+
         if not os.path.exists(common.MFC_LOCK_FILEPATH):
             common.create_file(common.MFC_LOCK_FILEPATH)
             common.file_dump_yaml(common.MFC_LOCK_FILEPATH, {
-                "mode": mfc.user.modes[0].name,
+                "mode": default_mode,
                 "targets": []
             })
 
         self.data: dict = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
 
         self.targets = []
-        self.mode    = self.data["mode"]
+        self.mode    = self.data.get("mode", default_mode)
 
         for t in self.data["targets"]:
             self.add_target(LockTargetHolder(t))
