@@ -35,7 +35,7 @@ before_script:
   - if [[ ! "$CI_PROJECT_NAME" == *"MFC"* ]]; then exit 1; fi;
 
   # Define MFC directory path
-  - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME"
+  - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH"
 
 # Clone MFC after removing artifacts from previous run(s). 
 clone-job:
