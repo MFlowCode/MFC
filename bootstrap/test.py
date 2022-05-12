@@ -437,54 +437,60 @@ class MFCTest:
 
         tests = self.filter_tests(self.get_test_params())
 
-        nAvailableThreads = self.mfc.args["jobs"]
-        threads           = []
+        with rich.progress.Progress() as progress:
+            queue_tracker    = progress.add_task("Queued   ", total=len(tests))
+            complete_tracker = progress.add_task("Completed", total=len(tests))
 
-        for i, test in enumerate(rich.progress.track(tests, "Queue Tests [bold blue]mfc[/bold blue]...")):
-            test: TestCaseConfiguration
-            
-            # Use the correct test ID if --only is selected
-            testID = i+1
-            if len(self.mfc.args["only"]):
-                testID = self.mfc.args["only"][i]
+            nAvailableThreads = self.mfc.args["jobs"]
+            threads           = []
 
-            ppn = self.get_case_from_mods(test.parameters)["ppn"]
+            # Queue Tests
+            for i, test in enumerate(tests):
+                test: TestCaseConfiguration
+                
+                # Use the correct test ID if --only is selected
+                testID = i+1
+                if len(self.mfc.args["only"]):
+                    testID = self.mfc.args["only"][i]
 
-            # Wait until there are threads available
-            while nAvailableThreads < ppn:
-                # This is important if "-j 1" is used (the default) since there
-                # are test cases that require ppn=2
-                if ppn > self.mfc.args["jobs"] and nAvailableThreads > 0:
-                    break
+                ppn = self.get_case_from_mods(test.parameters)["ppn"]
 
-                # Keep track of threads that are done
+                # Wait until there are threads available
+                while nAvailableThreads < ppn:
+                    # This is important if "-j 1" is used (the default) since there
+                    # are test cases that require ppn=2
+                    if ppn > self.mfc.args["jobs"] and nAvailableThreads > 0:
+                        break
+
+                    # Keep track of threads that are done
+                    for threadID, threadHolder in enumerate(threads):
+                        threadHolder: TestThreadHolder
+
+                        if not threadHolder.thread.is_alive():
+                            nAvailableThreads += threadHolder.ppn
+                            progress.advance(complete_tracker)
+                            del threads[threadID]
+                            break
+                    
+                    # Do not overwhelm this core with this loop
+                    time.sleep(0.2)
+
+                rich.print(f"Queued [T-{str(len(threads)+1).zfill(len(str(self.mfc.args['jobs'])))}] #{str(i).zfill(len(str(len(tests))))} ({len(tests)}) - {test.traceback}")
+                progress.advance(queue_tracker)
+                thread = threading.Thread(target=self.handle_case, args=(testID, test))
+                thread.start()
+                threads.append(TestThreadHolder(thread, ppn))
+                nAvailableThreads -= ppn
+
+            # Wait for the lasts tests to complete
+            while len(threads) != 0:
                 for threadID, threadHolder in enumerate(threads):
                     threadHolder: TestThreadHolder
 
                     if not threadHolder.thread.is_alive():
-                        nAvailableThreads += threadHolder.ppn
                         del threads[threadID]
+                        progress.advance(complete_tracker)
                         break
-                
-                # Do not overwhelm this core with this loop
-                time.sleep(0.2)
-
-            # nMaxAvailableThreads >= ppn
-
-            rich.print(f"Submit [T{len(threads)}] #{i}/{len(tests)} - {test.traceback}")
-            thread = threading.Thread(target=self.handle_case, args=(testID, test))
-            thread.start()
-            threads.append(TestThreadHolder(thread, ppn))
-            nAvailableThreads -= ppn
-
-        # Join remaining threads
-        while len(threads) != 0:
-            for threadID, threadHolder in enumerate(threads):
-                threadHolder: TestThreadHolder
-
-                if not threadHolder.thread.is_alive():
-                    del threads[threadID]
-                    break
             
             time.sleep(0.2)
 
