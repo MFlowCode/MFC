@@ -137,4 +137,7 @@ def get_py_program_output(filepath: str):
     return (proc.stdout, proc.returncode)
 
 def isspace(s: str) -> bool:
+    if s == None:
+        return True
+    
     return len(s.strip()) == 0

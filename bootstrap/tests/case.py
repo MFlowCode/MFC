@@ -1,6 +1,8 @@
 
 import json
+import hashlib
 import binascii
+import traceback
 import dataclasses
 
 import common
@@ -12,7 +14,6 @@ mydt = 0.0005
 BASE_CFG = {
     'case_dir'                     : '\'.\'',
     'run_time_info'                : 'F',
-    'nodes'                        : 1,
     'ppn'                          : 1,
     'queue'                        : 'normal',
     'walltime'                     : '24:00:00',
@@ -119,10 +120,7 @@ class Case:
         return json.dumps(self.params, indent=4)
 
     def get_uuid(self) -> str:
-        delta = set(self.params) ^ set(BASE_CFG)
-        s = "".join(sorted(str(delta)))
-
-        return hex(binascii.crc32(s.encode()))[2:]
+        return hex(binascii.crc32(hashlib.sha1(str(self.trace).encode()).digest())).upper()[2:].zfill(8)
 
     def get_dirpath(self):
         return f"{common.MFC_TESTDIR}/{self.get_uuid()}"
@@ -161,6 +159,9 @@ class CaseGeneratorStack:
     def __init__(self) -> None:
         self.trace, self.mods = [], []
 
+    def size(self) -> int:
+        return len(self.trace)
+
     def push(self, trace: str, mods: dict) -> None:
         self.trace.append(trace)
         self.mods.append(mods)
@@ -176,8 +177,9 @@ def create_case(stack: CaseGeneratorStack, newTrace, newMods) -> Case:
         mods.update(dict)
     mods.update(newMods)
 
-    traces: list = stack.trace.copy()
-    if not common.isspace(newTrace):
-        traces.append(newTrace)
+    traces: list = []
+    for trace in stack.trace[:] + [newTrace]:
+        if not common.isspace(trace):
+            traces.append(trace)
 
     return Case(' -> '.join(traces), mods)
