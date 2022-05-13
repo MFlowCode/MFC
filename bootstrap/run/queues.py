@@ -92,7 +92,7 @@ class SLURMSystem(QueueSystem):
         return f"sbatch {filename}"
 
 
-QUEUE_SYSTEMS = [ SLURMSystem(), LSFSystem(), PBSSystem() ]
+QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
 
 def get_system() -> QueueSystem:
     for system in QUEUE_SYSTEMS:
