@@ -75,7 +75,7 @@ def generate_cases() -> list:
     for dimInfo, dimParams in get_dimensions():
         stack.push(f"{len(dimInfo[0])}D (m={dimInfo[1].get('m')},n={dimInfo[1].get('n')},p={dimInfo[1].get('p')})", dimParams)
 
-        for bc in [ -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12 ]:
+        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3 ]:
             params = {}
             for dimCmp in dimInfo[0]:
                 params.update({f'bc_{dimCmp}%beg': bc, f'bc_{dimCmp}%end': bc})
