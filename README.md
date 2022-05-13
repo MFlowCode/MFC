@@ -148,10 +148,10 @@ you can use others such as `release-gpu`.
 
 **IMPORTANT NOTE**: This same mode will be used for any future commands such as `./mfc.sh test` and `./mfc.sh run` until you specify `-m` again (in any of these commands).
 
-+ Run MFC's tests to make sure it was correctly built and your environment is adequate
++ Run MFC's tests with as many concurrent processes as you wish to make sure it was correctly built and your environment is adequate
 
 ```console
-./mfc.sh test
+./mfc.sh test -j $(nproc)
 ```
 
 Please refer to the <a href="#testing">Testing</a> section of this document for more information. 
@@ -191,13 +191,13 @@ To run MFC's test suite, simply run `./mfc.sh test`. It will generate and run te
  
 Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
 
-If you want to only run certain tests, you can pass the argument `-o` (`--only`) along with the associated test ID or hash:
-- **Test ID:** It is the execution order of a test. The first test is `#1`, the next one is `#2`, and so on. If a test is added or removed, it could modify the test IDs of all tests executed after it.
-- **Hash:** It is a hash of the parameters given to MFC by a certain test. They look like `5340bc2a`. They are used to refer to a specific test, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content. However, if a test's parameters change, its hash also changes (ignoring collisions).
+If you want to only run certain tests, you can pass the argument `-o` (`--only`) along with the associated hash.
+
+**Hash:** It is a hexadecimal representation of the hash of the parameters given to MFC by a certain test. They look like `1A6B6EB3`. They are used to refer to a specific test, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content. However, if a test's parameters change, its hash also changes (ignoring collisions).
 
 An example of running targeted tests:
 ```console
-./mfc.sh test -m release-gpu -o 7 5b486221
+./mfc.sh test -m release-gpu -o 1A6B6EB3 0F5DB706
 ```
 
 # Development

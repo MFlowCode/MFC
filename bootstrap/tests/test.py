@@ -7,6 +7,7 @@ import re
 import time
 import signal
 import threading
+#import traceback
 import subprocess
 import dataclasses
 
@@ -35,7 +36,7 @@ class MFCTest:
             common.delete_directory_recursive(common.MFC_TESTDIR)
             common.create_directory(common.MFC_TESTDIR)
 
-        # Build pre_process and simulation if required
+        # Build mfc if required
         if not self.mfc.build.is_built("mfc"):
             rich.print(f"> [bold cyan]mfc[/bold cyan] needs (re)building...")
             self.mfc.build.build_target(f"mfc", "> > ")
@@ -52,11 +53,6 @@ class MFCTest:
             # Queue Tests
             for i, test in enumerate(cases):
                 test: Case
-                
-                # Use the correct test ID if --only is selected
-                testID = i+1
-                if len(self.mfc.args["only"]):
-                    testID = self.mfc.args["only"][i]
 
                 ppn = test["ppn"]
 
@@ -80,9 +76,9 @@ class MFCTest:
                     # Do not overwhelm this core with this loop
                     time.sleep(0.2)
 
-                rich.print(f"Queued [T-{str(len(threads)+1).zfill(len(str(self.mfc.args['jobs'])))}] #{str(i).zfill(len(str(len(cases))))} ({len(cases)}) - {test.trace}")
+                rich.print(f" |-> {str(i+1).zfill(len(str(len(cases))))}/{len(cases)} ([bold magenta]{test.get_uuid()}[/bold magenta]): {test.trace}")
                 progress.advance(queue_tracker)
-                thread = threading.Thread(target=self.handle_case, args=(testID, test))
+                thread = threading.Thread(target=self.handle_case, args=(test,))
                 thread.start()
                 threads.append(TestThreadHolder(thread, ppn))
                 nAvailableThreads -= ppn
@@ -144,7 +140,7 @@ class MFCTest:
         # Both tests gave the same results within an acceptable tolerance
         return (True, "")
 
-    def handle_case(self, testID, test: Case):
+    def handle_case(self, test: Case):
         try:
             test.create_directory()
 
@@ -157,17 +153,20 @@ class MFCTest:
 
             def on_test_errror(msg: str = "", term_out: str = ""):
                 common.clear_line()
-                rich.print(f"> Test #{testID}: Failed! [bold green]✓[/bold green]")
+
+                uuid = test.get_uuid()
+                rich.print(f"> Test #{uuid}: Failed!")
                 if msg != "":
                     rich.print(f"> {msg}")
 
-                common.file_write(f"{common.MFC_TESTDIR}/failed_test.txt", f"""\
-(1/3) Test #{testID}:
-- Test ID:  {testID}
-- Summary:  {test.trace}
-- Location: {test.get_dirpath()}
-- Error:    {msg}
-- When:     {common.get_datetime_str()}
+                filepath = f"{common.MFC_TESTDIR}/failed_{test.get_uuid()}.txt"
+                common.file_write(filepath, f"""\
+(1/3) Test #{uuid}:
+- Test UUID: {uuid}
+- Summary:   {test.trace}
+- Location:  {test.get_dirpath()}
+- Error:     {msg}
+- When:      {common.get_datetime_str()}
 
 (2/3) Test case:
 {test.gen_json_dict_str()}
@@ -176,7 +175,7 @@ class MFCTest:
 {term_out}
 """)
 
-                rich.print(f"> Please read {common.MFC_TESTDIR}/failed_test.txt for more information.")
+                rich.print(f"> Please read {filepath} for more information.")
                 raise common.MFCException("Testing failed (view above).")
 
             cmd = subprocess.run(
@@ -211,6 +210,7 @@ class MFCTest:
             
         except BaseException as exc:
             print(exc)
+            #traceback.print_exc()
             
             # Exit
             os.kill(os.getpid(), signal.SIGTERM)

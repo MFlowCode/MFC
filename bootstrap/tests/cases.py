@@ -1,4 +1,4 @@
-import copy
+import common
 
 from tests.case import Case
 from tests.case import create_case
@@ -125,9 +125,7 @@ def generate_cases() -> list:
                     if riemann_solver == 2:
                         cases.append(create_case(stack, 'alt_soundspeed=T', {'alt_soundspeed': 'T'}))
 
-                    cases.append(create_case(stack, 'avg_state=1',   {'avg_state':     1}))
-                    cases.append(create_case(stack, 'wave_speeds=2', {'wave_speeds':   2}))
-                    cases.append(create_case(stack, 'mpp_lim=T',     {'mpp_lim':     'T'}))
+                    cases.append(create_case(stack, 'mpp_lim=T', {'mpp_lim': 'T'}))
 
                 stack.pop()
 
@@ -179,20 +177,16 @@ def generate_cases() -> list:
                 
                 stack.pop()
 
-            stack.push('', {'polytropic':  'T'})
-            stack.push('', {'bubble_model': 2 })
-
-            stack.push(f"nb={'1'}", {'nb': 1})
-            cases.append(create_case(stack, '', {}))
-            stack.pop()
+            stack.push('', {'polytropic': 'T', 'bubble_model': 2})
+            cases.append(create_case(stack, 'nb=1', {'nb': 1}))
 
             stack.push(f"qbmm={'T'}", {'qbmm': 'T'})
             cases.append(create_case(stack, '', {}))
 
-            stack.push('', {'bubble_model': 3})
+            stack.push('bubble_model=3', {'bubble_model': 3})
             cases.append(create_case(stack, '', {}))
 
-            for i in range(4):
+            for i in range(6):
                 stack.pop()
 
             if len(dimInfo[0]) >= 2:
@@ -201,14 +195,19 @@ def generate_cases() -> list:
             if len(dimInfo[0]) >= 3:
                 stack.pop()
 
-            stack.pop()
-            stack.pop()
+        for i in range(3):
             stack.pop()
 
-        stack.pop()
+    # Sanity Check 1
 
-        for i in range(2):
-            stack.pop()
+    if stack.size() != 0:
+        raise common.MFCException("generate_cases: stack isn't fully pop'ed")
+
+    # Sanity Check 2
+    uuids = [ case.get_uuid() for case in cases ]
+    l1, l2 = len(uuids), len(set(uuids))
+    if l1 != l2:
+        raise common.MFCException(f"generate_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
 
     return cases
 
@@ -222,12 +221,6 @@ def generate_filtered_cases(args: dict):
 
             doKeep = False
             for o in args["only"]:
-                if str(o).isnumeric():
-                    testID = i+1
-                    if testID == int(o):
-                        doKeep = True
-                        break
-                
                 if str(o) == case.get_uuid():
                     doKeep = True
                     break
