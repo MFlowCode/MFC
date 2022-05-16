@@ -68,7 +68,7 @@ program p_main
 
 #ifdef _OPENACC
     real(kind(0d0)) :: starttime, endtime
-    integer :: num_devices, num_nodes, ppn, my_device_num
+    integer :: num_devices, local_size, num_nodes, ppn, my_device_num
     integer :: dev, devNum, local_rank, local_comm
     integer(acc_device_kind) :: devtype
 #endif
@@ -78,17 +78,22 @@ program p_main
     ! Initializing MPI execution environment
 
     CALL s_mpi_initialize()
-      
+
+! Bind GPUs if OpenACC is enabled
 #ifdef _OPENACC
     call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
-           MPI_INFO_NULL, local_comm, ierr)
-      call MPI_Comm_rank(local_comm, local_rank, ierr)
-            print *,"RANK", local_rank
-      devtype = acc_get_device_type()
-      devNum = acc_get_num_devices(devtype)
-     dev = mod(local_rank, devNum)
-      print *,"DEV", dev
-      call acc_set_device_num(dev, devtype)   
+        MPI_INFO_NULL, local_comm, ierr)
+    call MPI_Comm_size(local_comm, local_size, ierr)
+    call MPI_Comm_rank(local_comm, local_rank, ierr)
+
+    devtype = acc_get_device_type()
+    devNum  = acc_get_num_devices(devtype)
+    dev     = mod(local_rank, devNum)
+
+    ! Note: I0 (Iw, where w=0) is a Fortran 95 feature.
+    print '("Global Rank "I0" (/"I0") - Local Rank "I0" (/"I0") - OpenACC (Local) Device "I0" (/"I0")")', proc_rank, num_procs, local_rank, local_size, dev, devNum
+
+    call acc_set_device_num(dev, devtype)   
 #endif   
 
     ! The rank 0 processor assigns default values to the user inputs prior to
