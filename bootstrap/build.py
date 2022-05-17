@@ -94,6 +94,15 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
             pass
 
 
+    def get_cuda_libdirpath(self) -> str:
+        matches = list(filter(lambda test_key: test_key in [ "CUDA_HOME", "CUDA_DIR" ], os.environ))
+
+        if len(matches) == 0:
+            raise common.MFCException(f'Failed to locate Cuda. If you have Cuda installed, please define $CUDA_HOME and/or $CUDA_DIR.')
+
+        return os.environ[matches[0]].rstrip('/')
+
+
     def string_replace(self, dependency_name: str, string: str, recursive=True):
         dep       = self.mfc.conf.get_target(dependency_name)
         compilers = self.mfc.user.build.compilers
@@ -106,24 +115,7 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
         flags = vars(copy.deepcopy(mode))
         for lang in flags.keys():
             lang: str
-            if "${CUDA:INSTALL_PATH}" in flags[lang]:
-                matches = list(filter(lambda test_key: test_key in [ "CUDA_HOME", "CUDA_DIR" ], os.environ))
-
-                if len(matches) == 0:
-                    raise common.MFCException(f'''\
-Failed to find where CUDA was installed for {dependency_name} with {mode.name}/{lang}.
-Please follow the instructions bellow:
-- Make sure CUDA is installed and properly configured.
-- Open mfc.conf.py.
-- Locate section compilers -> modes -> {mode.name} -> {lang}:
-- Replace $(CUDA:INSTALL_PATH) with the root path to your CUDA installation.
-  "include" and "lib" should be folders directly accessible from this folder.
-If you think MFC could (or should) be able to find it automatically for you system, you are welcome to file an issue on GitHub or a pull request with your changes to mfc.py at https://github.com/MFlowCode/MFC.
-''')
-
-                cuda_install_path = os.environ[matches[0]]
-
-                flags[lang] = flags[lang].replace("${CUDA:INSTALL_PATH}", cuda_install_path)
+            flags[lang] = flags[lang].replace("${CUDA:INSTALL_PATH}", self.get_cuda_libdirpath())
 
         replace_list = [
             ("${MFC_ROOT_PATH}",     common.MFC_ROOTDIR),

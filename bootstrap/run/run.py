@@ -57,8 +57,13 @@ class MFCRun:
     def get_binpath(self, target: str) -> str:
         return f'{self.mfc.build.get_build_path(target)}/bin/{target}'
 
-    def get_ld(self) -> str:
-        return f'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{common.MFC_SUBDIR}/common/build/lib"'
+    def get_ld(self, target: str) -> str:
+        paths: list = [
+            ("$LD_LIBRARY_PATH",                                          True),
+            ("{common.MFC_SUBDIR}/common/build/lib",                      True),
+            (f"{self.mfc.build.get_cuda_libdirpath().rstrip('/')}/lib64", target=="simulation")
+        ]
+        return f'LD_LIBRARY_PATH="{":".join([ path[0] for path in paths if path[1] ])}"'
 
     def get_case_dirpath(self) -> str:
         return os.path.abspath(os.path.dirname(self.mfc.args["input"]))
@@ -67,7 +72,7 @@ class MFCRun:
         bin = self.get_binpath(target_name)
 
         cd = f'cd "{self.get_case_dirpath()}"'
-        ld = self.get_ld()
+        ld = self.get_ld(target_name)
 
         np = self.mfc.args["cpus_per_node"]*self.mfc.args["nodes"]
 
