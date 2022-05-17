@@ -9,7 +9,7 @@ COLOR_RESET="\033[m"
 
 echo -en "$YELLOW"
 echo -e "Please source this script:"
-echo -e "$ source ./misc/load.sh\n"
+echo -e "$(whoami) $ . ./mfc.sh load\n"
 echo -en "$COLOR_RESET"
 
 on_error() {
