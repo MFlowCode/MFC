@@ -141,3 +141,6 @@ def isspace(s: str) -> bool:
         return True
     
     return len(s.strip()) == 0
+
+def does_cmd_exist(s: str) -> bool:
+    return os.system(f"which {s} > /dev/null 2>&1") == 0

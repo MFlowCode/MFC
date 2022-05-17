@@ -26,7 +26,7 @@ class PBSSystem(QueueSystem):
         super().__init__("PBS")
 
     def is_active(self) -> bool:
-        return 0 == os.system(f"qsub -h > /dev/null 2>&1")
+        return common.does_cmd_exist("qsub")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return queue_helper(
@@ -49,7 +49,7 @@ class LSFSystem(QueueSystem):
         super().__init__("LSF")
 
     def is_active(self) -> bool:
-        return 0 == os.system(f"bsub -h > /dev/null 2>&1")
+        return common.does_cmd_exist("bsub")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return queue_helper(
@@ -71,7 +71,7 @@ class SLURMSystem(QueueSystem):
         super().__init__("SLURM")
 
     def is_active(self) -> bool:
-        return 0 == os.system(f"sbatch -h > /dev/null 2>&1")
+        return common.does_cmd_exist("sbatch")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return queue_helper(
