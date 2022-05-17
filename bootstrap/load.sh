@@ -162,7 +162,7 @@ elif [ "$u_computer" == "e" ]; then # Expanse
         MODULES=("gpu/0.15.4" "openmpi/4.0.5" "cuda/11.0.2" "nvhpc/22.2")
     fi
 
-    MODULES=("${MODULES[@]}" "python/3.8.5" "slurm/expanse/current")
+    MODULES=("${MODULES[@]}" "slurm/expanse/current")
 elif [ "$u_computer" == "p" ]; then # Phoenix
     COMPUTER="$PHOENIX"
 

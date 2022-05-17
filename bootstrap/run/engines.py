@@ -30,7 +30,7 @@ class SerialEngine(Engine):
     def get_targets(self, targets: list) -> list:
         if targets[0] == "mfc":
             return ["pre_process", "simulation", "post_process"]
-        
+
         return targets
 
     def run(self, mfc, target_name: str) -> None:
@@ -57,7 +57,7 @@ class ParallelEngine(Engine):
     def get_targets(self, targets: list) -> list:
         if targets[0] == "mfc" or len(targets) != 1:
             raise common.MFCException("The parallel engine requires a unique target to run.")
-        
+
         return targets
 
     def run(self, mfc, target_name: str) -> None:
@@ -108,6 +108,9 @@ printf "$TABLE_FOOTER"
 t_start=$(date +%s)
 
 echo ""
+
+module purge
+{f"module load {' '.join(common.loaded_modules())}"}
 
 {self.mfc.run.get_exec_cmd(target_name)}
 

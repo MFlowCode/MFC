@@ -139,8 +139,20 @@ def get_py_program_output(filepath: str):
 def isspace(s: str) -> bool:
     if s == None:
         return True
-    
+
     return len(s.strip()) == 0
+
 
 def does_cmd_exist(s: str) -> bool:
     return os.system(f"which {s} > /dev/null 2>&1") == 0
+
+
+def loaded_modules() -> list:
+    res = subprocess.Popen("module list 2>&1 | tail -n +3 | sed s/[[:digit:]]\)//g | sed '/^[[:space:]]*$/d' | tr -s ' ' | sed 's/^ //g' | tr '\n' ' '", stdout=subprocess.PIPE, shell=True)
+
+    res.wait()
+    if res.returncode != 0:
+        raise MFCException("Failed to retrive the list of loaded modules.")
+
+    return res.stdout.read().decode("utf-8").strip().split(" ")
+
