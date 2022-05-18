@@ -6,7 +6,9 @@ import dataclasses
 import rich
 
 import common
-import run.queues as queues
+
+import run.queues   as queues
+import run.mpi_bins as mpi_bins
 
 @dataclasses.dataclass
 class Engine:
@@ -16,7 +18,7 @@ class Engine:
     def get_targets(self, targets: list) -> list:
         raise common.MFCException(f"MFCEngine::get_targets: not implemented for {self.name}.")
 
-    def run(self, mfc, target_name: str) -> None:
+    def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
     def validate_job_options(self, mfc) -> None:
@@ -33,14 +35,14 @@ class SerialEngine(Engine):
 
         return targets
 
-    def run(self, mfc, target_name: str) -> None:
+    def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
         self.mfc = mfc
 
         date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
         rich.print(f"{date} Running...")
 
         start_time = time.monotonic()
-        common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name))
+        common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name, mpibin))
         end_time   = time.monotonic()
 
         rich.print(f"> > Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
@@ -60,13 +62,13 @@ class ParallelEngine(Engine):
 
         return targets
 
-    def run(self, mfc, target_name: str) -> None:
+    def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
         self.mfc = mfc
 
         system = queues.get_system()
         rich.print(f"> > Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
-        self.create_batch_file(system, target_name)
+        self.create_batch_file(system, target_name, mpibin)
 
         self.execute_batch_file(system, target_name)
 
@@ -75,7 +77,7 @@ class ParallelEngine(Engine):
 
         return os.path.abspath(f"{case_dirpath}/{target_name}.sh")
 
-    def create_batch_file(self, system: queues.QueueSystem, target_name: str):
+    def create_batch_file(self, system: queues.QueueSystem, target_name: str, mpibin: mpi_bins.MPIBinary):
         job_name = self.mfc.run.get_job_name(target_name)
 
         BATCH_CONTENT: str = f"""\
@@ -86,8 +88,8 @@ RED="\\u001b[31m";   CYAN="\\u001b[36m";   BLUE="\\u001b[34m";    WHITE="\\u001b
 GREEN="\\u001b[32m"; YELLOW="\\u001b[33m"; MAGENTA="\\u001b[35m"; COLOR_RESET="\\033[m"
 
 TABLE_FORMAT_LINE="| - %-14s %-35s - %-14s %-35s |\\n"
-TABLE_HEADER="/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ \\n"
-TABLE_FOOTER="\_______________________________________________________________________________________/\\n"
+TABLE_HEADER="/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ \\n"
+TABLE_FOOTER="\____________________________________________________________________/\\n"
 TABLE_TITLE_FORMAT="| %8s $MAGENTA%-51s$COLOR_RESET                          |\\n"
 TABLE_CONTENT=$(cat <<-END
 $(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                       "Start-date:"    "$(date +%T)")
@@ -97,6 +99,7 @@ $(printf "$TABLE_FORMAT_LINE" "CPUs (/node):"  "{self.mfc.args["cpus_per_node"]}
 $(printf "$TABLE_FORMAT_LINE" "Input File:"    "{self.mfc.args["input"]}"          "Engine"         "{self.mfc.args["engine"]}")
 $(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Mode:"          "{self.mfc.args["mode"]}")
 $(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          "Job Name:"      "{job_name}")\\n
+$(printf "$TABLE_FORMAT_LINE" "MPI Binary:"    "{mpibin.bin}"                      ""      "")\\n
 END
 )
 
@@ -112,7 +115,7 @@ echo ""
 module purge
 {f"module load {' '.join(common.loaded_modules())}"}
 
-{self.mfc.run.get_exec_cmd(target_name)}
+{self.mfc.run.get_exec_cmd(target_name, mpibin)}
 
 echo ""
 
