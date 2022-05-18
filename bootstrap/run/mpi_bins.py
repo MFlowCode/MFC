@@ -33,7 +33,7 @@ class JSRUN(MPIBinary):
 class SRUN(MPIBinary):
     def __init__(self):
         super().__init__("SLURM's SRUN", "srun")
-    
+
     def gen_params(self, args: list) -> str:
         params = f' -n {args["cpus_per_node"]}'
 
@@ -72,7 +72,7 @@ class MPIRUN(MPIBinary):
 
     def gen_params(self, args: list) -> str:
         np = args["cpus_per_node"]*args["nodes"]
-        
+
         return f"-np {np}"
 
 # In descending order of priority (if no override present)
@@ -95,5 +95,5 @@ def get_binary(args: list) -> MPIBinary:
 
         if binary.is_present():
             return binary
-    
+
     raise common.MFCException("No executable capable of running an MPI program could be located.")

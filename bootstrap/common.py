@@ -148,7 +148,7 @@ def does_cmd_exist(s: str) -> bool:
 
 
 def loaded_modules() -> list:
-    res = subprocess.Popen("module list 2>&1 | tail -n +3 | sed s/[[:digit:]]\)//g | sed '/^[[:space:]]*$/d' | tr -s ' ' | sed 's/^ //g' | tr '\n' ' '", stdout=subprocess.PIPE, shell=True)
+    res = subprocess.Popen('module list 2>&1 | tail -n +3 | sed "s/[[:digit:]]\+)//g" | sed "/^[[:space:]]*$/d" | tr -s " " | sed "s/^ //g" | tr "\n" " "', stdout=subprocess.PIPE, shell=True)
 
     res.wait()
     if res.returncode != 0:
