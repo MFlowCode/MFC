@@ -1,8 +1,10 @@
 import os, re, json, rich, typing, time, dataclasses
 
-import run.engines as engines
+import run.engines  as engines
+import run.mpi_bins as mpi_bins
 
 import common, run.case_dicts as case_dicts
+
 
 class MFCRun:
     def __init__(self, mfc):
@@ -68,62 +70,20 @@ class MFCRun:
     def get_case_dirpath(self) -> str:
         return os.path.abspath(os.path.dirname(self.mfc.args["input"]))
 
-    def get_exec_cmd(self, target_name: str):
-        bin = self.get_binpath(target_name)
+    def get_exec_cmd(self, target_name: str, mpibin: mpi_bins.MPIBinary):
+        binpath = self.get_binpath(target_name)
 
         cd = f'cd "{self.get_case_dirpath()}"'
         ld = self.get_ld(target_name)
 
-        np = self.mfc.args["cpus_per_node"]*self.mfc.args["nodes"]
-
-        options = ""
+        flags = ""
         if self.mfc.args["engine"] == "serial":
             for flag in self.mfc.args["flags"]:
-                options += f"\"{flag}\" "
+                flags += f"\"{flag}\" "
 
-        if common.does_cmd_exist("jsrun"):
-            # ORNL Summit: https://docs.olcf.ornl.gov/systems/summit_user_guide.html?highlight=lsf#launching-a-job-with-jsrun
-            # We create one resource-set per CPU(Core)/GPU pair.
-            rs=np
-            cpus_per_rs=1
-            gpus_per_rs=min(self.mfc.args["gpus_per_node"], 1)
-            tasks_per_rs=1
+        exec_params = mpibin.gen_params(self.mfc.args)
 
-            options += f'--smpiargs="-gpu" --nrs {rs} --cpu_per_rs {cpus_per_rs} --gpu_per_rs {gpus_per_rs} --tasks_per_rs {tasks_per_rs}'
-
-            return f'{cd} && {ld} jsrun {options} "{bin}"'
-        elif common.does_cmd_exist("srun"):
-            options += f' -n {self.mfc.args["cpus_per_node"]}'
-
-            if self.mfc.args["nodes"] != 1:
-                options += f' -N {self.mfc.args["nodes"]}'
-
-            # MFC binds its GPUs on its own, as long as they have been allocated
-            # by the system's scheduler, or are present on your local machine,
-            # if running in serial mode.
-            #
-            # if self.mfc.args["gpus_per_node"] != 0:
-            #    options += f' -G {self.mfc.args["gpus_per_node"]}'
-
-
-            if not common.isspace(self.mfc.args["account"]):
-                options += f' -A "{self.mfc.args["account"]}"'
-
-            if not common.isspace(self.mfc.args["partition"]):
-                options += f' -p "{self.mfc.args["partition"]}"'
-
-            return f'{cd} && {ld} srun {options} "{bin}"'
-        elif common.does_cmd_exist("mpiexec"):
-            options += f" -np {np}"
-
-            return f'{cd} && {ld} mpiexec {options} "{bin}"'
-        elif common.does_cmd_exist("mpirun"):
-            options += f" -np {np}"
-            
-            return f'{cd} && {ld} mpirun {options} "{bin}"'
-        else:
-            raise common.MFCException("Not program capable of running an MPI program could be located.")
-
+        return f'{cd} && {ld} {mpibin.bin} {exec_params} {flags} "{binpath}"'
 
     def validate_job_options(self) -> None:
         if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \
@@ -149,6 +109,8 @@ class MFCRun:
             rich.print(f"> No target selected.")
             return
 
+        mpibin = mpi_bins.get_binary(self.mfc.args)
+
         rich.print(f"""\
 [bold][u]Run:[/u][/bold]
 > Input               {self.mfc.args['input']}
@@ -163,6 +125,7 @@ class MFCRun:
 > Partition     (-p)  {self.mfc.args["partition"]}
 > Account       (-a)  {self.mfc.args["account"]}
 > Email         (-@)  {self.mfc.args["email"]}
+> MPI Binary    (-b)  {mpibin.bin} {f"[green](autodetect: {mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {mpibin.name})[/yellow]"}
 """)
 
         self.validate_job_options()
@@ -178,4 +141,4 @@ class MFCRun:
 
             self.create_input_file(target_name, self.get_case_dict())
 
-            engine.run(self.mfc, target_name)
+            engine.run(self.mfc, target_name, mpibin)
