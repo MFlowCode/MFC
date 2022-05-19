@@ -1,32 +1,38 @@
 #!/usr/bin/env python3
 
+import math
 import json
 
-# Numerical setup ==========================
-Nx, Ny   =            100,             70
-dx, dy   = 1./(1.*(Nx+1)), 1./(1.*(Ny+1))
-Tend, Nt =           0.03,            100
-mydt     = Tend/(1.*Nt)
+#Numerical setup
+Nx, Ny, Nz = 200, 200, 200
+dx, dy, dz = 1./(1.*(Nx+1)), 1./(1.*(Ny+1)), 1./(1.*(Nz+1))
 
-# ==============================================================================
+mydt = 0.0003
 
+# Configuring case dictionary
 print(json.dumps({
+    # Logistics ================================================================
     'case_dir'                     : '\'.\'',
-    'run_time_info'                : 'T',
-    # Computational Domain Parameters ==========================
+    'run_time_info'                : 'F',
+    # ==========================================================================
+
+    # Computational Domain Parameters ==========================================
     'x_domain%beg'                 : 0.E+00,
     'y_domain%beg'                 : 0.E+00,
+    'z_domain%beg'                 : 0.E+00,
     'x_domain%end'                 : 1.E+00,
     'y_domain%end'                 : 1.E+00,
+    'z_domain%end'                 : 1.E+00,
     'm'                            : Nx,
     'n'                            : Ny,
-    'p'                            : 0,
+    'p'                            : Nz,
     'dt'                           : mydt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(Nt),
-    't_step_save'                  : int(Nt),
-    # ==========================================================
-    # Simulation Algorithm Parameters ==========================
+    't_step_stop'                  : 20,
+    't_step_save'                  : 20,
+    # ==========================================================================
+
+    # Simulation Algorithm Parameters ==========================================
     'num_patches'                  : 1,
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
@@ -41,21 +47,28 @@ print(json.dumps({
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
     'mp_weno'                      : 'F',
+    'weno_flat'                    : 'T',
+    'riemann_flat'                 : 'T',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
+    'cu_mpi'                       : 'F',
     'bc_x%beg'                     : -1,
     'bc_y%beg'                     : -1,
+    'bc_z%beg'                     : -1,
     'bc_x%end'                     : -1,
     'bc_y%end'                     : -1,
-    # ==========================================================
-    # Formatted Database Files Structure Parameters ============
+    'bc_z%end'                     : -1,
+    # ==========================================================================
+
+    # Formatted Database Files Structure Parameters ============================
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
-    # ==========================================================
-    # Patch 1 L ================================================
+    'parallel_io'                  :'F',
+    # ==========================================================================
+
+    # Patch 1 L ================================================================
     # 'patch_icpp(1)%geometry'       : 1,
     # 'patch_icpp(1)%x_centroid'     : 0.25,
     # 'patch_icpp(1)%length_x'       : 0.5,
@@ -63,8 +76,9 @@ print(json.dumps({
     # 'patch_icpp(1)%pres'           : 1.0,
     # 'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
     # 'patch_icpp(1)%alpha(1)'       : 1.,
-    # # ==========================================================
-    # Patch 2 R ================================================
+    # # ========================================================================
+
+    # Patch 2 R ================================================================
     # 'patch_icpp(2)%geometry'       : 1,
     # 'patch_icpp(2)%x_centroid'     : 0.75,
     # 'patch_icpp(2)%length_x'       : 0.5,
@@ -72,23 +86,28 @@ print(json.dumps({
     # 'patch_icpp(2)%pres'           : 0.1,
     # 'patch_icpp(2)%alpha_rho(1)'   : 0.125E+00,
     # 'patch_icpp(2)%alpha(1)'       : 1.,
-    # ==========================================================
-    # Patch 1D Analytical ======================================
-    'patch_icpp(1)%geometry'       : 7,
+    # ==========================================================================
+
+    # Patch 1D Analytical ======================================================
+    'patch_icpp(1)%geometry'       : 13,
     'patch_icpp(1)%x_centroid'     : 0.5,
     'patch_icpp(1)%y_centroid'     : 0.5,
+    'patch_icpp(1)%z_centroid'     : 0.5,
     'patch_icpp(1)%length_x'       : 1.0,
     'patch_icpp(1)%length_y'       : 1.0,
+    'patch_icpp(1)%length_z'       : 1.0,
     'patch_icpp(1)%vel(1)'         : 0.05,
     'patch_icpp(1)%vel(2)'         : 0.05,
+    'patch_icpp(1)%vel(3)'         : 0.05,
     'patch_icpp(1)%pres'           : 1.1,
     'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
     'patch_icpp(1)%alpha(1)'       : 1.,
-    # ==========================================================
-    # Fluids Physical Parameters ===============================
+    # ==========================================================================
+
+    # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
-    # ==========================================================
+    # ==========================================================================
 }))
 
 # ==============================================================================
