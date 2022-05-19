@@ -12,8 +12,8 @@ The MFC is a fully-documented parallel simulation software for multi-component, 
  <a href="#authors">Authors</a> | 
  <a href="#publications">Publications</a> | 
  <a href="#installing-mfc">Installing</a> | 
- <a href="#running">Running</a> | 
- <a href="#testing">Testing</a> | 
+ <a href="#running-mfc">Running</a> | 
+ <a href="#testing-mfc">Testing</a> | 
  <a href="https://github.com/MFlowCode/MFC/raw/master/doc/MFC_user_guide.pdf">User's Guide</a> | 
  <a href="https://mflowcode.github.io/">Documentation</a>
 </p>
@@ -99,6 +99,7 @@ Below are some commands for popular operating systems and package managers.
 ### \*nix
 
 * **Via [Aptitude](https://wiki.debian.org/Aptitude):**
+
 ```console
 sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-dev python3-dev python3-venv libopenmpi-dev
 ```
@@ -112,7 +113,7 @@ You can modify the assignment on the first line to have the GCC major version yo
 ```console
 USE_GCC_VERSION=11
 brew install wget make python make cmake gcc@$USE_GCC_VERSION
-HOMEBREW_CC=gcc-$USE_GCC_VERSION; HOMEBREW_CXX=g++-$USE_GCC_VERSION; brew install open-mpi
+HOMEBREW_CC=gcc-$USE_GCC_VERSION; HOMEBREW_CXX=g++-$USE_GCC_VERSION; brew install --build-from-source open-mpi
 ```
 
 Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
@@ -120,7 +121,7 @@ Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS:
 ### Fetch and build MFC
 
 The following commands fetch and build MFC and its required dependencies. 
-The dependencies are built to the `build/` directory within your MFC installation. 
+The dependencies are built to the `build/common/` directory within your MFC installation. 
 This should have no impact on your local installation(s) of these packages.
 
 + **Fetch MFC:**
@@ -154,7 +155,7 @@ you can use others such as `release-gpu`.
 ./mfc.sh test -j $(nproc)
 ```
 
-Please refer to the <a href="#testing">Testing</a> section of this document for more information. 
+Please refer to the [Testing](#testing-mfc) section of this document for more information. 
 
 ## User Configuration (`mfc.user.yaml`)
 
@@ -163,41 +164,92 @@ The `mfc.sh` script used in the previous section is configured through the file 
 # Running MFC
 
 The MFC can be run using `mfc.sh`'s `run` command. It supports both serial and
-parallel execution, the latter being designed for multi-socket systems such as supercomputers,
+parallel execution, the latter being designed for multi-socket systems, namely supercomputers,
 equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
 of available arguments can be acquired with `./mfc.sh -h`. Example Python input
 files can be found in the `samples` directories, and they are often called `input.py`
 or `case.py`. They print a Python dictionary containing input parameters for the
 MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/)
+can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/).
 
-To run pre_process, simulation, and post_process on `2D_exercise_10` with `4` *processors*
-(effectively physical threads) on your system, in GPU mode,
+## Serial Execution (`-e serial`)
+
+To run [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/) on [2D_exercise_10](samples/2D_exercise_10/) with 4 processors/tasks on your system, in GPU mode,
 
 ```console
 ./mfc.sh run samples/2D_exercise_10/case.py -c 4 -m release-gpu
 ```
 
-If a rebuild is required, it will be done automatically, with the number of threads
+If a (re)build is required, it will be done automatically, with the number of threads
 specified with the `-j` option. Most parameters have sensible defaults which can
 be overridden in [mfc.user.yaml](mfc.user.yaml).
 
 Please refer to `./mfc.sh -h` for information on parallel execution.
- 
+
+## Batch Submission (`-e parallel`)
+
+The MFC detects which scheduler your system is using and handles the creation and
+execution of batch scripts. The parallel engine is requested with the `-e parallel` option.
+Whereas the serial engine can execute all MFC's codes in succession, the parallel engine
+requires you to only specify one target with the `-t` option. The number of nodes and GPUs can, 
+respectivally be specified with the `-n` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
+
+```console
+./mfc.sh run samples/2D_exercise_10/case.py -e parallel -n 2 -c 4 -g 4 -t simulation
+```
+
+Other useful arguments include:
+
+- `-# <job name>` to name your job. (i.e `--name`)
+- `-@ sample@example.com` to receive emails from the scheduler. (i.e `--email`)
+- `-w hh:mm:ss` to specify the job's maximum allowed walltime. (i.e `--walltime`)
+- `-a <acount name>` to identify the account to be charged for the job. (i.e `--account`)
+- `-p <partition name>` to select the job's partition. (i.e `--partition`)
+
+Since some schedulers don't have a standardized syntax to request GPUs, the `-g` option may not suffice.
+Therefore, the `-f` (i.e `--flags`) option, which appends options in the batch file, intended for the scheduler, can be used to request GPUs.
+This option accepts any number of arguments.
+
+On some computer clusters, MFC might select the wrong MPI program to execute your application
+because it uses a general heuristic for selection. Notably, `srun` is known to fail on some SLURM
+in GPU mode, whereas `mpirun` functions properly. To override and manually specify which MPI program
+you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
+
+**Disclaimer**: IBM's Jsrun on LSF-managed computers does use the traditional node-based approach to
+allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
+
+### Example Runs
+
+- Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/)
+
+```console
+. ./mfc.sh load -c s -m g
+./mfc.sh run samples/3D_exercise/case.py -e parallel -j 8  \
+             -n 2 -c 4 -g 4​ -t simulation -m release-gpu   \
+             -# 2D_exercise_10​ -@ <redacted> -a <redacted> 
+```
+
+- University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/)
+
+```console
+. ./mfc.sh load -c e -m g
+./mfc.sh run samples/3D_exercise/case.py -e parallel -p GPU -m release-gpu -t simulation​ \
+             -# GPU -@ <redacted> -j 8 -n 2 -c 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun   \
+             –w 00:30:00
+```
+
 # Testing MFC
  
 To run MFC's test suite, simply run `./mfc.sh test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
  
-Adding a new test case is as simple as modifying [bootstrap/internal/test.py](bootstrap/internal/test.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh test -g|--generate` to generate new golden files. Please make sure that these files are generated with accurate data.
+Adding a new test case is as simple as modifying [bootstrap/tests/cases.py](bootstrap/tests/cases.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh test -g` (i.e `--generate`) to generate new golden files. Please make sure that these files are generated with accurate data.
 
-If you want to only run certain tests, you can pass the argument `-o` (`--only`) along with the associated hash.
-
-**Hash:** It is a hexadecimal representation of the hash of the parameters given to MFC by a certain test. They look like `1A6B6EB3`. They are used to refer to a specific test, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content. However, if a test's parameters change, its hash also changes (ignoring collisions).
+If you want to only run certain tests, you can pass the argument `-o` (i.e `--only`) along with the associated hash. A test's hash is a hexadecimal representation of the hash of the parameters given to MFC by a certain test. They look like `1A6B6EB3` and are used to refer to a specific test, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content. However, if a test's parameters change, its hash also changes (ignoring collisions).
 
 An example of running targeted tests:
 ```console
-./mfc.sh test -m release-gpu -o 1A6B6EB3 0F5DB706
+./mfc.sh test -j 8 -m release-gpu -o 1A6B6EB3 0F5DB706
 ```
 
 # Development
