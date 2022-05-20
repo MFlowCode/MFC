@@ -61,10 +61,10 @@ class MFCRun:
 
     def get_ld(self, target: str) -> str:
         paths: list = [
-            ("$LD_LIBRARY_PATH",                                          True),
-            (f"{common.MFC_SUBDIR}/common/build/lib",                     True),
-            (f"{self.mfc.build.get_cuda_libdirpath().rstrip('/')}/lib64", target=="simulation")
+            ("$LD_LIBRARY_PATH",                      True),
+            (f"{common.MFC_SUBDIR}/common/build/lib", True),
         ]
+
         return f'LD_LIBRARY_PATH="{":".join([ path[0] for path in paths if path[1] ])}"'
 
     def get_case_dirpath(self) -> str:

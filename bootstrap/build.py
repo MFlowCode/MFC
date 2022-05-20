@@ -115,7 +115,8 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
         flags = vars(copy.deepcopy(mode))
         for lang in flags.keys():
             lang: str
-            flags[lang] = flags[lang].replace("${CUDA:INSTALL_PATH}", self.get_cuda_libdirpath())
+            if "${CUDA:INSTALL_PATH}" in flags[lang]:
+                flags[lang] = flags[lang].replace("${CUDA:INSTALL_PATH}", self.get_cuda_libdirpath())
 
         replace_list = [
             ("${MFC_ROOT_PATH}",     common.MFC_ROOTDIR),
