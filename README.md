@@ -14,6 +14,8 @@ The MFC is a fully-documented parallel simulation software for multi-component, 
  <a href="#installing-mfc">Installing</a> | 
  <a href="#running-mfc">Running</a> | 
  <a href="#testing-mfc">Testing</a> | 
+ <a href="#development">Development</a> | 
+ <a href="#useful-scripts">Useful Scripts</a> | 
  <a href="https://github.com/MFlowCode/MFC/raw/master/doc/MFC_user_guide.pdf">User's Guide</a> | 
  <a href="https://mflowcode.github.io/">Documentation</a>
 </p>
@@ -116,7 +118,7 @@ brew install wget make python make cmake gcc@$USE_GCC_VERSION
 HOMEBREW_CC=gcc-$USE_GCC_VERSION; HOMEBREW_CXX=g++-$USE_GCC_VERSION; brew install --build-from-source open-mpi
 ```
 
-Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
+Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency. [Anaconda](https://www.anaconda.com/) may interfere with the building process if it has a higher priority than [Homebrew](https://brew.sh/) in your `$PATH`. If an issue arises, you can either uninstall the affected Anaconda packages, change the ordering of directory paths in your `$PATH`, or make aliases to the correct binaries.
 
 ### Fetch and build MFC
 
@@ -193,7 +195,7 @@ The MFC detects which scheduler your system is using and handles the creation an
 execution of batch scripts. The parallel engine is requested with the `-e parallel` option.
 Whereas the serial engine can execute all MFC's codes in succession, the parallel engine
 requires you to only specify one target with the `-t` option. The number of nodes and GPUs can, 
-respectivally be specified with the `-n` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
+respectively be specified with the `-n` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
 
 ```console
 ./mfc.sh run samples/2D_exercise_10/case.py -e parallel -n 2 -c 4 -g 4 -t simulation
@@ -204,7 +206,7 @@ Other useful arguments include:
 - `-# <job name>` to name your job. (i.e `--name`)
 - `-@ sample@example.com` to receive emails from the scheduler. (i.e `--email`)
 - `-w hh:mm:ss` to specify the job's maximum allowed walltime. (i.e `--walltime`)
-- `-a <acount name>` to identify the account to be charged for the job. (i.e `--account`)
+- `-a <account name>` to identify the account to be charged for the job. (i.e `--account`)
 - `-p <partition name>` to select the job's partition. (i.e `--partition`)
 
 Since some schedulers don't have a standardized syntax to request GPUs, the `-g` option may not suffice.
@@ -213,10 +215,10 @@ This option accepts any number of arguments.
 
 On some computer clusters, MFC might select the wrong MPI program to execute your application
 because it uses a general heuristic for selection. Notably, `srun` is known to fail on some SLURM
-in GPU mode, whereas `mpirun` functions properly. To override and manually specify which MPI program
-you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
+systems in GPU mode, whereas `mpirun` functions properly. To override and manually specify which
+MPI program you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
 
-**Disclaimer**: IBM's Jsrun on LSF-managed computers does use the traditional node-based approach to
+**Disclaimer**: IBM's JSRUN on LSF-managed computers does use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
 
 ### Example Runs
@@ -224,19 +226,15 @@ allocate resources. Therefore, the MFC constructs equivalent resource-sets in ta
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/)
 
 ```console
-. ./mfc.sh load -c s -m g
-./mfc.sh run samples/3D_exercise/case.py -e parallel -j 8  \
-             -n 2 -c 4 -g 4​ -t simulation -m release-gpu   \
-             -# 2D_exercise_10​ -@ <redacted> -a <redacted> 
+./mfc.sh run samples/3D_exercise/case.py -e parallel    \
+             -n 2 -c 4 -g 4​ -t simulation -a <redacted>
 ```
 
 - University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/)
 
 ```console
-. ./mfc.sh load -c e -m g
-./mfc.sh run samples/3D_exercise/case.py -e parallel -p GPU -m release-gpu -t simulation​ \
-             -# GPU -@ <redacted> -j 8 -n 2 -c 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun   \
-             –w 00:30:00
+./mfc.sh run samples/3D_exercise/case.py -e parallel -p GPU -t simulation​ \
+             -n 2 -c 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
 ```
 
 # Testing MFC
@@ -249,7 +247,7 @@ If you want to only run certain tests, you can pass the argument `-o` (i.e `--on
 
 An example of running targeted tests:
 ```console
-./mfc.sh test -j 8 -m release-gpu -o 1A6B6EB3 0F5DB706
+./mfc.sh test -j 8 -o 1A6B6EB3 0F5DB706
 ```
 
 # Development
@@ -259,6 +257,22 @@ An example of running targeted tests:
 MFC uses [Fypp](https://github.com/aradi/fypp), a Python-based Fortran preprocessor to reduce code duplication. `.fpp` files are converted into regular `.f90` files as part of the build process. Documentation for Fypp can be found [here](https://fypp.readthedocs.io/en/stable/). 
 
 You can inspect the generated `.f90` files located in `build/<mode name>/src/<name of target>/src`.
+
+# Useful Scripts
+
+## Loading Modules
+
+On computer systems that run using environment modules, with implementations like [TACC's Lmod](https://github.com/TACC/Lmod), MFC provides a script that can load modules that have been used by contributors.
+
+```console
+. ./mfc.sh load
+``` 
+
+The list of modules offered by a system is subject to change. The aforementioned script serves as a convenient way to load modules that should work for most users of MFC. 
+
+## OpenACC Memory Profiling
+
+You can append `-DMFC_MEMORY_DUMP` to `release-gpu`'s Fortran compiler options in [mfc.user.yaml](mfc.user.yaml) to make the [simulation code](src/simulation_code/) call `acc_present_dump()` at various stages of program execution to obtain a printout of on-device memory usage. The [mem_parse.sh](misc/mem_parse.sh) script can be given as an argument the path to a file containing MFC's output, in order to aggregate the data and produce tables with formatted output.
 
 # License
  
