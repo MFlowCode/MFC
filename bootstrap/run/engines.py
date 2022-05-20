@@ -84,13 +84,10 @@ class ParallelEngine(Engine):
 #!/usr/bin/env bash
 {system.gen_batch_header(self.mfc.args, job_name)}
 
-RED="\\u001b[31m";   CYAN="\\u001b[36m";   BLUE="\\u001b[34m";    WHITE="\\u001b[37m"
-GREEN="\\u001b[32m"; YELLOW="\\u001b[33m"; MAGENTA="\\u001b[35m"; COLOR_RESET="\\033[m"
-
 TABLE_FORMAT_LINE="| - %-14s %-35s - %-14s %-35s |\\n"
-TABLE_HEADER="/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\ \\n"
-TABLE_FOOTER="\____________________________________________________________________/\\n"
-TABLE_TITLE_FORMAT="| %8s $MAGENTA%-51s$COLOR_RESET                          |\\n"
+TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
+TABLE_FOOTER="+-----------------------------------------------------------------------------------------------------------+ \\n"
+TABLE_TITLE_FORMAT="| %8s %-96s |\\n"
 TABLE_CONTENT=$(cat <<-END
 $(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                       "Start-date:"    "$(date +%T)")
 $(printf "$TABLE_FORMAT_LINE" "Partition:"     "{self.mfc.args["partition"]}"      "Walltime:"      "{self.mfc.args["walltime"]}")
@@ -98,40 +95,37 @@ $(printf "$TABLE_FORMAT_LINE" "Account:"       "{self.mfc.args["account"]}"     
 $(printf "$TABLE_FORMAT_LINE" "CPUs (/node):"  "{self.mfc.args["cpus_per_node"]}"  "GPUs (/node):"  "{self.mfc.args["gpus_per_node"]}")
 $(printf "$TABLE_FORMAT_LINE" "Input File:"    "{self.mfc.args["input"]}"          "Engine"         "{self.mfc.args["engine"]}")
 $(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Mode:"          "{self.mfc.args["mode"]}")
-$(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          "Job Name:"      "{job_name}")\\n
+$(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          "Job Name:"      "{job_name}")
 $(printf "$TABLE_FORMAT_LINE" "MPI Binary:"    "{mpibin.bin}"                      ""      "")\\n
 END
 )
 
 printf "$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Starting" "{job_name}"
+printf "$TABLE_TITLE_FORMAT" "Starting" "{job_name}:"
 printf "$TABLE_CONTENT"
-printf "$TABLE_FOOTER"
+printf "$TABLE_FOOTER\\n"
 
 t_start=$(date +%s)
 
-echo ""
-
+echo " 1/2) Loading modules... ({', '.join(common.loaded_modules())})"
 module purge
 {f"module load {' '.join(common.loaded_modules())}"}
 
+echo -e "\n 2/2) Running MFC..."
 {self.mfc.run.get_exec_cmd(target_name, mpibin)}
 
-echo ""
-
 code=$?
+
+t_stop="$(date +%s)"
 
 status_msg="SUCCESS"
 if [ "$code" -ne "0" ]; then
     status_msg="FAILURE"
 fi
 
-t_stop="$(date +%s)"
-
-printf "$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Finished" "{job_name}"
+printf "\\n$TABLE_HEADER"
+printf "$TABLE_TITLE_FORMAT" "Finished" "{job_name}:"
 printf "$TABLE_FORMAT_LINE" "Total-time:"  "$(expr $t_stop - $t_start)s"  "Status:"    "$status_msg"
-printf "$TABLE_CONTENT"
 printf "$TABLE_FORMAT_LINE" "End-time:"    "$(date +%T)"                  "End-date:"  "$(date +%T)"
 printf "$TABLE_FOOTER"
 
