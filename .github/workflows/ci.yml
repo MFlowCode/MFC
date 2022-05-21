@@ -44,22 +44,24 @@ jobs:
           sudo apt-get install -y nvhpc-22-2
           NVARCH=`uname -s`_`uname -m`
           NVCOMPILERS="/opt/nvidia/hpc_sdk"
-          echo "PATH=$NVCOMPILERS/$NVARCH/22.2/compilers/bin:$NVCOMPILERS/$NVARCH/22.2/comm_libs/mpi/bin:$PATH" >> $GITHUB_ENV
-          echo "CUDA_HOME=$NVCOMPILERS/$NVARCH/22.2/cuda/" >> $GITHUB_ENV
-          echo "CUDA_DIR=$NVCOMPILERS/$NVARCH/22.2/cuda/" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$NVCOMPILERS/$NVARCH/22.2/cuda/11.6/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          VERSION="22.2"
+          CUDA_VERSION="11.6"
+          echo "PATH=$NVCOMPILERS/$NVARCH/$VERSION/compilers/bin:$NVCOMPILERS/$NVARCH/$VERSION/comm_libs/mpi/bin:$PATH" >> $GITHUB_ENV
+          echo "CUDA_HOME=$NVCOMPILERS/$NVARCH/$VERSION/cuda/" >> $GITHUB_ENV
+          echo "CUDA_DIR=$NVCOMPILERS/$NVARCH/$VERSION/cuda/" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$NVCOMPILERS/$NVARCH/$VERSION/cuda/$CUDA_VERSION/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Build & Test MFC (CPU)
         run: |
           chmod +x ./mfc.sh
-          ./mfc.sh build -cc release-cpu -j $(nproc)
-          ./mfc.sh test
+          ./mfc.sh build -m release-cpu -j $(nproc)
+          ./mfc.sh test -j $(nproc)
 
       - name: Build & Test MFC (GPU)
         run: |
           chmod +x ./mfc.sh
-          ./mfc.sh build -cc release-gpu -j $(nproc)
-          ./mfc.sh test
+          ./mfc.sh build -m release-gpu -j $(nproc)
+          ./mfc.sh test -j $(nproc)
 
       - name: Upload logs
         uses: actions/upload-artifact@v2

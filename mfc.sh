@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# If the user wishes to run the "load" script
+if [ "$1" == "load" ]; then
+    shift;
+    source ./bootstrap/load.sh "$@"
+    return
+fi
 
 # Script Constants
 MFC_DIR="./build"
@@ -11,14 +17,16 @@ PYTHON_PIP_BIN="$PYTHON_BIN -m pip"
 PYTHON_MIN_MAJOR=3
 PYTHON_MIN_MINOR=6
 
+EXEC_PATH="bootstrap/mfc.py"
+
 # Check whether this script was called from MFC's root directory.
-if [ ! -f ./bootstrap/delegate.py ]; then
+if [ ! -f "$EXEC_PATH" ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
     exit 1
 fi
 
 # Make bootstrap files executable
-chmod +x ./bootstrap/delegate.py
+chmod +x "./$EXEC_PATH"
 
 # Check whether python3 is in the $PATH / is accessible.
 which $PYTHON_BIN > /dev/null 2>&1
@@ -107,11 +115,11 @@ for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
 done
 
 # Run the mfc.py bootstrap script
-$PYTHON_BIN ./bootstrap/delegate.py "$@"
+$PYTHON_BIN "./$EXEC_PATH" "$@"
 code=$?
 
 # Deactivate the Python virtualenv in case the user "source"'d this script
 deactivate
 
-# Exit with ./bootstrap/delegate.py's exit code
+# Exit proper exit code
 exit $code

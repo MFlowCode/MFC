@@ -33,6 +33,9 @@ samples/*/silo*
 samples/*/restart*
 samples/*/*.out
 samples/*/binary
+samples/*/pre_process.sh
+samples/*/simulation.sh
+samples/*/post_process.sh
 
 doc/*/MFC_user_guide.bbl
 doc/*/MFC_user_guide.blg

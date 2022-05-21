@@ -3,8 +3,6 @@
 # More information can be found in the README.
 # 
 
-general:
-  configuration: release-cpu
 build:
   threads:   1
   compilers:
@@ -12,16 +10,21 @@ build:
     cpp:     mpicxx
     fortran: mpif90
 run:
-  nodes:          1
-  partition:      not selected
-  tasks-per-node: 1
-  gpus-per-node:  0
-  walltime:       "24:00:00"
-configurations:
+  nodes:         1
+  account:       ""
+  partition:     ""
+  cpus-per-node: 0
+  cpus-per-node: 1
+  gpus-per-node: 0
+  walltime:      "01:00:00"
+  email:         ""
+  name:          "unnamed"
+  flags:         []
+modes:
   - name:    release-cpu
     c:       -O3
     cpp:     -O3
-    fortran: -O3 -cpp -w                   -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+    fortran: -O3 -cpp -w -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
 
   - name:    release-gpu
     fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
