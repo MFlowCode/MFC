@@ -131,6 +131,9 @@ f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}
 
         for e in replace_list:
             string = string.replace(*e)
+        
+        if "${CUDA:INSTALL_PATH}" in string:
+            string = string.replace("${CUDA:INSTALL_PATH}", self.get_cuda_libdirpath())
 
         # Combine different assignments to flag variables (CFLAGS, FFLAGS, ...)
         for FLAG_NAME in [ "CFLAGS", "CPPFLAGS", "FFLAGS" ]:
