@@ -31,6 +31,8 @@ class MFCTest:
         self.mfc = mfc
 
     def test(self):
+        rich.print("[bold][u]Test:[/u][/bold]")
+
         # Generate (re)case-generation
         if self.mfc.args["generate"]:
             common.delete_directory_recursive(common.MFC_TESTDIR)

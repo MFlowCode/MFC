@@ -17,6 +17,8 @@ class MFCState:
     def __init__(self) -> None:
         from build import MFCBuild
 
+        rich.print(common.MFC_HEADER)
+
         self.conf  = conf.MFCConf(self)
         self.user  = user.MFCUser()
         self.setup_directories()
@@ -27,19 +29,15 @@ class MFCState:
         self.test  = test.MFCTest(self)
         self.run   = run.MFCRun(self)
 
-        rich.print(common.MFC_HEADER)
-
         self.check_mode()
 
-        rich.print(f"[yellow]You are currently in the [bold green]{self.lock.mode}[/bold green] mode.[/yellow]")
+        rich.print(f"\n[yellow]You are currently in the [bold green]{self.lock.mode}[/bold green] mode.[/yellow]\n")
 
         if self.args["command"] == "test":
-            rich.print("[bold][u]Test:[/u][/bold]")
             self.test.test()
         elif self.args["command"] == "run":
             self.run.run()
         elif self.args["command"] == "clean":
-            rich.print("[bold][u]Clean:[/u][/bold]")
             self.clean.run()
 
         if self.args["command"] == "build":
