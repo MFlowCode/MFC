@@ -152,15 +152,12 @@ case_dict =                                                                     
                     'weno_vars'                    : 2,                        \
                     'weno_order'                   : 5,                        \
                     'weno_eps'                     : 1.E-16,                   \
-                    'char_decomp'                  : 'F',                      \
                     'mapped_weno'                  : 'T',                      \
                     'null_weights'                 : 'F',                      \
                     'mp_weno'                      : 'T',                      \
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
-                    'commute_err'                  : 'F',                      \
-                    'split_err'                    : 'F',                      \
                     'bc_x%beg'                     : -8,                       \
                     'bc_x%end'                     : -8,                       \
                     # ==========================================================
