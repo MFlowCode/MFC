@@ -49,7 +49,7 @@ class LSFSystem(QueueSystem):
         super().__init__("LSF")
 
     def is_active(self) -> bool:
-        return common.does_cmd_exist("bsub")
+        return common.does_cmd_exist("bsub") and common.does_cmd_exist("bqueues")
 
     def gen_batch_header(self, args: dict, job_name: str) -> str:
         return queue_helper(
