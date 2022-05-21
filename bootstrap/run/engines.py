@@ -107,7 +107,7 @@ printf "$TABLE_FOOTER\\n"
 
 t_start=$(date +%s)
 
-echo " 1/2) Loading modules... ({', '.join(common.loaded_modules())})"
+echo " 1/2) Loading modules... ({common.format_list_to_string(common.loaded_modules())})"
 module purge
 {f"module load {' '.join(common.loaded_modules())}"}
 

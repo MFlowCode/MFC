@@ -30,7 +30,7 @@ jobs:
       - name: Clone MFC
         uses: actions/checkout@v2
 
-      - name: Install (Aptitude) Package
+      - name: Install Dependencies (via Aptitude)
         run: |
           sudo apt update
           sudo apt upgrade -y

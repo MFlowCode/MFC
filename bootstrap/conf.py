@@ -2,18 +2,21 @@ import os, typing, dataclasses
 
 import common
 
+
 @dataclasses.dataclass
-class CompilerVersion:
-    name:    str
-    is_used: str
-    fetch:   str
-    minimum: str
+class Compiler:
+    name:        str
+    is_used_cmd: str
+    get_version: str
+    min_version: str
+    supported:   bool
 
     def __init__(self, data: dict) -> None:
-        self.name    = data.get("name")
-        self.is_used = data.get("is_used")
-        self.fetch   = data.get("fetch")
-        self.minimum = data.get("minimum")
+        self.name        = data.get("name")
+        self.is_used_cmd = data.get("is_used_cmd")
+        self.get_version = data.get("get_version", "")
+        self.min_version = data.get("min_version",  0)
+        self.supported   = data.get("supported")
 
 @dataclasses.dataclass
 class Target_Download:
@@ -93,9 +96,9 @@ class MFCConf:
     def __init__(self, mfc):
         data = common.file_load_yaml(common.MFC_DEV_FILEPATH)
 
-        self.compiler_verions = [ CompilerVersion(e) for e in data["compiler_versions"] ]
-        self.targets          = [ Target(e)          for e in data["targets"]           ]
-        self.mfc              = mfc
+        self.compilers = [ Compiler(e) for e in data["compilers"] ]
+        self.targets   = [ Target  (e) for e in data["targets"]   ]
+        self.mfc       = mfc
 
     def is_target_common(self, name: str) -> bool:
         return self.get_target(name).common_mode is not None

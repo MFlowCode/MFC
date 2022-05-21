@@ -8,7 +8,7 @@ MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml")
 MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
 MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
 
-MFC_HEADER = f"""[bold blue]
+MFC_HEADER = f"""[bold blue]\
      ___            ___          ___
     /__/\          /  /\        /  /\\
    |  |::\        /  /:/_      /  /:/
@@ -156,3 +156,15 @@ def loaded_modules() -> list:
 
     return res.stdout.read().decode("utf-8").strip().split(" ")
 
+
+def format_list_to_string(arr: list, empty = "nothing"):
+    if len(arr) == 0:
+        return empty
+    
+    if len(arr) == 1:
+        return arr[0]
+
+    lhs = ', '.join(arr[:-1])
+    rhs = f", and {arr[-1]}"
+
+    return lhs + rhs

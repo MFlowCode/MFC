@@ -1,11 +1,21 @@
 import conf, lock, user, common, mfc
 
 import rich, rich.progress
-import io, os, re, copy, urllib.request, shutil, subprocess, dataclasses
+
+import io
+import os
+import re
+import sys
+import copy
+import shutil
+import subprocess
+import dataclasses
+import urllib.request
 
 class MFCBuild:
     def __init__(self, mfc: mfc.MFCState) -> None:
         self.mfc = mfc
+        self.check_environment()
 
     def get_mode_base_path(self, cc: str = None):
         if cc is None:
@@ -59,35 +69,38 @@ class MFCBuild:
 
         # Run checks on the user's current compilers
         def compiler_str_replace(s: str):
-            s = s.replace("${C}",       self.mfc.user.build.compilers.c)
-            s = s.replace("${CPP}",     self.mfc.user.build.compilers.cpp)
-            s = s.replace("${FORTRAN}", self.mfc.user.build.compilers.fortran)
+            s = s.replace("${CC}",  self.mfc.user.build.compilers.c)
+            s = s.replace("${CXX}", self.mfc.user.build.compilers.cpp)
+            s = s.replace("${FC}",  self.mfc.user.build.compilers.fortran)
 
             return s
 
-        for check in self.mfc.conf.compiler_verions:
-            check: conf.CompilerVersion
+        for compiler in self.mfc.conf.compilers:
+            compiler: conf.Compiler
 
             # Check if used
-            is_used_cmd = compiler_str_replace(check.is_used)
+            is_used_cmd = compiler_str_replace(compiler.is_used_cmd)
             if 0 != common.execute_shell_command(is_used_cmd, no_exception=True):
                 continue
 
-            version_fetch_cmd     = compiler_str_replace(check.fetch)
+            if not compiler.supported:
+                raise common.MFCException(f"{compiler.name} is unsupported by MFC. Please check the documentation for a list of supported compilers.")
+
+            version_fetch_cmd     = compiler_str_replace(compiler.get_version)
             version_fetch_cmd_out = subprocess.check_output(version_fetch_cmd, shell=True, encoding='UTF-8').split()[0]
 
             def get_ver_from_str(s: str) -> int:
                 return int("".join([ n.zfill(4) for n in re.findall("[0-9]+", s) ]))
 
             version_num_fetched = get_ver_from_str(version_fetch_cmd_out)
-            version_num_minimum = get_ver_from_str(check.minimum)
+            version_num_minimum = get_ver_from_str(compiler.min_version)
 
             if version_num_fetched >= version_num_minimum:
-                rich.print(
-f"""> [bold blue]{check.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}[/bold magenta] \
->= [bold magenta]v{check.minimum}[/bold magenta] [bold green]✓[/bold green]""")
+                rich.print(f"""\
+> [bold blue]{compiler.name}[/bold blue] [bold magenta]v{version_fetch_cmd_out}[/bold magenta] \
+>= [bold magenta]v{compiler.min_version}[/bold magenta] [bold green]✓[/bold green]""")
             else:
-                raise common.MFCException(f"Compiler check {check.name} failed. Version v{check.minimum} minimum.")
+                raise common.MFCException(f"{compiler.name} requires version v{compiler.min_version} or above.")
 
         # TODO: MacOS Checks
         if sys.platform == "darwin": # MacOS
@@ -346,23 +359,24 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
         raise common.MFCException(f"Failed to update the lock file for {name} in the {target_mode.name} mode.")
 
 
-    def build_target(self, name: str, depth=""):
+    def build_target(self, name: str, depth="> "):
         # Proceed to build target
         prepend=f"{depth}Package [bold blue]{name}[/bold blue]"
         # Check if it needs to be (re)built
         if not self.build_should_rebuild(name):
-            rich.print(f"{prepend} - satisfied [bold green]✓[/bold green]")
+            rich.print(f"{prepend} -> Satisfied [bold green]✓[/bold green]")
             return False
 
         dependencies = self.mfc.conf.get_dependency_names(name, recursive=False)
         if len(dependencies) > 0:
-            rich.print(f"{prepend} requires {', '.join([ f'[bold blue]{x}[/bold blue]' for x in dependencies ])}.")
+            format_list = common.format_list_to_string([ f'[bold blue]{x}[/bold blue]' for x in dependencies ])
+            rich.print(f"{prepend} requires {format_list}.")
 
             # Build its dependencies
             for dependency in dependencies:
                 self.build_target(dependency, depth+"> ")
 
-        rich.print(f"{prepend}")
+        rich.print(f"{prepend}:")
 
         common.create_file(self.get_log_filepath(name))
 
@@ -372,6 +386,6 @@ Above is the output of {name}'s build command that failed. (#{cmd_idx+1} in mfc.
             self.build_target__build         (name, logfile, depth+"> ") # Build
             self.build_target__update_lock   (name,          depth+"> ") # Update LOCK
 
-        rich.print(f"{prepend} - Built [bold green]✓[/bold green]")
+        rich.print(f"{prepend} -> Built [bold green]✓[/bold green]")
 
         return True
