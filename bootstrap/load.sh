@@ -116,12 +116,12 @@ elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("gcc/10.2.0" "openmpi/4.0.5-gcc10.2.0")
+        MODULES=("gcc/10.2.0")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("nvhpc/22.1" "openmpi/4.0.5-nvhpc22.1" "cuda/11.1.1")
+        MODULES=("nvhpc/22.1" "cuda/11.1.1")
     fi
 
-    MODULES=("${MODULES[@]}" "python/3.8.6")
+    MODULES=("${MODULES[@]}" "openmpi/4.0.5-gcc10.2.0" "python/3.8.6")
 elif [ "$u_computer" == "a" ]; then # For Ascent
     COMPUTER="$ASCENT"
 
