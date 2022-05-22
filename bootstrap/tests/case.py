@@ -3,6 +3,7 @@ import json
 import hashlib
 import binascii
 import traceback
+import subprocess
 import dataclasses
 
 import common
@@ -109,6 +110,16 @@ class Case:
     def __init__(self, trace: str, mods: dict) -> None:
         self.trace  = trace
         self.params = {**BASE_CFG.copy(), **mods}
+
+    def run(self, args: dict) -> subprocess.CompletedProcess:
+        command: str = f'''\
+./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -c {self["ppn"]} \
+-t pre_process simulation 2>&1\
+'''
+
+        return subprocess.run(command, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, universal_newlines=True,
+                              shell=True)
 
     def get_keys(self) -> str:
         return self.params.keys()

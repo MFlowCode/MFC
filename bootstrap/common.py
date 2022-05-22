@@ -1,4 +1,11 @@
-import os, sys, yaml, shutil, tarfile, subprocess, datetime
+import os
+import sys
+import yaml
+import shutil
+import typing
+import tarfile
+import datetime
+import subprocess
 
 
 MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/..")
@@ -168,3 +175,11 @@ def format_list_to_string(arr: list, empty = "nothing"):
     rhs = f", and {arr[-1]}"
 
     return lhs + rhs
+
+
+def find(predicate, arr: list):
+    for index, item in enumerate(arr):
+        if predicate(index, item):
+            return index, item
+    
+    return None, None
