@@ -11,10 +11,13 @@ import threading
 import subprocess
 import dataclasses
 
-from pathlib import Path
-
-from tests.case import Case
+from tests.case  import Case
 from tests.cases import generate_filtered_cases
+
+from common import MFCException
+
+import tests.pack
+
 
 import rich
 import rich.progress
@@ -99,49 +102,6 @@ class MFCTest:
 
         rich.print(f"> Tested [bold green]✓[/bold green]")
 
-    def golden_file_compare_match(self, truth: str, candidate: str, tol):
-        if truth.count('\n') != candidate.count('\n'):
-            return (False, "Line count didn't match.")
-
-        if "NaN" in truth:
-            return (False, "NaN in golden file")
-
-        if "NaN" in candidate:
-            return (False, "NaN in packed file")
-
-        for candidate_line in candidate.splitlines():
-            if candidate_line == "":
-                continue
-
-            file_subpath: str = candidate_line.split(' ')[0]
-
-            line_trusted: str = ""
-            for l in truth.splitlines():
-                if l.startswith(file_subpath):
-                    line_trusted = l
-                    break
-
-            if len(line_trusted) == 0:
-                continue
-
-            numbers_cand  = [ float(x) for x in candidate_line.strip().split(' ')[1:] ]
-            numbers_trust = [ float(x) for x in line_trusted.strip().split(' ')[1:]   ]
-
-            # Different amount of spaces, means that there are more entires in one than in the other
-            if len(numbers_cand) != len(numbers_trust):
-                return (False, "Variable count didn't match.")
-
-            # check values one by one
-            for i in range(len(numbers_cand)):
-                abs_delta = abs(numbers_cand[i]-numbers_trust[i])
-                rel_diff  = abs(abs_delta/numbers_trust[i]) if numbers_trust[i] != 0 else 0
-                if    (abs_delta > tol and rel_diff > tol):
-                    percent_diff = rel_diff*100
-                    return (False, f"Error margin is too high for the value #{i+1} in {file_subpath}: ~{round(percent_diff, 5)}% (~{round(abs_delta, 5)}).")
-
-        # Both tests gave the same results within an acceptable tolerance
-        return (True, "")
-
     def handle_case(self, test: Case):
         try:
             test.create_directory()
@@ -153,62 +113,26 @@ class MFCTest:
             else:
                 tol = 1e-12
 
-            def on_test_errror(msg: str = "", term_out: str = ""):
-                common.clear_line()
+            cmd = test.run(self.mfc.args)
 
-                uuid = test.get_uuid()
-                rich.print(f"> Test #{uuid}: Failed!")
-                if msg != "":
-                    rich.print(f"> {msg}")
-
-                filepath = f"{common.MFC_TESTDIR}/failed_{test.get_uuid()}.txt"
-                common.file_write(filepath, f"""\
-(1/3) Test #{uuid}:
-- Test UUID: {uuid}
-- Summary:   {test.trace}
-- Location:  {test.get_dirpath()}
-- Error:     {msg}
-- When:      {common.get_datetime_str()}
-
-(2/3) Test case:
-{test.gen_json_dict_str()}
-
-(3/3) Terminal output:
-{term_out}
-""")
-
-                rich.print(f"> Please read {filepath} for more information.")
-                raise common.MFCException("Testing failed (view above).")
-
-            cmd = subprocess.run(
-                f'./mfc.sh run "{test.get_dirpath()}/case.py" -m "{self.mfc.args["mode"]}" -c {test["ppn"]} -t pre_process simulation 2>&1',
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                universal_newlines=True, shell=True
-            )
-            
             common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
 
             if cmd.returncode != 0:
-                on_test_errror("MFC Execution Failed.", cmd.stdout)
+                raise MFCException(f"tests/{test.get_uuid()}: Failed to execute MFC.")
 
-            pack = self.pack_case_output(test)
-            common.file_write(f"{test.get_dirpath()}/pack.txt", pack)
+            pack = tests.pack.generate(test)
+            pack.save(f"{test.get_dirpath()}/pack.txt")
 
             golden_filepath = f"{test.get_dirpath()}/golden.txt"
 
             if self.mfc.args["generate"]:
                 common.delete_file(golden_filepath)
-                common.file_write(golden_filepath, pack)
+                pack.save(golden_filepath)
 
             if not os.path.isfile(golden_filepath):
-                common.clear_line()
-                on_test_errror("Golden file doesn't exist! To generate golden files, use the '-g' flag.", cmd.stdout)
+                raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
 
-            golden_file_content = common.file_read(golden_filepath)
-            bSuccess, errorMsg  = self.golden_file_compare_match(golden_file_content, pack, tol)
-            
-            if not bSuccess:
-                on_test_errror(errorMsg, cmd.stdout)
+            tests.pack.check_tolerance(test.get_uuid(), pack, tests.pack.load(golden_filepath), tol)
             
         except BaseException as exc:
             print(exc)
@@ -216,17 +140,3 @@ class MFCTest:
             
             # Exit
             os.kill(os.getpid(), signal.SIGTERM)
-
-    def pack_case_output(self, case: Case):
-        result: str = ""
-
-        case_dir = case.get_dirpath()
-        D_dir    = f"{case_dir}/D/"
-
-        for filepath in list(Path(D_dir).rglob("*.dat")):
-            file_content   = common.file_read(filepath)
-            short_filepath = str(filepath).replace(f'{case_dir}/', '')
-
-            result += f"{short_filepath} " + re.sub(r' +', ' ', file_content.replace('\n', ' ')).strip() + '\n'
-
-        return result
