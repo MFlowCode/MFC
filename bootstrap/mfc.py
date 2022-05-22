@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import rich
-#import traceback
 
 import user
 import conf
@@ -9,6 +8,7 @@ import lock
 import args
 import clean
 import common
+import signal
 
 from run   import run
 from tests import test
@@ -103,8 +103,7 @@ if __name__ == "__main__":
     try:
         main()
     except common.MFCException as exc:
-        #traceback.print_exc()
         rich.print(f"[bold red]ERROR[/bold red]> {str(exc)}")
-        exit(1)
+        common.quit(signal.SIGTERM)
     except KeyboardInterrupt as exc:
-        exit(1)
+        common.quit(signal.SIGTERM)

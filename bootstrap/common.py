@@ -2,7 +2,6 @@ import os
 import sys
 import yaml
 import shutil
-import typing
 import tarfile
 import datetime
 import subprocess
@@ -183,3 +182,7 @@ def find(predicate, arr: list):
             return index, item
     
     return None, None
+
+
+def quit(sig):
+    os.kill(os.getpid(), sig)
