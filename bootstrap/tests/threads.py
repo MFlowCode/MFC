@@ -76,7 +76,6 @@ class MFCTestThreadManager:
                     time.sleep(0.05)
 
                 # Launch Thread
-                rich.print(f" |-> {str(i+1).zfill(len(str(len(cases))))}/{len(cases)} ([bold magenta]{test.get_uuid()}[/bold magenta]): {test.trace}")
                 progress.advance(queue_tracker)
                 
                 thread = TestThread(target=handle_case, args=(test,))

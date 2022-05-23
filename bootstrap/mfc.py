@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import rich
+import rich.console
 
 import user
 import conf
@@ -96,14 +97,26 @@ class MFCState:
                     for build_subdir in ["bin", "include", "lib", "share"]:
                         common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}/{build_subdir}")
 
-def main():
-    mfc = MFCState()
+FILE_ISSUE_MSG = f"""\
+We apologize for the inconvenience. If you believe this is an issue with MFC, \
+please visit https://github.com/MFlowCode/MFC-develop/issues to file an issue.\
+"""
 
 if __name__ == "__main__":
     try:
-        main()
+        MFCState()
     except common.MFCException as exc:
-        rich.print(f"[bold red]ERROR[/bold red]> {str(exc)}")
+        rich.print(f"""
+[bold red]FATAL ERROR[/bold red]> {str(exc)}
+{FILE_ISSUE_MSG}
+""")
         common.quit(signal.SIGTERM)
     except KeyboardInterrupt as exc:
+        common.quit(signal.SIGTERM)
+    except Exception as exc:
+        rich.console.Console().print_exception()
+        rich.print(f"""
+[bold red]FATAL ERROR[/bold red]> An unexpected exception occurred.
+{FILE_ISSUE_MSG}
+""")
         common.quit(signal.SIGTERM)
