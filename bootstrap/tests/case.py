@@ -113,7 +113,7 @@ class Case:
 
     def run(self, args: dict) -> subprocess.CompletedProcess:
         command: str = f'''\
-./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -c {self["ppn"]} \
+./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -n {self["ppn"]} \
 -t pre_process simulation 2>&1\
 '''
 
