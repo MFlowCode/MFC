@@ -80,6 +80,19 @@ class ParallelEngine(Engine):
     def create_batch_file(self, system: queues.QueueSystem, target_name: str, mpibin: mpi_bins.MPIBinary):
         job_name = self.mfc.run.get_job_name(target_name)
 
+        load_modules: str = ""
+
+        if common.does_cmd_exist("module"):
+            modules: list = common.loaded_modules()
+            load_modules: str = f"""\
+echo " :) Loading modules... ({common.format_list_to_string(modules)})"
+
+module purge || true
+{chr(10).join([ f"module load {m} || true" for m in modules ])}
+
+echo ""
+"""
+
         BATCH_CONTENT: str = f"""\
 #!/usr/bin/env bash
 {system.gen_batch_header(self.mfc.args, job_name)}
@@ -107,11 +120,9 @@ printf "$TABLE_FOOTER\\n"
 
 t_start=$(date +%s)
 
-echo " 1/2) Loading modules... ({common.format_list_to_string(common.loaded_modules())})"
-module purge
-{f"module load {' '.join(common.loaded_modules())}"}
+{load_modules}\
 
-echo -e "\n 2/2) Running MFC..."
+echo -e ":) Running MFC..."
 {self.mfc.run.get_exec_cmd(target_name, mpibin)}
 
 code=$?
