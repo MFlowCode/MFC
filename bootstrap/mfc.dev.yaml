@@ -70,7 +70,7 @@ targets:
         --enable-optimization --disable-hzip --disable-fpzip --disable-silex
         --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
         ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
-        --enable-static --disable-shared
+        --enable-static --disable-shared LIBS="-ldl"
       - make ${MAKE_OPTIONS}
       - make install prefix="${INSTALL_PATH}"
     clean:
