@@ -1,3 +1,4 @@
+from itertools import accumulate
 import re
 import math
 import dataclasses
@@ -9,6 +10,53 @@ import common
 import tests.test as test
 
 from common import MFCException
+
+
+@dataclasses.dataclass(repr=False)
+class Error:
+    absolute: float
+    relative: float
+
+    def __repr__(self) -> str:        
+        return f"abs: {self.absolute:.2E}, rel: {self.relative*100:.2E}%"
+
+
+def compute_error(measured: float, expected: float) -> Error:
+    absolute = abs(measured - expected)
+    
+    if expected != 0:
+        relative = absolute / expected
+    elif measured == expected:
+        relative = 0
+    else:
+        relative = float("NaN")
+
+    return Error(absolute, relative)
+
+
+class AverageError:
+    accumulated: Error
+    count:       int
+
+    def __init__(self) -> None:
+        self.accumulated = Error(0, 0)
+        self.count       = 0
+
+    def get(self) -> Error:
+        return Error(self.accumulated.absolute / self.count,
+                     self.accumulated.relative / self.count)
+
+    def push(self, error: Error) -> None:
+        if math.isnan(self.accumulated.relative):
+            return
+        
+        self.accumulated.absolute += error.absolute
+        self.accumulated.relative += error.relative
+
+        self.count += 1
+    
+    def __repr__(self) -> str:
+        return self.get().__repr__()
 
 
 @dataclasses.dataclass(repr=False)
@@ -68,7 +116,27 @@ def generate(case: test.Case) -> Pack:
     return Pack(entries)
 
 
-def check_tolerance(uuid: str, candidate: Pack, golden: Pack, tol: float) -> None:
+class Tolerance(Error):
+    pass
+
+
+def is_close(error: Error, tolerance: Tolerance) -> bool:
+    if error.absolute <= tolerance.absolute:
+        return True
+    
+    if math.isnan(error.relative):
+        return True
+
+    if error.relative <= tolerance.relative:
+        return True
+
+    return False
+
+
+def check_tolerance(uuid: str, candidate: Pack, golden: Pack, tol: float) -> Error:
+    # Keep track of the average error
+    avg_err = AverageError()
+
     # Compare entry-count
     if len(candidate.entries) != len(golden.entries):
         raise MFCException(f"tests/{uuid}: Line count didn't match.")
@@ -89,9 +157,17 @@ def check_tolerance(uuid: str, candidate: Pack, golden: Pack, tol: float) -> Non
 
         # Check if each variable is within tolerance
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
-            if not math.isclose(gVal, cVal, rel_tol=tol, abs_tol=tol):
+            # Keep track of the error and average errors
+            error = compute_error(cVal, gVal)
+            avg_err.push(error)
+
+            if not is_close(error, Tolerance(absolute=tol, relative=tol)):
                 raise MFCException(f"""\
 tests/{uuid}: Variable n°{valIndex+1} (1-indexed) in {filepath} is not within tolerance ({tol}):
   - Candidate: {cVal}
   - Golden:    {gVal}
+  - Error:     {error}
 """)
+
+    # Return the average relative error
+    return avg_err.get()

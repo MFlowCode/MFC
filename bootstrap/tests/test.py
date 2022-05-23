@@ -20,11 +20,11 @@ import rich
 
 class MFCTest:
     def __init__(self, mfc):
-        self.mfc   = mfc
-        self.sched = MFCTestThreadManager(self.mfc.args["jobs"])
+        self.mfc    = mfc
+        self.sched  = MFCTestThreadManager(self.mfc.args["jobs"])
 
     def test(self):
-        rich.print("[bold][u]Test:[/u][/bold]")
+        rich.print("[bold][u]Test:[/u][/bold] (in tests/)")
 
         # Clear previous tests if we wish to (re)generate golden files
         if self.mfc.args["generate"]:
@@ -37,6 +37,9 @@ class MFCTest:
             self.mfc.build.build_target(f"mfc", "> > ")
 
         # Run cases with multiple threads (if available)
+        rich.print(f" |-+------------+----------+----------+--------")
+        rich.print(f" | | tests/[bold magenta]UUID[/bold magenta] | Error RE |  % Tol.  | Summary")
+        rich.print(f" |-+------------+----------+----------+--------")
         self.sched.run(generate_filtered_cases(self.mfc.args), self.handle_case)
 
         rich.print(f"> Tested [bold green]✓[/bold green]")
@@ -70,4 +73,5 @@ class MFCTest:
         if not os.path.isfile(golden_filepath):
             raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
 
-        tests.pack.check_tolerance(test.get_uuid(), pack, tests.pack.load(golden_filepath), tol)
+        error = tests.pack.check_tolerance(test.get_uuid(), pack, tests.pack.load(golden_filepath), tol)
+        rich.print(f" |->  [bold magenta]{test.get_uuid()}[/bold magenta]  | {error.relative:+0.1E} | {(error.relative/tol)*100:+0.1E} | {test.trace})")
