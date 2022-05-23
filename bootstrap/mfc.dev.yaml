@@ -145,7 +145,7 @@ targets:
         make INSTALL_PATH="${post_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
         FFLAGS="-O0 -I${FFTW3:INSTALL_PATH}/include"
-        LNKFLAGS="-L${FFTW3:INSTALL_PATH}/lib -lsiloh5 -lhdf5 -lfftw3 -lm -lz"
+        LNKFLAGS="-L${FFTW3:INSTALL_PATH}/lib -lsiloh5 -lhdf5 -lfftw3 -lm -lz -ldl"
     clean:
       - make clean
  
