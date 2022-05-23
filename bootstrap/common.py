@@ -154,13 +154,14 @@ def does_cmd_exist(s: str) -> bool:
 
 
 def loaded_modules() -> list:
-    res = subprocess.Popen('module list 2>&1 | tail -n +3 | sed "s/[[:digit:]]\+)//g" | sed "/^[[:space:]]*$/d" | tr -s " " | sed "s/^ //g" | tr "\n" " "', stdout=subprocess.PIPE, shell=True)
+    res = subprocess.Popen('module -t list 2>&1', stdout=subprocess.PIPE, shell=True)
 
     res.wait()
     if res.returncode != 0:
         raise MFCException("Failed to retrive the list of loaded modules.")
 
-    return res.stdout.read().decode("utf-8").strip().split(" ")
+    lines = res.stdout.read().decode("utf-8").split('\n')
+    return [ m for m in lines if not isspace(m) ]
 
 
 def format_list_to_string(arr: list, empty = "nothing"):
