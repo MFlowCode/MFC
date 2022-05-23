@@ -28,7 +28,9 @@ targets:
         version: 3.3.10
         link: http://www.fftw.org/fftw-${VERSION}.tar.gz
     build:
-      - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads --enable-mpi
+      - >-
+        ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-threads
+        --enable-mpi --enable-static --disable-shared
       - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
       - make install
     clean:
@@ -42,8 +44,13 @@ targets:
         git: https://github.com/HDFGroup/hdf5
         hash: 4aa40365623cf35643b262781f92578220c42bbb
     build:
-      - ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel --enable-deprecated-symbols --disable-sharedlib-rpath CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
-      - make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
+      - >-
+        ./configure ${CONFIGURE_OPTIONS} ${COMPILERS} --enable-parallel
+        --enable-deprecated-symbols --disable-sharedlib-rpath CFLAGS="-O2"
+        CPPFLAGS="-O2" FFLAGS="-O2" --enable-static --disable-shared
+      - >-
+        make ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS} CFLAGS="-O2"
+        CPPFLAGS="-O2" FFLAGS="-O2"
       - make install prefix="${INSTALL_PATH}"
     clean:
       - make clean
@@ -59,10 +66,11 @@ targets:
         hash: 9e3a31fbf661c4d26e9f5272287e5ff41971d117
     build:
       - >-
-        ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule --enable-optimization
-        --disable-hzip --disable-fpzip --disable-silex
+        ./configure ${CONFIGURE_OPTIONS} --enable-pythonmodule
+        --enable-optimization --disable-hzip --disable-fpzip --disable-silex
         --with-hdf5="${HDF5:INSTALL_PATH}/include","${HDF5:INSTALL_PATH}/lib"
         ${COMPILERS} ${COMPILER_FLAGS} CFLAGS="-O2" CPPFLAGS="-O2" FFLAGS="-O2"
+        --enable-static --disable-shared
       - make ${MAKE_OPTIONS}
       - make install prefix="${INSTALL_PATH}"
     clean:
@@ -115,7 +123,8 @@ targets:
       - >-
         make INSTALL_PATH="${simulation:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-        FFLAGS="-lfftw3 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+        FFLAGS="-I${FFTW3:INSTALL_PATH}/include"
+        LNKFLAGS="-L${FFTW3:INSTALL_PATH}/lib -lfftw3 -lm"
     clean:
       - make clean
 
@@ -135,7 +144,8 @@ targets:
       - >-
         make INSTALL_PATH="${post_process:INSTALL_PATH}"
         ${MAKE_OPTIONS} ${COMPILER_FLAGS} ${COMPILERS}
-        FFLAGS="-O0 -lfftw3 -lsiloh5 -lm -I${FFTW3:INSTALL_PATH}/include -L${FFTW3:INSTALL_PATH}/lib"
+        FFLAGS="-O0 -I${FFTW3:INSTALL_PATH}/include"
+        LNKFLAGS="-L${FFTW3:INSTALL_PATH}/lib -lsiloh5 -lhdf5 -lfftw3 -lm -lz"
     clean:
       - make clean
  
