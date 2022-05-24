@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import signal
 
 
 import common
@@ -73,5 +72,5 @@ class MFCTest:
         if not os.path.isfile(golden_filepath):
             raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
 
-        error = tests.pack.check_tolerance(test.get_uuid(), pack, tests.pack.load(golden_filepath), tol)
+        error = tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
         rich.print(f" |->  [bold magenta]{test.get_uuid()}[/bold magenta]  | {error.relative:+0.1E} | {tol:+0.1E} | {test.trace})")
