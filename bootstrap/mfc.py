@@ -12,7 +12,7 @@ import common
 import signal
 
 from run   import run
-from tests import test
+from tests import tests
 
 class MFCState:
     def __init__(self) -> None:
@@ -27,7 +27,7 @@ class MFCState:
         self.args  = args.parse(self)
         self.clean = clean.MFCClean(self)
         self.build = MFCBuild(self)
-        self.test  = test.MFCTest(self)
+        self.test  = tests.MFCTest(self)
         self.run   = run.MFCRun(self)
 
         self.check_mode()

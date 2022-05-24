@@ -37,9 +37,9 @@ class MFCTest:
             self.mfc.build.build_target(f"mfc", "> > ")
 
         # Run cases with multiple threads (if available)
-        rich.print(f" |-+------------+----------+----------+--------")
-        rich.print(f" | | tests/[bold magenta]UUID[/bold magenta] | Error RE |  % Tol.  | Summary")
-        rich.print(f" |-+------------+----------+----------+--------")
+        rich.print(f" |-+------------+----------+----------+---------+")         
+        rich.print(f" | | tests/[bold magenta]UUID[/bold magenta] | Error RE |   Tol.   | Summary |")
+        rich.print(f" |-+------------+----------+----------+---------+")
         self.sched.run(generate_filtered_cases(self.mfc.args), self.handle_case)
 
         rich.print(f"> Tested [bold green]✓[/bold green]")
@@ -74,4 +74,4 @@ class MFCTest:
             raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
 
         error = tests.pack.check_tolerance(test.get_uuid(), pack, tests.pack.load(golden_filepath), tol)
-        rich.print(f" |->  [bold magenta]{test.get_uuid()}[/bold magenta]  | {error.relative:+0.1E} | {(error.relative/tol)*100:+0.1E} | {test.trace})")
+        rich.print(f" |->  [bold magenta]{test.get_uuid()}[/bold magenta]  | {error.relative:+0.1E} | {tol:+0.1E} | {test.trace})")
