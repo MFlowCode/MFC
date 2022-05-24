@@ -6,6 +6,8 @@ from pathlib import Path
 
 
 import common
+
+import tests.case  as case
 import tests.tests as tests
 
 from common import MFCException
@@ -141,7 +143,9 @@ def is_close(error: Error, tolerance: Tolerance) -> bool:
     return False
 
 
-def check_tolerance(uuid: str, candidate: Pack, golden: Pack, tol: float) -> Error:
+def check_tolerance(case: case.Case, candidate: Pack, golden: Pack, tol: float) -> Error:
+    uuid = case.get_uuid()
+    
     # Keep track of the average error
     avg_err = AverageError()
 
@@ -169,19 +173,24 @@ def check_tolerance(uuid: str, candidate: Pack, golden: Pack, tol: float) -> Err
             error = compute_error(cVal, gVal)
             avg_err.push(error)
 
+            def raise_err(msg: str):
+                raise MFCException(f"""\
+tests/{uuid}: Variable n°{valIndex+1} (1-indexed) in {filepath} {msg}:
+  - Description: {case.trace}
+  - Candidate:   {cVal}
+  - Golden:      {gVal}
+  - Error:       {error}
+  - Tolerance:   {tol}
+""")
+
             if math.isnan(gVal):
-                raise MFCException(f"A NaN was found in the golden file for {uuid}.")
+                raise_err("is NaN in the golden file")
 
             if math.isnan(cVal):
-                raise MFCException(f"A NaN was found in the pack file for {uuid}.")
+                raise_err("is NaN in the pack file")
 
             if not is_close(error, Tolerance(absolute=tol, relative=tol)):
-                raise MFCException(f"""\
-tests/{uuid}: Variable n°{valIndex+1} (1-indexed) in {filepath} is not within tolerance ({tol}):
-  - Candidate: {cVal}
-  - Golden:    {gVal}
-  - Error:     {error}
-""")
+                raise_err("is not within tolerance")
 
     # Return the average relative error
     return avg_err.get()
