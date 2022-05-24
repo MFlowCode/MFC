@@ -46,9 +46,9 @@ class MFCTest:
     def handle_case(self, test: Case):
         test.create_directory()
 
-        if 'qbmm' in test.params:
+        if test.params.get('qbmm', 'F') == 'T':
             tol = 1e-7
-        elif 'bubbles' in test.params:
+        elif test.params.get('bubbles', 'F') == 'T':
             tol = 1e-10
         else:
             tol = 1e-12
