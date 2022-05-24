@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 import common
-import tests.test as test
+import tests.tests as tests
 
 from common import MFCException
 
@@ -93,7 +93,7 @@ def load(filepath: str) -> Pack:
     return Pack(entries)
 
 
-def generate(case: test.Case) -> Pack:
+def generate(case: tests.Case) -> Pack:
     entries = []
 
     case_dir = case.get_dirpath()
@@ -110,6 +110,10 @@ def generate(case: test.Case) -> Pack:
         numbers_str = re.sub(pattern, " ", data_content.replace('\n', '')).strip()
         
         doubles: list = [ float(e) for e in numbers_str.split(' ') ] 
+
+        for double in doubles:
+            if math.isnan(double):
+                raise MFCException(f"A NaN was found while generating a pack file for {case.get_uuid()}.")
 
         entries.append(PackEntry(short_filepath,doubles))
 
@@ -160,6 +164,12 @@ def check_tolerance(uuid: str, candidate: Pack, golden: Pack, tol: float) -> Err
             # Keep track of the error and average errors
             error = compute_error(cVal, gVal)
             avg_err.push(error)
+
+            if math.isnan(gVal):
+                raise MFCException(f"A NaN was found in the golden file for {uuid}.")
+
+            if math.isnan(cVal):
+                raise MFCException(f"A NaN was found in the pack file for {uuid}.")
 
             if not is_close(error, Tolerance(absolute=tol, relative=tol)):
                 raise MFCException(f"""\
