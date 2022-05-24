@@ -1,4 +1,3 @@
-from itertools import accumulate
 import re
 import math
 import dataclasses
@@ -18,7 +17,7 @@ class Error:
     relative: float
 
     def __repr__(self) -> str:        
-        return f"abs: {self.absolute:.2E}, rel: {self.relative*100:.2E}%"
+        return f"abs: {self.absolute:.2E}, rel: {self.relative:.2E}"
 
 
 def compute_error(measured: float, expected: float) -> Error:
@@ -43,11 +42,16 @@ class AverageError:
         self.count       = 0
 
     def get(self) -> Error:
+        if self.count == 0:
+            return Error(0, 0)
+
         return Error(self.accumulated.absolute / self.count,
                      self.accumulated.relative / self.count)
 
     def push(self, error: Error) -> None:
-        if math.isnan(self.accumulated.relative):
+        # Do not include nans in the result
+        # See: compute_error()
+        if math.isnan(error.relative):
             return
         
         self.accumulated.absolute += error.absolute
