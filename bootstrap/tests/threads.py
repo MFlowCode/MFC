@@ -35,7 +35,7 @@ class MFCTestThreadManager:
         self.threads    = []
         self.nThreads   = nThreads
         self.nAvailable = self.nThreads
-    
+
     def join_first_dead_thread(self, progress, complete_tracker) -> None:
         for threadID, threadHolder in enumerate(self.threads):
             threadHolder: TestThreadHolder
@@ -48,7 +48,7 @@ class MFCTestThreadManager:
                 progress.advance(complete_tracker)
 
                 del self.threads[threadID]
-                
+
                 break
 
     def run(self, cases: list, handle_case) -> None:
@@ -71,13 +71,13 @@ class MFCTestThreadManager:
 
                     # Keep track of threads that are done
                     self.join_first_dead_thread(progress, complete_tracker)
-                    
+
                     # Do not overwhelm this core with this loop
                     time.sleep(0.05)
 
                 # Launch Thread
                 progress.advance(queue_tracker)
-                
+
                 thread = TestThread(target=handle_case, args=(test,))
                 thread.start()
 
@@ -88,6 +88,6 @@ class MFCTestThreadManager:
             while len(self.threads) != 0:
                 # Keep track of threads that are done
                 self.join_first_dead_thread(progress, complete_tracker)
-            
+
                 # Do not overwhelm this core with this loop
                 time.sleep(0.05)

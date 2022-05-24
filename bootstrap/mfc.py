@@ -12,7 +12,7 @@ import common
 import signal
 
 from run   import run
-from tests import test
+from tests import tests
 
 class MFCState:
     def __init__(self) -> None:
@@ -27,7 +27,7 @@ class MFCState:
         self.args  = args.parse(self)
         self.clean = clean.MFCClean(self)
         self.build = MFCBuild(self)
-        self.test  = test.MFCTest(self)
+        self.test  = tests.MFCTest(self)
         self.run   = run.MFCRun(self)
 
         self.check_mode()
@@ -51,11 +51,11 @@ class MFCState:
         def update_mode():
             if update_mode.triggered:
                 return
-            
+
             update_mode.triggered = True
 
             rich.print(f'[yellow]Switching to [bold green]{self.args["mode"]}[/bold green] from [bold magenta]{self.lock.mode}[/bold magenta]. Purging references to other modes...[/yellow]')
-            
+
             # Update mode in mfc.user.yaml
             self.lock.mode = self.args["mode"]
             self.lock.save()
@@ -68,7 +68,7 @@ class MFCState:
 
                 # Delete the build directory of other modes
                 common.delete_directory_recursive(self.build.get_mode_base_path(mode.name))
-        
+
         update_mode.triggered = False
 
         # User requested a new mode using -m as a command-line argument
@@ -81,7 +81,7 @@ class MFCState:
             # There exists a (built) target, which is not a common one, that has different mode
             if entry.target.common_mode == None and entry.metadata.mode != self.args["mode"]:
                 update_mode()
-                
+
                 # Remove it
                 del self.lock.targets[idx]
 
