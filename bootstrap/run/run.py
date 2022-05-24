@@ -59,14 +59,6 @@ class MFCRun:
     def get_binpath(self, target: str) -> str:
         return f'{self.mfc.build.get_build_path(target)}/bin/{target}'
 
-    def get_ld(self, target: str) -> str:
-        paths: list = [
-            ("$LD_LIBRARY_PATH",                      True),
-            (f"{common.MFC_SUBDIR}/common/build/lib", True),
-        ]
-
-        return f'LD_LIBRARY_PATH="{":".join([ path[0] for path in paths if path[1] ])}"'
-
     def get_case_dirpath(self) -> str:
         return os.path.abspath(os.path.dirname(self.mfc.args["input"]))
 
@@ -74,7 +66,6 @@ class MFCRun:
         binpath = self.get_binpath(target_name)
 
         cd = f'cd "{self.get_case_dirpath()}"'
-        ld = self.get_ld(target_name)
 
         flags = ""
         if self.mfc.args["engine"] == "serial":
@@ -83,7 +74,7 @@ class MFCRun:
 
         exec_params = mpibin.gen_params(self.mfc.args)
 
-        return f'{cd} && {ld} {mpibin.bin} {exec_params} {flags} "{binpath}"'
+        return f'{cd} && {mpibin.bin} {exec_params} {flags} "{binpath}"'
 
     def validate_job_options(self) -> None:
         if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \

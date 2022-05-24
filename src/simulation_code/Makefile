@@ -17,14 +17,14 @@ endef
 
 define CREATE_FC_RULE
 $(2) : $(1)
-	$(FC) $(FFLAGS) -c -o $(2) $< $(1)
+	$(FC) $(FFLAGS) -c -o $(2) $< $(1) $(LNKFLAGS)
 endef
 
 $(foreach l,$(FYPPS),$(eval $(call CREATE_FYPP_RULE,$(l),$(patsubst %.fpp,%.f90,$(l)))))
 $(foreach l,$(F90S), $(eval $(call CREATE_FC_RULE,  $(l),$(patsubst %.f90,%.o,  $(l)))))
 
 $(PROGRAM) : $(OBJS)
-	$(FC) $(OBJS) $(FFLAGS) -o $(EXEC)
+	$(FC) $(OBJS) $(FFLAGS) -o $(EXEC) $(LNKFLAGS)
 
 $(PRG_OBJ) : $(MOD_OBJS)
 

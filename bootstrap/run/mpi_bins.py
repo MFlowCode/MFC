@@ -35,7 +35,7 @@ class SRUN(MPIBinary):
         super().__init__("SLURM's SRUN", "srun")
 
     def gen_params(self, args: list) -> str:
-        params = f' -n {args["cpus_per_node"]}'
+        params = f' --ntasks-per-node {args["cpus_per_node"]}'
 
         if args["nodes"] != 1:
             params += f' -N {args["nodes"]}'

@@ -1,4 +1,10 @@
-import os, sys, yaml, shutil, tarfile, subprocess, datetime
+import os
+import sys
+import yaml
+import shutil
+import tarfile
+import datetime
+import subprocess
 
 
 MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/..")
@@ -8,7 +14,7 @@ MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml")
 MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
 MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
 
-MFC_HEADER = f"""[bold blue]
+MFC_HEADER = f"""[bold blue]\
      ___            ___          ___
     /__/\          /  /\        /  /\\
    |  |::\        /  /:/_      /  /:/
@@ -144,15 +150,40 @@ def isspace(s: str) -> bool:
 
 
 def does_cmd_exist(s: str) -> bool:
-    return os.system(f"which {s} > /dev/null 2>&1") == 0
+    return os.system(f"command -v {s} > /dev/null 2>&1") == 0
 
 
 def loaded_modules() -> list:
-    res = subprocess.Popen('module list 2>&1 | tail -n +3 | sed "s/[[:digit:]]\+)//g" | sed "/^[[:space:]]*$/d" | tr -s " " | sed "s/^ //g" | tr "\n" " "', stdout=subprocess.PIPE, shell=True)
+    res = subprocess.Popen("module -t list 2>&1 | grep -v -i 'Currently Loaded Modulefiles:'", stdout=subprocess.PIPE, shell=True)
 
     res.wait()
     if res.returncode != 0:
         raise MFCException("Failed to retrive the list of loaded modules.")
 
-    return res.stdout.read().decode("utf-8").strip().split(" ")
+    lines = res.stdout.read().decode("utf-8").split('\n')
+    return [ m for m in lines if not isspace(m) ]
 
+
+def format_list_to_string(arr: list, empty = "nothing"):
+    if len(arr) == 0:
+        return empty
+    
+    if len(arr) == 1:
+        return arr[0]
+
+    lhs = ', '.join(arr[:-1])
+    rhs = f", and {arr[-1]}"
+
+    return lhs + rhs
+
+
+def find(predicate, arr: list):
+    for index, item in enumerate(arr):
+        if predicate(index, item):
+            return index, item
+    
+    return None, None
+
+
+def quit(sig):
+    os.kill(os.getpid(), sig)
