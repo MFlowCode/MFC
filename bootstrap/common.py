@@ -150,11 +150,11 @@ def isspace(s: str) -> bool:
 
 
 def does_cmd_exist(s: str) -> bool:
-    return os.system(f"which {s} > /dev/null 2>&1") == 0
+    return os.system(f"command -v {s} > /dev/null 2>&1") == 0
 
 
 def loaded_modules() -> list:
-    res = subprocess.Popen('module -t list 2>&1', stdout=subprocess.PIPE, shell=True)
+    res = subprocess.Popen("module -t list 2>&1 | grep -v -i 'Currently Loaded Modulefiles:'", stdout=subprocess.PIPE, shell=True)
 
     res.wait()
     if res.returncode != 0:
