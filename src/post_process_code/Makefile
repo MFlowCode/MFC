@@ -16,11 +16,11 @@ all : $(PROGRAM)
 
 # Compiler steps for all objects
 $(OBJS) : %.o : %.f90
-	$(FC) $(FFLAGS) -c -o $@ $<
+	$(FC) $(FFLAGS) -c -o $@ $< $(LNKFLAGS)
 
 # Linker
 $(PROGRAM) : $(OBJS)
-	$(FC) $(OBJS) $(FFLAGS) -o $(EXEC)
+	$(FC) $(FFLAGS) $(OBJS) -o $(EXEC) $(LNKFLAGS)
 
 .PHONY: all clean
 

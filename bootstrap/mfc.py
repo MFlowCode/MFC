@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import rich
-#import traceback
+import rich.console
 
 import user
 import conf
@@ -9,6 +9,7 @@ import lock
 import args
 import clean
 import common
+import signal
 
 from run   import run
 from tests import test
@@ -16,6 +17,8 @@ from tests import test
 class MFCState:
     def __init__(self) -> None:
         from build import MFCBuild
+
+        rich.print(common.MFC_HEADER)
 
         self.conf  = conf.MFCConf(self)
         self.user  = user.MFCUser()
@@ -27,19 +30,15 @@ class MFCState:
         self.test  = test.MFCTest(self)
         self.run   = run.MFCRun(self)
 
-        rich.print(common.MFC_HEADER)
-
         self.check_mode()
 
-        rich.print(f"[yellow]You are currently in the [bold green]{self.lock.mode}[/bold green] mode.[/yellow]")
+        rich.print(f"\n[yellow]You are currently in the [bold green]{self.lock.mode}[/bold green] mode.[/yellow]\n")
 
         if self.args["command"] == "test":
-            rich.print("[bold][u]Test:[/u][/bold]")
             self.test.test()
         elif self.args["command"] == "run":
             self.run.run()
         elif self.args["command"] == "clean":
-            rich.print("[bold][u]Clean:[/u][/bold]")
             self.clean.run()
 
         if self.args["command"] == "build":
@@ -98,15 +97,26 @@ class MFCState:
                     for build_subdir in ["bin", "include", "lib", "share"]:
                         common.create_directory(f"{common.MFC_SUBDIR}/{mode}/{d}/{build_subdir}")
 
-def main():
-    mfc = MFCState()
+FILE_ISSUE_MSG = f"""\
+We apologize for the inconvenience. If you believe this is an issue with MFC, \
+please visit https://github.com/MFlowCode/MFC-develop/issues to file an issue.\
+"""
 
 if __name__ == "__main__":
     try:
-        main()
+        MFCState()
     except common.MFCException as exc:
-        #traceback.print_exc()
-        rich.print(f"[bold red]ERROR[/bold red]> {str(exc)}")
-        exit(1)
+        rich.print(f"""
+[bold red]FATAL ERROR[/bold red]> {str(exc)}
+{FILE_ISSUE_MSG}
+""")
+        common.quit(signal.SIGTERM)
     except KeyboardInterrupt as exc:
-        exit(1)
+        common.quit(signal.SIGTERM)
+    except Exception as exc:
+        rich.console.Console().print_exception()
+        rich.print(f"""
+[bold red]FATAL ERROR[/bold red]> An unexpected exception occurred.
+{FILE_ISSUE_MSG}
+""")
+        common.quit(signal.SIGTERM)

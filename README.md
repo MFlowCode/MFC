@@ -168,8 +168,8 @@ The `mfc.sh` script used in the previous section is configured through the file 
 The MFC can be run using `mfc.sh`'s `run` command. It supports both serial and
 parallel execution, the latter being designed for multi-socket systems, namely supercomputers,
 equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
-of available arguments can be acquired with `./mfc.sh -h`. Example Python input
-files can be found in the `samples` directories, and they are often called `input.py`
+of available arguments can be acquired with `./mfc.sh run -h`. Example Python input
+files can be found in the [samples/](samples/) directory, and they are often called `input.py`
 or `case.py`. They print a Python dictionary containing input parameters for the
 MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
@@ -177,17 +177,37 @@ can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/).
 
 ## Serial Execution (`-e serial`)
 
-To run [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/) on [2D_exercise_10](samples/2D_exercise_10/) with 4 processors/tasks on your system, in GPU mode,
+To run all stages of MFC, that is [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/) on the sample case [2D_shockbubble](samples/2D_shockbubble/),
 
 ```console
-./mfc.sh run samples/2D_exercise_10/case.py -c 4 -m release-gpu
+./mfc.sh run samples/2D_shockbubble/case.py
 ```
 
+If you want to run a subset of the available stages, you can use the `-t` argument.
+To use multiple threads, use the `-n` option along with the number of threads you wish to use.
 If a (re)build is required, it will be done automatically, with the number of threads
-specified with the `-j` option. Most parameters have sensible defaults which can
-be overridden in [mfc.user.yaml](mfc.user.yaml).
+specified with the `-j` option.
 
-Please refer to `./mfc.sh -h` for information on parallel execution.
+For example,
+
+- Running [pre_process](src/pre_process_code/) with 2 cores:
+
+```console
+./mfc.sh run samples/2D_shockbubble/case.py -t pre_process -n 2
+```
+
+- Running [simulation](src/simulation_code/) and [post_process](src/post_process_code/)
+using 4 cores:
+
+```console
+./mfc.sh run samples/2D_shockbubble/case.py -t simulation post_process -n 4
+```
+
+Most parameters have sensible defaults which can be overridden in [mfc.user.yaml](mfc.user.yaml):
+
+https://github.com/MFlowCode/MFC-develop/blob/d74e714b08562a9f8f815112e05df54c99c8c18f/mfc.user.yaml#L12-L21
+
+Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
 ## Batch Submission (`-e parallel`)
 
@@ -195,10 +215,10 @@ The MFC detects which scheduler your system is using and handles the creation an
 execution of batch scripts. The parallel engine is requested with the `-e parallel` option.
 Whereas the serial engine can execute all MFC's codes in succession, the parallel engine
 requires you to only specify one target with the `-t` option. The number of nodes and GPUs can, 
-respectively be specified with the `-n` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
+respectively be specified with the `-N` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
 
 ```console
-./mfc.sh run samples/2D_exercise_10/case.py -e parallel -n 2 -c 4 -g 4 -t simulation
+./mfc.sh run samples/2D_shockbubble/case.py -e parallel -N 2 -n 4 -g 4 -t simulation
 ```
 
 Other useful arguments include:
@@ -223,18 +243,18 @@ allocate resources. Therefore, the MFC constructs equivalent resource-sets in ta
 
 ### Example Runs
 
-- Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/)
+- Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
 ```console
-./mfc.sh run samples/3D_exercise/case.py -e parallel    \
-             -n 2 -c 4 -g 4​ -t simulation -a <redacted>
+./mfc.sh run samples/2D_shockbubble/case.py -e parallel    \
+             -N 2 -n 4 -g 4​ -t simulation -a <redacted>
 ```
 
-- University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/)
+- University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/):
 
 ```console
-./mfc.sh run samples/3D_exercise/case.py -e parallel -p GPU -t simulation​ \
-             -n 2 -c 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
+./mfc.sh run samples/2D_shockbubble/case.py -e parallel -p GPU -t simulation​ \
+             -N 2 -n 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
 ```
 
 # Testing MFC

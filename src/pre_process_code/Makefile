@@ -16,16 +16,16 @@ all : $(PROGRAM)
 
 # Compiler steps for all objects
 $(OBJS) : %.o : %.f90
-	$(FC) $(FFLAGS) -c -o $@ $<
+	$(FC) $(FFLAGS) -c -o $@ $< $(LNKFLAGS)
 
 # Linker
 $(PROGRAM) : $(OBJS)
-	$(FC) $(FFLAGS) -o $(EXEC) $(OBJS) 
+	$(FC) $(FFLAGS) -o $(EXEC) $(OBJS) $(LNKFLAGS)
 
 .PHONY: all clean
 
 clean:
-	rm -rf $(OBJS) $(PROGRAM) $(EXEC)  $(patsubst %.o,%.mod,$(MOD_OBJS))
+	rm -rf $(OBJS) $(PROGRAM) $(EXEC) $(patsubst %.o,%.mod,$(MOD_OBJS))
 
 # Dependencies
 

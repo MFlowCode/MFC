@@ -71,6 +71,10 @@ program p_main
         s_read_grid_data_files => s_read_serial_grid_data_files
         s_read_ic_data_files => s_read_serial_ic_data_files
         s_write_data_files => s_write_serial_data_files
+
+        ! Create the D directory if it doesn't exit, to store
+        ! the serial data files
+        call system('mkdir -p D')
     else
         s_generate_grid => s_generate_parallel_grid
         s_read_grid_data_files => s_read_parallel_grid_data_files
