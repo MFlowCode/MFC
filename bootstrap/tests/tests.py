@@ -36,7 +36,7 @@ class MFCTest:
             self.mfc.build.build_target(f"mfc", "> > ")
 
         # Run cases with multiple threads (if available)
-        rich.print(f" |-+------------+----------+----------+---------+")         
+        rich.print(f" |-+------------+----------+----------+---------+")
         rich.print(f" | | tests/[bold magenta]UUID[/bold magenta] | Error RE |   Tol.   | Summary |")
         rich.print(f" |-+------------+----------+----------+---------+")
         self.sched.run(generate_filtered_cases(self.mfc.args), self.handle_case)

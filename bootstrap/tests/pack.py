@@ -8,7 +8,7 @@ from pathlib import Path
 import common
 
 import tests.case  as case
-import tests.tests as tests
+import tests.tests
 
 from common import MFCException
 
@@ -18,13 +18,13 @@ class Error:
     absolute: float
     relative: float
 
-    def __repr__(self) -> str:        
+    def __repr__(self) -> str:
         return f"abs: {self.absolute:.2E}, rel: {self.relative:.2E}"
 
 
 def compute_error(measured: float, expected: float) -> Error:
     absolute = abs(measured - expected)
-    
+
     if expected != 0:
         relative = absolute / expected
     elif measured == expected:
@@ -55,12 +55,12 @@ class AverageError:
         # See: compute_error()
         if math.isnan(error.relative):
             return
-        
+
         self.accumulated.absolute += error.absolute
         self.accumulated.relative += error.relative
 
         self.count += 1
-    
+
     def __repr__(self) -> str:
         return self.get().__repr__()
 
@@ -99,7 +99,7 @@ def load(filepath: str) -> Pack:
     return Pack(entries)
 
 
-def generate(case: tests.Case) -> Pack:
+def generate(case: case.Case) -> Pack:
     entries = []
 
     case_dir = case.get_dirpath()
@@ -109,13 +109,13 @@ def generate(case: tests.Case) -> Pack:
         short_filepath = str(filepath).replace(f'{case_dir}/', '')
 
         data_content = common.file_read(filepath)
-        
+
         # 2 or more (contiguous) spaces
         pattern = r"([ ]{2,})"
-        
+
         numbers_str = re.sub(pattern, " ", data_content.replace('\n', '')).strip()
-        
-        doubles: list = [ float(e) for e in numbers_str.split(' ') ] 
+
+        doubles: list = [ float(e) for e in numbers_str.split(' ') ]
 
         for double in doubles:
             if math.isnan(double):
@@ -133,7 +133,7 @@ class Tolerance(Error):
 def is_close(error: Error, tolerance: Tolerance) -> bool:
     if error.absolute <= tolerance.absolute:
         return True
-    
+
     if math.isnan(error.relative):
         return True
 
@@ -145,14 +145,14 @@ def is_close(error: Error, tolerance: Tolerance) -> bool:
 
 def check_tolerance(case: case.Case, candidate: Pack, golden: Pack, tol: float) -> Error:
     uuid = case.get_uuid()
-    
+
     # Keep track of the average error
     avg_err = AverageError()
 
     # Compare entry-count
     if len(candidate.entries) != len(golden.entries):
         raise MFCException(f"tests/{uuid}: Line count didn't match.")
-    
+
     # For every entry in the golden's pack
     for gIndex, gEntry in enumerate(golden.entries):
         # Find the corresponding entry in the candidate's pack
@@ -160,7 +160,7 @@ def check_tolerance(case: case.Case, candidate: Pack, golden: Pack, tol: float) 
 
         if cIndex == None:
             raise MFCException(f"tests/{uuid}: No reference of {gEntry.filepath} in the candidate's pack.")
-        
+
         filepath: str = gEntry.filepath
 
         # Compare variable-count

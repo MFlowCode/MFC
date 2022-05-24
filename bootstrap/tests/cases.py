@@ -14,7 +14,7 @@ def get_dimensions():
         dimParams = {**dimInfo[1]}
 
         for dimCmp in dimInfo[0]:
-            dimParams.update({ f"{dimCmp}_domain%beg": 0.E+00, 
+            dimParams.update({ f"{dimCmp}_domain%beg": 0.E+00,
                                f"{dimCmp}_domain%end": 1.E+00 })
 
         for patchID in range(1, 3+1):
@@ -65,7 +65,7 @@ def get_dimensions():
                 dimParams[f"patch_icpp({patchID})%vel(3)"] = 0.0
 
         r.append((dimInfo, dimParams))
-    
+
     return r
 
 
@@ -85,7 +85,7 @@ def generate_cases() -> list:
 
             if bc != -3: # Use bc = 3 henceforth
                 stack.pop()
-        
+
         for weno_order in [3, 5]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
 
@@ -97,9 +97,9 @@ def generate_cases() -> list:
 
                 if not (mp_weno == 'T' and weno_order != 5):
                     cases.append(create_case(stack, '', {}))
-                
+
                 stack.pop()
-            
+
             stack.pop()
 
         for num_fluids in [1, 2]:
@@ -139,7 +139,7 @@ def generate_cases() -> list:
         else:
             cases.append(create_case(stack, f'ppn=2', {'ppn': 2}))
 
-        stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]}) 
+        stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
 
         if len(dimInfo[0]) > 0:
             stack.push(f"bubbles={'T'}", {"bubbles": 'T'})
@@ -147,9 +147,9 @@ def generate_cases() -> list:
             stack.push(f'', {
                 'nb' : 3, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
                 'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
-                'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33, 
+                'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
                 'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,
-                'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05, 
+                'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05,
                 'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.999999999999, 'patch_icpp(1)%alpha(1)':
                 1e-12, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.999999999999,
                 'patch_icpp(3)%alpha(1)': 1e-12, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
@@ -166,7 +166,7 @@ def generate_cases() -> list:
 
             for polytropic in ['T', 'F']:
                 stack.push(f"polytropic={polytropic}", {'polytropic' : polytropic})
-                
+
                 for bubble_model in [3, 2]:
                     stack.push(f"bubble_model={bubble_model}", {'bubble_model' : bubble_model})
 
@@ -174,7 +174,7 @@ def generate_cases() -> list:
                         cases.append(create_case(stack, '', {}))
 
                     stack.pop()
-                
+
                 stack.pop()
 
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
@@ -214,7 +214,7 @@ def generate_cases() -> list:
 
 def generate_filtered_cases(args: dict):
     cases: list = generate_cases()
-    
+
     if len(args["only"]) > 0:
         for i, case in enumerate(cases[:]):
             case: Case
@@ -227,5 +227,5 @@ def generate_filtered_cases(args: dict):
 
             if not doKeep:
                 cases.remove(case)
-    
+
     return cases
