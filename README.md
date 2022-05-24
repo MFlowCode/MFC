@@ -126,7 +126,7 @@ $ touch ~/.bash_profile
 $ open ~/.bash_profile
 ```
  
-An editor should open. Please paste the following lines into it. If you wish to use a version of GNU's GCC other than 11, modify the first assignment. These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't be used to compile MFC. Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
+An editor should open. Please paste the following lines into it before saving the file. If you wish to use a version of GNU's GCC other than 11, modify the first assignment. These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't be used to compile MFC. Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
 
 ```console
 # === MFC MPI Installation ===
@@ -139,13 +139,14 @@ export OMPI_FC=gfortran-$MFC_GCC_VER
 # === MFC MPI Installation ===
 ```
 
-In your terminal, execute the commands bellow. They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`. Building this package might take a while.
- 
+Close your the open editor **and** terminal windows. Open a **new terminal** window before executing the commands bellow.
+
 ```console
-$ reset
 $ brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
 $ brew install --build-from-source open-mpi
 ```
+ 
+ They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`. Building this package might take a while.
 
 ### Fetch and build MFC
 
