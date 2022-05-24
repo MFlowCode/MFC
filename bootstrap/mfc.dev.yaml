@@ -85,8 +85,12 @@ targets:
         hash: e8edaced12f139ddf16167987ded15e5da1b98da
     build:
       - mkdir -p build
-      - cd build && ${COMPILERS} cmake -DZFP_WITH_OPENMP=OFF BUILD_UTILITIES=OFF BUILD_ZFORP=ON -DZFP_WITH_CUDA=ON ..
-      - cd build && ${COMPILERS} cmake --build . --config Release
+      - >-
+        cd build && cmake -DZFP_WITH_OPENMP=OFF BUILD_UTILITIES=OFF
+        BUILD_ZFORP=ON -DZFP_WITH_CUDA=ON
+        -DCMAKE_C_COMPILER=nvc -DCMAKE_CXX_COMPILER=nvc++
+        -DCUDA_TOOLKIT_ROOT_DIR="${CUDA:INSTALL_PATH}" ..
+      - cd build && cmake --build . --config Release
       - rsync -avh --progress "$(pwd)/build/bin/" "${INSTALL_PATH}/bin"
       - rsync -avh --progress "$(pwd)/build/"lib*/ "${INSTALL_PATH}/lib"
     clean:
