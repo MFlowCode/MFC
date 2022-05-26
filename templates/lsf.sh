@@ -13,9 +13,13 @@
 #>   figure in the final batch script, not even as a
 #>   comment.
 #>
-#> - Statements of the form ${expression} are string-
-#>   -ced by mfc.sh run to provide runtime parameters,
-#>   most notably execution options.
+#> - Statements of the form `${expression}` are string-
+#>   -replaced by mfc.sh run to provide runtime parameters,
+#>   most notably execution options. They reference the
+#>   variables in the same format as those under the "run"
+#>   section of [mfc.user.yaml](mfc.user.yaml), replacing
+#>   "-" for "_". You can perform therein any Python operation
+#>   recognized by the built-in `expr()` function.
 #>
 #> - Statements of the form {MFC::expression} tell MFC
 #>   where to place the common code, across all batch

@@ -2,7 +2,6 @@
 import json
 import hashlib
 import binascii
-import traceback
 import subprocess
 import dataclasses
 
