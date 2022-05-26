@@ -1,3 +1,4 @@
+import re
 import os
 import time
 import datetime
@@ -35,6 +36,20 @@ class SerialEngine(Engine):
 
         return targets
 
+    def get_exec_cmd(self, target_name: str, mpibin: mpi_bins.MPIBinary):
+        binpath = self.mfc.run.get_binpath(target_name)
+
+        cd = f'cd "{self.mfc.run.get_case_dirpath()}"'
+
+        flags = ""
+        if self.mfc.args["engine"] == "serial":
+            for flag in self.mfc.args["flags"]:
+                flags += f"\"{flag}\" "
+
+        exec_params = mpibin.gen_params(self.mfc.args)
+
+        return f'{cd} && {mpibin.bin} {exec_params} {flags} "{binpath}"'
+
     def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
         self.mfc = mfc
 
@@ -42,7 +57,7 @@ class SerialEngine(Engine):
         rich.print(f"{date} Running...")
 
         start_time = time.monotonic()
-        common.execute_shell_command(self.mfc.run.get_exec_cmd(target_name, mpibin))
+        common.execute_shell_command(self.get_exec_cmd(target_name, mpibin))
         end_time   = time.monotonic()
 
         rich.print(f"> > Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
@@ -77,26 +92,8 @@ class ParallelEngine(Engine):
 
         return os.path.abspath(f"{case_dirpath}/{target_name}.sh")
 
-    def create_batch_file(self, system: queues.QueueSystem, target_name: str, mpibin: mpi_bins.MPIBinary):
-        job_name = self.mfc.run.get_job_name(target_name)
-
-        load_modules: str = ""
-
-        if common.does_cmd_exist("module"):
-            modules: list = common.loaded_modules()
-            load_modules: str = f"""\
-echo " :) Loading modules... ({common.format_list_to_string(modules)})"
-
-module purge || true
-{chr(10).join([ f"module load {m} || true" for m in modules ])}
-
-echo ""
-"""
-
-        BATCH_CONTENT: str = f"""\
-#!/usr/bin/env bash
-{system.gen_batch_header(self.mfc.args, job_name)}
-
+    def string_replace(self, s: str, system: queues.QueueSystem, target_name: str):
+        MFC_PROLOGUE: str = f"""\
 TABLE_FORMAT_LINE="| - %-14s %-35s - %-14s %-35s |\\n"
 TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
 TABLE_FOOTER="+-----------------------------------------------------------------------------------------------------------+ \\n"
@@ -106,48 +103,93 @@ $(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                    
 $(printf "$TABLE_FORMAT_LINE" "Partition:"     "{self.mfc.args["partition"]}"      "Walltime:"      "{self.mfc.args["walltime"]}")
 $(printf "$TABLE_FORMAT_LINE" "Account:"       "{self.mfc.args["account"]}"        "Nodes:"         "{self.mfc.args["nodes"]}")
 $(printf "$TABLE_FORMAT_LINE" "CPUs (/node):"  "{self.mfc.args["cpus_per_node"]}"  "GPUs (/node):"  "{self.mfc.args["gpus_per_node"]}")
-$(printf "$TABLE_FORMAT_LINE" "Input File:"    "{self.mfc.args["input"]}"          "Engine"         "{self.mfc.args["engine"]}")
+$(printf "$TABLE_FORMAT_LINE" "Job Name:"      "{self.mfc.args["name"]}"           "Engine"         "{self.mfc.args["engine"]}")
 $(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Mode:"          "{self.mfc.args["mode"]}")
-$(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          "Job Name:"      "{job_name}")
-$(printf "$TABLE_FORMAT_LINE" "MPI Binary:"    "{mpibin.bin}"                      ""      "")\\n
+$(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          ""               "")
 END
 )
 
 printf "$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Starting" "{job_name}:"
-printf "$TABLE_CONTENT"
+printf "$TABLE_TITLE_FORMAT" "Starting" "{self.mfc.args["name"]} from {self.mfc.args["input"]}:"
+printf "$TABLE_CONTENT\\n"
 printf "$TABLE_FOOTER\\n"
 
-t_start=$(date +%s)
-
-{load_modules}\
-
 echo -e ":) Running MFC..."
-{self.mfc.run.get_exec_cmd(target_name, mpibin)}
 
+t_start=$(date +%s)
+"""
+
+        MFC_EPILOGUE: str = f"""\
 code=$?
 
 t_stop="$(date +%s)"
 
-status_msg="SUCCESS"
-if [ "$code" -ne "0" ]; then
-    status_msg="FAILURE"
-fi
-
 printf "\\n$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Finished" "{job_name}:"
-printf "$TABLE_FORMAT_LINE" "Total-time:"  "$(expr $t_stop - $t_start)s"  "Status:"    "$status_msg"
+printf "$TABLE_TITLE_FORMAT" "Finished" "{self.mfc.args["name"]}:"
+printf "$TABLE_FORMAT_LINE" "Total-time:"  "$(expr $t_stop - $t_start)s"  "Exit Code:" "$code"
 printf "$TABLE_FORMAT_LINE" "End-time:"    "$(date +%T)"                  "End-date:"  "$(date +%T)"
 printf "$TABLE_FOOTER"
 
-printf "\\nThank you for using MFC !\\n\\n"
+printf "\\nI'll see you on the dark side of the moon...\\n\\n"
 
 exit $code
 """
 
+        replace_list = [
+            ("{MFC::PROLOGUE}", MFC_PROLOGUE),
+            ("{MFC::EPILOGUE}", MFC_EPILOGUE),
+            ("{MFC::BIN}",      self.mfc.run.get_binpath(target_name))
+        ]
+
+        for (key, value) in replace_list:
+            s = s.replace(key, value)
+
+        # Remove "#>" comments & redundant newlines
+        s = re.sub(r"^#>.*\n", "",   s, flags=re.MULTILINE)
+        s = re.sub(r"^\n{2,}", "\n", s, flags=re.MULTILINE)
+        
+        for match in re.findall(r"{[^\{]+}", s, flags=re.MULTILINE):
+            expression: str = match[1:-1]
+
+            if expression in self.mfc.args:
+                repl = str(self.mfc.args[expression])
+
+                # Check it isn't whitespace
+                if not common.isspace(repl):
+                    s = s.replace(match, str(self.mfc.args[expression]))
+                    continue
+            else:
+                # It may me a calculation
+                # Try and parse it
+                for arg in self.mfc.args:
+                    repl = str(arg)
+
+                    # Check it isn't whitespace
+                    if common.isspace(repl):
+                        continue
+                    
+                    expression = expression.replace(repl, str(self.mfc.args[arg]))
+                
+                # See if it computable
+                try:
+                    # We assume eval is safe because we
+                    # control the expression.
+                    result = eval(expression)
+
+                    s = s.replace(match, str(result))
+                    continue
+                except Exception as exc:
+                    raise common.MFCException(f"ParallelEngine: {match} is not valid in the template file.")
+
+            # If not specified, then remove the line it appears on
+            s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
+
+        return s
+
+    def create_batch_file(self, system: queues.QueueSystem, target_name: str, mpibin: mpi_bins.MPIBinary):
         filepath = self.get_batch_filepath(system, target_name)
 
-        common.file_write(filepath, BATCH_CONTENT)
+        common.file_write(filepath, self.string_replace(system.template, system, target_name))
 
     def execute_batch_file(self, system: queues.QueueSystem, target_name: str):
         if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(system, target_name))):

@@ -66,7 +66,7 @@ def parse(mfc):
     run.add_argument("-@", "--email",          metavar="EMAIL",                 type=str, default=mfc.user.run.email,          help="(Parallel) Email for job notification.")
     run.add_argument("-#", "--name",           metavar="NAME",                  type=str, default=mfc.user.run.name,           help="(Parallel) Job name.")
     run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs="+",  type=str, default=mfc.user.run.flags,          help="(Parallel) Additional batch options.")
-    run.add_argument("-b", "--binary",         choices=binaries, type=str, default=None,                        help="(Parallel) Override MPI execution binary")
+    run.add_argument("-b", "--binary",         choices=binaries, type=str, default=None, help="(Parallel) Override MPI execution binary")
 
     args: dict = vars(parser.parse_args())
 

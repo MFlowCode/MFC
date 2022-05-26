@@ -33,9 +33,6 @@ class MFCRun:
 
         return case
 
-    def get_job_name(self, target_name: str):
-        return f'MFC-{str(self.mfc.args["name"])}-{target_name}'
-
     def get_input_filepath(self, target_name: str):
         dirpath  = os.path.abspath(os.path.dirname(self.mfc.args["input"]))
         filename = f"{target_name}.inp"
@@ -61,20 +58,6 @@ class MFCRun:
 
     def get_case_dirpath(self) -> str:
         return os.path.abspath(os.path.dirname(self.mfc.args["input"]))
-
-    def get_exec_cmd(self, target_name: str, mpibin: mpi_bins.MPIBinary):
-        binpath = self.get_binpath(target_name)
-
-        cd = f'cd "{self.get_case_dirpath()}"'
-
-        flags = ""
-        if self.mfc.args["engine"] == "serial":
-            for flag in self.mfc.args["flags"]:
-                flags += f"\"{flag}\" "
-
-        exec_params = mpibin.gen_params(self.mfc.args)
-
-        return f'{cd} && {mpibin.bin} {exec_params} {flags} "{binpath}"'
 
     def validate_job_options(self) -> None:
         if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \
@@ -116,7 +99,7 @@ class MFCRun:
 > Partition     (-p)  {self.mfc.args["partition"]}
 > Account       (-a)  {self.mfc.args["account"]}
 > Email         (-@)  {self.mfc.args["email"]}
-> MPI Binary    (-b)  {mpibin.bin} {f"[green](autodetect: {mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {mpibin.name})[/yellow]"}
+{f'> MPI Binary    (-b)  {mpibin.bin} {f"[green](autodetect: {mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {mpibin.name})[/yellow]"}' if self.mfc.args["engine"] == "serial" else ''}\
 """)
 
         self.validate_job_options()
