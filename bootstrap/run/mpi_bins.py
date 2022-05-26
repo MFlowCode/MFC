@@ -3,6 +3,9 @@ import dataclasses
 
 import common
 
+# Note: This file is now only used when running
+#       in serial mode.
+
 @dataclasses.dataclass
 class MPIBinary:
     name: str
