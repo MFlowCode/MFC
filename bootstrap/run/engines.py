@@ -11,24 +11,44 @@ import common
 import run.queues   as queues
 import run.mpi_bins as mpi_bins
 
+from run.input import MFCInputFile
+
 @dataclasses.dataclass
 class Engine:
     name: str
     slug: str
 
+    def init(self, mfc, input: MFCInputFile) -> None:
+        self.mfc   = mfc
+        self.input = input
+
+        self._init()
+
+    def _init(self) -> None:
+        pass 
+
+    def get_args(self) -> str:
+        raise common.MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
+
     def get_targets(self, targets: list) -> list:
         raise common.MFCException(f"MFCEngine::get_targets: not implemented for {self.name}.")
 
-    def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
+    def run(self, target_name: str) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
-    def validate_job_options(self, mfc) -> None:
+    def validate_job_options(self) -> None:
         raise common.MFCException(f"MFCEngine::validate_job_options: not implemented for {self.name}.")
+
+    def get_binpath(self, target: str) -> str:
+        return f'{self.mfc.build.get_build_path(target)}/bin/{target}'
 
 
 class SerialEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Serial", "serial")
+
+    def _init(self) -> None:
+        self.mpibin = mpi_bins.get_binary(self.mfc.args)
 
     def get_targets(self, targets: list) -> list:
         if targets[0] == "mfc":
@@ -36,28 +56,31 @@ class SerialEngine(Engine):
 
         return targets
 
-    def get_exec_cmd(self, target_name: str, mpibin: mpi_bins.MPIBinary):
-        binpath = self.mfc.run.get_binpath(target_name)
+    def get_args(self) -> str:
+        return f"""\
+> MPI Binary    (-b)  {self.mpibin.bin} {f"[green](autodetect: {self.mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {self.mpibin.name})[/yellow]"}
+"""
 
-        cd = f'cd "{self.mfc.run.get_case_dirpath()}"'
+    def get_exec_cmd(self, target_name: str):
+        binpath = self.get_binpath(target_name)
+
+        cd = f'cd "{self.input.case_dirpath}"'
 
         flags = ""
         if self.mfc.args["engine"] == "serial":
             for flag in self.mfc.args["flags"]:
                 flags += f"\"{flag}\" "
 
-        exec_params = mpibin.gen_params(self.mfc.args)
+        exec_params = self.mpibin.gen_params(self.mfc.args)
 
-        return f'{cd} && {mpibin.bin} {exec_params} {flags} "{binpath}"'
+        return f'{cd} && {self.mpibin.bin} {exec_params} {flags} "{binpath}"'
 
-    def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
-        self.mfc = mfc
-
+    def run(self, target_name: str) -> None:
         date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
         rich.print(f"{date} Running...")
 
         start_time = time.monotonic()
-        common.execute_shell_command(self.get_exec_cmd(target_name, mpibin))
+        common.execute_shell_command(self.get_exec_cmd(target_name))
         end_time   = time.monotonic()
 
         rich.print(f"> > Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
@@ -77,23 +100,32 @@ class ParallelEngine(Engine):
 
         return targets
 
-    def run(self, mfc, target_name: str, mpibin: mpi_bins.MPIBinary) -> None:
-        self.mfc = mfc
+    def get_args(self) -> str:
+        return f"""\
+> Nodes         (-N)  {self.mfc.args['nodes']}
+> CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
+> GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
+> Walltime      (-w)  {self.mfc.args["walltime"]}
+> Partition     (-p)  {self.mfc.args["partition"]}
+> Account       (-a)  {self.mfc.args["account"]}
+> Email         (-@)  {self.mfc.args["email"]}
+"""
 
+    def run(self, target_name: str) -> None:
         system = queues.get_system()
         rich.print(f"> > Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
-        self.create_batch_file(system, target_name, mpibin)
+        self.create_batch_file(system, target_name)
 
         self.execute_batch_file(system, target_name)
 
-    def get_batch_filepath(self, system: queues.QueueSystem, target_name: str):
-        case_dirpath = self.mfc.run.get_case_dirpath()
+    def get_batch_filepath(self, target_name: str):
+        case_dirpath = self.input.case_dirpath
 
         return os.path.abspath(f"{case_dirpath}/{target_name}.sh")
 
-    def string_replace(self, s: str, system: queues.QueueSystem, target_name: str):
-        MFC_PROLOGUE: str = f"""\
+    def generate_prologue(self, system: queues.QueueSystem,) -> str:
+        return f"""\
 TABLE_FORMAT_LINE="| - %-14s %-35s - %-14s %-35s |\\n"
 TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
 TABLE_FOOTER="+-----------------------------------------------------------------------------------------------------------+ \\n"
@@ -114,12 +146,15 @@ printf "$TABLE_TITLE_FORMAT" "Starting" "{self.mfc.args["name"]} from {self.mfc.
 printf "$TABLE_CONTENT\\n"
 printf "$TABLE_FOOTER\\n"
 
+cd "{self.input.case_dirpath}"
+
 echo -e ":) Running MFC..."
 
 t_start=$(date +%s)
 """
 
-        MFC_EPILOGUE: str = f"""\
+    def generate_epilogue(self) -> str:
+        return f"""\
 code=$?
 
 t_stop="$(date +%s)"
@@ -135,10 +170,43 @@ printf "\\nI'll see you on the dark side of the moon...\\n\\n"
 exit $code
 """
 
+    def evaluate_variable(self, var: str) -> str:
+        v: str = var.strip()
+        if v in self.mfc.args:
+            return str(self.mfc.args[v])
+        
+        return None
+
+    def evaluate_expression(self, expr: str) -> str:
+        expr_original = expr[:]
+
+        evaluated = self.evaluate_variable(expr)
+        if evaluated is not None:
+            if not common.isspace(evaluated):
+                return evaluated
+            else:
+                # The expression is valid but it is empty
+                return None
+
+        # It may me a calculation. Try and parse it
+        for var_candidate in re.split(r"[\*,\+,\-,\/,\(,\),\,]", expr):
+            evaluated = self.evaluate_variable(var_candidate)
+
+            if evaluated is not None and not common.isspace(evaluated):                
+                expr = expr.replace(var_candidate, evaluated)
+        
+        # See if it computable
+        try:
+            # We assume eval is safe because we control the expression.
+            return str(eval(expr))
+        except Exception as exc:
+            raise common.MFCException(f"ParallelEngine: {expr_original} (interpreted as {expr}) is not a valid expression in the template file. Please check your spelling.")
+
+    def batch_evaluate(self, s: str, system: queues.QueueSystem, target_name: str):
         replace_list = [
-            ("{MFC::PROLOGUE}", MFC_PROLOGUE),
-            ("{MFC::EPILOGUE}", MFC_EPILOGUE),
-            ("{MFC::BIN}",      self.mfc.run.get_binpath(target_name))
+            ("{MFC::PROLOGUE}", self.generate_prologue(system)),
+            ("{MFC::EPILOGUE}", self.generate_epilogue()),
+            ("{MFC::BIN}",      self.get_binpath(target_name))
         ]
 
         for (key, value) in replace_list:
@@ -147,52 +215,25 @@ exit $code
         # Remove "#>" comments & redundant newlines
         s = re.sub(r"^#>.*\n", "",   s, flags=re.MULTILINE)
         s = re.sub(r"^\n{2,}", "\n", s, flags=re.MULTILINE)
-        
+
+        # Evaluate expressions of the form "{expression}"
         for match in re.findall(r"{[^\{]+}", s, flags=re.MULTILINE):
-            expression: str = match[1:-1]
+            repl = self.evaluate_expression(match[1:-1])
 
-            if expression in self.mfc.args:
-                repl = str(self.mfc.args[expression])
-
-                # Check it isn't whitespace
-                if not common.isspace(repl):
-                    s = s.replace(match, str(self.mfc.args[expression]))
-                    continue
+            if repl is not None:
+                s = s.replace(match, repl)
             else:
-                # It may me a calculation
-                # Try and parse it
-                for arg in self.mfc.args:
-                    repl = str(arg)
-
-                    # Check it isn't whitespace
-                    if common.isspace(repl):
-                        continue
-                    
-                    expression = expression.replace(repl, str(self.mfc.args[arg]))
-                
-                # See if it computable
-                try:
-                    # We assume eval is safe because we
-                    # control the expression.
-                    result = eval(expression)
-
-                    s = s.replace(match, str(result))
-                    continue
-                except Exception as exc:
-                    raise common.MFCException(f"ParallelEngine: {match} is not valid in the template file.")
-
-            # If not specified, then remove the line it appears on
-            s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
+                # If not specified, then remove the line it appears on
+                s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
 
         return s
 
-    def create_batch_file(self, system: queues.QueueSystem, target_name: str, mpibin: mpi_bins.MPIBinary):
-        filepath = self.get_batch_filepath(system, target_name)
-
-        common.file_write(filepath, self.string_replace(system.template, system, target_name))
+    def create_batch_file(self, system: queues.QueueSystem, target_name: str):
+        common.file_write(self.get_batch_filepath(target_name),
+                          self.batch_evaluate(system.template, system, target_name))
 
     def execute_batch_file(self, system: queues.QueueSystem, target_name: str):
-        if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(system, target_name))):
+        if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(target_name))):
             raise common.MFCException(f"Running batch file for {system.name} failed.")
 
     def validate_job_options(self, mfc) -> None:

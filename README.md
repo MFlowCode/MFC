@@ -235,6 +235,13 @@ Most parameters have sensible defaults which can be overridden in [mfc.user.yaml
 
 https://github.com/MFlowCode/MFC-develop/blob/d74e714b08562a9f8f815112e05df54c99c8c18f/mfc.user.yaml#L12-L21
 
+On some computer clusters, MFC might select the wrong MPI program to execute your application
+because it uses a general heuristic for selection. Notably, `srun` is known to fail on some SLURM
+systems in GPU mode, whereas `mpirun` functions properly. To override and manually specify which
+MPI program you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
+
+Additional flags can be given appended to the MPI executable call using the `-f` (i.e `--flags`) option.
+
 Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
 ## Batch Submission (`-e parallel`)
@@ -257,14 +264,32 @@ Other useful arguments include:
 - `-a <account name>` to identify the account to be charged for the job. (i.e `--account`)
 - `-p <partition name>` to select the job's partition. (i.e `--partition`)
 
-Since some schedulers don't have a standardized syntax to request GPUs, the `-g` option may not suffice.
-Therefore, the `-f` (i.e `--flags`) option, which appends options in the batch file, intended for the scheduler, can be used to request GPUs.
-This option accepts any number of arguments.
+Since some schedulers don't have a standardized syntax to request GPUs, MFC can only
+provide support for a restricted subset of common configuration options. If MFC fails
+to execute on your system, or if you wish to adjust how the program runs and resources
+are requested to be allocated, you are welcome to modify the template for your queue system.
+Upon execution of `./mfc.sh run`, MFC fills in the template with runtime parameters, to
+generate the batch file it will submit. These files are located in the [templates](templates/)
+directory. To request GPUs, modification of the template will be required with most queue
+systems.
 
-On some computer clusters, MFC might select the wrong MPI program to execute your application
-because it uses a general heuristic for selection. Notably, `srun` is known to fail on some SLURM
-systems in GPU mode, whereas `mpirun` functions properly. To override and manually specify which
-MPI program you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
+- Lines that begin with "#>" are ignored and won't figure in the final batch
+script, not even as a comment.
+
+- Statements of the form `${expression}` are string-replaced by mfc.sh run to provide
+runtime parameters, most notably execution options. They reference the variables in the
+same format as those under the "run" section of [mfc.user.yaml](mfc.user.yaml), replacing*
+"-" for "_". You can perform therein any Python operation recognized by the built-in `expr()` function.
+
+As an example, on might request GPUs on a SLURM system using the following:
+
+```
+#SBATCH --gpus=v100-32:{gpus_per_node*nodes}
+```
+
+- Statements of the form `{MFC::expression}` tell MFC where to place the common code,
+across all batch files that is required to run MFC. They are not intended to be
+modified by users.
 
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
