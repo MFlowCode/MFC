@@ -56,8 +56,6 @@ class SLURMSystem(QueueSystem):
 QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
 
 def get_system() -> QueueSystem:    
-    return SLURMSystem()
-
     for system in QUEUE_SYSTEMS:
         if system.is_active():
             return system

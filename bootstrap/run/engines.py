@@ -187,7 +187,7 @@ exit $code
                 return None
 
         # It may me a calculation. Try and parse it
-        for var_candidate in re.split(r"[\*,\+,\-,\/,\(,\),\,]", expr):
+        for var_candidate in re.split(r"[\*,\ ,\+,\-,\/,\\,\%,\,,\.,\^,\',\",\[,\],\(,\),\=]", expr):
             evaluated = self.evaluate_variable(var_candidate)
 
             if evaluated is not None and not common.isspace(evaluated):                
@@ -222,13 +222,9 @@ exit $code
                 s = s.replace(match, repl)
             else:
                 # If not specified, then remove the line it appears on
-                REG_PATTERN = f"^.*\{match}.*$\n"
-                lines = re.findall(REG_PATTERN, s, flags=re.MULTILINE)
-                s = re.sub(REG_PATTERN, "", s, flags=re.MULTILINE)
+                s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
 
-                rich.print(f"""
-[bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, the following lines will be discarded:
-{chr(10).join([ f' - {line.strip()}' for line in lines ])}""")
+                rich.print(f"[bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it figures on will be discarded.")
 
         return s
 
@@ -246,7 +242,7 @@ exit $code
 
 ENGINES = [ SerialEngine(), ParallelEngine() ]
 
-def get_engine(slug: str) -> Engine:
+def get_engine(slug: str) -> Engine:    
     engine: Engine = None
     for candidate in ENGINES:
         candidate: Engine
