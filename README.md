@@ -264,31 +264,30 @@ Other useful arguments include:
 - `-a <account name>` to identify the account to be charged for the job. (i.e `--account`)
 - `-p <partition name>` to select the job's partition. (i.e `--partition`)
 
-Since some schedulers don't have a standardized syntax to request GPUs, MFC can only
+Since some schedulers don't have a standardized syntax to request certain resources, MFC can only
 provide support for a restricted subset of common configuration options. If MFC fails
 to execute on your system, or if you wish to adjust how the program runs and resources
 are requested to be allocated, you are welcome to modify the template for your queue system.
 Upon execution of `./mfc.sh run`, MFC fills in the template with runtime parameters, to
 generate the batch file it will submit. These files are located in the [templates](templates/)
-directory. To request GPUs, modification of the template will be required with most queue
-systems.
+directory. To request GPUs, modification of the template will be required on most systems.
 
-- Lines that begin with "#>" are ignored and won't figure in the final batch
+- Lines that begin with `#>` are ignored and won't figure in the final batch
 script, not even as a comment.
 
 - Statements of the form `${expression}` are string-replaced by mfc.sh run to provide
 runtime parameters, most notably execution options. They reference the variables in the
 same format as those under the "run" section of [mfc.user.yaml](mfc.user.yaml), replacing*
-"-" for "_". You can perform therein any Python operation recognized by the built-in `expr()` function.
+`-` for `_`. You can perform therein any Python operation recognized by the built-in `expr()` function.
 
-As an example, on might request GPUs on a SLURM system using the following:
+As an example, one might request GPUs on a SLURM system using the following:
 
 ```
 #SBATCH --gpus=v100-32:{gpus_per_node*nodes}
 ```
 
 - Statements of the form `{MFC::expression}` tell MFC where to place the common code,
-across all batch files that is required to run MFC. They are not intended to be
+across all batch files, that is required for proper execution. They are not intended to be
 modified by users.
 
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does use the traditional node-based approach to
