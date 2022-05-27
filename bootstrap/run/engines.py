@@ -43,9 +43,9 @@ class Engine:
         return f'{self.mfc.build.get_build_path(target)}/bin/{target}'
 
 
-class SerialEngine(Engine):
+class InteractiveEngine(Engine):
     def __init__(self) -> None:
-        super().__init__("Serial", "serial")
+        super().__init__("Interactive", "interactive")
 
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary(self.mfc.args)
@@ -67,9 +67,8 @@ class SerialEngine(Engine):
         cd = f'cd "{self.input.case_dirpath}"'
 
         flags = ""
-        if self.mfc.args["engine"] == "serial":
-            for flag in self.mfc.args["flags"]:
-                flags += f"\"{flag}\" "
+        for flag in self.mfc.args["flags"]:
+            flags += f"\"{flag}\" "
 
         exec_params = self.mpibin.gen_params(self.mfc.args)
 
@@ -87,16 +86,16 @@ class SerialEngine(Engine):
 
     def validate_job_options(self, mfc) -> None:
         if mfc.args["nodes"] != 1:
-            raise common.MFCException("SerialEngine: In serial mode, only node can be used.")
+            raise common.MFCException("InteractiveEngine: Only node can be used with the interactive engine.")
 
 
-class ParallelEngine(Engine):
+class BatchEngine(Engine):
     def __init__(self) -> None:
-        super().__init__("Parallel", "parallel")
+        super().__init__("Batch", "batch")
 
     def get_targets(self, targets: list) -> list:
         if targets[0] == "mfc" or len(targets) != 1:
-            raise common.MFCException("The parallel engine requires a unique target to run.")
+            raise common.MFCException("The batch engine requires a unique target to run. Please specify -t <target_name>.")
 
         return targets
 
@@ -198,7 +197,7 @@ exit $code
             # We assume eval is safe because we control the expression.
             return str(eval(expr))
         except Exception as exc:
-            raise common.MFCException(f"ParallelEngine: {expr_original} (interpreted as {expr}) is not a valid expression in the template file. Please check your spelling.")
+            raise common.MFCException(f"BatchEngine: {expr_original} (interpreted as {expr}) is not a valid expression in the template file. Please check your spelling.")
 
     def batch_evaluate(self, s: str, system: queues.QueueSystem, target_name: str):
         replace_list = [
@@ -234,13 +233,13 @@ exit $code
 
     def execute_batch_file(self, system: queues.QueueSystem, target_name: str):
         if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(target_name))):
-            raise common.MFCException(f"Running batch file for {system.name} failed.")
+            raise common.MFCException(f"Running batch file for {system.name} failed. It can be found here: {self.get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:
         pass
 
 
-ENGINES = [ SerialEngine(), ParallelEngine() ]
+ENGINES = [ InteractiveEngine(), BatchEngine() ]
 
 def get_engine(slug: str) -> Engine:    
     engine: Engine = None
