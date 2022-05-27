@@ -281,6 +281,8 @@ module m_global_parameters
 
     logical :: weno_flat, riemann_flat, cu_mpi
 
+    LOGICAL cu_mpi
+
     ! ======================================================================
 
     ! Mathematical and Physical Constants ======================================
