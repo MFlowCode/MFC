@@ -165,8 +165,6 @@ printf "$TABLE_FORMAT_LINE" "Total-time:"  "$(expr $t_stop - $t_start)s"  "Exit 
 printf "$TABLE_FORMAT_LINE" "End-time:"    "$(date +%T)"                  "End-date:"  "$(date +%T)"
 printf "$TABLE_FOOTER"
 
-printf "\\nI'll see you on the dark side of the moon...\\n\\n"
-
 exit $code
 """
 
@@ -224,7 +222,13 @@ exit $code
                 s = s.replace(match, repl)
             else:
                 # If not specified, then remove the line it appears on
-                s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
+                REG_PATTERN = f"^.*\{match}.*$\n"
+                lines = re.findall(REG_PATTERN, s, flags=re.MULTILINE)
+                s = re.sub(REG_PATTERN, "", s, flags=re.MULTILINE)
+
+                rich.print(f"""
+[bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, the following lines will be discarded:
+{chr(10).join([ f' - {line.strip()}' for line in lines ])}""")
 
         return s
 

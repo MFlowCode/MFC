@@ -60,9 +60,10 @@
 #>       on your system - if at all. {MFC::BIN} refers to
 #>       the path the MFC executable.
 #>
-srun --ntasks-per-node {cpus_per_node} \
-     -p "{partition}"                  \
+srun --ntasks-per-node {cpus_per_node}
      "{MFC::BIN}"
+#> mpirun -np {cpus_per_node*nodes} \
+#>        "{MFC::BIN}"
 
 {MFC::EPILOGUE}
 #>
