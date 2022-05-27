@@ -54,7 +54,7 @@ def parse(mfc):
     test.add_argument("-b", "--binary",   choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
 
     # === RUN ===
-    engines  = [ e.slug for e in ENGINES  ]
+    engines  = [ e.slug for e in ENGINES ]
 
     add_common_arguments(run)
     run.add_argument("input",                  metavar="INPUT",                 type=str,                                      help="Input file for run.")

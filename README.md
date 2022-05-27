@@ -93,7 +93,7 @@ Ph.D. Disserations:
 ## Installing MFC
 
 <p align="justify">
-To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its developement headers and libraries, a C/C++ compiler
+To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its development headers and libraries, a C/C++ compiler
 (GCC, NVHPC, etc., but *not Clang*), and an MPI wrapper (like Open MPI). 
 Below are some commands for popular operating systems and package managers.
 <p>
@@ -163,7 +163,7 @@ $ cd MFC
 
 + **(Optional) Configure MFC defaults in [mfc.user.yaml](mfc.user.yaml):**
 
-If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customisation. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
+If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customization. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
 
 + **Build MFC and its dependencies with 8 threads in `release-cpu` mode:**
 
@@ -193,8 +193,8 @@ The `mfc.sh` script used in the previous section is configured through the file 
 
 # Running MFC
 
-The MFC can be run using `mfc.sh`'s `run` command. It supports both serial and
-parallel execution, the latter being designed for multi-socket systems, namely supercomputers,
+The MFC can be run using `mfc.sh`'s `run` command. It supports both interactive and
+batch execution, the latter being designed for multi-socket systems, namely supercomputers,
 equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
 of available arguments can be acquired with `./mfc.sh run -h`. Example Python input
 files can be found in the [samples/](samples/) directory, and they are often called `input.py`
@@ -203,7 +203,7 @@ MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
 can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/).
 
-## Serial Execution (`-e serial`)
+## Interactive Execution (`-e interactive`)
 
 To run all stages of MFC, that is [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/) on the sample case [2D_shockbubble](samples/2D_shockbubble/),
 
@@ -244,16 +244,16 @@ Additional flags can be given appended to the MPI executable call using the `-f`
 
 Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
-## Batch Submission (`-e parallel`)
+## Batch Submission (`-e batch`)
 
 The MFC detects which scheduler your system is using and handles the creation and
-execution of batch scripts. The parallel engine is requested with the `-e parallel` option.
-Whereas the serial engine can execute all MFC's codes in succession, the parallel engine
+execution of batch scripts. The batch engine is requested with the `-e batch` option.
+Whereas the interactive engine can execute all MFC's codes in succession, the batch engine
 requires you to only specify one target with the `-t` option. The number of nodes and GPUs can, 
 respectively be specified with the `-N` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e parallel -N 2 -n 4 -g 4 -t simulation
+$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -N 2 -n 4 -g 4 -t simulation
 ```
 
 Other useful arguments include:
@@ -298,14 +298,14 @@ allocate resources. Therefore, the MFC constructs equivalent resource-sets in ta
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e parallel    \
+$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch    \
                -N 2 -n 4 -g 4​ -t simulation -a <redacted>
 ```
 
 - University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/):
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e parallel -p GPU -t simulation​ \
+$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -p GPU -t simulation​ \
                -N 2 -n 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
 ```
 

@@ -58,7 +58,10 @@ class MFCTest:
         common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
 
         if cmd.returncode != 0:
-            raise MFCException(f"tests/{test.get_uuid()}: Failed to execute MFC [{test.trace}]")
+            rich.print(cmd.stdout)
+            raise MFCException(f"""\
+tests/{test.get_uuid()}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
+You can find the output in {test.get_dirpath()}/out.txt, and teh case dictionary in {test.get_dirpath()}/case.py.""")
 
         pack = tests.pack.generate(test)
         pack.save(f"{test.get_dirpath()}/pack.txt")
