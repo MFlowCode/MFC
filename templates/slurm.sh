@@ -67,8 +67,9 @@
 #>       the path the MFC executable.
 #>
 srun --ntasks-per-node {cpus_per_node} \
-     -p "{partition}"                  \
      "{MFC::BIN}"
+#> mpirun -np {cpus_per_node*nodes} \
+#>        "{MFC::BIN}"
 
 {MFC::EPILOGUE}
 #>
