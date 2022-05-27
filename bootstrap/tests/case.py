@@ -14,10 +14,6 @@ mydt = 0.0005
 BASE_CFG = {
     'case_dir'                     : '\'.\'',
     'run_time_info'                : 'F',
-    'ppn'                          : 1,
-    'queue'                        : 'normal',
-    'walltime'                     : '24:00:00',
-    'mail_list'                    : '',
     'm'                            : 0,
     'n'                            : 0,
     'p'                            : 0,
@@ -101,14 +97,16 @@ BASE_CFG = {
     'cu_mpi'                        :'F',
 }
 
-@dataclasses.dataclass
+@dataclasses.dataclass(init=False)
 class Case:
     trace:  str
     params: dict
+    ppn:    int
 
-    def __init__(self, trace: str, mods: dict) -> None:
+    def __init__(self, trace: str, mods: dict, ppn = None) -> None:
         self.trace  = trace
         self.params = {**BASE_CFG.copy(), **mods}
+        self.ppn    = ppn if ppn is not None else 1
 
     def run(self, args: dict) -> subprocess.CompletedProcess:
         binary_option = ""
@@ -116,7 +114,7 @@ class Case:
             binary_option = f"-b {args['binary']}"
 
         command: str = f'''\
-./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -n {self["ppn"]} \
+./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -n {self.ppn} \
 -t pre_process simulation {binary_option} 2>&1\
 '''
 
@@ -184,7 +182,7 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-def create_case(stack: CaseGeneratorStack, newTrace, newMods) -> Case:
+def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None) -> Case:
     mods: dict = {}
 
     for dict in stack.mods:
@@ -196,4 +194,4 @@ def create_case(stack: CaseGeneratorStack, newTrace, newMods) -> Case:
         if not common.isspace(trace):
             traces.append(trace)
 
-    return Case(' -> '.join(traces), mods)
+    return Case(' -> '.join(traces), mods, ppn)
