@@ -32,12 +32,12 @@
 #PBS -l walltime={walltime}
 #PBS -q {partition}
 #PBS -M {email}
+#>
 #> Note: The following options aren't enabled by default.
 #>       They serve as a guide to users that wish to pass
 #>       more options to the batch system.
 #>
-#> 
-#> 
+
 
 
 
@@ -60,10 +60,18 @@
 #>       on your system - if at all. {MFC::BIN} refers to
 #>       the path the MFC executable.
 #>
-srun --ntasks-per-node {cpus_per_node}
+srun                                   \ 
+     --nodes={nodes}                   \
+     --ntasks-per-node {cpus_per_node} \
      "{MFC::BIN}"
-#> mpirun -np {cpus_per_node*nodes} \
+#>
+#> srun --mpi=pmix   \
+#>      "{MFC::BIN}"
+#>
+#> mpirun                           \
+#>        -np {cpus_per_node*nodes} \
 #>        "{MFC::BIN}"
+#>
 
 {MFC::EPILOGUE}
 #>

@@ -111,9 +111,13 @@ class Case:
         self.params = {**BASE_CFG.copy(), **mods}
 
     def run(self, args: dict) -> subprocess.CompletedProcess:
+        binary_option = ""
+        if args["binary"] is not None:
+            binary_option = f"-b {args['binary']}"
+
         command: str = f'''\
 ./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -n {self["ppn"]} \
--t pre_process simulation 2>&1\
+-t pre_process simulation {binary_option} 2>&1\
 '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
@@ -175,7 +179,7 @@ class CaseGeneratorStack:
     def push(self, trace: str, mods: dict) -> None:
         self.trace.append(trace)
         self.mods.append(mods)
-    
+
     def pop(self) -> None:
         return (self.mods.pop(), self.trace.pop())
 

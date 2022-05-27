@@ -45,14 +45,16 @@ def parse(mfc):
 
     clean.add_argument("-r", "--recursive", default=False, action="store_true", help="Clean specified targets and their dependencies recursively.")
 
+    binaries = [ b.bin  for b in BINARIES ]
+
     # === TEST ===
     add_common_arguments(test)
     test.add_argument("-g", "--generate", action="store_true", help="Generate golden files.")
     test.add_argument("-o", "--only",     nargs="+", type=str, default=[], metavar="L", help="Only run tests with ids or hashes L.")
+    test.add_argument("-b", "--binary",   choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
 
     # === RUN ===
     engines  = [ e.slug for e in ENGINES  ]
-    binaries = [ b.bin  for b in BINARIES ]
 
     add_common_arguments(run)
     run.add_argument("input",                  metavar="INPUT",                 type=str,                                      help="Input file for run.")

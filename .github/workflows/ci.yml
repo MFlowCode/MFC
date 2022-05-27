@@ -6,13 +6,14 @@ on:
     paths:
       - '**.f90'
       - '**.fpp'
-      - '**.sh'
+      - 'mfc.sh'
       - '**.py'
       - '**.yaml'
       - '**.yml'
       - 'golden.txt'
       - 'Makefile'
       - 'makefile'
+      - 'CMakeLists.txt'
 
   pull_request:
     branches: [ master, GPU ]

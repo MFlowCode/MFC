@@ -31,12 +31,17 @@
 #BSUB -N
 #BSUB -P {account}
 #BSUB -W {"walltime"[:-3]}
+#>
+#> Note: The above expression for the walltime converts
+#>       the expression "hh:mm:ss" to the appropriate
+#>       format for the batch system ("hh:mm"). It is
+#>       a python expression evaluated at runtime.
+#>
+#>
 #> Note: The following options aren't enabled by default.
 #>       They serve as a guide to users that wish to pass
 #>       more options to the batch system.
 #>
-#> 
-#> 
 
 
 
@@ -60,7 +65,7 @@
 #>       the path the MFC executable.
 #>
 jsrun --smpiargs="-gpu"                      \
-      --nrs          {cpus_per_node}         \
+      --nrs          {cpus_per_node*nodes}   \
       --cpu_per_rs   1                       \
       --gpu_per_rs   {min(gpus_per_node, 1)} \
       --tasks_per_rs 1                       \
