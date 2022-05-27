@@ -116,7 +116,7 @@ elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("gcc/10.2.0")
+        MODULES=("intel/2021.3.0" "intelmpi/2021.3.0-intel2021.3.0")
     elif [ "$u_cg" == "g" ]; then
         MODULES=("nvhpc/22.1" "cuda/11.1.1")
     fi
@@ -157,7 +157,7 @@ elif [ "$u_computer" == "e" ]; then # Expanse
     COMPUTER="$EXPANSE"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("cpu/0.15.4" "gcc/10.2.0" "openmpi/gcc/64/1.10.7")
+        MODULES=("cpu/0.15.4" "intel/19.1.1.217" "intel-mpi/2019.8.254")
     elif [ "$u_cg" == "g" ]; then
         MODULES=("gpu/0.15.4" "openmpi/4.0.5" "cuda/11.0.2" "nvhpc/22.2")
     fi
@@ -167,10 +167,7 @@ elif [ "$u_computer" == "p" ]; then # Phoenix
     COMPUTER="$PHOENIX"
 
     if [ "$u_cg" == "c" ]; then
-        echo -e $RED"Error: CPU not supported on Phoenix."$COLOR_RESET
-        
-        on_error
-        return
+        MODULES=("intel/19.0.5" "mvapich2/2.3.2")
     elif [ "$u_cg" == "g" ]; then
         MODULES=("cuda/11.2" "nvhpc/22.1")
     fi
