@@ -116,12 +116,12 @@ elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("intel/2021.3.0" "intelmpi/2021.3.0-intel2021.3.0")
+        MODULES=("gcc/10.2.0" "openmpi/4.0.5-gcc10.2.0")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("nvhpc/22.1" "cuda/11.1.1")
+        MODULES=("nvhpc/22.1" "cuda/11.1.1" "openmpi/4.0.5-nvhpc22.1")
     fi
 
-    MODULES=("${MODULES[@]}" "openmpi/4.0.5-gcc10.2.0" "python/3.8.6")
+    MODULES=("${MODULES[@]}" "python/3.8.6")
 elif [ "$u_computer" == "a" ]; then # For Ascent
     COMPUTER="$ASCENT"
 
@@ -157,12 +157,12 @@ elif [ "$u_computer" == "e" ]; then # Expanse
     COMPUTER="$EXPANSE"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("cpu/0.15.4" "intel/19.1.1.217" "intel-mpi/2019.8.254")
+        MODULES=("cpu/0.15.4" "gcc/10.2.0" "openmpi/4.0.4")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("gpu/0.15.4" "openmpi/4.0.5" "cuda/11.0.2" "nvhpc/22.2")
+        MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5")
     fi
 
-    MODULES=("${MODULES[@]}" "slurm/expanse/current")
+    MODULES=("${MODULES[@]}")
 elif [ "$u_computer" == "p" ]; then # Phoenix
     COMPUTER="$PHOENIX"
 
