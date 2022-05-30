@@ -53,7 +53,7 @@ jobs:
           python python-dev python3-dev python3-venv libopenmpi-dev
 
       - name: Install Nvidia HPC SDK
-        if:   matrix.os == 'ubuntu-latest' && github.ref == 'refs/heads/GPU'
+        if:   matrix.os == 'ubuntu-latest' && contains(github.ref, 'GPU')
         run: |
           echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
           sudo apt-get update  -y
@@ -99,7 +99,7 @@ jobs:
           mpicxx --showme
 
       - name: Build MFC (GPU)
-        if:   github.ref == 'refs/heads/GPU'
+        if:   contains(github.ref, 'GPU')
         run:  ./mfc.sh build -m release-gpu -j $(nproc)
 
       - name: Upload logs
