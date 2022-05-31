@@ -153,17 +153,6 @@ def does_cmd_exist(s: str) -> bool:
     return os.system(f"command -v {s} > /dev/null 2>&1") == 0
 
 
-def loaded_modules() -> list:
-    res = subprocess.Popen("module -t list 2>&1 | grep -v -i 'Currently Loaded Modulefiles:'", stdout=subprocess.PIPE, shell=True)
-
-    res.wait()
-    if res.returncode != 0:
-        raise MFCException("Failed to retrive the list of loaded modules.")
-
-    lines = res.stdout.read().decode("utf-8").split('\n')
-    return [ m for m in lines if not isspace(m) ]
-
-
 def format_list_to_string(arr: list, empty = "nothing"):
     if len(arr) == 0:
         return empty

@@ -58,7 +58,10 @@ class MFCTest:
         common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
 
         if cmd.returncode != 0:
-            raise MFCException(f"tests/{test.get_uuid()}: Failed to execute MFC.")
+            rich.print(cmd.stdout)
+            raise MFCException(f"""\
+tests/{test.get_uuid()}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
+You can find the output in {test.get_dirpath()}/out.txt, and teh case dictionary in {test.get_dirpath()}/case.py.""")
 
         pack = tests.pack.generate(test)
         pack.save(f"{test.get_dirpath()}/pack.txt")
@@ -70,7 +73,7 @@ class MFCTest:
             pack.save(golden_filepath)
 
         if not os.path.isfile(golden_filepath):
-            raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
+            raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
         error = tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
         rich.print(f" |->  [bold magenta]{test.get_uuid()}[/bold magenta]  | {error.relative:+0.1E} | {tol:+0.1E} | {test.trace})")

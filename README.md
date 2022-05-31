@@ -93,7 +93,7 @@ Ph.D. Disserations:
 ## Installing MFC
 
 <p align="justify">
-To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its developement headers and libraries, a C/C++ compiler
+To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its development headers and libraries, a C/C++ compiler
 (GCC, NVHPC, etc., but *not Clang*), and an MPI wrapper (like Open MPI). 
 Below are some commands for popular operating systems and package managers.
 <p>
@@ -163,7 +163,7 @@ $ cd MFC
 
 + **(Optional) Configure MFC defaults in [mfc.user.yaml](mfc.user.yaml):**
 
-If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customisation. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
+If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customization. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
 
 + **Build MFC and its dependencies with 8 threads in `release-cpu` mode:**
 
@@ -193,17 +193,32 @@ The `mfc.sh` script used in the previous section is configured through the file 
 
 # Running MFC
 
-The MFC can be run using `mfc.sh`'s `run` command. It supports both serial and
-parallel execution, the latter being designed for multi-socket systems, namely supercomputers,
+MFC can be run using `mfc.sh`'s `run` command. It supports both interactive and
+batch execution, the latter being designed for multi-socket systems, namely supercomputers,
 equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
 of available arguments can be acquired with `./mfc.sh run -h`. Example Python input
-files can be found in the [samples/](samples/) directory, and they are often called `input.py`
-or `case.py`. They print a Python dictionary containing input parameters for the
-MFC. Their contents, and a guide to filling them out, are documented
+files can be found in the [samples/](samples/) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
 can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/).
 
-## Serial Execution (`-e serial`)
+The skeleton for an input file may look like the following:
+
+```python
+#!/usr/bin/env python3
+
+import json
+
+# Calculations (if necessary)
+...
+
+# Configuring case dictionary
+print(json.dumps({
+     # Insert case parameters here
+     ...
+}))
+```
+
+## Interactive Execution (`-e interactive`)
 
 To run all stages of MFC, that is [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/) on the sample case [2D_shockbubble](samples/2D_shockbubble/),
 
@@ -235,18 +250,25 @@ Most parameters have sensible defaults which can be overridden in [mfc.user.yaml
 
 https://github.com/MFlowCode/MFC-develop/blob/d74e714b08562a9f8f815112e05df54c99c8c18f/mfc.user.yaml#L12-L21
 
+On some computer clusters, MFC might select the wrong MPI program to execute your application
+because it uses a general heuristic for its selection. Notably, `srun` is known to fail on some SLURM
+systems when using GPUs or MPI implementations from different vendors, whereas `mpirun` functions properly. To override and manually specify which
+MPI program you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
+
+Additional flags can be appended to the MPI executable call using the `-f` (i.e `--flags`) option.
+
 Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
-## Batch Submission (`-e parallel`)
+## Batch Submission (`-e batch`)
 
 The MFC detects which scheduler your system is using and handles the creation and
-execution of batch scripts. The parallel engine is requested with the `-e parallel` option.
-Whereas the serial engine can execute all MFC's codes in succession, the parallel engine
+execution of batch scripts. The batch engine is requested with the `-e batch` option.
+Whereas the interactive engine can execute all of MFC's codes in succession, the batch engine
 requires you to only specify one target with the `-t` option. The number of nodes and GPUs can, 
 respectively be specified with the `-N` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e parallel -N 2 -n 4 -g 4 -t simulation
+$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -N 2 -n 4 -g 4 -t simulation
 ```
 
 Other useful arguments include:
@@ -257,14 +279,31 @@ Other useful arguments include:
 - `-a <account name>` to identify the account to be charged for the job. (i.e `--account`)
 - `-p <partition name>` to select the job's partition. (i.e `--partition`)
 
-Since some schedulers don't have a standardized syntax to request GPUs, the `-g` option may not suffice.
-Therefore, the `-f` (i.e `--flags`) option, which appends options in the batch file, intended for the scheduler, can be used to request GPUs.
-This option accepts any number of arguments.
+Since some schedulers don't have a standardized syntax to request certain resources, MFC can only
+provide support for a restricted subset of common configuration options. If MFC fails
+to execute on your system, or if you wish to adjust how the program runs and resources
+are requested to be allocated, you are invited to modify the template batch script for your queue system.
+Upon execution of `./mfc.sh run`, MFC fills in the template with runtime parameters, to
+generate the batch file it will submit. These files are located in the [templates](templates/)
+directory. To request GPUs, modification of the template will be required on most systems.
 
-On some computer clusters, MFC might select the wrong MPI program to execute your application
-because it uses a general heuristic for selection. Notably, `srun` is known to fail on some SLURM
-systems in GPU mode, whereas `mpirun` functions properly. To override and manually specify which
-MPI program you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
+- Lines that begin with `#>` are ignored and won't figure in the final batch
+script, not even as a comment.
+
+- Statements of the form `${expression}` are string-replaced to provide
+runtime parameters, most notably execution options. They reference the variables in the
+same format as those under the "run" section of [mfc.user.yaml](mfc.user.yaml), replacing
+`-` for `_`. You can perform therein any Python operation recognized by the built-in `expr()` function.
+
+As an example, one might request GPUs on a SLURM system using the following:
+
+```
+#SBATCH --gpus=v100-32:{gpus_per_node*nodes}
+```
+
+- Statements of the form `{MFC::expression}` tell MFC where to place the common code,
+across all batch files, that is required for proper execution. They are not intended to be
+modified by users.
 
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
@@ -274,29 +313,84 @@ allocate resources. Therefore, the MFC constructs equivalent resource-sets in ta
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e parallel    \
+$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch    \
                -N 2 -n 4 -g 4​ -t simulation -a <redacted>
 ```
 
 - University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/):
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e parallel -p GPU -t simulation​ \
+$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -p GPU -t simulation​ \
                -N 2 -n 8 -g 8​ -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
 ```
 
 # Testing MFC
  
-To run MFC's test suite, simply run `./mfc.sh test`. It will generate and run test cases, to compare their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing within a very small margin of error, to maintain a high level of stability and accuracy across versions of MFC.
- 
-Adding a new test case is as simple as modifying [bootstrap/tests/cases.py](bootstrap/tests/cases.py), and selecting which parameters you want to vary from the base case. Then run `./mfc.sh test -g` (i.e `--generate`) to generate new golden files. Please make sure that these files are generated with accurate data.
+To run MFC's test suite, run `./mfc.sh test`. It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy.
 
-If you want to only run certain tests, you can pass the argument `-o` (i.e `--only`) along with the associated hash. A test's hash is a hexadecimal representation of the hash of the parameters given to MFC by a certain test. They look like `1A6B6EB3` and are used to refer to a specific test, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content. However, if a test's parameters change, its hash also changes (ignoring collisions).
+If you want to only run certain tests, you can pass the `-o` (i.e `--only`) option along with their corresponding hashes. A test's hash is a hexadecimal representation of its hashed description (also called `trace`). They look like `1A6B6EB3` and are used to uniquely identify tests, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content.
 
-An example of running targeted tests:
+An example of only running certain tests:
 ```console
 $ ./mfc.sh test -j 8 -o 1A6B6EB3 0F5DB706
 ```
+
+## Creating Tests
+
+To (re)generate *golden files*, append the `-g` (i.e `--generate`) option:
+```console
+$ ./mfc.sh test -g -j 8
+```
+
+Adding a new test case can be done by modifying [bootstrap/tests/cases.py](bootstrap/tests/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` dictionary within [bootstrap/tests/case.py](bootstrap/tests/case.py). The function operates on two variables:
+
+- `stack`: A stack that holds the variations to the default case parameters. By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).
+
+- `cases`: A list that holds fully-formed `Case` objects, that will be returned at the end of the function. 
+
+Internally a case is described as:
+```python
+@dataclasses.dataclass(init=False)
+class Case:
+    trace:  str
+    params: dict
+    ppn:    int
+```
+
+where:
+- The `trace` is a string that contains a human-readable description of what parameters were varied, or more generally what the case is meant to test. **Each `trace` must be distinct.**
+- `params` is a dictionnary containg the case's description, as you would describe it in your input files.
+- `ppn` is the number of processes per node to use when running the case.
+
+To illustrate, consider the following excerpt from [bootstrap/tests/cases.py](bootstrap/tests/cases.py):
+
+```python
+for weno_order in [3, 5]:
+    stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
+
+    for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
+        stack.push(f"(mapped_weno={mapped_weno},mp_weno={mp_weno})", {
+            'mapped_weno': mapped_weno,
+            'mp_weno':     mp_weno
+        })
+
+        if not (mp_weno == 'T' and weno_order != 5):
+            cases.append(create_case(stack, '', {}))
+
+        stack.pop()
+
+    stack.pop()
+```
+
+When pushing to the stack, or creating a new case with the `create_case` function, you must specify:
+- `trace`: A human-readable string describing what you are currently varying.
+- `params`: A dictionary that contains the parameters you currently wish to to vary.
+
+When creating a case using `create_case(stack, trace, params)`:
+- The `trace` function parameter will be appended to the stack's traces, to form a string.
+- The final case dictionary will be generated by successively applying your desired changes to the base case.
+
+Finally, the case is appended to the `cases` list, which will be returned by the `generate_cases` function.
 
 # Development
 

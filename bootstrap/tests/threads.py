@@ -60,13 +60,11 @@ class MFCTestThreadManager:
             for i, test in enumerate(cases):
                 test: Case
 
-                ppn = test["ppn"]
-
                 # Wait until there are threads available
-                while self.nAvailable < ppn:
+                while self.nAvailable < test.ppn:
                     # This is important if "-j 1" is used (the default) since there
-                    # are test cases that require ppn=2
-                    if ppn > self.nThreads and self.nAvailable > 0:
+                    # are test cases that require test.ppn=2
+                    if test.ppn > self.nThreads and self.nAvailable > 0:
                         break
 
                     # Keep track of threads that are done
@@ -81,8 +79,8 @@ class MFCTestThreadManager:
                 thread = TestThread(target=handle_case, args=(test,))
                 thread.start()
 
-                self.threads.append(TestThreadHolder(thread, ppn))
-                self.nAvailable -= ppn
+                self.threads.append(TestThreadHolder(thread, test.ppn))
+                self.nAvailable -= test.ppn
 
             # Wait for the lasts tests to complete
             while len(self.threads) != 0:

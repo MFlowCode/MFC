@@ -45,14 +45,16 @@ def parse(mfc):
 
     clean.add_argument("-r", "--recursive", default=False, action="store_true", help="Clean specified targets and their dependencies recursively.")
 
+    binaries = [ b.bin  for b in BINARIES ]
+
     # === TEST ===
     add_common_arguments(test)
     test.add_argument("-g", "--generate", action="store_true", help="Generate golden files.")
     test.add_argument("-o", "--only",     nargs="+", type=str, default=[], metavar="L", help="Only run tests with ids or hashes L.")
+    test.add_argument("-b", "--binary",   choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
 
     # === RUN ===
-    engines  = [ e.slug for e in ENGINES  ]
-    binaries = [ b.bin  for b in BINARIES ]
+    engines  = [ e.slug for e in ENGINES ]
 
     add_common_arguments(run)
     run.add_argument("input",                  metavar="INPUT",                 type=str,                                      help="Input file for run.")
@@ -66,7 +68,7 @@ def parse(mfc):
     run.add_argument("-@", "--email",          metavar="EMAIL",                 type=str, default=mfc.user.run.email,          help="(Parallel) Email for job notification.")
     run.add_argument("-#", "--name",           metavar="NAME",                  type=str, default=mfc.user.run.name,           help="(Parallel) Job name.")
     run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs="+",  type=str, default=mfc.user.run.flags,          help="(Parallel) Additional batch options.")
-    run.add_argument("-b", "--binary",         choices=binaries, type=str, default=None,                        help="(Parallel) Override MPI execution binary")
+    run.add_argument("-b", "--binary",         choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
 
     args: dict = vars(parser.parse_args())
 
