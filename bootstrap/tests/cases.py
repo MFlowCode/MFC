@@ -107,7 +107,7 @@ def generate_cases() -> list:
 
             if num_fluids == 2:
                 stack.push("", {
-                    'fluid_pp(2)%gamma':          2.5,    'fluid_pp(2)%pi_inf':         0.0, ' patch_icpp(1)%alpha_rho(1)': 0.81,
+                    'fluid_pp(2)%gamma':          2.5,    'fluid_pp(2)%pi_inf':         0.0,  'patch_icpp(1)%alpha_rho(1)': 0.81,
                     'patch_icpp(1)%alpha(1)':     0.9,    'patch_icpp(1)%alpha_rho(2)': 0.19, 'patch_icpp(1)%alpha(2)':     0.1,
                     'patch_icpp(2)%alpha_rho(1)': 0.25,   'patch_icpp(2)%alpha(1)':     0.5,  'patch_icpp(2)%alpha_rho(2)': 0.25,
                     'patch_icpp(2)%alpha(2)':     0.5,    'patch_icpp(3)%alpha_rho(1)': 0.08, 'patch_icpp(3)%alpha(1)':     0.2,
@@ -135,9 +135,9 @@ def generate_cases() -> list:
             stack.pop()
 
         if len(dimInfo[0]) == 3:
-            cases.append(create_case(stack, f'ppn=2,m=29,n=29,p=49', {'ppn': 2, 'm': 29, 'n': 29, 'p': 49}))
+            cases.append(create_case(stack, f'ppn=2,m=29,n=29,p=49', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
         else:
-            cases.append(create_case(stack, f'ppn=2', {'ppn': 2}))
+            cases.append(create_case(stack, f'ppn=2', {}, ppn=2))
 
         stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
 
