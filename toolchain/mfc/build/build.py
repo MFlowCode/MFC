@@ -145,7 +145,8 @@ class MFCBuild:
             ("${INSTALL_PATH}",      install_path),
             ("${MAKE_OPTIONS}",      f'-j {self.mfc.args["jobs"]}'),
             ("${COMPILER_FLAGS}",    f'CFLAGS="{flags.get("c")}" CPPFLAGS="{flags.get("cpp")}" FFLAGS="{flags.get("fortran")}"'),
-            ("${COMPILERS}",         f'CC="{compilers.c}" CXX="{compilers.cpp}" FC="{compilers.fortran}"')
+            ("${COMPILERS}",         f'CC="{compilers.c}" CXX="{compilers.cpp}" FC="{compilers.fortran}"'),
+            ("${FYPPFLAGS}",         f'FYPPFLAGS="-D{"hmm"}"')
         ]
 
         for e in replace_list:
