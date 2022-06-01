@@ -5,8 +5,6 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.9)
 
 PROJECT(MFC-Dependencies)
 
-# Install directory
-SET(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/../../install")
 
 # Imports
 INCLUDE(GNUInstallDirs)

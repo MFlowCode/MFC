@@ -1,43 +1,26 @@
 import os
+import typing
 import dataclasses
 
 import common
 
 
 @dataclasses.dataclass
-class Compilers:
-    c:       str
-    cpp:     str
-    fortran: str
-
-    def __init__(self, data: dict) -> None:
-        self.c       = data.get("c",       "")
-        self.cpp     = data.get("cpp",     "")
-        self.fortran = data.get("fortran", "")
-
-
-@dataclasses.dataclass
 class Mode:
-    name:    str
-    c:       str
-    cpp:     str
-    fortran: str
+    name:  str
+    flags: typing.List[str]
 
     def __init__(self, data: dict) -> None:
-        self.name    = data.get("name",    "")
-        self.c       = data.get("c",       "")
-        self.cpp     = data.get("cpp",     "")
-        self.fortran = data.get("fortran", "")
+        self.name  = data.get("name",  "")
+        self.flags = data.get("flags", [])
 
 
 @dataclasses.dataclass
 class Build:
-    threads:   int
-    compilers: Compilers
+    threads: int
 
     def __init__(self, data: dict) -> None:
-        self.threads   = data.get("threads", "")
-        self.compilers = Compilers(data.get("compilers", ""))
+        self.threads = data.get("threads", 1)
 
 
 @dataclasses.dataclass

@@ -8,7 +8,6 @@ PROJECT(MFC LANGUAGES Fortran)
 INCLUDE(GNUInstallDirs)
 INCLUDE(ExternalProject)
 
-SET(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/install")
 
 # MPI
 FIND_PACKAGE(MPI REQUIRED COMPONENTS Fortran)
@@ -31,47 +30,45 @@ ENDIF()
 
 
 # Options
-OPTION(MFC_WITH_ACC   "Build with OpenACC" OFF)
-OPTION(MFC_BUILD_PRE  "Build pre_process"  OFF)
-OPTION(MFC_BUILD_SIM  "Build simulation"   OFF)
-OPTION(MFC_BUILD_POST "Build post_process" OFF)
-OPTION(MFC_BUILD_ALL  "Build pre_process, simulation, and post_process" OFF)
+OPTION(MFC_WITH_OPEN_ACC        "Build with OpenACC" OFF)
+OPTION(MFC_BUILD_PRE_PROCESS    "Build pre_process"  OFF)
+OPTION(MFC_BUILD_SIM_SIMULATION "Build simulation"   OFF)
+OPTION(MFC_BUILD_POST_PROCESS   "Build post_process" OFF)
+OPTION(MFC_BUILD_ALL            "Build pre_process, simulation, and post_process" OFF)
+
+IF(MFC_BUILD_ALL)
+    SET(MFC_BUILD_PRE_PROCESS    ON FORCE)
+    SET(MFC_BUILD_SIM_SIMULATION ON FORCE)
+    SET(MFC_BUILD_POST_PROCESS   ON FORCE)
+ENDIF()
 
 
 # Enable OpenACC
-IF(MFC_WITH_ACC)
+IF(MFC_WITH_OPEN_ACC)
     FIND_PACKAGE(OpenACC REQUIRED)
+    ADD_COMPILE_OPTIONS(OpenACC_Fortran_FLAGS)
 
-    IF (CMAKE_FC_COMPILER_ID STREQUAL "NVHPC")
-        ADD_COMPILE_OPTIONS(-acc)
-    ELSE()
+    IF (NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         MESSAGE(FATAL_ERROR "MFC only supports NVHPC as an OpenACC compiler.")
     ENDIF()
 ENDIF()
 
 
-# Check compiler vendor is supported
+# Check compiler vendor is not unsupported
 IF (CMAKE_FC_COMPILER_ID STREQUAL "AppleClang")
     MESSAGE(FATAL_ERROR "MFC does not support the Apple Clang compilers. Please consult the README for more details.")
 ENDIF()
 
 
-# Check compiler version is supported
+# Check compiler version is not unsupported
 IF (CMAKE_FC_COMPILER_ID STREQUAL "GNU")
     IF (CMAKE_FC_COMPILER_VERSION VERSION_LESS 5)
-        MESSAGE(FATAL_ERROR "GNU v5.0 or newer is required to build MFC. [current=${CMAKE_FC_COMPILER_VERSION}]")
+        MESSAGE(FATAL_ERROR "GNU v5.0 or newer is required to build MFC. [current: ${CMAKE_FC_COMPILER_VERSION}]")
     ENDIF()
 ELSEIF (CMAKE_FC_COMPILER_ID STREQUAL "NVHPC")
     IF (CMAKE_FC_COMPILER_VERSION VERSION_LESS 21.7)
-        MESSAGE(FATAL_ERROR "NVHPC v21.7 or newer is required to build MFC. [current=${CMAKE_FC_COMPILER_VERSION}]")
+        MESSAGE(FATAL_ERROR "NVHPC v21.7 or newer is required to build MFC. [current: ${CMAKE_FC_COMPILER_VERSION}]")
     ENDIF()
-ENDIF()
-
-
-IF(MFC_BUILD_ALL)
-    SET(MFC_BUILD_PRE  ON FORCE)
-    SET(MFC_BUILD_SIM  ON FORCE)
-    SET(MFC_BUILD_POST ON FORCE)
 ENDIF()
 
 
