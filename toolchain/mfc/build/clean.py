@@ -2,10 +2,10 @@ import rich
 
 import os
 
-import common, mfc
+import common, main
 
 class MFCClean:
-    def __init__(self, mfc: mfc.MFCState) -> None:
+    def __init__(self, mfc: main.MFCState) -> None:
         self.mfc = mfc
 
     def clean_target(self, name: str, prepend="> ") -> None:

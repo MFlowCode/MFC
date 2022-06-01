@@ -17,7 +17,7 @@ PYTHON_PIP_BIN="$PYTHON_BIN -m pip"
 PYTHON_MIN_MAJOR=3
 PYTHON_MIN_MINOR=6
 
-EXEC_PATH="bootstrap/mfc.py"
+EXEC_PATH="toolchain/mfc/main.py"
 
 # Check whether this script was called from MFC's root directory.
 if [ ! -f "$EXEC_PATH" ]; then
@@ -98,7 +98,7 @@ fi
 # Fetch required Python modules.
 # Some modules which are now in Python's standard library
 #                    are imported as backports to support Python v3.6.
-declare -a REQUIRED_PYTHON_MODULES=("argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "rich,rich" "fypp,fypp")
+declare -a REQUIRED_PYTHON_MODULES=("mfc,toolchain/" "argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "rich,rich" "fypp,fypp")
 
 for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
     import_name=$(echo $module | tr ',' '\n' | head -n 1)

@@ -3,20 +3,23 @@
 import rich
 import rich.console
 
-import user
-import conf
-import lock
+from data import user
+from data import conf
+from data import lock
+
+import build.clean
+
 import args
-import clean
 import common
+
 import signal
 
-from run   import run
-from tests import tests
+import run.run
+import tests.tests
 
 class MFCState:
     def __init__(self) -> None:
-        from build import MFCBuild
+        from build.build import MFCBuild
 
         rich.print(common.MFC_HEADER)
 
@@ -25,10 +28,10 @@ class MFCState:
         self.setup_directories()
         self.lock  = lock.MFCLock(self)
         self.args  = args.parse(self)
-        self.clean = clean.MFCClean(self)
+        self.clean = build.clean.MFCClean(self)
         self.build = MFCBuild(self)
-        self.test  = tests.MFCTest(self)
-        self.run   = run.MFCRun(self)
+        self.test  = tests.tests.MFCTest(self)
+        self.run   = run.run.MFCRun(self)
 
         self.check_mode()
 
