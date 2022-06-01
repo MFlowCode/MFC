@@ -1,15 +1,20 @@
 import argparse
 
+from build import get_target_names
+
 
 def parse(mfc):
-    from main import MFCState
+    from main         import MFCState
     from run.engines  import ENGINES
     from run.mpi_bins import BINARIES
 
     mfc: MFCState
 
-    parser = argparse.ArgumentParser(description="Wecome to the MFC master script.", prog="./mfc.sh",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        prog="./mfc.sh",
+        description="Wecome to the MFC master script.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
 
     mode_names = [ e.name for e in mfc.user.modes ]
 
@@ -21,24 +26,23 @@ def parse(mfc):
     test  = parsers.add_parser(name="test",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     def add_common_arguments(p, mask=""):
-        compiler_target_names = [e.name for e in mfc.conf.targets]
-
         if "t" not in mask:
             p.add_argument("-t", "--targets", nargs="+", type=str.lower,
-                           choices=compiler_target_names, default=["mfc"], help="")
+                           choices=get_target_names(), default=["mfc"], help="")
 
         if "m" not in mask:
-            p.add_argument("-m", "--mode",        type=str.lower, choices=mode_names,
-                           default=mfc.lock.mode, help="Mode used to compile, run, and test MFC.")
+            p.add_argument("-m", "--mode", type=str.lower, choices=mode_names,
+                           help="Mode used to compile, run, and test MFC.")
 
         if "j" not in mask:
             p.add_argument("-j", "--jobs", metavar="N", type=int,
                            help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
 
+    # === BUILD ===
+    add_common_arguments(build)
+
     # === CLEAN ===
     add_common_arguments(clean, "j")
-
-    clean.add_argument("-r", "--recursive", default=False, action="store_true", help="Clean specified targets and their dependencies recursively.")
 
     binaries = [ b.bin  for b in BINARIES ]
 
@@ -76,7 +80,7 @@ def parse(mfc):
                 if not key in args:
                     args[key] = val
 
-    for a, b in [("run", run), ("test", test)]:
+    for a, b in [("run", run), ("test", test), ("build", build), ("clean", clean)]:
         append_defaults_to_data(a, b)
 
     if args["command"] is None:

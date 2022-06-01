@@ -4,11 +4,8 @@
 # 
 
 build:
-  threads:   1
-  compilers:
-    c:       mpicc
-    cpp:     mpicxx
-    fortran: mpif90
+  threads: 1
+
 run:
   nodes:         1
   account:       ""
@@ -20,17 +17,22 @@ run:
   email:         ""
   name:          "unnamed"
   flags:         []
+
 modes:
-  - name:    release-cpu
-    c:       -O3
-    cpp:     -O3
-    fortran: -O3 -cpp -w -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+- name: release-cpu
+  flags:
+  - -DCMAKE_BUILD_TYPE=Release
 
-  - name:    release-gpu
-    fortran: -O3 -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+- name: debug-cpu
+  flags:
+  - -DCMAKE_BUILD_TYPE=Debug
 
-  - name:    debug-cpu
-    fortran: -Og -g -cpp -w
+- name: release-gpu
+  flags:
+  - -DCMAKE_BUILD_TYPE=Release
+  - -DMFC_WITH_ACC=ON
 
-  - name:    debug-gpu
-    fortran: -Og -cpp -w -acc -Minfo=accel -L${CUDA:INSTALL_PATH}/lib64 -lnvToolsExt
+- name: debug-gpu
+  flags:
+  - -DCMAKE_BUILD_TYPE=Debug
+  - -DMFC_WITH_ACC=ON

@@ -9,9 +9,9 @@ class QueueSystem:
     name:     str
     template: str 
 
-    def __init__(self, name: str, template_filepath: str) -> None:
+    def __init__(self, name: str, filename: str) -> None:
         self.name     = name
-        self.template = common.file_read(template_filepath)
+        self.template = common.file_read(f"toolchain/templates/{filename}")
 
     def is_active(self) -> bool:
         raise common.MFCException("QueueSystem::is_active: not implemented.")
@@ -22,7 +22,7 @@ class QueueSystem:
 
 class PBSSystem(QueueSystem):
     def __init__(self) -> None:
-        super().__init__("PBS", "templates/pbs.sh")
+        super().__init__("PBS", "pbs.sh")
 
     def is_active(self) -> bool:
         return common.does_cmd_exist("qsub")
@@ -33,7 +33,7 @@ class PBSSystem(QueueSystem):
 
 class LSFSystem(QueueSystem):
     def __init__(self) -> None:
-        super().__init__("LSF", "templates/lsf.sh")
+        super().__init__("LSF", "lsf.sh")
 
     def is_active(self) -> bool:
         return common.does_cmd_exist("bsub") and common.does_cmd_exist("bqueues")
@@ -44,7 +44,7 @@ class LSFSystem(QueueSystem):
 
 class SLURMSystem(QueueSystem):
     def __init__(self) -> None:
-        super().__init__("SLURM", "templates/slurm.sh")
+        super().__init__("SLURM", "slurm.sh")
 
     def is_active(self) -> bool:
         return common.does_cmd_exist("sbatch")
