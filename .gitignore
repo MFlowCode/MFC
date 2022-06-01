@@ -3,6 +3,13 @@ src/*/tags
 
 __pycache__
 
+/install
+
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+
 *.egg-info
 
 /build/

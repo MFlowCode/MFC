@@ -35,11 +35,6 @@ def parse(mfc):
             p.add_argument("-j", "--jobs", metavar="N", type=int,
                            help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
 
-    # === BUILD ===
-    add_common_arguments(build)
-
-    build.add_argument("-s", "--scratch", action="store_true", help="Build from scratch.")
-
     # === CLEAN ===
     add_common_arguments(clean, "j")
 
@@ -69,6 +64,7 @@ def parse(mfc):
     run.add_argument("-#", "--name",           metavar="NAME",                  type=str, default=mfc.user.run.name,           help="(Parallel) Job name.")
     run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs="+",  type=str, default=mfc.user.run.flags,          help="(Parallel) Additional batch options.")
     run.add_argument("-b", "--binary",         choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
+    run.add_argument("-s", "--scratch", action="store_true", help="Build from scratch.")
 
     args: dict = vars(parser.parse_args())
 
@@ -80,7 +76,7 @@ def parse(mfc):
                 if not key in args:
                     args[key] = val
 
-    for a, b in [("run", run), ("test", test), ("build", build)]:
+    for a, b in [("run", run), ("test", test)]:
         append_defaults_to_data(a, b)
 
     if args["command"] is None:
