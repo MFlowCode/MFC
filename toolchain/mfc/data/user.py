@@ -1,4 +1,5 @@
-import os, dataclasses
+import os
+import dataclasses
 
 import common
 

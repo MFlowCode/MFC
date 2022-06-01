@@ -1,6 +1,12 @@
-import conf, lock, user, common, mfc
+from data import conf
+from data import lock
+from data import user
 
-import rich, rich.progress
+import main
+import common
+
+import rich
+import rich.progress
 
 import io
 import os
@@ -13,7 +19,7 @@ import dataclasses
 import urllib.request
 
 class MFCBuild:
-    def __init__(self, mfc: mfc.MFCState) -> None:
+    def __init__(self, mfc: main.MFCState) -> None:
         self.mfc = mfc
         self.check_environment()
 

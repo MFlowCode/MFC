@@ -1,6 +1,8 @@
 import os, dataclasses
 
-import conf, common
+from data import conf
+
+import common
 
 @dataclasses.dataclass
 class LockTargetMetadata:

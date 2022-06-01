@@ -7,10 +7,10 @@ import datetime
 import subprocess
 
 
-MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/..")
+MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
 MFC_TESTDIR         = os.path.abspath(f"{MFC_ROOTDIR}/tests")
 MFC_SUBDIR          = os.path.abspath(f"{MFC_ROOTDIR}/build")
-MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/bootstrap/mfc.dev.yaml")
+MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/toolchain/mfc.dev.yaml")
 MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
 MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
 

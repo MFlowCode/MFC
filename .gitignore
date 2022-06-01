@@ -1,8 +1,12 @@
-build/
 tags
 src/*/tags
 
 __pycache__
+
+*.egg-info
+
+/build/
+toolchain/build/
 
 src/*/*.mod
 src/*/*.o

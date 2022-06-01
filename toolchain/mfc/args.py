@@ -2,7 +2,7 @@ import argparse
 
 
 def parse(mfc):
-    from mfc import MFCState
+    from main import MFCState
     from run.engines  import ENGINES
     from run.mpi_bins import BINARIES
 
