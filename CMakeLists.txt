@@ -9,6 +9,9 @@ INCLUDE(GNUInstallDirs)
 INCLUDE(ExternalProject)
 
 
+# Tell CMake to also check for lib64/
+SET_PROPERTY(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
+
 # Find and configure all executables for MPI
 FIND_PACKAGE(MPI REQUIRED COMPONENTS Fortran)
 
