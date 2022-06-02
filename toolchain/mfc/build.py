@@ -93,7 +93,7 @@ def build_target(mfc, name: str):
 
     cmake_target = name if name != 'mfc' else 'all'
 
-    configure = f"cd '{build_dirpath}' && cmake -DCMAKE_INSTALL_PREFIX='{install_dirpath}' {' '.join(flags)} '{cmake_dirpath}'"
+    configure = f"cd '{build_dirpath}' && cmake -DCMAKE_INSTALL_PREFIX='{install_dirpath}' -DCMAKE_PREFIX_PATH='{install_dirpath}' {' '.join(flags)} '{cmake_dirpath}'"
     build     = f"cd '{build_dirpath}' && cmake --build . -j {mfc.args['jobs']} --target {cmake_target}"
     install   = f"cd '{build_dirpath}' && cmake --install ."
 

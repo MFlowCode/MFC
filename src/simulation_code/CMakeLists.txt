@@ -3,6 +3,7 @@
 FILE(GLOB simulation_f90s "${CMAKE_CURRENT_SOURCE_DIR}/*.f90")
 FILE(GLOB simulation_fpps "${CMAKE_CURRENT_SOURCE_DIR}/*.fpp")
 
+
 FOREACH(in_fpp_file IN LISTS simulation_fpps)
     STRING(REGEX REPLACE ".fpp\$" ".f90" out_fpp_file "${in_fpp_file}")
     
@@ -10,14 +11,19 @@ FOREACH(in_fpp_file IN LISTS simulation_fpps)
         OUTPUT          "${out_fpp_file}"
         COMMAND          fypp "${in_fpp_file}" "${out_fpp_file}"
         MAIN_DEPENDENCY "${in_fpp_file}"
-        VERBATIM)
+        VERBATIM
+    )
     
     SET(simulation_f90s ${simulation_f90s} "${out_fpp_file}")
 ENDFOREACH(in_fpp_file)
 
+
 ADD_EXECUTABLE(simulation "${simulation_f90s}")
 
-TARGET_INCLUDE_DIRECTORIES(simulation PRIVATE "${CMAKE_INSTALL_PREFIX}/include")
-TARGET_LINK_LIBRARIES     (simulation PRIVATE "${CMAKE_INSTALL_PREFIX}/lib/libfftw3.a")
+
+# Use FFTW3
+TARGET_INCLUDE_DIRECTORIES(simulation PRIVATE "${FFTW3_INCLUDE_DIRS}")
+TARGET_LINK_LIBRARIES     (simulation PRIVATE "${FFTW3_LIBRARIES}")
+
 
 INSTALL(TARGETS simulation RUNTIME DESTINATION bin)
