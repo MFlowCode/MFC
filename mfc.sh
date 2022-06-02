@@ -101,7 +101,7 @@ fi
 
 
 # Activate the Python venv
-source "$PYTHON_VENV_DIR"/bin/activate
+source "$PYTHON_VENV_DIR/bin/activate"
 
 
 # Upgrade Pip
@@ -117,7 +117,7 @@ fi
 # Fetch required Python modules.
 # Some modules which are now in Python's standard library
 #                    are imported as backports to support Python v3.6.
-declare -a REQUIRED_PYTHON_MODULES=("mfc,$TOOLCHAIN_DIR/" "argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "rich,rich" "fypp,fypp")
+declare -a REQUIRED_PYTHON_MODULES=("mfc,$TOOLCHAIN_DIR/")
 
 for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
     import_name=$(echo $module | tr ',' '\n' | head -n 1)
