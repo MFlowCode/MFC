@@ -12,7 +12,7 @@ class MFCTarget:
     name:         str
     flags:        typing.List[str]
     isDependency: bool
-    requires:     list[str]
+    requires:     typing.List[str]
 
 
 TARGETS: typing.List[MFCTarget] = [

@@ -5,6 +5,7 @@ setuptools.setup(
     version='0.1',
     license='MIT',
     zip_safe=False,
+    package_dir={'': '.'},
     packages=setuptools.find_packages(),
     fullname='MFC Toolchain',
     author_email='hberre3@gatech.edu',
