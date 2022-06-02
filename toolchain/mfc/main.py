@@ -31,7 +31,8 @@ class MFCState:
             for target in self.args["targets"]:
                 build.build_target(self, target)
         elif self.args["command"] == "clean":
-            build.clean(self)
+            for target in self.args["targets"]:
+                build.clean_target(self, target)
 
 
 FILE_ISSUE_MSG = f"""\
