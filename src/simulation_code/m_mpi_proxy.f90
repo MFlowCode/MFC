@@ -244,7 +244,7 @@ contains
         call MPI_BCAST(bc_z_glb%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         ! Fluids physical parameters
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids
             call MPI_BCAST(fluid_pp(i)%gamma, 1, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
@@ -339,7 +339,7 @@ contains
                        MPI_INTEGER, 0, &
                        MPI_COMM_WORLD, ierr)
 
-        do j = 1, num_probes_max
+        do j = 1, num_probes
             do i = 1, 3
                 call MPI_BCAST(mono(j)%loc(i), 1, &
                                MPI_DOUBLE_PRECISION, 0, &
@@ -368,9 +368,9 @@ contains
                            MPI_COMM_WORLD, ierr)
         end do
 
-        call MPI_BCAST(com_wrt(1), num_fluids_max, MPI_LOGICAL, &
+        call MPI_BCAST(com_wrt(1), num_fluids, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(cb_wrt(1), num_fluids_max, MPI_LOGICAL, &
+        call MPI_BCAST(cb_wrt(1), num_fluids, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(fd_order, 1, MPI_INTEGER, &
                        0, MPI_COMM_WORLD, ierr)
@@ -379,7 +379,7 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(probe_wrt, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        do i = 1, num_probes_max
+        do i = 1, num_probes
             call MPI_BCAST(probe(i)%x, 1, MPI_DOUBLE_PRECISION, &
                            0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(probe(i)%y, 1, MPI_DOUBLE_PRECISION, &
@@ -392,7 +392,7 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(num_integrals, 1, MPI_INTEGER, &
                        0, MPI_COMM_WORLD, ierr)
-        do i = 1, num_probes_max
+        do i = 1, num_probes
             call MPI_BCAST(integral(i)%xmin, 1, MPI_DOUBLE_PRECISION, &
                            0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(integral(i)%xmax, 1, MPI_DOUBLE_PRECISION, &
@@ -449,6 +449,8 @@ contains
             !! after the majority is divided up among the available processors
 
         integer :: i, j !< Generic loop iterators
+
+        integer :: temporary_rank
 
         if (num_procs == 1 .and. parallel_io) then
             do i = 1, num_dims
@@ -1129,13 +1131,19 @@ contains
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        q_cons_buff_send(0), &
+                        q_cons_buff_send, &
                         buff_size*sys_size*(n + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
-                        q_cons_buff_recv(0), &
+                        MPI_DOUBLE_PRECISION, &
+                        bc_x%end, &
+                        INT(0), &
+                        q_cons_buff_recv, &
                         buff_size*sys_size*(n + 1)*(p + 1), &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        MPI_DOUBLE_PRECISION, &
+                        bc_x%beg, &
+                        INT(0), &
+                        MPI_COMM_WORLD, &
+                        MPI_STATUS_IGNORE, &
+                        ierr)
 
 !$acc end host_data
 !$acc wait
@@ -1202,7 +1210,7 @@ contains
 
                 end if
 
-              if(cu_mpi == .false.) then
+              if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
 
@@ -1316,7 +1324,7 @@ contains
 
                 end if
 
-              if(cu_mpi == .false.) then
+              if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
 
@@ -1437,7 +1445,7 @@ contains
                     end if
                 end if
 
-              if(cu_mpi == .false.) then
+              if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
 
@@ -1554,7 +1562,7 @@ contains
 
                 end if
 
-              if(cu_mpi == .false.) then
+              if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
 
@@ -1678,7 +1686,7 @@ contains
 
                 end if
 
-              if(cu_mpi == .false.) then
+              if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
 
@@ -1796,7 +1804,7 @@ contains
                       
                 end if
 
-              if(cu_mpi == .false.) then
+              if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
 

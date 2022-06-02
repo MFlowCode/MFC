@@ -1,6 +1,30 @@
+include(../common/CMakeLists.txt)
 
 FILE(GLOB post_process_f90s "${CMAKE_CURRENT_SOURCE_DIR}/*.f90")
-ADD_EXECUTABLE(post_process "${post_process_f90s}")
+FILE(GLOB post_process_fpps "${CMAKE_CURRENT_SOURCE_DIR}/*.fpp")
+
+# Run FYPP
+FOREACH(in_fpp_file IN LISTS post_process_fpps)
+    STRING(REGEX REPLACE ".fpp\$" ".f90" out_fpp_file "${in_fpp_file}")
+
+    GET_FILENAME_COMPONENT(out_fpp_file_dirpath "${out_fpp_file}" DIRECTORY)
+    GET_FILENAME_COMPONENT(mytest2_file_name    "${out_fpp_file}" NAME)
+
+    SET(out_fpp_file "${out_fpp_file_dirpath}/autogen/${mytest2_file_name}")
+
+    ADD_CUSTOM_COMMAND(
+        OUTPUT          "${out_fpp_file}"
+        COMMAND         "fypp" "${in_fpp_file}" "${out_fpp_file}"
+        MAIN_DEPENDENCY "${in_fpp_file}"
+        COMMENT         "Fypp ${in_fpp_file} -> ${out_fpp_file}"
+        VERBATIM
+    )
+    
+    SET(post_process_f90s ${post_process_f90s} "${out_fpp_file}")
+ENDFOREACH(in_fpp_file)
+
+
+ADD_EXECUTABLE(post_process "${common_f90s}" "${post_process_f90s}")
 
 
 TARGET_INCLUDE_DIRECTORIES(

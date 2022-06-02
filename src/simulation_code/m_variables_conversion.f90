@@ -336,7 +336,8 @@ contains
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
 
-        real(kind(0d0)), dimension(:), intent(IN) :: alpha_rho_K, alpha_K !<
+        ! TODO: Ensure these were meant to be "INOUT" and not just "IN"
+        real(kind(0d0)), dimension(:), intent(INOUT) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
 
         integer, intent(IN) :: k, l, r
@@ -529,9 +530,14 @@ contains
         end do
 !$acc update device(gammas, pi_infs)
 
-        do i = 1, nb
-            bubrs(i) = bub_idx%rs(i)
-        end do
+        if (bubbles) then
+
+            do i = 1, nb
+                bubrs(i) = bub_idx%rs(i)
+            end do
+
+        end if
+
 !$acc update device(bubrs)
 
 
@@ -555,8 +561,6 @@ contains
 !$acc update device(mono(i)%delay)
 
         end do
-
-
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -776,14 +780,14 @@ contains
         integer :: s2b, s3b
         real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(IN) :: qK_prim_vf
         real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(INOUT) :: FK_vf 
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, advxb:), intent(INOUT) :: FK_src_vf
+        real(kind(0d0)), dimension(0:, s2b:, s3b:, INT(advxb):), intent(INOUT) :: FK_src_vf
  
         type(bounds_info), intent(IN) :: is1, is2, is3
 
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
         ! the shear and volume Reynolds numbers and the Weber numbers
-        real(kind(0d0)), dimension(contxe)          :: alpha_rho_K
+        real(kind(0d0)), dimension(INT(contxe))           :: alpha_rho_K
         real(kind(0d0)), dimension(num_fluids)            :: alpha_K  
         real(kind(0d0))                                   ::       rho_K
         real(kind(0d0)), dimension(num_dims)              ::       vel_K

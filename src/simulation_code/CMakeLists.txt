@@ -1,16 +1,24 @@
+include(../common/CMakeLists.txt)
 
-# Run FYPP
 FILE(GLOB simulation_f90s "${CMAKE_CURRENT_SOURCE_DIR}/*.f90")
 FILE(GLOB simulation_fpps "${CMAKE_CURRENT_SOURCE_DIR}/*.fpp")
 
+# Run FYPP
+FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/autogen")
 
 FOREACH(in_fpp_file IN LISTS simulation_fpps)
     STRING(REGEX REPLACE ".fpp\$" ".f90" out_fpp_file "${in_fpp_file}")
-    
+
+    GET_FILENAME_COMPONENT(out_fpp_file_dirpath "${out_fpp_file}" DIRECTORY)
+    GET_FILENAME_COMPONENT(mytest2_file_name    "${out_fpp_file}" NAME)
+
+    SET(out_fpp_file "${out_fpp_file_dirpath}/autogen/${mytest2_file_name}")
+
     ADD_CUSTOM_COMMAND(
         OUTPUT          "${out_fpp_file}"
-        COMMAND          fypp "${in_fpp_file}" "${out_fpp_file}"
+        COMMAND         "fypp" "${in_fpp_file}" "${out_fpp_file}"
         MAIN_DEPENDENCY "${in_fpp_file}"
+        COMMENT         "Fypp ${in_fpp_file}"
         VERBATIM
     )
     
@@ -18,7 +26,7 @@ FOREACH(in_fpp_file IN LISTS simulation_fpps)
 ENDFOREACH(in_fpp_file)
 
 
-ADD_EXECUTABLE(simulation "${simulation_f90s}")
+ADD_EXECUTABLE(simulation "${common_f90s}" "${simulation_f90s}")
 
 
 TARGET_INCLUDE_DIRECTORIES(simulation PRIVATE "${FFTW3_INCLUDE_DIRS}")

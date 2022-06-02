@@ -40,21 +40,22 @@ program p_main
 
     use m_data_output          !< Run-time info & solution data output procedures
 
-    use m_derived_variables    !< Derived variables evaluation procedures
-
     use m_time_steppers        !< Time-stepping algorithms
 
     use m_qbmm                 !< Quadrature MOM
 
-#IFDEF _OPENACC 
+    use m_derived_variables     !< Procedures used to compute quantites derived
+                                !! from the conservative and primitive variables
+
+#ifdef _OPENACC 
     use openacc
-#ENDIF
+#endif
 
     use nvtx
 
 #ifdef _OPENACC
    use openacc
-  #endif
+#endif
     ! ==========================================================================
 
     implicit none
@@ -99,16 +100,11 @@ program p_main
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
     ! their consistency is checked. The identification of any inconsistencies
- 
-   ! will result in the termination of the simulation.
-
-    if (proc_rank == 0) then
-        call s_assign_default_values_to_user_inputs()
-        call s_read_input_file()
-    
-        call s_check_input_file()
-    end if
-    
+    ! will result in the termination of the simulation.
+    IF(proc_rank == 0) THEN
+        CALL s_check_input_file()
+    END IF
+   
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
@@ -217,8 +213,6 @@ program p_main
     else
         mytime = t_step*dt
     end if
-    finaltime = t_step_stop*dt
-
 
 
     ! Time-stepping Loop =======================================================

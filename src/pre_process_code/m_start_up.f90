@@ -27,16 +27,15 @@ module m_start_up
     implicit none
 
     private; public :: s_initialize_start_up_module, &
- s_read_input_file, &
- s_check_input_file, &
- s_read_grid_data_files, &
- s_read_ic_data_files, &
- s_read_serial_grid_data_files, &
- s_read_serial_ic_data_files, &
- s_read_parallel_grid_data_files, &
- s_read_parallel_ic_data_files, &
- s_check_grid_data_files, &
- s_finalize_start_up_module
+                       s_check_input_file, &
+                       s_read_grid_data_files, &
+                       s_read_ic_data_files, &
+                       s_read_serial_grid_data_files, &
+                       s_read_serial_ic_data_files, &
+                       s_read_parallel_grid_data_files, &
+                       s_read_parallel_ic_data_files, &
+                       s_check_grid_data_files, &
+                       s_finalize_start_up_module
 
     abstract interface ! ===================================================
 
@@ -71,62 +70,10 @@ module m_start_up
 
 contains
 
-    !>  Reads the configuration file pre_process.inp, in order to
-        !!      populate the parameters in module m_global_parameters.f90
-        !!      with the user provided inputs
-    subroutine s_read_input_file() ! ---------------------------------------
-
-        character(LEN=name_len) :: file_loc  !<
-            !! Generic string used to store the address of a particular file
-
-        logical :: file_check !<
-            !! Generic logical used for the purpose of asserting whether a file
-            !! is or is not present in the designated location
-
-        ! Namelist for all of the parameters to be inputed by the user
-        namelist /user_inputs/ case_dir, old_grid, old_ic, t_step_old, m, &
-            n, p, x_domain, y_domain, z_domain, &
-            stretch_x, stretch_y, stretch_z, a_x, a_y, &
-            a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
-            model_eqns, num_fluids, &
-            adv_alphan, mpp_lim, &
-            weno_order, bc_x, bc_y, bc_z, num_patches, &
-            patch_icpp, fluid_pp, &
-            precision, parallel_io, &
-            perturb_flow, perturb_flow_fluid, &
-            perturb_sph, perturb_sph_fluid, fluid_rho, &
-            cyl_coord, loops_x, loops_y, loops_z, &
-            rhoref, pref, bubbles, R0ref, nb, &
-            polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma, qbmm, &
-            nnode, sigR, sigV, dist_type, rhoRV, R0_type
-
-        ! Inquiring the status of the pre_process.inp file
-        file_loc = 'pre_process.inp'
-        inquire (FILE=trim(file_loc), EXIST=file_check)
-
-        ! Checking whether the input file is there. If it is, the input file
-        ! is read. If not, the program is terminated.
-        if (file_check) then
-            open (1, FILE=trim(file_loc), FORM='formatted', &
-                  STATUS='old', ACTION='read')
-            read (1, NML=user_inputs)
-            close (1)
-            ! Store m,n,p into global m,n,p
-            m_glb = m
-            n_glb = n
-            p_glb = p
-        else
-            print '(A)', 'File pre_process.inp is missing. Exiting ...'
-            call s_mpi_abort()
-        end if
-
-    end subroutine s_read_input_file ! -------------------------------------
-
     !>  Checking that the user inputs make sense, i.e. that the
-        !!      individual choices are compatible with the code's options
-        !!      and that the combination of these choices results into a
-        !!      valid configuration for the pre-process
+    !!      individual choices are compatible with the code's options
+    !!      and that the combination of these choices results into a
+    !!      valid configuration for the pre-process
     subroutine s_check_input_file() ! --------------------------------------
 
         character(LEN=len_trim(case_dir)) :: file_loc !<
@@ -545,22 +492,21 @@ contains
             call s_mpi_abort()
         elseif (num_fluids /= dflt_int &
                 .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids_max)) then
+                (num_fluids < 1 .or. num_fluids > num_fluids_alloc)) then
             print '(A)', 'Unsupported value of num_fluids. Exiting ...'
             call s_mpi_abort()
-        elseif ((model_eqns == 1 .and. num_fluids /= dflt_int) &
-                .or. &
-                (model_eqns == 2 .and. num_fluids == dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns and num_fluids. '// &
-                'Exiting ...'
-            call s_mpi_abort()
+!        elseif ((model_eqns == 1) &
+!                .or. &
+!                (model_eqns == 2)) then
+!            print '(A)', 'Unsupported combination of values of '// &
+!                'model_eqns and num_fluids. '// &
+!                'Exiting ...'
+!            call s_mpi_abort()
         elseif (model_eqns == 1 .and. adv_alphan) then
             print '(A)', 'Unsupported combination of values of '// &
                 'model_eqns and adv_alphan. '// &
                 'Exiting ...'
             call s_mpi_abort()
-
             ! Constraints on the order of the WENO scheme
         elseif (weno_order /= 1 .and. weno_order /= 3 &
                 .and. &
@@ -610,27 +556,27 @@ contains
         if (cyl_coord .neqv. .true.) then ! Cartesian coordinates
 
             ! Constraints on the boundary conditions in the y-direction
-            if (bc_y%beg /= dflt_real &
+            if (bc_y%beg /= dflt_int &
                 .and. &
                 (bc_y%beg < -12 .or. bc_y%beg > -1)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_y%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif (bc_y%end /= dflt_real &
+            elseif (bc_y%end /= dflt_int &
                     .and. &
                     (bc_y%end < -12 .or. bc_y%end > -1)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_y%end. Exiting ...'
                 call s_mpi_abort()
-            elseif ((n == 0 .and. bc_y%beg /= dflt_real) &
+            elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
                     .or. &
-                    (n > 0 .and. bc_y%beg == dflt_real)) then
+                    (n > 0 .and. bc_y%beg == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of n and '// &
                     'bc_y%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif ((n == 0 .and. bc_y%end /= dflt_real) &
+            elseif ((n == 0 .and. bc_y%end /= dflt_int) &
                     .or. &
-                    (n > 0 .and. bc_y%end == dflt_real)) then
+                    (n > 0 .and. bc_y%end == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of n and '// &
                     'bc_y%end. Exiting ...'
                 call s_mpi_abort()
@@ -645,27 +591,27 @@ contains
                 call s_mpi_abort()
 
                 ! Constraints on the boundary conditions in the z-direction
-            elseif (bc_z%beg /= dflt_real &
+            elseif (bc_z%beg /= dflt_int &
                     .and. &
                     (bc_z%beg < -12 .or. bc_z%beg > -1)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_z%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif (bc_z%end /= dflt_real &
+            elseif (bc_z%end /= dflt_int &
                     .and. &
                     (bc_z%end < -12 .or. bc_z%end > -1)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_z%end. Exiting ...'
                 call s_mpi_abort()
-            elseif ((p == 0 .and. bc_z%beg /= dflt_real) &
+            elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
                     .or. &
-                    (p > 0 .and. bc_z%beg == dflt_real)) then
+                    (p > 0 .and. bc_z%beg == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of p and '// &
                     'bc_z%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif ((p == 0 .and. bc_z%end /= dflt_real) &
+            elseif ((p == 0 .and. bc_z%end /= dflt_int) &
                     .or. &
-                    (p > 0 .and. bc_z%end == dflt_real)) then
+                    (p > 0 .and. bc_z%end == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of p and '// &
                     'bc_z%end. Exiting ...'
                 call s_mpi_abort()
@@ -683,7 +629,7 @@ contains
         else ! Cylindrical coordinates
 
             ! Constraints on the boundary conditions in the r-direction
-            if (bc_y%beg /= dflt_real &
+            if (bc_y%beg /= dflt_int &
                 .and. &
                 ((p > 0 .and. bc_y%beg /= -13) &
                  .or. &
@@ -691,43 +637,43 @@ contains
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_y%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif (bc_y%end /= dflt_real &
+            elseif (bc_y%end /= dflt_int &
                     .and. &
                     (bc_y%end < -12 .or. bc_y%end > -1)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_y%end. Exiting ...'
                 call s_mpi_abort()
-            elseif ((n > 0 .and. bc_y%beg == dflt_real)) then
+            elseif ((n > 0 .and. bc_y%beg == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of n and '// &
                     'bc_y%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif ((n > 0 .and. bc_y%end == dflt_real)) then
+            elseif ((n > 0 .and. bc_y%end == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of n and '// &
                     'bc_y%end. Exiting ...'
                 call s_mpi_abort()
 
                 ! Constraints on the boundary conditions in the theta-direction
-            elseif (bc_z%beg /= dflt_real &
+            elseif (bc_z%beg /= dflt_int &
                     .and. &
                     (bc_z%beg /= -1 .and. bc_z%beg /= -2)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_z%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif (bc_z%end /= dflt_real &
+            elseif (bc_z%end /= dflt_int &
                     .and. &
                     (bc_z%end /= -1 .and. bc_z%end /= -2)) then
                 print '(A)', 'Unsupported choice for the value of '// &
                     'bc_z%end. Exiting ...'
                 call s_mpi_abort()
-            elseif ((p == 0 .and. bc_z%beg /= dflt_real) &
+            elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
                     .or. &
-                    (p > 0 .and. bc_z%beg == dflt_real)) then
+                    (p > 0 .and. bc_z%beg == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of p and '// &
                     'bc_z%beg. Exiting ...'
                 call s_mpi_abort()
-            elseif ((p == 0 .and. bc_z%end /= dflt_real) &
+            elseif ((p == 0 .and. bc_z%end /= dflt_int) &
                     .or. &
-                    (p > 0 .and. bc_z%end == dflt_real)) then
+                    (p > 0 .and. bc_z%end == dflt_int)) then
                 print '(A)', 'Unsupported choice for the value of p and '// &
                     'bc_z%end. Exiting ...'
                 call s_mpi_abort()
@@ -745,7 +691,7 @@ contains
         end if
 
         ! Constraints on number of patches making up the initial condition
-        if (num_patches < 0 .or. num_patches > num_patches_max .or. &
+        if (num_patches < 0 .or. num_patches > num_patches .or. &
             (num_patches == 0 .and. t_step_old == dflt_int)) then
             print '(A)', 'Unsupported choice for the value of '// &
                 'num_patches. Exiting ...'
@@ -794,7 +740,7 @@ contains
         end if
 
         ! Constraints on the geometric initial condition patch parameters
-        do i = 1, num_patches_max
+        do i = 1, num_patches
             if (i <= num_patches) then
                 if (patch_icpp(i)%geometry == 1) then
                     call s_check_line_segment_patch_geometry(i)
@@ -853,7 +799,7 @@ contains
         end do
 
         ! Constraints on overwrite rights initial condition patch parameters
-        do i = 1, num_patches_max
+        do i = 1, num_patches
             if (i <= num_patches) then
                 call s_check_active_patch_alteration_rights(i)
             else
@@ -862,7 +808,7 @@ contains
         end do
 
         ! Constraints on smoothing initial condition patch parameters
-        do i = 1, num_patches_max
+        do i = 1, num_patches
             if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. &
                              patch_icpp(i)%geometry == 4 .or. &
                              patch_icpp(i)%geometry == 5 .or. &
@@ -877,7 +823,7 @@ contains
         end do
 
         ! Constraints on flow variables initial condition patch parameters
-        do i = 1, num_patches_max
+        do i = 1, num_patches
             if (i <= num_patches) then
                 call s_check_active_patch_primitive_variables(i)
             else
@@ -886,7 +832,7 @@ contains
         end do
 
         ! Constraints on the stiffened equation of state fluids parameters
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
 
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
@@ -1549,11 +1495,11 @@ contains
         ! Constraints on the primitive variables of an active patch
         if (patch_icpp(patch_id)%vel(1) == dflt_real &
             .or. &
-            (n == 0 .and. patch_icpp(patch_id)%vel(2) /= dflt_real) &
+            (n == 0 .and. patch_icpp(patch_id)%vel(2) /= dflt_real .and. patch_icpp(patch_id)%vel(2) /= 0) &
             .or. &
             (n > 0 .and. patch_icpp(patch_id)%vel(2) == dflt_real) &
             .or. &
-            (p == 0 .and. patch_icpp(patch_id)%vel(3) /= dflt_real) &
+            (p == 0 .and. patch_icpp(patch_id)%vel(3) /= dflt_real .and. patch_icpp(patch_id)%vel(3) /= 0) &
             .or. &
             (p > 0 .and. patch_icpp(patch_id)%vel(3) == dflt_real) &
             !                               .OR.                           &
@@ -1586,7 +1532,7 @@ contains
 
         end if
 
-        if (model_eqns == 2 .and. num_fluids < num_fluids_max) then
+        if (model_eqns == 2 .and. num_fluids < num_fluids_alloc) then
 
             if (any(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:) &
                     /= dflt_real) &
@@ -1697,8 +1643,8 @@ contains
         x_cc = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
 
         ! Computing minimum cell-width
-        dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
-        if (num_procs > 1) call s_mpi_reduce_min(dx)
+        dx_min = minval(x_cb(0:m) - x_cb(-1:m - 1))
+        if (num_procs > 1) call s_mpi_reduce_min(dx_min)
 
         ! Setting locations of domain bounds
         x_domain%beg = x_cb(-1)
@@ -1730,8 +1676,8 @@ contains
             y_cc = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
 
             ! Computing minimum cell-width
-            dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
-            if (num_procs > 1) call s_mpi_reduce_min(dy)
+            dy_min = minval(y_cb(0:n) - y_cb(-1:n - 1))
+            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
 
             ! Setting locations of domain bounds
             y_domain%beg = y_cb(-1)
@@ -1763,8 +1709,8 @@ contains
                 z_cc = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
 
                 ! Computing minimum cell-width
-                dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
-                if (num_procs > 1) call s_mpi_reduce_min(dz)
+                dz_min = minval(z_cb(0:p) - z_cb(-1:p - 1))
+                if (num_procs > 1) call s_mpi_reduce_min(dz_min)
 
                 ! Setting locations of domain bounds
                 z_domain%beg = z_cb(-1)
@@ -1939,8 +1885,8 @@ contains
         ! Computing cell center locations
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
         ! Computing minimum cell width
-        dx = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
-        if (num_procs > 1) call s_mpi_reduce_min(dx)
+        dx_min = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
+        if (num_procs > 1) call s_mpi_reduce_min(dx_min)
         ! Setting locations of domain bounds
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
@@ -1965,8 +1911,8 @@ contains
             ! Computing cell center locations
             y_cc = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
             ! Computing minimum cell width
-            dy = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
-            if (num_procs > 1) call s_mpi_reduce_min(dy)
+            dy_min = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
+            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
             ! Setting locations of domain bounds
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
@@ -1991,8 +1937,8 @@ contains
                 ! Computing cell center locations
                 z_cc = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
                 ! Computing minimum cell width
-                dz = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
-                if (num_procs > 1) call s_mpi_reduce_min(dz)
+                dz_min = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
+                if (num_procs > 1) call s_mpi_reduce_min(dz_min)
                 ! Setting locations of domain bounds
                 z_domain%beg = z_cb(-1)
                 z_domain%end = z_cb(p)

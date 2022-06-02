@@ -32,7 +32,7 @@ program p_main
 
     implicit none
 
- 
+
    ! Initialization of the MPI environment
 
    call s_mpi_initialize()
@@ -42,12 +42,9 @@ program p_main
     ! consistency is checked. The detection of any inconsistencies automatically
     ! leads to the termination of the pre-process.
 
-    if (proc_rank == 0) then
-        call s_assign_default_values_to_user_inputs()
-        call s_read_input_file()
-        call s_check_input_file()
-    end if
-
+    IF (proc_rank == 0) THEN
+        CALL s_check_input_file()
+    END IF
 
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -118,7 +115,7 @@ program p_main
     s_read_grid_data_files => null()
     s_read_ic_data_files => null()
     s_write_data_files => null()
-    
+
 
     ! Deallocation procedures for the modules
     call s_finalize_initial_condition_module()

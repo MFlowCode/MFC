@@ -1,156 +1,223 @@
-import common
+import typing
+import dataclasses
 
-PRE_PROCESS = ['case_dir', 'old_grid', 'old_ic', 't_step_old', 'm', 'n', 'p',
-               'cyl_coord', 'model_eqns', 'num_fluids', 'adv_alphan', 'mpp_lim',
-               'weno_order', 'precision', 'parallel_io', 'perturb_flow',
-               'perturb_flow_fluid', 'perturb_sph', 'perturb_sph_fluid',
-               'fluid_rho', 'hypoelasticity', 'num_patches', 'Ca', 'Web',
-               'Re_inv', 'pref', 'rhoref', 'bubbles' , 'polytropic',
-               'polydisperse', 'poly_sigma', 'thermal', 'nb', 'R0ref', 'qbmm',
-               'dist_type', 'R0_type', 'nnode', 'sigR', 'sigV', 'rhoRV']
+DFLT_REAL = -1e6
+DFLT_INT  = -100
 
-for cmp in ["x", "y", "z"]:
-    for prepend in ["domain%beg", "domain%end", "a", "b"]:
-        PRE_PROCESS.append(f"{cmp}_{prepend}")
+class CaseAttribute:
+    pass
 
-    for append in ["stretch", "a", "loops"]:
-        PRE_PROCESS.append(f"{append}_{cmp}")
+@dataclasses.dataclass
+class CaseAttribute:
+    name:    str
+    default: typing.Any # If None, it must be set by the user
+    inner:   typing.List[CaseAttribute] = None
 
-    PRE_PROCESS.append(f"bc_{cmp}%beg")
-    PRE_PROCESS.append(f"bc_{cmp}%end")
+# Shorthand for CaseAttribute
+MFCCA = CaseAttribute
 
-for f_id in range(1, 10+1):
-    PRE_PROCESS.append(f'fluid_rho({f_id})')
-
-    for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "G"]:
-        PRE_PROCESS.append(f"fluid_pp({f_id})%{attribute}")
-
-for p_id in range(1, 10+1):
-    for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
-                      "normal", "smoothen", "smooth_patch_id", "alpha_rho",
-                      "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0"]:
-        PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
-
-    for cmp_id, cmp in enumerate(["x", "y", "z"]):
-        cmp_id += 1
-        PRE_PROCESS.append(f'patch_icpp({p_id})%{cmp}_centroid')
-        PRE_PROCESS.append(f'patch_icpp({p_id})%length_{cmp}')
-
-        for append in ["radii", "normal", "vel"]:
-            PRE_PROCESS.append(f'patch_icpp({p_id})%{append}({cmp_id})')
-
-    for arho_id in range(1, 10+1):
-        PRE_PROCESS.append(f'patch_icpp({p_id})%alpha({arho_id})')
-        PRE_PROCESS.append(f'patch_icpp({p_id})%alpha_rho({arho_id})')
-
-    for taue_id in range(1, 6+1):
-        PRE_PROCESS.append(f'patch_icpp({p_id})%tau_e({taue_id})')
-
-    if p_id >= 2:
-        PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch')
-
-        for alter_id in range(1, p_id):
-            PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
-
-
-SIMULATION = ['case_dir', 'run_time_info', 't_step_old', 't_tol', 'debug', 'm',
-              'n', 'p', 'cyl_coord', 'dt', 't_step_start', 't_step_stop',
-              't_step_save', 'model_eqns', 'num_fluids', 'adv_alphan',
-              'mpp_lim', 'time_stepper', 'weno_vars', 'weno_order', 'weno_eps',
-              'char_decomp', 'mapped_weno', 'mp_weno', 'weno_avg',
-              'weno_Re_flux', 'riemann_solver', 'wave_speeds', 'avg_state',
-              'commute_err', 'split_err', 'alt_crv', 'alt_soundspeed',
-              'regularization', 'reg_eps', 'null_weights', 'mixture_err',
-              'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds', 'flux_lim',
-              'We_riemann_flux', 'We_rhs_flux', 'We_src', 'We_wave_speeds',
-              'lsq_deriv', 'parallel_io', 'precision', 'hypoelasticity',
-              'fd_order' , 'com_wrt', 'num_probes', 'probe_wrt', 'cb_wrt',
-              'threshold_mf', 'moment_order', 'pref', 'rhoref', 'polydisperse',
-              'poly_sigma', 'bubbles', 'bubble_model', 'polytropic', 'thermal',
-              'R0ref', 'Ca', 'Web', 'Re_inv', 'nb', 'Monopole', 'num_mono',
-              'qbmm', 'R0_type', 'nnode', 'integral_wrt', 'num_integrals',
-              "cu_mpi"]
-
-for cmp in ["x", "y", "z"]:
-    SIMULATION.append(f'bc_{cmp}%beg')
-    SIMULATION.append(f'bc_{cmp}%end')
+PARAMS: typing.List[CaseAttribute] = [
+    MFCCA('case_dir',           '.'),
+    MFCCA('old_grid',           None),
+    MFCCA('old_ic',             None),
+    MFCCA('t_step_old',         None),
+    MFCCA('m',                  None),
+    MFCCA('n',                  0),
+    MFCCA('p',                  0),
+    MFCCA('cyl_coord',          None),
+    MFCCA('model_eqns',         None),
+    MFCCA('adv_alphan',         None),
+    MFCCA('mpp_lim',            None),
+    MFCCA('weno_order',         None),
+    MFCCA('precision',          None),
+    MFCCA('parallel_io',        None),
+    MFCCA('perturb_flow',       None),
+    MFCCA('perturb_flow_fluid', None),
+    MFCCA('perturb_sph',        None),
+    MFCCA('perturb_sph_fluid',  None),
+    MFCCA('fluid_rho',          None),
+    MFCCA('hypoelasticity',     None),
+    MFCCA('num_patches',        None),
+    MFCCA('Ca',                 None),
+    MFCCA('Web',                None),
+    MFCCA('Re_inv',             None),
+    MFCCA('pref',         None),
+    MFCCA('rhoref',       None),
+    MFCCA('bubbles',      None),
+    MFCCA('polytropic',   None),
+    MFCCA('polydisperse', None),
+    MFCCA('poly_sigma', None),
+    MFCCA('thermal', None),
+    MFCCA('nb', None),
+    MFCCA('R0ref', None),
+    MFCCA('qbmm', None),
+    MFCCA('dist_type', None),
+    MFCCA('R0_type', None),
+    MFCCA('nnode', None),
+    MFCCA('sigR', None),
+    MFCCA('sigV', None),
+    MFCCA('rhoRV', None),
+    MFCCA('run_time_info', None),
+    MFCCA('t_tol', None),
+    MFCCA('debug', None),
+    MFCCA('dt', None),
+    MFCCA('t_step_start', None),
+    MFCCA('t_step_stop', None),
+    MFCCA('t_step_save', None),
+    MFCCA('num_fluids', None),
+    MFCCA('time_stepper', None),
+    MFCCA('weno_vars', None),
+    MFCCA('weno_eps', None),
+    MFCCA('char_decomp', None),
+    MFCCA('mapped_weno', None),
+    MFCCA('mp_weno', None),
+    MFCCA('weno_avg', None),
+    MFCCA('weno_Re_flux', None),
+    MFCCA('riemann_solver', None),
+    MFCCA('wave_speeds', None),
+    MFCCA('avg_state', None),
+    MFCCA('commute_err', None),
+    MFCCA('split_err', None),
+    MFCCA('alt_crv', None),
+    MFCCA('alt_soundspeed', None),
+    MFCCA('regularization', None),
+    MFCCA('reg_eps', None),
+    MFCCA('null_weights', None),
+    MFCCA('mixture_err', None),
+    MFCCA('tvd_riemann_flux', None),
+    MFCCA('tvd_rhs_flux', None),
+    MFCCA('tvd_wave_speeds', None),
+    MFCCA('flux_lim', None),
+    MFCCA('We_riemann_flux', None),
+    MFCCA('We_rhs_flux', None),
+    MFCCA('We_src', None),
+    MFCCA('We_wave_speeds', None),
+    MFCCA('lsq_deriv', None),
+    MFCCA('fd_order', None),
+    MFCCA('com_wrt', None),
+    MFCCA('num_probes', None),
+    MFCCA('probe_wrt', None),
+    MFCCA('cb_wrt', None),
+    MFCCA('threshold_mf', None),
+    MFCCA('moment_order', None),
+    MFCCA('bubble_model', None),
+    MFCCA('Monopole', None),
+    MFCCA('num_mono', None),
+    MFCCA('integral_wrt', None),
+    MFCCA('num_integrals', None),
+    MFCCA('cu_mpi', None),
+    MFCCA('format', None),
+    MFCCA('coarsen_silo', None),
+    MFCCA('fourier_decomp', None),
+    MFCCA('fourier_modes%beg', None),
+    MFCCA('fourier_modes%end', None),
+    MFCCA('alpha_rho_wrt', None),
+    MFCCA('rho_wrt', None),
+    MFCCA('mom_wrt', None),
+    MFCCA('vel_wrt', None),
+    MFCCA('flux_wrt', None),
+    MFCCA('E_wrt', None),
+    MFCCA('pres_wrt', None),
+    MFCCA('alpha_wrt', None),
+    MFCCA('kappa_wrt', None),
+    MFCCA('gamma_wrt', None),
+    MFCCA('heat_ratio_wrt', None),
+    MFCCA('pi_inf_wrt', None),
+    MFCCA('pres_inf_wrt', None),
+    MFCCA('cons_vars_wrt', None),
+    MFCCA('prim_vars_wrt', None),
+    MFCCA('c_wrt', None),
+    MFCCA('omega_wrt', None),
+    MFCCA('schlieren_wrt', None),
+    MFCCA('schlieren_alpha', None),
+    MFCCA('fluids',  [], [
+        MFCCA("gamma", None),
+        MFCCA("pi_inf", None),
+        MFCCA("mul0", None),
+        MFCCA("ss", None),
+        MFCCA("pv", None),
+        MFCCA("gamma_v", None),
+        MFCCA("M_v", None),
+        MFCCA("mu_v", None),
+        MFCCA("k_v", None),
+        MFCCA("G", None),
+        MFCCA("Re(1)", None),
+        MFCCA("Re(2)", None),
+    ]),
+    MFCCA('patches', [], [
+        MFCCA("geometry", None),
+        MFCCA("radius", None),
+        MFCCA("radii", None),
+        MFCCA("epsilon", None),
+        MFCCA("beta", None),
+        MFCCA("normal", None),
+        MFCCA("smoothen", None),
+        MFCCA("smooth_patch_id", None),
+        MFCCA("alpha_rho", None),
+        MFCCA("smooth_coeff", None),
+        MFCCA("rho", None),
+        MFCCA("vel", None),
+        MFCCA("pres", None),
+        MFCCA("alpha", None),
+        MFCCA("gamma", None),
+        MFCCA("pi_inf", None),
+        MFCCA("r0", None),
+        MFCCA("v0", None),
+        MFCCA("p0", None),
+        MFCCA("m0", None),
+    ]),
+]
 
 for wrt_id in range(1,10+1):
-    SIMULATION.append(f'com_wrt({wrt_id})')
-    SIMULATION.append(f'cb_wrt({wrt_id})')
+    PARAMS.append(MFCCA(f'com_wrt({wrt_id})', None))
+    PARAMS.append(MFCCA(f'cb_wrt({wrt_id})', None))
 
     for cmp in ["x", "y", "z"]:
-        SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
+        PARAMS.append(MFCCA(f'probe_wrt({wrt_id})%{cmp}', None))
 
 for probe_id in range(1,3+1):
     for cmp in ["x", "y", "z"]:
-        SIMULATION.append(f'probe({probe_id})%{cmp}')
+        PARAMS.append(MFCCA(f'probe({probe_id})%{cmp}', None))
 
-for mf_id in range(1,5+1):
-    SIMULATION.append(f'threshold_mf({mf_id})')
+for cmp in ["x", "y", "z"]:
+    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+        PARAMS.append(MFCCA(f"{cmp}_{prepend}", DFLT_REAL))
 
-for order_id in range(1,5+1):
-    SIMULATION.append(f'moment_order({order_id})')
+    for append in [("stretch", False), ("a", DFLT_REAL), ("loops", 1)]:
+        PARAMS.append(MFCCA(f"{append[0]}_{cmp}", append[1]))
 
-for f_id in range(1,10+1):
-    for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "G"]:
-        SIMULATION.append(f"fluid_pp({f_id})%{attribute}")
+    PARAMS.append(MFCCA(f"bc_{cmp}%beg", DFLT_REAL))
+    PARAMS.append(MFCCA(f"bc_{cmp}%end", DFLT_REAL))
 
-    for re_id in [1, 2]:
-        SIMULATION.append(f"fluid_pp({f_id})%Re({re_id})")
+    for cmp_id, cmp in enumerate(["x", "y", "z"]):
+        cmp_id += 1
+        PARAMS["patches"].inner.append(MFCCA(f'{cmp}_centroid'))
+        PARAMS["patches"].inner.append(MFCCA(f'length_{cmp}'))
 
-    for mono_id in range(1,4+1):
-        for attribute in ["mag", "length", "dir", "npulse", "pulse", "support",
-                          "delay"]:
-            SIMULATION.append(f"Mono({mono_id})%{attribute}")
+        for append in ["radii", "normal", "vel"]:
+            PARAMS["patches"].inner.append(MFCCA(f'{append}({cmp_id})'))
 
-        for cmp_id in range(1,3+1):
-            SIMULATION.append(f"Mono({mono_id})%loc({cmp_id})")
+def generate(user: dict, master: dict = None):
+    if master is None:
+        master = PARAMS.copy()
 
-    for int_id in range(1,5+1):
-        for cmp in ["x", "y", "z"]:
-            SIMULATION.append(f"integral({int_id})%{cmp}min")
-            SIMULATION.append(f"integral({int_id})%{cmp}max")
+    result: dict = {}
 
+    if not set(user.keys()).issubset(set([ e.name for e in master ])):
+        print(set(user.keys()) - set([ e.name for e in master ]))
+        print(set(user.keys()))
+        print(set([ e.name for e in master ]))
+        raise "case_dicts::generate invalid."
 
-POST_PROCESS = ['case_dir', 'cyl_coord', 'm', 'n', 'p', 't_step_start',
-                't_step_stop', 't_step_save', 'model_eqns', 'num_fluids',
-                'adv_alphan', 'mpp_lim', 'weno_order', 'alt_soundspeed',
-                'mixture_err', 'parallel_io', 'hypoelasticity',
-                'polydisperse', 'poly_sigma', 'polytropic', 'thermal',
-                'pref', 'Ca', 'Web', 'Re_inv', 'rhoref', 'bubbles',
-                'R0ref', 'nb', 'format', 'precision', 'coarsen_silo',
-                'fourier_decomp', 'fourier_modes%beg',
-                'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
-                'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt',
-                'pres_wrt', 'alpha_wrt', 'kappa_wrt', 'gamma_wrt',
-                'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt',
-                'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
-                'schlieren_wrt', 'schlieren_alpha', 'fd_order']
+    for param in PARAMS:
+        entry: dict = {
+            param.name: user[param.name] if param.name in user else param.default
+        }
 
-for cmp_id in range(1,3+1):
-    cmp = ["x", "y", "z"][cmp_id-1]
+        if param.inner is not None:
+            for entry in entry[param.name]:
+                entry = generate(entry, param.inner)
 
-    POST_PROCESS.append(f'bc_{cmp}%beg')
-    POST_PROCESS.append(f'bc_{cmp}%end')
+        result.update(entry.copy())
 
-    for attribute in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
-        POST_PROCESS.append(f'{attribute}({cmp_id})')
-
-for fl_id in range(1,10+1):
-    for append in ["schlieren_alpha", "alpha_rho_wrt", "alpha_wrt", "kappa_wrt"]:
-        POST_PROCESS.append(f'{append}({fl_id})')
-
-    for attribute in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0"]:
-        POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
-
-
-def get_input_dict_keys(target_name: str) -> list:
-    if target_name == "pre_process":  return PRE_PROCESS.copy()
-    if target_name == "simulation":   return SIMULATION.copy()
-    if target_name == "post_process": return POST_PROCESS.copy()
-
-    raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
+    return result

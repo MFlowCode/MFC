@@ -253,7 +253,7 @@ contains
         call MPI_BCAST(parallel_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
         ! Fluids physical parameters
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
             call MPI_BCAST(fluid_pp(i)%gamma, 1, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
@@ -302,21 +302,14 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(schlieren_wrt, 1, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alpha_rho_wrt(1), num_fluids_max, MPI_LOGICAL, &
+        call MPI_BCAST(alpha_rho_wrt(1), num_fluids_alloc, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, &
                        ierr)
-        call MPI_BCAST(alpha_wrt(1), num_fluids_max, MPI_LOGICAL, &
+        call MPI_BCAST(alpha_wrt(1), num_fluids_alloc, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, &
                        ierr)
-
-        call MPI_BCAST(schlieren_alpha(1), num_fluids_max, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
 
         call MPI_BCAST(fd_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(fourier_decomp, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
 
         ! Tait EOS
         call MPI_BCAST(pref, 1, &
@@ -1691,7 +1684,9 @@ contains
                              MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, &
                              ierr)
 
-            if (proc_rank == 0) x_root_cb(-1) = x_cb(-1)
+            if (proc_rank == 0) then
+                x_root_cb(-1) = x_cb(-1)
+            end if
 
         end if
 

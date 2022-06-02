@@ -31,15 +31,15 @@ module m_start_up
 
     implicit none
 
-    private; public :: s_initialize_start_up_module, &
- s_read_input_file, &
- s_check_input_file, &
- s_read_data_files, &
- s_read_serial_data_files, &
- s_read_parallel_data_files, &
- s_populate_grid_variables_buffers, &
- s_initialize_internal_energy_equations, &
- s_finalize_start_up_module
+    PRIVATE; PUBLIC :: s_initialize_start_up_module, &
+                       s_check_input_file, &
+                       s_read_data_files, &
+                       s_read_serial_data_files, &
+                       s_read_parallel_data_files, &
+                       s_populate_grid_variables_buffers, &
+                       s_initialize_internal_energy_equations, &
+                       s_finalize_start_up_module
+
 
     abstract interface ! ===================================================
 
@@ -62,73 +62,9 @@ module m_start_up
 
 contains
 
-    !>  The purpose of this procedure is to first verify that an
-        !!      input file has been made available by the user. Provided
-        !!      that this is so, the input file is then read in.
-    subroutine s_read_input_file() ! ---------------------------------------
-
-        ! Relative path to the input file provided by the user
-        character(LEN=name_len) :: file_path = './simulation.inp'
-
-        logical :: file_exist !<
-            !! Logical used to check the existence of the input file
-
-        ! Namelist of the global parameters which may be specified by user
-        namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, &
-            model_eqns, num_fluids, adv_alphan, &
-            mpp_lim, time_stepper, weno_vars, &
-            weno_order, weno_eps, weno_flat, riemann_flat, cu_mpi, cu_tensor, &
-            mapped_weno, mp_weno, &
-            riemann_solver, wave_speeds, avg_state, &
-            bc_x, bc_y, bc_z, &
-            fluid_pp, com_wrt, cb_wrt, probe_wrt, &
-            fd_order, probe, num_probes, t_step_old, &
-            threshold_mf, moment_order, &
-            alt_soundspeed, mixture_err, weno_Re_flux, &
-            null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles, bubble_model, &
-            R0ref, nb, Ca, Web, Re_inv, &
-            monopole, mono, num_mono, &
-            polytropic, thermal, &
-            integral, integral_wrt, num_integrals, &
-            polydisperse, poly_sigma, qbmm, nnode, &
-            R0_type, DEBUG
-
-        ! Checking that an input file has been provided by the user. If it
-        ! has, then the input file is read in, otherwise, simulation exits.
-        inquire (FILE=trim(file_path), EXIST=file_exist)
-
-        if (file_exist) then
-            open (1, FILE=trim(file_path), &
-                  FORM='formatted', &
-                  ACTION='read', &
-                  STATUS='old')
-            read (1, NML=user_inputs); close (1)
-
-            ! Store BC information into global BC
-            bc_x_glb%beg = bc_x%beg
-            bc_x_glb%end = bc_x%end
-            bc_y_glb%beg = bc_y%beg
-            bc_y_glb%end = bc_y%end
-            bc_z_glb%beg = bc_z%beg
-            bc_z_glb%end = bc_z%end
-
-            ! Store m,n,p into global m,n,p
-            m_glb = m
-            n_glb = n
-            p_glb = p
-
-        else
-            print '(A)', trim(file_path)//' is missing. Exiting ...'
-            call s_mpi_abort()
-        end if
-
-    end subroutine s_read_input_file ! -------------------------------------
-
     !> The goal of this procedure is to verify that each of the
-        !!      user provided inputs is valid and that their combination
-        !!      consitutes a meaningful configuration for the simulation.
+    !!      user provided inputs is valid and that their combination
+    !!      consitutes a meaningful configuration for the simulation.
     subroutine s_check_input_file() ! --------------------------------------
 
         ! Relative path to the current directory file in the case directory
@@ -259,7 +195,7 @@ contains
             call s_mpi_abort()
         elseif (num_fluids /= dflt_int &
                 .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids_max)) then
+                (num_fluids < 1 .or. num_fluids > num_fluids_alloc)) then
             print '(A)', 'Unsupported value of num_fluids. Exiting ...'
             call s_mpi_abort()
         elseif ((model_eqns == 1 .and. num_fluids /= dflt_int) &
@@ -466,7 +402,7 @@ contains
         ! END: Finite Difference Parameters ================================
 
         ! Fluids Physical Parameters =======================================
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
 
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
@@ -556,7 +492,6 @@ contains
 
     end subroutine s_check_input_file ! ------------------------------------
 
-    !> The primary purpose of this procedure is to read in the
         !!              initial condition and grid data files. The cell-average
         !!              conservative variables constitute the former, while the
         !!              cell-boundary locations in x-, y- and z-directions make

@@ -45,7 +45,8 @@ if __name__ == "__main__":
         MFCState()
     except common.MFCException as exc:
         rich.print(f"""
-[bold red]FATAL ERROR[/bold red]> {str(exc)}
+ --- [bold red]FATAL MFC ERROR[/bold red] ---
+{str(exc)}
 {FILE_ISSUE_MSG}
 """)
         common.quit(signal.SIGTERM)
@@ -54,7 +55,8 @@ if __name__ == "__main__":
     except Exception as exc:
         rich.console.Console().print_exception()
         rich.print(f"""
-[bold red]FATAL ERROR[/bold red]> An unexpected exception occurred.
+ --- [bold red]FATAL MFC ERROR[/bold red] ---
+An unexpected exception occurred:
 {FILE_ISSUE_MSG}
 """)
         common.quit(signal.SIGTERM)

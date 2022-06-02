@@ -34,8 +34,6 @@ program p_main
     use m_data_output           !< Procedures that write the grid and chosen flow
                                 !! variable(s) to the formatted database file(s)
 
-    use m_derived_variables     !< Procedures used to compute quantites derived
-                                !! from the conservative and primitive variables
     ! ==========================================================================
 
     implicit none
@@ -63,8 +61,6 @@ program p_main
     ! consistency is checked. The detection of any inconsistencies automatically
     ! leads to the termination of the post-process.
     if (proc_rank == 0) then
-        call s_assign_default_values_to_user_inputs()
-        call s_read_input_file()
         call s_check_input_file()
     end if
 

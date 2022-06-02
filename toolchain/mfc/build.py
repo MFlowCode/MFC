@@ -4,6 +4,7 @@ import common
 
 import os
 import typing
+import binascii
 import dataclasses
 
 
@@ -75,9 +76,13 @@ def get_target(name: str) -> MFCTarget:
     raise common.MFCException(f"Target '{name}' does not exist.")
 
 
+def get_build_sub_dirpath(target: MFCTarget):
+    return f'{os.getcwd()}/build/{["mfc", "dependencies"][int(target.isDependency)]}'
+
+
 # Get path to directory that will store the build files
 def get_build_dirpath(target: MFCTarget) -> str:
-    return f'{os.getcwd()}/build/{["mfc", "dependencies"][int(target.isDependency)]}/{target.name}'
+    return f'{get_build_sub_dirpath(target)}/{target.name}'
 
 
 # Get the directory that contains the target's CMakeLists.txt
@@ -139,8 +144,13 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     if not os.path.exists(build_dirpath):
         os.mkdir(build_dirpath)
         rich.print(f" + {configure}")
-        common.execute_shell_command(configure)
+        
+        if common.execute_shell_command(configure, no_exception=True) != 0:
+            new_dirpath = f"{get_build_sub_dirpath(target)}/{name}-failed-{binascii.b2a_hex(os.urandom(5)).decode()}"
+            os.rename(build_dirpath, new_dirpath)
 
+            raise common.MFCException(f"Failed to configure the {name} target. Its CMake build directory is located at {new_dirpath}.")
+            
     rich.print(f" + {build}")
     common.execute_shell_command(build)
 

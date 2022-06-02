@@ -414,7 +414,9 @@ contains
                     if (model_eqns == 3) then
                         do i = internalEnergies_idx%beg, internalEnergies_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i - adv_idx%end)%sf(j, k, l)* &
-                                                       fluid_pp(i - adv_idx%end)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + fluid_pp(i - adv_idx%end)%pi_inf
+                                                       fluid_pp(i - adv_idx%end)%gamma* &
+                                                       q_prim_vf(E_idx)%sf(j, k, l) + &
+                                                       fluid_pp(i - adv_idx%end)%pi_inf
                         end do
                     end if
 

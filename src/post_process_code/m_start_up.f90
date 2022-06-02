@@ -23,58 +23,6 @@ module m_start_up
 
 contains
 
-    !>  Reads the configuration file post_process.inp, in order
-        !!      to populate parameters in module m_global_parameters.f90
-        !!      with the user provided inputs
-    subroutine s_read_input_file() ! ---------------------------------------
-
-        character(LEN=name_len) :: file_loc !<
-            !! Generic string used to store the address of a particular file
-
-        logical :: file_check !<
-            !! Generic logical used for the purpose of asserting whether a file
-            !! is or is not present in the designated location
-
-        ! Namelist for all of the parameters to be inputed by the user
-        namelist /user_inputs/ case_dir, m, n, p, t_step_start, &
-            t_step_stop, t_step_save, model_eqns, &
-            num_fluids, mpp_lim, adv_alphan, &
-            weno_order, bc_x, &
-            bc_y, bc_z, fluid_pp, format, precision, &
-            alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
-            E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
-            heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
-            cons_vars_wrt, prim_vars_wrt, c_wrt, &
-            omega_wrt, schlieren_wrt, schlieren_alpha, &
-            fd_order, mixture_err, alt_soundspeed, &
-            flux_lim, flux_wrt, cyl_coord, &
-            parallel_io, coarsen_silo, fourier_decomp, &
-            rhoref, pref, bubbles, R0ref, nb, &
-            polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma
-
-        ! Inquiring the status of the post_process.inp file
-        file_loc = 'post_process.inp'
-        inquire (FILE=trim(file_loc), EXIST=file_check)
-
-        ! Checking whether the input file is there. If it is, the input file
-        ! is read. If not, the program is terminated.
-        if (file_check) then
-            open (1, FILE=trim(file_loc), FORM='formatted', &
-                  STATUS='old', ACTION='read')
-            read (1, NML=user_inputs)
-            close (1)
-            ! Store m,n,p into global m,n,p
-            m_glb = m
-            n_glb = n
-            p_glb = p
-        else
-            print '(A)', 'File post_process.inp is missing. Exiting ...'
-            call s_mpi_abort()
-        end if
-
-    end subroutine s_read_input_file ! -------------------------------------
-
     !>  Checking that the user inputs make sense, i.e. that the
         !!      individual choices are compatible with the code's options
         !!      and that the combination of these choices results into a
@@ -157,7 +105,7 @@ contains
             call s_mpi_abort()
         elseif (num_fluids /= dflt_int &
                 .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids_max)) then
+                (num_fluids < 1 .or. num_fluids > num_fluids_alloc)) then
             print '(A)', 'Unsupported value of num_fluids. Exiting ...'
             call s_mpi_abort()
         elseif ((model_eqns == 1 .and. num_fluids /= dflt_int) &
@@ -297,15 +245,10 @@ contains
                 'values for p, bc_z%beg and bc_z%end. '// &
                 'Exiting ...'
             call s_mpi_abort()
-
-            ! Constraints on Fourier decomposition options
-        elseif (fourier_decomp) then 
-            print '(A)', 'fourier not supported'
-            call s_mpi_abort()
         end if
 
         ! Constraints on the stiffened equation of state fluids parameters
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
 
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
@@ -387,7 +330,7 @@ contains
         end if
 
         ! Constraints on the post-processing of the partial densities
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
             if (((i > num_fluids .or. model_eqns == 1) &
                  .and. &
                  alpha_rho_wrt(i)) &
@@ -451,7 +394,7 @@ contains
         end if
 
         ! Constraints on the post-processing of the volume fractions
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
             if (((i > num_fluids .or. model_eqns == 1) &
                  .and. &
                  alpha_wrt(i)) &
@@ -520,7 +463,7 @@ contains
         end if
 
         ! Constraints on the coefficients of numerical Schlieren function
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
             if (schlieren_alpha(i) /= dflt_real &
                 .and. &
                 schlieren_alpha(i) <= 0d0) then
