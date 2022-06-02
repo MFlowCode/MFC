@@ -111,7 +111,8 @@ if [ "$u_computer" == "s" ]; then # For Summit
     fi
 
     MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
-             "hsi/5.0.2.p5"  "xalt/1.2.1"    "lsf-tools/2.0")
+             "hsi/5.0.2.p5"  "xalt/1.2.1"    "lsf-tools/2.0"
+             "cmake/3.23.1")
 elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
@@ -131,6 +132,8 @@ elif [ "$u_computer" == "a" ]; then # For Ascent
         MODULES=("nvhpc/21.11"    "spectrum-mpi"   "cuda/nvhpc"
                  "nsight-compute" "nsight-systems")
     fi
+
+    MODULES=("${MODULES[@]}" "cmake/3.22.2")
 elif [ "$u_computer" == "r" ]; then # Richardson
     COMPUTER="$RICHARDSON"
 
@@ -152,7 +155,7 @@ elif [ "$u_computer" == "w" ]; then # For Wombat
         MODULES=("cuda/11.5.1" "/sw/wombat/Nvidia_HPC_SDK/modulefiles/nvhpc/22.1")
     fi
 
-    MODULES=("${MODULES[@]}" "python/3.9.9")
+    MODULES=("${MODULES[@]}" "cmake/3.22.1" "python/3.9.9")
 elif [ "$u_computer" == "e" ]; then # Expanse
     COMPUTER="$EXPANSE"
 
@@ -162,7 +165,7 @@ elif [ "$u_computer" == "e" ]; then # Expanse
         MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5")
     fi
 
-    MODULES=("${MODULES[@]}")
+    MODULES=("${MODULES[@]}" "cmake/3.19.8")
 elif [ "$u_computer" == "p" ]; then # Phoenix
     COMPUTER="$PHOENIX"
 
@@ -172,7 +175,7 @@ elif [ "$u_computer" == "p" ]; then # Phoenix
         MODULES=("cuda/11.2" "nvhpc/22.1")
     fi
 
-    MODULES=("${MODULES[@]}" "python/3.7.4")
+    MODULES=("${MODULES[@]}" "python/3.7.4" "cmake/3.20.3")
 else
     echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
     

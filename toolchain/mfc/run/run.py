@@ -6,6 +6,7 @@ import run.engines as engines
 import run.input   as input
 
 import common
+import build
 
 
 class MFCRun:
@@ -56,9 +57,7 @@ class MFCRun:
         for target_name in engine.get_targets(self.mfc.args["targets"]):
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
 
-            if not self.mfc.build.is_built(target_name):
-                rich.print(f"> > Target {target_name} needs (re)building...")
-                self.mfc.build.build_target(target_name, "> > > ")
+            build.build_target(self.mfc, target_name)
                         
             # Create input file
             input_file.dump(target_name)
