@@ -22,17 +22,21 @@ modes:
 - name: release-cpu
   flags:
   - -DCMAKE_BUILD_TYPE=Release
+  - -Wno-dev
 
 - name: debug-cpu
   flags:
   - -DCMAKE_BUILD_TYPE=Debug
+  - -Wno-dev
 
 - name: release-gpu
   flags:
   - -DCMAKE_BUILD_TYPE=Release
   - -DMFC_WITH_ACC=ON
+  - -Wno-dev
 
 - name: debug-gpu
   flags:
   - -DCMAKE_BUILD_TYPE=Debug
   - -DMFC_WITH_ACC=ON
+  - -Wno-dev
