@@ -126,7 +126,7 @@ contains
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0))                               :: rho    !< density
-        real(kind(0d0)), dimension(E_idx - mom_idx%beg) :: vel    !< velocity
+        real(kind(0d0)), dimension(INT(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(kind(0d0))                               :: pres   !< pressure
         real(kind(0d0))                               :: gamma  !< specific heat ratio function
 
@@ -1122,7 +1122,7 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
 
-                    eta = tanh(smooth_coeff/min(dx, dy)* &
+                    eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
                                (sqrt((x_cc(i) - x_centroid)**2d0 &
                                      + (y_cc(j) - y_centroid)**2d0) &
                                 - radius))*(-0.5d0) + 0.5d0
@@ -1285,7 +1285,7 @@ contains
             do i = 0, m
 
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = tanh(smooth_coeff/min(dx, dy)* &
+                    eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
                                (sqrt(((x_cc(i) - x_centroid)/a)**2d0 + &
                                      ((y_cc(j) - y_centroid)/b)**2d0) &
                                 - 1d0))*(-0.5d0) + 0.5d0
@@ -1352,7 +1352,7 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                        eta = tanh(smooth_coeff/min(dx_min, dy_min, dz_min)* &
                                    (sqrt(((x_cc(i) - x_centroid)/a)**2d0 + &
                                          ((cart_y - y_centroid)/b)**2d0 + &
                                          ((cart_z - z_centroid)/c)**2d0) &
@@ -1482,7 +1482,7 @@ contains
             do i = 0, m
 
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy) &
+                    eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx_min, dy_min) &
                                            *(a*x_cc(i) + b*y_cc(j) + c) &
                                            /sqrt(a**2d0 + b**2d0))
                 end if
@@ -2107,7 +2107,7 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
 
-                        eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                        eta = tanh(smooth_coeff/min(dx_min, dy_min, dz_min)* &
                                    (sqrt((x_cc(i) - x_centroid)**2d0 &
                                          + (cart_y - y_centroid)**2d0 &
                                          + (cart_z - z_centroid)**2d0) &
@@ -2283,17 +2283,17 @@ contains
                     if (patch_icpp(patch_id)%smoothen) then
 
                         if (length_x /= dflt_real) then
-                            eta = tanh(smooth_coeff/min(dy, dz)* &
+                            eta = tanh(smooth_coeff/min(dy_min, dz_min)* &
                                        (sqrt((cart_y - y_centroid)**2d0 &
                                              + (cart_z - z_centroid)**2d0) &
                                         - radius))*(-0.5d0) + 0.5d0
                         elseif (length_y /= dflt_real) then
-                            eta = tanh(smooth_coeff/min(dx, dz)* &
+                            eta = tanh(smooth_coeff/min(dx_min, dz_min)* &
                                        (sqrt((x_cc(i) - x_centroid)**2d0 &
                                              + (cart_z - z_centroid)**2d0) &
                                         - radius))*(-0.5d0) + 0.5d0
                         else
-                            eta = tanh(smooth_coeff/min(dx, dy)* &
+                            eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
                                        (sqrt((x_cc(i) - x_centroid)**2d0 &
                                              + (cart_y - y_centroid)**2d0) &
                                         - radius))*(-0.5d0) + 0.5d0
@@ -2382,7 +2382,7 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy, dz) &
+                        eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx_min, dy_min, dz_min) &
                                                *(a*x_cc(i) + &
                                                  b*cart_y + &
                                                  c*cart_z + d) &

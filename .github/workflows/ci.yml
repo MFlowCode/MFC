@@ -25,9 +25,7 @@ jobs:
     strategy:
       matrix:
         include:
-        - os:    ubuntu-latest
-          nvhpc: 22.3
-          cuda:  11.6
+        - os: ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Clone MFC
@@ -52,55 +50,15 @@ jobs:
           sudo apt install -y tar wget make cmake gcc g++ python3 openmpi-*
           python python-dev python3-dev python3-venv libopenmpi-dev
 
-      - name: Install Nvidia HPC SDK
-        if:   matrix.os == 'ubuntu-latest' && contains(github.ref, 'GPU')
-        run: |
-          echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
-          sudo apt-get update  -y
-          sudo apt-get install -y nvhpc-$(echo "${{ matrix.nvhpc }}" | tr '.' '-')
-          NVARCH=`uname -s`_`uname -m`
-          NVCOMPILERS="/opt/nvidia/hpc_sdk"
-          VERSION="${{ matrix.nvhpc }}"
-          CUDA_VERSION="${{ matrix.cuda }}"
-          echo "PATH=$NVCOMPILERS/$NVARCH/$VERSION/compilers/bin:$NVCOMPILERS/$NVARCH/$VERSION/comm_libs/mpi/bin:$PATH" >> $GITHUB_ENV
-          echo "CUDA_HOME=$NVCOMPILERS/$NVARCH/$VERSION/cuda/" >> $GITHUB_ENV
-          echo "CUDA_DIR=$NVCOMPILERS/$NVARCH/$VERSION/cuda/" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$NVCOMPILERS/$NVARCH/$VERSION/cuda/$CUDA_VERSION/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
       - name: Install Dependencies (via Brew)
         if: matrix.os == 'macos-latest'
         run: |
           brew install wget make python make cmake coreutils
           brew install gcc@${{ matrix.gcc }}
           brew install --build-from-source open-mpi
-
-      - name: Print MPI Configuration
-        run: |
-          mpif90 --version
-          mpif90 --showme
-          mpicc --version
-          mpicc --showme
-          mpicxx --version
-          mpicxx --showme
-
-      - name: Build MFC (CPU)
-        run:  ./mfc.sh build -m release-cpu -j $(nproc)
           
       - name: Test MFC (CPU)
-        run:  ./mfc.sh test -j $(nproc)
-
-      - name: Print MPI Configuration
-        run: |
-          mpif90 --version
-          mpif90 --showme
-          mpicc --version
-          mpicc --showme
-          mpicxx --version
-          mpicxx --showme
-
-      - name: Build MFC (GPU)
-        if:   contains(github.ref, 'GPU')
-        run:  ./mfc.sh build -m release-gpu -j $(nproc)
+        run:  ./mfc.sh test -j $(nproc) -m release-cpu 
 
       - name: Upload logs
         uses: actions/upload-artifact@v2

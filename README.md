@@ -101,14 +101,23 @@ Below are some commands for popular operating systems and package managers.
 [Anaconda](https://www.anaconda.com/) may interfere with the building process. If an issue arises, you can either uninstall the affected Anaconda packages, change the ordering of directory paths in your `$PATH`, or make aliases to the correct binaries.
  
 ### \*nix 
- 
+
+If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com/hpc-sdk), follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
+
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
 ```console
+$ sudo apt update
+$ sudo apt upgrade
 $ sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-dev python3-dev python3-venv libopenmpi-dev
 ```
- 
-If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com/hpc-sdk), follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
+
+- **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
+
+```console
+$ pacman -Syu
+$ sudo pacman -S python gcc make cmake wget openmpi tar
+```
 
 ### MacOS (including x86 and M1/Apple Silicon) [**via [Homebrew](https://brew.sh/)**]
  

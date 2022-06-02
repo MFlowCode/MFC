@@ -1,9 +1,9 @@
 tags
 src/*/tags
 
-__pycache__
+mfc.user.yaml
 
-/install
+__pycache__
 
 CMakeFiles/
 CMakeCache.txt
@@ -17,11 +17,14 @@ toolchain/build/
 
 src/*/*.mod
 src/*/*.o
+src/*/autogen/
+src/common/case.fpp
 src/pre_process_code/pre_process
 src/simulation_code/simulation
 src/post_process_code/post_process
 src/master_scripts/*.pyc
 src/*/.build
+src/*/case.*
 src/master_scripts/__*
 make_doc.sh
 cases/

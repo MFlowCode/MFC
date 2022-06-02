@@ -64,11 +64,11 @@ contains
         real(kind(0d0)) :: length   !< domain lengths
 
         ! Grid Generation in the x-direction ===============================
-        dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
+        dx_min = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
 
         do i = 0, m
-            x_cc(i) = x_domain%beg + 5d-1*dx*real(2*i + 1, kind(0d0))
-            x_cb(i - 1) = x_domain%beg + dx*real(i, kind(0d0))
+            x_cc(i) = x_domain%beg + 5d-1*dx_min*real(2*i + 1, kind(0d0))
+            x_cb(i - 1) = x_domain%beg + dx_min*real(i, kind(0d0))
         end do
 
         x_cb(m) = x_domain%end
@@ -92,9 +92,9 @@ contains
 
             x_cc = (x_cb(0:m) + x_cb(-1:m - 1))/2d0
 
-            dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
+            dx_min = minval(x_cb(0:m) - x_cb(-1:m - 1))
             print *, 'Stretched grid: min/max x grid: ', minval(x_cc(:)), maxval(x_cc(:))
-            if (num_procs > 1) call s_mpi_reduce_min(dx)
+            if (num_procs > 1) call s_mpi_reduce_min(dx_min)
 
         end if
         ! ==================================================================
@@ -105,23 +105,23 @@ contains
         if (grid_geometry == 2 .and. y_domain%beg .eq. 0.0d0) then
             !IF (grid_geometry == 2) THEN
 
-            dy = (y_domain%end - y_domain%beg)/real(2*n + 1, kind(0d0))
+            dy_min = (y_domain%end - y_domain%beg)/real(2*n + 1, kind(0d0))
 
-            y_cc(0) = y_domain%beg + 5d-1*dy
+            y_cc(0) = y_domain%beg + 5d-1*dy_min
             y_cb(-1) = y_domain%beg
 
             do i = 1, n
-                y_cc(i) = y_domain%beg + 2d0*dy*real(i, kind(0d0))
-                y_cb(i - 1) = y_domain%beg + dy*real(2*i - 1, kind(0d0))
+                y_cc(i) = y_domain%beg + 2d0*dy_min*real(i, kind(0d0))
+                y_cb(i - 1) = y_domain%beg + dy_min*real(2*i - 1, kind(0d0))
             end do
 
         else
 
-            dy = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
+            dy_min = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
 
             do i = 0, n
-                y_cc(i) = y_domain%beg + 5d-1*dy*real(2*i + 1, kind(0d0))
-                y_cb(i - 1) = y_domain%beg + dy*real(i, kind(0d0))
+                y_cc(i) = y_domain%beg + 5d-1*dy_min*real(2*i + 1, kind(0d0))
+                y_cb(i - 1) = y_domain%beg + dy_min*real(i, kind(0d0))
             end do
 
         end if
@@ -147,9 +147,9 @@ contains
             y_cb = y_cb * length
             y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2d0
 
-            dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
+            dy_min = minval(y_cb(0:n) - y_cb(-1:n - 1))
 
-            if (num_procs > 1) call s_mpi_reduce_min(dy)
+            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
 
         end if
         ! ==================================================================
@@ -157,11 +157,11 @@ contains
         ! Grid Generation in the z-direction ===============================
         if (p == 0) return
 
-        dz = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
+        dz_min = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
 
         do i = 0, p
-            z_cc(i) = z_domain%beg + 5d-1*dz*real(2*i + 1, kind(0d0))
-            z_cb(i - 1) = z_domain%beg + dz*real(i, kind(0d0))
+            z_cc(i) = z_domain%beg + 5d-1*dz_min*real(2*i + 1, kind(0d0))
+            z_cb(i - 1) = z_domain%beg + dz_min*real(i, kind(0d0))
         end do
 
         z_cb(p) = z_domain%end
@@ -185,9 +185,9 @@ contains
             z_cb = z_cb * length
             z_cc = (z_cb(0:p) + z_cb(-1:p - 1))/2d0
 
-            dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
+            dz_min = minval(z_cb(0:p) - z_cb(-1:p - 1))
 
-            if (num_procs > 1) call s_mpi_reduce_min(dz)
+            if (num_procs > 1) call s_mpi_reduce_min(dz_min)
 
         end if
         ! ==================================================================
@@ -222,9 +222,9 @@ contains
         allocate (z_cb_glb(-1:p_glb))
 
         ! Grid generation in the x-direction
-        dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, kind(0d0))
+        dx_min = (x_domain%end - x_domain%beg)/real(m_glb + 1, kind(0d0))
         do i = 0, m_glb
-            x_cb_glb(i - 1) = x_domain%beg + dx*real(i, kind(0d0))
+            x_cb_glb(i - 1) = x_domain%beg + dx_min*real(i, kind(0d0))
         end do
         x_cb_glb(m_glb) = x_domain%end
         if (stretch_x) then
@@ -250,15 +250,15 @@ contains
         if (n_glb > 0) then
 
             if (grid_geometry == 2 .and. y_domain%beg .eq. 0.0d0) then
-                dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, kind(0d0))
+                dy_min = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, kind(0d0))
                 y_cb_glb(-1) = y_domain%beg
                 do i = 1, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dy*real(2*i - 1, kind(0d0))
+                    y_cb_glb(i - 1) = y_domain%beg + dy_min*real(2*i - 1, kind(0d0))
                 end do
             else
-                dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, kind(0d0))
+                dy_min = (y_domain%end - y_domain%beg)/real(n_glb + 1, kind(0d0))
                 do i = 0, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dy*real(i, kind(0d0))
+                    y_cb_glb(i - 1) = y_domain%beg + dy_min*real(i, kind(0d0))
                 end do
             end if
             y_cb_glb(n_glb) = y_domain%end
@@ -283,9 +283,9 @@ contains
 
             ! Grid generation in the z-direction
             if (p_glb > 0) then
-                dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, kind(0d0))
+                dz_min = (z_domain%end - z_domain%beg)/real(p_glb + 1, kind(0d0))
                 do i = 0, p_glb
-                    z_cb_glb(i - 1) = z_domain%beg + dz*real(i, kind(0d0))
+                    z_cb_glb(i - 1) = z_domain%beg + dz_min*real(i, kind(0d0))
                 end do
                 z_cb_glb(p_glb) = z_domain%end
                 if (stretch_z) then

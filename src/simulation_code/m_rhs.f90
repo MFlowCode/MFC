@@ -133,7 +133,7 @@ module m_rhs
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     !> @}
 
-    type(bounds_info) :: iv !< Vector field indical bounds
+    type(int_bounds_info) :: iv !< Vector field indical bounds
 
     !> @name Indical bounds in the x-, y- and z-directions
     !> @{

@@ -3477,10 +3477,15 @@ contains
         allocate (vel_src_rsy_vf(1:num_dims))
         allocate (vel_src_rsz_vf(1:num_dims))
 
+        if (any(Re_size > 0)) then
+            ! TODO: check this is the proper allocation for
+            ! Re_avg_rs_vf
+            allocate (Re_avg_rs_vf(1:2))
 
-        if (any(Re_size > 0)) allocate (Re_avg_rsx_vf(1:2))
-        if (any(Re_size > 0)) allocate (Re_avg_rsy_vf(1:2))
-        if (any(Re_size > 0)) allocate (Re_avg_rsz_vf(1:2))
+            allocate (Re_avg_rsx_vf(1:2))
+            allocate (Re_avg_rsy_vf(1:2))
+            allocate (Re_avg_rsz_vf(1:2))
+        end if
 
         allocate (alpha_rho_L(1:cont_idx%end), vel_L(1:num_dims))
         allocate (alpha_rho_R(1:cont_idx%end), vel_R(1:num_dims))

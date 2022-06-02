@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 
 
-# Script Constants
+# Script Constants (use MFC_xx prefix because this file can be source'd)
 MFC_DIR="$(pwd)/build"
+
+
+MFC_TOOLCHAIN_DIR="$(pwd)/toolchain"
+MFC_EXEC_PATH="$MFC_TOOLCHAIN_DIR/mfc/main.py"
+
+MFC_PYTHON_BIN="python3"
+MFC_PYTHON_MIN_MAJOR=3
+MFC_PYTHON_MIN_MINOR=6
+MFC_PYTHON_PIP_BIN="$MFC_PYTHON_BIN -m pip"
+MFC_PYTHON_VENV_DIR="$MFC_DIR/environment/venv"
 MFC_GET_PIP_PATH="$MFC_DIR/environment/get-pip.py"
-PYTHON_VENV_DIR="$MFC_DIR/environment/venv"
-TOOLCHAIN_DIR="$(pwd)/toolchain"
-
-PYTHON_BIN="python3"
-PYTHON_PIP_BIN="$PYTHON_BIN -m pip"
-PYTHON_MIN_MAJOR=3
-PYTHON_MIN_MINOR=6
-
-EXEC_PATH="$TOOLCHAIN_DIR/mfc/main.py"
-
 
 # Check whether this script was called from MFC's root directory.
-if [ ! -f "$EXEC_PATH" ]; then
+if [ ! -f "$MFC_EXEC_PATH" ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
     exit 1
 fi
@@ -25,7 +25,7 @@ fi
 # If the user wishes to run the "load" script
 if [ "$1" == "load" ]; then
     shift;
-    source "$TOOLCHAIN_DIR/load.sh" "$@"
+    source "$MFC_TOOLCHAIN_DIR/load.sh" "$@"
     return
 fi
 
@@ -37,11 +37,11 @@ mkdir -p "$MFC_DIR/dependencies"
 
 
 # Make bootstrap files executable
-chmod +x "$EXEC_PATH"
+chmod +x "$MFC_EXEC_PATH"
 
 
 # Check whether python3 is in the $PATH / is accessible.
-which $PYTHON_BIN > /dev/null 2>&1
+which $MFC_PYTHON_BIN > /dev/null 2>&1
 if (($?)); then
     echo "[mfc.sh] Error: Couldn't find Python. Please ensure it is discoverable."
     exit 1
@@ -49,7 +49,7 @@ fi
 
 
 # Check if Python is at least minimally functionnal.
-$PYTHON_BIN -c 'print("")' > /dev/null 2>&1
+$MFC_PYTHON_BIN -c 'print("")' > /dev/null 2>&1
 if (($?)); then
     echo "[mfc.sh] Error: Python is present but can't execute a simple program. Please ensure that python3 is working."
     exit 1
@@ -57,9 +57,9 @@ fi
 
 
 # CHeck Python's version for compatibility with bootstrap/*.py scripts
-$PYTHON_BIN -c "import sys; exit(int(not (sys.version_info[0]==$PYTHON_MIN_MAJOR and sys.version_info[1] >= $PYTHON_MIN_MINOR)))"
+$MFC_PYTHON_BIN -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"
 if (($?)); then
-    echo "[mfc.sh] Error: $($PYTHON_BIN --version) is incompatible. Python v$PYTHON_MIN_MAJOR.$PYTHON_MIN_MINOR or higher is required."
+    echo "[mfc.sh] Error: $($MFC_PYTHON_BIN --version) is incompatible. Python v$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR or higher is required."
     exit 1
 fi
 
@@ -79,7 +79,11 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
         exit 1
     fi
 
-    $PYTHON_BIN "$MFC_GET_PIP_PATH" --user
+    # Suppress PIP version warning (out of date)
+    export PIP_DISABLE_PIP_VERSION_CHECK=1
+    $MFC_PYTHON_PIP_BIN config set global.disable-pip-version-check true || true
+    $MFC_PYTHON_BIN "$MFC_GET_PIP_PATH" --user
+    
     if (($?)); then
         echo "[mfc.sh] Error: Coudln't install pip with get-pip.py ($MFC_GET_PIP_PATH)."
         exit 1
@@ -89,10 +93,10 @@ fi
 
 # Create a Python virtualenv if it hasn't already been created
 bVenvIsNew=0
-if [ ! -d "$PYTHON_VENV_DIR" ]; then
+if [ ! -d "$MFC_PYTHON_VENV_DIR" ]; then
     bVenvIsNew=1
 
-    $PYTHON_BIN -m venv "$PYTHON_VENV_DIR"
+    $MFC_PYTHON_BIN -m venv "$MFC_PYTHON_VENV_DIR"
     if (($?)); then
         echo "[mfc.sh] Error: Failed to create a Python virtual environment."
         exit 1
@@ -100,13 +104,38 @@ if [ ! -d "$PYTHON_VENV_DIR" ]; then
 fi
 
 
+# If the user wishes to enter the python venv
+# mfc.sh must be source'd for this to work
+if [ "$1" == "venv" ]; then
+    if [[ "$VIRTUAL_ENV" != "" ]]; then
+        # Already inside the venv, exit out of it
+
+        echo " > Exiting the MFC Python virtual environment."
+
+        deactivate
+    else
+        # Enter the venv
+        echo " > Entering the MFC Python virtual environment."
+        
+        source "$MFC_PYTHON_VENV_DIR/bin/activate"
+        
+        echo " > To exit, you can do any of the following:"
+        echo "    - Run 'deactivate'."
+        echo "    - Run '. ./mfc.sh venv'."
+        echo "    - Close your terminal."
+    fi
+    
+    return
+fi
+
+
 # Activate the Python venv
-source "$PYTHON_VENV_DIR/bin/activate"
+source "$MFC_PYTHON_VENV_DIR/bin/activate"
 
 
 # Upgrade Pip
 if [ "$bVenvIsNew" == "1" ]; then
-    $PYTHON_PIP_BIN install --upgrade pip > /dev/null
+    $MFC_PYTHON_PIP_BIN install --upgrade pip > /dev/null
     if (($?)); then
         echo "[mfc.sh] Error: Failed to update Pip."
         exit 1
@@ -114,28 +143,22 @@ if [ "$bVenvIsNew" == "1" ]; then
 fi
 
 
-# Fetch required Python modules.
-# Some modules which are now in Python's standard library
-#                    are imported as backports to support Python v3.6.
-declare -a REQUIRED_PYTHON_MODULES=("mfc,$TOOLCHAIN_DIR/")
+# Fetch required Python modules, including
+# the MFC toolchain/kit and its dependencies,
+# inside the Python venv.
 
-for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
-    import_name=$(echo $module | tr ',' '\n' | head -n 1)
-    install_name=$(echo $module | tr ',' '\n' | tail -n 1)
-
-    $PYTHON_BIN -c "import $import_name" > /dev/null 2>&1
+$MFC_PYTHON_BIN -c "import mfc" > /dev/null 2>&1
+if (($?)); then
+    $MFC_PYTHON_PIP_BIN install -e "$MFC_TOOLCHAIN_DIR/"
     if (($?)); then
-        $PYTHON_PIP_BIN install $install_name
-        if (($?)); then
-            echo "[mfc.sh] Error: Failed to install $import_name/$install_name through Python3's pip."
-            exit 1
-        fi
+        echo "[mfc.sh] Error: Failed to install MFC's toolchain through Python3's pip."
+        exit 1
     fi
-done
+fi
 
 
 # Run the mfc.py bootstrap script
-$PYTHON_BIN "$EXEC_PATH" "$@"
+$MFC_PYTHON_BIN "$MFC_EXEC_PATH" "$@"
 code=$?
 
 

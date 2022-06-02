@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+
 import math, json
+
+from mfc.case import *
 
 x0      = 10.E-06
 p0      = 101325.
@@ -52,7 +55,7 @@ n0      = vf0/(math.pi*4.E+00/3.E+00)
 cact    = 1475.
 t0      = x0/c0
 
-nbubbles = 1 
+nbubbles = 1
 myr0    = R0ref
 
 cfl     = 0.1
@@ -74,149 +77,105 @@ Nt     = int(Nout*Nfiles)
 
 # ==============================================================================
 
+print(Case(
+    logistics=Logistics(
+        run_time_info=True
+    ),
+    domain=ComputationalDomain(
+        cells=Cells(x=Nx),
+        domain=SpacialDomain(
+            x=AxisDomain(begin=-10.E-03/x0, end=10.E-03/x0)
+        ),
+        time=Time(dt=dt, end=30000, save=1000),
+    ),
+    fluids=[
+        Fluid(
+            gamma=1.E+00/(n_tait-1.E+00),
+            pi_inf=n_tait*B_tait/(n_tait-1.)
+        ),
+#       Fluid(
+#           gamma=1./(gamma_gas-1.),
+#           pi_inf=0.0E+00
+#       )
+    ],
+    patches=[
+        Patch(
+            smooth_patch_id=1,
+            geometry=PatchGeometry.D1_LINE_SEGMENT,
+            centroid=Point(x=0),
+            length=Vector(x=20.E-03/x0),
+            velocity=Vector(x=0.0),
+            pressure=1,
+            r0=1,
+            v0=0,
+            alpha_rho=[(1.-vf0)*1.E+03/rho0],
+            alpha=[vf0],
+        ),
+    ],
+    bubbles=Bubbles(
+        bubbles=True,
+        model=BubbleModel.RAYLEIGH_PLESSET,
+        number=1,
+        nnode=4,
+        qbmm=True,
+        thermal=ThermalModel.TRANSFER,
+        polytropic=True,
+        R0ref=myr0,
+        cavitation=Ca,
+        Re_inv=Re_inv,
+        sigR=0.1,
+        sigV=0.1,
+        rhoRV=0.0,
+        distribution=BubbleDistribution.BINORMAL
+    ),
+    database=DatabseStructure(
+        precision=FloatingPrecision.DOUBLE,
+        write=DatabaseWrite(
+            prim_vars=True,
+            probe=True
+        ),
+        fd_order=1,
+        parallel_io=True,
+        format=DatabaseFormat.SILO_HDF5,
+        alt_soundspeed=False
+    ),
+    algorithm=SimulationAlgorithm(
+        model=MulticomponentModel.EQUATION_5,
+        weno=WenoParameters(
+            order=3,
+            mapped=True,
+            mp=False,
+            variables=WenoVariables.PRIMITIVE
+        ),
+        boundary=BoundaryConditions(
+            x=AxisBoundaryCondition(
+                begin=BoundaryCondition.PERIODIC,
+                end=BoundaryCondition.PERIODIC
+            )
+        ),
+        riemann_solver=RiemannSolver.HLLC,
+        time_stepper=TimeStepper.RUNGE_KUTTA_1,
+        wave_speeds=WaveSpeedEstimation.DIRECT,
+        avg_state=AverageStateEvaluation.ARITHMETIC_MEAN,
+        mixture_err=False,
+        adv_alphan=True,
+        mpp_lim=False,
+        null_weights=False,
+        pref=p0,
+        rhoref=rho0
+    ),
+    acoustic=AcousticParameters()
+))
+
+"""
 # Configuring case dictionary
 print(json.dumps({
-    # Logistics =================================================================
-    'case_dir'                     : '\'.\'',
-    'run_time_info'                : 'T',
-    # ===========================================================================
-    
-    # Computational Domain Parameters ===========================================
-    'x_domain%beg'                 : -10.E-03/x0,
-    'x_domain%end'                 :  10.E-03/x0,
-    'stretch_x'                    : 'F',
-    'cyl_coord'                    : 'F',
-    'm'                            : Nx,
-    'n'                            : 0,
-    'p'                            : 0,
-    'dt'                           : 0.001,
-    't_step_start'                 : 0,
-    't_step_stop'                  : 30000,
-    # 't_step_stop'                  : 4,
-    't_step_save'                  : 1000,
-    # 't_step_save'                  : 1,
-    # ===========================================================================
-    
-    # Simulation Algorithm Parameters ===========================================
-    'num_patches'                  : 1,
-    'model_eqns'                   : 2,
-    'alt_soundspeed'               : 'F',
-    'num_fluids'                   : 1,
-    'adv_alphan'                   : 'T',
-    'mpp_lim'                      : 'F',
-    'mixture_err'                  : 'F',
-    'time_stepper'                 : 1,
-    'weno_vars'                    : 2,
-    'weno_order'                   : 3,
-    'weno_eps'                     : 1.E-16,
-    'mapped_weno'                  : 'T',
-    'null_weights'                 : 'F',
-    'mp_weno'                      : 'F',
-    'riemann_solver'               : 2,
-    'wave_speeds'                  : 1,
-    'avg_state'                    : 2,
-    'bc_x%beg'                     : -1,
-    'bc_x%end'                     : -1,
-    # ===========================================================================
-    
     # Formatted Database Files Structure Parameters =============================
-    'format'                       : 1,
-    'precision'                    : 2,
-    'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
-    'fd_order'                     : 1,
-    # 'schlieren_wrt'                :'T',
-    'probe_wrt'                    :'T',
     'num_probes'                   : 1,
     'probe(1)%x'                   : 0.,
     # ===========================================================================
-    
-    # Patch 1 _ Background ======================================================
-    # 'patch_icpp(1)%geometry'       : 1,
-    # 'patch_icpp(1)%x_centroid'     : 0.,
-    # 'patch_icpp(1)%length_x'       : 20.E-03/x0,
-    # 'patch_icpp(1)%vel(1)'         : 0.0,
-    # 'patch_icpp(1)%pres'           : patm,
-    # 'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0,
-    # 'patch_icpp(1)%alpha(1)'       : 1.E-12,
-    # 'patch_icpp(1)%r0'             : 1.,
-    # 'patch_icpp(1)%v0'             : 0.0E+00,
-    # ===========================================================================
-    
-    # Patch 2 Screen ============================================================
-    'patch_icpp(1)%geometry'       : 1,
-    'patch_icpp(1)%x_centroid'     : 0.,
-    # 'patch_icpp(1)%length_x'       : 5.E-03/x0,
-    'patch_icpp(1)%length_x'       : 20.E-03/x0,
-    # 'patch_icpp(2)%alter_patch(1)' : 'T',
-    'patch_icpp(1)%vel(1)'         : 0.0,
-    # 'patch_icpp(1)%pres'           : 1/0.5,
-    'patch_icpp(1)%pres'           : 1.0,
-    # 'patch_icpp(1)%pres'           : patm,
-    'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,
-    'patch_icpp(1)%alpha(1)'       : vf0,
-    'patch_icpp(1)%r0'             : 1.,
-    'patch_icpp(1)%v0'             : 0.,
-    # 'patch_icpp(1)%v0'             : -0.5,
-    # ===========================================================================
-    
-    # Fluids Physical Parameters ================================================
-    # Surrounding liquid
-    'fluid_pp(1)%gamma'            : 1.E+00/(n_tait-1.E+00),
-    'fluid_pp(1)%pi_inf'           : n_tait*B_tait/(n_tait-1.),
-    # 'fluid_pp(1)%mul0'             : mul0,
-    # 'fluid_pp(1)%ss'               : ss,
-    # 'fluid_pp(1)%pv'               : pv,
-    # 'fluid_pp(1)%gamma_v'          : gamma_v,
-    # 'fluid_pp(1)%M_v'              : M_v,
-    # 'fluid_pp(1)%mu_v'             : mu_v,
-    # 'fluid_pp(1)%k_v'              : k_v,
-    # Last fluid_pp is always reserved for bubble gas state ====================
-    # if applicable  ===========================================================
-    'fluid_pp(2)%gamma'            : 1./(gamma_gas-1.),
-    'fluid_pp(2)%pi_inf'           : 0.0E+00,
-    # 'fluid_pp(2)%gamma_v'          : gamma_n,
-    # 'fluid_pp(2)%M_v'              : M_n,
-    # 'fluid_pp(2)%mu_v'             : mu_n,
-    # 'fluid_pp(2)%k_v'              : k_n,
-    # ==========================================================================
-    
-    # Non-polytropic gas compression model AND/OR Tait EOS =====================
-    'pref'                         : p0,
-    'rhoref'                       : rho0,
-    # ==========================================================================
-    
-    # Bubbles ==================================================================
-    'bubbles'                      : 'T',
-    'bubble_model'                 : 3,
-    'polytropic'                   : 'T',
-    # 'polydisperse'                 : 'T',
-    # 'poly_sigma'                   : 0.1,
-    'thermal'                      : 3,
-    'R0ref'                        : myr0,
-    # 'nb'                           : 3,
-    'nb'                           : 1,
-    'Ca'                           : Ca,
-    # 'Web'                          : We,
-    'Re_inv'                       : Re_inv,
-    'qbmm'                         : 'T',
-    'nnode'                        : 4,
-    'dist_type'                    : 1,
-    'sigR'                         : 0.1,
-    'sigV'                         : 0.1,
-    'rhoRV'                        : 0.0,
-    # ==========================================================================
-    
-    # Acoustic source ==========================================================
-    # 'Monopole'                     : 'T',
-    # 'num_mono'                     : 1,
-    # 'Mono(1)%loc(1)'               : -5.E-03/x0, 
-    # 'Mono(1)%npulse'               : 1,
-    # 'Mono(1)%dir'                  : 1.,
-    # 'Mono(1)%pulse'                : 1,
-    # 'Mono(1)%mag'                  : pa,
-    # 'Mono(1)%length'               : (1./(300000.))*cact/x0,
-    # ==========================================================================
+
 }))
 
 # ==============================================================================
+"""

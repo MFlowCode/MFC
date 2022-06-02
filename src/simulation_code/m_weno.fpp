@@ -259,7 +259,7 @@ contains
         real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
             !! Cell-boundary locations in the s-direction
 
-        type(bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
+        type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
 
         integer :: i !< Generic loop iterator
 
@@ -330,10 +330,16 @@ contains
             else
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
+                    PRINT *, "=== BEGIN LOOP ==="
+                    PRINT *, " i, beg, end", i, is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
+                    PRINT *, " SHAPE(s_cb)", SHAPE(s_cb)
+                    PRINT *, " SHAPE(poly_...)", SHAPE(poly_coef_cbR_${XYZ}$)
 
+                    PRINT *, " denominator", ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
                     poly_coef_cbR_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
+                    PRINT *, " after current bug location"
                     poly_coef_cbR_${XYZ}$(i + 1, 1, 0) = &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))
@@ -343,6 +349,7 @@ contains
                     poly_coef_cbR_${XYZ}$(i + 1, 2, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
+
                     poly_coef_cbL_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
@@ -455,7 +462,6 @@ contains
 
                 end do
 
-
                 ! Modifying the ideal weights coefficients in the neighborhood
                 ! of beginning and end Riemann state extrapolation BC to avoid
                 ! any contributions from outside of the physical domain during
@@ -478,6 +484,7 @@ contains
             end if
         endif
 #:endfor
+
 
 ! END: Computing WENO5 Coefficients ================================
         if(weno_dir == 1) then

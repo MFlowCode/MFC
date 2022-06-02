@@ -51,8 +51,8 @@ ENDIF()
 # SILO
 IF (MFC_BUILD_SILO)
     ExternalProject_Add(silo
-        GIT_REPOSITORY   "https://github.com/henryleberre/Silo"
-        GIT_TAG          bd507bf1d739902c437c8b68807c423878cbace0
+        GIT_REPOSITORY   "https://github.com/LLNL/Silo"
+        GIT_TAG          2597088f1b0c48873fee8635ce788df0defaf5b2
         CMAKE_ARGS       "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
                          "-DSILO_HDF5_DIR=${CMAKE_INSTALL_PREFIX}"
                          -DSILO_ENABLE_SHARED=OFF

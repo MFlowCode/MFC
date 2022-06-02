@@ -5,124 +5,270 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-!> @brief The module contains all of the parameters describing the program
-!!              logistics, the computational domain and the simulation algorithm.
-!!              Additionally, for the volume fraction model, physical parameters
-!!              of each of the fluids present in the flow are located here. They
-!!              include stiffened gas equation of state parameters, the Reynolds
-!!              numbers and the Weber numbers.
+#:include 'case.fpp'
+
+!> @brief This module contains all of the parameters characterizing the
+!!              computational domain, simulation algorithm, initial condition
+!!              and the stiffened equation of state.
 module m_global_parameters
 
     ! Dependencies =============================================================
-    use mpi                    !< Message passing interface (MPI) module
-
-    use m_derived_types        !< Definitions of the derived types
-
-    use openacc
+    use m_derived_types         ! Definitions of the derived types
 
     ! ==========================================================================
 
     implicit none
 
     ! Logistics ================================================================
-    integer                    :: num_procs             !< Number of processors
-    integer, parameter :: num_stcls_min = 5     !< Mininum # of stencils
-    integer, parameter :: path_len = 400   !< Maximum path length
-    integer, parameter :: name_len = 50    !< Maximum name length
-    character, parameter :: dflt_char = ' '   !< Default string value
-    real(kind(0d0)) :: dflt_real = -1d6  !< Default real value
-    integer :: dflt_int = -100  !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
-    integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
-    character(LEN=path_len)  :: case_dir              !< Case folder location
-    logical                    :: run_time_info         !< Run-time output flag
-    logical                    :: debug                 !< Debug mode print statements
-    integer                    :: t_step_old            !< Existing IC/grid folder
-    real(kind(0d0)), PARAMETER :: small_alf = 1d-7 !< Small alf tolerance
-    ! ==========================================================================
+    integer                    :: num_procs                  !< Number of processors
+    integer,         parameter :: num_stcls_min = 5          !< Mininum # of stencils
+    integer,         parameter :: path_len      = 400        !< Maximum path length
+    integer,         parameter :: name_len      = 50         !< Maximum name length
+    CHARACTER ,      parameter :: dflt_char     = ' '        !< Default string value
+    real(kind(0d0)), parameter :: dflt_real     = -1d6       !< Default real value
+    integer,         parameter :: dflt_int      = -100       !< Default integer value
+    integer,         parameter :: fourier_rings = 5          !< Fourier filter ring limit
+    REAL(KIND(0d0)), parameter :: sgm_eps       = 1d-16      !< Segmentation tolerance
+    REAL(KIND(0d0)), parameter :: small_alf     = 1d-7       !< Small alf tolerance
+    character(LEN=path_len)    :: case_dir      = "${CASE['logistics']['case_dir']}$"       !< Case folder location
+    logical,         parameter :: run_time_info = .${CASE['logistics']['run_time_info']}$.  !< Run-time output flag
+    logical,         parameter :: debug         = .${CASE['logistics']['debug']}$.          !< Debug mode print statements
+    logical,         parameter :: old_grid      = .${CASE['logistics']['old_grid']}$.       !< Use existing grid data
+    logical,         parameter :: old_ic        = .${CASE['logistics']['old_ic']}$.         !< Use existing IC data
+    integer,         parameter :: t_step_old    = ${CASE['logistics']['t_step_old']}$       !< Existing IC/grid folder
 !$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps)
+    ! ==========================================================================
+
     ! Computational Domain Parameters ==========================================
 
     integer :: proc_rank !< Rank of the local processor
 
-    !> @name Number of cells in the x-, y- and z-directions, respectively
-    !> @{
-    integer :: m, n, p
-    !> @}
+    integer, parameter :: m_glb = ${CASE['domain']['cells']['x']}$
+    integer, parameter :: n_glb = ${CASE['domain']['cells']['y']}$
+    integer, parameter :: p_glb = ${CASE['domain']['cells']['z']}$
+    !! Global number of cells in each direction
 
-    !> @name Global number of cells in each direction
-    !> @{
-    integer :: m_glb, n_glb, p_glb
-    !> @}
+    integer :: m_root = dflt_int
+    integer :: m = m_glb
+    integer :: n = n_glb
+    integer :: p = p_glb
+    !! Number of cells in the x-, y- and z-coordinate directions
 
-    !> @name Cylindrical coordinates (either axisymmetric or full 3D)
-    !> @{
-    logical :: cyl_coord
-    integer :: grid_geometry
-    !> @}
+    logical, parameter :: cyl_coord     = .${CASE['domain']['cyl_coord']}$.
+    integer, parameter :: grid_geometry = ${CASE['autogen']['grid_geometry']}$!<
 !$acc declare create(cyl_coord, grid_geometry)
+    !! Cylindrical coordinates (either axisymmetric or full 3D)
 
-    !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
-    !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    !> @}
+    real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc !<
+    !! Locations of cell-centers (cc) in x-, y- and z-directions, respectively
 
-    !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
-    !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
-    !> @}
+    real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb !<
+    real(kind(0d0)), allocatable, dimension(:) :: coarse_x_cb, coarse_y_cb, coarse_z_cb
+    !! Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
+
+    real(kind(0d0)) :: dx_min, dy_min, dz_min !<
+    !! Minimum cell-widths in the x-, y- and z-coordinate directions
 
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
+    REAL(KIND(0d0)), TARGET, ALLOCATABLE, DIMENSION(:) :: dx, dy, dz
     !> @}
 
-    real(kind(0d0)) :: dt !< Size of the time-step
-
+    REAL(KIND(0d0)) :: dt = ${CASE['domain']['time']['dt']}$ !< Size of the time-step
 !$acc declare create(x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
     !> @{
-    integer :: t_step_start, t_step_stop, t_step_save
+    INTEGER, parameter :: t_step_start = ${CASE['domain']['time']['begin']}$
+    INTEGER, parameter :: t_step_stop  = ${CASE['domain']['time']['end']}$
+    INTEGER, parameter :: t_step_save  = ${CASE['domain']['time']['save']}$
     !> @}
+
+    type(bounds_info) :: x_domain = ${CASE['autogen']['x_domain']}$
+    type(bounds_info) :: y_domain = ${CASE['autogen']['y_domain']}$
+    type(bounds_info) :: z_domain = ${CASE['autogen']['z_domain']}$
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+
+    logical, parameter :: stretch_x = .${CASE['domain']['stretch']['x']['stretch']}$.
+    logical, parameter :: stretch_y = .${CASE['domain']['stretch']['y']['stretch']}$.
+    logical, parameter :: stretch_z = .${CASE['domain']['stretch']['z']['stretch']}$.
+    !<
+    !! Grid stretching flags for the x-, y- and z-coordinate directions
+
+    ! Parameters of the grid stretching function for the x-, y- and z-coordinate
+    ! directions. The "a" parameters are a measure of the rate at which the grid
+    ! is stretched while the remaining parameters are indicative of the location
+    ! on the grid at which the stretching begins.
+    real(kind(0d0)), parameter :: a_x     = ${CASE['domain']['stretch']['x']['rate']}$
+    real(kind(0d0)), parameter :: a_y     = ${CASE['domain']['stretch']['y']['rate']}$
+    real(kind(0d0)), parameter :: a_z     = ${CASE['domain']['stretch']['z']['rate']}$
+    integer,         parameter :: loops_x = ${CASE['domain']['stretch']['x']['loops']}$
+    integer,         parameter :: loops_y = ${CASE['domain']['stretch']['y']['loops']}$
+    integer,         parameter :: loops_z = ${CASE['domain']['stretch']['z']['loops']}$
+    real(kind(0d0))            :: x_a     = ${CASE['domain']['stretch']['x']['begin_neg']}$
+    real(kind(0d0))            :: y_a     = ${CASE['domain']['stretch']['y']['begin_neg']}$
+    real(kind(0d0))            :: z_a     = ${CASE['domain']['stretch']['z']['begin_neg']}$
+    real(kind(0d0))            :: x_b     = ${CASE['domain']['stretch']['x']['begin_pos']}$
+    real(kind(0d0))            :: y_b     = ${CASE['domain']['stretch']['y']['begin_pos']}$
+    real(kind(0d0))            :: z_b     = ${CASE['domain']['stretch']['z']['begin_pos']}$
 
     ! ==========================================================================
 
     ! Simulation Algorithm Parameters ==========================================
-    integer         :: model_eqns     !< Multicomponent flow model
-    integer         :: num_dims       !< Number of spatial dimensions
-    integer         :: num_fluids     !< Number of fluids in the flow
-    logical         :: adv_alphan     !< Advection of the last volume fraction
-    logical         :: mpp_lim        !< Mixture physical parameters (MPP) limits
-    integer         :: time_stepper   !< Time-stepper algorithm
-    integer         :: weno_vars      !< WENO-reconstructed state variables type
-    integer         :: weno_order     !< Order of the WENO reconstruction
-    integer         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
-    real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-    logical         :: mapped_weno    !< WENO with mapping of nonlinear weights
-    logical         :: mp_weno        !< Monotonicity preserving (MP) WENO
-    logical         :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer         :: riemann_solver !< Riemann solver algorithm
-    integer         :: wave_speeds    !< Wave speeds estimation method
-    integer         :: avg_state      !< Average state evaluation method
-    logical         :: alt_soundspeed !< Alternate mixture sound speed
-    logical         :: null_weights   !< Null undesired WENO weights
-    logical         :: mixture_err    !< Mixture properties correction
-    logical         :: cu_tensor   
-
-    integer         :: cpu_start, cpu_end, cpu_rate
-
+    INTEGER, parameter :: model_eqns       = ${CASE['algorithm']['model']}$             !< Multicomponent flow model
+    INTEGER :: num_dims !< Number of spatial dimensions
+    INTEGER, parameter :: num_fluids       = ${CASE['autogen']['num_fluids']}$          !< Number of fluids in the flow
+    INTEGER, parameter :: num_fluids_alloc = ${CASE['autogen']['num_fluids_alloc']}$    !< Number of fluids in the flow
+    LOGICAL, parameter :: adv_alphan       = .${CASE['algorithm']['adv_alphan']}$.      !< Advection of the last volume fraction
+    LOGICAL, parameter :: mpp_lim          = .${CASE['algorithm']['mpp_lim']}$.         !< Mixture physical parameters (MPP) limits
+    INTEGER, parameter :: time_stepper     = ${CASE['algorithm']['time_stepper']}$      !< Time-stepper algorithm
+    INTEGER, parameter :: weno_vars        = ${CASE['algorithm']['weno']['variables']}$ !< WENO-reconstructed state variables type
+    INTEGER, parameter :: weno_order       = ${CASE['algorithm']['weno']['order']}$     !< Order of the WENO reconstruction
+    INTEGER, parameter :: weno_polyn       = (weno_order - 1) / 2  !< Degree of the WENO polynomials (polyn)
+    REAL(KIND(0d0)), parameter :: weno_eps = ${CASE['algorithm']['weno']['epsilon']}$      !< Binding for the WENO nonlinear weights
+    LOGICAL, parameter :: char_decomp      = .${CASE['algorithm']['char_decomp']}$. !< Characteristic decomposition
+    LOGICAL, parameter :: mapped_weno      = .${CASE['algorithm']['weno']['mapped']}$.    !< WENO with mapping of nonlinear weights
+    LOGICAL, parameter :: mp_weno          = .${CASE['algorithm']['weno']['mp']}$.      !< Monotonicity preserving (MP) WENO
+    LOGICAL, parameter :: weno_avg         = .${CASE['algorithm']['weno']['average']}$.  !< Average left/right cell-boundary states
+    LOGICAL, parameter :: weno_Re_flux     = .${CASE['algorithm']['weno']['Re_flux']}$.  !< WENO reconstruct velocity gradients for viscous stress tensor
+    logical, parameter :: weno_flat        = .${CASE['algorithm']['weno']['flat']}$.
+    INTEGER, parameter :: riemann_solver   = ${CASE['algorithm']['riemann_solver']}$   !< Riemann solver algorithm
+    INTEGER, parameter :: wave_speeds      = ${CASE['algorithm']['wave_speeds']}$      !< Wave speeds estimation method
+    INTEGER, parameter :: avg_state        = ${CASE['algorithm']['avg_state']}$        !< Average state evaluation method
+    LOGICAL, parameter :: commute_err      = .${CASE['algorithm']['commute_err']}$. !< Commutative error correction
+    LOGICAL, parameter :: split_err        = .${CASE['algorithm']['split_err']}$.!< Dimensional splitting error correction
+    LOGICAL, parameter :: alt_crv          = .${CASE['algorithm']['alt_crv']}$. !< Alternate curvature definition
+    LOGICAL, parameter :: alt_soundspeed   = .${CASE['algorithm']['alt_soundspeed']}$. !< Alternate mixture sound speed
+    LOGICAL, parameter :: regularization   = .${CASE['algorithm']['regularization']}$. !< Regularization terms of Tiwari (2013)
+    REAL(KIND(0d0)), parameter :: reg_eps  = ${CASE['algorithm']['reg_eps']}$     !< User-defined interface thickness parameter for regularization terms
+    LOGICAL, parameter :: null_weights     = .${CASE['algorithm']['null_weights']}$.!< Null undesired WENO weights
+    LOGICAL, parameter :: mixture_err      = .${CASE['algorithm']['mixture_err']}$.!< Mixture properties correction
+    LOGICAL, parameter :: tvd_riemann_flux = .${CASE['algorithm']['tvd_riemann_flux']}$.!< Apply TVD flux limiter to left and right states inside Riemann solver
+    LOGICAL, parameter :: tvd_rhs_flux     = .${CASE['algorithm']['tvd_rhs_flux']}$.!< Apply TVD flux limiter to to intercell fluxes outside Riemann solver
+    LOGICAL, parameter :: tvd_wave_speeds  = .${CASE['algorithm']['tvd_wave_speeds']}$. !< Use TVD wavespeeds when computing fluxes inside Riemann solver
+    INTEGER, parameter :: flux_lim         = ${CASE['algorithm']['flux_lim']}$ !< Choice of flux limiter
+    LOGICAL, parameter :: We_riemann_flux  = .${CASE['algorithm']['We_riemann_flux']}$. !< Account for capillary effects in the Riemann solver
+    LOGICAL, parameter :: We_rhs_flux      = .${CASE['algorithm']['We_rhs_flux']}$. !< Account for capillary effects using the conservative formulation in RHS
+    LOGICAL, parameter :: We_src           = .${CASE['algorithm']['We_src']}$. !< Account for capillary effects in non-conservative formulation in RHS
+    LOGICAL, parameter :: We_wave_speeds   = .${CASE['algorithm']['We_wave_speeds']}$. !< Account for capillary effects when computing the contact wave speed
+    LOGICAL, parameter :: lsq_deriv        = .${CASE['algorithm']['lsq_deriv']}$. !< Use linear least squares to calculate normals and curvatures
+    LOGICAL, parameter :: hypoelasticity   = .${CASE['algorithm']['hypoelasticity']}$. !< Hypoelastic modeling
 !$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
+
+    INTEGER         :: cpu_start, cpu_end, cpu_rate
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
-    type(bounds_info) :: bc_x, bc_y, bc_z
-    type(bounds_info) :: bc_x_glb, bc_y_glb, bc_z_glb
+    TYPE(int_bounds_info), parameter :: bc_x_glb = int_bounds_info(${CASE['algorithm']['boundary']['x']['begin']}$, ${CASE['algorithm']['boundary']['x']['end']}$)
+    TYPE(int_bounds_info), parameter :: bc_y_glb = int_bounds_info(${CASE['algorithm']['boundary']['y']['begin']}$, ${CASE['algorithm']['boundary']['y']['end']}$)
+    TYPE(int_bounds_info), parameter :: bc_z_glb = int_bounds_info(${CASE['algorithm']['boundary']['z']['begin']}$, ${CASE['algorithm']['boundary']['z']['end']}$)
+
+    TYPE(int_bounds_info) :: bc_x = bc_x_glb
+    TYPE(int_bounds_info) :: bc_y = bc_y_glb
+    TYPE(int_bounds_info) :: bc_z = bc_z_glb
+
     !> @}
 
-    logical :: parallel_io !< Format of the data files
-    integer :: precision !< Precision of output files
+    !> @name Annotations of the structure of the state and flux vectors in terms of the
+    !! size and the configuration of the system of equations to which they belong
+    !> @{
+    INTEGER               :: sys_size              !< Number of unknowns in system of eqns.
+    TYPE(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
+    TYPE(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
+    INTEGER               :: E_idx                 !< Index of energy equation
+    TYPE(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
+    TYPE(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
+    TYPE(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
+    INTEGER               :: alf_idx               !< Index of void fraction
+    INTEGER               :: gamma_idx             !< Index of specific heat ratio func. eqn.
+    INTEGER               :: pi_inf_idx            !< Index of liquid stiffness func. eqn.
+    TYPE(int_bounds_info) :: stress_idx            !< Indexes of first and last shear stress eqns.
+    !> @}
+!$acc declare create(bub_idx)
+
+
+    !> @name The number of fluids, along with their identifying indexes, respectively,
+    !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
+    !! numbers, will be non-negligible.
+    !> @{
+    INTEGER,              DIMENSION(2)   :: Re_size
+    INTEGER, ALLOCATABLE, DIMENSION(:,:) :: Re_idx
+    !> @}
+!$acc declare create(Re_size, Re_idx)
+
+
+    !> @name The number of idiosyncratic material interfaces, along with the indexes of
+    !! the fluids comprising them, respectively, for which the effects of surface
+    !! tension, e.g. the Weber (We) numbers, will be non-negligible.
+    !> @{
+    INTEGER                              :: We_size
+    INTEGER, ALLOCATABLE, DIMENSION(:,:) :: We_idx
+    !> @}
+
+    !> @name The number of fluids, along with their identifying indexes, respectively,
+    !! for which the physical and the geometric curvatures (crv) of the material
+    !! interfaces will be calculated.
+    !> @{
+    INTEGER                            :: crv_size
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: crv_idx
+    !> @}
+
+    !> @name The coordinate direction indexes and flags (flg), respectively, for which
+    !! the configurations will be determined with respect to a working direction
+    !! and that will be used to isolate the contributions, in that direction, in
+    !! the dimensionally split system of equations.
+    !> @{
+    INTEGER        , DIMENSION(3) :: dir_idx
+    REAL(KIND(0d0)), DIMENSION(3) :: dir_flg
+    !> @}
+!$acc declare create(dir_idx, dir_flg)
+
+    !! extra coordinate direction index used if hypoelasticity = true
+    INTEGER        , DIMENSION(3) :: dir_idx_tau
+
+    REAL(KIND(0d0)) :: wa_flg !<
+    !! The WENO average (WA) flag regulates whether the calculation of any cell-
+    !! average spatial derivatives is carried out in each cell by utilizing the
+    !! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
+    !! values or simply, the unaltered left and right, WENO-reconstructed, cell-
+    !! boundary values.
+
+    INTEGER :: buff_size !<
+    !! The number of cells that are necessary to be able to store enough boundary
+    !! conditions data to march the solution in the physical computational domain
+    !! to the next time-step.
+
+
+    integer :: startx, starty, startz
+
+!$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx)
+
+
+    ! END: Simulation Algorithm Parameters =====================================
+
+    ! Formatted Database File(s) Structure Parameters ==========================
+    
+    integer, parameter :: format       = ${CASE['database']['format']}$ !< Format of the database file(s)
+    logical, parameter :: coarsen_silo = .${CASE['database']['coarsen_silo']}$.
+    logical, parameter :: parallel_io  = .${CASE['database']['parallel_io']}$. !< Format of the data files
+    integer            :: precision    = ${CASE['database']['precision']}$ !< Precision of output files
+
+    !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
+    !! The definition of the ghost zone layers is only necessary when using the
+    !! Silo database file format in multidimensions. These zones provide VisIt
+    !! with the subdomain connectivity information that it requires in order to
+    !! produce smooth plots.
+    !> @{
+    type(int_bounds_info) :: offset_x, offset_y, offset_z
+    !> @}
+
+    ! Perturb density of surrounding air so as to break symmetry of grid
+    logical, parameter :: perturb_flow       = .${CASE['algorithm']['perturb_flow']}$.
+    integer, parameter :: perturb_flow_fluid = ${CASE['algorithm']['perturb_flow_fluid']}$   !< Fluid to be perturbed with perturb_flow flag
+    logical, parameter :: perturb_sph        = .${CASE['algorithm']['perturb_sph']}$.
+    integer, parameter :: perturb_sph_fluid  = ${CASE['algorithm']['perturb_sph_fluid']}$  !< Fluid to be perturbed with perturb_sph flag
+    real(kind(0d0)), dimension(num_fluids), parameter :: fluid_rho = ${CASE['algorithm']['fluid_rho']}$ 
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -132,307 +278,169 @@ module m_global_parameters
 
     type(mpi_io_var), public :: MPI_IO_DATA
 
-    !> @name MPI info for parallel IO with Lustre file systems
-    !> @{
     character(LEN=name_len) :: mpiiofs
-    integer :: mpi_info_int
-    !> @}
+    integer :: mpi_info_int !<
+    !! MPI info for parallel IO with Lustre file systems
 
     integer, private :: ierr
+    ! ==========================================================================
 
-    !> @name Annotations of the structure of the state and flux vectors in terms of the
-    !! size and the configuration of the system of equations to which they belong
-    !> @{
-    integer           :: sys_size                  !< Number of unknowns in system of eqns.
-    type(bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
-    type(bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
-    integer           :: E_idx                     !< Index of energy equation
-    type(bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
-    type(bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
-    type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer               :: alf_idx               !< Index of void fraction
-    integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
-    integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
-    !> @}
+    ! Initial Condition Parameters =============================================
+    integer, parameter :: num_patches = ${len(CASE['patches'])}$ !< Number of patches composing initial condition
 
-!$acc declare create(bub_idx)
+    type(ic_patch_parameters), dimension(num_patches) :: patch_icpp = ${CASE['autogen']['patch_icpp']}$
 
-    !> @name The number of fluids, along with their identifying indexes, respectively,
-    !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
-    !! numbers, will be non-negligible.
-    !> @{
-    integer, dimension(2)   :: Re_size
-    integer, allocatable, dimension(:, :) :: Re_idx
-    !> @}
-!$acc declare create(Re_size, Re_idx)
-
-    !> @name The coordinate direction indexes and flags (flg), respectively, for which
-    !! the configurations will be determined with respect to a working direction
-    !! and that will be used to isolate the contributions, in that direction, in
-    !! the dimensionally split system of equations.
-    !> @{
-    integer, dimension(3) :: dir_idx
-    real(kind(0d0)), dimension(3) :: dir_flg
-    !> @}
-!$acc declare create(dir_idx, dir_flg)
-
-    integer :: buff_size !<
-    !! The number of cells that are necessary to be able to store enough boundary
-    !! conditions data to march the solution in the physical computational domain
-    !! to the next time-step.
-
-    integer :: startx, starty, startz
-
-!$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx)
-
-    ! END: Simulation Algorithm Parameters =====================================
+    !<
+    !! Database of the initial condition patch parameters (icpp) for each of the
+    !! patches employed in the configuration of the initial condition.
+    ! ==========================================================================
 
     ! Fluids Physical Parameters ===============================================
+    type(physical_parameters), dimension(num_fluids_alloc), parameter :: fluid_pp = ${CASE['autogen']['fluid_pp']}$
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
+    !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
-
     ! ==========================================================================
 
-    integer :: fd_order !<
+    INTEGER, parameter :: fd_order = ${CASE['database']['fd_order']}$ !<
     !! The order of the finite-difference (fd) approximations of the first-order
     !! derivatives that need to be evaluated when the CoM or flow probe data
     !! files are to be written at each time step
 
-    integer :: fd_number !<
+    INTEGER, parameter :: fd_number = ${max(1, CASE['database']['fd_order'] // 2)}$ !<
     !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
 
-    logical, dimension(num_fluids_max) :: com_wrt, cb_wrt
-    logical :: probe_wrt
-    logical :: integral_wrt
-    integer :: num_probes
-    integer :: num_integrals
-    type(probe_parameters), dimension(num_probes_max) :: probe
-    type(integral_parameters), dimension(num_probes_max) :: integral
-    real(kind(0d0)), dimension(5) :: threshold_mf
-    integer, dimension(5) :: moment_order
+    LOGICAL, DIMENSION(num_fluids_alloc) :: com_wrt, cb_wrt
+    LOGICAL, parameter :: probe_wrt     = .${CASE['database']['write']['probe']}$.
+    LOGICAL, parameter :: integral_wrt  = .${CASE['database']['write']['integral']}$.
+    INTEGER, parameter :: num_probes    = ${len(CASE['database']['probes'])}$
+    INTEGER, parameter :: num_integrals = ${len(CASE['database']['integrals'])}$
+    TYPE(probe_parameters),    DIMENSION(num_probes),    parameter :: probe    = ${CASE['autogen']['probe']}$
+    TYPE(integral_parameters), DIMENSION(num_integrals), parameter :: integral = ${CASE['autogen']['integral']}$
+    REAL(KIND(0d0)), DIMENSION(5) :: threshold_mf = dflt_real
+    INTEGER, DIMENSION(5) :: moment_order = (/ dflt_int, dflt_int, dflt_int, dflt_int, dflt_int /)
 
-    !> @name Reference density and pressure for Tait EOS
+    !> @name The list of all possible flow variables that may be written to a database
+    !! file. It includes partial densities, density, momentum, velocity, energy,
+    !! pressure, volume fraction(s), specific heat ratio function, specific heat
+    !! ratio, liquid stiffness function, liquid stiffness, primitive variables,
+    !! conservative variables, speed of sound, the vorticity,
+    !! and the numerical Schlieren function.
     !> @{
-    real(kind(0d0)) :: rhoref, pref
+    logical, dimension(num_fluids)  :: alpha_rho_wrt  = .${CASE['database']['write']['alpha_rho']}$.
+    logical, parameter              :: rho_wrt        = .${CASE['database']['write']['rho']}$.
+    logical, dimension(3)           :: mom_wrt        = .${CASE['database']['write']['mom']}$.
+    logical, dimension(3)           :: vel_wrt        = .${CASE['database']['write']['velocity']}$.
+    logical, dimension(3)           :: flux_wrt       = .${CASE['database']['write']['flux']}$.
+    logical, parameter              :: E_wrt          = .${CASE['database']['write']['E']}$.
+    logical, parameter              :: pres_wrt       = .${CASE['database']['write']['pressure']}$.
+    logical, dimension(num_fluids)  :: alpha_wrt      = .${CASE['database']['write']['alpha']}$.
+    logical, parameter              :: gamma_wrt      = .${CASE['database']['write']['gamma']}$.
+    logical, parameter              :: heat_ratio_wrt = .${CASE['database']['write']['heat_ratio']}$.
+    logical, parameter              :: pi_inf_wrt     = .${CASE['database']['write']['pi_inf']}$.
+    logical, parameter              :: pres_inf_wrt   = .${CASE['database']['write']['pressure_inf']}$.
+    logical, parameter              :: prim_vars_wrt  = .${CASE['database']['write']['prim_vars']}$.
+    logical, parameter              :: cons_vars_wrt  = .${CASE['database']['write']['cons_vars']}$.
+    logical, parameter              :: c_wrt          = .${CASE['database']['write']['c']}$.
+    logical, dimension(3)           :: omega_wrt      = .${CASE['database']['write']['omega']}$.
+    logical, parameter              :: schlieren_wrt  = .${CASE['database']['write']['schlieren']}$.
     !> @}
+
+
+    real(kind(0d0)), dimension(num_fluids) :: schlieren_alpha    !<
+    !! Amplitude coefficients of the numerical Schlieren function that are used
+    !! to adjust the intensity of numerical Schlieren renderings for individual
+    !! fluids. This enables waves and interfaces of varying strenghts and in all
+    !! of the fluids to be made simulatenously visible on a single plot.
+
+    real(kind(0d0)) :: rhoref = ${CASE['algorithm']['rhoref']}$
+    real(kind(0d0)) :: pref   = ${CASE['algorithm']['pref']}$
+    !< Reference parameters for Tait EOS
 !$acc declare create(rhoref, pref)
+
 
     !> @name Bubble modeling
     !> @{
-    integer         :: nb       !< Number of eq. bubble sizes
-    real(kind(0d0)) :: R0ref    !< Reference bubble size
-    real(kind(0d0)) :: Ca       !< Cavitation number
-    real(kind(0d0)) :: Web      !< Weber number
-    real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
-    real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
-    real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
-    real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
-    logical         :: bubbles      !< Bubbles on/off
-    logical         :: polytropic   !< Polytropic  switch
-    logical         :: polydisperse !< Polydisperse bubbles
+    INTEGER,         parameter :: nb     = ${CASE['bubbles']['number']}$  !< Number of eq. bubble sizes
+    REAL(KIND(0d0)), parameter :: R0ref  = ${CASE['bubbles']['R0ref']}$  !< Reference bubble size
+    REAL(KIND(0d0)), parameter :: Ca     = ${CASE['bubbles']['cavitation']}$       !< Cavitation number
+    REAL(KIND(0d0)), parameter :: Web    = ${CASE['bubbles']['weber']}$     !< Weber number
+    REAL(KIND(0d0)), parameter :: Re_inv = ${CASE['bubbles']['Re_inv']}$  !< Inverse Reynolds number
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: weight !< Simpson quadrature weights
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: R0     !< Bubble sizes
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: V0     !< Bubble velocities
+    LOGICAL,         parameter :: bubbles      = .${CASE['bubbles']['bubbles']}$. !< Bubbles on/off
+    LOGICAL,         parameter :: polytropic   = .${CASE['bubbles']['polytropic']}$.  !< Polytropic  switch
+    LOGICAL,         parameter :: polydisperse = .${CASE['bubbles']['polydisperse']}$. !< Polydisperse bubbles
 
-    integer         :: bubble_model !< Gilmore or Keller--Miksis bubble model
-    integer         :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
-    real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
+    INTEGER, parameter :: bubble_model = ${CASE['bubbles']['model']}$ !< Gilmore or Keller--Miksis bubble model
+    INTEGER, parameter :: thermal      = ${CASE['bubbles']['thermal']}$ !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
+    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: ptil  !< Pressure modification
+    REAL(KIND(0d0)), parameter :: poly_sigma = ${CASE['bubbles']['poly_sigma']}$ !< log normal sigma for polydisperse PDF
 
-    logical         :: qbmm !< Quadrature moment method
-    integer         :: nmom !< Number of carried moments per R0 location
-    integer         :: nnode !< Number of QBMM nodes
-    integer         :: nmomsp !< Number of moments required by ensemble-averaging
-    integer         :: nmomtot !< Total number of carried moments moments/transport equations
-    integer         :: R0_type
+    LOGICAL,         parameter :: qbmm      = .${CASE['bubbles']['qbmm']}$. !< Quadrature moment method
+    INTEGER                    :: nmom      !< Number of carried moments per R0 location
+    INTEGER,         parameter :: nnode     = ${CASE['bubbles']['nnode']}$ !< Number of QBMM nodes
+    INTEGER                    :: nmomsp    !< Number of moments required by ensemble-averaging
+    INTEGER                    :: nmomtot   !< Total number of carried moments moments/transport equations
+    integer,         parameter :: dist_type = ${CASE['bubbles']['distribution']}$ !1 = binormal, 2 = lognormal-normal
+    INTEGER,         parameter :: R0_type   = ${CASE['bubbles']['R0_type']}$ !< R0 distribution type
+    real(kind(0d0)), parameter :: sigR      = ${CASE['bubbles']['sigR']}$
+    real(kind(0d0)), parameter :: sigV      = ${CASE['bubbles']['sigV']}$
+    real(kind(0d0)), parameter :: rhoRV     = ${CASE['bubbles']['rhoRV']}$
 
-!$acc declare create(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
-
-    type(scalar_field), allocatable, dimension(:) :: mom_sp
-    type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)     :: mom_sp
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:,:,:) :: mom_3d
     !> @}
+!$acc declare create(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 !$acc declare create(mom_sp, mom_3d)
+
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: gam
+    REAL(KIND(0d0)) :: R_n    = dflt_real, R_v    = dflt_real
+    REAL(KIND(0d0)) :: phi_vn = dflt_real, phi_nv = dflt_real
+    REAL(KIND(0d0)) :: Pe_c   = dflt_real, Tw     = dflt_real
+    REAL(KIND(0d0)) :: pv, M_n, M_v
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    REAL(KIND(0d0)) :: mul0, ss, gamma_v, mu_v, G
+    REAL(KIND(0d0)) :: gamma_m, gamma_n, mu_n
+    REAL(KIND(0d0)) :: gam
     !> @}
 !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
+
     !> @name Acoustic monopole parameters
     !> @{
-    logical         :: monopole !< Monopole switch
-    type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
-    integer         :: num_mono !< Number of monopoles
+    LOGICAL, parameter :: monopole = .${CASE['acoustic']['monopole']}$. !< Monopole switch
+    INTEGER, parameter :: num_mono = ${len(CASE['acoustic']['monopoles'])}$ !< Number of monopoles
+    TYPE(mono_parameters), DIMENSION(num_mono), parameter :: mono = ${CASE['autogen']['mono']}$ !< Monopole parameters
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 
 
-    real(kind(0d0)) :: mytime       !< Current simulation time
-    real(kind(0d0)) :: finaltime    !< Final simulation time
+    integer, allocatable, dimension(:, :, :) :: logic_grid
 
+    REAL(KIND(0d0))            :: mytime       !< Current simulation time
+    REAL(KIND(0d0))            :: dt0          !< Initial time step size
+    REAL(KIND(0d0)), parameter :: finaltime = t_step_stop*${CASE['domain']['time']['dt']}$ !< Final simulation time
 
-    logical :: weno_flat, riemann_flat, cu_mpi
-
-    LOGICAL cu_mpi
-
-    ! ======================================================================
+    logical, parameter :: riemann_flat = .${CASE['algorithm']['riemann_flat']}$.
+    logical, parameter :: cu_mpi       = .${CASE['logistics']['cu_mpi']}$.
+    logical, parameter :: cu_tensor    = .${CASE['logistics']['cu_tensor']}$.
 
     ! Mathematical and Physical Constants ======================================
-    ! REAL(KIND(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
-    real(kind(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
-    !$acc declare create(pi)
-
+    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
+!$acc declare create(pi)
     ! ==========================================================================
 
 contains
-
-    !> Assigns default values to the user inputs before reading
-        !!  them in. This enables for an easier consistency check of
-        !!  these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs() ! ------------------
-
-        integer :: i, j !< Generic loop iterator
-
-        ! Logistics
-        case_dir = dflt_char
-        run_time_info = .false.
-        t_step_old = dflt_int
-
-        debug = .false.
-
-        ! Computational domain parameters
-        m = dflt_int; n = dflt_int; p = dflt_int
-
-        cyl_coord = .false.
-
-        dt = dflt_real
-
-        t_step_start = dflt_int
-        t_step_stop = dflt_int
-        t_step_save = dflt_int
-
-        ! Simulation algorithm parameters
-        model_eqns = dflt_int
-        num_fluids = dflt_int
-        adv_alphan = .false.
-        mpp_lim = .false.
-        time_stepper = dflt_int
-        weno_vars = dflt_int
-        weno_order = dflt_int
-        weno_eps = dflt_real
-        mapped_weno = .false.
-        mp_weno = .false.
-        weno_Re_flux = .false.
-        riemann_solver = dflt_int
-        wave_speeds = dflt_int
-        avg_state = dflt_int
-        alt_soundspeed = .false.
-        null_weights = .false.
-        mixture_err = .false.
-        parallel_io = .false.
-        precision = 2
-        weno_flat = .true.
-        riemann_flat = .true.
-        cu_mpi = .true.
-
-        bc_x%beg = dflt_int; bc_x%end = dflt_int
-        bc_y%beg = dflt_int; bc_y%end = dflt_int
-        bc_z%beg = dflt_int; bc_z%end = dflt_int
-
-        ! Fluids physical parameters
-        do i = 1, num_fluids_max
-            fluid_pp(i)%gamma = dflt_real
-            fluid_pp(i)%pi_inf = dflt_real
-            fluid_pp(i)%Re(:) = dflt_real
-            fluid_pp(i)%mul0 = dflt_real
-            fluid_pp(i)%ss = dflt_real
-            fluid_pp(i)%pv = dflt_real
-            fluid_pp(i)%gamma_v = dflt_real
-            fluid_pp(i)%M_v = dflt_real
-            fluid_pp(i)%mu_v = dflt_real
-            fluid_pp(i)%k_v = dflt_real
-        end do
-
-        ! Tait EOS
-        rhoref = dflt_real
-        pref = dflt_real
-
-        ! Bubble modeling
-        bubbles = .false.
-        bubble_model = 1
-        polytropic = .true.
-        polydisperse = .false.
-        thermal = dflt_int
-        R0ref = dflt_real
-        nb = dflt_int
-        R0_type = dflt_int
-
-        ! User inputs for qbmm for simulation code
-        qbmm = .false.
-        nnode = 1
-
-        Ca = dflt_real
-        Re_inv = dflt_real
-        Web = dflt_real
-        poly_sigma = dflt_real
-
-        ! Monopole source
-        monopole = .false.
-        num_mono = 1
-
-        cu_tensor = .false.
-
-        do j = 1, num_probes_max
-            do i = 1, 3
-                mono(j)%loc(i) = dflt_real
-            end do
-            mono(j)%mag = dflt_real
-            mono(j)%length = dflt_real
-            mono(j)%delay = dflt_real
-            mono(j)%dir = 1.d0
-            mono(j)%npulse = 1.d0
-            mono(j)%pulse = 1
-            mono(j)%support = 1
-        end do
-
-        fd_order = dflt_int
-        com_wrt = .false.
-        cb_wrt = .false.
-        probe_wrt = .false.
-        integral_wrt = .false.
-        num_probes = dflt_int
-        num_integrals = dflt_int
-
-        do i = 1, num_probes_max
-            probe(i)%x = dflt_real
-            probe(i)%y = dflt_real
-            probe(i)%z = dflt_real
-        end do
-
-        do i = 1, num_probes_max
-            integral(i)%xmin = dflt_real
-            integral(i)%xmax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
-        end do
-
-        do i = 1, 5
-            threshold_mf(i) = dflt_real
-            moment_order(i) = dflt_int
-        end do
-
-    end subroutine s_assign_default_values_to_user_inputs ! ----------------
-
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
@@ -446,11 +454,14 @@ contains
 
         type(bounds_info) :: ix, iy, iz
 
-        ! Determining the degree of the WENO polynomials
-        weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
 !$acc update device(nb)
 
+
+        ! Setting m_root equal to m in the case of a 1D serial simulation
+        if (num_procs == 1 .and. n == 0) then
+            m_root = m
+        end if
 
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces
@@ -461,9 +472,6 @@ contains
 
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
-
-            ! Setting number of fluids
-            num_fluids = 1
 
             ! Annotating structure of the state and flux vectors belonging
             ! to the system of equations defined by the selected number of
@@ -537,12 +545,23 @@ contains
 
                     if (qbmm) then
                         allocate (bub_idx%moms(nb, nmom))
+                        allocate ( bub_idx%fullmom(nb,0:nmom,0:nmom) )
+
                         do i = 1, nb
                             do j = 1, nmom
                                 bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
                             end do
                             bub_idx%rs(i) = bub_idx%moms(i, 2)
                             bub_idx%vs(i) = bub_idx%moms(i, 3)
+
+                            bub_idx%fullmom(i,0,0) = bub_idx%moms(i,1)
+                            bub_idx%fullmom(i,1,0) = bub_idx%moms(i,2)
+                            bub_idx%fullmom(i,0,1) = bub_idx%moms(i,3)
+                            bub_idx%fullmom(i,2,0) = bub_idx%moms(i,4)
+                            bub_idx%fullmom(i,1,1) = bub_idx%moms(i,5)
+                            bub_idx%fullmom(i,0,2) = bub_idx%moms(i,6)
+
+                            bub_idx%rs(i) = bub_idx%fullmom(i,1,0)
                         end do
                     else
                         do i = 1, nb
@@ -571,8 +590,7 @@ contains
                         if (R0_type == 1) then
                             call s_simpson
                         else 
-                            print*, 'Invalid R0 type - abort'
-                            stop
+                            call s_wheeler
                         end if
                         V0(:) = 1d0
                     else
@@ -731,7 +749,6 @@ contains
         end if
 
         if (probe_wrt) then
-            fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
 
@@ -748,26 +765,42 @@ contains
 
 !$acc update device(startx, starty, startz)
 
-        if (cyl_coord .neqv. .true.) then ! Cartesian grid
-            grid_geometry = 1
-        elseif (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
-            grid_geometry = 2
-        else ! Fully 3D cylindrical grid
-            grid_geometry = 3
-        end if
-
         ! Allocating grid variables for the x-, y- and z-directions
         allocate (x_cb(-1 - buff_size:m + buff_size))
         allocate (x_cc(-buff_size:m + buff_size))
         allocate (dx(-buff_size:m + buff_size))
 
-        if (n == 0) return; allocate (y_cb(-1 - buff_size:n + buff_size))
-        allocate (y_cc(-buff_size:n + buff_size))
-        allocate (dy(-buff_size:n + buff_size))
+        if (n > 0 .and. n /= dflt_int) then
+            allocate (y_cb(-1 - buff_size:n + buff_size))
+            allocate (y_cc(-buff_size:n + buff_size))
+            allocate (dy(-buff_size:n + buff_size))
 
-        if (p == 0) return; allocate (z_cb(-1 - buff_size:p + buff_size))
-        allocate (z_cc(-buff_size:p + buff_size))
-        allocate (dz(-buff_size:p + buff_size))
+            if (p > 0 .and. p /= dflt_int) then
+                allocate (z_cb(-1 - buff_size:p + buff_size))
+                allocate (z_cc(-buff_size:p + buff_size))
+                allocate (dz(-buff_size:p + buff_size))
+            end if
+
+            ! Allocating the grid variables, only used for the 1D simulations,
+            ! and containing the defragmented computational domain grid data
+        else
+            allocate (x_root_cb(-1:m_root))
+            allocate (x_root_cc(0:m_root))
+        end if
+
+        if (coarsen_silo) then
+            allocate (coarse_x_cb(-1 - offset_x%beg:(m/2) + offset_x%end))
+
+            if (n > 0 .and. n /= dflt_int) then
+                allocate (coarse_y_cb(-1 - offset_y%beg:(n/2) + offset_y%end))
+                
+                if (p > 0 .and. p /= dflt_int) then
+                    allocate (coarse_z_cb(-1 - offset_z%beg:(p/2) + offset_z%end))
+                end if
+            end if
+        end if
+
+        allocate (logic_grid(0:m, 0:n, 0:p))
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 
@@ -949,9 +982,27 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         deallocate (x_cb, x_cc, dx)
 
-        if (n == 0) return; deallocate (y_cb, y_cc, dy)
+        if (n > 0 .and. n /= dflt_int) then
+            deallocate (y_cb, y_cc, dy)
 
-        if (p == 0) return; deallocate (z_cb, z_cc, dz)
+            if (p > 0 .and. p /= dflt_int) then
+                deallocate (z_cb, z_cc, dz)
+            end if
+        else
+            deallocate (x_root_cb, x_root_cc)
+        end if
+
+        if (coarsen_silo) then
+            deallocate (coarse_x_cb)
+
+            if (n > 0 .and. n /= dflt_int) then
+                deallocate (coarse_y_cb)
+
+                if (p > 0 .and. p /= dflt_int) then
+                    deallocate (coarse_z_cb)
+                end if
+            end if
+        end if
 
         deallocate (proc_coords)
         if (parallel_io) then

@@ -6,12 +6,6 @@ import json
 print(json.dumps({
     # Logistics ================================================================
     'case_dir'                     : '\'.\'',
-    'run_time_info'                : 'T',
-    'nodes'                        : 1,
-    'ppn'                          : 1,
-    'queue'                        : 'normal',
-    'walltime'                     : '24:00:00',
-    'mail_list'                    : '',
     # ==========================================================================
     
     # Computational Domain Parameters ==========================================

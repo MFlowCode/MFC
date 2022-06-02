@@ -57,9 +57,9 @@ class MFCRun:
         for target_name in engine.get_targets(self.mfc.args["targets"]):
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
 
-            build.build_target(self.mfc, target_name)
-                        
             # Create input file
             input_file.dump(target_name)
 
+            build.build_target(self.mfc, target_name)
+                        
             engine.run(target_name)

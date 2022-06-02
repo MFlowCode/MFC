@@ -30,11 +30,6 @@ class MFCTest:
             common.delete_directory_recursive(common.MFC_TESTDIR)
             common.create_directory(common.MFC_TESTDIR)
 
-        # Build mfc if required
-        if not self.mfc.build.is_built("mfc"):
-            rich.print(f"> [bold cyan]mfc[/bold cyan] needs (re)building...")
-            self.mfc.build.build_target(f"mfc", "> > ")
-
         # Run cases with multiple threads (if available)
         rich.print(f" |-+------------+----------+----------+---------+")
         rich.print(f" | | tests/[bold magenta]UUID[/bold magenta] | Error RE |   Tol.   | Summary |")
@@ -46,9 +41,9 @@ class MFCTest:
     def handle_case(self, test: Case):
         test.create_directory()
 
-        if test.params.get('qbmm', 'F') == 'T':
+        if test.case.bubbles.qbmm:
             tol = 1e-7
-        elif test.params.get('bubbles', 'F') == 'T':
+        elif test.case.bubbles.bubbles:
             tol = 1e-10
         else:
             tol = 1e-12

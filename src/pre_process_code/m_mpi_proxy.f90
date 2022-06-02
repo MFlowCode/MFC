@@ -186,14 +186,14 @@ contains
         call MPI_BCAST(perturb_flow_fluid, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(perturb_sph, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(perturb_sph_fluid, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, &
+        call MPI_BCAST(fluid_rho(1), num_fluids_alloc, MPI_LOGICAL, &
                        0, MPI_COMM_WORLD, &
                        ierr)
 
         ! Initial condition parameters
         call MPI_BCAST(num_patches, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-        do i = 1, num_patches_max
+        do i = 1, num_patches
             call MPI_BCAST(patch_icpp(i)%geometry, 1, &
                            MPI_INTEGER, 0, &
                            MPI_COMM_WORLD, ierr)
@@ -255,13 +255,13 @@ contains
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alter_patch(0), &
-                           num_patches_max, MPI_LOGICAL, 0, &
+                           num_patches, MPI_LOGICAL, 0, &
                            MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alpha_rho(1), &
-                           num_fluids_max, MPI_DOUBLE_PRECISION, 0, &
+                           num_fluids_alloc, MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alpha(1), &
-                           num_fluids_max - 1, MPI_DOUBLE_PRECISION, 0, &
+                           num_fluids_alloc - 1, MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
 
             ! Bubbles
@@ -281,7 +281,7 @@ contains
         end do
 
         ! Fluids physical parameters
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids_alloc
             call MPI_BCAST(fluid_pp(i)%gamma, 1, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
@@ -419,11 +419,11 @@ contains
 
         ! Generating 3D Cartesian Processor Topology =======================
 
-        if (n > 0) then
+        if (n > 0 .and. n /= dflt_int) then
 
-            if (p > 0) then
+            if (p > 0 .and. p /= dflt_int) then
 
-                if (cyl_coord .and. p > 0) then
+                if (cyl_coord) then
                     ! Implement pencil processor blocking if using cylindrical coordinates so
                     ! that all cells in azimuthal direction are stored on a single processor.
                     ! This is necessary for efficient application of Fourier filter near axis.
@@ -564,7 +564,7 @@ contains
 
                 ! Preliminary uniform cell-width spacing
                 if (old_grid .neqv. .true.) then
-                    dz = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
+                    dz_min = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
                 end if
 
                 ! Optimal number of cells per processor
@@ -582,15 +582,15 @@ contains
                 if (parallel_io .neqv. .true.) then
                     if (old_grid .neqv. .true.) then
                         if (proc_coords(3) < rem_cells) then
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)* &
+                            z_domain%beg = z_domain%beg + dz_min*real((p + 1)* &
                                                                   proc_coords(3))
-                            z_domain%end = z_domain%end - dz*real((p + 1)* &
+                            z_domain%end = z_domain%end - dz_min*real((p + 1)* &
                                                                   (num_procs_z - proc_coords(3) - 1) &
                                                                   - (num_procs_z - rem_cells))
                         else
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)* &
+                            z_domain%beg = z_domain%beg + dz_min*real((p + 1)* &
                                                                   proc_coords(3) + rem_cells)
-                            z_domain%end = z_domain%end - dz*real((p + 1)* &
+                            z_domain%end = z_domain%end - dz_min*real((p + 1)* &
                                                                   (num_procs_z - proc_coords(3) - 1))
                         end if
                     end if
@@ -679,7 +679,7 @@ contains
 
             ! Preliminary uniform cell-width spacing
             if (old_grid .neqv. .true.) then
-                dy = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
+                dy_min = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
             end if
 
             ! Optimal number of cells per processor
@@ -697,15 +697,15 @@ contains
             if (parallel_io .neqv. .true.) then
                 if (old_grid .neqv. .true.) then
                     if (proc_coords(2) < rem_cells) then
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)* &
+                        y_domain%beg = y_domain%beg + dy_min*real((n + 1)* &
                                                               proc_coords(2))
-                        y_domain%end = y_domain%end - dy*real((n + 1)* &
+                        y_domain%end = y_domain%end - dy_min*real((n + 1)* &
                                                               (num_procs_y - proc_coords(2) - 1) &
                                                               - (num_procs_y - rem_cells))
                     else
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)* &
+                        y_domain%beg = y_domain%beg + dy_min*real((n + 1)* &
                                                               proc_coords(2) + rem_cells)
-                        y_domain%end = y_domain%end - dy*real((n + 1)* &
+                        y_domain%end = y_domain%end - dy_min*real((n + 1)* &
                                                               (num_procs_y - proc_coords(2) - 1))
                     end if
                 end if
@@ -748,7 +748,7 @@ contains
 
         ! Preliminary uniform cell-width spacing
         if (old_grid .neqv. .true.) then
-            dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
+            dx_min = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
         end if
 
         ! Optimal number of cells per processor
@@ -766,15 +766,15 @@ contains
         if (parallel_io .neqv. .true.) then
             if (old_grid .neqv. .true.) then
                 if (proc_coords(1) < rem_cells) then
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)* &
+                    x_domain%beg = x_domain%beg + dx_min*real((m + 1)* &
                                                           proc_coords(1))
-                    x_domain%end = x_domain%end - dx*real((m + 1)* &
+                    x_domain%end = x_domain%end - dx_min*real((m + 1)* &
                                                           (num_procs_x - proc_coords(1) - 1) &
                                                           - (num_procs_x - rem_cells))
                 else
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)* &
+                    x_domain%beg = x_domain%beg + dx_min*real((m + 1)* &
                                                           proc_coords(1) + rem_cells)
-                    x_domain%end = x_domain%end - dx*real((m + 1)* &
+                    x_domain%end = x_domain%end - dx_min*real((m + 1)* &
                                                           (num_procs_x - proc_coords(1) - 1))
                 end if
             end if

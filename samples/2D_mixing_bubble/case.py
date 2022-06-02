@@ -121,65 +121,73 @@ print(json.dumps({
     'fd_order'                     : 1,
     # 'schlieren_wrt'                :'F',
     # ==========================================================================
-                                                                
+
     # Patch 1 ==================================================================
-    'patch_icpp(1)%geometry'       : 3,
-    'patch_icpp(1)%x_centroid'     : 0.,
-    'patch_icpp(1)%y_centroid'     : 0.,
-    'patch_icpp(1)%length_x'       : Lx,
-    'patch_icpp(1)%length_y'       : Ly,
-    'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.,
-    'patch_icpp(1)%alpha_rho(2)'   : (1.-vf0)*1.E-12,
-    'patch_icpp(1)%alpha_rho(3)'   : vf0*1.E-3,
-    'patch_icpp(1)%alpha(1)'       : (1-vf0)*1.,
-    'patch_icpp(1)%alpha(2)'       : (1-vf0)*1.E-12,
-    'patch_icpp(1)%alpha(3)'       : vf0,
-    'patch_icpp(1)%vel(1)'         : uu,
-    'patch_icpp(1)%vel(2)'         : 0.00,
-    'patch_icpp(1)%pres'           : 1.00,
-    'patch_icpp(1)%r0'             : 1.E+00,
-    'patch_icpp(1)%v0'             : 0.0E+00,
-    # ==========================================================================
+    'patches': [
+        {
+            'geometry'       : 3,
+            'x_centroid'     : 0.,
+            'y_centroid'     : 0.,
+            'length_x'       : Lx,
+            'length_y'       : Ly,
+            'alpha_rho(1)'   : (1.-vf0)*1.,
+            'alpha_rho(2)'   : (1.-vf0)*1.E-12,
+            'alpha_rho(3)'   : vf0*1.E-3,
+            'alpha(1)'       : (1-vf0)*1.,
+            'alpha(2)'       : (1-vf0)*1.E-12,
+            'alpha(3)'       : vf0,
+            'vel(1)'         : uu,
+            'vel(2)'         : 0.00,
+            'pres'           : 1.00,
+            'r0'             : 1.E+00,
+            'v0'             : 0.0E+00,
+            # ==========================================================================
+        },
 
-    # Patch 2 ==================================================================
-    'patch_icpp(2)%geometry'       : 4,
-    'patch_icpp(2)%alter_patch(1)' : 'T',
-    'patch_icpp(2)%x_centroid'     : 0.,
-    'patch_icpp(2)%y_centroid'     : 0.,
-    'patch_icpp(2)%normal(1)'      :  math.sin(math.pi*ang/180.),
-    'patch_icpp(2)%normal(2)'      : -math.cos(math.pi*ang/180.),
-    'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E-12,
-    'patch_icpp(2)%alpha_rho(2)'   : (1.-vf0)*1.,
-    'patch_icpp(2)%alpha_rho(3)'   : vf0*1.E-3,
-    'patch_icpp(2)%alpha(1)'       : (1-vf0)*1.E-12,
-    'patch_icpp(2)%alpha(2)'       : (1-vf0)*1.,
-    'patch_icpp(2)%alpha(3)'       : vf0,
-    'patch_icpp(2)%vel(1)'         : -1.*uu,
-    'patch_icpp(2)%vel(2)'         : 0.0,
-    'patch_icpp(2)%pres'           : 1.0,
-    'patch_icpp(2)%r0'             : 1.E+00,
-    'patch_icpp(2)%v0'             : 0.0E+00,
-    # 'patch_icpp(2)%normal(1)'      : 0.00624987793326E+00,
-    # 'patch_icpp(2)%normal(2)'      :-0.99998046932219E+00,
-    # 'patch_icpp(2)%length_x'       : Lx,
-    # 'patch_icpp(2)%length_y'       : Ly/2.,
-    # ==========================================================================
+        # Patch 2 ==================================================================
+        {
+            'geometry'       : 4,
+            'alter_patch(1)' : True,
+            'x_centroid'     : 0.,
+            'y_centroid'     : 0.,
+            'normal(1)'      :  math.sin(math.pi*ang/180.),
+            'normal(2)'      : -math.cos(math.pi*ang/180.),
+            'alpha_rho(1)'   : (1.-vf0)*1.E-12,
+            'alpha_rho(2)'   : (1.-vf0)*1.,
+            'alpha_rho(3)'   : vf0*1.E-3,
+            'alpha(1)'       : (1-vf0)*1.E-12,
+            'alpha(2)'       : (1-vf0)*1.,
+            'alpha(3)'       : vf0,
+            'vel(1)'         : -1.*uu,
+            'vel(2)'         : 0.0,
+            'pres'           : 1.0,
+            'r0'             : 1.E+00,
+            'v0'             : 0.0E+00,
+            # 'patch_icpp(2)%normal(1)'      : 0.00624987793326E+00,
+            # 'patch_icpp(2)%normal(2)'      :-0.99998046932219E+00,
+            # 'patch_icpp(2)%length_x'       : Lx,
+            # 'patch_icpp(2)%length_y'       : Ly/2.,
+            # ==========================================================================
+        },
 
-    # # ========================================================================
-    # 'patch_icpp(3)%geometry'       : 2,
-    # 'patch_icpp(3)%x_centroid'     : 5.E-01,
-    # 'patch_icpp(3)%y_centroid'     : 0.5,
-    # 'patch_icpp(3)%radius'          : 0.1,
-    # 'patch_icpp(3)%alter_patch(1)' : 'T',
-    # 'patch_icpp(3)%alter_patch(2)' : 'T',
-    # 'patch_icpp(3)%alpha_rho(1)'   : (1-vf0)*1.E+00,
-    # 'patch_icpp(3)%vel(1)'         : 0.00,
-    # 'patch_icpp(3)%vel(2)'         : 0.00,
-    # 'patch_icpp(3)%pres'           : 1.00,
-    # 'patch_icpp(3)%alpha(1)'       : vf0,
-    # 'patch_icpp(3)%r0'             : 1.E+00,
-    # 'patch_icpp(3)%v0'             : 0.0E+00,
-    # # ========================================================================
+        #{
+            # # ========================================================================
+            # 'patch_icpp(3)%geometry'       : 2,
+            # 'patch_icpp(3)%x_centroid'     : 5.E-01,
+            # 'patch_icpp(3)%y_centroid'     : 0.5,
+            # 'patch_icpp(3)%radius'          : 0.1,
+            # 'patch_icpp(3)%alter_patch(1)' : 'T',
+            # 'patch_icpp(3)%alter_patch(2)' : 'T',
+            # 'patch_icpp(3)%alpha_rho(1)'   : (1-vf0)*1.E+00,
+            # 'patch_icpp(3)%vel(1)'         : 0.00,
+            # 'patch_icpp(3)%vel(2)'         : 0.00,
+            # 'patch_icpp(3)%pres'           : 1.00,
+            # 'patch_icpp(3)%alpha(1)'       : vf0,
+            # 'patch_icpp(3)%r0'             : 1.E+00,
+            # 'patch_icpp(3)%v0'             : 0.0E+00,
+            # # ========================================================================
+        #}
+    ],
 
     # SHB: Bubbles =============================================================
     # 'perturb_flow'              : 'T',
@@ -187,13 +195,22 @@ print(json.dumps({
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================
+    'fluids': [
+        {
+            'gamma' : 1.E+00/(n_tait-1.E+00),
+            'pi_inf': n_tait*B_tait/(n_tait-1.),
+        },
+        {
+            'gamma' : 1.E+00/(n_tait-1.E+00),
+            'pi_inf': n_tait*B_tait/(n_tait-1.),
+        },
+        {
+            'gamma' : 1./(gamma_gas-1.),
+            'pi_inf': 0.0E+00,
+        }
+    ],
     # Surrounding liquid
-    'fluid_pp(1)%gamma'             : 1.E+00/(n_tait-1.E+00),
-    'fluid_pp(1)%pi_inf'            : n_tait*B_tait/(n_tait-1.),
-    'fluid_pp(2)%gamma'             : 1.E+00/(n_tait-1.E+00),
-    'fluid_pp(2)%pi_inf'            : n_tait*B_tait/(n_tait-1.),
-    'fluid_pp(3)%gamma'             : 1./(gamma_gas-1.),
-    'fluid_pp(3)%pi_inf'            : 0.0E+00,
+
     # ==========================================================================
     # SHB: Tait EOS ============================================================
     'pref'                  : p0,

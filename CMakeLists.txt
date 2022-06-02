@@ -23,11 +23,34 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}"
 
 # Add some (required) and cross-compiler compiler flags
 SET(CMAKE_Fortran_PREPROCESS ON)
-ADD_COMPILE_OPTIONS("-Wall")
+
+ADD_COMPILE_OPTIONS(-cpp)
 
 # Add compiler specific flags
-IF (CMAKE_FC_COMPILER_ID STREQUAL "NVHPC")
-    ADD_COMPILE_OPTIONS("-Minfo=accel")
+IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    ADD_COMPILE_OPTIONS(
+        -ffree-line-length-none
+        -Wno-array-bounds
+        -fallow-argument-mismatch
+    )
+
+    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        ADD_COMPILE_OPTIONS(
+            -fbacktrace
+            -fcheck=all
+            -ffpe-trap=invalid,zero,overflow,underflow
+        )
+    ENDIF()
+    
+    IF (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
+        ADD_COMPILE_OPTIONS(-fallow-invalid-boz)
+    ENDIF()
+ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+    ADD_COMPILE_OPTIONS(
+        -Mfreeform
+        -Minfo=accel
+        -lnvToolsExt
+    )
 ENDIF()
 
 
@@ -57,19 +80,19 @@ ENDIF()
 
 
 # Check compiler vendor is not unsupported
-IF (CMAKE_FC_COMPILER_ID STREQUAL "AppleClang")
+IF (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang")
     MESSAGE(FATAL_ERROR "MFC does not support the Apple Clang compilers. Please consult the README for more details.")
 ENDIF()
 
 
 # Check compiler version is not unsupported
-IF (CMAKE_FC_COMPILER_ID STREQUAL "GNU")
-    IF (CMAKE_FC_COMPILER_VERSION VERSION_LESS 5)
-        MESSAGE(FATAL_ERROR "GNU v5.0 or newer is required to build MFC. [current: ${CMAKE_FC_COMPILER_VERSION}]")
+IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    IF (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
+        MESSAGE(FATAL_ERROR "GNU v5.0 or newer is required to build MFC. [current: ${CMAKE_Fortran_COMPILER_VERSION}]")
     ENDIF()
-ELSEIF (CMAKE_FC_COMPILER_ID STREQUAL "NVHPC")
-    IF (CMAKE_FC_COMPILER_VERSION VERSION_LESS 21.7)
-        MESSAGE(FATAL_ERROR "NVHPC v21.7 or newer is required to build MFC. [current: ${CMAKE_FC_COMPILER_VERSION}]")
+ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+    IF (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
+        MESSAGE(FATAL_ERROR "NVHPC v21.7 or newer is required to build MFC. [current: ${CMAKE_Fortran_COMPILER_VERSION}]")
     ENDIF()
 ENDIF()
 
