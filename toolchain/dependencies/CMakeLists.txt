@@ -1,7 +1,7 @@
 # This is a superbuild CMake file
 # See: https://cmake.org/cmake/help/latest/module/ExternalProject.html.
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.9)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
 
 PROJECT(MFC-Dependencies)
 
@@ -36,9 +36,8 @@ ENDIF()
 IF (MFC_BUILD_HDF5)
     ExternalProject_Add(hdf5
         GIT_REPOSITORY "https://github.com/HDFGroup/hdf5"
-        GIT_TAG        hdf5-1_12_1
+        GIT_TAG        hdf5-1_12_2
         CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-                       -DCMAKE_BUILD_WITH_INSTALL_RPATH:BOOL=OFF
                        -DBUILD_SHARED_LIBS=OFF
                        -DFORTRAN_LIBRARIES=ON
                        -DBUILD_TESTING=OFF
