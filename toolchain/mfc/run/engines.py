@@ -6,6 +6,7 @@ import dataclasses
 
 import rich
 
+import build
 import common
 
 import run.queues   as queues
@@ -40,7 +41,7 @@ class Engine:
         raise common.MFCException(f"MFCEngine::validate_job_options: not implemented for {self.name}.")
 
     def get_binpath(self, target: str) -> str:
-        return f'{self.mfc.build.get_build_path(target)}/bin/{target}'
+        return f'{build.get_install_dirpath()}/bin/{target}'
 
 
 class InteractiveEngine(Engine):
@@ -64,6 +65,9 @@ class InteractiveEngine(Engine):
     def get_exec_cmd(self, target_name: str):
         binpath = self.get_binpath(target_name)
 
+        # Setting LD_LIBRARY_PATH is necessary because
+        # Silo doesn't support static library generation.
+        ld = f'LD_LIBRARY_PATH=""'
         cd = f'cd "{self.input.case_dirpath}"'
 
         flags = ""

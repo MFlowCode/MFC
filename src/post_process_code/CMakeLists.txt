@@ -6,22 +6,22 @@ ADD_EXECUTABLE(post_process "${post_process_f90s}")
 TARGET_INCLUDE_DIRECTORIES(
     post_process
     PRIVATE "${FFTW3_INCLUDE_DIRS}"
-            "${HDF5_INCLUDE_DIRS}"
             "${SILO_INCLUDE_DIRS}"
+            "${HDF5_INCLUDE_DIRS}"
 )
 
 TARGET_LINK_DIRECTORIES(
     post_process
     PRIVATE "${FFTW3_LIBRARY_DIRS}"
-            "${HDF5_LIBRARY_DIRS}"
             "${SILO_LIBRARY_DIRS}"
+            "${HDF5_LIBRARY_DIRS}"
 )
 
 TARGET_LINK_LIBRARIES(
     post_process
     PRIVATE "${FFTW3_LIBRARIES}"
-            "${HDF5_LIBRARIES}"
             "${SILO_LIBRARIES}"
+            "${HDF5_LIBRARIES}"
 )
 
 
