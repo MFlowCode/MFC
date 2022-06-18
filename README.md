@@ -4,6 +4,7 @@
 [![YourActionName Actions Status](https://github.com/ComputationalFlowPhysics/MFC-develop/workflows/CI/badge.svg)](https://github.com/ComputationalFlowPhysics/MFC-develop/actions)
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
 [![GitHub latest commit](https://badgen.net/github/last-commit/MFlowCode/MFC-develop)](https://github.com/MFlowCode/MFC-develop/commit/)
+[![Docker Image Size](https://shields.io/docker/image-size/henryleberre/mfc)](https://hub.docker.com/repository/docker/henryleberre/mfc)
  
 Welcome to MFC! 
 The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows.
@@ -90,7 +91,7 @@ Ph.D. Disserations:
         V. Coralic (2014) Ph.D. thesis, California Institute of Technology
         </a>
 
-## Installing MFC
+## Build environment
 
 <p align="justify">
 To fetch, build, and run MFC and its dependencies on a UNIX-like system, you must have installed common utilities such as GNU's Make, Python3, its development headers and libraries, a C/C++ compiler
@@ -99,7 +100,54 @@ Below are some commands for popular operating systems and package managers.
 <p>
 
 [Anaconda](https://www.anaconda.com/) may interfere with the building process. If an issue arises, you can either uninstall the affected Anaconda packages, change the ordering of directory paths in your `$PATH`, or make aliases to the correct binaries.
- 
+
+### Docker (Portable)
+
+Docker can be a convenient way to experiment with MFC as it establishes a unique
+and consistent shell environment, no matter your host operating system, while 
+being highly perfomant.
+
+First, clone MFC
+
+```console
+$ git clone https://github.com/MFlowCode/MFC
+$ cd MFC
+```
+
+Install Docker from [here](https://docs.docker.com/get-docker/). You can
+then either build the image from scratch using the provided [Dockerfile](Dockerfile),
+or pull it from [DockerHub](https://hub.docker.com/repository/docker/henryleberre/mfc).
+The latter is much faster than the former if you have access to a strong internet
+connection.
+
+```console
+$ docker pull henryleberre/mfc       # Download from DockerHub
+$ docker build . -t henryleberre/mfc # (or) Build from scratch
+```
+
+Then, enter an interactive shell session, logged-in as a non-root user named `me` by
+running
+
+```console
+$ docker run --interactive --tty                                   \
+             --mount type=bind,source="$(pwd)",target=/home/me/MFC \
+             henryleberre/mfc
+```
+
+To understand this command: 
+- `docker run ... henryleberre/mfc ...`: Creates and starts a new docker container
+from the pulled (or built) `henryleberre/mfc` image, with transient state, reset
+ . Thus, any change to
+the docker container itself, including files and downloadsed packages, will be
+discarded upon exitting the interactive session.
+- `--interactive --tty`: Enter an interactive session within an allocated pseudo-tty.
+- `--mount type=bind,source="$(pwd)",target=/home/me/MFC`: Mounts your local MFC
+directory to the docker container, as to enable persistent storage. This effectively
+bypasses the transient state of the container, if only for the MFC directory.
+
+Using Docker Desktop, you can both manage and use the image and container through
+a GUI interface.
+
 ### \*nix 
 
 If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com/hpc-sdk), follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
@@ -109,15 +157,28 @@ If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com
 ```console
 $ sudo apt update
 $ sudo apt upgrade
-$ sudo apt install tar wget make cmake gcc g++ python3 "openmpi-*" python python-dev python3-dev python3-venv libopenmpi-dev
+$ sudo apt install tar wget make cmake gcc g++ \
+                   python3 python3-dev         \
+                   "openmpi-*" libopenmpi-dev
 ```
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
 
 ```console
 $ pacman -Syu
-$ sudo pacman -S python gcc make cmake wget openmpi tar
+$ sudo pacman -S git ninja cmake wget \
+                 python3 gcc openmpi  \
+                 vim coreutils which  \
+                 gcc-fortran openssh
 ```
+
+### Windows
+
+On Windows, you can either:
+
+- Use Docker, following the [instructions above](#docker-portable).
+- Use Microsoft's [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/)
+  (WSL) and a distribution. You can then follow the instructions for it.
 
 ### MacOS (including x86 and M1/Apple Silicon) [**via [Homebrew](https://brew.sh/)**]
  
@@ -174,10 +235,10 @@ $ cd MFC
 
 If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customization. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
 
-+ **Build MFC and its dependencies with 8 threads in `release-cpu` mode:**
++ **Run MFC's tests in `release-cpu` mode:**
 
 ```console
-$ ./mfc.sh build -j 8
+$ ./mfc.sh test -j 8
 ```
 
 To build MFC in different configurations (herein, *modes*), the `-m <mode>` option
@@ -187,12 +248,6 @@ modes can be created at your discretion. The default mode is `release-cpu` but
 you can use others such as `release-gpu`.
 
 **IMPORTANT NOTE**: This same mode will be used for any future commands such as `./mfc.sh test` and `./mfc.sh run` until you specify `-m` again (in any of these commands).
-
-+ Run MFC's tests with as many concurrent processes as you wish to make sure it was correctly built and your environment is adequate
-
-```console
-$ ./mfc.sh test -j $(nproc)
-```
 
 Please refer to the [Testing](#testing-mfc) section of this document for more information. 
 
