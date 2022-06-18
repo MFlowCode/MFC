@@ -1,6 +1,7 @@
 tags
 src/*/tags
 
+.vscode/
 mfc.user.yaml
 
 __pycache__
