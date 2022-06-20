@@ -1640,7 +1640,7 @@ contains
         end if
 
         ! Computing cell-center locations
-        x_cc = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
+        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
 
         ! Computing minimum cell-width
         dx_min = minval(x_cb(0:m) - x_cb(-1:m - 1))
@@ -1673,7 +1673,7 @@ contains
             end if
 
             ! Computing cell-center locations
-            y_cc = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
+            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
 
             ! Computing minimum cell-width
             dy_min = minval(y_cb(0:n) - y_cb(-1:n - 1))
@@ -1706,7 +1706,7 @@ contains
                 end if
 
                 ! Computing cell-center locations
-                z_cc = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
+                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
 
                 ! Computing minimum cell-width
                 dz_min = minval(z_cb(0:p) - z_cb(-1:p - 1))
@@ -1909,7 +1909,7 @@ contains
             ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
             ! Computing cell center locations
-            y_cc = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
+            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
             ! Computing minimum cell width
             dy_min = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
             if (num_procs > 1) call s_mpi_reduce_min(dy_min)
@@ -1935,7 +1935,7 @@ contains
                 ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
                 ! Computing cell center locations
-                z_cc = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
+                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
                 ! Computing minimum cell width
                 dz_min = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
                 if (num_procs > 1) call s_mpi_reduce_min(dz_min)

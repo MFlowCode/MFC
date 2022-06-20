@@ -32,12 +32,17 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         -ffree-line-length-none
         -Wno-array-bounds
         -fallow-argument-mismatch
+        -march=native
+        -Wextra
+        -Wall
+        -pedantic
     )
 
     IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
         ADD_COMPILE_OPTIONS(
             -fbacktrace
             -fcheck=all
+            -fimplicit-none
             -ffpe-trap=invalid,zero,overflow,underflow
         )
     ENDIF()

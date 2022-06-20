@@ -69,7 +69,7 @@ print(Case(
     ],
     acoustic=AcousticParameters(),
     database=DatabseStructure(
-        parallel_io=True,
+        parallel_io=False,
         alt_soundspeed=False,
         format=DatabaseFormat.SILO_HDF5,
         precision=FloatingPrecision.DOUBLE,
