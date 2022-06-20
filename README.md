@@ -101,52 +101,29 @@ Below are some commands for popular operating systems and package managers.
 
 [Anaconda](https://www.anaconda.com/) may interfere with the building process. If an issue arises, you can either uninstall the affected Anaconda packages, change the ordering of directory paths in your `$PATH`, or make aliases to the correct binaries.
 
-### Docker (Portable)
+### Docker
 
-Docker can be a convenient way to experiment with MFC as it establishes a unique
-and consistent shell environment, no matter your host operating system, while 
-being highly perfomant.
-
-First, clone MFC
+Once Docker and Git are installed on your system, clone MFC with
 
 ```console
 $ git clone https://github.com/MFlowCode/MFC
-$ cd MFC
+$ cd MFC 
 ```
 
-Install Docker from [here](https://docs.docker.com/get-docker/). You can
-then either build the image from scratch using the provided [Dockerfile](Dockerfile),
-or pull it from [DockerHub](https://hub.docker.com/repository/docker/henryleberre/mfc).
-The latter is much faster than the former if you have access to a strong internet
-connection.
+To fetch the prebuilt Docker image and enter an interactive bash session with the
+recommended settings applied, run
 
 ```console
-$ docker pull henryleberre/mfc          # Download from DockerHub
-$ docker build . --tag henryleberre/mfc # (or) Build from scratch
+$ ./mfc.sh  docker # If on \*nix/macOS
+$ .\mfc.bat docker # If on Windows
 ```
 
-Then, enter an interactive shell session, logged-in as a non-root user named `me` by
-running
+We automatically mount and configure the proper permissions in order for you to
+access your local copy of MFC.
 
-```console
-$ docker run --interactive --tty                                   \
-             --mount type=bind,source="$(pwd)",target=/home/me/MFC \
-             henryleberre/mfc
-```
-
-To understand this command: 
-- `docker run ... henryleberre/mfc ...`: Creates and starts a new docker container
-from the pulled (or built) `henryleberre/mfc` image, with transient state, reset
- . Thus, any change to
-the docker container itself, including files and downloadsed packages, will be
-discarded upon exitting the interactive session.
-- `--interactive --tty`: Enters an interactive session within an allocated pseudo-tty.
-- `--mount type=bind,source="$(pwd)",target=/home/me/MFC`: Mounts your local MFC
-directory to the docker container, as to enable persistent storage. This effectively
-bypasses the transient state of the container, if only for the MFC directory.
-
-Using Docker Desktop, you can both manage and use the image and container through
-a GUI interface.
+**WARNING:** The state of your container is entirely transient, except for the
+mounted MFC folder. Thus, any modification outside of the confines on the MFC
+directory should be considered as permanently lost upon session exit.
 
 ### \*nix 
 
@@ -165,23 +142,38 @@ $ sudo apt install tar wget make cmake gcc g++ \
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
 
 ```console
-$ pacman -Syu
-$ pacman -S git ninja cmake wget    \
-            python3 openmpi vim     \
-            coreutils gcc-fortran   \
-            openssh base-devel tree
+$ sudo pacman -Syu
+$ sudo pacman -S base-devel coreutils  \
+                 git ninja gcc-fortran \
+                 cmake openmpi python3 \
+                 python-pip openssh    \
+                 python-virtualenv vim \
+                 wget tree
 ```
 
 ### Windows
 
-On Windows, you can either:
+On Windows, you can either use [Docker](https://docs.docker.com/get-docker/) or
+the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/).
 
-- Use Docker, following the [instructions above](#docker-portable).
-- Use Microsoft's [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/)
-  (WSL) and a distribution. You can then follow the instructions for it.
+#### Windows + Docker
+
+See [the instructions above](#docker).
+
+#### Windows + WSL
+
+Install the latest version of the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/)
+as well as a distribution such as Ubuntu which can be found [here](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV). Acquiring an interactive session is as simple as typing `wsl` in your
+command prompt, or alternatively, selecting the distribution from the dropdown menu
+available in [Microsoft's Terminal application](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701).
+
+You can now follow the appropriate instructions for your distribution.
 
 ### MacOS (including x86 and M1/Apple Silicon) [**via [Homebrew](https://brew.sh/)**]
- 
+
+**Note:** macOS remains the most difficult platform to consistently compile MFC on.
+If you run into issues, we suggest you try using Docker (instructions [here](#docker)).
+
  - **MacOS v10.15 (Catalina) or newer [ZSH]**
 
 ```console
