@@ -156,9 +156,9 @@ def gen_f90_array_constructor(f90_type: str, arr: list) -> str:
 
 @dataclasses.dataclass
 class Point:
-    x: float = dataclasses.field(default=0)
-    y: float = dataclasses.field(default=0)
-    z: float = dataclasses.field(default=0)
+    x: float = dataclasses.field(default_factory=lambda: 0)
+    y: float = dataclasses.field(default_factory=lambda: 0)
+    z: float = dataclasses.field(default_factory=lambda: 0)
 
 
 class Vector(Point):
@@ -171,8 +171,8 @@ class Vector(Point):
 
 @dataclasses.dataclass
 class AxisDomain:
-    begin: float = field(default=0)
-    end:   float = field(default=0)
+    begin: float = field(default_factory=lambda: 0)
+    end:   float = field(default_factory=lambda: 0)
 
     def to_f90(self) -> str:
         return f"bounds_info({float(self.begin)}, {float(self.end)})"
@@ -180,32 +180,32 @@ class AxisDomain:
 
 @dataclasses.dataclass
 class AxisStretch(AxisDomain):
-    stretch:   bool   = field(default=False)
-    rate:      float  = field(default=0.0)
-    loops:     int    = field(default=1)
-    begin_pos: float  = field(default=DFLT_REAL)
-    begin_neg: float  = field(default=DFLT_REAL)
+    stretch:   bool   = field(default_factory=lambda: False)
+    rate:      float  = field(default_factory=lambda: 0.0)
+    loops:     int    = field(default_factory=lambda: 1)
+    begin_pos: float  = field(default_factory=lambda: DFLT_REAL)
+    begin_neg: float  = field(default_factory=lambda: DFLT_REAL)
 
 
 @dataclasses.dataclass
 class Stretch:
-    x: AxisStretch = field(default=AxisStretch())
-    y: AxisStretch = field(default=AxisStretch())
-    z: AxisStretch = field(default=AxisStretch())
+    x: AxisStretch = field(default_factory=lambda: AxisStretch())
+    y: AxisStretch = field(default_factory=lambda: AxisStretch())
+    z: AxisStretch = field(default_factory=lambda: AxisStretch())
 
 
 @dataclasses.dataclass
 class Cells:
     x: int
-    y: int = field(default=0)
-    z: int = field(default=0)
+    y: int = field(default_factory=lambda: 0)
+    z: int = field(default_factory=lambda: 0)
 
 
 @dataclasses.dataclass
 class SpacialDomain:
     x: AxisDomain
-    y: AxisDomain = field(default=AxisDomain(begin=DFLT_REAL, end=DFLT_REAL))
-    z: AxisDomain = field(default=AxisDomain(begin=DFLT_REAL, end=DFLT_REAL))
+    y: AxisDomain = field(default_factory=lambda: AxisDomain(begin=DFLT_REAL, end=DFLT_REAL))
+    z: AxisDomain = field(default_factory=lambda: AxisDomain(begin=DFLT_REAL, end=DFLT_REAL))
 
 
 @dataclasses.dataclass
@@ -213,7 +213,7 @@ class Time:
     end:   int
     save:  int
     dt:    float
-    begin: int   = field(default=0)
+    begin: int   = field(default_factory=lambda: 0)
 
 
 @dataclasses.dataclass
@@ -221,8 +221,8 @@ class ComputationalDomain:
     cells:        Cells
     domain:       SpacialDomain
     time:         Time
-    cyl_coord:    bool    = field(default=False)
-    stretch:      Stretch = field(default=Stretch())
+    cyl_coord:    bool    = field(default_factory=lambda: False)
+    stretch:      Stretch = field(default_factory=lambda: Stretch())
 
 
 # ===        FLUIDS        === #
@@ -230,17 +230,17 @@ class ComputationalDomain:
 
 @dataclasses.dataclass
 class Fluid:
-    gamma:   float              = field(default=DFLT_REAL)
-    pi_inf:  float              = field(default=DFLT_REAL)
+    gamma:   float              = field(default_factory=lambda: DFLT_REAL)
+    pi_inf:  float              = field(default_factory=lambda: DFLT_REAL)
     Re:      typing.List[float] = field(default_factory=lambda: [DFLT_REAL, DFLT_REAL])
-    mul0:    float              = field(default=DFLT_REAL)
-    ss:      float              = field(default=DFLT_REAL)
-    pv:      float              = field(default=DFLT_REAL)
-    gamma_v: float              = field(default=DFLT_REAL)
-    M_v:     float              = field(default=DFLT_REAL)
-    mu_v:    float              = field(default=DFLT_REAL)
-    k_v:     float              = field(default=DFLT_REAL)
-    G:       float              = field(default=DFLT_REAL)
+    mul0:    float              = field(default_factory=lambda: DFLT_REAL)
+    ss:      float              = field(default_factory=lambda: DFLT_REAL)
+    pv:      float              = field(default_factory=lambda: DFLT_REAL)
+    gamma_v: float              = field(default_factory=lambda: DFLT_REAL)
+    M_v:     float              = field(default_factory=lambda: DFLT_REAL)
+    mu_v:    float              = field(default_factory=lambda: DFLT_REAL)
+    k_v:     float              = field(default_factory=lambda: DFLT_REAL)
+    G:       float              = field(default_factory=lambda: DFLT_REAL)
 
     def to_f90(self) -> str:
         members = []
@@ -267,12 +267,12 @@ class Fluid:
 class WenoParameters:
     order:     int
     variables: WenoVariables
-    mapped:    bool  = field(default=False)
-    mp:        bool  = field(default=False)
-    flat:      bool  = field(default=True)
-    epsilon:   float = field(default=1e-16)
-    average:   bool  = field(default=False)
-    Re_flux:   bool  = field(default=False)
+    mapped:    bool  = field(default_factory=lambda: False)
+    mp:        bool  = field(default_factory=lambda: False)
+    flat:      bool  = field(default_factory=lambda: True)
+    epsilon:   float = field(default_factory=lambda: 1e-16)
+    average:   bool  = field(default_factory=lambda: False)
+    Re_flux:   bool  = field(default_factory=lambda: False)
 
 
 @dataclasses.dataclass
@@ -286,8 +286,8 @@ class AxisBoundaryCondition:
 @dataclasses.dataclass
 class BoundaryConditions:
     x: AxisBoundaryCondition
-    y: AxisBoundaryCondition = field(default=AxisBoundaryCondition())
-    z: AxisBoundaryCondition = field(default=AxisBoundaryCondition())
+    y: AxisBoundaryCondition = field(default_factory=lambda: AxisBoundaryCondition())
+    z: AxisBoundaryCondition = field(default_factory=lambda: AxisBoundaryCondition())
 
 
 @dataclasses.dataclass
@@ -299,36 +299,36 @@ class SimulationAlgorithm:
     wave_speeds:        WaveSpeedEstimation
     avg_state:          AverageStateEvaluation
     riemann_solver:     RiemannSolver
-    riemann_flat:       bool        = field(default=True)
-    char_decomp:        bool        = field(default=False)
-    commute_err:        bool        = field(default=False)
-    split_err:          bool        = field(default=False)
-    mixture_err:        bool        = field(default=False)
-    mpp_lim:            bool        = field(default=False)
-    adv_alphan:         bool        = field(default=False)
-    hypoelasticity:     bool        = field(default=False)
-    null_weights:       bool        = field(default=False)
-    alt_crv:            bool        = field(default=False)
-    alt_soundspeed:     bool        = field(default=False)
-    regularization:     bool        = field(default=False)
-    reg_eps:            float       = field(default=DFLT_REAL)
-    tvd_riemann_flux:   bool        = field(default=False)
-    tvd_rhs_flux:       bool        = field(default=False)
-    tvd_wave_speeds:    bool        = field(default=False)
-    flux_lim:           FluxLimiter = field(default=DFLT_INT)
-    We_riemann_flux:    bool        = field(default=False)
-    We_rhs_flux:        bool        = field(default=False)
-    We_src:             bool        = field(default=False)
-    We_wave_speeds:     bool        = field(default=False)
-    lsq_deriv:          bool        = field(default=False)
-    hypoelasticity:     bool        = field(default=False)
-    perturb_flow:       bool        = field(default=False)
-    perturb_flow_fluid: int         = field(default=DFLT_INT)
-    perturb_sph:        bool        = field(default=False)
-    perturb_sph_fluid:  int         = field(default=DFLT_INT)
-    fluid_rho:          float       = field(default=DFLT_REAL)
-    rhoref:             float       = field(default=DFLT_REAL) 
-    pref:               float       = field(default=DFLT_REAL)
+    riemann_flat:       bool        = field(default_factory=lambda: True)
+    char_decomp:        bool        = field(default_factory=lambda: False)
+    commute_err:        bool        = field(default_factory=lambda: False)
+    split_err:          bool        = field(default_factory=lambda: False)
+    mixture_err:        bool        = field(default_factory=lambda: False)
+    mpp_lim:            bool        = field(default_factory=lambda: False)
+    adv_alphan:         bool        = field(default_factory=lambda: False)
+    hypoelasticity:     bool        = field(default_factory=lambda: False)
+    null_weights:       bool        = field(default_factory=lambda: False)
+    alt_crv:            bool        = field(default_factory=lambda: False)
+    alt_soundspeed:     bool        = field(default_factory=lambda: False)
+    regularization:     bool        = field(default_factory=lambda: False)
+    reg_eps:            float       = field(default_factory=lambda: DFLT_REAL)
+    tvd_riemann_flux:   bool        = field(default_factory=lambda: False)
+    tvd_rhs_flux:       bool        = field(default_factory=lambda: False)
+    tvd_wave_speeds:    bool        = field(default_factory=lambda: False)
+    flux_lim:           FluxLimiter = field(default_factory=lambda: DFLT_INT)
+    We_riemann_flux:    bool        = field(default_factory=lambda: False)
+    We_rhs_flux:        bool        = field(default_factory=lambda: False)
+    We_src:             bool        = field(default_factory=lambda: False)
+    We_wave_speeds:     bool        = field(default_factory=lambda: False)
+    lsq_deriv:          bool        = field(default_factory=lambda: False)
+    hypoelasticity:     bool        = field(default_factory=lambda: False)
+    perturb_flow:       bool        = field(default_factory=lambda: False)
+    perturb_flow_fluid: int         = field(default_factory=lambda: DFLT_INT)
+    perturb_sph:        bool        = field(default_factory=lambda: False)
+    perturb_sph_fluid:  int         = field(default_factory=lambda: DFLT_INT)
+    fluid_rho:          float       = field(default_factory=lambda: DFLT_REAL)
+    rhoref:             float       = field(default_factory=lambda: DFLT_REAL) 
+    pref:               float       = field(default_factory=lambda: DFLT_REAL)
 
 
 
@@ -338,29 +338,29 @@ class SimulationAlgorithm:
 
 @dataclasses.dataclass
 class Patch:
-    geometry:        PatchGeometry      = field(default=DFLT_INT)
-    centroid:        Point              = field(default=Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
-    length:          Vector             = field(default=Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
-    radius:          float              = field(default=DFLT_REAL)
-    radii:           Vector             = field(default=Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
-    epsilon:         float              = field(default=DFLT_REAL)
-    beta:            float              = field(default=DFLT_REAL)
-    normal:          Vector             = field(default=Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
+    geometry:        PatchGeometry      = field(default_factory=lambda: DFLT_INT)
+    centroid:        Point              = field(default_factory=lambda: Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
+    length:          Vector             = field(default_factory=lambda: Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
+    radius:          float              = field(default_factory=lambda: DFLT_REAL)
+    radii:           Vector             = field(default_factory=lambda: Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
+    epsilon:         float              = field(default_factory=lambda: DFLT_REAL)
+    beta:            float              = field(default_factory=lambda: DFLT_REAL)
+    normal:          Vector             = field(default_factory=lambda: Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
     alter:           typing.List[bool]  = field(default_factory=lambda: [])
-    smoothen:        bool               = field(default=False)
-    smooth_patch_id: int                = field(default=DFLT_INT)
-    smooth_coeff:    float              = field(default=DFLT_REAL)
+    smoothen:        bool               = field(default_factory=lambda: False)
+    smooth_patch_id: int                = field(default_factory=lambda: DFLT_INT)
+    smooth_coeff:    float              = field(default_factory=lambda: DFLT_REAL)
     alpha_rho:       typing.List[float] = field(default_factory=lambda: [])
-    rho:             float              = field(default=DFLT_REAL)
-    velocity:        Vector             = field(default=Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
-    pressure:        float              = field(default=DFLT_REAL)
+    rho:             float              = field(default_factory=lambda: DFLT_REAL)
+    velocity:        Vector             = field(default_factory=lambda: Vector(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
+    pressure:        float              = field(default_factory=lambda: DFLT_REAL)
     alpha:           typing.List[float] = field(default_factory=lambda: [])
-    gamma:           float              = field(default=DFLT_REAL)
-    pi_inf:          float              = field(default=DFLT_REAL)
-    r0:              float              = field(default=DFLT_REAL)
-    v0:              float              = field(default=DFLT_REAL)
-    p0:              float              = field(default=DFLT_REAL)
-    m0:              float              = field(default=DFLT_REAL)
+    gamma:           float              = field(default_factory=lambda: DFLT_REAL)
+    pi_inf:          float              = field(default_factory=lambda: DFLT_REAL)
+    r0:              float              = field(default_factory=lambda: DFLT_REAL)
+    v0:              float              = field(default_factory=lambda: DFLT_REAL)
+    p0:              float              = field(default_factory=lambda: DFLT_REAL)
+    m0:              float              = field(default_factory=lambda: DFLT_REAL)
 
 
     def to_f90(self) -> str:
@@ -396,15 +396,15 @@ class Patch:
 
 @dataclasses.dataclass
 class AxisMinMax:
-    min: float = field(default=DFLT_REAL)
-    max: float = field(default=DFLT_REAL)
+    min: float = field(default_factory=lambda: DFLT_REAL)
+    max: float = field(default_factory=lambda: DFLT_REAL)
 
 
 @dataclasses.dataclass
 class Integral:
-    x: AxisMinMax = field(default=AxisMinMax())
-    y: AxisMinMax = field(default=AxisMinMax())
-    z: AxisMinMax = field(default=AxisMinMax())
+    x: AxisMinMax = field(default_factory=lambda: AxisMinMax())
+    y: AxisMinMax = field(default_factory=lambda: AxisMinMax())
+    z: AxisMinMax = field(default_factory=lambda: AxisMinMax())
 
     def to_f90(self) -> str:
         return f"integral_parameters({float(self.x.min)}, {float(self.x.max)}, {float(self.y.min)}, {float(self.y.max)}, {float(self.z.min)}, {float(self.z.max)})"
@@ -418,37 +418,37 @@ class Probe(Vector):
 
 @dataclasses.dataclass
 class DatabaseWrite:
-    alpha_rho:    bool = field(default=False)
-    rho:          bool = field(default=False)
-    mom:          bool = field(default=False)
-    velocity:     bool = field(default=False)
-    flux:         bool = field(default=False)
-    E:            bool = field(default=False)
-    pressure:     bool = field(default=False)
-    alpha:        bool = field(default=False)
-    gamma:        bool = field(default=False)
-    heat_ratio:   bool = field(default=False)
-    pi_inf:       bool = field(default=False)
-    pressure_inf: bool = field(default=False)
-    prim_vars:    bool = field(default=False)
-    cons_vars:    bool = field(default=False)
-    c:            bool = field(default=False)
-    omega:        bool = field(default=False)
-    schlieren:    bool = field(default=False)
-    probe:        bool = field(default=False)
-    integral:     bool = field(default=False)
+    alpha_rho:    bool = field(default_factory=lambda: False)
+    rho:          bool = field(default_factory=lambda: False)
+    mom:          bool = field(default_factory=lambda: False)
+    velocity:     bool = field(default_factory=lambda: False)
+    flux:         bool = field(default_factory=lambda: False)
+    E:            bool = field(default_factory=lambda: False)
+    pressure:     bool = field(default_factory=lambda: False)
+    alpha:        bool = field(default_factory=lambda: False)
+    gamma:        bool = field(default_factory=lambda: False)
+    heat_ratio:   bool = field(default_factory=lambda: False)
+    pi_inf:       bool = field(default_factory=lambda: False)
+    pressure_inf: bool = field(default_factory=lambda: False)
+    prim_vars:    bool = field(default_factory=lambda: False)
+    cons_vars:    bool = field(default_factory=lambda: False)
+    c:            bool = field(default_factory=lambda: False)
+    omega:        bool = field(default_factory=lambda: False)
+    schlieren:    bool = field(default_factory=lambda: False)
+    probe:        bool = field(default_factory=lambda: False)
+    integral:     bool = field(default_factory=lambda: False)
     #TODO: Some (i) params
 
 
 @dataclasses.dataclass
 class DatabseStructure:
-    precision:      FloatingPrecision = field(default=FloatingPrecision.DOUBLE)
-    fd_order:       int               = field(default=DFLT_INT)
-    write:          DatabaseWrite     = field(default=DatabaseWrite())
-    alt_soundspeed: bool              = field(default=False)
-    parallel_io:    bool              = field(default=False)
-    coarsen_silo:   bool              = field(default=False)
-    format:         DatabaseFormat    = field(default=DatabaseFormat.SILO_HDF5)
+    precision:      FloatingPrecision = field(default_factory=lambda: FloatingPrecision.DOUBLE)
+    fd_order:       int               = field(default_factory=lambda: DFLT_INT)
+    write:          DatabaseWrite     = field(default_factory=lambda: DatabaseWrite())
+    alt_soundspeed: bool              = field(default_factory=lambda: False)
+    parallel_io:    bool              = field(default_factory=lambda: False)
+    coarsen_silo:   bool              = field(default_factory=lambda: False)
+    format:         DatabaseFormat    = field(default_factory=lambda: DatabaseFormat.SILO_HDF5)
     probes:         typing.List[Probe]    = field(default_factory=lambda: [])
     integrals:      typing.List[Integral] = field(default_factory=lambda: [])
 
@@ -458,45 +458,45 @@ class DatabseStructure:
 
 @dataclasses.dataclass
 class Bubbles:
-    bubbles:      bool               = field(default=False)
-    model:        BubbleModel        = field(default=BubbleModel.GILMORE)
-    polytropic:   bool               = field(default=True)
-    thermal:      ThermalModel       = field(default=DFLT_INT)
-    R0ref:        float              = field(default=DFLT_REAL)
-    number:       int                = field(default=DFLT_INT)
-    cavitation:   float              = field(default=DFLT_REAL)
-    weber:        float              = field(default=DFLT_REAL)
-    Re_inv:       float              = field(default=DFLT_REAL)
-    mu_10:        float              = field(default=DFLT_REAL)
-    ss:           float              = field(default=DFLT_REAL)
-    pv:           float              = field(default=DFLT_REAL)
-    gamma_v:      float              = field(default=DFLT_REAL)
-    M_v:          float              = field(default=DFLT_REAL)
-    mu_v:         float              = field(default=DFLT_REAL)
-    k_v:          float              = field(default=DFLT_REAL)
-    qbmm:         bool               = field(default=False)
-    polydisperse: bool               = field(default=False)
-    nnode:        int                = field(default=1)
-    sigR:         float              = field(default=DFLT_REAL)
-    sigV:         float              = field(default=DFLT_REAL)
-    rhoRV:        float              = field(default=0)
-    poly_sigma:   float              = field(default=DFLT_REAL)
-    distribution: BubbleDistribution = field(default=DFLT_INT)
-    R0_type:      int                = field(default=DFLT_INT)
+    bubbles:      bool               = field(default_factory=lambda: False)
+    model:        BubbleModel        = field(default_factory=lambda: BubbleModel.GILMORE)
+    polytropic:   bool               = field(default_factory=lambda: True)
+    thermal:      ThermalModel       = field(default_factory=lambda: DFLT_INT)
+    R0ref:        float              = field(default_factory=lambda: DFLT_REAL)
+    number:       int                = field(default_factory=lambda: DFLT_INT)
+    cavitation:   float              = field(default_factory=lambda: DFLT_REAL)
+    weber:        float              = field(default_factory=lambda: DFLT_REAL)
+    Re_inv:       float              = field(default_factory=lambda: DFLT_REAL)
+    mu_10:        float              = field(default_factory=lambda: DFLT_REAL)
+    ss:           float              = field(default_factory=lambda: DFLT_REAL)
+    pv:           float              = field(default_factory=lambda: DFLT_REAL)
+    gamma_v:      float              = field(default_factory=lambda: DFLT_REAL)
+    M_v:          float              = field(default_factory=lambda: DFLT_REAL)
+    mu_v:         float              = field(default_factory=lambda: DFLT_REAL)
+    k_v:          float              = field(default_factory=lambda: DFLT_REAL)
+    qbmm:         bool               = field(default_factory=lambda: False)
+    polydisperse: bool               = field(default_factory=lambda: False)
+    nnode:        int                = field(default_factory=lambda: 1)
+    sigR:         float              = field(default_factory=lambda: DFLT_REAL)
+    sigV:         float              = field(default_factory=lambda: DFLT_REAL)
+    rhoRV:        float              = field(default_factory=lambda: 0)
+    poly_sigma:   float              = field(default_factory=lambda: DFLT_REAL)
+    distribution: BubbleDistribution = field(default_factory=lambda: DFLT_INT)
+    R0_type:      int                = field(default_factory=lambda: DFLT_INT)
 
 # === LOGISTICS === #
 
 
 @dataclasses.dataclass
 class Logistics:
-    case_dir:      str  = field(default='.')
-    run_time_info: bool = field(default=False)
-    cu_mpi:        bool = field(default=False)
-    cu_tensor:     bool = field(default=False)
-    debug:         bool = field(default=False)
-    old_grid:      bool = field(default=False)
-    old_ic:        bool = field(default=False)
-    t_step_old:    int  = field(default=DFLT_INT)
+    case_dir:      str  = field(default_factory=lambda: '.')
+    run_time_info: bool = field(default_factory=lambda: False)
+    cu_mpi:        bool = field(default_factory=lambda: False)
+    cu_tensor:     bool = field(default_factory=lambda: False)
+    debug:         bool = field(default_factory=lambda: False)
+    old_grid:      bool = field(default_factory=lambda: False)
+    old_ic:        bool = field(default_factory=lambda: False)
+    t_step_old:    int  = field(default_factory=lambda: DFLT_INT)
 
 
 # === === #
@@ -504,14 +504,14 @@ class Logistics:
 
 @dataclasses.dataclass
 class Monopole:    
-    location:  Point                  = field(default=Point(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
-    magnitude: float                  = field(default=DFLT_REAL)
-    length:    float                  = field(default=DFLT_REAL)
-    npulse:    float                  = field(default=1.0)
-    direction: float                  = field(default=1.0)
-    delay:     float                  = field(default=DFLT_REAL)
-    pulse:     AcousticWaveForm       = field(default=AcousticWaveForm.SINE)
-    support:   AcousticSpacialSupport = field(default=AcousticSpacialSupport.D1)
+    location:  Point                  = field(default_factory=lambda: Point(x=DFLT_REAL,y=DFLT_REAL,z=DFLT_REAL))
+    magnitude: float                  = field(default_factory=lambda: DFLT_REAL)
+    length:    float                  = field(default_factory=lambda: DFLT_REAL)
+    npulse:    float                  = field(default_factory=lambda: 1.0)
+    direction: float                  = field(default_factory=lambda: 1.0)
+    delay:     float                  = field(default_factory=lambda: DFLT_REAL)
+    pulse:     AcousticWaveForm       = field(default_factory=lambda: AcousticWaveForm.SINE)
+    support:   AcousticSpacialSupport = field(default_factory=lambda: AcousticSpacialSupport.D1)
 
 
     def to_f90(self) -> str:
@@ -531,7 +531,7 @@ class Monopole:
 
 @dataclasses.dataclass
 class AcousticParameters:
-    monopole:  bool = field(default=False)
+    monopole:  bool = field(default_factory=lambda: False)
     monopoles: typing.List[Monopole] = field(default_factory=lambda: [])
 
 

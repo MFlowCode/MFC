@@ -140,7 +140,7 @@ from the pulled (or built) `henryleberre/mfc` image, with transient state, reset
  . Thus, any change to
 the docker container itself, including files and downloadsed packages, will be
 discarded upon exitting the interactive session.
-- `--interactive --tty`: Enter an interactive session within an allocated pseudo-tty.
+- `--interactive --tty`: Enters an interactive session within an allocated pseudo-tty.
 - `--mount type=bind,source="$(pwd)",target=/home/me/MFC`: Mounts your local MFC
 directory to the docker container, as to enable persistent storage. This effectively
 bypasses the transient state of the container, if only for the MFC directory.

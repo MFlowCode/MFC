@@ -390,8 +390,8 @@ module m_global_parameters
     INTEGER                    :: nmomtot   !< Total number of carried moments moments/transport equations
     integer,         parameter :: dist_type = ${CASE['bubbles']['distribution']}$ !1 = binormal, 2 = lognormal-normal
     INTEGER,         parameter :: R0_type   = ${CASE['bubbles']['R0_type']}$ !< R0 distribution type
-    real(kind(0d0)), parameter :: sigR      = ${CASE['bubbles']['sigR']}$
-    real(kind(0d0)), parameter :: sigV      = ${CASE['bubbles']['sigV']}$
+    real(kind(0d0))            :: sigR      = ${CASE['bubbles']['sigR']}$
+    real(kind(0d0))            :: sigV      = ${CASE['bubbles']['sigV']}$
     real(kind(0d0)), parameter :: rhoRV     = ${CASE['bubbles']['rhoRV']}$
 
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)     :: mom_sp
@@ -774,7 +774,6 @@ contains
             allocate (y_cb(-1 - buff_size:n + buff_size))
             allocate (y_cc(-buff_size:n + buff_size))
             allocate (dy(-buff_size:n + buff_size))
-
             if (p > 0 .and. p /= dflt_int) then
                 allocate (z_cb(-1 - buff_size:p + buff_size))
                 allocate (z_cc(-buff_size:p + buff_size))
@@ -980,16 +979,16 @@ contains
         if (any(Re_size > 0)) deallocate (Re_idx)
 
         ! Deallocating grid variables for the x-, y- and z-directions
-        deallocate (x_cb, x_cc, dx)
+        deallocate(x_cb, x_cc, dx)
 
         if (n > 0 .and. n /= dflt_int) then
-            deallocate (y_cb, y_cc, dy)
+            deallocate(y_cb, y_cc, dy)
 
             if (p > 0 .and. p /= dflt_int) then
-                deallocate (z_cb, z_cc, dz)
+                deallocate(z_cb, z_cc, dz)
             end if
         else
-            deallocate (x_root_cb, x_root_cc)
+            deallocate(x_root_cb, x_root_cc)
         end if
 
         if (coarsen_silo) then

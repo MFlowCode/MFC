@@ -114,7 +114,7 @@ def generate_cases() -> list:
                 bc_variations = bc_variations + [
                     TCV(f"algorithm.boundary.{dim}.begin", bc),
                     TCV(f"algorithm.boundary.{dim}.end",   bc),                    
-                ]
+                 ]
 
             stack.push(TCVS(f"bc={bc}", bc_variations))
 
@@ -224,14 +224,14 @@ def generate_cases() -> list:
             TCV("fluids[1].mu_v",      1.8e-05),
             TCV("fluids[1].k_v",       0.02556), 
             # Patches
-            TCV("fluids[0].alpha_rho", [0.999999999999]), 
-            TCV("fluids[0].alpha",     [1e-12]),
-            TCV("fluids[0].pressure",  1.0),
-            TCV("fluids[1].alpha_rho", [0.96]), 
-            TCV("fluids[1].alpha",     [4e-02]),  
-            TCV("fluids[2].alpha_rho", [0.999999999999]),
-            TCV("fluids[2].alpha",     [1e-12]), 
-            TCV("fluids[2].pressure",  1.0)
+            TCV("patches[0].alpha_rho", [0.999999999999]), 
+            TCV("patches[0].alpha",     [1e-12]),
+            TCV("patches[0].pressure",  1.0),
+            TCV("patches[1].alpha_rho", [0.96]), 
+            TCV("patches[1].alpha",     [4e-02]),  
+            TCV("patches[2].alpha_rho", [0.999999999999]),
+            TCV("patches[2].alpha",     [1e-12]), 
+            TCV("patches[2].pressure",  1.0)
         ]))
 
         stack.push(TCVS("Monopole=T", [
