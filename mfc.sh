@@ -2,18 +2,19 @@
 
 
 # Script Constants (use MFC_xx prefix because this file can be source'd)
-MFC_DIR="$(pwd)/build"
+MFC_DIR="$(pwd)"
+MFC_TOOLCHAIN_DIR="$MFC_DIR/toolchain"
+MFC_BUILD_DIR="$MFC_DIR/build"
+MFC_ENV_DIR="$MFC_BUILD_DIR/env"
+MFC_VENV_DIR="$MFC_ENV_DIR/venv"
+MFC_GET_PIP_PATH="$MFC_ENV_DIR/get-pip.py"
 
-
-MFC_TOOLCHAIN_DIR="$(pwd)/toolchain"
 MFC_EXEC_PATH="$MFC_TOOLCHAIN_DIR/mfc/main.py"
 
 MFC_PYTHON_BIN="python3"
 MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=6
 MFC_PYTHON_PIP_BIN="$MFC_PYTHON_BIN -m pip"
-MFC_PYTHON_VENV_DIR="$MFC_DIR/environment/venv"
-MFC_GET_PIP_PATH="$MFC_DIR/environment/get-pip.py"
 
 # Check whether this script was called from MFC's root directory.
 if [ ! -f "$MFC_EXEC_PATH" ]; then
@@ -29,11 +30,38 @@ if [ "$1" == "load" ]; then
     return
 fi
 
+if [ "$1" == "docker" ]; then
+    shift;
+
+    if ! command -v docker > /dev/null 2>&1; then
+        echo "[mfc.sh] Error: Docker is not installed."
+        exit 1
+    fi
+
+    echo "[mfc.sh] Running in Docker mode."
+    echo "  - Fetching image..."
+    docker pull henryleberre/mfc
+    if (($?)); then
+        echo "[mfc.sh] Error: Failed to fetch Docker image from Docker Hub."
+        exit 1
+    fi
+
+    echo "  - Starting container..."
+    docker run --interactive --tty --rm                              \
+               --mount type=bind,source="$(pwd)",target=/home/me/MFC \
+               henryleberre/mfc
+    if (($?)); then
+        echo "[mfc.sh] Error: Failed to start Docker container."
+        exit 1
+    fi
+
+    exit 0
+fi
 
 # Create main subdirectories inside $MFC_DIR
-mkdir -p "$MFC_DIR/mfc"
-mkdir -p "$MFC_DIR/environment"
-mkdir -p "$MFC_DIR/dependencies"
+mkdir -p "$MFC_BUILD_DIR/mfc"
+mkdir -p "$MFC_ENV_DIR"
+mkdir -p "$MFC_BUILD_DIR/deps"
 
 
 # Make bootstrap files executable
@@ -81,7 +109,6 @@ if [ ! -f "$MFC_GET_PIP_PATH" ]; then
 
     # Suppress PIP version warning (out of date)
     export PIP_DISABLE_PIP_VERSION_CHECK=1
-    $MFC_PYTHON_PIP_BIN config set global.disable-pip-version-check true || true
     $MFC_PYTHON_BIN "$MFC_GET_PIP_PATH" --user
     
     if (($?)); then
@@ -93,10 +120,10 @@ fi
 
 # Create a Python virtualenv if it hasn't already been created
 bVenvIsNew=0
-if [ ! -d "$MFC_PYTHON_VENV_DIR" ]; then
+if [ ! -d "$MFC_VENV_DIR" ]; then
     bVenvIsNew=1
 
-    $MFC_PYTHON_BIN -m venv "$MFC_PYTHON_VENV_DIR"
+    $MFC_PYTHON_BIN -m venv "$MFC_VENV_DIR"
     if (($?)); then
         echo "[mfc.sh] Error: Failed to create a Python virtual environment."
         exit 1
@@ -117,7 +144,7 @@ if [ "$1" == "venv" ]; then
         # Enter the venv
         echo " > Entering the MFC Python virtual environment."
         
-        source "$MFC_PYTHON_VENV_DIR/bin/activate"
+        source "$MFC_VENV_DIR/bin/activate"
         
         echo " > To exit, you can do any of the following:"
         echo "    - Run 'deactivate'."
@@ -130,7 +157,7 @@ fi
 
 
 # Activate the Python venv
-source "$MFC_PYTHON_VENV_DIR/bin/activate"
+source "$MFC_VENV_DIR/bin/activate"
 
 
 # Upgrade Pip
@@ -155,7 +182,6 @@ if (($?)); then
         exit 1
     fi
 fi
-
 
 # Run the mfc.py bootstrap script
 $MFC_PYTHON_BIN "$MFC_EXEC_PATH" "$@"
