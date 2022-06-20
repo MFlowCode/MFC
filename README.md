@@ -121,8 +121,8 @@ The latter is much faster than the former if you have access to a strong interne
 connection.
 
 ```console
-$ docker pull henryleberre/mfc       # Download from DockerHub
-$ docker build . -t henryleberre/mfc # (or) Build from scratch
+$ docker pull henryleberre/mfc          # Download from DockerHub
+$ docker build . --tag henryleberre/mfc # (or) Build from scratch
 ```
 
 Then, enter an interactive shell session, logged-in as a non-root user named `me` by
@@ -166,10 +166,10 @@ $ sudo apt install tar wget make cmake gcc g++ \
 
 ```console
 $ pacman -Syu
-$ sudo pacman -S git ninja cmake wget \
-                 python3 gcc openmpi  \
-                 vim coreutils which  \
-                 gcc-fortran openssh
+$ pacman -S git ninja cmake wget    \
+            python3 openmpi vim     \
+            coreutils gcc-fortran   \
+            openssh base-devel tree
 ```
 
 ### Windows
