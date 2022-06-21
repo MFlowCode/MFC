@@ -32,6 +32,15 @@ if %errorlevel% neq 0 (
 )
 
 
+echo ^[mfc.bat^] Fetching image...
+docker pull henryleberre/mfc
+if %errorlevel% neq 0 (
+	echo.
+	echo ^[mfc.bat^] Docker: Failed to fetch image.
+	echo           Pleasure ensure docker is running.
+	exit /b 1
+)
+
 
 if "%1" == "docker" (
 	set arg="/bin/bash"
