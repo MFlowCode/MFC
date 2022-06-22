@@ -20,7 +20,7 @@ import rich
 class MFCTest:
     def __init__(self, mfc):
         self.mfc    = mfc
-        self.sched  = MFCTestThreadManager(self.mfc.args["jobs"])
+        self.sched  = MFCTestThreadManager(1)
 
     def test(self):
         rich.print("[bold][u]Test:[/u][/bold] (in tests/)")
