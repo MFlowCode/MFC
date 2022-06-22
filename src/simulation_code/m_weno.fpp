@@ -29,7 +29,7 @@ module m_weno
 
     !implicit none
 
-    private; public :: s_initialize_weno_module, s_initialize_weno, s_weno, s_finalize_weno, s_finalize_weno_module, s_weno_alt
+    private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno_alt
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
     !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
@@ -519,7 +519,7 @@ contains
         real(kind(0d0)), dimension(0:2) :: beta 
         real(kind(0d0)), pointer :: beta_p(:)
 
-        integer :: i, j, k, l, r, s
+        integer :: i, j, k, l, r, s, w
 
         
         integer :: t1, t2, c_rate, c_max
