@@ -1631,7 +1631,7 @@ contains
         if (file_check) then
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS='old', ACTION='read')
-            read (1) x_cb
+            read (1) x_cb(-1:m)
             close (1)
         else
             print '(A)', 'File x_cb.dat is missing in '// &
@@ -1664,7 +1664,7 @@ contains
             if (file_check) then
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
                       STATUS='old', ACTION='read')
-                read (1) y_cb
+                read (1) y_cb(-1:n)
                 close (1)
             else
                 print '(A)', 'File y_cb.dat is missing in '// &
@@ -1697,7 +1697,7 @@ contains
                 if (file_check) then
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
                           STATUS='old', ACTION='read')
-                    read (1) z_cb
+                    read (1) z_cb(-1:p)
                     close (1)
                 else
                     print '(A)', 'File z_cb.dat is missing in '// &
