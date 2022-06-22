@@ -95,7 +95,7 @@ contains
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
         open (1, FILE=trim(file_loc), FORM='unformatted', STATUS='new')
-        write (1) x_cb
+        write (1) x_cb(-1:m)
         close (1)
 
         ! y- and z-coordinate directions
@@ -104,7 +104,7 @@ contains
             file_loc = trim(t_step_dir)//'/y_cb.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS='new')
-            write (1) y_cb
+            write (1) y_cb(-1:n)
             close (1)
 
             ! z-coordinate direction
@@ -112,7 +112,7 @@ contains
                 file_loc = trim(t_step_dir)//'/z_cb.dat'
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
                       STATUS='new')
-                write (1) z_cb
+                write (1) z_cb(-1:p)
                 close (1)
             end if
         end if

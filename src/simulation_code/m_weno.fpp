@@ -330,16 +330,9 @@ contains
             else
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-                    PRINT *, "=== BEGIN LOOP ==="
-                    PRINT *, " i, beg, end", i, is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-                    PRINT *, " SHAPE(s_cb)", SHAPE(s_cb)
-                    PRINT *, " SHAPE(poly_...)", SHAPE(poly_coef_cbR_${XYZ}$)
-
-                    PRINT *, " denominator", ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
                     poly_coef_cbR_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
-                    PRINT *, " after current bug location"
                     poly_coef_cbR_${XYZ}$(i + 1, 1, 0) = &
                         ((s_cb(i - 1) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i)))/ &
                         ((s_cb(i - 1) - s_cb(i + 2))*(s_cb(i + 2) - s_cb(i)))

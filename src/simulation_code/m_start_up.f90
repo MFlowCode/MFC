@@ -541,7 +541,7 @@ contains
             print '(A)', trim(file_path)//' is missing. Exiting ...'
             call s_mpi_abort()
         end if
-
+        
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
         ! ==================================================================
