@@ -32,7 +32,7 @@ def parse(mfc):
 
         if "m" not in mask:
             p.add_argument("-m", "--mode", type=str.lower, choices=mode_names,
-                           help="Mode used to compile, run, and test MFC.")
+                           default=mfc.lock.mode, help="Mode used to compile, run, and test MFC.")
 
         if "j" not in mask:
             p.add_argument("-j", "--jobs", metavar="N", type=int,

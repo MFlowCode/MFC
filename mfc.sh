@@ -61,7 +61,7 @@ fi
 # Create main subdirectories inside $MFC_DIR
 mkdir -p "$MFC_BUILD_DIR/mfc"
 mkdir -p "$MFC_ENV_DIR"
-mkdir -p "$MFC_BUILD_DIR/deps"
+mkdir -p "$MFC_BUILD_DIR/dependenciess"
 
 
 # Make bootstrap files executable
