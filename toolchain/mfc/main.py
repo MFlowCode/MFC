@@ -22,8 +22,8 @@ class MFCState:
 
         self.user = user.MFCUser()
         self.lock = lock.MFCLock(self.user)
-        self.args = args.parse(self)
         self.test = tests.tests.MFCTest(self)
+        self.args = args.parse(self)
         self.run  = run.run.MFCRun(self)
 
         # Handle mode change
@@ -44,7 +44,7 @@ class MFCState:
         rich.print("")
 
         if self.args["command"] == "test":
-            self.test.test()
+            self.test.execute()
         elif self.args["command"] == "run":
             self.run.run()
         elif self.args["command"] == "build":

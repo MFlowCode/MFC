@@ -199,7 +199,7 @@ class CaseGeneratorStack:
         return self.stack.pop()
     
     def gen_trace(self) -> str:        
-        return ' -> '.join([ tcvs.trace for tcvs in self.stack ])
+        return ' -> '.join([ tcvs.trace for tcvs in self.stack if tcvs.trace is not None ])
 
     def gen_variations(self) -> TCV:
         result: TCV = []
@@ -215,7 +215,6 @@ def create_case(stack: CaseGeneratorStack,
                 tcvs:  TCVS = None,
                 ppn:   int  = None) -> TestCase:
     newStack = copy.deepcopy(stack)
-
     if tcvs is not None:
         newStack.push(tcvs)
 
