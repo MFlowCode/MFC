@@ -31,7 +31,7 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     ADD_COMPILE_OPTIONS(
         -ffree-line-length-none
         -Wno-array-bounds
-        -fallow-argument-mismatch
+        -Wno-argument-mismatch
         -march=native
         -Wextra
         -Wall
