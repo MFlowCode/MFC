@@ -115,9 +115,11 @@ module m_global_parameters
 
     ! ==========================================================================
 
+    ! Note: We assume 1 + min(1, n) + min(1, p) == 1 + min(1, n_glb) + min(1, p_glb)
+
     ! Simulation Algorithm Parameters ==========================================
     INTEGER, parameter :: model_eqns       = ${CASE['algorithm']['model']}$             !< Multicomponent flow model
-    INTEGER :: num_dims !< Number of spatial dimensions
+    INTEGER, parameter :: num_dims         = ${1 + min(1, CASE['domain']['cells']['y']) + min(1, CASE['domain']['cells']['z'])}$!< Number of spatial dimensions
     INTEGER, parameter :: num_fluids       = ${CASE['autogen']['num_fluids']}$          !< Number of fluids in the flow
     INTEGER, parameter :: num_fluids_alloc = ${CASE['autogen']['num_fluids_alloc']}$    !< Number of fluids in the flow
     LOGICAL, parameter :: adv_alphan       = .${CASE['algorithm']['adv_alphan']}$.      !< Advection of the last volume fraction
@@ -332,27 +334,27 @@ module m_global_parameters
     !! conservative variables, speed of sound, the vorticity,
     !! and the numerical Schlieren function.
     !> @{
-    logical, dimension(num_fluids)  :: alpha_rho_wrt  = .${CASE['database']['write']['alpha_rho']}$.
-    logical, parameter              :: rho_wrt        = .${CASE['database']['write']['rho']}$.
-    logical, dimension(3)           :: mom_wrt        = .${CASE['database']['write']['mom']}$.
-    logical, dimension(3)           :: vel_wrt        = .${CASE['database']['write']['velocity']}$.
-    logical, dimension(3)           :: flux_wrt       = .${CASE['database']['write']['flux']}$.
-    logical, parameter              :: E_wrt          = .${CASE['database']['write']['E']}$.
-    logical, parameter              :: pres_wrt       = .${CASE['database']['write']['pressure']}$.
-    logical, dimension(num_fluids)  :: alpha_wrt      = .${CASE['database']['write']['alpha']}$.
-    logical, parameter              :: gamma_wrt      = .${CASE['database']['write']['gamma']}$.
-    logical, parameter              :: heat_ratio_wrt = .${CASE['database']['write']['heat_ratio']}$.
-    logical, parameter              :: pi_inf_wrt     = .${CASE['database']['write']['pi_inf']}$.
-    logical, parameter              :: pres_inf_wrt   = .${CASE['database']['write']['pressure_inf']}$.
-    logical, parameter              :: prim_vars_wrt  = .${CASE['database']['write']['prim_vars']}$.
-    logical, parameter              :: cons_vars_wrt  = .${CASE['database']['write']['cons_vars']}$.
-    logical, parameter              :: c_wrt          = .${CASE['database']['write']['c']}$.
-    logical, dimension(3)           :: omega_wrt      = .${CASE['database']['write']['omega']}$.
-    logical, parameter              :: schlieren_wrt  = .${CASE['database']['write']['schlieren']}$.
+    logical, dimension(num_fluids_alloc) :: alpha_rho_wrt  = .${CASE['database']['write']['alpha_rho']}$.
+    logical, parameter                   :: rho_wrt        = .${CASE['database']['write']['rho']}$.
+    logical, dimension(3)                :: mom_wrt        = .${CASE['database']['write']['mom']}$.
+    logical, dimension(3)                :: vel_wrt        = .${CASE['database']['write']['velocity']}$.
+    logical, dimension(3)                :: flux_wrt       = .${CASE['database']['write']['flux']}$.
+    logical, parameter                   :: E_wrt          = .${CASE['database']['write']['E']}$.
+    logical, parameter                   :: pres_wrt       = .${CASE['database']['write']['pressure']}$.
+    logical, dimension(num_fluids_alloc) :: alpha_wrt      = .${CASE['database']['write']['alpha']}$.
+    logical, parameter                   :: gamma_wrt      = .${CASE['database']['write']['gamma']}$.
+    logical, parameter                   :: heat_ratio_wrt = .${CASE['database']['write']['heat_ratio']}$.
+    logical, parameter                   :: pi_inf_wrt     = .${CASE['database']['write']['pi_inf']}$.
+    logical, parameter                   :: pres_inf_wrt   = .${CASE['database']['write']['pressure_inf']}$.
+    logical, parameter                   :: prim_vars_wrt  = .${CASE['database']['write']['prim_vars']}$.
+    logical, parameter                   :: cons_vars_wrt  = .${CASE['database']['write']['cons_vars']}$.
+    logical, parameter                   :: c_wrt          = .${CASE['database']['write']['c']}$.
+    logical, dimension(3)                :: omega_wrt      = .${CASE['database']['write']['omega']}$.
+    logical, parameter                   :: schlieren_wrt  = .${CASE['database']['write']['schlieren']}$.
     !> @}
 
 
-    real(kind(0d0)), dimension(num_fluids) :: schlieren_alpha    !<
+    real(kind(0d0)), dimension(num_fluids_alloc) :: schlieren_alpha = dflt_real   !<
     !! Amplitude coefficients of the numerical Schlieren function that are used
     !! to adjust the intensity of numerical Schlieren renderings for individual
     !! fluids. This enables waves and interfaces of varying strenghts and in all
@@ -384,14 +386,14 @@ module m_global_parameters
     REAL(KIND(0d0)), parameter :: poly_sigma = ${CASE['bubbles']['poly_sigma']}$ !< log normal sigma for polydisperse PDF
 
     LOGICAL,         parameter :: qbmm      = .${CASE['bubbles']['qbmm']}$. !< Quadrature moment method
-    INTEGER                    :: nmom      !< Number of carried moments per R0 location
+    INTEGER,         parameter :: nmom      = 6 !< Number of carried moments per R0 location
     INTEGER,         parameter :: nnode     = ${CASE['bubbles']['nnode']}$ !< Number of QBMM nodes
-    INTEGER                    :: nmomsp    !< Number of moments required by ensemble-averaging
-    INTEGER                    :: nmomtot   !< Total number of carried moments moments/transport equations
+    INTEGER,         parameter :: nmomsp    = 4 !< Number of moments required by ensemble-averaging
+    INTEGER,         parameter :: nmomtot   = nmom*nb !< Total number of carried moments moments/transport equations
     integer,         parameter :: dist_type = ${CASE['bubbles']['distribution']}$ !1 = binormal, 2 = lognormal-normal
     INTEGER,         parameter :: R0_type   = ${CASE['bubbles']['R0_type']}$ !< R0 distribution type
-    real(kind(0d0))            :: sigR      = ${CASE['bubbles']['sigR']}$
-    real(kind(0d0))            :: sigV      = ${CASE['bubbles']['sigV']}$
+    real(kind(0d0)), parameter :: sigR      = ${CASE['bubbles']['sigR']}$
+    real(kind(0d0)), parameter :: sigV      = ${CASE['bubbles']['sigV']}$
     real(kind(0d0)), parameter :: rhoRV     = ${CASE['bubbles']['rhoRV']}$
 
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)     :: mom_sp
@@ -516,11 +518,6 @@ contains
                 if (bubbles) then
                     bub_idx%beg = sys_size + 1
                     if (qbmm) then
-                        nmomsp = 4 !number of special moments
-                        if (nnode == 4) then
-                            nmom = 6
-                            nmomtot = nmom*nb
-                        end if
                         bub_idx%end = adv_idx%end + nb*nmom
                     else
                         if (.not. polytropic) then
@@ -946,8 +943,6 @@ contains
 
     !> Initializes parallel infrastructure
     subroutine s_initialize_parallel_io() ! --------------------------------
-
-        num_dims = 1 + min(1, n) + min(1, p)
 
         allocate (proc_coords(1:num_dims))
 

@@ -142,8 +142,10 @@ def generate_cases() -> list:
             stack.pop()
 
         for num_fluids in [1, 2]:
+            stack.push(TCVS(f"num_fluids={num_fluids}", []))
+
             if num_fluids == 2:
-                stack.push(TCVS(f"num_fluids={num_fluids}", [
+                stack.push(TCVS(None, [
                     # 2nd Fluid
                     TCV("fluids[1].gamma",  2.5),
                     TCV("fluids[1].pi_inf", 0.0),
@@ -187,6 +189,8 @@ def generate_cases() -> list:
 
             if num_fluids == 2:
                 stack.pop()
+
+            stack.pop()
 
         if len(dims) == 3:
             cases.append(create_case(stack, TCVS(f"ppn=2,m=29,n=29,p=49", [

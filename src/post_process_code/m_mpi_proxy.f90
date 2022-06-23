@@ -220,29 +220,7 @@ contains
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, &
                        0, MPI_COMM_WORLD, ierr)
 
-        ! Computational domain parameters
-        call MPI_BCAST(m, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(p, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(m_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(n_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(p_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(cyl_coord, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(t_step_start, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(t_step_stop, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(t_step_save, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
         ! Simulation algorithm parameters
-        call MPI_BCAST(model_eqns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(num_fluids, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(adv_alphan, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mpp_lim, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mixture_err, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alt_soundspeed, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
         call MPI_BCAST(bc_x%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_x%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_y%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -250,66 +228,8 @@ contains
         call MPI_BCAST(bc_z%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_z%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-        call MPI_BCAST(parallel_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
-        ! Fluids physical parameters
-        do i = 1, num_fluids_alloc
-            call MPI_BCAST(fluid_pp(i)%gamma, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%pi_inf, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-        end do
-
         ! Formatted database file(s) structure parameters
-        call MPI_BCAST(format, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
         call MPI_BCAST(precision, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(coarsen_silo, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(rho_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mom_wrt(1), 3, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(vel_wrt(1), 3, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(flux_lim, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(flux_wrt(1), 3, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(E_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(pres_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(gamma_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(heat_ratio_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(pi_inf_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(pres_inf_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(cons_vars_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(prim_vars_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(c_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(omega_wrt(1), 3, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(schlieren_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alpha_rho_wrt(1), num_fluids_alloc, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, &
-                       ierr)
-        call MPI_BCAST(alpha_wrt(1), num_fluids_alloc, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, &
-                       ierr)
-
-        call MPI_BCAST(fd_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         ! Tait EOS
         call MPI_BCAST(pref, 1, &
@@ -319,38 +239,6 @@ contains
                        MPI_DOUBLE_PRECISION, 0, &
                        MPI_COMM_WORLD, ierr)
 
-        ! Bubble modeling
-        call MPI_BCAST(bubbles, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(polytropic, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(thermal, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(R0ref, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(nb, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(polydisperse, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(poly_sigma, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(Web, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(Ca, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(Re_inv, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
 
     !>  This subroutine takes care of efficiently distributing

@@ -24,26 +24,23 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}"
 # Add some (required) and cross-compiler compiler flags
 SET(CMAKE_Fortran_PREPROCESS ON)
 
-ADD_COMPILE_OPTIONS(-cpp)
 
 # Add compiler specific flags
 IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     ADD_COMPILE_OPTIONS(
-        -ffree-line-length-none
-        -Wno-array-bounds
-        -Wno-argument-mismatch
+        -w
+        -cpp
         -march=native
-        -Wextra
-        -Wall
-        -pedantic
         -fdefault-real-8
         -fdefault-double-8
+        -Wno-argument-mismatch
+        -ffree-line-length-none
     )
 
     IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
         ADD_COMPILE_OPTIONS(
-            -fbacktrace
             -fcheck=all
+            -fbacktrace
             -fimplicit-none
             -ffpe-trap=invalid,zero,overflow,underflow
         )
@@ -52,9 +49,16 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     IF (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
         ADD_COMPILE_OPTIONS(-fallow-invalid-boz)
     ENDIF()
+ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
+    ADD_COMPILE_OPTIONS(
+        -Mfreeform 
+        -Mpreprocess
+        -fdefault-real-8
+    )
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
         -r8
+        -cpp
         -Mfreeform
         -Minfo=accel
         -lnvToolsExt
