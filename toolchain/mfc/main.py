@@ -5,9 +5,11 @@ import rich.console
 
 import args
 import user
+import lock
 import build
 import common
 
+import os
 import signal
 
 import run.run
@@ -19,9 +21,27 @@ class MFCState:
         rich.print(common.MFC_HEADER)
 
         self.user = user.MFCUser()
+        self.lock = lock.MFCLock(self.user)
         self.args = args.parse(self)
         self.test = tests.tests.MFCTest(self)
         self.run  = run.run.MFCRun(self)
+
+        # Handle mode change
+        if self.args["mode"] != self.lock.mode:
+            rich.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]")
+            self.lock.mode = self.args["mode"]
+            self.lock.write()
+
+            rich.print(f"[bold red]Purging build files...[/bold red]")
+
+            for dep_name in build.get_target("mfc").requires:
+                t = build.get_target(dep_name)
+                dirpath = build.get_build_dirpath(t)
+                rich.print(f"[bold red] - {dep_name}: {os.path.relpath(dirpath)}[/bold red]")
+                common.delete_directory_recursive(dirpath)
+        else:
+            rich.print(f"[bold yellow]You are currently in [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]")
+        rich.print("")
 
         if self.args["command"] == "test":
             self.test.test()

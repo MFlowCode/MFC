@@ -77,7 +77,7 @@ def get_target(name: str) -> MFCTarget:
 
 
 def get_build_sub_dirpath(target: MFCTarget):
-    return f'{os.getcwd()}/build/{["mfc", "deps"][int(target.isDependency)]}'
+    return f'{os.getcwd()}/build/{["mfc", "dependencies"][int(target.isDependency)]}'
 
 
 # Get path to directory that will store the build files
