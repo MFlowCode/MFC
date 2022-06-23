@@ -127,13 +127,13 @@ elif [ "$u_computer" == "a" ]; then # For Ascent
     COMPUTER="$ASCENT"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("gcc/11.1.0" "spectrum-mpi")
+        MODULES=("gcc/11.1.0" "spectrum-mpi" "cuda")
     elif [ "$u_cg" == "g" ]; then
         MODULES=("nvhpc/21.11"    "spectrum-mpi"   "cuda/nvhpc"
                  "nsight-compute" "nsight-systems")
     fi
 
-    MODULES=("${MODULES[@]}" "cmake/3.22.2")
+    MODULES=("${MODULES[@]}" "python" "cmake/3.22.2")
 elif [ "$u_computer" == "r" ]; then # Richardson
     COMPUTER="$RICHARDSON"
 

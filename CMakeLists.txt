@@ -36,6 +36,8 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         -Wextra
         -Wall
         -pedantic
+        -fdefault-real-8
+        -fdefault-double-8
     )
 
     IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -52,6 +54,7 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     ENDIF()
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
+        -r8
         -Mfreeform
         -Minfo=accel
         -lnvToolsExt

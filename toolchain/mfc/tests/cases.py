@@ -157,7 +157,7 @@ def generate_cases() -> list:
                 ]))
 
             for riemann_solver in [RiemannSolver.HLL, RiemannSolver.HLLC]:
-                stack.push(TCVS(f"riemann_solver={riemann_solver}", [
+                stack.push(TCVS(f"riemann_solver={riemann_solver.value}", [
                     TCV("algorithm.riemann_solver", riemann_solver)
                 ]))
 
