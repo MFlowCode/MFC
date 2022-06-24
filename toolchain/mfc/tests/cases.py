@@ -39,8 +39,8 @@ def get_dimensions():
 
         for dimCmp in dimInfo[0]:
             dimParams.adds([
-                TCV(f"domain.domain.x.begin", 0.E+00),
-                TCV(f"domain.domain.x.end",   1.E+00)
+                TCV(f"domain.domain.{dimCmp}.begin", 0.E+00),
+                TCV(f"domain.domain.{dimCmp}.end",   1.E+00)
             ])
         
         if "z" in dimInfo[0]:
@@ -88,15 +88,9 @@ def get_dimensions():
                     TCV(f"patches[{patchID}].length.x",   1)
                 ])
 
-            if "x" in dimInfo[0]:
-                dimParams.add(TCV(f"patches[{patchID}].velocity.x", 0.0))
-
-            if "y" in dimInfo[0]:
-                dimParams.add(TCV(f"patches[{patchID}].velocity.y", 0.0))
-
-            if "z" in dimInfo[0]:
-                dimParams.add(TCV(f"patches[{patchID}].velocity.z", 0.0))
-
+            for dimCmp in dimInfo[0]:
+                dimParams.add(TCV(f"patches[{patchID}].velocity.{dimCmp}", 0.0))
+            
         r.append((dimInfo[0], dimParams))
 
     return r
@@ -263,7 +257,7 @@ def generate_cases() -> list:
                 BubbleModel.RAYLEIGH_PLESSET,
                 BubbleModel.KELLER_MIKSIS
             ]:
-                stack.push(TCVS(f"bubble_model={bubble_model}", [
+                stack.push(TCVS(f"bubble_model={bubble_model.value}", [
                     TCV("bubbles.model", bubble_model)
                 ]))
 
@@ -315,24 +309,5 @@ def generate_cases() -> list:
     l1, l2 = len(uuids), len(set(uuids))
     if l1 != l2:
         raise common.MFCException(f"generate_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
-
-    return cases
-
-
-def generate_filtered_cases(args: dict):
-    cases: list = generate_cases()
-
-    if len(args["only"]) > 0:
-        for i, case in enumerate(cases[:]):
-            case: Case
-
-            doKeep = False
-            for o in args["only"]:
-                if str(o) == case.get_uuid():
-                    doKeep = True
-                    break
-
-            if not doKeep:
-                cases.remove(case)
 
     return cases

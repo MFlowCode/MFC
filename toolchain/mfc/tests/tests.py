@@ -25,7 +25,6 @@ class MFCTest:
         self.cases  = generate_cases()
 
     def __filter_tests(self):
-        filtered_cases = []
         # Check "--from" and "--to" exist and are in the right order
         bFoundFrom, bFoundTo = (False, False)
         from_i = -1
@@ -60,9 +59,9 @@ class MFCTest:
         self.__filter_tests()
 
         if self.mfc.args["list"]:
-            table = rich.table.Table(title="MFC Test Cases")
+            table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
 
-            table.add_column("UUID",  style="magenta")
+            table.add_column("UUID", style="magenta", justify="center")
             table.add_column("Trace")
 
             for case in self.cases:
@@ -72,7 +71,14 @@ class MFCTest:
 
             return
 
-        rich.print("[bold][u]Test:[/u][/bold] (in tests/)")
+        range_str = f"from [bold magenta]{self.mfc.args['from']}[/bold magenta] to [bold magenta]{self.mfc.args['to']}[/bold magenta]"
+
+        if len(self.mfc.args["only"]) > 0:
+            range_str = common.format_list_to_string([
+                f"[bold magenta]{uuid}[/bold magenta]" for uuid in self.mfc.args["only"]
+            ], "Nothing to run")
+
+        rich.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} tests)")
 
         # Clear previous tests if we wish to (re)generate golden files
         if self.mfc.args["generate"]:
@@ -80,9 +86,9 @@ class MFCTest:
             common.create_directory(common.MFC_TESTDIR)
 
         # Run cases with multiple threads (if available)
-        rich.print(f" |-+------------+----------+----------+---------+")
-        rich.print(f" | | tests/[bold magenta]UUID[/bold magenta] | Error RE |   Tol.   | Summary |")
-        rich.print(f" |-+------------+----------+----------+---------+")
+        rich.print(f"")
+        rich.print(f"  tests/[bold magenta]UUID[/bold magenta]   Error RE     Tol.     Summary")
+        rich.print(f"")
         self.sched.run(self.cases, self.handle_case)
 
         rich.print(f"> Tested [bold green]✓[/bold green]")
@@ -120,4 +126,4 @@ You can find the output in {test.get_dirpath()}/out.txt, and teh case dictionary
             raise MFCException(f"tests/{test.get_uuid()}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
         error = tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
-        rich.print(f" |->  [bold magenta]{test.get_uuid()}[/bold magenta]  | {error.relative:+0.1E} | {tol:+0.1E} | {test.trace})")
+        rich.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {error.relative:+0.1E}   {tol:+0.1E}   {test.trace}")

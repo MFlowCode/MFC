@@ -146,7 +146,7 @@ class TestCase:
 
         command: str = f'''\
 ./mfc.sh run "{self.get_dirpath()}/case.json" -m "{args["mode"]}" -n {self.ppn} \
--t pre_process simulation {binary_option} 2>&1\
+-t pre_process simulation {binary_option} -j {args["jobs"]} 2>&1\
 '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
@@ -198,8 +198,14 @@ class CaseGeneratorStack:
     def pop(self) -> None:
         return self.stack.pop()
     
-    def gen_trace(self) -> str:        
-        return ' -> '.join([ tcvs.trace for tcvs in self.stack if tcvs.trace is not None ])
+    def gen_trace(self) -> str:     
+        traces = []
+        
+        for trace in [ tcvs.trace for tcvs in self.stack ]:
+            if not common.isspace(trace):
+                traces.append(trace)
+        
+        return ' -> '.join(traces)
 
     def gen_variations(self) -> TCV:
         result: TCV = []

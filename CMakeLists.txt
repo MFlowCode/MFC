@@ -62,6 +62,7 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID 
         -Mfreeform
         -Minfo=accel
         -lnvToolsExt
+        -Mr8intrinsics
     )
 ENDIF()
 

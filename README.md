@@ -128,12 +128,12 @@ correct binaries.
   We build a Docker Image that contains the packages required to build and run MFC on your local machine.
    
   First install Docker and Git:
-  - Windows: [Docker](https://docs.docker.com/get-docker/), [Git](https://git-scm.com/downloads).
-  - macOS: `brew install git docker` using [Homebrew](https://brew.sh/).
+  - Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
+  - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
   - Other systems:
   ```console
-  $ apt install git docker # Debian / Ubuntu via Aptitude
-  $ pacman -S git docker   # Arch Linux via Pacman
+  $ sudo apt install git docker # Debian / Ubuntu via Aptitude
+  $ sudo pacman -S git docker   # Arch Linux via Pacman
   ```
   
   Once Docker and Git are installed on your system, clone MFC with
@@ -307,16 +307,16 @@ The skeleton for an input file may look like the following:
 ```python
 #!/usr/bin/env python3
 
-import json
+from mfc.case import *
 
 # Calculations (if necessary)
 ...
 
 # Configuring case dictionary
-print(json.dumps({
-     # Insert case parameters here
-     ...
-}))
+print(Case(
+  # Insert case parameters here
+  ...
+))
 ```
 
 <details>
@@ -410,7 +410,7 @@ print(json.dumps({
   across all batch files, that is required for proper execution. They are not intended to be
   modified by users.
   
-  **Disclaimer**: IBM's JSRUN on LSF-managed computers does use the traditional node-based approach to
+  **Disclaimer**: IBM's JSRUN on LSF-managed computers does not use the traditional node-based approach to
   allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
 
 </details>
@@ -433,14 +433,12 @@ $ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -p GPU -t simulation \
 
 ## Testing MFC
  
-To run MFC's test suite, run `./mfc.sh test`. It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy.
-
-If you want to only run certain tests, you can pass the `-o` (i.e `--only`) option along with their corresponding hashes. A test's hash is a hexadecimal representation of its hashed description (also called `trace`). They look like `1A6B6EB3` and are used to uniquely identify tests, as they don't change if tests are added or removed, since they are not based on execution order, but rather on test content.
-
-An example of only running certain tests:
+To run MFC's test suite, run
 ```console
-$ ./mfc.sh test -j 8 -o 1A6B6EB3 0F5DB706
+$ ./mfc.sh test -j <thread count>
 ```
+
+It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy. Run `./mfc.sh test -h` for a full list of accepted arguments.
 
 <details>
   <summary><h3>Creating Tests</h3></summary>
@@ -450,54 +448,52 @@ $ ./mfc.sh test -j 8 -o 1A6B6EB3 0F5DB706
   $ ./mfc.sh test -g -j 8
   ```
   
-  Adding a new test case can be done by modifying [bootstrap/tests/cases.py](bootstrap/tests/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` dictionary within [bootstrap/tests/case.py](bootstrap/tests/case.py). The function operates on two variables:
+  Adding a new test case can be done by modifying [cases.py](toolchain/mfc/tests/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](toolchain/mfc/tests/case.py). The function operates on two variables:
   
   - `stack`: A stack that holds the variations to the default case parameters. By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).
   
   - `cases`: A list that holds fully-formed `Case` objects, that will be returned at the end of the function. 
   
-  Internally a case is described as:
+  Internally a test case is described as:
   ```python
   @dataclasses.dataclass(init=False)
-  class Case:
-      trace:  str
-      params: dict
-      ppn:    int
+  class TestCase:
+      trace: str
+      case:  Case
+      ppn:   int
   ```
   
   where:
   - The `trace` is a string that contains a human-readable description of what parameters were varied, or more generally what the case is meant to test. **Each `trace` must be distinct.**
-  - `params` is a dictionnary containg the case's description, as you would describe it in your input files.
+  - `case` is the mfc case that should be executed.
   - `ppn` is the number of processes per node to use when running the case.
   
-  To illustrate, consider the following excerpt from [bootstrap/tests/cases.py](bootstrap/tests/cases.py):
+  To illustrate, consider the following excerpt from `generate_cases`:
   
   ```python
   for weno_order in [3, 5]:
-      stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
-  
-      for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-          stack.push(f"(mapped_weno={mapped_weno},mp_weno={mp_weno})", {
-              'mapped_weno': mapped_weno,
-              'mp_weno':     mp_weno
-          })
-  
-          if not (mp_weno == 'T' and weno_order != 5):
-              cases.append(create_case(stack, '', {}))
-  
-          stack.pop()
-  
+    stack.push(TCVS(f"weno_order={weno_order}", [
+      TCV("algorithm.weno.order", weno_order)
+    ]))
+
+    for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
+      stack.push(TCVS(f"(mapped_weno={mapped_weno},mp_weno={mp_weno})", [
+        TCV("algorithm.weno.mapped", mapped_weno == 'T'),
+        TCV("algorithm.weno.mp",     mp_weno == 'T')
+      ]))
+
+      if not (mp_weno == 'T' and weno_order != 5):
+        cases.append(create_case(stack))
+
       stack.pop()
+
+    stack.pop()
   ```
   
   When pushing to the stack, or creating a new case with the `create_case` function, you must specify:
   - `trace`: A human-readable string describing what you are currently varying.
-  - `params`: A dictionary that contains the parameters you currently wish to to vary.
-  
-  When creating a case using `create_case(stack, trace, params)`:
-  - The `trace` function parameter will be appended to the stack's traces, to form a string.
-  - The final case dictionary will be generated by successively applying your desired changes to the base case.
-  
+  - `variations`: A list of `TCV` objects that contains the parameters you currently wish to to vary.
+
   Finally, the case is appended to the `cases` list, which will be returned by the `generate_cases` function.
   
 </details>
