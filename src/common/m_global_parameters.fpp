@@ -420,9 +420,12 @@ module m_global_parameters
 
     !> @name Acoustic monopole parameters
     !> @{
-    LOGICAL, parameter :: monopole = .${CASE['acoustic']['monopole']}$. !< Monopole switch
-    INTEGER, parameter :: num_mono = ${len(CASE['acoustic']['monopoles'])}$ !< Number of monopoles
-    TYPE(mono_parameters), DIMENSION(num_mono), parameter :: mono = ${CASE['autogen']['mono']}$ !< Monopole parameters
+    !< Monopole switch
+    LOGICAL, parameter :: monopole = .${CASE['acoustic']['monopole']}$.
+    !< Number of monopoles
+    INTEGER, parameter :: num_mono = ${len(CASE['acoustic']['monopoles'])}$
+    !< Monopole parameters
+    TYPE(mono_parameters), DIMENSION(num_mono), parameter :: mono = ${CASE['autogen']['mono']}$
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 

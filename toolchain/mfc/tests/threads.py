@@ -53,8 +53,8 @@ class MFCTestThreadManager:
 
     def run(self, cases: list, handle_case) -> None:
         with rich.progress.Progress() as progress:
-            queue_tracker    = progress.add_task("Queued   ", total=len(cases))
-            complete_tracker = progress.add_task("Completed", total=len(cases))
+            queue_tracker    = progress.add_task("Queued   ", total=len(cases), )
+            complete_tracker = progress.add_task("Completed", total=len(cases), )
 
             # Queue Tests
             for i, test in enumerate(cases):
