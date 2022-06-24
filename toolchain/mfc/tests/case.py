@@ -66,12 +66,12 @@ BASE_CASE = Case(
             alpha=[1.]
         ),
     ],
-    fluids=[
+    fluids=Fluids(1, [
         Fluid(
             gamma=1.E+00/(1.4-1.E+00),
             pi_inf=0.0
         )
-    ],
+    ]),
     bubbles=Bubbles(
         R0ref=1e-05,
         weber=13.927835051546392,

@@ -88,16 +88,16 @@ print(Case(
         ),
         time=Time(dt=dt, end=30000, save=1000),
     ),
-    fluids=[
+    fluids=Fluids(1, [
         Fluid(
             gamma=1.E+00/(n_tait-1.E+00),
             pi_inf=n_tait*B_tait/(n_tait-1.)
         ),
-#       Fluid(
-#           gamma=1./(gamma_gas-1.),
-#           pi_inf=0.0E+00
-#       )
-    ],
+        Fluid(
+            gamma=1./(gamma_gas-1.),
+            pi_inf=0.0E+00
+        )
+    ]),
     patches=[
         Patch(
             smooth_patch_id=1,
