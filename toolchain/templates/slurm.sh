@@ -44,6 +44,7 @@
 #>       more options to the batch system.
 #>
 #> #SBATCH --mem=...
+#> #SBATCH --constraint="lustre"
 #> #SBATCH --gpus=v100-16:{gpus_per_node*nodes}
 #>
 

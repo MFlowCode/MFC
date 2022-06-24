@@ -237,6 +237,15 @@ class Fluid:
         return f"physical_parameters({', '.join(members)})"
 
 
+@dataclasses.dataclass
+class Fluids:
+    count:  int                = dflt(lambda: 0)
+    fluids: typing.List[Fluid] = dflt(lambda: [])
+
+    def __getitem__(self, id) -> Fluid:
+        return self.fluids[id]
+
+
 # === SIMULATION ALGORITHM === #
 
 
@@ -511,14 +520,14 @@ class AcousticParameters:
 
 @dataclasses.dataclass
 class Case:
-    logistics: Logistics
-    domain:    ComputationalDomain
-    fluids:    typing.List[Fluid]
-    patches:   typing.List[Patch]
-    bubbles:   Bubbles
-    database:  DatabseStructure
-    algorithm: SimulationAlgorithm
-    acoustic:  AcousticParameters
+    logistics:  Logistics
+    domain:     ComputationalDomain
+    fluids:     Fluids
+    patches:    typing.List[Patch]
+    bubbles:    Bubbles
+    database:   DatabseStructure
+    algorithm:  SimulationAlgorithm
+    acoustic:   AcousticParameters
 
 
     def __repr__(self) -> str:
@@ -532,8 +541,8 @@ class Case:
         if expr.startswith(match):
             fluid_idx = int(expr[len(match):].split(']')[0])
 
-            if fluid_idx + 1 > len(self.fluids):
-                self.fluids.append(Fluid())
+            if fluid_idx + 1 > len(self.fluids.fluids):
+                self.fluids.fluids.append(Fluid())
 
         exec(expr)
 
@@ -569,8 +578,8 @@ class Case:
         if self.algorithm.model == 1 and len(self.fluids) != 1:
             raise mfc.common.MFCException("Invalid combination.")
 
-        num_fluids       = len(self.fluids)
-        num_fluids_alloc = len(self.fluids) + 1 # +1 is a workaround for the bellow:
+        num_fluids       = self.fluids.count
+        num_fluids_alloc = max(self.fluids.count, len(self.fluids.fluids)) + 1 # +1 is a workaround for the bellow:
 
         # Workaround for https://github.com/henryleberre/MFC/blob/f6620bba0f248b729491dd3b0b1dd070ddd63c2d/src/common/m_global_parameters.fpp#L511-L515
         # if num_fluids == 1 and self.bubbles.bubbles and self.algorithm.model == MulticomponentModel.EQUATION_5:
@@ -592,7 +601,7 @@ class Case:
                 "y_domain":         serialize(self.domain.domain.y),
                 "z_domain":         serialize(self.domain.domain.z),
                 "patch_icpp":       serialize_array_constructor("ic_patch_parameters", patches),
-                "fluid_pp":         serialize_array_constructor("physical_parameters", self.fluids + [Fluid()]),
+                "fluid_pp":         serialize_array_constructor("physical_parameters", self.fluids.fluids + [Fluid()]),
                 "mono":             serialize_array_constructor("mono_parameters",     self.acoustic.monopoles),
                 "probe":            serialize_array_constructor("probe_parameters",    self.database.probes),
                 "integral":         serialize_array_constructor("integral_parameters", self.database.integrals),

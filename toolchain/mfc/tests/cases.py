@@ -136,7 +136,7 @@ def generate_cases() -> list:
             stack.pop()
 
         for num_fluids in [1, 2]:
-            stack.push(TCVS(f"num_fluids={num_fluids}", []))
+            stack.push(TCVS(f"num_fluids={num_fluids}", [TCV("fluids.count", num_fluids)]))
 
             if num_fluids == 2:
                 stack.push(TCVS(None, [

@@ -120,8 +120,6 @@ module m_global_parameters
     ! Simulation Algorithm Parameters ==========================================
     INTEGER, parameter :: model_eqns       = ${CASE['algorithm']['model']}$             !< Multicomponent flow model
     INTEGER, parameter :: num_dims         = ${1 + min(1, CASE['domain']['cells']['y']) + min(1, CASE['domain']['cells']['z'])}$!< Number of spatial dimensions
-    INTEGER, parameter :: num_fluids       = ${CASE['autogen']['num_fluids']}$          !< Number of fluids in the flow
-    INTEGER, parameter :: num_fluids_alloc = ${CASE['autogen']['num_fluids_alloc']}$    !< Number of fluids in the flow
     LOGICAL, parameter :: adv_alphan       = .${CASE['algorithm']['adv_alphan']}$.      !< Advection of the last volume fraction
     LOGICAL, parameter :: mpp_lim          = .${CASE['algorithm']['mpp_lim']}$.         !< Mixture physical parameters (MPP) limits
     INTEGER, parameter :: time_stepper     = ${CASE['algorithm']['time_stepper']}$      !< Time-stepper algorithm
@@ -288,8 +286,6 @@ module m_global_parameters
     ! ==========================================================================
 
     ! Initial Condition Parameters =============================================
-    integer, parameter :: num_patches = ${len(CASE['patches'])}$ !< Number of patches composing initial condition
-
     type(ic_patch_parameters), dimension(num_patches) :: patch_icpp = ${CASE['autogen']['patch_icpp']}$
 
     !<

@@ -50,12 +50,12 @@ print(Case(
             )
         ),
     ),
-    fluids=[
+    fluids=Fluids(1, [
         Fluid(
             gamma=1.E+00/(1.4-1.E+00),
             pi_inf=0.0
         )
-    ],
+    ]),
     patches=[
         Patch(
             geometry=7,
