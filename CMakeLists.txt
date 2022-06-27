@@ -33,12 +33,12 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         -march=native
         -fdefault-real-8
         -fdefault-double-8
-        -Wno-argument-mismatch
         -ffree-line-length-none
     )
 
     IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
         ADD_COMPILE_OPTIONS(
+            -g
             -fcheck=all
             -fbacktrace
             -fimplicit-none
@@ -47,7 +47,10 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     ENDIF()
     
     IF (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
-        ADD_COMPILE_OPTIONS(-fallow-invalid-boz)
+        ADD_COMPILE_OPTIONS(
+            -fallow-invalid-boz
+            -fallow-argument-mismatch
+        )
     ENDIF()
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     ADD_COMPILE_OPTIONS(

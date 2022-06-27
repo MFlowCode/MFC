@@ -20,10 +20,9 @@ def parse(mfc):
 
     parsers = parser.add_subparsers(dest="command")
 
-    build = parsers.add_parser(name="build", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean = parsers.add_parser(name="clean", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     run   = parsers.add_parser(name="run",   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test  = parsers.add_parser(name="test",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean = parsers.add_parser(name="clean", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     def add_common_arguments(p, mask=""):
         if "t" not in mask:
@@ -38,13 +37,10 @@ def parse(mfc):
             p.add_argument("-j", "--jobs", metavar="N", type=int,
                            help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
 
-    # === BUILD ===
-    add_common_arguments(build)
-
     # === CLEAN ===
     add_common_arguments(clean, "j")
 
-    binaries = [ b.bin  for b in BINARIES ]
+    binaries = [ b.bin for b in BINARIES ]
 
     # === TEST ===
     add_common_arguments(test, "t")
@@ -83,7 +79,7 @@ def parse(mfc):
                 if not key in args:
                     args[key] = val
 
-    for a, b in [("run", run), ("test", test), ("build", build), ("clean", clean)]:
+    for a, b in [("run", run), ("test", test), ("clean", clean)]:
         append_defaults_to_data(a, b)
 
     if args["command"] is None:

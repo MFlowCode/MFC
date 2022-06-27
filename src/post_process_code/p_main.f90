@@ -18,6 +18,9 @@ program p_main
     ! Dependencies =============================================================
     use m_derived_types         !< Definitions of the derived types
 
+    use m_derived_variables     !< Procedures used to compute quantites derived
+                                !! from the conservative and primitive variables
+
     use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
@@ -74,7 +77,10 @@ program p_main
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     call s_initialize_global_parameters_module()
-    if (num_procs > 1) call s_initialize_mpi_proxy_module()
+    if (num_procs > 1 .or. parallel_io .eqv. .False.) then
+        call s_initialize_mpi_proxy_module()
+    end if
+    
     call s_initialize_variables_conversion_module()
     call s_initialize_data_input_module()
     call s_initialize_derived_variables_module()
