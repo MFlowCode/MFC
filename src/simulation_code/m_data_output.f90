@@ -604,7 +604,7 @@ contains
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
         if (file_exist) call SYSTEM('rm -rf '//trim(t_step_dir))
-        call SYSTEM('mkdir -p '//trim(t_step_dir))
+        call s_create_directory(trim(t_step_dir))
 
         ! Writing the grid data file in the x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -665,7 +665,7 @@ contains
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
-        if (.not. file_exist) call SYSTEM('mkdir -p '//trim(t_step_dir))
+        if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         !1D
         if (n == 0 .and. p == 0) then

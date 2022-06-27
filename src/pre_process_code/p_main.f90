@@ -28,6 +28,8 @@ program p_main
 
     use m_data_output           !< Procedures to write the grid data and the
                                 !! conservative variables to files
+    
+    use m_compile_specific      !< Compile-specific procedures
     ! ==========================================================================
 
     implicit none
@@ -71,7 +73,7 @@ program p_main
 
         ! Create the D directory if it doesn't exit, to store
         ! the serial data files
-        call system('mkdir -p D')
+        call s_create_directory('D')
     else
         s_generate_grid => s_generate_parallel_grid
         s_read_grid_data_files => s_read_parallel_grid_data_files

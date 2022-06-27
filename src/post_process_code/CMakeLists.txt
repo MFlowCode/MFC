@@ -1,7 +1,7 @@
 include(../common/CMakeLists.txt)
 
-FILE(GLOB post_process_f90s "${CMAKE_CURRENT_SOURCE_DIR}/*.f90")
-FILE(GLOB post_process_fpps "${CMAKE_CURRENT_SOURCE_DIR}/*.fpp")
+FILE(GLOB post_process_f90s "${CMAKE_CURRENT_LIST_DIR}/*.f90")
+FILE(GLOB post_process_fpps "${CMAKE_CURRENT_LIST_DIR}/*.fpp")
 
 # Run FYPP
 FOREACH(in_fpp_file IN LISTS post_process_fpps)
@@ -16,7 +16,7 @@ FOREACH(in_fpp_file IN LISTS post_process_fpps)
         OUTPUT          "${out_fpp_file}"
         COMMAND         "fypp" "${in_fpp_file}" "${out_fpp_file}"
         MAIN_DEPENDENCY "${in_fpp_file}"
-        COMMENT         "Fypp ${in_fpp_file} -> ${out_fpp_file}"
+        COMMENT         "Preprocessing ${in_fpp_file_name}"
         VERBATIM
     )
     

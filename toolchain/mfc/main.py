@@ -38,7 +38,7 @@ class MFCState:
                 t = build.get_target(dep_name)
                 dirpath = build.get_build_dirpath(t)
                 rich.print(f"[bold red] - {dep_name}: {os.path.relpath(dirpath)}[/bold red]")
-                common.delete_directory_recursive(dirpath)
+                common.delete_directory(dirpath)
         else:
             rich.print(f"[bold yellow]You are currently in [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]")
         rich.print("")

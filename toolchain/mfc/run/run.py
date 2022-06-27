@@ -48,7 +48,7 @@ class MFCRun:
 > Job Name      (-#)  {self.mfc.args['name']}
 > Engine        (-e)  {self.mfc.args['engine']}
 > Mode          (-m)  {self.mfc.args['mode']}
-> Targets       (-t)  {self.mfc.args['targets']}
+> Targets       (-t)  {common.format_list_to_string(self.mfc.args['targets'], "None")}
 {engine.get_args()}\
 """)
 
@@ -58,7 +58,7 @@ class MFCRun:
             rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
 
             # Create input file
-            input_file.dump(target_name)
+            input_file.dump()
 
             build.build_target(self.mfc, target_name)
                         

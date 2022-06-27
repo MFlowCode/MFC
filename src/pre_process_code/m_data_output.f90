@@ -145,7 +145,7 @@ contains
 
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (.not. file_exist) call SYSTEM('mkdir -p '//trim(t_step_dir))
+        if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         !1D
         if (n == 0 .and. p == 0) then
@@ -364,7 +364,7 @@ contains
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check) call SYSTEM('rm -rf '//trim(t_step_dir))
-                call SYSTEM('mkdir -p '//trim(t_step_dir))
+                call s_create_directory(trim(t_step_dir))
 
             end if
 
@@ -379,7 +379,7 @@ contains
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check) call SYSTEM('rm -rf '//trim(restart_dir))
-                call SYSTEM('mkdir -p '//trim(restart_dir))
+                call s_create_directory(trim(restart_dir))
             end if
 
             call s_mpi_barrier()

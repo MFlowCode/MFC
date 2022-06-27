@@ -41,7 +41,7 @@ class Engine:
         raise common.MFCException(f"MFCEngine::validate_job_options: not implemented for {self.name}.")
 
     def get_binpath(self, target: str) -> str:
-        return f'{build.get_install_dirpath()}/bin/{target}'
+        return os.sep.join([build.get_install_dirpath(), "bin", target])
 
 
 class InteractiveEngine(Engine):
@@ -83,7 +83,8 @@ class InteractiveEngine(Engine):
         rich.print(f"{date} Running...")
 
         start_time = time.monotonic()
-        common.execute_shell_command(self.get_exec_cmd(target_name))
+        common.system(self.get_exec_cmd(target_name))
+
         end_time   = time.monotonic()
 
         rich.print(f"> > Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
@@ -125,7 +126,7 @@ class BatchEngine(Engine):
     def get_batch_filepath(self, target_name: str):
         case_dirpath = self.input.case_dirpath
 
-        return os.path.abspath(f"{case_dirpath}/{target_name}.sh")
+        return os.path.abspath(os.sep.join([case_dirpath, f"{target_name}.sh"]))
 
     def generate_prologue(self, system: queues.QueueSystem,) -> str:
         return f"""\
