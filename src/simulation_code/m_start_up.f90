@@ -1050,6 +1050,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
+
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files
         else

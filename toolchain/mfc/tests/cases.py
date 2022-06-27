@@ -170,7 +170,7 @@ def generate_cases() -> list:
                 ])))
 
                 if num_fluids == 2:
-                    if riemann_solver == 2: # RiemannSolver.HLLC
+                    if riemann_solver == RiemannSolver.HLLC:
                         cases.append(create_case(stack, TCVS("alt_soundspeed=T", [
                             TCV("algorithm.alt_soundspeed", True)
                         ])))
@@ -201,8 +201,6 @@ def generate_cases() -> list:
             TCV("bubbles.bubbles", True)
         ]))
 
-        # TODO: num_fluids might not have been correctly set previously
-        #       and fluids[1]%pressure is not set.
         stack.push(TCVS("", [
             TCV("bubbles.number", 3),
             # Fluids
@@ -227,6 +225,7 @@ def generate_cases() -> list:
             TCV("patches[0].pressure",  1.0),
             TCV("patches[1].alpha_rho", [0.96]), 
             TCV("patches[1].alpha",     [4e-02]),  
+            TCV("patches[1].pressure",  1.0),
             TCV("patches[2].alpha_rho", [0.999999999999]),
             TCV("patches[2].alpha",     [1e-12]), 
             TCV("patches[2].pressure",  1.0)
@@ -261,7 +260,7 @@ def generate_cases() -> list:
                     TCV("bubbles.model", bubble_model)
                 ]))
 
-                if not (polytropic == 'F' and bubble_model == 3):
+                if not (polytropic == 'F' and bubble_model == BubbleModel.RAYLEIGH_PLESSET):
                     cases.append(create_case(stack))
 
                 stack.pop()
@@ -273,7 +272,7 @@ def generate_cases() -> list:
             TCV("bubbles.model",      BubbleModel.KELLER_MIKSIS)
         ]))
 
-        cases.append(create_case(stack, TCVS("", [
+        cases.append(create_case(stack, TCVS("nb=1", [
             TCV("bubbles.number", 1)
         ])))
 

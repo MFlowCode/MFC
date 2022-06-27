@@ -116,7 +116,6 @@ MODULE m_derived_variables
                 flg = 0
             END IF
             
-            
         END SUBROUTINE s_initialize_derived_variables_module ! --------------------
         
         
