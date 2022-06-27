@@ -55,6 +55,10 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
         -Mpreprocess
         -fdefault-real-8
     )
+ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+    ADD_COMPILE_OPTIONS(
+        -free
+    )
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
         -r8

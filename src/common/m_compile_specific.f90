@@ -12,6 +12,18 @@ module m_compile_specific
 
 contains
 
+    !>  Creates a directory and all its parents if it does not exist
+        !!  @param dir_name Directory path
+    subroutine s_create_directory(dir_name)
+        character(LEN=*), intent(IN) :: dir_name
+
+#ifndef _WIN32
+        call system("mkdir -p "//dir_name)
+#else
+        call system("mkdir "//dir_name//" 2> NUL")
+#endif
+    end subroutine s_create_directory
+
     !>  Inquires on the existence of a directory
         !!  @param fileloc File directory location
         !!  @param dircheck Switch that indicates if directory exists

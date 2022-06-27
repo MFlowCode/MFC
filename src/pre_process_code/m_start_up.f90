@@ -1730,7 +1730,7 @@ contains
         ! condition data are also generated.
         if (old_ic .neqv. .true.) then
             call SYSTEM('rm -rf '//trim(proc_rank_dir)//'/*')
-            call SYSTEM('mkdir -p '//trim(proc_rank_dir)//'/0')
+            call s_create_directory(trim(proc_rank_dir)//'/0')
         end if
 
     end subroutine s_read_serial_grid_data_files ! --------------------------------
@@ -1841,7 +1841,7 @@ contains
         ! In addition, the time-step folder that will contain the new grid
         ! and initial condition data are also generated.
         call SYSTEM('rm -rf '//trim(proc_rank_dir)//'/*')
-        call SYSTEM('mkdir -p '//trim(proc_rank_dir)//'/0')
+        call s_create_directory(trim(proc_rank_dir)//'/0')
 
     end subroutine s_read_serial_ic_data_files ! ----------------------------------
 

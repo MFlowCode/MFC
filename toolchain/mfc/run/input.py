@@ -17,7 +17,7 @@ class MFCInputFile:
     case_dict:    dict
 
     # Generate .inp and case.fpp input files.
-    def dump(self,  target_name: str) -> None:
+    def dump(self) -> None:
         # === case.fpp ===
         filepath = f"{os.getcwd()}/src/common/case.fpp"
         content  = f"""\

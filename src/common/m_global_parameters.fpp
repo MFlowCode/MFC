@@ -453,7 +453,7 @@ contains
         integer :: fac
         integer :: i1, i2, i3
 
-        type(bounds_info) :: ix, iy, iz
+        type(int_bounds_info) :: ix, iy, iz
 
 !$acc update device(weno_polyn)
 !$acc update device(nb)
@@ -586,7 +586,8 @@ contains
                         if (R0_type == 1) then
                             call s_simpson
                         else 
-                            call s_wheeler
+                            print*, 'Invalid R0 type - abort'
+                            stop
                         end if
                         V0(:) = 1d0
                     else

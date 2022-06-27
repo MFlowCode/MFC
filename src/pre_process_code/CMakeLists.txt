@@ -1,7 +1,7 @@
 include(../common/CMakeLists.txt)
 
-FILE(GLOB pre_process_f90s "${CMAKE_CURRENT_SOURCE_DIR}/*.f90")
-FILE(GLOB pre_process_fpps "${CMAKE_CURRENT_SOURCE_DIR}/*.fpp")
+FILE(GLOB pre_process_f90s "${CMAKE_CURRENT_LIST_DIR}/*.f90")
+FILE(GLOB pre_process_fpps "${CMAKE_CURRENT_LIST_DIR}/*.fpp")
 
 # Run FYPP
 FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/autogen")

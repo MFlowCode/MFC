@@ -1,4 +1,4 @@
-import json
+import os
 import copy
 import typing
 import hashlib
@@ -163,7 +163,7 @@ class TestCase:
         return hex(binascii.crc32(hashlib.sha1(str(self.trace).encode()).digest())).upper()[2:].zfill(8)
 
     def get_dirpath(self):
-        return f"{common.MFC_TESTDIR}/{self.get_uuid()}"
+        return os.sep.join([common.MFC_TESTDIR, self.get_uuid()])
 
     def create_directory(self):
         dirpath = self.get_dirpath()

@@ -8,10 +8,12 @@ import common
 @dataclasses.dataclass
 class Mode:
     name:  str
+    type:  str
     flags: typing.List[str]
 
     def __init__(self, data: dict) -> None:
-        self.name  = data.get("name",  "")
+        self.name  = data["name"]
+        self.type  = data["type"]
         self.flags = data.get("flags", [])
 
 

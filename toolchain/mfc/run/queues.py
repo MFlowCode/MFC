@@ -11,7 +11,7 @@ class QueueSystem:
 
     def __init__(self, name: str, filename: str) -> None:
         self.name     = name
-        self.template = common.file_read(f"toolchain/templates/{filename}")
+        self.template = common.file_read(os.sep.join(["toolchain", "templates", filename]))
 
     def is_active(self) -> bool:
         raise common.MFCException("QueueSystem::is_active: not implemented.")

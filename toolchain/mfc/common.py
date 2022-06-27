@@ -34,7 +34,7 @@ class MFCException(Exception):
     pass
 
 
-def execute_shell_command(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
+def system(command: str, no_exception: bool = False, exception_text=None, on_error=lambda: None) -> int:
     status = os.system(command)
 
     if status != 0:
@@ -87,17 +87,6 @@ def file_dump_yaml(filepath: str, data) -> None:
         raise MFCException(f'Failed to dump YAML to "{filepath}": {exc}.')
 
 
-# TODO: Better solution
-def uncompress_archive_to(archive_filepath: str, destination: str) -> None:
-    archive = tarfile.open(archive_filepath, "r")
-    archive.extractall("/".join(destination.rstrip("/").split("/")[:-1]))
-    archive.close()
-
-    src = "/".join(destination.rstrip("/").split("/")[:-1])+"/"+archive_filepath.split("/")[-1].replace(".tar.gz", "")
-
-    os.rename(src, destination)
-
-
 def delete_file(filepath: str) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
@@ -110,7 +99,7 @@ def create_file(filepath: str) -> None:
         except IOError as exc:
             raise MFCException(f"Failed to create file {filepath}: {exc}")
 
-def delete_directory_recursive(directory_path: str) -> None:
+def delete_directory(directory_path: str) -> None:
     if os.path.isdir(directory_path):
         shutil.rmtree(directory_path)
 
@@ -118,19 +107,6 @@ def delete_directory_recursive(directory_path: str) -> None:
 def create_directory(directory_path: str) -> None:
     os.makedirs(directory_path, exist_ok=True)
 
-
-def clear_print(message, end='\n') -> None:
-    clear_line()
-    print(message, end=end)
-
-
-def update_symlink(at: str, to: str) -> None:
-    if os.path.islink(at):
-        os.remove(at)
-
-    # Use a relative symlink so that users can
-    # move and rename MFC's root folder
-    os.symlink(os.path.relpath(to, MFC_SUBDIR), at)
 
 def get_py_program_output(filepath: str):
     dirpath:  str = os.path.abspath (os.path.dirname(filepath))
@@ -150,7 +126,7 @@ def isspace(s: str) -> bool:
 
 
 def does_cmd_exist(s: str) -> bool:
-    return os.system(f"command -v {s} > /dev/null 2>&1") == 0
+    return shutil.which(s) is not None
 
 
 def format_list_to_string(arr: list, empty = "nothing"):
