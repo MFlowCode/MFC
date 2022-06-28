@@ -833,6 +833,7 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, k
+        real(kind(0d0)) :: start, finish
 
         ! Silo-HDF5 Database Format ========================================
 

@@ -30,12 +30,13 @@ module m_qbmm
     type(bounds_info) :: is1, is2, is3
 
 
-    real(kind(0d0)) :: momxb, momxe
-    real(kind(0d0)) :: contxb, contxe
-    real(kind(0d0)) :: bubxb, bubxe
-    real(kind(0d0)) :: advxb, advxe
-    real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs, bubrs
-    real(kind(0d0)), allocatable, dimension(:, :) :: bubmoms
+    integer :: momxb, momxe
+    integer :: contxb, contxe
+    integer :: bubxb, bubxe
+    integer :: advxb, advxe
+    real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs 
+    integer ,allocatable, dimension(:) :: bubrs
+    integer, allocatable, dimension(:, :) :: bubmoms
 
 !$acc declare create(verysmall, momrhs, nterms, is1, is2, is3)
 !$acc declare create(momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, gammas, pi_infs, bubrs, bubmoms)

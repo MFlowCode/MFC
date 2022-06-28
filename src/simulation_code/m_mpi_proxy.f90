@@ -126,19 +126,19 @@ contains
         if (n > 0) then
 
             if (p > 0) then
-                allocate (q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                allocate (q_cons_buff_send(0:buff_size*sys_size* &
                                            (m + 2*buff_size + 1)* &
                                            (n + 2*buff_size + 1)* &
                                            (p + 2*buff_size + 1)/ &
-                                           (min(m, n, p) + 2*buff_size + 1)))
+                                           (min(m, n, p) + 2*buff_size + 1) - 1))
             else
-                allocate (q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                           (max(m, n) + 2*buff_size + 1)))
+                allocate (q_cons_buff_send(0:buff_size*sys_size* &
+                                           (max(m, n) + 2*buff_size + 1) - 1))
             end if
 
         else
 
-            allocate (q_cons_buff_send(0:-1 + buff_size*sys_size))
+            allocate (q_cons_buff_send(0:buff_size*sys_size - 1))
 
         end if
 
@@ -560,7 +560,6 @@ contains
             proc_coords(1) = proc_coords(1) + 1
         end if
 
-        print *, bc_x%beg
 
         ! Boundary condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
