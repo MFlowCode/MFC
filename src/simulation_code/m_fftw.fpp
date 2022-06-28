@@ -14,11 +14,9 @@ MODULE m_fftw
     
     USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-#IFDEF _OPENACC
-    USE cudafor
-
+#ifdef _OPENACC
     USE cufft
-#ENDIF
+#endif
 
     ! ==========================================================================
 
@@ -48,7 +46,7 @@ MODULE m_fftw
 
     
     
-#IFDEF _OPENACC
+#ifdef _OPENACC
     REAL(kind(0d0)), POINTER :: data_real_gpu(:) 
 
     COMPLEX(kind(0d0)), POINTER :: data_cmplx_gpu(:)  
@@ -62,7 +60,7 @@ MODULE m_fftw
     INTEGER :: istride, ostride, idist, odist, rank
      
     !$acc declare create(real_size, cmplx_size, x_size, batch_size, data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
-#ENDIF
+#endif
 
     CONTAINS
 
@@ -85,7 +83,7 @@ MODULE m_fftw
 
             batch_size = x_size*sys_size
 
-#IFDEF _OPENACC
+#ifdef _OPENACC
             rank = 1; istride = 1; ostride = 1
 
             allocate(cufft_size(1:rank),iembed(1:rank), oembed(1:rank))
@@ -96,7 +94,7 @@ MODULE m_fftw
             oembed(1) = 0
 
             !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
-#ENDIF
+#endif
             ! Allocate input and output DFT data sizes
             fftw_real_data       = fftw_alloc_real   (int( real_size, C_SIZE_T))
             fftw_cmplx_data      = fftw_alloc_complex(int(cmplx_size, C_SIZE_T))
@@ -110,14 +108,14 @@ MODULE m_fftw
             fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real      , data_cmplx, FFTW_ESTIMATE)
             bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real , FFTW_ESTIMATE)
 
-#IFDEF _OPENACC
+#ifdef _OPENACC
             allocate(data_real_gpu(1:real_size*x_size*sys_size))
             allocate(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
             allocate(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
 
             ierr = cufftPlanMany(fwd_plan_gpu, rank, cufft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
             ierr = cufftPlanMany(bwd_plan_gpu, rank, cufft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, CUFFT_Z2D, batch_size)
-#ENDIF    
+#endif    
         END SUBROUTINE s_initialize_fftw_module ! ------------------------------
 
 
@@ -138,7 +136,7 @@ MODULE m_fftw
             ! Restrict filter to processors that have cells adjacent to axis
             IF (bc_y%beg >= 0) RETURN
 
-#IFDEF _OPENACC
+#ifdef _OPENACC
             
 !$acc parallel loop collapse(3) gang vector default(present) 
                 DO k = 1, sys_size
@@ -244,7 +242,7 @@ MODULE m_fftw
             END DO
             
               
-#ELSE
+#else
             Nfq = 3
             DO j = 0, m
                 DO k = 1, sys_size
@@ -273,7 +271,7 @@ MODULE m_fftw
                     END DO
                 END DO
             END DO              
-#ENDIF
+#endif
 
 
 
@@ -293,11 +291,11 @@ MODULE m_fftw
             CALL fftw_destroy_plan(fwd_plan)
             CALL fftw_destroy_plan(bwd_plan)
 
-#IFDEF _OPENACC
+#ifdef _OPENACC
             deallocate(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
             ierr = cufftDestroy(fwd_plan_gpu)
             ierr = cufftDestroy(bwd_plan_gpu)
-#ENDIF    
+#endif   
 
         END SUBROUTINE s_finalize_fftw_module ! --------------------------------
 
