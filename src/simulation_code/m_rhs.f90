@@ -3793,7 +3793,7 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
 
 
-        integer :: i, j, k, l !< Generic loop iterator
+        integer :: i, j, k, l, q !< Generic loop iterator
 
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
         if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
@@ -3882,8 +3882,8 @@ contains
                                     
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
 !$acc loop seq
-                                    do j = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, j))/Res(i,j) &
+                                    do q = 1, Re_size(i)
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i,q) &
                                                   + Re_visc(i)
                                     end do
 
@@ -3986,8 +3986,8 @@ contains
                                     
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
 !$acc loop seq
-                                    do j = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, j))/Res(i,j) &
+                                    do q = 1, Re_size(i)
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i,q) &
                                                   + Re_visc(i)
                                     end do
 
@@ -4086,8 +4086,8 @@ contains
                                     
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
 !$acc loop seq
-                                    do j = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, j))/Res(i,j) &
+                                    do q = 1, Re_size(i)
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i,q) &
                                                   + Re_visc(i)
                                     end do
 
@@ -4190,8 +4190,8 @@ contains
                                     
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
 !$acc loop seq
-                                    do j = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, j))/Res(i,j) &
+                                    do q = 1, Re_size(i)
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i,q) &
                                                   + Re_visc(i)
                                     end do
 
