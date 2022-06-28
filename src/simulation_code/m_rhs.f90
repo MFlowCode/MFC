@@ -4681,7 +4681,6 @@ contains
                         end do
 
                         ! Iterative process for relaxed pressure determination
-                        iter = 0
                         f_pres = 1d-9
                         df_pres = 1d9
 
@@ -4690,43 +4689,39 @@ contains
                             rho_K_s(i) = 0d0
                         end do
 
-                        do while (DABS(f_pres) .gt. 1d-10)
+                        !$acc loop seq
+                        do iter = 0, 49
 
-                            pres_relax = pres_relax - f_pres/df_pres
+                            if(DABS(f_pres) .gt. 1d-10) then
+                                pres_relax = pres_relax - f_pres/df_pres
 
-                            ! Convergence
-                            iter = iter + 1
-                            if (iter == 50) then
-                                print '(A)', 'Pressure relaxation procedure failed to converge to a solution. Exiting ...'
-                                call s_mpi_abort()
+                                ! Physical pressure
+                                do i = 1, num_fluids
+                                    if (pres_relax .le. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                        pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
+                                end do
+
+                                ! Newton-Raphson method
+                                f_pres = -1d0
+                                df_pres = 0d0
+
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    if (q_cons_vf(i + advxb - 1)%sf(j, k, l) .gt. sgm_eps) then
+                                        rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
+                                                     max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
+                                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
+                                                                                   pres_inf(i)))**(1d0/gamma_min(i))
+
+                                        f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                 /rho_K_s(i)
+
+                                        df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                  /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
+                                    end if
+                                end do
                             end if
-
-                            ! Physical pressure
-                            do i = 1, num_fluids
-                                if (pres_relax .le. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
-                                    pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
-                            end do
-
-                            ! Newton-Raphson method
-                            f_pres = -1d0
-                            df_pres = 0d0
-
-                            !$acc loop seq
-                            do i = 1, num_fluids
-                                if (q_cons_vf(i + advxb - 1)%sf(j, k, l) .gt. sgm_eps) then
-                                    rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
-                                                 max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                                 *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                               pres_inf(i)))**(1d0/gamma_min(i))
-
-                                    f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                             /rho_K_s(i)
-
-                                    df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                              /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
-                                end if
-                            end do
-
+                            
                         end do
 
                         ! Cell update of the volume fraction
@@ -4760,14 +4755,14 @@ contains
                             pi_inf = 0d0
 
                             if(mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-!$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     rho = rho + alpha_rho(i)
                                     gamma = gamma + alpha(i)*gammas(i)
                                     pi_inf = pi_inf + alpha(i)*pi_infs(i)
                                 end do
                             else if((model_eqns == 2) .and. (num_fluids > 2)) then
-!$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids - 1
                                     rho = rho + alpha_rho(i)
                                     gamma = gamma + alpha(i)*gammas(i)
@@ -4786,7 +4781,7 @@ contains
                             sum_alpha = 0d0
 
                             if (mpp_lim) then
-!$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_rho(i) = max(0d0, alpha_rho(i))
                                     alpha(i) = min(max(0d0, alpha(i)), 1d0)
@@ -4797,7 +4792,7 @@ contains
 
                             end if
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, num_fluids
                                 rho = rho + alpha_rho(i)
                                 gamma = gamma + alpha(i)*gammas(i)
@@ -4805,12 +4800,12 @@ contains
                             end do
 
                             if(any(Re_size > 0)) then
-!$acc loop seq
+                                !$acc loop seq
                                 do i = 1, 2
                                     Re(i) = dflt_real 
                                     
                                     if (Re_size(i) > 0) Re(i) = 0d0
-!$acc loop seq
+                                    !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re(i) = alpha(Re_idx(i, q))/Res(i,q) &
                                                   + Re(i)

@@ -546,8 +546,8 @@ contains
 
         type(bounds_info), intent(IN) :: ix, iy, iz
 
-        real(kind(0d0)),   dimension(2) :: alpha_K, alpha_rho_K
-        real(kind(0d0)), dimension(2) :: Re_K
+        real(kind(0d0)),   dimension(num_fluids) :: alpha_K, alpha_rho_K
+        real(kind(0d0)), dimension(num_fluids) :: Re_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
         real(kind(0d0)), dimension(nb) :: nRtmp
         real(kind(0d0)) :: vftmp, nR3, nbub_sc
@@ -728,7 +728,7 @@ contains
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
         ! the shear and volume Reynolds numbers and the Weber numbers
-        real(kind(0d0)), dimension(contxe)          :: alpha_rho_K
+        real(kind(0d0)), dimension(num_fluids)          :: alpha_rho_K
         real(kind(0d0)), dimension(num_fluids)            :: alpha_K  
         real(kind(0d0))                                   ::       rho_K
         real(kind(0d0)), dimension(num_dims)              ::       vel_K

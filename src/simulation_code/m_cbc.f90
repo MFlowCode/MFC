@@ -830,18 +830,18 @@ contains
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
         ! ratio and liquid stiffness functions
-        real(kind(0d0)), dimension(contxe)   :: dalpha_rho_dt
+        real(kind(0d0)), dimension(num_fluids)   :: dalpha_rho_dt
         real(kind(0d0))                            ::       drho_dt
         real(kind(0d0)), dimension(num_dims)       ::       dvel_dt
         real(kind(0d0))                            ::      dpres_dt
-        real(kind(0d0)), dimension(advxe - E_idx) ::       dadv_dt
+        real(kind(0d0)), dimension(num_fluids) ::       dadv_dt
         real(kind(0d0))                            ::     dgamma_dt
         real(kind(0d0))                            ::    dpi_inf_dt
         real(kind(0d0)), dimension(contxe)   :: alpha_rho, dalpha_rho_ds, mf
         real(kind(0d0)), dimension(2) :: Re_cbc
-        real(kind(0d0)), dimension(1:num_dims)     :: vel, dvel_ds
-        real(kind(0d0)), dimension(1:advxe-E_idx) :: adv, dadv_ds
-        real(kind(0d0)), dimension(1:advxe)       :: L
+        real(kind(0d0)), dimension(num_dims)     :: vel, dvel_ds
+        real(kind(0d0)), dimension(num_fluids) :: adv, dadv_ds
+        real(kind(0d0)), dimension(sys_size)       :: L
         real(kind(0d0)), dimension(3)             ::lambda  
 
 

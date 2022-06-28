@@ -452,13 +452,13 @@ contains
         integer, intent(IN) :: norm_dir
         type(bounds_info), intent(IN) :: ix, iy, iz
 
-        real(kind(0d0)),dimension(2)   :: alpha_rho_L, alpha_rho_R
+        real(kind(0d0)),dimension(num_fluids)   :: alpha_rho_L, alpha_rho_R
         real(kind(0d0))                              ::       rho_L, rho_R
-        real(kind(0d0)), dimension(3)   ::       vel_L, vel_R
+        real(kind(0d0)), dimension(num_dims)   ::       vel_L, vel_R
         real(kind(0d0))                              ::      pres_L, pres_R
         real(kind(0d0))                              ::         E_L, E_R
         real(kind(0d0))                              ::         H_L, H_R
-        real(kind(0d0)), dimension(2)   ::     alpha_L, alpha_R
+        real(kind(0d0)), dimension(num_fluids)   ::     alpha_L, alpha_R
         real(kind(0d0))                              ::         Y_L, Y_R
         real(kind(0d0))                              ::     gamma_L, gamma_R
         real(kind(0d0))                              ::    pi_inf_L, pi_inf_R
@@ -466,7 +466,7 @@ contains
         real(kind(0d0)), dimension(2)   :: Re_L, Re_R
 
         real(kind(0d0))                                 :: rho_avg
-        real(kind(0d0)),dimension(3)   :: vel_avg
+        real(kind(0d0)),dimension(num_dims)   :: vel_avg
         real(kind(0d0))                                 :: H_avg
         real(kind(0d0))                                 :: gamma_avg
         real(kind(0d0))                                 :: c_avg
@@ -985,13 +985,13 @@ contains
         type(bounds_info), intent(IN) :: ix, iy, iz
 
 
-        real(kind(0d0)),dimension(2)   :: alpha_rho_L, alpha_rho_R 
+        real(kind(0d0)),dimension(num_fluids)   :: alpha_rho_L, alpha_rho_R 
         real(kind(0d0))                              ::       rho_L, rho_R
-        real(kind(0d0)), dimension(3)   :: vel_L, vel_R 
+        real(kind(0d0)), dimension(num_dims)   :: vel_L, vel_R 
         real(kind(0d0))                              ::      pres_L, pres_R
         real(kind(0d0))                              ::         E_L, E_R
         real(kind(0d0))                              ::         H_L, H_R
-        real(kind(0d0)), dimension(2)   :: alpha_L, alpha_R 
+        real(kind(0d0)), dimension(num_fluids)   :: alpha_L, alpha_R 
         real(kind(0d0))                              ::         Y_L, Y_R
         real(kind(0d0))                              ::     gamma_L, gamma_R
         real(kind(0d0))                              ::    pi_inf_L, pi_inf_R
@@ -999,7 +999,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
 
         real(kind(0d0))                                 :: rho_avg
-        real(kind(0d0)),dimension(3)   :: vel_avg 
+        real(kind(0d0)),dimension(num_dims)   :: vel_avg 
         real(kind(0d0))                                 :: H_avg
         real(kind(0d0))                                 :: gamma_avg
         real(kind(0d0))                                 :: c_avg
@@ -3572,13 +3572,13 @@ contains
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
         ! of velocity
-        real(kind(0d0)), dimension(3) :: avg_vel
-        real(kind(0d0)), dimension(3) :: dvel_avg_dx
-        real(kind(0d0)), dimension(3) :: dvel_avg_dy
-        real(kind(0d0)), dimension(3) :: dvel_avg_dz
+        real(kind(0d0)), dimension(num_dims) :: avg_vel
+        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dx
+        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dy
+        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dz
 
         ! Viscous stress tensor
-        real(kind(0d0)), dimension(3, 3) :: tau_Re
+        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
 
         ! Generic loop iterators
         integer :: i, j, k, l
@@ -4103,11 +4103,11 @@ contains
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
         ! of velocity
-        real(kind(0d0)), dimension(3) :: dvel_avg_dx
-        real(kind(0d0)), dimension(3) :: dvel_avg_dy
-        real(kind(0d0)), dimension(3) :: dvel_avg_dz
+        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dx
+        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dy
+        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dz
 
-        real(kind(0d0)), dimension(3, 3) :: tau_Re !< Viscous stress tensor
+        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re !< Viscous stress tensor
 
         integer :: i, j, k, l !< Generic loop iterators
 
