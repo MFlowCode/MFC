@@ -578,6 +578,17 @@ contains
 
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
+    subroutine mpi_bcast_time_step_values(proc_time, time_avg)
+
+            real(kind(0d0)), dimension(0:), intent(INOUT) :: proc_time
+            real(kind(0d0)), intent(INOUT) :: time_avg
+            integer :: j
+
+            call MPI_GATHER(time_avg, 1, MPI_DOUBLE_PRECISION, proc_time(0), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr )
+
+      end subroutine mpi_bcast_time_step_values
+
+
     !>  The following subroutine takes the inputted variable and
         !!      determines its minimum value on the entire computational
         !!      domain. The result is stored back into inputted variable.

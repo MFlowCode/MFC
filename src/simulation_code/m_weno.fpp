@@ -29,7 +29,7 @@ module m_weno
 
     !implicit none
 
-    private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno_alt
+    private; public :: s_initialize_weno_module, s_initialize_weno,  s_finalize_weno_module, s_weno_alt
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
     !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
@@ -123,7 +123,7 @@ module m_weno
 !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
 !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
 !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
-!$acc                is1, is2, is3, test)
+!$acc                v_size, is1, is2, is3, test)
 
 contains
 
@@ -330,6 +330,7 @@ contains
             else
 
                 do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
+
                     poly_coef_cbR_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
@@ -342,7 +343,6 @@ contains
                     poly_coef_cbR_${XYZ}$(i + 1, 2, 1) = &
                         ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/ &
                         ((s_cb(i - 2) - s_cb(i))*(s_cb(i - 2) - s_cb(i + 1)))
-
                     poly_coef_cbL_${XYZ}$(i + 1, 0, 0) = &
                         ((s_cb(i + 1) - s_cb(i))*(s_cb(i) - s_cb(i + 2)))/ &
                         ((s_cb(i) - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i + 1)))
@@ -455,6 +455,7 @@ contains
 
                 end do
 
+
                 ! Modifying the ideal weights coefficients in the neighborhood
                 ! of beginning and end Riemann state extrapolation BC to avoid
                 ! any contributions from outside of the physical domain during
@@ -478,7 +479,6 @@ contains
         endif
 #:endfor
 
-
 ! END: Computing WENO5 Coefficients ================================
         if(weno_dir == 1) then
 !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
@@ -499,7 +499,7 @@ contains
                       norm_dir, weno_dir,  &
                       is1_d, is2_d, is3_d)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: v_vf
+        type(scalar_field), dimension(1:), intent(IN) :: v_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) ::  vL_rs_vf_x_flat, vL_rs_vf_y_flat, vL_rs_vf_z_flat, vR_rs_vf_x_flat, vR_rs_vf_y_flat, vR_rs_vf_z_flat
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
@@ -519,6 +519,9 @@ contains
 
 
 
+
+
+
         ! For MP_WENO
         real(kind(0d0)), dimension(-1:1) :: d
         real(kind(0d0)) :: d_MD, d_LC
@@ -531,7 +534,6 @@ contains
         real(kind(0d0)) :: beta_mp  = 4d0/3d0
 
         integer :: is1b, is2b, is3b, is1e, is2e, is3e
-
 
 
         is1 = is1_d
@@ -1910,7 +1912,7 @@ contains
             end if            
  
 
-      
+            
 
     end subroutine s_weno_alt
 
@@ -1942,7 +1944,9 @@ contains
         ! y- and z-directions to those in the s1-, s2- and s3-directions
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
-        v_size = sys_size
+        v_size = ubound(v_vf, 1)
+        
+        !$acc update device(v_size)
 
 
             if(weno_dir == 1) then

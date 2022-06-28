@@ -226,6 +226,7 @@ contains
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
+        real(kind(0d0)) :: start, finish
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
@@ -341,7 +342,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                        MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             else
@@ -353,7 +354,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                        MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             end if

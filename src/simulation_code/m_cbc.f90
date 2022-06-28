@@ -838,6 +838,7 @@ contains
         real(kind(0d0))                            ::     dgamma_dt
         real(kind(0d0))                            ::    dpi_inf_dt
         real(kind(0d0)), dimension(contxe)   :: alpha_rho, dalpha_rho_ds, mf
+        real(kind(0d0)), dimension(2) :: Re_cbc
         real(kind(0d0)), dimension(1:num_dims)     :: vel, dvel_ds
         real(kind(0d0)), dimension(1:advxe-E_idx) :: adv, dadv_ds
         real(kind(0d0)), dimension(1:advxe)       :: L
@@ -961,7 +962,7 @@ contains
             ! ==================================================================
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
-    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
 
@@ -993,7 +994,7 @@ contains
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
@@ -1308,7 +1309,7 @@ contains
             ! ==================================================================
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
-    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
 
@@ -1340,7 +1341,7 @@ contains
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
@@ -1659,7 +1660,7 @@ contains
             ! ==================================================================
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
-    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
 
@@ -1691,7 +1692,7 @@ contains
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum

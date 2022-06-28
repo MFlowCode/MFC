@@ -42,6 +42,10 @@ program p_main
     implicit none
 
     integer :: t_step !< Iterator for the main time-stepping loop
+    integer :: i, nt
+    logical :: file_exists
+    real(kind(0d0)) :: start, finish,start2, finish2, time_avg, time_final
+    real(kind(0d0)), allocatable, dimension(:) :: proc_time
 
     character(LEN=name_len) :: varname !<
     !! Generic storage for the name(s) of the flow variable(s) that will be added
@@ -93,12 +97,14 @@ program p_main
         s_read_data_files => s_read_parallel_data_files
     end if
 
+    allocate(proc_time(0:num_procs - 1))
+
     ! Setting the time-step iterator to the first time step to be post-processed
     t_step = t_step_start
 
     ! Time-Marching Loop =======================================================
     do
-
+        call CPU_time(start)
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
         ! Populating the buffer regions of the grid variables
@@ -480,6 +486,8 @@ program p_main
         ! Closing the formatted database file
         call s_close_formatted_database_file()
 
+        call CPU_time(finish)
+
         ! Modifies the time-step iterator so that it may reach the final time-
         ! step to be post-processed, in the case that this one is not originally
         ! attainable through constant incrementation from the first time-step.
@@ -488,11 +496,46 @@ program p_main
         if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
             t_step = t_step_stop - t_step_save
         elseif (t_step == t_step_stop) then
+
+            call s_mpi_barrier() 
+            
+            if(num_procs > 1) then
+              call mpi_bcast_time_step_values(proc_time, time_avg)
+            end if
+
+            if(proc_rank == 0) then
+                time_final = 0d0
+                if(num_procs == 1) then
+                   time_final = time_avg
+                   print*, "Final Time", time_final
+                else
+                    time_final = maxval(proc_time)    
+                    print*, "Final Time", time_final
+                end if
+                INQUIRE(FILE = 'post_time_data.dat', EXIST = file_exists)
+                if(file_exists) then
+                    open(1, file = 'post_time_data.dat', position = 'append',status = 'old')
+                    write(1,*) num_procs, time_final
+                    close(1)
+                else
+                    open(1, file = 'post_time_data.dat', status = 'new')
+                    write(1,*) num_procs, time_final
+                    close(1)
+                end if
+            end if 
+            
             exit
         end if
 
         ! Incrementing time-step iterator to next time-step to be post-processed
         t_step = t_step + t_step_save
+
+        nt = int((t_step - t_step_start)/t_step_save)
+        if(nt == 1) then
+                time_avg = abs(finish - start)
+        else
+                time_avg = (abs(finish - start) + time_avg*(nt - 1))/nt
+        end if
 
     end do
     ! END: Time-Marching Loop ==================================================

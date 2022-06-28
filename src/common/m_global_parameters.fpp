@@ -36,7 +36,7 @@ module m_global_parameters
     logical,         parameter :: old_grid      = .${CASE['logistics']['old_grid']}$.       !< Use existing grid data
     logical,         parameter :: old_ic        = .${CASE['logistics']['old_ic']}$.         !< Use existing IC data
     integer,         parameter :: t_step_old    = ${CASE['logistics']['t_step_old']}$       !< Existing IC/grid folder
-!$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps)
+!$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps, fourier_rings)
     ! ==========================================================================
 
     ! Computational Domain Parameters ==========================================
@@ -75,7 +75,7 @@ module m_global_parameters
     !> @}
 
     REAL(KIND(0d0)) :: dt = ${CASE['domain']['time']['dt']}$ !< Size of the time-step
-!$acc declare create(x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+!$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -720,7 +720,7 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
-!$acc update device(Re_size)
+!$acc update device(Re_size, Re_idx)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to

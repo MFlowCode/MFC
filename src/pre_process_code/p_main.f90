@@ -34,6 +34,11 @@ program p_main
 
     implicit none
 
+    integer :: i
+    logical :: file_exists
+    real(kind(0d0)) :: start, finish, time_avg, time_final
+    real(kind(0d0)), allocatable, dimension(:) :: proc_time
+
 
    ! Initialization of the MPI environment
 
@@ -92,6 +97,10 @@ program p_main
 
     ! Setting up grid and initial condition
 
+    allocate(proc_time(0:num_procs - 1))
+
+    call CPU_time(start)
+
     if (old_grid) then
         call s_read_grid_data_files(dflt_int)
         call s_check_grid_data_files()
@@ -111,6 +120,42 @@ program p_main
     call s_generate_initial_condition()
 
     call s_write_data_files(q_cons_vf)
+
+    call CPU_time(finish)
+
+    time_avg = abs(finish - start)
+
+    call s_mpi_barrier()
+
+
+    if(num_procs > 1) then
+        call mpi_bcast_time_step_values(proc_time, time_avg)
+    end if
+
+    
+
+    if(proc_rank == 0) then
+        time_final = 0d0
+        if(num_procs == 1) then
+           time_final = time_avg 
+           print*, "Final Time", time_final
+        else    
+            time_final = maxval(proc_time)
+            print*, "Final Time", time_final
+        end if               
+        INQUIRE(FILE = 'pre_time_data.dat', EXIST = file_exists)
+        if(file_exists) then
+            open(1, file = 'pre_time_data.dat', position = 'append',status = 'old')
+            write(1,*) num_procs, time_final
+            close(1)
+        else
+            open(1, file = 'pre_time_data.dat', status = 'new')
+            write(1,*) num_procs, time_final
+            close(1)
+        end if
+   end if
+
+    
 
     ! Disassociate pointers for serial and parallel I/O
     s_generate_grid => null()
