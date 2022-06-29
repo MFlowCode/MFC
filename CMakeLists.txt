@@ -13,12 +13,7 @@ INCLUDE(ExternalProject)
 SET_PROPERTY(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 
 # Find and configure all executables for MPI
-FIND_PACKAGE(MPI REQUIRED COMPONENTS Fortran)
-
-ADD_DEFINITIONS(${MPI_Fortran_COMPILE_FLAGS})
-INCLUDE_DIRECTORIES(${MPI_Fortran_INCLUDE_DIRS})
-LINK_LIBRARIES(${MPI_Fortran_LIBRARIES})
-SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}")
+FIND_PACKAGE(MPI REQUIRED)
 
 
 # Add some (required) and cross-compiler compiler flags
@@ -64,11 +59,13 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     )
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
+        -g
+        -gopt
         -r8
         -cpp
         -Mfreeform
+        -lcutensor
         -Minfo=accel
-        -lnvToolsExt
         -Mr8intrinsics
     )
 ENDIF()
@@ -90,8 +87,8 @@ ENDIF()
 
 # Enable OpenACC
 IF(MFC_WITH_OPEN_ACC)
-    FIND_PACKAGE(OpenACC REQUIRED)
-    ADD_COMPILE_OPTIONS(OpenACC_Fortran_FLAGS)
+    FIND_PACKAGE(OpenACC     REQUIRED)
+    FIND_PACKAGE(CUDAToolkit REQUIRED)
 
     IF (NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         MESSAGE(FATAL_ERROR "MFC only supports NVHPC as an OpenACC compiler.")

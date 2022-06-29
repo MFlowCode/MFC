@@ -446,6 +446,7 @@ contains
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module() ! -------------------
+!$acc routine seq
 
         integer :: tmp_idx !< Temporary indexes storage
         integer :: i, j !< Generic loop iterators
@@ -965,6 +966,7 @@ contains
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_global_parameters_module() ! ---------------------
+!$acc routine seq
 
         integer :: i
 
@@ -1104,6 +1106,7 @@ contains
 
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
+!$acc routine seq
 
         integer :: ir
         real(kind(0.d0)) :: R0mn

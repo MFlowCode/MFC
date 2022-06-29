@@ -78,7 +78,7 @@ class MFCTest:
                 f"[bold magenta]{uuid}[/bold magenta]" for uuid in self.mfc.args["only"]
             ], "Nothing to run")
 
-        rich.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} tests)")
+        rich.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} test{'s' if len(self.cases) != 1 else ''})")
 
         # Clear previous tests if we wish to (re)generate golden files
         if self.mfc.args["generate"]:
@@ -87,7 +87,7 @@ class MFCTest:
 
         # Run cases with multiple threads (if available)
         rich.print(f"")
-        rich.print(f"  tests/[bold magenta]UUID[/bold magenta]   Error RE     Tol.     Summary")
+        rich.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
         rich.print(f"")
         self.sched.run(self.cases, self.handle_case)
 
@@ -125,5 +125,5 @@ You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary
         if not os.path.isfile(golden_filepath):
             raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
-        error = tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
-        rich.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {error.relative:+0.1E}   {tol:+0.1E}   {test.trace}")
+        tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
+        rich.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")

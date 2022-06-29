@@ -29,3 +29,4 @@ ENDFOREACH(in_fpp_file)
 ADD_EXECUTABLE(pre_process "${common_f90s}" "${pre_process_f90s}")
 
 INSTALL(TARGETS pre_process RUNTIME DESTINATION bin)
+TARGET_LINK_LIBRARIES(pre_process PRIVATE MPI::MPI_Fortran)
