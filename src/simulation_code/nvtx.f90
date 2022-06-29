@@ -50,8 +50,6 @@ module nvtx
     end subroutine
   end interface
 
-  contains
-
 #endif
 
   contains

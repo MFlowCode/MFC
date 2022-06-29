@@ -35,3 +35,17 @@ TARGET_LINK_LIBRARIES     (simulation PRIVATE "${FFTW3_LIBRARIES}")
 
 
 INSTALL(TARGETS simulation RUNTIME DESTINATION bin)
+TARGET_LINK_LIBRARIES(simulation PRIVATE MPI::MPI_Fortran)
+
+
+IF (MFC_WITH_OPEN_ACC)
+    TARGET_LINK_LIBRARIES(simulation PRIVATE
+        OpenACC::OpenACC_Fortran
+        CUDA::nvToolsExt
+        CUDA::cufft
+    )
+
+    target_compile_options(simulation PRIVATE -fPIC)
+
+#    SET_PROPERTY(TARGET simulation PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+ENDIF ()

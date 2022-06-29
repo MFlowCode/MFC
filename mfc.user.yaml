@@ -30,9 +30,9 @@ modes:
 - name: release-gpu
   type: Release
   flags:
-  - -DMFC_WITH_ACC=ON
+  - -DMFC_WITH_OPEN_ACC=ON
 
 - name: debug-gpu
   type: Debug
   flags:
-  - -DMFC_WITH_ACC=ON
+  - -DMFC_WITH_OPEN_ACC=ON
