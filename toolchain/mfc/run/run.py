@@ -32,18 +32,19 @@ class MFCRun:
         engines.get_engine(self.mfc.args["engine"]).validate_job_options(self.mfc)
 
     def run(self) -> None:
+        rich.print("[bold][u]Run:[/u][/bold]")
+
         if len(self.mfc.args["targets"]) == 0:
             rich.print(f"> No target selected.")
             return
 
-        # Load input file
+        rich.print("Acquiring input file...")
         input_file = input.load(self.mfc.args["input"].strip())
 
         engine = engines.get_engine(self.mfc.args["engine"])
         engine.init(self.mfc, input_file)
 
         rich.print(f"""\
-[bold][u]Run:[/u][/bold]
 > Input               {self.mfc.args['input']}
 > Job Name      (-#)  {self.mfc.args['name']}
 > Engine        (-e)  {self.mfc.args['engine']}
@@ -55,11 +56,11 @@ class MFCRun:
         self.validate_job_options()
 
         for target_name in engine.get_targets(self.mfc.args["targets"]):
-            rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
-
-            # Create input file
+            rich.print(f"> Generating input file...")
             input_file.dump()
 
+            rich.print(f"> Building [bold magenta]{target_name}[/bold magenta]:")
             build.build_target(self.mfc, target_name)
-                        
+
+            rich.print(f"> Running [bold magenta]{target_name}[/bold magenta]:")
             engine.run(target_name)

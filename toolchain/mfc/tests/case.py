@@ -140,13 +140,9 @@ class TestCase:
             self.case.set(tcv.path, tcv.value)
         
     def run(self, args: dict) -> subprocess.CompletedProcess:
-        binary_option = ""
-        if args["binary"] is not None:
-            binary_option = f"-b {args['binary']}"
-
         command: str = f'''\
 ./mfc.sh run "{self.get_dirpath()}/case.json" -m "{args["mode"]}" -n {self.ppn} \
--t pre_process simulation {binary_option} -j {args["jobs"]} 2>&1\
+-t pre_process simulation -b {args['binary']} -j {args["jobs"]} 2>&1\
 '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,

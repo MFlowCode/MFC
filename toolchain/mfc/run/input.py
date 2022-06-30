@@ -44,8 +44,6 @@ def load(filename: str) -> MFCInputFile:
     dirpath:    str  = os.path.abspath(os.path.dirname(filename))
     dictionary: dict = {}
 
-    rich.print(f"> > Fetching case dictionary from {filename}...")
-
     if not os.path.exists(filename):
         raise common.MFCException(f"Input file '{filename}' does not exist. Please check the path is valid.")
 
