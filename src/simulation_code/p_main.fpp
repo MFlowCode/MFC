@@ -295,7 +295,7 @@ program p_main
 
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
-        if (mod(t_step - t_step_start, t_step_save) == 0) then
+        if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
             
                call CPU_time(start)
           !  call nvtxStartRange("I/O")

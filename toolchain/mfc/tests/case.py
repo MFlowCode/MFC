@@ -24,7 +24,7 @@ BASE_CASE = Case(
         domain=SpacialDomain(
             x=AxisDomain(begin=DFLT_REAL, end=DFLT_REAL)
         ),
-        time=Time(dt=mydt, end=int(Nt+1), save=int(Nt)),
+        time=Time(dt=mydt, end=int(Nt), save=int(Nt)),
     ),
     database=DatabseStructure(write=DatabaseWrite(prim_vars=True)),
     algorithm=SimulationAlgorithm(
