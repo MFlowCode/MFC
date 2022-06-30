@@ -5,7 +5,7 @@ import copy
 import datetime
 import dataclasses
 
-import rich
+from mfc.printer import cons
 
 import build
 import common
@@ -60,7 +60,7 @@ class InteractiveEngine(Engine):
 
     def get_args(self) -> str:
         return f"""\
-> MPI Binary    (-b)  {self.mpibin.bin} {f"[green](autodetect: {self.mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {self.mpibin.name})[/yellow]"}
+MPI Binary    (-b)  {self.mpibin.bin} {f"[green](autodetect: {self.mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {self.mpibin.name})[/yellow]"}\
 """
 
     def get_exec_cmd(self, target_name: str):
@@ -79,11 +79,21 @@ class InteractiveEngine(Engine):
         return f'{cd} && {self.mpibin.bin} {exec_params} {flags} "{binpath}"'
 
     def run(self, target_name: str) -> None:
-        start_time = time.monotonic()
-        common.system(self.get_exec_cmd(target_name))
+        cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
+        cons.indent()
 
-        end_time = time.monotonic()
-        rich.print(f"> > Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
+        cmd = self.get_exec_cmd(target_name)
+
+        cons.print(f"[yellow]{cmd.split('&&')[-1].strip()}[/yellow]", highlight=False)
+        cons.print(no_indent=True)
+        start_time = time.monotonic()
+        common.system(cmd)
+        end_time   = time.monotonic()
+        cons.print(no_indent=True)
+
+        cons.print(f"Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
+
+        cons.unindent()
 
     def validate_job_options(self, mfc) -> None:
         if mfc.args["nodes"] != 1:
@@ -112,16 +122,23 @@ class BatchEngine(Engine):
 """
 
     def run(self, target_name: str) -> None:
+        cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
+        cons.indent()
+
         system = queues.get_system()
-        rich.print(f"> > Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
+        cons.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
         self.__create_batch_file(system, target_name)
 
+        cons.print(no_indent=True)
         self.__execute_batch_file(system, target_name)
+        cons.print(no_indent=True)
 
-        rich.print("> > [bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
-        rich.print("> > [bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
-        rich.print("> > [bold yellow]INFO:[/bold yellow] You can modify the template batch file to your needs.")
+        cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
+        cons.print("[bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
+        cons.print("[bold yellow]INFO:[/bold yellow] You can modify the template batch file to your needs.")
+
+        cons.unindent()
 
     def __get_batch_dirpath(self) -> str:
         return copy.copy(self.input.case_dirpath)
@@ -235,17 +252,17 @@ exit $code
                 # If not specified, then remove the line it appears on
                 s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
 
-                rich.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it figures on will be discarded.")
+                cons.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it figures on will be discarded.")
 
         return s
 
     def __create_batch_file(self, system: queues.QueueSystem, target_name: str):
-        rich.print("> > Generating batch file...")
+        cons.print("> > Generating batch file...")
         filepath = self.__get_batch_filepath(target_name)
-        rich.print("> > Evaluating template file...")
+        cons.print("> > Evaluating template file...")
         content = self.__batch_evaluate(system.template, system, target_name)
 
-        rich.print("> > Writing batch file...")
+        cons.print("> > Writing batch file...")
         common.file_write(filepath, content)
 
     def __execute_batch_file(self, system: queues.QueueSystem, target_name: str):

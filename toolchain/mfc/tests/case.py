@@ -8,6 +8,7 @@ import dataclasses
 
 
 import common
+import run.mpi_bins
 
 from mfc.case import *
 
@@ -140,9 +141,13 @@ class TestCase:
             self.case.set(tcv.path, tcv.value)
         
     def run(self, args: dict) -> subprocess.CompletedProcess:
+        mpi_bin = copy.copy(args["binary"])
+        if mpi_bin is None:
+            mpi_bin = run.mpi_bins.get_binary(args, exclude=["srun"]).bin
+
         command: str = f'''\
 ./mfc.sh run "{self.get_dirpath()}/case.json" -m "{args["mode"]}" -n {self.ppn} \
--t pre_process simulation -b {args['binary']} -j {args["jobs"]} 2>&1\
+-t pre_process simulation -b {mpi_bin} -j {args["jobs"]} 2>&1\
 '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,

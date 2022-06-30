@@ -1,4 +1,4 @@
-import rich
+from mfc.printer import cons
 
 import common
 
@@ -90,6 +90,9 @@ def get_install_dirpath() -> str:
 
 
 def clean_target(mfc, name: str):
+    cons.print(f"Cleaning [bold magenta]{name}[/bold magenta]:")
+    cons.indent()
+
     target = get_target(name)
     mode   = mfc.user.get_mode(mfc.args["mode"])
 
@@ -97,24 +100,32 @@ def clean_target(mfc, name: str):
         for dependency_name in target.requires:
             clean_target(mfc, dependency_name)
         
+        cons.unindent()
         return
 
     build_dirpath = get_build_dirpath(target)
 
     if not os.path.isdir(build_dirpath):
+        cons.unindent()
         return
 
     clean = f"cmake --build . --target clean --config {mode.type}"
 
-    rich.print(f" + {clean}")
+    cons.print(f"[yellow]{clean}[/yellow]", highlight=False)
     common.system(f"cd \"{build_dirpath}\" && {clean}")
+
+    cons.unindent()
 
 
 def build_target(mfc, name: str, history: typing.List[str] = None):
+    cons.print(f"Building [bold magenta]{name}[/bold magenta]:")
+    cons.indent()
+    
     if history is None:
         history = []
 
     if name in history:
+        cons.unindent()
         return
     
     history.append(name)
@@ -126,6 +137,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
         build_target(mfc, dependency_name, history)
 
     if target.isCollection:
+        cons.unindent()
         return
 
     build_dirpath   = get_build_dirpath(target)
@@ -146,16 +158,24 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
     # Only configure the first time
     if not os.path.exists(build_dirpath):
-        rich.print(f" + {configure}")
+        cons.print(f"[yellow]{configure}[/yellow]", highlight=False)
+        cons.print(no_indent=True)
         common.create_directory(build_dirpath)
         
         if common.system(f"{cd} && {configure}", no_exception=True) != 0:
             common.delete_directory(build_dirpath)
 
             raise common.MFCException(f"Failed to configure the {name} target.")
-            
-    rich.print(f" + {build}")
-    common.system(f"{cd} && {build}")
 
-    rich.print(f" + {install}")
+        cons.print(no_indent=True)
+    
+    cons.print(f"[yellow]{build}[/yellow]", highlight=False)
+    cons.print(no_indent=True)
+    common.system(f"{cd} && {build}")
+    cons.print(no_indent=True)
+    cons.print(f"[yellow]{install}[/yellow]", highlight=False)
+    cons.print(no_indent=True)
     common.system(f"{cd} && {install}")
+    cons.print(no_indent=True)
+
+    cons.unindent()

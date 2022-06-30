@@ -1,4 +1,4 @@
-
+import typing
 import dataclasses
 
 import common
@@ -81,22 +81,25 @@ class MPIRUN(MPIBinary):
 # In descending order of priority (if no override present)
 BINARIES: list = [ JSRUN(), SRUN(), MPIEXEC(), MPIRUN() ]
 
-def get_binary(args: list) -> MPIBinary:
+def get_binary(args: list, exclude: typing.List[str] = None) -> MPIBinary:
+    if exclude is None:
+        exclude = []
+
+    binaries = [
+        b for b in BINARIES if b.is_present() and b.bin not in exclude
+    ]
+
+    if len(binaries) == 0:
+        raise common.MFCException("No MPI binary found.")
+
     # Handle user override
-    if args["binary"] != None:
-        for binary in BINARIES:
+    if args["binary"] is not None:
+        for binary in binaries:
             binary: MPIBinary
 
             if binary.bin == args["binary"]:
                 return binary
 
-        # Technically redundant
-        raise common.MFCException(f'{args["binary"]} is not currently supported by MFC.')
+        raise common.MFCException(f"MPI Binary <{args['binary']}> not found.")
 
-    for binary in BINARIES:
-        binary: MPIBinary
-
-        if binary.is_present():
-            return binary
-
-    raise common.MFCException("No executable capable of running an MPI program could be located.")
+    return binaries[0]

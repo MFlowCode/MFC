@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-import rich
-import rich.console
+from mfc.printer import cons
 
 import args
 import user
@@ -18,7 +17,7 @@ import tests.tests
 
 class MFCState:
     def __init__(self) -> None:
-        rich.print(common.MFC_HEADER)
+        cons.print(common.MFC_HEADER)
 
         self.user = user.MFCUser()
         self.lock = lock.MFCLock(self.user)
@@ -28,20 +27,17 @@ class MFCState:
 
         # Handle mode change
         if self.args["mode"] != self.lock.mode:
-            rich.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]")
+            cons.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode:[/bold yellow]")
             self.lock.mode = self.args["mode"]
             self.lock.write()
-
-            rich.print(f"[bold red]Purging build files...[/bold red]")
 
             for dep_name in build.get_target("mfc").requires:
                 t = build.get_target(dep_name)
                 dirpath = build.get_build_dirpath(t)
-                rich.print(f"[bold red] - {dep_name}: {os.path.relpath(dirpath)}[/bold red]")
+                cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
                 common.delete_directory(dirpath)
-        else:
-            rich.print(f"[bold yellow]You are currently in [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]")
-        rich.print("")
+
+        cons.print(f"[bold yellow]You are currently in [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]\n")
 
         if self.args["command"] == "test":
             self.test.execute()
@@ -64,8 +60,10 @@ if __name__ == "__main__":
     try:
         MFCState()
     except common.MFCException as exc:
-        rich.print(f"""
- --- [bold red]FATAL MFC ERROR[/bold red] ---
+        cons.reset()
+        cons.print(f"""
+--- [bold red]FATAL MFC ERROR[/bold red] ---
+
 {str(exc)}
 {FILE_ISSUE_MSG}
 """)
@@ -73,9 +71,11 @@ if __name__ == "__main__":
     except KeyboardInterrupt as exc:
         common.quit(signal.SIGTERM)
     except Exception as exc:
-        rich.console.Console().print_exception()
-        rich.print(f"""
- --- [bold red]FATAL MFC ERROR[/bold red] ---
+        cons.reset()
+        cons.print_exception()
+        cons.print(f"""
+--- [bold red]FATAL MFC ERROR[/bold red] ---
+
 An unexpected exception occurred:
 {FILE_ISSUE_MSG}
 """)

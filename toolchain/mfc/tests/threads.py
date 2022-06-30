@@ -2,6 +2,7 @@ import time
 import threading
 import dataclasses
 
+from mfc.printer import cons
 
 from tests.case import Case
 
@@ -52,9 +53,9 @@ class MFCTestThreadManager:
                 break
 
     def run(self, cases: list, handle_case) -> None:
-        with rich.progress.Progress() as progress:
-            queue_tracker    = progress.add_task("Queued   ", total=len(cases), )
-            complete_tracker = progress.add_task("Completed", total=len(cases), )
+        with rich.progress.Progress(console=cons.raw, transient=True) as progress:
+            queue_tracker    = progress.add_task("Queued   ", total=len(cases))
+            complete_tracker = progress.add_task("Completed", total=len(cases))
 
             # Queue Tests
             for i, test in enumerate(cases):

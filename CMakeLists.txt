@@ -59,8 +59,6 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     )
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
-        -g
-        -gopt
         -r8
         -cpp
         -Mfreeform
