@@ -318,8 +318,8 @@ module m_global_parameters
     LOGICAL, parameter :: integral_wrt  = .${CASE['database']['write']['integral']}$.
     INTEGER, parameter :: num_probes    = ${len(CASE['database']['probes'])}$
     INTEGER, parameter :: num_integrals = ${len(CASE['database']['integrals'])}$
-    TYPE(probe_parameters),    DIMENSION(num_probes),    parameter :: probe    = ${CASE['autogen']['probe']}$
-    TYPE(integral_parameters), DIMENSION(num_integrals), parameter :: integral = ${CASE['autogen']['integral']}$
+    TYPE(probe_parameters),    DIMENSION(num_probes) :: probe    = ${CASE['autogen']['probe']}$
+    TYPE(integral_parameters), DIMENSION(num_integrals) :: integral = ${CASE['autogen']['integral']}$
     REAL(KIND(0d0)), DIMENSION(5) :: threshold_mf = dflt_real
     INTEGER, DIMENSION(5) :: moment_order = (/ dflt_int, dflt_int, dflt_int, dflt_int, dflt_int /)
 
@@ -401,9 +401,9 @@ module m_global_parameters
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
-    REAL(KIND(0d0)) :: R_n    = dflt_real, R_v    = dflt_real
-    REAL(KIND(0d0)) :: phi_vn = dflt_real, phi_nv = dflt_real
-    REAL(KIND(0d0)) :: Pe_c   = dflt_real, Tw     = dflt_real
+    REAL(KIND(0d0)) :: R_n = dflt_real, R_v = dflt_real  
+    REAL(KIND(0d0)) :: phi_vn = dflt_real , phi_nv = dflt_real
+    REAL(KIND(0d0)) :: Pe_c = dflt_real , Tw = dflt_real 
     REAL(KIND(0d0)) :: pv, M_n, M_v
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     REAL(KIND(0d0)), DIMENSION(:), ALLOCATABLE :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
@@ -421,7 +421,7 @@ module m_global_parameters
     !< Number of monopoles
     INTEGER, parameter :: num_mono = ${len(CASE['acoustic']['monopoles'])}$
     !< Monopole parameters
-    TYPE(mono_parameters), DIMENSION(num_mono), parameter :: mono = ${CASE['autogen']['mono']}$
+    TYPE(mono_parameters), DIMENSION(num_mono):: mono = ${CASE['autogen']['mono']}$
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 
@@ -446,7 +446,6 @@ contains
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module() ! -------------------
-!$acc routine seq
 
         integer :: tmp_idx !< Temporary indexes storage
         integer :: i, j !< Generic loop iterators
@@ -966,7 +965,6 @@ contains
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_global_parameters_module() ! ---------------------
-!$acc routine seq
 
         integer :: i
 
@@ -1020,7 +1018,6 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
 !$acc routine seq
-
         real(kind(0d0)), intent(IN) :: vftmp
         real(kind(0d0)), dimension(:), intent(IN) :: nRtmp
         real(kind(0d0)), intent(OUT) :: ntmp
@@ -1106,7 +1103,6 @@ contains
 
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
-!$acc routine seq
 
         integer :: ir
         real(kind(0.d0)) :: R0mn
