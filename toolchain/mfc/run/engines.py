@@ -1,6 +1,7 @@
 import re
 import os
 import time
+import copy
 import datetime
 import dataclasses
 
@@ -122,10 +123,17 @@ class BatchEngine(Engine):
         rich.print("> > [bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
         rich.print("> > [bold yellow]INFO:[/bold yellow] You can modify the template batch file to your needs.")
 
-    def __get_batch_filepath(self, target_name: str):
-        case_dirpath = self.input.case_dirpath
+    def __get_batch_dirpath(self) -> str:
+        return copy.copy(self.input.case_dirpath)
 
-        return os.path.abspath(os.sep.join([case_dirpath, f"{target_name}.sh"]))
+    def __get_batch_filename(self, target_name: str) -> str:
+        return f"{target_name}.sh"
+
+    def __get_batch_filepath(self, target_name: str):
+        return os.path.abspath(os.sep.join([
+            self.__get_batch_dirpath(),
+            self.__get_batch_filename(target_name)
+        ]))
 
     def __generate_prologue(self, system: queues.QueueSystem,) -> str:
         return f"""\
@@ -241,8 +249,14 @@ exit $code
         common.file_write(filepath, content)
 
     def __execute_batch_file(self, system: queues.QueueSystem, target_name: str):
-        if 0 != os.system(system.gen_submit_cmd(self.__get_batch_filepath(target_name))):
-            raise common.MFCException(f"Running batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
+        # We CD to the case directory before executing the batch file so that
+        # any files the queue system generates (like .err and .out) are created
+        # in the correct directory.
+        
+        if os.system(
+            f"cd \"{self.__get_batch_dirpath()}\" && {self.__get_batch_filename(target_name)}"
+        ) != 0:
+            raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:
         pass
