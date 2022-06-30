@@ -37,36 +37,28 @@ jobs:
     steps:
       - name: Clone MFC
         uses: actions/checkout@v3
-      - name: (${{ matrix.os }}) Fetch dependencies
-        if: ${{ matrix.unix }}
+
+      - name: (macos-latest) Setup
+        if: matrix.os == 'macos-latest'
         run: |
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev; fi
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then brew install wget make python make cmake coreutils gcc@${{ matrix.gcc }}; fi
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then brew install --build-from-source open-mpi; fi
-        
-      - name: (${{ matrix.os }}) Setup & Environment Variables
-        if: ${{ matrix.unix }}
+          echo "OMPI_FC=gfortran-${{ matrix.gcc }}" >> $GITHUB_ENV
+          echo "OMPI_CXX=g++-${{ matrix.gcc }}"     >> $GITHUB_ENV
+          echo "OMPI_MPICC=gcc-${{ matrix.gcc }}"   >> $GITHUB_ENV
+          echo "CC=gcc-${{ matrix.gcc }}"           >> $GITHUB_ENV
+          echo "CXX=g++-${{ matrix.gcc }}"          >> $GITHUB_ENV
+          echo "FC=gfortran-${{ matrix.gcc }}"      >> $GITHUB_ENV
+          brew install wget make python make cmake coreutils gcc@${{ matrix.gcc }}
+          HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-${{ matrix.gcc }} --verbose --build-from-source open-mpi
+
+      - name: (ubuntu-latest) Setup
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then echo "HOMEBREW_CC=gcc-${{ matrix.gcc }}"  >> $GITHUB_ENV; fi
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then echo "HOMEBREW_CXX=g++-${{ matrix.gcc }}" >> $GITHUB_ENV; fi
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then echo "OMPI_MPICC=gcc-${{ matrix.gcc }}"   >> $GITHUB_ENV; fi
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then echo "OMPI_CXX=g++-${{ matrix.gcc }}"     >> $GITHUB_ENV; fi
-          if [[ "${{ matrix.os }}" == "macos-latest"  ]]; then echo "OMPI_FC=gfortran-${{ matrix.gcc }}" >> $GITHUB_ENV; fi
+          sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
 
       - name: (${{ matrix.os }}) Test MFC
-        if: ${{ matrix.unix }}
         run: |
           chmod +x ./mfc.sh
           ./mfc.sh test -j $(nproc) -m release-cpu
-          rm -rf build
-
-      - name: (${{ matrix.os }} - Docker) Build Image
-        run:  docker build --tag mfc toolchain/
-
-      - name: (${{ matrix.os }} - Docker) Test MFC
-        run:  >
-          docker run -it --mount type=bind,source="$(pwd)",target=/home/me/MFC
-          mfc /bin/bash -c "cd MFC && ./mfc.sh test -j $(nproc) -m release-cpu"
 
       - name: Upload logs
         uses: actions/upload-artifact@v3
