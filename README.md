@@ -122,46 +122,6 @@ change the ordering of directory paths in your `$PATH`, or make aliases to the
 correct binaries.
 
 <details>
-  <summary><h3>Docker (Cross-Platform)</h3></summary>
-
-  Docker is a lightweight, cross-platform, and performant alternative to Virtual Machines (VMs).
-  We build a Docker Image that contains the packages required to build and run MFC on your local machine.
-   
-  First install Docker and Git:
-  - Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
-  - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
-  - Other systems:
-  ```console
-  $ sudo apt install git docker # Debian / Ubuntu via Aptitude
-  $ sudo pacman -S git docker   # Arch Linux via Pacman
-  ```
-  
-  Once Docker and Git are installed on your system, clone MFC with
-  
-  ```console
-  $ git clone https://github.com/MFlowCode/MFC
-  $ cd MFC 
-  ```
-  
-  To fetch the prebuilt Docker image and enter an interactive bash session with the
-  recommended settings applied, run
-  
-  ```console
-  $ ./mfc.sh  docker # If on \*nix/macOS
-  $ .\mfc.bat docker # If on Windows
-  ```
-  
-  We automatically mount and configure the proper permissions in order for you to
-  access your local copy of MFC, available at `~/MFC`. You will be logged-in as the
-  `me` user with root permissions.
-  
-  :warning: The state of your container is entirely transient, except for the MFC mount.
-  Thus, any modification outside of `~/MFC` should be considered as permanently lost upon
-  session exit.
-
-</details>
-
-<details>
   <summary><h3>*nix</h3></summary>
 
   - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
@@ -216,15 +176,15 @@ correct binaries.
  
   **Note:** macOS remains the most difficult platform to consistently compile MFC on.
   If you run into issues, we suggest you try using Docker (instructions above).
-  
-   - **MacOS v10.15 (Catalina) or newer [ZSH]**
+
+   - **MacOS v10.15 (Catalina) or newer [ZSH]** (Verify with `echo $SHELL`)
   
   ```console
   $ touch ~/.zshrc
   $ open ~/.zshrc
   ```
   
-   - **Older than MacOS v10.15 (Catalina) [BASH]**
+   - **Older than MacOS v10.15 (Catalina) [BASH]** (Verify with `echo $SHELL`)
    
   ```console
   $ touch ~/.bash_profile
@@ -236,22 +196,63 @@ correct binaries.
   ```console
   # === MFC MPI Installation ===
   export MFC_GCC_VER=11
-  export HOMEBREW_CC=gcc-$MFC_GCC_VER
-  export HOMEBREW_CXX=g++-$MFC_GCC_VER
   export OMPI_MPICC=gcc-$MFC_GCC_VER
   export OMPI_CXX=g++-$MFC_GCC_VER
   export OMPI_FC=gfortran-$MFC_GCC_VER
+  export CC=gcc-$MFC_GCC_VER
+  export CXX=g++-$MFC_GCC_VER
+  export FC=gfortran-$MFC_GCC_VER
   # === MFC MPI Installation ===
   ```
   
-  Close your the open editor **and** terminal windows. Open a **new terminal** window before executing the commands bellow.
+  **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands bellow.
   
   ```console
   $ brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
-  $ brew install --build-from-source open-mpi
+  $ HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
   ```
-   
+   s
   They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`. Building this package might take a while.
+
+</details>
+
+<details>
+  <summary><h3>Docker (Cross-Platform)</h3></summary>
+
+  Docker is a lightweight, cross-platform, and performant alternative to Virtual Machines (VMs).
+  We build a Docker Image that contains the packages required to build and run MFC on your local machine.
+   
+  First install Docker and Git:
+  - Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
+  - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
+  - Other systems:
+  ```console
+  $ sudo apt install git docker # Debian / Ubuntu via Aptitude
+  $ sudo pacman -S git docker   # Arch Linux via Pacman
+  ```
+  
+  Once Docker and Git are installed on your system, clone MFC with
+  
+  ```console
+  $ git clone https://github.com/MFlowCode/MFC
+  $ cd MFC 
+  ```
+  
+  To fetch the prebuilt Docker image and enter an interactive bash session with the
+  recommended settings applied, run
+  
+  ```console
+  $ ./mfc.sh  docker # If on \*nix/macOS
+  $ .\mfc.bat docker # If on Windows
+  ```
+  
+  We automatically mount and configure the proper permissions in order for you to
+  access your local copy of MFC, available at `~/MFC`. You will be logged-in as the
+  `me` user with root permissions.
+  
+  :warning: The state of your container is entirely transient, except for the MFC mount.
+  Thus, any modification outside of `~/MFC` should be considered as permanently lost upon
+  session exit.
 
 </details>
  
