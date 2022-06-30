@@ -67,7 +67,6 @@ class InteractiveEngine(Engine):
 
         # Setting LD_LIBRARY_PATH is necessary because
         # Silo doesn't support static library generation.
-        ld = f'LD_LIBRARY_PATH=""'
         cd = f'cd "{self.input.case_dirpath}"'
 
         flags = ""
@@ -79,14 +78,10 @@ class InteractiveEngine(Engine):
         return f'{cd} && {self.mpibin.bin} {exec_params} {flags} "{binpath}"'
 
     def run(self, target_name: str) -> None:
-        date = f"> > [bold cyan][{common.get_datetime_str()}][/bold cyan]"
-        rich.print(f"{date} Running...")
-
         start_time = time.monotonic()
         common.system(self.get_exec_cmd(target_name))
 
-        end_time   = time.monotonic()
-
+        end_time = time.monotonic()
         rich.print(f"> > Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
 
     def validate_job_options(self, mfc) -> None:
@@ -119,16 +114,20 @@ class BatchEngine(Engine):
         system = queues.get_system()
         rich.print(f"> > Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
-        self.create_batch_file(system, target_name)
+        self.__create_batch_file(system, target_name)
 
-        self.execute_batch_file(system, target_name)
+        self.__execute_batch_file(system, target_name)
 
-    def get_batch_filepath(self, target_name: str):
+        rich.print("> > [bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
+        rich.print("> > [bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
+        rich.print("> > [bold yellow]INFO:[/bold yellow] You can modify the template batch file to your needs.")
+
+    def __get_batch_filepath(self, target_name: str):
         case_dirpath = self.input.case_dirpath
 
         return os.path.abspath(os.sep.join([case_dirpath, f"{target_name}.sh"]))
 
-    def generate_prologue(self, system: queues.QueueSystem,) -> str:
+    def __generate_prologue(self, system: queues.QueueSystem,) -> str:
         return f"""\
 TABLE_FORMAT_LINE="| - %-14s %-35s - %-14s %-35s |\\n"
 TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
@@ -157,7 +156,7 @@ echo -e ":) Running MFC..."
 t_start=$(date +%s)
 """
 
-    def generate_epilogue(self) -> str:
+    def __generate_epilogue(self) -> str:
         return f"""\
 code=$?
 
@@ -172,17 +171,17 @@ printf "$TABLE_FOOTER"
 exit $code
 """
 
-    def evaluate_variable(self, var: str) -> str:
+    def __evaluate_variable(self, var: str) -> str:
         v: str = var.strip()
         if v in self.mfc.args:
             return str(self.mfc.args[v])
         
         return None
 
-    def evaluate_expression(self, expr: str) -> str:
+    def __evaluate_expression(self, expr: str) -> str:
         expr_original = expr[:]
 
-        evaluated = self.evaluate_variable(expr)
+        evaluated = self.__evaluate_variable(expr)
         if evaluated is not None:
             if not common.isspace(evaluated):
                 return evaluated
@@ -190,9 +189,9 @@ exit $code
                 # The expression is valid but it is empty
                 return None
 
-        # It may me a calculation. Try and parse it
+        # It may be an expression. Try and parse it
         for var_candidate in re.split(r"[\*,\ ,\+,\-,\/,\\,\%,\,,\.,\^,\',\",\[,\],\(,\),\=]", expr):
-            evaluated = self.evaluate_variable(var_candidate)
+            evaluated = self.__evaluate_variable(var_candidate)
 
             if evaluated is not None and not common.isspace(evaluated):                
                 expr = expr.replace(var_candidate, evaluated)
@@ -204,10 +203,10 @@ exit $code
         except Exception as exc:
             raise common.MFCException(f"BatchEngine: {expr_original} (interpreted as {expr}) is not a valid expression in the template file. Please check your spelling.")
 
-    def batch_evaluate(self, s: str, system: queues.QueueSystem, target_name: str):
+    def __batch_evaluate(self, s: str, system: queues.QueueSystem, target_name: str):
         replace_list = [
-            ("{MFC::PROLOGUE}", self.generate_prologue(system)),
-            ("{MFC::EPILOGUE}", self.generate_epilogue()),
+            ("{MFC::PROLOGUE}", self.__generate_prologue(system)),
+            ("{MFC::EPILOGUE}", self.__generate_epilogue()),
             ("{MFC::BIN}",      self.get_binpath(target_name))
         ]
 
@@ -220,7 +219,7 @@ exit $code
 
         # Evaluate expressions of the form "{expression}"
         for match in re.findall(r"{[^\{]+}", s, flags=re.MULTILINE):
-            repl = self.evaluate_expression(match[1:-1])
+            repl = self.__evaluate_expression(match[1:-1])
 
             if repl is not None:
                 s = s.replace(match, repl)
@@ -228,17 +227,22 @@ exit $code
                 # If not specified, then remove the line it appears on
                 s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
 
-                rich.print(f"[bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it figures on will be discarded.")
+                rich.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it figures on will be discarded.")
 
         return s
 
-    def create_batch_file(self, system: queues.QueueSystem, target_name: str):
-        common.file_write(self.get_batch_filepath(target_name),
-                          self.batch_evaluate(system.template, system, target_name))
+    def __create_batch_file(self, system: queues.QueueSystem, target_name: str):
+        rich.print("> > Generating batch file...")
+        filepath = self.__get_batch_filepath(target_name)
+        rich.print("> > Evaluating template file...")
+        content = self.__batch_evaluate(system.template, system, target_name)
 
-    def execute_batch_file(self, system: queues.QueueSystem, target_name: str):
-        if 0 != os.system(system.gen_submit_cmd(self.get_batch_filepath(target_name))):
-            raise common.MFCException(f"Running batch file for {system.name} failed. It can be found here: {self.get_batch_filepath(target_name)}. Please check the file for errors.")
+        rich.print("> > Writing batch file...")
+        common.file_write(filepath, content)
+
+    def __execute_batch_file(self, system: queues.QueueSystem, target_name: str):
+        if 0 != os.system(system.gen_submit_cmd(self.__get_batch_filepath(target_name))):
+            raise common.MFCException(f"Running batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:
         pass
