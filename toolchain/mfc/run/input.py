@@ -3,12 +3,7 @@ import os
 import json
 import dataclasses
 
-import rich
-
 import common
-
-#import run.case_dicts as case_dicts
-import case
 
 @dataclasses.dataclass
 class MFCInputFile:
@@ -16,8 +11,8 @@ class MFCInputFile:
     case_dirpath: str
     case_dict:    dict
 
-    # Generate .inp and case.fpp input files.
-    def dump(self) -> None:
+    # Generate case.fpp
+    def create(self, target_name: str) -> None:
         # === case.fpp ===
         filepath = f"{os.getcwd()}/src/common/case.fpp"
         content  = f"""\
@@ -25,6 +20,7 @@ class MFCInputFile:
 ! describe the case one wishes to run.
 
 #:set CASE={self.case_dict}
+#:set CODE="{target_name}"
 
 """
 
@@ -39,7 +35,7 @@ class MFCInputFile:
         common.file_write(filepath, content)
 
 
-# Load from Python input file
+# Load the input file
 def load(filename: str) -> MFCInputFile:
     dirpath:    str  = os.path.abspath(os.path.dirname(filename))
     dictionary: dict = {}

@@ -42,7 +42,7 @@ program p_main
     implicit none
 
     integer :: t_step !< Iterator for the main time-stepping loop
-    integer :: i, nt
+    integer :: nt
     logical :: file_exists
     real(kind(0d0)) :: start, finish,start2, finish2, time_avg, time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
