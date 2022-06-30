@@ -49,7 +49,7 @@ def parse(mfc):
     test.add_argument("-f", "--from",     default=mfc.test.cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",       default=mfc.test.cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",     nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
-    test.add_argument("-b", "--binary",   choices=binaries, type=str, default="mpirun", help="(Serial) Override MPI execution binary")
+    test.add_argument("-b", "--binary",   choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
 
     # === RUN ===
     engines  = [ e.slug for e in ENGINES ]

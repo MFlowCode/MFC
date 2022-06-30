@@ -38,15 +38,15 @@ class Run:
     flags:          list
 
     def __init__(self, data: dict) -> None:
-        self.nodes          = int(data.get("nodes",         ""))
-        self.partition      =     data.get("partition",     "")
-        self.cpus_per_node  = int(data.get("cpus-per-node", ""))
-        self.gpus_per_node  = int(data.get("gpus-per-node", ""))
-        self.walltime       =     data.get("walltime",      "")
-        self.account        =     data.get("account",       "")
-        self.email          =     data.get("email",         "")
-        self.name           =     data.get("name",          "")
-        self.flags          =     data.get("flags",         [])
+        self.nodes         = int(data.get("nodes",         ""))
+        self.partition     =     data.get("partition",     "")
+        self.cpus_per_node = int(data.get("cpus-per-node", ""))
+        self.gpus_per_node = int(data.get("gpus-per-node", ""))
+        self.walltime      =     data.get("walltime",      "")
+        self.account       =     data.get("account",       "")
+        self.email         =     data.get("email",         "")
+        self.name          =     data.get("name",          "")
+        self.flags         =     data.get("flags",         [])
 
 
 @dataclasses.dataclass

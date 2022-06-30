@@ -2,6 +2,9 @@
 
 import os
 
+import rich
+
+from mfc.printer import cons
 
 import common
 
@@ -74,11 +77,13 @@ class MFCTest:
         range_str = f"from [bold magenta]{self.mfc.args['from']}[/bold magenta] to [bold magenta]{self.mfc.args['to']}[/bold magenta]"
 
         if len(self.mfc.args["only"]) > 0:
-            range_str = common.format_list_to_string([
+            range_str = "Only " + common.format_list_to_string([
                 f"[bold magenta]{uuid}[/bold magenta]" for uuid in self.mfc.args["only"]
             ], "Nothing to run")
+        
 
-        rich.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} test{'s' if len(self.cases) != 1 else ''})")
+        cons.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} test{'s' if len(self.cases) != 1 else ''})")
+        cons.indent()
 
         # Clear previous tests if we wish to (re)generate golden files
         if self.mfc.args["generate"]:
@@ -86,12 +91,14 @@ class MFCTest:
             common.create_directory(common.MFC_TESTDIR)
 
         # Run cases with multiple threads (if available)
-        rich.print(f"")
-        rich.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
-        rich.print(f"")
+        cons.print()
+        cons.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
+        cons.print()
         self.sched.run(self.cases, self.handle_case)
 
-        rich.print(f"> Tested [bold green]✓[/bold green]")
+        cons.print()
+        cons.print(f"Tested [bold green]✓[/bold green]")
+        cons.unindent()
 
     def handle_case(self, test: Case):
         test.create_directory()
@@ -108,7 +115,7 @@ class MFCTest:
         common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
 
         if cmd.returncode != 0:
-            rich.print(cmd.stdout)
+            cons.print(cmd.stdout)
             raise MFCException(f"""\
 {os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
 You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary in {test.get_dirpath()}/case.py.""")
@@ -126,4 +133,4 @@ You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary
             raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
         tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
-        rich.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+        cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")

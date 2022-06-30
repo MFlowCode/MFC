@@ -3,6 +3,8 @@ import os
 import json
 import dataclasses
 
+from mfc.printer import cons
+
 import common
 
 @dataclasses.dataclass
@@ -37,6 +39,8 @@ class MFCInputFile:
 
 # Load the input file
 def load(filename: str) -> MFCInputFile:
+    cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
+
     dirpath:    str  = os.path.abspath(os.path.dirname(filename))
     dictionary: dict = {}
 
