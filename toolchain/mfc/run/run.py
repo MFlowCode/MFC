@@ -57,7 +57,7 @@ class MFCRun:
 
         for target_name in engine.get_targets(self.mfc.args["targets"]):
             rich.print(f"> Generating input file...")
-            input_file.dump()
+            input_file.create(target_name)
 
             rich.print(f"> Building [bold magenta]{target_name}[/bold magenta]:")
             build.build_target(self.mfc, target_name)

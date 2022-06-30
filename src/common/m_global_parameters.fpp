@@ -156,7 +156,7 @@ module m_global_parameters
     LOGICAL, parameter :: hypoelasticity   = .${CASE['algorithm']['hypoelasticity']}$. !< Hypoelastic modeling
 !$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
 
-    INTEGER         :: cpu_start, cpu_end, cpu_rate
+    INTEGER :: cpu_start, cpu_end, cpu_rate
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -720,6 +720,14 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
+#:if CODE == "pre_process"
+
+        allocate (logic_grid(0:m, 0:n, 0:p))
+
+#:endif
+
+#:if CODE != "post_process"
+
 !$acc update device(Re_size, Re_idx)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
@@ -732,23 +740,19 @@ contains
         end if
 
 
-
-
-
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             allocate (ptil(ix%beg:ix%end, &
-                           iy%beg:iy%end, &
-                           iz%beg:iz%end))
+                        iy%beg:iy%end, &
+                        iz%beg:iz%end))
         end if
 
         if (probe_wrt) then
             buff_size = buff_size + fd_number
         end if
-
 
         startx = -buff_size
         starty = 0
@@ -784,6 +788,48 @@ contains
             allocate (x_root_cc(0:m_root))
         end if
 
+#:else
+
+        ! Determining the finite-difference number and the buffer size. Note
+        ! that the size of the buffer is unrelated to the order of the WENO
+        ! scheme. Rather, it is directly dependent on maximum size of ghost
+        ! zone layers and possibly the order of the finite difference scheme
+        ! used for the computation of vorticity and/or numerical Schlieren
+        ! function.
+        buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
+        offset_y%end, offset_z%beg, offset_z%end)
+
+        if (any(omega_wrt) .or. schlieren_wrt) then
+            buff_size = buff_size + fd_number
+        end if
+
+        ! Allocating the grid variables in the x-coordinate direction
+        allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
+        allocate (x_cc(-buff_size:m + buff_size))
+        allocate (dx(-buff_size:m + buff_size))
+
+        ! Allocating grid variables in the y- and z-coordinate directions
+        if (n > 0) then
+
+            allocate (y_cb(-1 - offset_y%beg:n + offset_y%end))
+            allocate (y_cc(-buff_size:n + buff_size))
+            allocate (dy(-buff_size:n + buff_size))
+
+            if (p > 0) then
+                allocate (z_cb(-1 - offset_z%beg:p + offset_z%end))
+                allocate (z_cc(-buff_size:p + buff_size))
+                allocate (dz(-buff_size:p + buff_size))
+            end if
+
+            ! Allocating the grid variables, only used for the 1D simulations,
+            ! and containing the defragmented computational domain grid data
+        else
+
+            allocate (x_root_cb(-1:m_root))
+            allocate (x_root_cc(0:m_root))
+
+        end if
+
         if (coarsen_silo) then
             allocate (coarse_x_cb(-1 - offset_x%beg:(m/2) + offset_x%end))
 
@@ -796,7 +842,7 @@ contains
             end if
         end if
 
-        allocate (logic_grid(0:m, 0:n, 0:p))
+#:endif
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 
