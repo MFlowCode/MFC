@@ -71,7 +71,7 @@ def get_target(name: str) -> MFCTarget:
     for target in TARGETS:
         if target.name == name:
             return target
-    
+
     raise common.MFCException(f"Target '{name}' does not exist.")
 
 
@@ -99,7 +99,7 @@ def clean_target(mfc, name: str):
     if target.isCollection:
         for dependency_name in target.requires:
             clean_target(mfc, dependency_name)
-        
+
         cons.unindent()
         return
 
@@ -120,14 +120,14 @@ def clean_target(mfc, name: str):
 def build_target(mfc, name: str, history: typing.List[str] = None):
     cons.print(f"Building [bold magenta]{name}[/bold magenta]:")
     cons.indent()
-    
+
     if history is None:
         history = []
 
     if name in history:
         cons.unindent()
         return
-    
+
     history.append(name)
 
     target = get_target(name)
@@ -145,7 +145,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     install_dirpath = get_install_dirpath()
 
     flags: list = target.flags.copy() + mode.flags + [
-        f"-Wno-dev"
+        f"-Wno-dev",
         f"-DCMAKE_BUILD_TYPE={mode.type}",
         f"-DCMAKE_PREFIX_PATH=\"{install_dirpath}\"",
         f"-DCMAKE_INSTALL_PREFIX=\"{install_dirpath}\"",
@@ -161,14 +161,14 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
         cons.print(f"[yellow]{configure}[/yellow]", highlight=False)
         cons.print(no_indent=True)
         common.create_directory(build_dirpath)
-        
+
         if common.system(f"{cd} && {configure}", no_exception=True) != 0:
             common.delete_directory(build_dirpath)
 
             raise common.MFCException(f"Failed to configure the {name} target.")
 
         cons.print(no_indent=True)
-    
+
     cons.print(f"[yellow]{build}[/yellow]", highlight=False)
     cons.print(no_indent=True)
     common.system(f"{cd} && {build}")

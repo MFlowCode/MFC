@@ -1,31 +1,25 @@
-# Initial configuration
 CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
 
 PROJECT(MFC LANGUAGES C CXX Fortran)
 
-
 # Imports
 INCLUDE(GNUInstallDirs)
 INCLUDE(ExternalProject)
-
+INCLUDE(CheckFortranCompilerFlag)
+INCLUDE(CheckIPOSupported)
 
 # Tell CMake to also check for lib64/
 SET_PROPERTY(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 
-# Find and configure all executables for MPI
-FIND_PACKAGE(MPI REQUIRED)
-
-
 # Add some (required) and cross-compiler compiler flags
 SET(CMAKE_Fortran_PREPROCESS ON)
 
+LINK_LIBRARIES(${CMAKE_DL_LIBS})
 
 # Add compiler specific flags
 IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     ADD_COMPILE_OPTIONS(
         -w
-        -cpp
-        -march=native
         -fdefault-real-8
         -fdefault-double-8
         -ffree-line-length-none
@@ -40,7 +34,7 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -ffpe-trap=invalid,zero,overflow,underflow
         )
     ENDIF()
-    
+
     IF (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
         ADD_COMPILE_OPTIONS(
             -fallow-invalid-boz
@@ -49,7 +43,7 @@ IF (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     ENDIF()
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     ADD_COMPILE_OPTIONS(
-        -Mfreeform 
+        -Mfreeform
         -Mpreprocess
         -fdefault-real-8
     )
@@ -69,6 +63,28 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID 
 ENDIF()
 
 
+IF (CMAKE_BUILD_TYPE STREQUAL "Release")
+
+    CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
+    IF (SUPPORTS_MARCH_NATIVE)
+        SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -march=native")
+    ELSE()
+    	CHECK_FORTRAN_COMPILER_FLAG("-mcpu=native" SUPPORTS_MCPU_NATIVE)
+        IF (SUPPORTS_MCPU_NATIVE)
+            SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mcpu=native")
+        ENDIF()
+    ENDIF()
+
+    # Check IPO (LTO)
+    CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
+    IF (SUPPORTS_IPO)
+        MESSAGE(STATUS "IPO / LTO enabled")
+        SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    ENDIF()
+
+ENDIF()
+
+
 # Options
 OPTION(MFC_WITH_OPEN_ACC      "Build with OpenACC" OFF)
 OPTION(MFC_BUILD_PRE_PROCESS  "Build pre_process"  OFF)
@@ -82,6 +98,8 @@ IF(MFC_BUILD_ALL)
     SET(MFC_BUILD_POST_PROCESS ON FORCE)
 ENDIF()
 
+# Find and configure all executables for MPI
+FIND_PACKAGE(MPI REQUIRED)
 
 # Enable OpenACC
 IF(MFC_WITH_OPEN_ACC)
