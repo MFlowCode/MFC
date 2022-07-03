@@ -26,7 +26,7 @@ module nvtx
     type   (C_PTR)     :: message          ! ascii char
   end type
 
-#ifdef _OPENACC
+#if defined(_OPENACC) && defined(__PGI)
 
   interface nvtxRangePush
     ! push range with custom label and standard color
@@ -59,7 +59,7 @@ module nvtx
     integer, optional :: id
     type(nvtxEventAttributes):: event
 
-#ifdef _OPENACC
+#if defined(_OPENACC) && defined(__PGI)
 
     tempName=trim(name)//c_null_char
 
@@ -75,7 +75,7 @@ module nvtx
   end subroutine
 
   subroutine nvtxEndRange
-#ifdef _OPENACC
+#if defined(_OPENACC) && defined(__PGI)
     call nvtxRangePop
 #endif
   end subroutine
