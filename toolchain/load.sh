@@ -78,7 +78,7 @@ fi
 if [ -v $u_cg ]; then
     echo -e "$MAGENTA[Q 2/2]$COLOR_RESET Would you like to run solely on CPUs or GPUs as well?"
     echo -e " - CPU (c) - GPU (g)"
-    echo -n "(c/g): " 
+    echo -n "(c/g): "
     read u_cg
 fi
 
@@ -144,7 +144,7 @@ elif [ "$u_computer" == "r" ]; then # Richardson
         on_error
         return
     fi
-    
+
     MODULES=("${MODULES[@]}" "python/3.7")
 elif [ "$u_computer" == "w" ]; then # For Wombat
     COMPUTER="$WOMBAT"
@@ -160,12 +160,12 @@ elif [ "$u_computer" == "e" ]; then # Expanse
     COMPUTER="$EXPANSE"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("cpu/0.15.4" "gcc/10.2.0" "openmpi/4.0.4")
+        MODULES=("cpu/0.15.4" "gcc/10.2.0" "openmpi/4.0.4" "cmake/3.18.2")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5")
+        MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
     fi
 
-    MODULES=("${MODULES[@]}" "cmake/3.19.8")
+    MODULES=("${MODULES[@]}" "python/3.8.5")
 elif [ "$u_computer" == "p" ]; then # Phoenix
     COMPUTER="$PHOENIX"
 
@@ -178,7 +178,7 @@ elif [ "$u_computer" == "p" ]; then # Phoenix
     MODULES=("${MODULES[@]}" "python/3.7.4" "cmake/3.20.3")
 else
     echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
-    
+
     on_error
     return
 fi
@@ -225,7 +225,7 @@ for module_name in ${MODULES[@]}; do
         echo -e "[$GREEN""SUCCESSFUL$COLOR_RESET]"
     else
         echo -e "[$RED""FAILED$COLOR_RESET]"
-        
+
         # Run load again to show error message
         module load "$module_name"
 

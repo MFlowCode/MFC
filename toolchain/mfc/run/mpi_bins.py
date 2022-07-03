@@ -30,7 +30,17 @@ class JSRUN(MPIBinary):
         gpus_per_rs=min(args["gpus_per_node"], 1)
         tasks_per_rs=1
 
-        return f'--smpiargs="-gpu" --nrs {nrs} --cpu_per_rs {cpus_per_rs} --gpu_per_rs {gpus_per_rs} --tasks_per_rs {tasks_per_rs}'
+        arguments=[
+            f'--nrs {nrs}',
+            f'--cpu_per_rs {cpus_per_rs}',
+            f'--gpu_per_rs {gpus_per_rs}',
+            f'--tasks_per_rs {tasks_per_rs}'
+        ]
+
+        if gpus_per_rs >= 1:
+            arguments.append('--smpiargs="-gpu"')
+
+        return ' '.join(arguments)
 
 
 class SRUN(MPIBinary):
@@ -79,7 +89,7 @@ class MPIRUN(MPIBinary):
         return f"-np {np}"
 
 # In descending order of priority (if no override present)
-BINARIES: list = [ JSRUN(), SRUN(), MPIEXEC(), MPIRUN() ]
+BINARIES: list = [ JSRUN(), SRUN(), MPIRUN(), MPIEXEC() ]
 
 def get_binary(args: list, exclude: typing.List[str] = None) -> MPIBinary:
     if exclude is None:
