@@ -27,7 +27,7 @@ class Engine:
         self._init()
 
     def _init(self) -> None:
-        pass 
+        pass
 
     def get_args(self) -> str:
         raise common.MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
@@ -84,14 +84,15 @@ MPI Binary    (-b)  {self.mpibin.bin} {f"[green](autodetect: {self.mpibin.name})
 
         cmd = self.get_exec_cmd(target_name)
 
-        cons.print(f"[yellow]{cmd.split('&&')[-1].strip()}[/yellow]", highlight=False)
-        cons.print(no_indent=True)
-        start_time = time.monotonic()
-        common.system(cmd)
-        end_time   = time.monotonic()
-        cons.print(no_indent=True)
+        if not self.mfc.args["dry_run"]:
+            cons.print(f"[yellow]{cmd.split('&&')[-1].strip()}[/yellow]", highlight=False)
+            cons.print(no_indent=True)
+            start_time = time.monotonic()
+            common.system(cmd)
+            end_time   = time.monotonic()
+            cons.print(no_indent=True)
 
-        cons.print(f"Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
+            cons.print(f"Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
 
         cons.unindent()
 
@@ -112,13 +113,13 @@ class BatchEngine(Engine):
 
     def get_args(self) -> str:
         return f"""\
-> Nodes         (-N)  {self.mfc.args['nodes']}
-> CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
-> GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
-> Walltime      (-w)  {self.mfc.args["walltime"]}
-> Partition     (-p)  {self.mfc.args["partition"]}
-> Account       (-a)  {self.mfc.args["account"]}
-> Email         (-@)  {self.mfc.args["email"]}
+Nodes         (-N)  {self.mfc.args['nodes']}
+CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
+GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
+Walltime      (-w)  {self.mfc.args["walltime"]}
+Partition     (-p)  {self.mfc.args["partition"]}
+Account       (-a)  {self.mfc.args["account"]}
+Email         (-@)  {self.mfc.args["email"]}
 """
 
     def run(self, target_name: str) -> None:
@@ -130,13 +131,14 @@ class BatchEngine(Engine):
 
         self.__create_batch_file(system, target_name)
 
-        cons.print(no_indent=True)
-        self.__execute_batch_file(system, target_name)
-        cons.print(no_indent=True)
+        if not self.mfc.args["dry_run"]:
+            cons.print(no_indent=True)
+            self.__execute_batch_file(system, target_name)
+            cons.print(no_indent=True)
 
-        cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
-        cons.print("[bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
-        cons.print("[bold yellow]INFO:[/bold yellow] You can modify the template batch file to your needs.")
+            cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
+            cons.print("[bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
+            cons.print("[bold yellow]INFO:[/bold yellow] You can modify the template batch file to your needs.")
 
         cons.unindent()
 
@@ -200,7 +202,7 @@ exit $code
         v: str = var.strip()
         if v in self.mfc.args:
             return str(self.mfc.args[v])
-        
+
         return None
 
     def __evaluate_expression(self, expr: str) -> str:
@@ -218,9 +220,9 @@ exit $code
         for var_candidate in re.split(r"[\*,\ ,\+,\-,\/,\\,\%,\,,\.,\^,\',\",\[,\],\(,\),\=]", expr):
             evaluated = self.__evaluate_variable(var_candidate)
 
-            if evaluated is not None and not common.isspace(evaluated):                
+            if evaluated is not None and not common.isspace(evaluated):
                 expr = expr.replace(var_candidate, evaluated)
-        
+
         # See if it computable
         try:
             # We assume eval is safe because we control the expression.
@@ -269,9 +271,9 @@ exit $code
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
-        
+
         if os.system(
-            f"cd \"{self.__get_batch_dirpath()}\" && {self.__get_batch_filename(target_name)}"
+            system.gen_submit_cmd(self.__get_batch_dirpath(), self.__get_batch_filename(target_name))
         ) != 0:
             raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
@@ -281,7 +283,7 @@ exit $code
 
 ENGINES = [ InteractiveEngine(), BatchEngine() ]
 
-def get_engine(slug: str) -> Engine:    
+def get_engine(slug: str) -> Engine:
     engine: Engine = None
     for candidate in ENGINES:
         candidate: Engine

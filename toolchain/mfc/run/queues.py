@@ -7,7 +7,7 @@ import common
 @dataclasses.dataclass
 class QueueSystem:
     name:     str
-    template: str 
+    template: str
 
     def __init__(self, name: str, filename: str) -> None:
         self.name     = name
@@ -16,7 +16,7 @@ class QueueSystem:
     def is_active(self) -> bool:
         raise common.MFCException("QueueSystem::is_active: not implemented.")
 
-    def gen_submit_cmd(self, filename: str) -> None:
+    def gen_submit_cmd(self, workdir: str, filepath: str) -> None:
         raise common.MFCException("QueueSystem::gen_submit_cmd: not implemented.")
 
 
@@ -27,8 +27,8 @@ class PBSSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_cmd_exist("qsub")
 
-    def gen_submit_cmd(self, filename: str) -> None:
-        return f"qsub {filename}"
+    def gen_submit_cmd(self, workdir: str, filename: str) -> None:
+        return f"cd '{workdir}' && qsub {filename}"
 
 
 class LSFSystem(QueueSystem):
@@ -38,8 +38,8 @@ class LSFSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_cmd_exist("bsub") and common.does_cmd_exist("bqueues")
 
-    def gen_submit_cmd(self, filename: str) -> None:
-        return f"bsub {filename}"
+    def gen_submit_cmd(self, workdir: str, filename: str) -> None:
+        return f"cd '{workdir}' && bsub {filename}"
 
 
 class SLURMSystem(QueueSystem):
@@ -49,8 +49,8 @@ class SLURMSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_cmd_exist("sbatch")
 
-    def gen_submit_cmd(self, filename: str) -> None:
-        return f"sbatch {filename}"
+    def gen_submit_cmd(self, workdir: str, filename: str) -> None:
+        return f"cd '{workdir}' && sbatch {filename}"
 
 
 QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
@@ -61,3 +61,4 @@ def get_system() -> QueueSystem:
             return system
 
     raise common.MFCException(f"Failed to detect a queue system.")
+

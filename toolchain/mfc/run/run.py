@@ -67,7 +67,7 @@ Targets       (-t)  {common.format_list_to_string(self.mfc.args['targets'], "Non
             build.build_target(self.mfc, target_name)
 
             engine.run(target_name)
-            
+
             cons.unindent()
-    
+
         cons.unindent()
