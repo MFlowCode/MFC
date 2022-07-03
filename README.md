@@ -505,7 +505,7 @@ It will generate and run test cases, comparing their output to that of previous 
 
 MFC uses [Fypp](https://github.com/aradi/fypp), a Python-based Fortran preprocessor to reduce code duplication. `.fpp` files are converted into regular `.f90` files as part of the build process. Documentation for Fypp can be found [here](https://fypp.readthedocs.io/en/stable/). 
 
-You can inspect the generated `.f90` files located in `build/<mode name>/src/<name of target>/src`.
+You can inspect the generated `.f90` files in `src/<code name>/autogen/`.
 
 ## Useful Scripts
 
