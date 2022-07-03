@@ -43,7 +43,7 @@ IF (MFC_WITH_OPEN_ACC)
         OpenACC::OpenACC_Fortran
     )
 
-    IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+    IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
         TARGET_LINK_LIBRARIES(simulation PRIVATE
             CUDA::nvToolsExt
             CUDA::cufft
