@@ -14,7 +14,7 @@ MODULE m_fftw
     
     USE m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-#ifdef _OPENACC
+#if defined(_OPENACC) && defined(__PGI)
     USE cufft
 #endif
 
@@ -25,8 +25,10 @@ MODULE m_fftw
     PRIVATE; PUBLIC :: s_initialize_fftw_module,   &
                        s_apply_fourier_filter,     &
                        s_finalize_fftw_module
-    
+
+#if !(defined(_OPENACC) && defined(__PGI))
     INCLUDE 'fftw3.f03'
+#endif
 
     TYPE(C_PTR) :: fwd_plan, bwd_plan
     TYPE(C_PTR) :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
@@ -46,7 +48,7 @@ MODULE m_fftw
 
     
     
-#ifdef _OPENACC
+#if defined(_OPENACC) && defined(__PGI)
     REAL(kind(0d0)), POINTER :: data_real_gpu(:) 
 
     COMPLEX(kind(0d0)), POINTER :: data_cmplx_gpu(:)  
@@ -72,7 +74,12 @@ MODULE m_fftw
         !!      applying the Fourier filter in the azimuthal direction.
         SUBROUTINE s_initialize_fftw_module() ! ----------------------------------
 
+#if defined(_OPENACC) && !defined(__PGI)
 
+            print *, "The FFTW module is not supported on OpenACC when using a compiler other than NVHPC/PGI."
+            stop 1
+
+#endif // defined(_OPENACC) && !defined(__PGI)
 
             ! Size of input array going into DFT
             real_size = p+1
@@ -83,7 +90,7 @@ MODULE m_fftw
 
             batch_size = x_size*sys_size
 
-#ifdef _OPENACC
+#if defined(_OPENACC)
             rank = 1; istride = 1; ostride = 1
 
             allocate(cufft_size(1:rank),iembed(1:rank), oembed(1:rank))
@@ -94,7 +101,7 @@ MODULE m_fftw
             oembed(1) = 0
 
             !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
-#endif
+#else
             ! Allocate input and output DFT data sizes
             fftw_real_data       = fftw_alloc_real   (int( real_size, C_SIZE_T))
             fftw_cmplx_data      = fftw_alloc_complex(int(cmplx_size, C_SIZE_T))
@@ -107,8 +114,8 @@ MODULE m_fftw
             ! Generate plans for forward and backward DFTs
             fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real      , data_cmplx, FFTW_ESTIMATE)
             bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real , FFTW_ESTIMATE)
-
-#ifdef _OPENACC
+#endif
+#if defined(_OPENACC)
             allocate(data_real_gpu(1:real_size*x_size*sys_size))
             allocate(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
             allocate(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -136,7 +143,7 @@ MODULE m_fftw
             ! Restrict filter to processors that have cells adjacent to axis
             IF (bc_y%beg >= 0) RETURN
 
-#ifdef _OPENACC
+#if defined(_OPENACC)
             
 !$acc parallel loop collapse(3) gang vector default(present) 
                 DO k = 1, sys_size
@@ -284,18 +291,19 @@ MODULE m_fftw
         !!      that will be used in the forward and backward DFTs when
         !!      applying the Fourier filter in the azimuthal direction.
         SUBROUTINE s_finalize_fftw_module() ! ------------------------------------
+
+#if defined(_OPENACC) && defined(__PGI)
+            deallocate(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+            ierr = cufftDestroy(fwd_plan_gpu)
+            ierr = cufftDestroy(bwd_plan_gpu)
+#else
             CALL fftw_free(fftw_real_data)
             CALL fftw_free(fftw_cmplx_data)
             CALL fftw_free(fftw_fltr_cmplx_data)
 
             CALL fftw_destroy_plan(fwd_plan)
             CALL fftw_destroy_plan(bwd_plan)
-
-#ifdef _OPENACC
-            deallocate(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
-            ierr = cufftDestroy(fwd_plan_gpu)
-            ierr = cufftDestroy(bwd_plan_gpu)
-#endif   
+#endif
 
         END SUBROUTINE s_finalize_fftw_module ! --------------------------------
 

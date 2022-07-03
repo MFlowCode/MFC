@@ -180,6 +180,7 @@ module m_rhs
     integer :: contxb, contxe
     integer :: advxb, advxe
     integer :: intxb, intxe
+!$acc declare create(intxb, intxe)
 
     integer :: bubxb, bubxe
     real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs

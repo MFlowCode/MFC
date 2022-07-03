@@ -36,7 +36,6 @@ module m_global_parameters
     logical,         parameter :: old_grid      = .${CASE['logistics']['old_grid']}$.       !< Use existing grid data
     logical,         parameter :: old_ic        = .${CASE['logistics']['old_ic']}$.         !< Use existing IC data
     integer,         parameter :: t_step_old    = ${CASE['logistics']['t_step_old']}$       !< Existing IC/grid folder
-!$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps, fourier_rings)
     ! ==========================================================================
 
     ! Computational Domain Parameters ==========================================
@@ -56,7 +55,6 @@ module m_global_parameters
 
     logical, parameter :: cyl_coord     = .${CASE['domain']['cyl_coord']}$.
     integer, parameter :: grid_geometry = ${CASE['autogen']['grid_geometry']}$!<
-!$acc declare create(cyl_coord, grid_geometry)
     !! Cylindrical coordinates (either axisymmetric or full 3D)
 
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc !<
@@ -154,7 +152,6 @@ module m_global_parameters
     LOGICAL, parameter :: We_wave_speeds   = .${CASE['algorithm']['We_wave_speeds']}$. !< Account for capillary effects when computing the contact wave speed
     LOGICAL, parameter :: lsq_deriv        = .${CASE['algorithm']['lsq_deriv']}$. !< Use linear least squares to calculate normals and curvatures
     LOGICAL, parameter :: hypoelasticity   = .${CASE['algorithm']['hypoelasticity']}$. !< Hypoelastic modeling
-!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
 
     INTEGER :: cpu_start, cpu_end, cpu_rate
 
@@ -395,7 +392,7 @@ module m_global_parameters
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:)     :: mom_sp
     TYPE(scalar_field), ALLOCATABLE, DIMENSION(:,:,:) :: mom_3d
     !> @}
-!$acc declare create(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc declare create(weight, R0, V0, ptil)
 !$acc declare create(mom_sp, mom_3d)
 
 
@@ -423,7 +420,7 @@ module m_global_parameters
     !< Monopole parameters
     TYPE(mono_parameters), DIMENSION(num_mono):: mono = ${CASE['autogen']['mono']}$
     !> @}
-!$acc declare create(monopole, mono, num_mono)
+!$acc declare create(mono)
 
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -438,7 +435,6 @@ module m_global_parameters
 
     ! Mathematical and Physical Constants ======================================
     real(kind(0d0)), parameter :: pi = 3.141592653589793d0
-!$acc declare create(pi)
     ! ==========================================================================
 
 contains
@@ -454,9 +450,6 @@ contains
         integer :: i1, i2, i3
 
         type(int_bounds_info) :: ix, iy, iz
-
-!$acc update device(weno_polyn)
-!$acc update device(nb)
 
 
         ! Setting m_root equal to m in the case of a 1D serial simulation

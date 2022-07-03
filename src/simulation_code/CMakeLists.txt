@@ -41,11 +41,14 @@ TARGET_LINK_LIBRARIES(simulation PRIVATE MPI::MPI_Fortran)
 IF (MFC_WITH_OPEN_ACC)
     TARGET_LINK_LIBRARIES(simulation PRIVATE
         OpenACC::OpenACC_Fortran
-        CUDA::nvToolsExt
-        CUDA::cufft
     )
 
-    target_compile_options(simulation PRIVATE -fPIC)
+    IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        TARGET_LINK_LIBRARIES(simulation PRIVATE
+            CUDA::nvToolsExt
+            CUDA::cufft
+        )
+    ENDIF()
 
-#    SET_PROPERTY(TARGET simulation PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    TARGET_COMPILE_OPTIONS(simulation PRIVATE "-fPIC")
 ENDIF ()
