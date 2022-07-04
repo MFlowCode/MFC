@@ -1,5 +1,5 @@
-import common
-from user import MFCUser
+import mfc.util.common as common
+from mfc.cfg.user import MFCUser
 
 import os
 import dataclasses

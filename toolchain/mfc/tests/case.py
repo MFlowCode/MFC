@@ -7,7 +7,7 @@ import subprocess
 import dataclasses
 
 
-import common
+import mfc.util.common as common
 import run.mpi_bins
 
 from mfc.case import *

@@ -1,11 +1,11 @@
 import re
 
-from mfc.printer import cons
+from mfc.util.printer import cons
 
 import run.engines as engines
 import run.input   as input
 
-import common
+import mfc.util.common as common
 import build
 
 
@@ -50,8 +50,6 @@ class MFCRun:
 Input               {self.mfc.args['input']}
 Job Name      (-#)  {self.mfc.args['name']}
 Engine        (-e)  {self.mfc.args['engine']}
-Mode          (-m)  {self.mfc.args['mode']}
-Targets       (-t)  {common.format_list_to_string(self.mfc.args['targets'], "None")}
 {engine.get_args()}\
 """)
         cons.unindent()

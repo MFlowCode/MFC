@@ -1,7 +1,7 @@
 import typing
 import dataclasses
 
-import common
+import mfc.util.common as common
 
 # Note: This file is now only used when running
 #       in serial mode.
@@ -12,7 +12,7 @@ class MPIBinary:
     bin:  str
 
     def is_present(self) -> bool:
-        return common.does_cmd_exist(self.bin)
+        return common.does_command_exist(self.bin)
 
     def gen_params(self, args: list) -> str:
         raise common.MFCException(f"MPIBinary::gen_params <{self.name}> not implemented.")

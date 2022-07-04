@@ -4,15 +4,15 @@ import os
 
 import rich
 
-from mfc.printer import cons
+from mfc.util.printer import cons
 
-import common
+import mfc.util.common as common
 
 from tests.case    import Case
 from tests.cases   import generate_cases
 from tests.threads import MFCTestThreadManager
 
-from common import MFCException
+from mfc.util.common import MFCException
 
 import tests.pack
 
@@ -64,7 +64,7 @@ class MFCTest:
         if self.mfc.args["list"]:
             table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
 
-            table.add_column("UUID", style="magenta", justify="center")
+            table.add_column("UUID", style="bold magenta", justify="center")
             table.add_column("Trace")
 
             for case in self.cases:

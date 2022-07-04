@@ -3,7 +3,7 @@ import json
 import typing
 import dataclasses
 
-import mfc.common
+import mfc.util.common as common
 
 # === (RE)DEFINE FORTRAN CONSTANTS === #
 

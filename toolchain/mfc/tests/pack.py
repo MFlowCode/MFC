@@ -6,12 +6,12 @@ import dataclasses
 from pathlib import Path
 
 
-import common
+import mfc.util.common as common
 
 import tests.case  as case
 import tests.tests
 
-from common import MFCException
+from mfc.util.common import MFCException
 
 
 @dataclasses.dataclass(repr=False)

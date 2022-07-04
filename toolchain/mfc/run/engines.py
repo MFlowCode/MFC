@@ -5,10 +5,10 @@ import copy
 import datetime
 import dataclasses
 
-from mfc.printer import cons
+from mfc.util.printer import cons
 
 import build
-import common
+import mfc.util.common as common
 
 import run.queues   as queues
 import run.mpi_bins as mpi_bins
@@ -58,9 +58,12 @@ class InteractiveEngine(Engine):
 
         return targets
 
-    def get_args(self) -> str:
+    def get_args(self) -> str:        
         return f"""\
-MPI Binary    (-b)  {self.mpibin.bin} {f"[green](autodetect: {self.mpibin.name})[/green]" if self.mfc.args["binary"] == None else f"[yellow](override: {self.mpibin.name})[/yellow]"}\
+Nodes         (-N)  {self.mfc.args['nodes']}
+CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
+GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
+MPI Binary    (-b)  {self.mpibin.bin}\
 """
 
     def get_exec_cmd(self, target_name: str):
@@ -155,6 +158,16 @@ Email         (-@)  {self.mfc.args["email"]}
         ]))
 
     def __generate_prologue(self, system: queues.QueueSystem,) -> str:
+        modules = f""
+
+        if common.does_system_use_modules():
+            modules = f"""\
+printf ":) Loading modules...\\n"
+
+module purge
+module load {' '.join(common.get_loaded_modules())}
+"""
+
         return f"""\
 TABLE_FORMAT_LINE="| - %-14s %-35s - %-14s %-35s |\\n"
 TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
@@ -175,6 +188,8 @@ printf "$TABLE_HEADER"
 printf "$TABLE_TITLE_FORMAT" "Starting" "{self.mfc.args["name"]} from {self.mfc.args["input"]}:"
 printf "$TABLE_CONTENT\\n"
 printf "$TABLE_FOOTER\\n"
+
+{modules}
 
 cd "{self.input.case_dirpath}"
 

@@ -1,20 +1,18 @@
 import os
-import sys
 import yaml
+import typing
 import shutil
-import tarfile
-import datetime
 import subprocess
 
 
-MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../..")
+MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__file__))}/../../..")
 MFC_TESTDIR         = os.path.abspath(f"{MFC_ROOTDIR}/tests")
 MFC_SUBDIR          = os.path.abspath(f"{MFC_ROOTDIR}/build")
 MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/toolchain/mfc.dev.yaml")
 MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
 MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
 
-MFC_HEADER = f"""[bold blue]\
+MFC_LOGO = f"""\
      ___            ___          ___
     /__/\          /  /\        /  /\\
    |  |::\        /  /:/_      /  /:/
@@ -26,7 +24,6 @@ MFC_HEADER = f"""[bold blue]\
   \  \:\         \  \:\       \  \:\/:/
    \  \:\         \  \:\       \  \::/
     \__\/          \__\/        \__\/
-[/bold blue]\
 """
 
 
@@ -47,12 +44,6 @@ def system(command: str, no_exception: bool = False, exception_text=None, on_err
             raise MFCException(exception_text)
 
     return status
-
-def get_datetime_str() -> str:
-    return datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-
-def clear_line() -> None:
-    sys.stdout.write("\033[K")
 
 
 def file_write(filepath: str, content: str):
@@ -99,13 +90,14 @@ def create_file(filepath: str) -> None:
         except IOError as exc:
             raise MFCException(f"Failed to create file {filepath}: {exc}")
 
-def delete_directory(directory_path: str) -> None:
-    if os.path.isdir(directory_path):
-        shutil.rmtree(directory_path)
+
+def create_directory(dirpath: str) -> None:
+    os.makedirs(dirpath, exist_ok=True)
 
 
-def create_directory(directory_path: str) -> None:
-    os.makedirs(directory_path, exist_ok=True)
+def delete_directory(dirpath: str) -> None:
+    if os.path.isdir(dirpath):
+        shutil.rmtree(dirpath)
 
 
 def get_py_program_output(filepath: str):
@@ -118,6 +110,7 @@ def get_py_program_output(filepath: str):
 
     return (proc.stdout, proc.returncode)
 
+
 def isspace(s: str) -> bool:
     if s == None:
         return True
@@ -125,7 +118,7 @@ def isspace(s: str) -> bool:
     return len(s.strip()) == 0
 
 
-def does_cmd_exist(s: str) -> bool:
+def does_command_exist(s: str) -> bool:
     return shutil.which(s) is not None
 
 
@@ -155,3 +148,26 @@ def find(predicate, arr: list):
 
 def quit(sig):
     os.kill(os.getpid(), sig)
+
+
+def does_system_use_modules() -> bool:
+    """
+    Returns True if the system uses modules.
+    """
+
+    return does_command_exist("module")
+
+
+def get_loaded_modules() -> typing.List[str]:
+    """
+    Returns a list of loaded modules.
+    """
+
+    proc = subprocess.run("module -t list", stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True,
+                          shell=True)
+    
+    if proc.returncode != 0:
+        raise MFCException(f"Failed to get loaded modules [Exit code={proc.stderr}].")
+
+    return proc.stdout.splitlines()

@@ -2,7 +2,7 @@ import time
 import threading
 import dataclasses
 
-from mfc.printer import cons
+from mfc.util.printer import cons
 
 from tests.case import Case
 

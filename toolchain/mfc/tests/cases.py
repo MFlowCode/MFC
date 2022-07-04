@@ -1,6 +1,6 @@
 import copy
 
-import common
+import mfc.util.common as common
 
 from mfc.case import *
 
