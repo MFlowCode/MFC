@@ -32,9 +32,6 @@ class Engine:
     def get_args(self) -> str:
         raise common.MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
 
-    def get_targets(self, targets: list) -> list:
-        raise common.MFCException(f"MFCEngine::get_targets: not implemented for {self.name}.")
-
     def run(self, target_name: str) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
@@ -44,19 +41,12 @@ class Engine:
     def get_binpath(self, target: str) -> str:
         return os.sep.join([build.get_install_dirpath(), "bin", target])
 
-
 class InteractiveEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Interactive", "interactive")
 
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary(self.mfc.args)
-
-    def get_targets(self, targets: list) -> list:
-        if targets[0] == "mfc":
-            return ["pre_process", "simulation", "post_process"]
-
-        return targets
 
     def get_args(self) -> str:        
         return f"""\
@@ -88,7 +78,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
         cmd = self.get_exec_cmd(target_name)
 
         if not self.mfc.args["dry_run"]:
-            cons.print(f"[yellow]{cmd.split('&&')[-1].strip()}[/yellow]", highlight=False)
+            cons.print(f"$ {cmd.split('&&')[-1].strip()}")
             cons.print(no_indent=True)
             start_time = time.monotonic()
             common.system(cmd)
@@ -107,12 +97,6 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 class BatchEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Batch", "batch")
-
-    def get_targets(self, targets: list) -> list:
-        if targets[0] == "mfc" or len(targets) != 1:
-            raise common.MFCException("The batch engine requires a unique target to run. Please specify -t <target_name>.")
-
-        return targets
 
     def get_args(self) -> str:
         return f"""\

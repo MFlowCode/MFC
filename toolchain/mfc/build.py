@@ -47,12 +47,6 @@ TARGETS: typing.List[MFCTarget] = [
         isDependency=False,
         isCollection=False,
         requires=['fftw3', 'silo']
-    ), MFCTarget(
-        name='mfc',
-        flags=[],
-        isDependency=False,
-        isCollection=True,
-        requires=['pre_process', 'simulation', 'post_process']
     ),
     MFCTarget(
         name="clean",
@@ -62,9 +56,12 @@ TARGETS: typing.List[MFCTarget] = [
         requires=[])
 ]
 
+def get_mfc_target_names() -> typing.List[str]:
+    return [ target.name for target in TARGETS if not target.isDependency and not target.isCollection ]
 
-def get_target_names() -> typing.List[str]:
-    return [ target.name for target in TARGETS ]
+
+def get_regular_target_names() -> typing.List[str]:
+    return [ target.name for target in TARGETS if not target.isCollection ]
 
 
 def get_target(name: str) -> MFCTarget:
@@ -158,7 +155,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
     # Only configure the first time
     if not os.path.exists(build_dirpath):
-        cons.print(f"[yellow]{configure}[/yellow]", highlight=False)
+        cons.print(f"$ {configure}")
         cons.print(no_indent=True)
         common.create_directory(build_dirpath)
 
@@ -169,11 +166,11 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
         cons.print(no_indent=True)
 
-    cons.print(f"[yellow]{build}[/yellow]", highlight=False)
+    cons.print(f"$ {build}")
     cons.print(no_indent=True)
     common.system(f"{cd} && {build}")
     cons.print(no_indent=True)
-    cons.print(f"[yellow]{install}[/yellow]", highlight=False)
+    cons.print(f"$ {install}")
     cons.print(no_indent=True)
     common.system(f"{cd} && {install}")
     cons.print(no_indent=True)

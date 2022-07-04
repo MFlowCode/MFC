@@ -1,6 +1,6 @@
 import argparse
 
-from build import get_target_names
+from build import get_mfc_target_names, get_regular_target_names
 
 
 def parse(mfc):
@@ -27,7 +27,7 @@ def parse(mfc):
     def add_common_arguments(p, mask=""):
         if "t" not in mask:
             p.add_argument("-t", "--targets", nargs="+", type=str.lower,
-                           choices=get_target_names(), default=["mfc"], help="")
+                           choices=get_regular_target_names(), default=get_mfc_target_names(), help="")
 
         if "m" not in mask:
             p.add_argument("-m", "--mode", type=str.lower, choices=mode_names,

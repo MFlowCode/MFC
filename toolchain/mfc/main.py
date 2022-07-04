@@ -26,6 +26,12 @@ class MFCState:
         self.args = mfc.args.parse(self)
         self.run  = mfc.run.run.MFCRun(self)
 
+        self.__handle_mode()
+        self.__print_greeting()
+        self.__run()
+
+
+    def __handle_mode(self):
         # Handle mode change
         if self.args["mode"] != self.lock.mode:
             cons.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode:[/bold yellow]")
@@ -38,6 +44,8 @@ class MFCState:
                 cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
                 delete_directory(dirpath)
 
+
+    def __print_greeting(self):
         MFC_LOGO_LINES       = MFC_LOGO.splitlines()
         max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
 
@@ -49,9 +57,9 @@ class MFCState:
             '-' * len(host_line),
             "",
             "",
-            f"[bold]-j: [magenta]{self.args['jobs']}[/magenta][/bold]",
-            f"[bold]-m: [magenta]{self.lock.mode}[/magenta][/bold]",
-            f"[bold]-t: {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in self.args['targets']], 'None')}[/bold]",
+            f"[bold]--jobs:    [magenta]{self.args['jobs']}[/magenta][/bold]",
+            f"[bold]--mode:    [magenta]{self.lock.mode}[/magenta][/bold]",
+            f"[bold]--targets: {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in self.args['targets']], 'None')}[/bold]",
             "",
             "",
             "[yellow]$ ./mfc.sh \[run, test, clean] --help[/yellow]",
@@ -68,6 +76,8 @@ class MFCState:
 
         cons.print()
 
+
+    def __run(self):
         if self.args["command"] == "test":
             self.test.execute()
         elif self.args["command"] == "run":
