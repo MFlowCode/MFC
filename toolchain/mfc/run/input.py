@@ -3,9 +3,9 @@ import os
 import json
 import dataclasses
 
-from mfc.printer import cons
+from mfc.util.printer import cons
 
-import common
+import mfc.util.common as common
 
 @dataclasses.dataclass
 class MFCInputFile:

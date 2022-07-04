@@ -1,7 +1,7 @@
 import os
 import dataclasses
 
-import common
+import mfc.util.common as common
 
 
 @dataclasses.dataclass
@@ -25,7 +25,7 @@ class PBSSystem(QueueSystem):
         super().__init__("PBS", "pbs.sh")
 
     def is_active(self) -> bool:
-        return common.does_cmd_exist("qsub")
+        return common.does_command_exist("qsub")
 
     def gen_submit_cmd(self, workdir: str, filename: str) -> None:
         return f"cd '{workdir}' && qsub {filename}"
@@ -36,7 +36,7 @@ class LSFSystem(QueueSystem):
         super().__init__("LSF", "lsf.sh")
 
     def is_active(self) -> bool:
-        return common.does_cmd_exist("bsub") and common.does_cmd_exist("bqueues")
+        return common.does_command_exist("bsub") and common.does_command_exist("bqueues")
 
     def gen_submit_cmd(self, workdir: str, filename: str) -> None:
         return f"cd '{workdir}' && bsub {filename}"
@@ -47,7 +47,7 @@ class SLURMSystem(QueueSystem):
         super().__init__("SLURM", "slurm.sh")
 
     def is_active(self) -> bool:
-        return common.does_cmd_exist("sbatch")
+        return common.does_command_exist("sbatch")
 
     def gen_submit_cmd(self, workdir: str, filename: str) -> None:
         return f"cd '{workdir}' && sbatch {filename}"

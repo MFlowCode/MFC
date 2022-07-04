@@ -11,7 +11,7 @@ class MFCPrinter:
         self.stack = []
 
     def indent(self, msg: str = None):
-        msg = msg if msg is not None else "> "
+        msg = msg if msg is not None else "  "
         
         self.stack.append(msg)
 

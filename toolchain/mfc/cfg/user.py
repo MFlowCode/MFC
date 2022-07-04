@@ -2,7 +2,8 @@ import os
 import typing
 import dataclasses
 
-import common
+from mfc.util.common import MFC_USER_FILEPATH, MFCException, create_file, \
+                            file_load_yaml
 
 
 @dataclasses.dataclass
@@ -56,10 +57,10 @@ class MFCUser:
     run:   Run
 
     def __init__(self) -> None:
-        if not os.path.exists(common.MFC_USER_FILEPATH):
-            common.create_file(common.MFC_USER_FILEPATH)
+        if not os.path.exists(MFC_USER_FILEPATH):
+            create_file(MFC_USER_FILEPATH)
         
-        data: dict = common.file_load_yaml(common.MFC_USER_FILEPATH)
+        data: dict = file_load_yaml(MFC_USER_FILEPATH)
 
         self.build = Build(data["build"])
         self.run   = Run  (data["run"])
@@ -70,4 +71,4 @@ class MFCUser:
             if mode.name == name:
                 return mode
 
-        raise common.MFCException(f'MFCConf: Mode "{mode}" doesn\'t exist')
+        raise MFCException(f'MFCConf: Mode "{mode}" doesn\'t exist')

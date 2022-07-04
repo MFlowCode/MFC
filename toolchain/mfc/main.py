@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
 
-from mfc.printer import cons
-
-import args
-import user
-import lock
-import build
-import common
-
 import os
 import signal
+import getpass
+import platform
+import itertools
 
-import run.run
-import tests.tests
+from mfc.util.common  import MFC_LOGO, MFCException, quit, delete_directory, format_list_to_string
+from mfc.util.printer import cons
+
+import mfc.args
+import mfc.build
+import mfc.cfg.user
+import mfc.cfg.lock
+
+import mfc.run.run
+import mfc.tests.tests
 
 
 class MFCState:
     def __init__(self) -> None:
-        cons.print(common.MFC_HEADER)
-
-        self.user = user.MFCUser()
-        self.lock = lock.MFCLock(self.user)
-        self.test = tests.tests.MFCTest(self)
-        self.args = args.parse(self)
-        self.run  = run.run.MFCRun(self)
+        self.user = mfc.cfg.user.MFCUser()
+        self.lock = mfc.cfg.lock.MFCLock(self.user)
+        self.test = mfc.tests.tests.MFCTest(self)
+        self.args = mfc.args.parse(self)
+        self.run  = mfc.run.run.MFCRun(self)
 
         # Handle mode change
         if self.args["mode"] != self.lock.mode:
@@ -31,13 +32,41 @@ class MFCState:
             self.lock.mode = self.args["mode"]
             self.lock.write()
 
-            for dep_name in build.get_target("mfc").requires:
-                t = build.get_target(dep_name)
-                dirpath = build.get_build_dirpath(t)
+            for dep_name in mfc.build.get_target("mfc").requires:
+                t = mfc.build.get_target(dep_name)
+                dirpath = mfc.build.get_build_dirpath(t)
                 cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
-                common.delete_directory(dirpath)
+                delete_directory(dirpath)
 
-        cons.print(f"[bold yellow]You are currently in [bold magenta]{self.lock.mode}[/bold magenta] mode.[/bold yellow]\n")
+        MFC_LOGO_LINES       = MFC_LOGO.splitlines()
+        max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
+
+        host_line = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]" 
+
+        MFC_SIDEBAR_LINES = [
+            "",
+            f"[bold]{host_line}[/bold]",
+            '-' * len(host_line),
+            "",
+            "",
+            f"[bold]-j: [magenta]{self.args['jobs']}[/magenta][/bold]",
+            f"[bold]-m: [magenta]{self.lock.mode}[/magenta][/bold]",
+            f"[bold]-t: {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in self.args['targets']], 'None')}[/bold]",
+            "",
+            "",
+            "[yellow]$ ./mfc.sh \[run, test, clean] --help[/yellow]",
+        ]
+
+
+        for a, b in itertools.zip_longest(MFC_LOGO_LINES, MFC_SIDEBAR_LINES):
+            lhs = a.ljust(max_logo_line_length)
+            rhs = b if b is not None else ''
+            cons.print(
+                f"[bold blue] {lhs} [/bold blue]  {rhs}",
+                highlight=False
+            )
+
+        cons.print()
 
         if self.args["command"] == "test":
             self.test.execute()
@@ -45,10 +74,10 @@ class MFCState:
             self.run.run()
         elif self.args["command"] == "build":
             for target in self.args["targets"]:
-                build.build_target(self, target)
+                mfc.build.build_target(self, target)
         elif self.args["command"] == "clean":
             for target in self.args["targets"]:
-                build.clean_target(self, target)
+                mfc.build.clean_target(self, target)
 
 
 FILE_ISSUE_MSG = f"""\
@@ -59,7 +88,7 @@ please visit https://github.com/MFlowCode/MFC-develop/issues to file an issue.\
 if __name__ == "__main__":
     try:
         MFCState()
-    except common.MFCException as exc:
+    except MFCException as exc:
         cons.reset()
         cons.print(f"""
 --- [bold red]FATAL MFC ERROR[/bold red] ---
@@ -67,9 +96,9 @@ if __name__ == "__main__":
 {str(exc)}
 {FILE_ISSUE_MSG}
 """)
-        common.quit(signal.SIGTERM)
+        quit(signal.SIGTERM)
     except KeyboardInterrupt as exc:
-        common.quit(signal.SIGTERM)
+        quit(signal.SIGTERM)
     except Exception as exc:
         cons.reset()
         cons.print_exception()
@@ -79,4 +108,4 @@ if __name__ == "__main__":
 An unexpected exception occurred:
 {FILE_ISSUE_MSG}
 """)
-        common.quit(signal.SIGTERM)
+        quit(signal.SIGTERM)
