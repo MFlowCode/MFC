@@ -48,7 +48,7 @@ class InteractiveEngine(Engine):
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary(self.mfc.args)
 
-    def get_args(self) -> str:        
+    def get_args(self) -> str:
         return f"""\
 Nodes         (-N)  {self.mfc.args['nodes']}
 CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
@@ -277,6 +277,8 @@ exit $code
             raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:
+        if len(mfc.args["targets"]) != 1:
+            raise common.MFCException(f"The Batch engine requires a unique target (-t) to run.")
         pass
 
 

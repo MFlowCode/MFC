@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #>
-#>           - SLURM Batch File Template -             
+#>           - SLURM Batch File Template -
 #>
 #> This file is part of the ./mfc.sh run subsystem.
 #> For more information, please consult the README.
-#> 
+#>
 #> - You are invited to modify this file to suit your
 #>   needs, in order to get MFC running properly on
 #>   your system.
@@ -23,7 +23,7 @@
 #>
 #> - Statements of the form {MFC::expression} tell MFC
 #>   where to place the common code, across all batch
-#>   files that is required to run MFC. They are not 
+#>   files that is required to run MFC. They are not
 #>   intended to be modified by users.
 #>
 #SBATCH --job-name="{name}"
@@ -49,12 +49,11 @@
 #>
 
 
-#> 
+#>
 #> Note: If your system requires you to load environment
 #>       modules inside of your batch script, please load
 #>       them bellow.
-#> 
-
+#>
 
 
 #>
@@ -63,22 +62,23 @@
 #>
 {MFC::PROLOGUE}
 
+
 #>
 #> Note: This MPI executable might not be well supported
 #>       on your system - if at all. {MFC::BIN} refers to
 #>       the path the MFC executable.
 #>
-srun                                   \
-     --nodes={nodes}                   \
-     --ntasks-per-node {cpus_per_node} \
-     "{MFC::BIN}"
+#>srun                                   \
+#>     --nodes={nodes}                   \
+#>     --ntasks-per-node {cpus_per_node} \
+#>     "{MFC::BIN}"
 #>
 #> srun --mpi=pmix   \
 #>      "{MFC::BIN}"
 #>
-#> mpirun                           \
-#>        -np {cpus_per_node*nodes} \
-#>        "{MFC::BIN}"
+ mpirun                           \
+        -np {cpus_per_node*nodes} \
+        "{MFC::BIN}"
 #>
 
 {MFC::EPILOGUE}

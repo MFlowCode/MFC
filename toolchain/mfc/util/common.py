@@ -119,16 +119,22 @@ def isspace(s: str) -> bool:
 
 
 def does_command_exist(s: str) -> bool:
-    return shutil.which(s) is not None
+    # If system is (not) Posix compliant
+    if shutil.which("command") is None:
+        return shutil.which(s) is not None
+
+    # command -v is useful because it allows for finding much more
+    # than with "which". Checkout "man command"
+    return 0 == os.system(f"command -v {s} > /dev/null 2>&1")
 
 
 def format_list_to_string(arr: list, empty = "nothing"):
     if len(arr) == 0:
         return empty
-    
+
     if len(arr) == 1:
         return arr[0]
-    
+
     if len(arr) == 2:
         return f"{arr[0]} and {arr[1]}"
 
@@ -142,7 +148,7 @@ def find(predicate, arr: list):
     for index, item in enumerate(arr):
         if predicate(index, item):
             return index, item
-    
+
     return None, None
 
 
@@ -163,11 +169,6 @@ def get_loaded_modules() -> typing.List[str]:
     Returns a list of loaded modules.
     """
 
-    proc = subprocess.run("module -t list", stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, universal_newlines=True,
-                          shell=True)
-    
-    if proc.returncode != 0:
-        raise MFCException(f"Failed to get loaded modules [Exit code={proc.stderr}].")
+    return subprocess.getoutput("module -t list").splitlines()
 
-    return proc.stdout.splitlines()
+

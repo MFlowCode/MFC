@@ -38,8 +38,8 @@ class MFCState:
             self.lock.mode = self.args["mode"]
             self.lock.write()
 
-            for dep_name in mfc.build.get_target("mfc").requires:
-                t = mfc.build.get_target(dep_name)
+            for target_name in mfc.build.get_mfc_target_names():
+                t = mfc.build.get_target(target_name)
                 dirpath = mfc.build.get_build_dirpath(t)
                 cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
                 delete_directory(dirpath)
@@ -49,7 +49,7 @@ class MFCState:
         MFC_LOGO_LINES       = MFC_LOGO.splitlines()
         max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
 
-        host_line = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]" 
+        host_line = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
 
         MFC_SIDEBAR_LINES = [
             "",
