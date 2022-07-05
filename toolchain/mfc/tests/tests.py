@@ -59,6 +59,14 @@ class MFCTest:
 
 
     def execute(self):
+        # Delete UUIDs that are not in the list of cases from tests/
+        if self.mfc.args["generate"]:
+            dir_uuids = set([name for name in os.listdir(".") if os.path.isdir(name)])
+            new_uuids = set([case.get_uuid() for case in self.cases])
+            
+            for old_uuid in dir_uuids - new_uuids:
+                common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+
         self.__filter_tests()
 
         if self.mfc.args["list"]:
@@ -85,10 +93,6 @@ class MFCTest:
         cons.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} test{'s' if len(self.cases) != 1 else ''})")
         cons.indent()
 
-        # Clear previous tests if we wish to (re)generate golden files
-        if self.mfc.args["generate"]:
-            common.delete_directory(common.MFC_TESTDIR)
-            common.create_directory(common.MFC_TESTDIR)
 
         # Run cases with multiple threads (if available)
         cons.print()
@@ -128,9 +132,10 @@ You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary
         if self.mfc.args["generate"]:
             common.delete_file(golden_filepath)
             pack.save(golden_filepath)
+        else:
+            if not os.path.isfile(golden_filepath):
+                raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
-        if not os.path.isfile(golden_filepath):
-            raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
-
-        tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
+            tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
+        
         cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
