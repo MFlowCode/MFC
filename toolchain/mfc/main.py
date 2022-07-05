@@ -51,6 +51,9 @@ class MFCState:
 
         host_line = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
 
+        targets_line = \
+            f"[bold]--targets: {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in self.args['targets']], 'None')}[/bold]"
+
         MFC_SIDEBAR_LINES = [
             "",
             f"[bold]{host_line}[/bold]",
@@ -59,7 +62,7 @@ class MFCState:
             "",
             f"[bold]--jobs:    [magenta]{self.args['jobs']}[/magenta][/bold]",
             f"[bold]--mode:    [magenta]{self.lock.mode}[/magenta][/bold]",
-            f"[bold]--targets: {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in self.args['targets']], 'None')}[/bold]",
+            targets_line if self.args["command"] != "test" else "",
             "",
             "",
             "[yellow]$ ./mfc.sh \[run, test, clean] --help[/yellow]",

@@ -76,7 +76,7 @@ MODULE m_fftw
 
 #if defined(_OPENACC) && !defined(__PGI)
 
-            print *, "The FFTW module is not supported on OpenACC when using a compiler other than NVHPC/PGI."
+            print *, "The FFTW module is not supported when using OpenACC with a compiler other than NVHPC/PGI."
             stop 1
 
 #endif // defined(_OPENACC) && !defined(__PGI)
@@ -90,7 +90,7 @@ MODULE m_fftw
 
             batch_size = x_size*sys_size
 
-#if defined(_OPENACC)
+#if defined(_OPENACC) && defined(__PGI)
             rank = 1; istride = 1; ostride = 1
 
             allocate(cufft_size(1:rank),iembed(1:rank), oembed(1:rank))
@@ -115,7 +115,7 @@ MODULE m_fftw
             fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real      , data_cmplx, FFTW_ESTIMATE)
             bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real , FFTW_ESTIMATE)
 #endif
-#if defined(_OPENACC)
+#if defined(_OPENACC) && defined(__PGI)
             allocate(data_real_gpu(1:real_size*x_size*sys_size))
             allocate(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
             allocate(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -143,7 +143,7 @@ MODULE m_fftw
             ! Restrict filter to processors that have cells adjacent to axis
             IF (bc_y%beg >= 0) RETURN
 
-#if defined(_OPENACC)
+#if defined(_OPENACC) && defined(__PGI)
             
 !$acc parallel loop collapse(3) gang vector default(present) 
                 DO k = 1, sys_size
