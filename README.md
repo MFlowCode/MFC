@@ -441,6 +441,14 @@ $ ./mfc.sh test -j <thread count>
 
 It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy. Run `./mfc.sh test -h` for a full list of accepted arguments.
 
+Most notably, you can consult the full list of tests by running
+```
+$ ./mfc.sh test -l
+```
+
+To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options. To run a 
+(non-contiguous) subset of tests, use the `--only` (`-o`) option instead.
+
 <details>
   <summary><h3>Creating Tests</h3></summary>
 

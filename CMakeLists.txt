@@ -99,7 +99,7 @@ IF (MFC_BUILD_ALL)
 ENDIF()
 
 # Find and configure all executables for MPI
-FIND_PACKAGE(MPI REQUIRED)
+FIND_PACKAGE(MPI COMPONENTS Fortran REQUIRED)
 
 # Enable OpenACC
 IF (MFC_WITH_OPEN_ACC)
