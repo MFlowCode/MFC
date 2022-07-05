@@ -155,6 +155,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
     # Only configure the first time
     if not os.path.exists(build_dirpath):
+        cons.print(no_indent=True)
         cons.print(f"$ {configure}")
         cons.print(no_indent=True)
         common.create_directory(build_dirpath)
@@ -164,8 +165,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
             raise common.MFCException(f"Failed to configure the {name} target.")
 
-        cons.print(no_indent=True)
-
+    cons.print(no_indent=True)
     cons.print(f"$ {build}")
     cons.print(no_indent=True)
     common.system(f"{cd} && {build}")

@@ -78,6 +78,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
         cmd = self.get_exec_cmd(target_name)
 
         if not self.mfc.args["dry_run"]:
+            cons.print(no_indent=True)
             cons.print(f"$ {cmd.split('&&')[-1].strip()}")
             cons.print(no_indent=True)
             start_time = time.monotonic()
@@ -270,10 +271,13 @@ exit $code
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
+        cmd = system.gen_submit_cmd(self.__get_batch_dirpath(), self.__get_batch_filename(target_name))
 
-        if os.system(
-            system.gen_submit_cmd(self.__get_batch_dirpath(), self.__get_batch_filename(target_name))
-        ) != 0:
+        cons.print(no_indent=True)
+        cons.print(f"$ {cmd}")
+        cons.print(no_indent=True)
+
+        if os.system(cmd) != 0:
             raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:

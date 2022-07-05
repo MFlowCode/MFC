@@ -57,6 +57,7 @@ Engine        (-e)  {self.mfc.args['engine']}
         self.validate_job_options()
 
         for target_name in self.mfc.args["targets"]:
+            cons.print(no_indent=True)
             cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
             cons.indent()
 
