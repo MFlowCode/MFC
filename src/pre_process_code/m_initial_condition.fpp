@@ -5,6 +5,8 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
+#:include '../common/case.fpp'
+
 !> @brief This module provides a platform that is analagous to constructive
 !!              solid geometry techniques and in this way allows for the creation
 !!              of a wide variety of initial conditions. Several 1D, 2D and 3D
@@ -192,26 +194,26 @@ contains
             q_prim_vf(1)%sf(j, k, 0) = &
                 rho*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
                      (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2d0 &
-                                   - (y_cc(k) - y_centroid)**2d0)) &
+                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                                   - (y_cc(k) - y_centroid)**2)) &
                      )**gamma
 
             ! Velocity
             q_prim_vf(2)%sf(j, k, 0) = &
                 vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2d0 &
-                          - (y_cc(k) - y_centroid)**2d0))
+                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                          - (y_cc(k) - y_centroid)**2))
             q_prim_vf(3)%sf(j, k, 0) = &
                 vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2d0 &
-                          - (y_cc(k) - y_centroid)**2d0))
+                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                          - (y_cc(k) - y_centroid)**2))
 
             ! Pressure
             q_prim_vf(4)%sf(j, k, 0) = &
                 pres*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
                       (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2d0 &
-                                    - (y_cc(k) - y_centroid)**2d0)) &
+                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                                    - (y_cc(k) - y_centroid)**2)) &
                       )**(gamma + 1d0)
 
             ! Specific heat ratio function
@@ -312,7 +314,7 @@ contains
         end if
 
         ! Bubbles variables
-        if (bubbles) then
+        #:if CASE['bubbles']['bubbles']
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
                 muV = patch_icpp(patch_id)%v0 ! = 0
@@ -322,16 +324,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2d0 + sigR**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2d0 + sigV**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2d0)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2d0)/2d0)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2d0 + sigV**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
 
                     if (j == 0 .and. k == 0 .and. l == 0) then
@@ -352,7 +354,7 @@ contains
                     end if
                 end if
             end do
-        end if
+        #:endif
 
         ! Density and the specific heat ratio and liquid stiffness functions
         call s_convert_species_to_mixture_variables( &
@@ -391,7 +393,7 @@ contains
         end if
 
         ! Bubbles variables
-        if (bubbles) then
+        #:if CASE['bubbles']['bubbles']
             do i = 1, nb
                 muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
                 muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
@@ -401,16 +403,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2d0 + sigR**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2d0 + sigV**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2d0)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2d0)/2d0)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2d0 + sigV**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2d0)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
@@ -421,7 +423,7 @@ contains
                     end if
                 end if
             end do
-        end if
+        #:endif
 
         ! Density and the specific heat ratio and liquid stiffness functions
         call s_convert_species_to_mixture_variables( &
@@ -489,7 +491,7 @@ contains
         end do
 
         ! Smoothed bubble variables
-        if (bubbles) then
+        #:if CASE['bubbles']['bubbles']
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
                 muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
@@ -499,16 +501,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2d0 + sigR**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2d0 + sigV**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2d0)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2d0)*2d0)*(muR**2d0)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2d0)/2d0)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2d0 + sigV**2d0
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2d0)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
                     ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
@@ -527,7 +529,7 @@ contains
 
                 end if
             end do
-        end if
+        #:endif
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -1123,14 +1125,14 @@ contains
                 if (patch_icpp(patch_id)%smoothen) then
 
                     eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
-                               (sqrt((x_cc(i) - x_centroid)**2d0 &
-                                     + (y_cc(j) - y_centroid)**2d0) &
+                               (sqrt((x_cc(i) - x_centroid)**2 &
+                                     + (y_cc(j) - y_centroid)**2) &
                                 - radius))*(-0.5d0) + 0.5d0
 
                 end if
 
-                if (((x_cc(i) - x_centroid)**2d0 &
-                     + (y_cc(j) - y_centroid)**2d0 <= radius**2d0 &
+                if (((x_cc(i) - x_centroid)**2 &
+                     + (y_cc(j) - y_centroid)**2 <= radius**2 &
                      .and. &
                      patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
@@ -1179,8 +1181,8 @@ contains
         ! the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
-                myr = dsqrt((x_cc(i) - x_centroid)**2d0 &
-                            + (y_cc(j) - y_centroid)**2d0)
+                myr = dsqrt((x_cc(i) - x_centroid)**2 &
+                            + (y_cc(j) - y_centroid)**2)
 
                 if (myr <= radius + thickness/2.d0 .and. &
                     myr >= radius - thickness/2.d0 .and. &
@@ -1232,8 +1234,8 @@ contains
         do k = 0, p
         do j = 0, n
             do i = 0, m
-                myr = dsqrt((x_cc(i) - x_centroid)**2d0 &
-                            + (y_cc(j) - y_centroid)**2d0)
+                myr = dsqrt((x_cc(i) - x_centroid)**2 &
+                            + (y_cc(j) - y_centroid)**2)
 
                 if (myr <= radius + thickness/2.d0 .and. &
                     myr >= radius - thickness/2.d0 .and. &
@@ -1286,13 +1288,13 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
-                               (sqrt(((x_cc(i) - x_centroid)/a)**2d0 + &
-                                     ((y_cc(j) - y_centroid)/b)**2d0) &
+                               (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
+                                     ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1d0))*(-0.5d0) + 0.5d0
                 end if
 
-                if ((((x_cc(i) - x_centroid)/a)**2d0 + &
-                     ((y_cc(j) - y_centroid)/b)**2d0 <= 1d0 &
+                if ((((x_cc(i) - x_centroid)/a)**2 + &
+                     ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
                      .and. &
                      patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
@@ -1353,15 +1355,15 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx_min, dy_min, dz_min)* &
-                                   (sqrt(((x_cc(i) - x_centroid)/a)**2d0 + &
-                                         ((cart_y - y_centroid)/b)**2d0 + &
-                                         ((cart_z - z_centroid)/c)**2d0) &
+                                   (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
+                                         ((cart_y - y_centroid)/b)**2 + &
+                                         ((cart_z - z_centroid)/c)**2) &
                                     - 1d0))*(-0.5d0) + 0.5d0
                     end if
 
-                    if ((((x_cc(i) - x_centroid)/a)**2d0 + &
-                         ((cart_y - y_centroid)/b)**2d0 + &
-                         ((cart_z - z_centroid)/c)**2d0 <= 1d0 &
+                    if ((((x_cc(i) - x_centroid)/a)**2 + &
+                         ((cart_y - y_centroid)/b)**2 + &
+                         ((cart_z - z_centroid)/c)**2 <= 1d0 &
                          .and. &
                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
@@ -1484,7 +1486,7 @@ contains
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx_min, dy_min) &
                                            *(a*x_cc(i) + b*y_cc(j) + c) &
-                                           /sqrt(a**2d0 + b**2d0))
+                                           /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0d0 &
@@ -1534,8 +1536,8 @@ contains
         do j = 0, n
             do i = 0, m
 
-                if ((x_cc(i) - x_centroid)**2d0 &
-                    + (y_cc(j) - y_centroid)**2d0 <= radius**2d0 &
+                if ((x_cc(i) - x_centroid)**2 &
+                    + (y_cc(j) - y_centroid)**2 <= radius**2 &
                     .and. &
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     then
@@ -1800,11 +1802,11 @@ contains
                     ! ================================================================================
 
                     ! Initial pressure profile smearing for bubble collapse case of Tiwari (2013) ====
-                    !IF((       (x_cc(i))**2d0                     &
-                    !         + (y_cc(j))**2d0 <= 1d0**2d0)) THEN
+                    !IF((       (x_cc(i))**2                     &
+                    !         + (y_cc(j))**2 <= 1d0**2)) THEN
                     !         q_prim_vf(E_idx)%sf(i,j,0) = 1d5 / 25d0
                     !ELSE
-                    !    q_prim_vf(E_idx)%sf(i,j,0) = 1d5 + 1d0/SQRT(x_cc(i)**2d0+y_cc(j)**2d0) &
+                    !    q_prim_vf(E_idx)%sf(i,j,0) = 1d5 + 1d0/SQRT(x_cc(i)**2+y_cc(j)**2) &
                     !                                    * ((1d5/25d0) - 1d5)
                     !END IF
                     ! ================================================================================
@@ -1921,7 +1923,7 @@ contains
                         !q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
                         !q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
                         !q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = y_cc(j)*COS(z_cc(k))*SIN(z_cc(k))
-                        !q_prim_vf(mom_idx%end  )%sf(i,j,k) = -y_cc(j)*SIN(z_cc(k))**2d0
+                        !q_prim_vf(mom_idx%end  )%sf(i,j,k) = -y_cc(j)*SIN(z_cc(k))**2
                         !q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
                         !q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
                         ! ================================================================================
@@ -1975,9 +1977,9 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (((x_cc(i) - x_centroid)**2d0 &
-                         + (cart_y - y_centroid)**2d0 &
-                         + (cart_z - z_centroid)**2d0 <= radius**2d0 &
+                    if (((x_cc(i) - x_centroid)**2 &
+                         + (cart_y - y_centroid)**2 &
+                         + (cart_z - z_centroid)**2 <= radius**2 &
                          .and. &
                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)))) &
                         then
@@ -1992,34 +1994,34 @@ contains
                             end if
                         elseif (epsilon == 2d0) then
                             if (beta == 0d0) then
-                                H = 25d-2*sqrt(5d0/pi)*(3d0*cos(sph_phi)**2d0 - 1d0)
+                                H = 25d-2*sqrt(5d0/pi)*(3d0*cos(sph_phi)**2 - 1d0)
                             elseif (beta == 1d0) then
                                 H = -5d-1*sqrt(15d0/(2d0*pi))*exp(cmplx_i*z_cc(k))*sin(sph_phi)*cos(sph_phi)
                             elseif (beta == 2d0) then
-                                H = 25d-2*sqrt(15d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))*sin(sph_phi)**2d0
+                                H = 25d-2*sqrt(15d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))*sin(sph_phi)**2
                             end if
                         elseif (epsilon == 3d0) then
                             if (beta == 0d0) then
                                 H = 25d-2*sqrt(7d0/pi)*(5d0*cos(sph_phi)**3d0 - 3d0*cos(sph_phi))
                             elseif (beta == 1d0) then
                                 H = -125d-3*sqrt(21d0/pi)*exp(cmplx_i*z_cc(k))*sin(sph_phi)* &
-                                    (5d0*cos(sph_phi)**2d0 - 1d0)
+                                    (5d0*cos(sph_phi)**2 - 1d0)
                             elseif (beta == 2d0) then
                                 H = 25d-2*sqrt(105d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**2d0*cos(sph_phi)
+                                    sin(sph_phi)**2*cos(sph_phi)
                             elseif (beta == 3d0) then
                                 H = -125d-3*sqrt(35d0/pi)*exp(3d0*cmplx_i*z_cc(k))*sin(sph_phi)**3d0
                             end if
                         elseif (epsilon == 4d0) then
                             if (beta == 0d0) then
                                 H = 3d0/16d0*sqrt(1d0/pi)*(35d0*cos(sph_phi)**4d0 - &
-                                                           3d1*cos(sph_phi)**2d0 + 3d0)
+                                                           3d1*cos(sph_phi)**2 + 3d0)
                             elseif (beta == 1d0) then
                                 H = -3d0/8d0*sqrt(5d0/pi)*exp(cmplx_i*z_cc(k))* &
                                     sin(sph_phi)*(7d0*cos(sph_phi)**3d0 - 3d0*cos(sph_phi))
                             elseif (beta == 2d0) then
                                 H = 3d0/8d0*sqrt(5d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**2d0*(7d0*cos(sph_phi)**2d0 - 1d0)
+                                    sin(sph_phi)**2*(7d0*cos(sph_phi)**2 - 1d0)
                             elseif (beta == 3d0) then
                                 H = -3d0/8d0*sqrt(35d0/pi)*exp(3d0*cmplx_i*z_cc(k))* &
                                     sin(sph_phi)**3d0*cos(sph_phi)
@@ -2033,13 +2035,13 @@ contains
                                                             7d1*cos(sph_phi)**3d0 + 15d0*cos(sph_phi))
                             elseif (beta == 1d0) then
                                 H = -1d0/16d0*sqrt(165d0/(2d0*pi))*exp(cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)*(21d0*cos(sph_phi)**4d0 - 14d0*cos(sph_phi)**2d0 + 1d0)
+                                    sin(sph_phi)*(21d0*cos(sph_phi)**4d0 - 14d0*cos(sph_phi)**2 + 1d0)
                             elseif (beta == 2d0) then
                                 H = 125d-3*sqrt(1155d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**2d0*(3d0*cos(sph_phi)**3d0 - cos(sph_phi))
+                                    sin(sph_phi)**2*(3d0*cos(sph_phi)**3d0 - cos(sph_phi))
                             elseif (beta == 3d0) then
                                 H = -1d0/32d0*sqrt(385d0/pi)*exp(3d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**3d0*(9d0*cos(sph_phi)**2d0 - 1d0)
+                                    sin(sph_phi)**3d0*(9d0*cos(sph_phi)**2 - 1d0)
                             elseif (beta == 4d0) then
                                 H = 3d0/16d0*sqrt(385d0/(2d0*pi))*exp(4d0*cmplx_i*z_cc(k))* &
                                     sin(sph_phi)**4d0*cos(sph_phi)
@@ -2108,16 +2110,16 @@ contains
                     if (patch_icpp(patch_id)%smoothen) then
 
                         eta = tanh(smooth_coeff/min(dx_min, dy_min, dz_min)* &
-                                   (sqrt((x_cc(i) - x_centroid)**2d0 &
-                                         + (cart_y - y_centroid)**2d0 &
-                                         + (cart_z - z_centroid)**2d0) &
+                                   (sqrt((x_cc(i) - x_centroid)**2 &
+                                         + (cart_y - y_centroid)**2 &
+                                         + (cart_z - z_centroid)**2) &
                                     - radius))*(-0.5d0) + 0.5d0
 
                     end if
 
-                    if (((x_cc(i) - x_centroid)**2d0 &
-                         + (cart_y - y_centroid)**2d0 &
-                         + (cart_z - z_centroid)**2d0 <= radius**2d0 &
+                    if (((x_cc(i) - x_centroid)**2 &
+                         + (cart_y - y_centroid)**2 &
+                         + (cart_z - z_centroid)**2 <= radius**2 &
                          .and. &
                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
@@ -2130,16 +2132,16 @@ contains
 
                     ! Initialization of the pressure field that corresponds to the bubble-collapse
                      !! test case found in Tiwari et al. (2013)
-                    ! radius_pressure = SQRT(x_cc(i)**2d0) ! 1D
-                    ! radius_pressure = SQRT(x_cc(i)**2d0 + cart_y**2d0) ! 2D
-                    ! radius_pressure = SQRT(x_cc(i)**2d0 + cart_y**2d0 + cart_z**2d0) ! 3D
+                    ! radius_pressure = SQRT(x_cc(i)**2) ! 1D
+                    ! radius_pressure = SQRT(x_cc(i)**2 + cart_y**2) ! 2D
+                    ! radius_pressure = SQRT(x_cc(i)**2 + cart_y**2 + cart_z**2) ! 3D
                     ! pressure_bubble = 1.E+04
                     ! pressure_inf    = 1.E+05
                     ! q_prim_vf(E_idx)%sf(i,j,k) = pressure_inf + radius / radius_pressure * (pressure_bubble - pressure_inf)
                     !
-                    ! IF(       ((  x_cc(i) - x_centroid)**2d0                    &
-                    !          + (   cart_y - y_centroid)**2d0                    &
-                    !          + (   cart_z - z_centroid)**2d0) <= radius**2d0)   &
+                    ! IF(       ((  x_cc(i) - x_centroid)**2                    &
+                    !          + (   cart_y - y_centroid)**2                    &
+                    !          + (   cart_z - z_centroid)**2) <= radius**2)   &
                     !                               THEN
                     !
                     !    q_prim_vf(E_idx)%sf(i,j,k) = pressure_bubble
@@ -2284,38 +2286,38 @@ contains
 
                         if (length_x /= dflt_real) then
                             eta = tanh(smooth_coeff/min(dy_min, dz_min)* &
-                                       (sqrt((cart_y - y_centroid)**2d0 &
-                                             + (cart_z - z_centroid)**2d0) &
+                                       (sqrt((cart_y - y_centroid)**2 &
+                                             + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         elseif (length_y /= dflt_real) then
                             eta = tanh(smooth_coeff/min(dx_min, dz_min)* &
-                                       (sqrt((x_cc(i) - x_centroid)**2d0 &
-                                             + (cart_z - z_centroid)**2d0) &
+                                       (sqrt((x_cc(i) - x_centroid)**2 &
+                                             + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         else
                             eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
-                                       (sqrt((x_cc(i) - x_centroid)**2d0 &
-                                             + (cart_y - y_centroid)**2d0) &
+                                       (sqrt((x_cc(i) - x_centroid)**2 &
+                                             + (cart_y - y_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         end if
 
                     end if
 
                     if ((((length_x /= dflt_real .and. &
-                           (cart_y - y_centroid)**2d0 &
-                           + (cart_z - z_centroid)**2d0 <= radius**2d0 .and. &
+                           (cart_y - y_centroid)**2 &
+                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
                            x_boundary%beg <= x_cc(i) .and. &
                            x_boundary%end >= x_cc(i)) &
                           .or. &
                           (length_y /= dflt_real .and. &
-                           (x_cc(i) - x_centroid)**2d0 &
-                           + (cart_z - z_centroid)**2d0 <= radius**2d0 .and. &
+                           (x_cc(i) - x_centroid)**2 &
+                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
                            y_boundary%beg <= cart_y .and. &
                            y_boundary%end >= cart_y) &
                           .or. &
                           (length_z /= dflt_real .and. &
-                           (x_cc(i) - x_centroid)**2d0 &
-                           + (cart_y - y_centroid)**2d0 <= radius**2d0 .and. &
+                           (x_cc(i) - x_centroid)**2 &
+                           + (cart_y - y_centroid)**2 <= radius**2 .and. &
                            z_boundary%beg <= cart_z .and. &
                            z_boundary%end >= cart_z)) &
                          .and. &
@@ -2386,7 +2388,7 @@ contains
                                                *(a*x_cc(i) + &
                                                  b*cart_y + &
                                                  c*cart_z + d) &
-                                               /sqrt(a**2d0 + b**2d0 + c**2d0))
+                                               /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0d0 &
