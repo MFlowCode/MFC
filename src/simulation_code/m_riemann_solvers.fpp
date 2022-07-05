@@ -1057,7 +1057,9 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
                 if(model_eqns == 3) then
                     !ME3
-                
+
+!$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg)
+
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end

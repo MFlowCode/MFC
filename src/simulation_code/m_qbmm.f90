@@ -38,7 +38,7 @@ module m_qbmm
     integer ,allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
 
-!$acc declare create(verysmall, momrhs, nterms, is1, is2, is3)
+!$acc declare create(momrhs, nterms, is1, is2, is3)
 !$acc declare create(momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, gammas, pi_infs, bubrs, bubmoms)
 
 

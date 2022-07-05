@@ -1177,7 +1177,7 @@ contains
                       end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1198,7 +1198,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1211,7 +1211,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 else                        ! PBC at the beginning only
 
@@ -1229,7 +1229,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1244,7 +1244,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1257,13 +1257,13 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 end if
 
-              if(cu_mpi .eqv. .false.) then
+              #:if not CASE["logistics"]["cu_mpi"]
 !$acc update device(q_cons_buff_recv)
-              end if
+              #:endif
 
                 ! Unpacking buffer received from bc_x%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1297,7 +1297,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1312,7 +1312,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1325,7 +1325,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 else                        ! PBC at the end only
 
@@ -1343,7 +1343,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1358,7 +1358,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1371,13 +1371,13 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 end if
 
-              if(cu_mpi .eqv. .false.) then
+              #:if not CASE["logistics"]["cu_mpi"]
 !$acc update device(q_cons_buff_recv)
-              end if
+              #:endif
 
                 ! Unpacking buffer received from bc_x%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1418,7 +1418,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1433,7 +1433,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1446,7 +1446,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 else                        ! PBC at the beginning only
 
@@ -1465,7 +1465,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1480,7 +1480,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1493,12 +1493,12 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
                 end if
 
-              if(cu_mpi .eqv. .false.) then
+              #:if not CASE["logistics"]["cu_mpi"]
 !$acc update device(q_cons_buff_recv)
-              end if
+              #:endif
 
                 ! Unpacking buffer received from bc_y%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1534,7 +1534,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1549,7 +1549,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1562,7 +1562,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 else                        ! PBC at the end only
 
@@ -1581,7 +1581,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1596,7 +1596,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1609,13 +1609,13 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 end if
 
-              if(cu_mpi .eqv. .false.) then
+              #:if not CASE["logistics"]["cu_mpi"]
 !$acc update device(q_cons_buff_recv)
-              end if
+              #:endif
 
                 ! Unpacking buffer received form bc_y%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1658,7 +1658,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1673,7 +1673,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1686,7 +1686,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 else                        ! PBC at the beginning only
 
@@ -1705,7 +1705,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1720,7 +1720,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1733,13 +1733,13 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
 
                 end if
 
-              if(cu_mpi .eqv. .false.) then
+              #:if not CASE["logistics"]["cu_mpi"]
 !$acc update device(q_cons_buff_recv)
-              end if
+              #:endif
 
                 ! Unpacking buffer from bc_z%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1776,7 +1776,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1791,7 +1791,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1804,7 +1804,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_z%end
@@ -1823,7 +1823,7 @@ contains
                         end do
                     end do
 
-                    if(cu_mpi) then
+                    #:if CASE["logistics"]["cu_mpi"]
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1838,7 +1838,7 @@ contains
 
 !$acc end host_data
 !$acc wait
-                    else
+                    #:else
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1851,20 +1851,20 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if
+                    #:endif
                       
                 end if
 
-              if(cu_mpi .eqv. .false.) then
+                #:if not CASE["logistics"]["cu_mpi"]
 !$acc update device(q_cons_buff_recv)
-              end if
+                #:endif
 
                 ! Unpacking buffer received from bc_z%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
-              do i = 1, sys_size
-                do l = p + 1, p + buff_size
-                    do k = -buff_size, n + buff_size
-                        do j = -buff_size, m + buff_size                            
+                do i = 1, sys_size
+                    do l = p + 1, p + buff_size
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size                            
                                 r = (i - 1) + sys_size* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
