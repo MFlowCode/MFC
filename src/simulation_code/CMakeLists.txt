@@ -45,9 +45,8 @@ IF (MFC_WITH_OPEN_ACC)
 
     IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
 	TARGET_LINK_LIBRARIES(simulation PRIVATE
+            CUDA::cufft
             CUDA::nvToolsExt
-            CUDA::cufft_static
-            CUDA::cudart_static
 	)
     ENDIF()
 
