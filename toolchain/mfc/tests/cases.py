@@ -169,6 +169,12 @@ def generate_cases() -> list:
                     TCV("algorithm.wave_speeds", WaveSpeedEstimation.PRESSURE_VELOCITY)
                 ])))
 
+                if riemann_solver == RiemannSolver.HLLC:
+                    cases.append(create_case(stack, TCVS("model_eqns=3", [
+                        TCV("algorithm.model", MulticomponentModel.EQUATION_6)
+                    ])))
+
+
                 if num_fluids == 2:
                     if riemann_solver == RiemannSolver.HLLC:
                         cases.append(create_case(stack, TCVS("alt_soundspeed=T", [
@@ -185,6 +191,148 @@ def generate_cases() -> list:
                 stack.pop()
 
             stack.pop()
+
+        for num_fluids in [2]:
+
+            stack.push(TCVS(f"num_fluids={num_fluids}", [TCV("fluids.count", num_fluids)]))
+
+            stack.push(TCVS(None, [
+                # 2nd Fluid
+                TCV("fluids[1].gamma",  2.5),
+                TCV("fluids[1].pi_inf", 0.0),
+                # Patches
+                TCV("patches[0].alpha_rho",    [0.81, 0.19  ]),
+                TCV("patches[0].alpha",        [0.9,  0.1   ]),
+                TCV("patches[1].alpha_rho",    [0.25, 0.25  ]),
+                TCV("patches[1].alpha",        [0.5,  0.5   ]),
+                TCV("patches[2].alpha_rho",    [0.08, 0.0225]),
+                TCV("patches[2].alpha",        [0.2,  0.8   ]),
+            ]))
+
+            stack.push(TCVS(f"Viscous", [
+                # 2nd Fluid
+                TCV("fluids[0].Re[0]",  0.001),
+                TCV("fluids[0].Re[1]", 0.001),
+                TCV("fluids[1].Re[0]",  0.001),
+                TCV("fluids[1].Re[1]", 0.001),
+                TCV("domain.time.dt", 1e-11)
+            ]))
+
+            cases.append(create_case(stack, TCVS("weno_Re_flux=F", [
+                TCV("algorithm.weno.Re_flux", False)
+            ])))
+
+            cases.append(create_case(stack, TCVS("weno_Re_flux=T", [
+                TCV("algorithm.weno.Re_flux", True)
+            ])))
+
+            for i in range(3):
+                stack.pop()
+
+        if len(dims) == 2:
+            stack.push(TCVS(f"Axisymmetric", [TCV("algorithm.boundary.y.begin", -2), 
+                TCV("domain.cyl_coord", True)]))
+
+            stack.push(TCVS(None, [
+                TCV("fluids.count", 2),
+                # 2nd Fluid
+                TCV("fluids[1].gamma",  2.5),
+                TCV("fluids[1].pi_inf", 0.0),
+                # Patches
+                TCV("patches[0].alpha_rho",    [0.81, 0.19  ]),
+                TCV("patches[0].alpha",        [0.9,  0.1   ]),
+                TCV("patches[1].alpha_rho",    [0.25, 0.25  ]),
+                TCV("patches[1].alpha",        [0.5,  0.5   ]),
+                TCV("patches[2].alpha_rho",    [0.08, 0.0225]),
+                TCV("patches[2].alpha",        [0.2,  0.8   ]),
+            ])) 
+
+            cases.append(create_case(stack, TCVS("model_eqns=2", [
+                TCV("algorithm.model", MulticomponentModel.EQUATION_5)
+            ])))
+
+            cases.append(create_case(stack, TCVS("model_eqns=3", [
+                TCV("algorithm.model", MulticomponentModel.EQUATION_6)
+            ])))
+
+            stack.push(TCVS(f"Viscous", [
+                TCV("fluids[0].Re[0]",  0.001),
+                TCV("fluids[0].Re[1]", 0.001),
+                TCV("fluids[1].Re[0]",  0.001),
+                TCV("fluids[1].Re[1]", 0.001),
+                TCV("domain.time.dt", 1e-11)
+            ]))
+
+            cases.append(create_case(stack, TCVS("weno_Re_flux=F", [
+                TCV("algorithm.weno.Re_flux", False)
+            ])))
+
+            cases.append(create_case(stack, TCVS("weno_Re_flux=T", [
+                TCV("algorithm.weno.Re_flux", True)
+            ])))
+
+            for i in range(3):
+                stack.pop()
+
+        if len(dims) == 3:
+            stack.push(TCVS(f"Cylindrical", [TCV("algorithm.boundary.y.begin", -13), 
+                TCV("algorithm.boundary.z.begin", -1), TCV("algorithm.boundary.z.end", -1),
+                TCV("domain.cyl_coord", True), TCV("domain.domain.x.begin", 0.0),
+                TCV("domain.domain.x.end", 5.0), TCV("domain.domain.y.begin", 0.0),
+                TCV("domain.domain.y.end", 1.0), TCV("domain.domain.z.begin", 0.0),
+                TCV("domain.domain.z.end", 2.0*3.141592653589793E+00), TCV("domain.cells.x", 29),
+                TCV("domain.cells.y", 29), TCV("domain.cells.z", 29)]))
+
+            stack.push(TCVS(None, [TCV("patches[0].geometry", 10), TCV("patches[1].geometry", 10),
+                TCV("patches[2].geometry", 10), TCV("patches[0].centroid.x", 0.5), 
+                TCV("patches[0].centroid.y", 0.0), TCV("patches[0].centroid.z", 0.0),
+                TCV("patches[1].centroid.x", 2.5), TCV("patches[1].centroid.y", 0.0),
+                TCV("patches[1].centroid.z", 0.0), TCV("patches[2].centroid.x", 4.5),
+                TCV("patches[2].centroid.y", 0.0), TCV("patches[2].centroid.z", 0.0),
+                TCV("patches[0].radius", 1.0), TCV("patches[1].radius", 1.0),
+                TCV("patches[2].radius", 1.0), TCV("patches[0].length.x", 1.0),
+                TCV("patches[1].length.y", -1E6), TCV("patches[2].length.z", -1E6), 
+                TCV("patches[0].length.x", 3.0),TCV("patches[1].length.y", -1E6), 
+                TCV("patches[2].length.z", -1E6),TCV("patches[0].length.x", 1.0),
+                TCV("patches[1].length.y", -1E6), TCV("patches[2].length.z", -1E6)]))
+
+            stack.push(TCVS(None, [
+                TCV("fluids.count", 2),
+                # 2nd Fluid
+                TCV("fluids[1].gamma",  2.5),
+                TCV("fluids[1].pi_inf", 0.0),
+                # Patches
+                TCV("patches[0].alpha_rho",    [0.81, 0.19  ]),
+                TCV("patches[0].alpha",        [0.9,  0.1   ]),
+                TCV("patches[1].alpha_rho",    [0.25, 0.25  ]),
+                TCV("patches[1].alpha",        [0.5,  0.5   ]),
+                TCV("patches[2].alpha_rho",    [0.08, 0.0225]),
+                TCV("patches[2].alpha",        [0.2,  0.8   ]),
+            ])) 
+
+            cases.append(create_case(stack, TCVS("model_eqns=2", [
+                TCV("algorithm.model", MulticomponentModel.EQUATION_5)
+            ])))
+
+            stack.push(TCVS(f"Viscous", [
+                TCV("fluids[0].Re[0]",  0.001),
+                TCV("fluids[0].Re[1]", 0.001),
+                TCV("fluids[1].Re[0]",  0.001),
+                TCV("fluids[1].Re[1]", 0.001),
+                TCV("domain.time.dt", 1e-11)
+            ]))
+
+            cases.append(create_case(stack, TCVS("weno_Re_flux=F", [
+                TCV("algorithm.weno.Re_flux", False)
+            ])))
+
+            cases.append(create_case(stack, TCVS("weno_Re_flux=T", [
+                TCV("algorithm.weno.Re_flux", True)
+            ])))
+
+            for i in range(4):
+                stack.pop()
+
 
         if len(dims) == 3:
             cases.append(create_case(stack, TCVS(f"ppn=2,m=29,n=29,p=49", [

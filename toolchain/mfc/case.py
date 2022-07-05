@@ -356,6 +356,8 @@ class Patch:
 
             if field.name in ["radii", "normal", "velocity"]:
                 members.append(f"(/ {float(val.x)}, {float(val.y)}, {float(val.z)} /)")
+            elif field.name == "length":
+                members.append(f"{serialize(val.x)}, {serialize(val.y)}, {serialize(val.z)}")
             elif isinstance(val, Point) or isinstance(val, Vector):
                 members.append(f"{float(val.x)}, {float(val.y)}, {float(val.z)}")
             elif isinstance(val, list):

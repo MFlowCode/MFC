@@ -1419,6 +1419,9 @@ contains
 
                             end if
 
+                            flux_src_rs${XYZ}$_vf_flat(j, k, l, advxb) = vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(1))
+
+
                             ! Geometrical source flux for cylindrical coordinates
                             if (cyl_coord .and. norm_dir == 2) then
                                 ! Substituting the advective flux into the inviscid geometrical source flux
