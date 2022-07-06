@@ -14,11 +14,7 @@ INCLUDE(ExternalProject)
 # Options
 OPTION(MFC_BUILD_FFTW3 "Build the FFTW3 dependency" OFF)
 OPTION(MFC_BUILD_HDF5  "Build the HDF5  dependency" OFF)
-OPTION(MFC_BUILD_SILO  "Build the SILO  dependency (implies MFC_BUILD_HDF5)" OFF)
-
-IF (MFC_BUILD_SILO)
-    SET(MFC_BUILD_HDF5 ON)
-ENDIF()
+OPTION(MFC_BUILD_SILO  "Build the SILO  dependency" OFF)
 
 
 # FFTW3
@@ -53,13 +49,15 @@ IF (MFC_BUILD_SILO)
     ExternalProject_Add(silo
         GIT_REPOSITORY   "https://github.com/LLNL/Silo"
         GIT_TAG          2597088f1b0c48873fee8635ce788df0defaf5b2
-        CMAKE_ARGS       "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-                         "-DSILO_HDF5_DIR=${CMAKE_INSTALL_PREFIX}"
-                         -DSILO_ENABLE_SHARED=OFF
+        CMAKE_ARGS       -DSILO_ENABLE_SHARED=OFF
                          -DSILO_ENABLE_SILOCK=OFF
-                         -DSILO_ENABLE_BROWSER=OFF                         
+                         -DSILO_ENABLE_BROWSER=OFF
+                         -DHDF5_USE_STATIC_LIBRARIES=ON     
+                         "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}" 
+                         $<$<BOOL:${MFC_BUILD_HDF5}>:"-DSILO_HDF5_DIR=\"${CMAKE_INSTALL_PREFIX}\"">
     )
 
-    ADD_DEPENDENCIES(silo hdf5)
+    IF (MFC_BUILD_HDF5)
+        ADD_DEPENDENCIES(silo hdf5)
+    ENDIF()
 ENDIF()
-

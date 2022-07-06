@@ -26,6 +26,7 @@ class MFCTest:
         self.mfc    = mfc
         self.sched  = MFCTestThreadManager(1)
         self.cases  = generate_cases()
+        self.nFail  = 0
 
     def __filter_tests(self):
         # Check "--from" and "--to" exist and are in the right order
@@ -101,41 +102,54 @@ class MFCTest:
         self.sched.run(self.cases, self.handle_case)
 
         cons.print()
-        cons.print(f"Tested [bold green]✓[/bold green]")
-        cons.unindent()
+        if self.nFail == 0:
+            cons.print(f"Tested [bold green]✓[/bold green]")
+            cons.unindent()
+        else:
+            raise MFCException("Testing: There were [bold red]{self.nFail}[/bold red] failures.")
+
 
     def handle_case(self, test: Case):
-        test.create_directory()
+        try:
+            test.create_directory()
 
-        if test.case.bubbles.qbmm:
-            tol = 1e-7
-        elif test.case.bubbles.bubbles:
-            tol = 1e-10
-        else:
-            tol = 1e-12
+            if test.case.bubbles.qbmm:
+                tol = 1e-7
+            elif test.case.bubbles.bubbles:
+                tol = 1e-10
+            else:
+                tol = 1e-12
 
-        cmd = test.run(self.mfc.args)
+            cmd = test.run(self.mfc.args)
 
-        common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
+            common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
 
-        if cmd.returncode != 0:
-            cons.print(cmd.stdout)
-            raise MFCException(f"""\
-{os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
-You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary in {test.get_dirpath()}/case.py.""")
+            if cmd.returncode != 0:
+                cons.print(cmd.stdout)
+                raise MFCException(f"""\
+    {os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
+    You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary in {test.get_dirpath()}/case.py.""")
 
-        pack = tests.pack.generate(test)
-        pack.save(f"{test.get_dirpath()}/pack.txt")
+            pack = tests.pack.generate(test)
+            pack.save(f"{test.get_dirpath()}/pack.txt")
 
-        golden_filepath = f"{test.get_dirpath()}/golden.txt"
+            golden_filepath = f"{test.get_dirpath()}/golden.txt"
 
-        if self.mfc.args["generate"]:
-            common.delete_file(golden_filepath)
-            pack.save(golden_filepath)
-        else:
-            if not os.path.isfile(golden_filepath):
-                raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
+            if self.mfc.args["generate"]:
+                common.delete_file(golden_filepath)
+                pack.save(golden_filepath)
+            else:
+                if not os.path.isfile(golden_filepath):
+                    raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
-            tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
-        
-        cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+                tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
+            
+            cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+        except Exception as exc:
+            self.nFail = self.nFail + 1
+
+            if not self.mfc.args["relentless"]:
+                raise exc
+            
+            cons.print(f"[bold red]Failed Test [bold magenta]{test.get_uuid()}[/bold magenta] ! [/bold red] ({test.trace})")
+            cons.print(f"{exc}")

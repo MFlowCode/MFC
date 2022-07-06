@@ -38,17 +38,21 @@ INSTALL(TARGETS simulation RUNTIME DESTINATION bin)
 TARGET_LINK_LIBRARIES(simulation PRIVATE MPI::MPI_Fortran)
 
 
+IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+    TARGET_LINK_LIBRARIES(simulation PRIVATE
+        CUDA::nvToolsExt
+    )
+ENDIF()
+
+
 IF (MFC_WITH_OPEN_ACC)
     TARGET_LINK_LIBRARIES(simulation PRIVATE
         OpenACC::OpenACC_Fortran
     )
 
     IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-	TARGET_LINK_LIBRARIES(simulation PRIVATE
+        TARGET_LINK_LIBRARIES(simulation PRIVATE
             CUDA::cufft
-            CUDA::nvToolsExt
-	)
+        )
     ENDIF()
-
-    TARGET_COMPILE_OPTIONS(simulation PRIVATE "-fPIC")
 ENDIF ()

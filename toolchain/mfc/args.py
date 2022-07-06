@@ -26,16 +26,19 @@ def parse(mfc):
 
     def add_common_arguments(p, mask=""):
         if "t" not in mask:
-            p.add_argument("-t", "--targets", nargs="+", type=str.lower,
-                           choices=get_regular_target_names(), default=get_mfc_target_names(), help="")
+            p.add_argument("-t", "--targets", nargs="+", type=str.lower, choices=get_regular_target_names(),
+                           default=get_mfc_target_names(), help="")
 
         if "m" not in mask:
-            p.add_argument("-m", "--mode", type=str.lower, choices=mode_names,
-                           default=mfc.lock.mode, help="Mode used to compile, run, and test MFC.")
+            p.add_argument("-m", "--mode", type=str.lower, choices=mode_names, default=mfc.lock.mode,
+                           help="Mode used to compile, run, and test MFC.")
 
         if "j" not in mask:
-            p.add_argument("-j", "--jobs", metavar="N", type=int,
-                           help="Allows for N concurrent jobs.", default=int(mfc.user.build.threads))
+            p.add_argument("-j", "--jobs", metavar="N", type=int, default=int(mfc.user.build.threads),
+                           help="Allows for N concurrent jobs.")
+
+        p.add_argument("--no-dependencies", action="store_true", default=False,
+                       help="Does not build dependencies. CMake will search for system-installed versions.")
 
     # === CLEAN ===
     add_common_arguments(clean, "j")
@@ -44,12 +47,13 @@ def parse(mfc):
 
     # === TEST ===
     add_common_arguments(test, "t")
-    test.add_argument("-g", "--generate", action="store_true", help="Generate golden files.")
-    test.add_argument("-l", "--list",     action="store_true", help="List all available tests.")
-    test.add_argument("-f", "--from",     default=mfc.test.cases[0].get_uuid(), type=str, help="First test UUID to run.")
-    test.add_argument("-t", "--to",       default=mfc.test.cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
-    test.add_argument("-o", "--only",     nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
-    test.add_argument("-b", "--binary",   choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
+    test.add_argument("-g", "--generate",   action="store_true", help="Generate golden files.")
+    test.add_argument("-l", "--list",       action="store_true", help="List all available tests.")
+    test.add_argument("-f", "--from",       default=mfc.test.cases[0].get_uuid(), type=str, help="First test UUID to run.")
+    test.add_argument("-t", "--to",         default=mfc.test.cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
+    test.add_argument("-o", "--only",       nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
+    test.add_argument("-b", "--binary",     choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
+    test.add_argument("-r", "--relentless", action="store_true", default=False, help="Run all tests, even if multiple fail.")
 
     # === RUN ===
     engines  = [ e.slug for e in ENGINES ]
