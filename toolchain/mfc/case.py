@@ -576,6 +576,13 @@ class Case:
         else:
             grid_geometry = 3
 
+        nterms = None
+        # Not set for BubbleModel.GILMORE
+        if self.bubbles.model == BubbleModel.KELLER_MIKSIS:
+            nterms = 12
+        elif self.bubbles.model == BubbleModel.RAYLEIGH_PLESSET:
+            nterms = 6
+
         # num_fluids
         if self.algorithm.model == 1 and len(self.fluids) != 1:
             raise mfc.common.MFCException("Invalid combination.")
@@ -599,6 +606,7 @@ class Case:
                 "num_fluids":       num_fluids,
                 "num_fluids_alloc": num_fluids_alloc,
                 "grid_geometry":    grid_geometry,
+                "nterms":           nterms,
                 "x_domain":         serialize(self.domain.domain.x),
                 "y_domain":         serialize(self.domain.domain.y),
                 "z_domain":         serialize(self.domain.domain.z),
