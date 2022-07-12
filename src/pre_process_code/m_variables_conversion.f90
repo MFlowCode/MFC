@@ -330,7 +330,7 @@ contains
                         do i = 1, nb
                             nRtmp(i) = q_cons_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
+                        call s_comp_n_from_cons_cpu(q_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
                         do i = bub_idx%beg, bub_idx%end
                             q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/nbub
                         end do
@@ -430,7 +430,7 @@ contains
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
+                        call s_comp_n_from_prim_cpu(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
