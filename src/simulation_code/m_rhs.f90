@@ -2867,7 +2867,29 @@ contains
             call nvtxEndRange
 
         end do
-        ! END: Dimensional Splitting Loop ================================== 
+        ! END: Dimensional Splitting Loop =================================
+
+
+        if(run_time_info) then
+
+            ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+            if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+            ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+!$acc update device(ix, iy, iz)
+
+!$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size
+                  do l = iz%beg, iz%end
+                    do k = iy%beg, iy%end
+                      do j = ix%beg, ix%end
+                        q_prim_vf(i)%sf(j,k,l) = q_prim_qp%vf(i)%sf(j,k,l)
+                      end do
+                    end do
+                  end do
+                end do
+        end if
+
+
 
         ! ==================================================================
 
