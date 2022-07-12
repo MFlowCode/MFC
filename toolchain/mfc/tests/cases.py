@@ -256,10 +256,10 @@ def generate_cases() -> list:
             ])))
 
             stack.push(TCVS(f"Viscous", [
-                TCV("fluids[0].Re[0]",  0.001),
-                TCV("fluids[0].Re[1]", 0.001),
-                TCV("fluids[1].Re[0]",  0.001),
-                TCV("fluids[1].Re[1]", 0.001),
+                TCV("fluids[0].Re[0]",  0.0001),
+                TCV("fluids[0].Re[1]", 0.0001),
+                TCV("fluids[1].Re[0]",  0.0001),
+                TCV("fluids[1].Re[1]", 0.0001),
                 TCV("domain.time.dt", 1e-11)
             ]))
 
@@ -291,10 +291,10 @@ def generate_cases() -> list:
                 TCV("patches[2].centroid.y", 0.0), TCV("patches[2].centroid.z", 0.0),
                 TCV("patches[0].radius", 1.0), TCV("patches[1].radius", 1.0),
                 TCV("patches[2].radius", 1.0), TCV("patches[0].length.x", 1.0),
-                TCV("patches[1].length.y", -1E6), TCV("patches[2].length.z", -1E6), 
-                TCV("patches[0].length.x", 3.0),TCV("patches[1].length.y", -1E6), 
-                TCV("patches[2].length.z", -1E6),TCV("patches[0].length.x", 1.0),
-                TCV("patches[1].length.y", -1E6), TCV("patches[2].length.z", -1E6)]))
+                TCV("patches[0].length.y", -1E6), TCV("patches[0].length.z", -1E6), 
+                TCV("patches[1].length.x", 3.0),TCV("patches[1].length.y", -1E6), 
+                TCV("patches[1].length.z", -1E6),TCV("patches[2].length.x", 1.0),
+                TCV("patches[2].length.y", -1E6), TCV("patches[2].length.z", -1E6)]))
 
             stack.push(TCVS(None, [
                 TCV("fluids.count", 2),
@@ -315,10 +315,10 @@ def generate_cases() -> list:
             ])))
 
             stack.push(TCVS(f"Viscous", [
-                TCV("fluids[0].Re[0]",  0.001),
-                TCV("fluids[0].Re[1]", 0.001),
-                TCV("fluids[1].Re[0]",  0.001),
-                TCV("fluids[1].Re[1]", 0.001),
+                TCV("fluids[0].Re[0]",  0.0001),
+                TCV("fluids[0].Re[1]", 0.0001),
+                TCV("fluids[1].Re[0]",  0.0001),
+                TCV("fluids[1].Re[1]", 0.0001),
                 TCV("domain.time.dt", 1e-11)
             ]))
 
