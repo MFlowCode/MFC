@@ -69,6 +69,15 @@ module m_data_output
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) ::   Rc_sf  !< Rc stability criterion
 
+!$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+
+    real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
+    real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
+    real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
+    real(kind(0d0)) ::   Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+
+!$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
+
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
     real(kind(0d0)) :: icfl_max !< ICFL criterion maximum
@@ -88,6 +97,13 @@ module m_data_output
     real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: x_accel, y_accel, z_accel
     type(scalar_field), allocatable, dimension(:)           :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
     real(kind(0d0)), target, allocatable, dimension(:, :, :)  :: energy
+
+    integer :: momxb, momxe
+    integer :: contxb, contxe
+    integer :: bubxb, bubxe
+    integer :: advxb, advxe
+    real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs
+    !$acc declare create(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, gammas, pi_infs)
     !> @}
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
@@ -375,11 +391,7 @@ contains
         ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
         ! time-step and located on both the local (loc) and the global (glb)
         ! computational domains
-        real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
-        real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
-        real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-        real(kind(0d0)) ::   Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-
+ 
         real(kind(0d0)) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
 
@@ -390,16 +402,24 @@ contains
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         ! Computing Stability Criteria at Current Time-step ================
+!$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
 
-                    call s_convert_to_mixture_variables(q_prim_vf, rho, &
-                                                        gamma, pi_inf, &
-                                                        Re, j, k, l)
+                    do i = 1, num_fluids
+                        alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                        alpha(i) = q_prim_vf(E_idx+i)%sf(j, k, l)
+                    end do
+
+                    if(bubbles) then
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, j, k, l)
+                    else
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
+                    end if
 
                     do i = 1, num_dims
-                        vel(i) = q_prim_vf(cont_idx%end + i)%sf(j, k, l)
+                        vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
                     end do
 
                     pres = q_prim_vf(E_idx)%sf(j, k, l)
@@ -409,16 +429,16 @@ contains
                         do i = 1, num_fluids
                             alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                         end do
-                        blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
-                                   fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                        blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
-                                   fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+                        blkmod1 = ((gammas(1) + 1d0)*pres + &
+                                   pi_infs(1))/gammas(1)
+                        blkmod2 = ((gammas(2) + 1d0)*pres + &
+                                   pi_infs(2))/gammas(2)
                         c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
                     elseif (model_eqns == 3) then
                         c = 0d0
                         do i = 1, num_fluids
-                            c = c + q_prim_vf(i + adv_idx%beg - 1)%sf(j, k, l)*(1d0/fluid_pp(i)%gamma + 1d0)* &
-                                (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma + 1d0))
+                            c = c + q_prim_vf(i + advxb - 1)%sf(j, k, l)*(1d0/gammas(i) + 1d0)* &
+                                (pres + pi_infs(i)/(gammas(i) + 1d0))
                         end do
                     else
                         c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
@@ -510,9 +530,14 @@ contains
         ! END: Computing Stability Criteria at Current Time-step ===========
 
         ! Determining local stability criteria extrema at current time-step
+
+        !$acc kernels
         icfl_max_loc = maxval(icfl_sf)
         if (any(Re_size > 0)) vcfl_max_loc = maxval(vcfl_sf)
         if (any(Re_size > 0)) Rc_min_loc = minval(Rc_sf)
+        !$acc end kernels
+
+        !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
@@ -2326,6 +2351,21 @@ contains
         type(bounds_info) :: ix, iy, iz
 
         integer :: i !< Generic loop iterator
+
+        momxb = mom_idx%beg; momxe = mom_idx%end
+        bubxb = bub_idx%beg; bubxe = bub_idx%end
+        advxb = adv_idx%beg; advxe = adv_idx%end
+        contxb = cont_idx%beg; contxe = cont_idx%end
+!$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe)
+
+        allocate(gammas(1:num_fluids))
+        allocate(pi_infs(1:num_fluids))
+
+        do i = 1, num_fluids
+            gammas(i) = fluid_pp(i)%gamma
+            pi_infs(i) = fluid_pp(i)%pi_inf
+        end do
+!$acc update device(gammas, pi_infs)
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         allocate (icfl_sf(0:m, 0:n, 0:p)); icfl_max = 0d0
