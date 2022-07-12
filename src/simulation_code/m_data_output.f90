@@ -533,9 +533,14 @@ contains
 
         !$acc kernels
         icfl_max_loc = maxval(icfl_sf)
-        if (any(Re_size > 0)) vcfl_max_loc = maxval(vcfl_sf)
-        if (any(Re_size > 0)) Rc_min_loc = minval(Rc_sf)
         !$acc end kernels
+
+        if (any(Re_size > 0)) then 
+        !$acc kernels
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+        !$acc end kernels
+        end if
 
         !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
 
