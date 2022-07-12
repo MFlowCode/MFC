@@ -1158,7 +1158,6 @@ contains
     end subroutine s_comp_n_from_prim
 
     subroutine s_comp_n_from_prim_cpu(vftmp, Rtmp, ntmp)
-!$acc routine seq
 
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(:), intent(IN) :: Rtmp
