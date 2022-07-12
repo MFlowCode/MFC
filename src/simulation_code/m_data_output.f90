@@ -378,7 +378,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)), dimension(cont_idx%end)          :: alpha_rho  !< Cell-avg. partial density
+        real(kind(0d0)), dimension(num_fluids)          :: alpha_rho  !< Cell-avg. partial density
         real(kind(0d0))                                   :: rho        !< Cell-avg. density
         real(kind(0d0)), dimension(num_dims)              :: vel        !< Cell-avg. velocity
         real(kind(0d0))                                   :: pres       !< Cell-avg. pressure
