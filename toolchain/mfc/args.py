@@ -1,6 +1,9 @@
 import argparse
 
-from build import get_mfc_target_names, get_regular_target_names
+
+from build import get_mfc_target_names
+from build import get_target_names
+from build import get_dependencies_names
 
 
 def parse(mfc):
@@ -26,7 +29,7 @@ def parse(mfc):
 
     def add_common_arguments(p, mask=""):
         if "t" not in mask:
-            p.add_argument("-t", "--targets", nargs="+", type=str.lower, choices=get_regular_target_names(),
+            p.add_argument("-t", "--targets", nargs="+", type=str.lower, choices=get_target_names(),
                            default=get_mfc_target_names(), help="")
 
         if "m" not in mask:
@@ -37,8 +40,9 @@ def parse(mfc):
             p.add_argument("-j", "--jobs", metavar="N", type=int, default=int(mfc.user.build.threads),
                            help="Allows for N concurrent jobs.")
 
-        p.add_argument("--no-dependencies", action="store_true", default=False,
-                       help="Does not build dependencies. CMake will search for system-installed versions.")
+        for name in get_dependencies_names():
+            p.add_argument(f"--no-{name}", action="store_true", help=f"Do not build the {name} dependency. Use the system version instead.")
+
 
     # === CLEAN ===
     add_common_arguments(clean, "j")

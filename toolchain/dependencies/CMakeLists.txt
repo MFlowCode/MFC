@@ -29,7 +29,8 @@ ENDIF()
 
 
 # HDF5
-IF (MFC_BUILD_HDF5)
+FIND_PACKAGE(HDF5)
+IF (MFC_BUILD_HDF5 OR (MFC_BUILD_SILO AND NOT HDF5_FOUND))
     ExternalProject_Add(hdf5
         GIT_REPOSITORY "https://github.com/HDFGroup/hdf5"
         GIT_TAG        hdf5-1_12_2
