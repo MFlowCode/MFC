@@ -17,8 +17,8 @@ FOREACH(in_fpp_file IN LISTS pre_process_fpps)
     ADD_CUSTOM_COMMAND(
         OUTPUT          "${out_f90_file}"
         COMMAND         "fypp" "${in_fpp_file}" "${out_f90_file}"
-        MAIN_DEPENDENCY "${in_fpp_file}"
-        COMMENT         "Fypp ${in_fpp_file} -> ${out_f90_file}"
+        DEPENDS         "${in_fpp_file}" "${CMAKE_CURRENT_LIST_DIR}/../common/case.fpp"
+        COMMENT         "Preprocessing ${in_fpp_file_name}"
         VERBATIM
     )
     

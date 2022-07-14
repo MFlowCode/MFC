@@ -18,8 +18,10 @@ class MFCTarget:
 TARGETS: typing.List[MFCTarget] = [
     MFCTarget(name='fftw3', flags=['-DMFC_BUILD_FFTW3=ON'],
               isDependency=True, requires=[]),
-    MFCTarget(name='silo', flags=['-DMFC_BUILD_SILO=ON'],
+    MFCTarget(name='hdf5', flags=['-DMFC_BUILD_HDF5=ON'],
               isDependency=True, requires=[]),
+    MFCTarget(name='silo', flags=['-DMFC_BUILD_SILO=ON'],
+              isDependency=True, requires=["hdf5"]),
     MFCTarget(name='pre_process', flags=['-DMFC_BUILD_PRE_PROCESS=ON'],
               isDependency=False, requires=[]),
     MFCTarget(name='simulation', flags=['-DMFC_BUILD_SIMULATION=ON'],
@@ -33,7 +35,11 @@ def get_mfc_target_names() -> typing.List[str]:
     return [ target.name for target in TARGETS if not target.isDependency ]
 
 
-def get_regular_target_names() -> typing.List[str]:
+def get_dependencies_names() -> typing.List[str]:
+    return [ target.name for target in TARGETS if target.isDependency ]
+
+
+def get_target_names() -> typing.List[str]:
     return [ target.name for target in TARGETS ]
 
 
@@ -57,6 +63,11 @@ def get_cmake_dirpath(target: MFCTarget) -> str:
 
 def get_install_dirpath() -> str:
     return os.sep.join([os.getcwd(), "build", "install"])
+
+
+def is_target_configured(target: MFCTarget) -> bool:
+    build_dirpath = get_build_dirpath(target)
+    return os.path.isdir(build_dirpath)
 
 
 def clean_target(mfc, name: str):
@@ -97,13 +108,10 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     target = get_target(name)
     mode   = mfc.user.get_mode(mfc.args["mode"])
 
-    if target.isDependency and mfc.args["no_dependencies"] and not name in mfc.args["targets"]:
-        cons.print("--no-dependencies given, skipping...")
+    if target.isDependency and mfc.args[f"no_{target.name}"]:
+        cons.print(f"--no-{target.name} given, skipping...")
         cons.unindent()
         return
-
-    for dependency_name in target.requires:
-        build_target(mfc, dependency_name, history)
 
     build_dirpath   = get_build_dirpath(target)
     cmake_dirpath   = get_cmake_dirpath(target)
@@ -116,15 +124,15 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
         f"-DCMAKE_INSTALL_PREFIX=\"{install_dirpath}\"",
     ]
 
-    if not mfc.args["no_dependencies"] and name == "silo":
-        flags.append("-DMFC_BUILD_HDF5=ON")
-
     configure = f"cd \"{build_dirpath}\" && cmake {' '.join(flags)} \"{cmake_dirpath}\""
     build     = f"cd \"{build_dirpath}\" && cmake --build . -j {mfc.args['jobs']} --target {name} --config {mode.type}"
     install   = f"cd \"{build_dirpath}\" && cmake --install ."
 
     # Only configure the first time
-    if not os.path.exists(build_dirpath):
+    if not is_target_configured(target):
+        for dependency_name in target.requires:
+            build_target(mfc, dependency_name, history)
+
         cons.print(no_indent=True)
         cons.print(f"$ {configure}")
         cons.print(no_indent=True)
