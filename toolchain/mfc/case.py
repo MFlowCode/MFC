@@ -3,7 +3,7 @@ import json
 import typing
 import dataclasses
 
-import mfc.util.common as common
+from mfc.util.common import MFCException, enumeq
 
 # === (RE)DEFINE FORTRAN CONSTANTS === #
 
@@ -576,16 +576,16 @@ class Case:
         else:
             grid_geometry = 3
 
-        nterms = None
+        nterms = DFLT_INT
         # Not set for BubbleModel.GILMORE
-        if self.bubbles.model == BubbleModel.KELLER_MIKSIS:
+        if enumeq(self.bubbles.model, BubbleModel.KELLER_MIKSIS):
             nterms = 12
-        elif self.bubbles.model == BubbleModel.RAYLEIGH_PLESSET:
+        elif enumeq(self.bubbles.model, BubbleModel.RAYLEIGH_PLESSET):
             nterms = 6
 
         # num_fluids
-        if self.algorithm.model == 1 and len(self.fluids) != 1:
-            raise mfc.common.MFCException("Invalid combination.")
+        if enumeq(self.algorithm.model, 1) and len(self.fluids) != 1:
+            raise MFCException("Invalid combination.")
 
         num_fluids       = self.fluids.count
         num_fluids_alloc = max(self.fluids.count, len(self.fluids.fluids)) + 1 # +1 is a workaround for the bellow:

@@ -1,5 +1,6 @@
 import os
 import yaml
+import enum
 import typing
 import shutil
 import subprocess
@@ -171,4 +172,15 @@ def get_loaded_modules() -> typing.List[str]:
 
     return subprocess.getoutput("module -t list").splitlines()
 
+
+def enumint(x: typing.Union[int, enum.Enum]) -> int:
+    return x.value if isinstance(x, enum.Enum) else x
+
+
+def enumeq(lhs: typing.Union[enum.Enum, int], rhs: typing.Union[enum.Enum, int]) -> bool:
+    return enumint(lhs) == enumint(rhs)
+
+
+def enumne(lhs: typing.Union[enum.Enum, int], rhs: typing.Union[enum.Enum, int]) -> bool:
+    return not enumeq(lhs, rhs)
 

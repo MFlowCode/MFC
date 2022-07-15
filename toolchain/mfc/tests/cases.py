@@ -1,12 +1,10 @@
 import copy
 
-import mfc.util.common as common
-
 from mfc.case import *
 
-from tests.case import TestCase, TCV, TCVS
-from tests.case import create_case
-from tests.case import CaseGeneratorStack
+from mfc.util.common import MFCException, enumeq, enumne
+
+from mfc.tests.case import TCV, TCVS, create_case, CaseGeneratorStack
 
 
 def get_dimensions():
@@ -128,7 +126,7 @@ def generate_cases() -> list:
                     TCV("algorithm.weno.mp",     mp_weno == 'T')
                 ]))
 
-                if not (mp_weno == 'T' and weno_order != 5):
+                if not (mp_weno == 'T' and enumne(weno_order, 5)):
                     cases.append(create_case(stack))
 
                 stack.pop()
@@ -169,14 +167,14 @@ def generate_cases() -> list:
                     TCV("algorithm.wave_speeds", WaveSpeedEstimation.PRESSURE_VELOCITY)
                 ])))
 
-                if riemann_solver == RiemannSolver.HLLC:
+                if enumeq(riemann_solver, RiemannSolver.HLLC):
                     cases.append(create_case(stack, TCVS("model_eqns=3", [
                         TCV("algorithm.model", MulticomponentModel.EQUATION_6)
                     ])))
 
 
                 if num_fluids == 2:
-                    if riemann_solver == RiemannSolver.HLLC:
+                    if enumeq(riemann_solver, RiemannSolver.HLLC):
                         cases.append(create_case(stack, TCVS("alt_soundspeed=T", [
                             TCV("algorithm.alt_soundspeed", True)
                         ])))
@@ -193,7 +191,6 @@ def generate_cases() -> list:
             stack.pop()
 
         for num_fluids in [2]:
-
             stack.push(TCVS(f"num_fluids={num_fluids}", [TCV("fluids.count", num_fluids)]))
 
             stack.push(TCVS(None, [
@@ -408,7 +405,7 @@ def generate_cases() -> list:
                     TCV("bubbles.model", bubble_model)
                 ]))
 
-                if not (polytropic == 'F' and bubble_model == BubbleModel.RAYLEIGH_PLESSET):
+                if not (polytropic == 'F' and enumeq(bubble_model, BubbleModel.RAYLEIGH_PLESSET)):
                     cases.append(create_case(stack))
 
                 stack.pop()
@@ -449,12 +446,12 @@ def generate_cases() -> list:
     # Sanity Check 1
 
     if stack.size() != 0:
-        raise common.MFCException("generate_cases: stack isn't fully pop'ed")
+        raise MFCException("generate_cases: stack isn't fully pop'ed")
 
     # Sanity Check 2
     uuids = [ case.get_uuid() for case in cases ]
     l1, l2 = len(uuids), len(set(uuids))
     if l1 != l2:
-        raise common.MFCException(f"generate_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
+        raise MFCException(f"generate_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
 
     return cases
