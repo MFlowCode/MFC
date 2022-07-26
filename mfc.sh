@@ -5,7 +5,7 @@
 MFC_GET_PIP_PATH="$MFC_ENV_DIR/get-pip.py"
 
 MFC_PYTHON_MIN_MAJOR=3
-MFC_PYTHON_MIN_MINOR=8
+MFC_PYTHON_MIN_MINOR=6
 
 
 # Check whether this script was called from MFC's root directory.

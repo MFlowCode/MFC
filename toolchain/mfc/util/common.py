@@ -10,8 +10,8 @@ MFC_ROOTDIR         = os.path.normpath(f"{os.path.dirname(os.path.realpath(__fil
 MFC_TESTDIR         = os.path.abspath(f"{MFC_ROOTDIR}/tests")
 MFC_SUBDIR          = os.path.abspath(f"{MFC_ROOTDIR}/build")
 MFC_DEV_FILEPATH    = os.path.abspath(f"{MFC_ROOTDIR}/toolchain/mfc.dev.yaml")
-MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/mfc.user.yaml")
-MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/mfc.lock.yaml")
+MFC_USER_FILEPATH   = os.path.abspath(f"{MFC_ROOTDIR}/defaults.yaml")
+MFC_LOCK_FILEPATH   = os.path.abspath(f"{MFC_SUBDIR}/lock.yaml")
 
 MFC_LOGO = f"""\
      ___            ___          ___

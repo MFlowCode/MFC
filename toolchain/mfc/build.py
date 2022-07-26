@@ -80,19 +80,22 @@ def clean_target(mfc, name: str):
     build_dirpath = get_build_dirpath(target)
 
     if not os.path.isdir(build_dirpath):
+        cons.print("Target not configured. Nothing to clean.")
         cons.unindent()
         return
 
     clean = f"cmake --build . --target clean --config {mode.type}"
 
-    cons.print(f"[yellow]{clean}[/yellow]", highlight=False)
-    common.system(f"cd \"{build_dirpath}\" && {clean}")
+    cons.print()
+    cons.print(f"$ {clean}", highlight=False)
+    cons.print()
+    common.system(f"cd \"{build_dirpath}\" && {clean}", exception_text=f"Failed to clean the [bold magenta]{name}[/bold magenta] target.")
 
     cons.unindent()
 
 
 def build_target(mfc, name: str, history: typing.List[str] = None):
-    cons.print(f"Building [bold magenta]{name}[/bold magenta]:")
+    cons.print(f"[bold]Building [magenta]{name}[/magenta]:[/bold]")
     cons.indent()
 
     if history is None:
@@ -141,16 +144,26 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
         if common.system(configure, no_exception=True) != 0:
             common.delete_directory(build_dirpath)
 
-            raise common.MFCException(f"Failed to configure the {name} target.")
+            raise common.MFCException(f"Failed to configure the [bold magenta]{name}[/bold magenta] target.")
 
     cons.print(no_indent=True)
     cons.print(f"$ {build}")
     cons.print(no_indent=True)
-    common.system(build)
+    common.system(build, exception_text=f"Failed to build the [bold magenta]{name}[/bold magenta] target.")
     cons.print(no_indent=True)
     cons.print(f"$ {install}")
     cons.print(no_indent=True)
-    common.system(install)
+    common.system(install, exception_text=f"Failed to install the [bold magenta]{name}[/bold magenta] target.")
     cons.print(no_indent=True)
+
+    cons.unindent()
+
+
+def build(mfc):
+    cons.print("[bold]Build:[/bold]")
+    cons.indent()
+
+    for target_name in mfc.args["targets"]:
+        build_target(mfc, target_name)
 
     cons.unindent()

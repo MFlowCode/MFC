@@ -15,10 +15,10 @@ FOREACH(in_fpp_file IN LISTS pre_process_fpps)
     SET(out_f90_file "${out_f90_file_dirpath}/autogen/${mytest2_file_name}")
 
     ADD_CUSTOM_COMMAND(
-        OUTPUT          "${out_f90_file}"
-        COMMAND         "fypp" "${in_fpp_file}" "${out_f90_file}"
-        DEPENDS         "${in_fpp_file}" "${CMAKE_CURRENT_LIST_DIR}/../common/case.fpp"
-        COMMENT         "Preprocessing ${in_fpp_file_name}"
+        OUTPUT   "${out_f90_file}"
+        COMMAND  "fypp" "${in_fpp_file}" "${out_f90_file}"
+        DEPENDS  "${in_fpp_file}" "${CMAKE_CURRENT_LIST_DIR}/../common/case.fpp"
+        COMMENT  "Preprocessing ${in_fpp_file_name}"
         VERBATIM
     )
     
@@ -30,3 +30,4 @@ ADD_EXECUTABLE(pre_process "${common_f90s}" "${pre_process_f90s}")
 
 INSTALL(TARGETS pre_process RUNTIME DESTINATION bin)
 TARGET_LINK_LIBRARIES(pre_process PRIVATE MPI::MPI_Fortran)
+TARGET_COMPILE_OPTIONS(pre_process PRIVATE -DMFC_PRE_PROCESS)

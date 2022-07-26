@@ -2,7 +2,7 @@ tags
 src/*/tags
 
 .vscode/
-mfc.user.yaml
+defaults.yaml
 
 __pycache__
 
@@ -48,6 +48,7 @@ samples/*/silo*
 samples/*/restart*
 samples/*/*.out
 samples/*/binary
+samples/*/fort.1
 samples/*/pre_process.sh
 samples/*/simulation.sh
 samples/*/post_process.sh
