@@ -27,6 +27,7 @@ module m_start_up
     implicit none
 
     private; public :: s_initialize_start_up_module, &
+                       s_read_input_file, &
                        s_check_input_file, &
                        s_read_grid_data_files, &
                        s_read_ic_data_files, &
@@ -69,6 +70,58 @@ module m_start_up
     procedure(s_read_abstract_ic_data_files), pointer :: s_read_ic_data_files => null()
 
 contains
+
+    !>  Reads the configuration file pre_process.inp, in order to
+        !!      populate the parameters in module m_global_parameters.f90
+        !!      with the user provided inputs
+    subroutine s_read_input_file() ! ---------------------------------------
+
+        character(LEN=name_len) :: file_loc  !<
+            !! Generic string used to store the address of a particular file
+
+        logical :: file_check !<
+            !! Generic logical used for the purpose of asserting whether a file
+            !! is or is not present in the designated location
+
+        ! Namelist for all of the parameters to be inputed by the user
+        namelist /user_inputs/ case_dir, old_grid, old_ic, t_step_old, m, &
+            n, p, x_domain, y_domain, z_domain, &
+            stretch_x, stretch_y, stretch_z, a_x, a_y, &
+            a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
+            model_eqns, num_fluids, &
+            adv_alphan, mpp_lim, &
+            weno_order, bc_x, bc_y, bc_z, num_patches, &
+            patch_icpp, fluid_pp, &
+            precision, parallel_io, &
+            perturb_flow, perturb_flow_fluid, &
+            perturb_sph, perturb_sph_fluid, fluid_rho, &
+            cyl_coord, loops_x, loops_y, loops_z, &
+            rhoref, pref, bubbles, R0ref, nb, &
+            polytropic, thermal, Ca, Web, Re_inv, &
+            polydisperse, poly_sigma, qbmm, &
+            nnode, sigR, sigV, dist_type, rhoRV, R0_type
+
+        ! Inquiring the status of the pre_process.inp file
+        file_loc = 'pre_process.inp'
+        inquire (FILE=trim(file_loc), EXIST=file_check)
+
+        ! Checking whether the input file is there. If it is, the input file
+        ! is read. If not, the program is terminated.
+        if (file_check) then
+            open (1, FILE=trim(file_loc), FORM='formatted', &
+                  STATUS='old', ACTION='read')
+            read (1, NML=user_inputs)
+            close (1)
+            ! Store m,n,p into global m,n,p
+            m_glb = m
+            n_glb = n
+            p_glb = p
+        else
+            print '(A)', 'File pre_process.inp is missing. Exiting ...'
+            call s_mpi_abort()
+        end if
+
+    end subroutine s_read_input_file ! -------------------------------------
 
     !>  Checking that the user inputs make sense, i.e. that the
     !!      individual choices are compatible with the code's options
@@ -492,7 +545,7 @@ contains
             call s_mpi_abort()
         elseif (num_fluids /= dflt_int &
                 .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids_alloc)) then
+                (num_fluids < 1 .or. num_fluids > num_fluids)) then
             print '(A)', 'Unsupported value of num_fluids. Exiting ...'
             call s_mpi_abort()
 !        elseif ((model_eqns == 1) &
@@ -832,7 +885,7 @@ contains
         end do
 
         ! Constraints on the stiffened equation of state fluids parameters
-        do i = 1, num_fluids_alloc
+        do i = 1, num_fluids
 
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
@@ -1532,7 +1585,7 @@ contains
 
         end if
 
-        if (model_eqns == 2 .and. num_fluids < num_fluids_alloc) then
+        if (model_eqns == 2 .and. num_fluids < num_fluids) then
 
             if (any(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:) &
                     /= dflt_real) &
@@ -1643,8 +1696,8 @@ contains
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
 
         ! Computing minimum cell-width
-        dx_min = minval(x_cb(0:m) - x_cb(-1:m - 1))
-        if (num_procs > 1) call s_mpi_reduce_min(dx_min)
+        dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
+        if (num_procs > 1) call s_mpi_reduce_min(dx)
 
         ! Setting locations of domain bounds
         x_domain%beg = x_cb(-1)
@@ -1676,8 +1729,8 @@ contains
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
 
             ! Computing minimum cell-width
-            dy_min = minval(y_cb(0:n) - y_cb(-1:n - 1))
-            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
+            dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
+            if (num_procs > 1) call s_mpi_reduce_min(dy)
 
             ! Setting locations of domain bounds
             y_domain%beg = y_cb(-1)
@@ -1709,8 +1762,8 @@ contains
                 z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
 
                 ! Computing minimum cell-width
-                dz_min = minval(z_cb(0:p) - z_cb(-1:p - 1))
-                if (num_procs > 1) call s_mpi_reduce_min(dz_min)
+                dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
+                if (num_procs > 1) call s_mpi_reduce_min(dz)
 
                 ! Setting locations of domain bounds
                 z_domain%beg = z_cb(-1)
@@ -1885,8 +1938,8 @@ contains
         ! Computing cell center locations
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
         ! Computing minimum cell width
-        dx_min = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
-        if (num_procs > 1) call s_mpi_reduce_min(dx_min)
+        dx = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
+        if (num_procs > 1) call s_mpi_reduce_min(dx)
         ! Setting locations of domain bounds
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
@@ -1911,8 +1964,8 @@ contains
             ! Computing cell center locations
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
             ! Computing minimum cell width
-            dy_min = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
-            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
+            dy = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
+            if (num_procs > 1) call s_mpi_reduce_min(dy)
             ! Setting locations of domain bounds
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
@@ -1937,8 +1990,8 @@ contains
                 ! Computing cell center locations
                 z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
                 ! Computing minimum cell width
-                dz_min = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
-                if (num_procs > 1) call s_mpi_reduce_min(dz_min)
+                dz = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
+                if (num_procs > 1) call s_mpi_reduce_min(dz)
                 ! Setting locations of domain bounds
                 z_domain%beg = z_cb(-1)
                 z_domain%end = z_cb(p)

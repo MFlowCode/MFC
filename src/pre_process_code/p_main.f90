@@ -50,6 +50,8 @@ program p_main
     ! leads to the termination of the pre-process.
 
     IF (proc_rank == 0) THEN
+        call s_assign_default_values_to_user_inputs()
+        call s_read_input_file()
         CALL s_check_input_file()
     END IF
 

@@ -48,8 +48,8 @@ ENDIF()
 # SILO
 IF (MFC_BUILD_SILO)
     ExternalProject_Add(silo
-        GIT_REPOSITORY   "https://github.com/LLNL/Silo"
-        GIT_TAG          2597088f1b0c48873fee8635ce788df0defaf5b2
+        GIT_REPOSITORY   "https://github.com/henryleberre/Silo"
+        GIT_TAG          964d993039b467e3d472d3a70afd03380fe2c320
         CMAKE_ARGS       -DSILO_ENABLE_SHARED=OFF
                          -DSILO_ENABLE_SILOCK=OFF
                          -DSILO_ENABLE_BROWSER=OFF

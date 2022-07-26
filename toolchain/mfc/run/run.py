@@ -32,14 +32,14 @@ class MFCRun:
         engines.get_engine(self.mfc.args["engine"]).validate_job_options(self.mfc)
 
     def run(self) -> None:
-        cons.print("[bold][u]Run:[/u][/bold]")
+        cons.print("[bold]Run[/bold]")
         cons.indent()
 
         if len(self.mfc.args["targets"]) == 0:
             cons.print(f"> No target selected.")
             return
 
-        input_file = input.load(self.mfc.args["input"].strip())
+        input_file = input.load(self.mfc.args)
 
         engine = engines.get_engine(self.mfc.args["engine"])
         engine.init(self.mfc, input_file)
@@ -58,10 +58,10 @@ Engine        (-e)  {self.mfc.args['engine']}
 
         for target_name in self.mfc.args["targets"]:
             cons.print(no_indent=True)
-            cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
+            cons.print(f"[bold]Running [magenta]{target_name}[/magenta][/bold]:")
             cons.indent()
 
-            input_file.create(target_name)
+            input_file.generate(target_name)
 
             build.build_target(self.mfc, target_name)
 

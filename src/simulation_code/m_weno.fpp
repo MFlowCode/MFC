@@ -5,8 +5,6 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-#:include "../common/case.fpp"
-
 !> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
 !!              that is supplemented with monotonicity preserving bounds (MPWENO)
 !!              and a mapping function that boosts the accuracy of the non-linear
@@ -1970,7 +1968,7 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
             if(n == 0) return
             if(weno_dir == 2) then
-                #:if CASE["logistics"]["cu_tensor"]
+                if (cu_tensor) then
                     if(p == 0) then
                                 block
                                 !use CuTensorEx 
@@ -1986,7 +1984,7 @@ contains
                                 !$acc end host_data
                                 end block          
                     end if
-                #:else
+                else
 !$acc parallel loop collapse(4) gang vector default(present)                 
                     do j = 1, v_size
                         do q = is3%beg, is3%end
@@ -1998,7 +1996,7 @@ contains
                         end do
                     end do
 !$acc end parallel loop 
-                #:endif
+                end if
             end if
 
 
@@ -2009,14 +2007,14 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
             if(p == 0) return 
             if(weno_dir == 3) then 
-                #:if CASE["logistics"]["cu_tensor"]
+                if (cu_tensor) then
                         block
                         !use CuTensorEx     
                         !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_z_flat)        
                         !v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
                         !$acc end host_data
                         end block
-                #:else
+                else
 !$acc parallel loop collapse(4) gang vector default(present)               
                     do j = 1, v_size
                         do q = is3%beg, is3%end
@@ -2028,7 +2026,7 @@ contains
                         end do
                     end do
 !$acc end parallel loop                 
-                #:endif
+                end if
             end if 
 
 

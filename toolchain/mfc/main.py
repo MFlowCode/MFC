@@ -6,7 +6,7 @@ import getpass
 import platform
 import itertools
 
-from mfc.util.common  import MFC_LOGO, MFCException, quit, delete_directory, format_list_to_string
+from mfc.util.common  import MFC_LOGO, MFCException, quit, delete_directory, format_list_to_string, does_command_exist
 from mfc.util.printer import cons
 
 import mfc.args
@@ -24,10 +24,12 @@ class MFCState:
         self.lock = mfc.cfg.lock.MFCLock(self.user)
         self.test = mfc.tests.tests.MFCTest(self)
         self.args = mfc.args.parse(self)
+        self.test.sched.nAvailable = self.args["jobs"]
         self.run  = mfc.run.run.MFCRun(self)
 
         self.__handle_mode()
         self.__print_greeting()
+        self.__checks()
         self.__run()
 
 
@@ -65,7 +67,7 @@ class MFCState:
             targets_line if self.args["command"] != "test" else "",
             "",
             "",
-            "[yellow]$ ./mfc.sh \[run, test, clean] --help[/yellow]",
+            "[yellow]$ ./mfc.sh \[build, run, test, clean] --help[/yellow]",
         ]
 
 
@@ -80,34 +82,35 @@ class MFCState:
         cons.print()
 
 
+    def __checks(self):
+        if not does_command_exist("cmake"):
+            raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
+
+        if not does_command_exist("mpif90"):
+            raise MFCException("mpif90 couldn't be located on your system. We therefore assume MPI is not available on your system. It is required to build MFC. Please ensure it is installed and discoverable (e.g in your system's $PATH).")
+
+
     def __run(self):
         if self.args["command"] == "test":
             self.test.execute()
         elif self.args["command"] == "run":
             self.run.run()
         elif self.args["command"] == "build":
-            for target in self.args["targets"]:
-                mfc.build.build_target(self, target)
+            mfc.build.build(self)
         elif self.args["command"] == "clean":
             for target in self.args["targets"]:
                 mfc.build.clean_target(self, target)
 
-
-FILE_ISSUE_MSG = f"""\
-We apologize for the inconvenience. If you believe this is an issue with MFC, \
-please visit https://github.com/MFlowCode/MFC-develop/issues to file an issue.\
-"""
 
 if __name__ == "__main__":
     try:
         MFCState()
     except MFCException as exc:
         cons.reset()
-        cons.print(f"""
---- [bold red]FATAL MFC ERROR[/bold red] ---
+        cons.print(f"""\
 
-{str(exc)}
-{FILE_ISSUE_MSG}
+
+[bold red]Error[/bold red]: {str(exc)}
 """)
         quit(signal.SIGTERM)
     except KeyboardInterrupt as exc:
@@ -115,10 +118,10 @@ if __name__ == "__main__":
     except Exception as exc:
         cons.reset()
         cons.print_exception()
-        cons.print(f"""
---- [bold red]FATAL MFC ERROR[/bold red] ---
+        cons.print(f"""\
 
-An unexpected exception occurred:
-{FILE_ISSUE_MSG}
+
+[bold red]ERROR[/bold red]: An unexpected exception occurred: {str(exc)}
 """)
+
         quit(signal.SIGTERM)

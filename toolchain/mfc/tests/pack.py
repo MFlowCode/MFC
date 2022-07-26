@@ -120,7 +120,7 @@ def generate(case: case.Case) -> Pack:
 
         for double in doubles:
             if math.isnan(double):
-                raise MFCException(f"A NaN was found while generating a pack file for {case.get_uuid()}.")
+                raise MFCException(f"A NaN was found while generating a pack file for test with UUID [bold magenta]{case.get_uuid()}[/bold magenta].")
 
         entries.append(PackEntry(short_filepath,doubles))
 

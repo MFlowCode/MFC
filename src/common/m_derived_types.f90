@@ -4,9 +4,6 @@
 !! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
 !! @version 1.0
 !! @date JUNE 06 2019
-
-#:include 'case.fpp'
-
 !> @brief This file contains the definitions of all of the custom-defined
 !!              types used in the pre-process code.
 module m_derived_types
@@ -15,9 +12,13 @@ module m_derived_types
 
     PUBLIC :: probe_parameters
 
-    INTEGER, parameter :: num_fluids       = ${CASE['autogen']['num_fluids']}$          !< Number of fluids in the flow
-    INTEGER, parameter :: num_fluids_alloc = ${CASE['autogen']['num_fluids_alloc']}$    !< Number of fluids in the flow
-    integer, parameter :: num_patches      = ${len(CASE['patches'])}$ !< Number of patches composing initial condition
+    INTEGER, parameter :: num_fluids_max  = 10 !<
+    !! Maximum number of fluids in the simulation
+
+    integer, parameter :: num_probes_max = 10 !<
+    !! Maximum number of flow probes in the simulation
+
+    integer, parameter :: num_patches_max = 10
 
     !> Derived type adding the field position (fp) as an attribute
     TYPE field_position
@@ -97,7 +98,7 @@ module m_derived_types
         real(kind(0d0)), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
         !! through its x-, y- and z-components, respectively.
-        logical, dimension(0:num_patches) :: alter_patch !<
+        logical, dimension(0:num_patches_max - 1) :: alter_patch !<
 
         !! List of permissions that indicate to the current patch which preceding
         !! patches it is allowed to overwrite when it is in process of being laid
@@ -114,13 +115,13 @@ module m_derived_types
         !! Smoothing coefficient (coeff) adminstrating the size of the stencil of
         !! cells across which boundaries of the current patch will be smeared out
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho
-        real(kind(0d0))                        :: rho
-        real(kind(0d0)), dimension(3)          :: vel
-        real(kind(0d0))                        :: pres
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0))                        :: gamma
-        real(kind(0d0))                        :: pi_inf !<
+        real(kind(0d0)), dimension(num_fluids_max) :: alpha_rho
+        real(kind(0d0))                            :: rho
+        real(kind(0d0)), dimension(3)              :: vel
+        real(kind(0d0))                            :: pres
+        real(kind(0d0)), dimension(num_fluids_max) :: alpha
+        real(kind(0d0))                            :: gamma
+        real(kind(0d0))                            :: pi_inf !<
 
         !! Primitive variables associated with the patch. In order, these include
         !! the partial densities, density, velocity, pressure, volume fractions,

@@ -5,8 +5,6 @@
 !! @version 1.0
 !! @date MAY 28, 2020
 
-#:include '../common/case.fpp'
-
 !> @brief This module is used to compute moment inversion via qbmm
 module m_qbmm
 
@@ -28,9 +26,8 @@ module m_qbmm
 
     real(kind(0d0)), parameter :: verysmall = 1.d-12
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :)  :: momrhs
-    integer,         parameter :: nterms = ${CASE["autogen"]["nterms"]}$ !< Number of rhs terms in each moment transport equations
+    integer :: nterms  !< Number of rhs terms in each moment transport equations
     type(bounds_info) :: is1, is2, is3
-
 
     integer :: momxb, momxe
     integer :: contxb, contxe
@@ -50,6 +47,16 @@ contains
 
         integer :: i1, i2, q, i, j
         
+        if (bubble_model == 2) then
+            ! Keller-Miksis without viscosity/surface tension
+            nterms = 12
+        else if (bubble_model == 3) then
+            ! Rayleigh-Plesset with viscosity/surface tension
+            nterms = 6
+        end if
+
+        !$acc update device(nterms)
+
         allocate (momrhs(3, 0:2, 0:2, nterms, nb))
         momrhs = 0d0
 

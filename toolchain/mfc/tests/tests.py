@@ -14,6 +14,8 @@ from tests.threads import MFCTestThreadManager
 
 from mfc.util.common import MFCException
 
+from mfc.build import build_target
+
 import tests.pack
 
 
@@ -83,6 +85,9 @@ class MFCTest:
 
             return
 
+        build_target(self.mfc, "pre_process")
+        build_target(self.mfc, "simulation")
+
         range_str = f"from [bold magenta]{self.mfc.args['from']}[/bold magenta] to [bold magenta]{self.mfc.args['to']}[/bold magenta]"
 
         if len(self.mfc.args["only"]) > 0:
@@ -113,19 +118,19 @@ class MFCTest:
         try:
             test.create_directory()
 
-            if test.case.bubbles.qbmm:
+            if test.params.get("qbmm", False):
                 tol = 1e-7
-            elif test.case.bubbles.bubbles:
+            elif test.params.get("bubbles", False):
                 tol = 1e-10
             else:
                 tol = 1e-12
 
             cmd = test.run(self.mfc.args)
 
-            common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
+            common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout.read())
 
             if cmd.returncode != 0:
-                cons.print(cmd.stdout)
+                cons.print(cmd.stdout.read())
                 raise MFCException(f"""\
     {os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
     You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary in {test.get_dirpath()}/case.py.""")

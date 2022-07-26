@@ -5,8 +5,6 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-#:include '../common/case.fpp'
-
 !> @brief This module provides a platform that is analagous to constructive
 !!              solid geometry techniques and in this way allows for the creation
 !!              of a wide variety of initial conditions. Several 1D, 2D and 3D
@@ -314,7 +312,7 @@ contains
         end if
 
         ! Bubbles variables
-        #:if CASE['bubbles']['bubbles']
+        if (bubbles) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
                 muV = patch_icpp(patch_id)%v0 ! = 0
@@ -354,7 +352,7 @@ contains
                     end if
                 end if
             end do
-        #:endif
+        end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
         call s_convert_species_to_mixture_variables( &
@@ -393,7 +391,7 @@ contains
         end if
 
         ! Bubbles variables
-        #:if CASE['bubbles']['bubbles']
+        if (bubbles) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(smooth_patch_id)%r0 ! = R0(i)
                 muV = V0(i)*patch_icpp(smooth_patch_id)%v0 ! = 0
@@ -423,7 +421,7 @@ contains
                     end if
                 end if
             end do
-        #:endif
+        end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
         call s_convert_species_to_mixture_variables( &
@@ -491,7 +489,7 @@ contains
         end do
 
         ! Smoothed bubble variables
-        #:if CASE['bubbles']['bubbles']
+        if (bubbles) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0 ! = 1*R0(i)
                 muV = V0(i)*patch_icpp(patch_id)%v0 ! = 1*V0(i)
@@ -529,7 +527,7 @@ contains
 
                 end if
             end do
-        #:endif
+        end if
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -1124,7 +1122,7 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
 
-                    eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
+                    eta = tanh(smooth_coeff/min(dx, dy)* &
                                (sqrt((x_cc(i) - x_centroid)**2 &
                                      + (y_cc(j) - y_centroid)**2) &
                                 - radius))*(-0.5d0) + 0.5d0
@@ -1287,7 +1285,7 @@ contains
             do i = 0, m
 
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
+                    eta = tanh(smooth_coeff/min(dx, dy)* &
                                (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
                                      ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1d0))*(-0.5d0) + 0.5d0
@@ -1354,7 +1352,7 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx_min, dy_min, dz_min)* &
+                        eta = tanh(smooth_coeff/min(dx, dy, dz)* &
                                    (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
                                          ((cart_y - y_centroid)/b)**2 + &
                                          ((cart_z - z_centroid)/c)**2) &
@@ -1484,7 +1482,7 @@ contains
             do i = 0, m
 
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx_min, dy_min) &
+                    eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy) &
                                            *(a*x_cc(i) + b*y_cc(j) + c) &
                                            /sqrt(a**2 + b**2))
                 end if
@@ -2109,7 +2107,7 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
 
-                        eta = tanh(smooth_coeff/min(dx_min, dy_min, dz_min)* &
+                        eta = tanh(smooth_coeff/min(dx, dy, dz)* &
                                    (sqrt((x_cc(i) - x_centroid)**2 &
                                          + (cart_y - y_centroid)**2 &
                                          + (cart_z - z_centroid)**2) &
@@ -2285,17 +2283,17 @@ contains
                     if (patch_icpp(patch_id)%smoothen) then
 
                         if (length_x /= dflt_real) then
-                            eta = tanh(smooth_coeff/min(dy_min, dz_min)* &
+                            eta = tanh(smooth_coeff/min(dy, dz)* &
                                        (sqrt((cart_y - y_centroid)**2 &
                                              + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         elseif (length_y /= dflt_real) then
-                            eta = tanh(smooth_coeff/min(dx_min, dz_min)* &
+                            eta = tanh(smooth_coeff/min(dx, dz)* &
                                        (sqrt((x_cc(i) - x_centroid)**2 &
                                              + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         else
-                            eta = tanh(smooth_coeff/min(dx_min, dy_min)* &
+                            eta = tanh(smooth_coeff/min(dx, dy)* &
                                        (sqrt((x_cc(i) - x_centroid)**2 &
                                              + (cart_y - y_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
@@ -2384,7 +2382,7 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx_min, dy_min, dz_min) &
+                        eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy, dz) &
                                                *(a*x_cc(i) + &
                                                  b*cart_y + &
                                                  c*cart_z + d) &

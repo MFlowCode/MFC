@@ -211,7 +211,7 @@ correct binaries.
   $ brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
   $ HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
   ```
-   s
+
   They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`. Building this package might take a while.
 
 </details>
@@ -256,7 +256,7 @@ correct binaries.
 
 </details>
  
-## Fetch, Configure, and Test MFC
+## Fetch, Configure, Build, and Test MFC
 
 The following commands fetch and build MFC and its required dependencies. 
 The dependencies are built to the `build/common/` directory within your MFC installation. 
@@ -269,29 +269,35 @@ $ git clone https://github.com/MFlowCode/MFC
 $ cd MFC
 ```
 
-+ **(Optional) Configure MFC defaults in [mfc.user.yaml](mfc.user.yaml):**
++ **(Optional) Configure MFC defaults in [defaults.yaml](defaults.yaml):**
 
-If you wish, you can override MFC's default build parameters in [mfc.user.yaml](mfc.user.yaml), a file intended for user customization. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
+If you wish, you can override MFC's default build parameters in [defaults.yaml](defaults.yaml), a file intended for user customization. This can greatly reduce the number of command-line arguments you have to pass to [mfc.sh](mfc.sh)` in the following sections. You can do this at any time.
 
-+ **Run MFC's tests in `release-cpu` mode:**
++ **Build MFC's codes in `release-cpu` mode with 8 threads:**
 
 ```console
-$ ./mfc.sh test -j 8
+$ ./mfc.sh build -t pre_process simulation post_process -j 8
 ```
 
 To build MFC in different configurations (herein, *modes*), the `-m <mode>` option
 can be specified to each call to `mfc.sh`. A full list of modes is located in
-[mfc.user.yaml](mfc.user.yaml). It can be modified to work with system, and additional
+[defaults.yaml](defaults.yaml). It can be modified to work with system, and additional
 modes can be created at your discretion. The default mode is `release-cpu` but
 you can use others such as `release-gpu`.
 
 **IMPORTANT NOTE**: This same mode will be used for any future commands such as `./mfc.sh test` and `./mfc.sh run` until you specify `-m` again (in any of these commands).
 
++ **Run MFC's tests in `release-cpu` mode with 8 threads:**
+
+```console
+$ ./mfc.sh test -j 8
+```
+
 Please refer to the [Testing](#testing-mfc) section of this document for more information. 
 
-### User Configuration (`mfc.user.yaml`)
+### User Configuration (`defaults.yaml`)
 
-The `mfc.sh` script used in the previous section is configured through the file named `mfc.user.yaml`.
+The `mfc.sh` script used in the previous section is configured through the file named `defaults.yaml`.
 
 ## Running MFC
 
@@ -349,9 +355,9 @@ print(Case(
   $ ./mfc.sh run samples/2D_shockbubble/case.py -t simulation post_process -n 4
   ```
   
-  Most parameters have sensible defaults which can be overridden in [mfc.user.yaml](mfc.user.yaml):
+  Most parameters have sensible defaults which can be overridden in [defaults.yaml](defaults.yaml):
   
-  https://github.com/MFlowCode/MFC-develop/blob/d74e714b08562a9f8f815112e05df54c99c8c18f/mfc.user.yaml#L12-L21
+  https://github.com/MFlowCode/MFC-develop/blob/d74e714b08562a9f8f815112e05df54c99c8c18f/defaults.yaml#L12-L21
   
   On some computer clusters, MFC might select the wrong MPI program to execute your application
   because it uses a general heuristic for its selection. Notably, `srun` is known to fail on some SLURM
@@ -398,7 +404,7 @@ print(Case(
   
   - Statements of the form `${expression}` are string-replaced to provide
   runtime parameters, most notably execution options. They reference the variables in the
-  same format as those under the "run" section of [mfc.user.yaml](mfc.user.yaml), replacing
+  same format as those under the "run" section of [defaults.yaml](defaults.yaml), replacing
   `-` for `_`. You can perform therein any Python operation recognized by the built-in `expr()` function.
   
   As an example, one might request GPUs on a SLURM system using the following:
@@ -529,7 +535,7 @@ The list of modules offered by a system is subject to change. The aforementioned
 
 ### OpenACC Memory Profiling
 
-You can append `-DMFC_MEMORY_DUMP` to `release-gpu`'s Fortran compiler options in [mfc.user.yaml](mfc.user.yaml) to make the [simulation code](src/simulation_code/) call `acc_present_dump()` at various stages of program execution to obtain a printout of on-device memory usage. The [mem_parse.sh](misc/mem_parse.sh) script can be given as an argument the path to a file containing MFC's output, in order to aggregate the data and produce tables with formatted output.
+You can append `-DMFC_MEMORY_DUMP` to `release-gpu`'s Fortran compiler options in [defaults.yaml](defaults.yaml) to make the [simulation code](src/simulation_code/) call `acc_present_dump()` at various stages of program execution to obtain a printout of on-device memory usage. The [mem_parse.sh](misc/mem_parse.sh) script can be given as an argument the path to a file containing MFC's output, in order to aggregate the data and produce tables with formatted output.
 
 ## License
  
