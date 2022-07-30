@@ -1058,38 +1058,23 @@ contains
                 if(model_eqns == 3) then
                     !ME3
 
-!$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg)
+!$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R)
 
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
 
-                            !$acc loop seq
-                            do i = 1, contxe
-                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf_flat(j,     k, l, i)
-                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
-                            end do
+
+                            vel_L_rms = 0d0; vel_R_rms = 0d0
 
                             !$acc loop seq
                             do i = 1, num_dims
                                 vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j,     k, l, contxe + i)
                                 vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
-                            end do
-
-                            vel_L_rms = 0d0; vel_R_rms = 0d0
-                !$acc loop seq
-                            do i = 1, num_dims
                                 vel_L_rms = vel_L_rms + vel_L(i)**2d0
                                 vel_R_rms = vel_R_rms + vel_R(i)**2d0
                             end do
 
-
-
-                !$acc loop seq
-                            do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
-                                alpha_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
-                            end do
 
                             pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
                             pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
@@ -1108,66 +1093,72 @@ contains
                             if (mpp_lim) then
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_L(i) = max(0d0, alpha_rho_L(i))
-                                    alpha_L(i) = min(max(0d0, alpha_L(i)), 1d0)
-                                    alpha_L_sum = alpha_L_sum + alpha_L(i)
+                                    qL_prim_rs${XYZ}$_vf_flat(j, k, l,  i) = max(0d0, qL_prim_rs${XYZ}$_vf_flat(j, k, l, i))
+                                    qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)), 1d0)
+                                    alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
                                 end do
-
-                                alpha_L = alpha_L/max(alpha_L_sum,sgm_eps)
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_R(i) = max(0d0, alpha_rho_R(i))
-                                    alpha_R(i) = min(max(0d0, alpha_R(i)), 1d0)
-                                    alpha_R_sum = alpha_R_sum + alpha_R(i)
+                                   qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)/max(alpha_L_sum,sgm_eps)
                                 end do
 
-                                alpha_R = alpha_R/max(alpha_R_sum,sgm_eps)
-                            end if
-
-                            !$acc loop seq
-                            do i = 1, num_fluids
-                                rho_L = rho_L + alpha_rho_L(i)
-                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-
-                                rho_R = rho_R + alpha_rho_R(i)
-                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                            end do
-
-                            if(any(Re_size > 0)) then                                    
                                 !$acc loop seq
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real 
-                                    
-                                    if (Re_size(i) > 0) Re_L(i) = 0d0
-                                    
-                                    !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res(i,q) &
-                                                  + Re_L(i)
-                                    end do
-
-                                    Re_L(i) = 1d0/max(Re_L(i), sgm_eps)
-
-                                end do     
+                                do i = 1, num_fluids
+                                    qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i))
+                                    qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i) = min(max(0d0,qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)), 1d0)
+                                    alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
+                                end do
 
                                 !$acc loop seq
-                                do i = 1, 2
-                                    Re_R(i) = dflt_real 
-                                    
-                                    if (Re_size(i) > 0) Re_R(i) = 0d0
-
-                                    !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res(i,q) &
-                                                  + Re_R(i)
-                                    end do
-
-                                    Re_R(i) = 1d0/max(Re_R(i), sgm_eps)
+                                do i = 1, num_fluids
+                                   qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)/max(alpha_R_sum,sgm_eps)
                                 end do
                             end if
+
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
+                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*pi_infs(i)
+
+                                    rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
+                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                end do
+
+                                if(any(Re_size > 0)) then                                    
+                                    !$acc loop seq
+                                    do i = 1, 2
+                                        Re_L(i) = dflt_real 
+                                        
+                                        if (Re_size(i) > 0) Re_L(i) = 0d0
+                                        
+                                        !$acc loop seq
+                                        do q = 1, Re_size(i)
+                                            Re_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + Re_idx(i, q))/Res(i,q) &
+                                                      + Re_L(i)
+                                        end do
+
+                                        Re_L(i) = 1d0/max(Re_L(i), sgm_eps)
+
+                                    end do     
+
+                                    !$acc loop seq
+                                    do i = 1, 2
+                                        Re_R(i) = dflt_real 
+                                        
+                                        if (Re_size(i) > 0) Re_R(i) = 0d0
+
+                                        !$acc loop seq
+                                        do q = 1, Re_size(i)
+                                            Re_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i,q) &
+                                                      + Re_R(i)
+                                        end do
+
+                                        Re_R(i) = 1d0/max(Re_R(i), sgm_eps)
+                                    end do
+                                end if
 
                             E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
 
@@ -1178,9 +1169,10 @@ contains
                             if(avg_state == 2) then
 
                                 rho_avg = 5d-1*(rho_L + rho_R)
+                                vel_avg_rms = 0d0
                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_avg(i) = 5d-1*(vel_L(i) + vel_R(i))
+                                    vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
                                 end do
 
                                 H_avg = 5d-1*(H_L + H_R)
@@ -1190,10 +1182,11 @@ contains
                             elseif(avg_state == 1) then
 
                                 rho_avg = sqrt(rho_L*rho_R)
+                                vel_avg_rms = 0d0
                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_avg(i) = (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))/ &
-                                        (sqrt(rho_L) + sqrt(rho_R))
+                                    vel_avg_rms  = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2d0/ &
+                                        (sqrt(rho_L) + sqrt(rho_R))**2d0
                                 end do
 
                                 H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
@@ -1203,11 +1196,7 @@ contains
                                     (sqrt(rho_L) + sqrt(rho_R))
                             end if
 
-                            vel_avg_rms = 0d0
-                !$acc loop seq
-                            do i = 1, num_dims
-                                vel_avg_rms = vel_avg_rms + vel_avg(i)**2d0
-                            end do
+                            
 
 
                             if (mixture_err) then
@@ -1224,18 +1213,19 @@ contains
 
                             if (alt_soundspeed) then
 
-
                                 blkmod1 = ((gammas(1) + 1d0)*pres_L + &
-                                        pi_infs(1))/gammas(1)
+                                            pi_infs(1))/gammas(1)
                                 blkmod2 = ((gammas(2) + 1d0)*pres_L + &
-                                        pi_infs(2))/gammas(2)
-                                c_L = 1d0/(rho_L*(alpha_L(1)/blkmod1 + alpha_L(2)/blkmod2))
+                                            pi_infs(2))/gammas(2)
+                                c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 1)/blkmod1 &
+                                                        + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 2)/blkmod2))
 
                                 blkmod1 = ((gammas(1) + 1d0)*pres_R + &
-                                        pi_infs(1))/gammas(1)
+                                            pi_infs(1))/gammas(1)
                                 blkmod2 = ((gammas(2) + 1d0)*pres_R + &
-                                        pi_infs(2))/gammas(2)
-                                c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
+                                            pi_infs(2))/gammas(2)
+                                c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + 1)/blkmod1 &
+                                                        + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, e_idx + 2)/blkmod2))
 
                             else
                                 c_L = 0d0
@@ -1261,6 +1251,13 @@ contains
                                 c_R = 100.d0*sgm_eps
                             else
                                 c_R = sqrt(c_R)
+                            end if
+
+                            if(any(Re_size > 0)) then
+                            !$acc loop seq
+                                do i = 1, 2
+                                    Re_avg_rs${XYZ}$_vf_flat(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
+                                end do
                             end if
 
                             if(wave_speeds == 1) then
@@ -1792,39 +1789,20 @@ contains
                     end do
                 end do
                 elseif(model_eqns == 2 .and. bubbles) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg)
+                !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
-
-                !$acc loop seq
-                                do i = 1, contxe
-                                    alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                    alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
-                                end do
+                                vel_L_rms = 0d0; vel_R_rms = 0d0
 
                 !$acc loop seq
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, contxe + i)
                                     vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
-                                end do
-
-                                vel_L_rms = 0d0; vel_R_rms = 0d0
-                !$acc loop seq
-                                do i = 1, num_dims
                                     vel_L_rms = vel_L_rms + vel_L(i)**2d0
                                     vel_R_rms = vel_R_rms + vel_R(i)**2d0
                                 end do
-
-
-
-                !$acc loop seq
-                                do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
-                                end do
-
 
                                 pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
@@ -1837,19 +1815,19 @@ contains
                                 if(mpp_lim .and. (num_fluids > 2)) then
                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        rho_L = rho_L + alpha_rho_L(i)
-                                        gamma_L = gamma_L+ alpha_L(i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l,i)
+                                        gamma_L = gamma_L+ qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
+                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j , k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else if(num_fluids > 2) then
                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        rho_L = rho_L + alpha_rho_L(i)
-                                        gamma_L = gamma_L+ alpha_L(i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l,  i)
+                                        gamma_L = gamma_L+ qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
+                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else
-                                    rho_L = alpha_rho_L(1)
+                                    rho_L = qL_prim_rs${XYZ}$_vf_flat(j , k, l,  1)
                                     gamma_L = gammas(1)
                                     pi_inf_L = pi_infs(1)
                                 end if
@@ -1861,19 +1839,19 @@ contains
                                 if(mpp_lim .and. (num_fluids > 2)) then
                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        rho_R = rho_R + alpha_rho_R(i)
-                                        gamma_R = gamma_R+ alpha_R(i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  i)
+                                        gamma_R = gamma_R+ qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + i)*gammas(i)
+                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + i)*pi_infs(i)
                                     end do
                                 else if(num_fluids > 2) then
                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        rho_R = rho_R + alpha_rho_R(i)
-                                        gamma_R = gamma_R+ alpha_R(i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  i)
+                                        gamma_R = gamma_R+ qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + i)*gammas(i)
+                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else
-                                    rho_R = alpha_rho_R(1)
+                                    rho_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  1)
                                     gamma_R = gammas(1)
                                     pi_inf_R = pi_infs(1)
                                 end if                              
@@ -1887,9 +1865,6 @@ contains
                                 H_R = (E_R + pres_R)/rho_R
                                 if(avg_state == 2) then
 
-
-
-                                    if (bubbles) then
 !$acc loop seq
                                         do i = 1, nb
                                             R0_L(i) =  qL_prim_rs${XYZ}$_vf_flat(j, k, l, rs(i) )
@@ -1903,8 +1878,11 @@ contains
                                             end if
                                         end do 
 
-                                        call s_comp_n_from_prim(alpha_L(num_fluids), R0_L, nbub_L)
-                                        call s_comp_n_from_prim(alpha_R(num_fluids), R0_R, nbub_R)
+                                        !call s_comp_n_from_prim(qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + num_fluids), R0_L, nbub_L)
+                                        !call s_comp_n_from_prim(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + num_fluids), R0_R, nbub_R)
+
+                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + num_fluids)/dot_product(R0_L**3d0, weight)
+                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + num_fluids)/dot_product(R0_R**3d0, weight)
 
 
 !$acc loop seq
@@ -1930,28 +1908,28 @@ contains
                                             R3V2Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 3)
                                             R3V2Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 3)
                                         else
-                                            call s_quad(pbw_L*(R0_L**3.d0), PbwR3Lbar)
-                                            call s_quad(pbw_R*(R0_R**3.d0), PbwR3Rbar)
 
-                                            call s_quad(R0_L**3.d0, R3Lbar)
-                                            call s_quad(R0_R**3.d0, R3Rbar)
+                                            PbwR3Lbar = dot_product(pbw_L*(R0_L**3.d0), weight)
+                                            PbwR3Rbar = dot_product(pbw_R*(R0_R**3.d0), weight)
 
-                                            call s_quad((R0_L**3.d0)*(V0_L**2.d0), R3V2Lbar)
-                                            call s_quad((R0_R**3.d0)*(V0_R**2.d0), R3V2Rbar)
+                                            R3Lbar = dot_product((R0_L**3.d0), weight)
+                                            R3Rbar = dot_product((R0_R**3.d0), weight)
 
+                                            R3V2Lbar = dot_product((R0_L**3.d0)*(V0_L**2.d0), weight)
+                                            R3V2Rbar = dot_product((R0_R**3.d0)*(V0_R**2.d0), weight)
                                         end if
 
-                                        if (alpha_L(num_fluids) < small_alf .or. R3Lbar < small_alf) then
-                                            ptilde_L = alpha_L(num_fluids)*pres_L
+                                        if (qL_prim_rs${XYZ}$_vf_flat(j , k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
+                                            ptilde_L = qL_prim_rs${XYZ}$_vf_flat(j , k, l, E_idx + num_fluids)*pres_L
                                         else
-                                            ptilde_L = alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
+                                            ptilde_L = qL_prim_rs${XYZ}$_vf_flat(j , k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
                                                                             rho_L*R3V2Lbar/R3Lbar)
                                         end if
 
-                                        if (alpha_R(num_fluids) < small_alf .or. R3Rbar < small_alf) then
-                                            ptilde_R = alpha_R(num_fluids)*pres_R
+                                        if (qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
+                                            ptilde_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)*pres_R
                                         else
-                                            ptilde_R = alpha_R(num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
+                                            ptilde_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
                                                                             rho_R*R3V2Rbar/R3Rbar)
                                         end if
 
@@ -1959,25 +1937,28 @@ contains
                                         end if
 
                                         !ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
-                                    end if
 
                                     rho_avg = 5d-1*(rho_L + rho_R)
-                !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg(i) = 5d-1*(vel_L(i) + vel_R(i))
-                                    end do
 
                                     H_avg = 5d-1*(H_L + H_R)
 
                                     gamma_avg = 5d-1*(gamma_L + gamma_R)
 
+                                    vel_avg_rms = 0d0
+                !$acc loop seq
+                                    do i = 1, num_dims
+                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
+                                    end do
+
                                 elseif(avg_state == 1) then
 
                                     rho_avg = sqrt(rho_L*rho_R)
+
+                                    vel_avg_rms = 0d0
                 !$acc loop seq
                                     do i = 1, num_dims
-                                        vel_avg(i) = (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
+                                        vel_avg_rms = vel_avg_rms +  (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2d0/ &
+                                            (sqrt(rho_L) + sqrt(rho_R))**2d0
                                     end do
 
                                     H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
@@ -1987,11 +1968,7 @@ contains
                                         (sqrt(rho_L) + sqrt(rho_R))
                                 end if
 
-                                vel_avg_rms = 0d0
-                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg_rms = vel_avg_rms + vel_avg(i)**2d0
-                                end do
+
 
 
                                 if (mixture_err) then
@@ -2015,13 +1992,13 @@ contains
                                             pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_L + &
                                             pi_infs(2))/gammas(2)
-                                    c_L = 1d0/(rho_L*(alpha_L(1)/blkmod1 + alpha_L(2)/blkmod2))
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf_flat(j , k, l,  E_idx + 1)/blkmod1 + qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + 2)/blkmod2))
 
                                     blkmod1 = ((gammas(1) + 1d0)*pres_R + &
                                             pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_R + &
                                             pi_infs(2))/gammas(2)
-                                    c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + 1)/blkmod1 + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + 2)/blkmod2))
 
                                 else
                                     ! Sound speed for bubble mmixture to order O(\alpha)
@@ -2035,11 +2012,11 @@ contains
                                         c_L = &
                                             (1d0/gamma_L + 1d0)* &
                                             (pres_L + pi_inf_L)/ &
-                                            (rho_L*(1d0 - alpha_L(num_fluids)))
+                                            (rho_L*(1d0 - qL_prim_rs${XYZ}$_vf_flat(j , k, l, E_idx + num_fluids)))
                                         c_R = &
                                             (1d0/gamma_R + 1d0)* &
                                             (pres_R + pi_inf_R)/ &
-                                            (rho_R*(1d0 - alpha_R(num_fluids)))
+                                            (rho_R*(1d0 - qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)))
                                     end if
                                 end if
 
@@ -2110,9 +2087,9 @@ contains
                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*alpha_rho_L(i) &
+                                        xi_M*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*alpha_rho_R(i) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
