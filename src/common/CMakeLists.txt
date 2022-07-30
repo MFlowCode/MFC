@@ -8,7 +8,6 @@ FOREACH(in_fpp_file IN LISTS common_fpps)
     STRING(REGEX REPLACE ".fpp\$" ".f90" out_f90_file "${in_fpp_file}")
 
     GET_FILENAME_COMPONENT(in_fpp_file_name     "${in_fpp_file}"  NAME)
-
     GET_FILENAME_COMPONENT(out_f90_file_dirpath "${out_f90_file}" DIRECTORY)
     GET_FILENAME_COMPONENT(out_f90_file_name    "${out_f90_file}" NAME)
 

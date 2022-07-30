@@ -28,8 +28,8 @@ class MFCInputFile:
                 continue
                 
             if key not in case_dicts.PRE_PROCESS  and \
-            key not in case_dicts.POST_PROCESS and \
-            key not in case_dicts.SIMULATION:
+               key not in case_dicts.POST_PROCESS and \
+               key not in case_dicts.SIMULATION:
                 raise common.MFCException(f"MFCInputFile::dump: Case parameter '{key}' is not used by any MFC code. Please check your spelling or add it as a new parameter.")
 
         contents = f"&user_inputs\n{dict_str}&end/\n"
@@ -46,13 +46,15 @@ class MFCInputFile:
 ! passed to ./mfc.sh run, enabling a GPU-oriented optimization that hard-codes
 ! some case parameters in order to improve runtime performance.
 
-#:set MFC_HARD_CODE  = {self.args["hard_code"]}
+#:set MFC_HARD_CODE = {self.args["hard_code"]}
 """
 
 
         if self.args["hard_code"]:
-            content = content + f"""\
-#:set MFC_WENO_POLYN = {int((self.case_dict["weno_order"] - 1) / 2)}
+            content = content + f"""
+#:set weno_polyn = {int((self.case_dict["weno_order"] - 1) / 2)}
+#:set nb         = {int(self.case_dict.get("nb", -100))}
+#:set num_dims   = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
 """
 
 

@@ -111,24 +111,17 @@ class Case:
 
     def run(self, args: dict) -> subprocess.CompletedProcess:
         binary_option = f"-b {args['binary']}" if args["binary"] is not None else ""
-        hard_code     =   "--hard-code"        if args["hard_code"]          else ""
+        hard_code     =   "--hard-code"        if args["hard_code"]          else "--no-build"
+        jobs          = f"-j {args['jobs']}"   if args["hard_code"]          else ""
 
         command: str = f'''\
 ./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -n {self.ppn} \
--t pre_process simulation {binary_option} {hard_code} 2>&1\
+-t pre_process simulation {binary_option} {hard_code} {jobs} 2>&1\
 '''
 
-        process = subprocess.Popen(
-            command, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, universal_newlines=True,
-            shell=True
-        )
-
-        process.wait()
-        #for c in iter(lambda: process.stdout.read(1), ""):
-        #    sys.stdout.write(c)
-
-        return process
+        return subprocess.run(command, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, universal_newlines=True,
+                              shell=True)
 
 
     def get_keys(self) -> str:

@@ -62,6 +62,13 @@ class MFCTest:
 
 
     def execute(self):
+        # Select the correct number of threads to use to launch test cases
+        # We can't use args["jobs"] when the --hard-code option is set because
+        # running a test case will have to install its targets which will be
+        # overriden by another threads attempting to run another case. This is a
+        # niche feature so we won't engineer around this issue (for now).
+        self.sched.nAvailable = self.mfc.args["jobs"] if not self.mfc.args["hard_code"] else 1
+
         # Delete UUIDs that are not in the list of cases from tests/
         if self.mfc.args["generate"]:
             dir_uuids = set([name for name in os.listdir(".") if os.path.isdir(name)])
@@ -127,10 +134,10 @@ class MFCTest:
 
             cmd = test.run(self.mfc.args)
 
-            common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout.read())
+            common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
 
             if cmd.returncode != 0:
-                cons.print(cmd.stdout.read())
+                cons.print(cmd.stdout)
                 raise MFCException(f"""\
     {os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
     You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary in {test.get_dirpath()}/case.py.""")

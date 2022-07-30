@@ -2,4 +2,4 @@
 ! passed to ./mfc.sh run, enabling a GPU-oriented optimization that hard-codes
 ! some case parameters in order to improve runtime performance.
 
-#:set MFC_HARD_CODE  = False
+#:set MFC_HARD_CODE = False

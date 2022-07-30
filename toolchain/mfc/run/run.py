@@ -63,7 +63,8 @@ Engine        (-e)  {self.mfc.args['engine']}
 
             input_file.generate(target_name)
 
-            build.build_target(self.mfc, target_name)
+            if not self.mfc.args["no_build"]:
+                build.build_target(self.mfc, target_name)
 
             engine.run(target_name)
 

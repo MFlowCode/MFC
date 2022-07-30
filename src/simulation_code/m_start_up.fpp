@@ -5,6 +5,8 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
+#:include '../common/case.fpp'
+
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data
 !!              that are provided by the user. The module is additionally tasked
@@ -89,7 +91,11 @@ contains
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
-            R0ref, nb, Ca, Web, Re_inv, &
+            R0ref, &
+#:if not MFC_HARD_CODE
+            nb, &
+#:endif
+            Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
