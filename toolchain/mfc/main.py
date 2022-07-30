@@ -24,7 +24,6 @@ class MFCState:
         self.lock = mfc.cfg.lock.MFCLock(self.user)
         self.test = mfc.tests.tests.MFCTest(self)
         self.args = mfc.args.parse(self)
-        self.test.sched.nAvailable = self.args["jobs"]
         self.run  = mfc.run.run.MFCRun(self)
 
         self.__handle_mode()

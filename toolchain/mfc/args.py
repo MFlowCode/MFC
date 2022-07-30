@@ -83,6 +83,7 @@ def parse(mfc):
     run.add_argument("-s", "--scratch",       action="store_true",                       default=False,                       help="Build from scratch.")
     run.add_argument(      "--dry-run",       action="store_true",                       default=False,                       help="(Batch) Run without submitting batch file.")
     run.add_argument(      "--hard-code",     action="store_true",                       default=False,                       help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    run.add_argument(      "--no-build",      action="store_true",                       default=False,                       help="(Testing) Do not rebuild MFC.")
 
     args: dict = vars(parser.parse_args())
 

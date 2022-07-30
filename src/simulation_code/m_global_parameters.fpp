@@ -95,7 +95,11 @@ module m_global_parameters
 
     ! Simulation Algorithm Parameters ==========================================
     integer         :: model_eqns     !< Multicomponent flow model
+#:if MFC_HARD_CODE
+    integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
+#:else
     integer         :: num_dims       !< Number of spatial dimensions
+#:endif
     integer         :: num_fluids     !< Number of fluids in the flow
     logical         :: adv_alphan     !< Advection of the last volume fraction
     logical         :: mpp_lim        !< Mixture physical parameters (MPP) limits
@@ -104,7 +108,7 @@ module m_global_parameters
     integer         :: weno_order     !< Order of the WENO reconstruction
 
 #:if MFC_HARD_CODE
-    integer, parameter :: weno_polyn = ${MFC_WENO_POLYN}$ !< Degree of the WENO polynomials (polyn)
+    integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
 #:else
     integer         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
 #:endif
@@ -235,7 +239,12 @@ module m_global_parameters
 
     !> @name Bubble modeling
     !> @{
-    integer         :: nb       !< Number of eq. bubble sizes
+#:if MFC_HARD_CODE
+    integer, parameter :: nb = ${nb}$ !< Number of eq. bubble sizes
+#:else
+    integer            :: nb       !< Number of eq. bubble sizes
+#:endif
+
     real(kind(0d0)) :: R0ref    !< Reference bubble size
     real(kind(0d0)) :: Ca       !< Cavitation number
     real(kind(0d0)) :: Web      !< Weber number
@@ -378,7 +387,10 @@ contains
         polydisperse = .false.
         thermal = dflt_int
         R0ref = dflt_real
+
+#:if not MFC_HARD_CODE
         nb = dflt_int
+#:endif
         R0_type = dflt_int
 
         ! User inputs for qbmm for simulation code
@@ -924,7 +936,9 @@ contains
     !> Initializes parallel infrastructure
     subroutine s_initialize_parallel_io() ! --------------------------------
 
+#:if not MFC_HARD_CODE
         num_dims = 1 + min(1, n) + min(1, p)
+#:endif
 
         allocate (proc_coords(1:num_dims))
 
