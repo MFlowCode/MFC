@@ -92,7 +92,7 @@ contains
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
-#:if not MFC_HARD_CODE
+#:if not MFC_CASE_OPTIMIZATION
             nb, &
 #:endif
             Ca, Web, Re_inv, &
@@ -162,6 +162,13 @@ contains
             call s_mpi_abort()
         end if
         ! ==================================================================
+
+#if !(defined(_OPENACC) && defined(__PGI))
+        if(cu_mpi) then
+            print '(A)', 'Unsupported value of cu_mpi. Exiting ...'
+            call s_mpi_abort()            
+        end if
+#endif
 
         ! Computational Domain Parameters ==================================
         if (m <= 0) then

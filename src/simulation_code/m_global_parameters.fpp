@@ -34,8 +34,8 @@ module m_global_parameters
     integer, parameter :: path_len = 400   !< Maximum path length
     integer, parameter :: name_len = 50    !< Maximum name length
     character, parameter :: dflt_char = ' '   !< Default string value
-    real(kind(0d0)) :: dflt_real = -1d6  !< Default real value
-    integer :: dflt_int = -100  !< Default integer value
+    real(kind(0d0)), parameter :: dflt_real = -1d6  !< Default real value
+    integer, parameter :: dflt_int = -100  !< Default integer value
     real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
     character(LEN=path_len)  :: case_dir              !< Case folder location
@@ -44,7 +44,6 @@ module m_global_parameters
     integer                    :: t_step_old            !< Existing IC/grid folder
     real(kind(0d0)), PARAMETER :: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
-!$acc declare create(small_alf, dflt_real, dflt_int, sgm_eps)
     ! Computational Domain Parameters ==========================================
 
     integer :: proc_rank !< Rank of the local processor
@@ -95,7 +94,7 @@ module m_global_parameters
 
     ! Simulation Algorithm Parameters ==========================================
     integer         :: model_eqns     !< Multicomponent flow model
-#:if MFC_HARD_CODE
+#:if MFC_CASE_OPTIMIZATION
     integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
 #:else
     integer         :: num_dims       !< Number of spatial dimensions
@@ -107,7 +106,7 @@ module m_global_parameters
     integer         :: weno_vars      !< WENO-reconstructed state variables type
     integer         :: weno_order     !< Order of the WENO reconstruction
 
-#:if MFC_HARD_CODE
+#:if MFC_CASE_OPTIMIZATION
     integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
 #:else
     integer         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
@@ -239,7 +238,7 @@ module m_global_parameters
 
     !> @name Bubble modeling
     !> @{
-#:if MFC_HARD_CODE
+#:if MFC_CASE_OPTIMIZATION
     integer, parameter :: nb = ${nb}$ !< Number of eq. bubble sizes
 #:else
     integer            :: nb       !< Number of eq. bubble sizes
@@ -388,7 +387,7 @@ contains
         thermal = dflt_int
         R0ref = dflt_real
 
-#:if not MFC_HARD_CODE
+#:if not MFC_CASE_OPTIMIZATION
         nb = dflt_int
 #:endif
         R0_type = dflt_int
@@ -464,7 +463,7 @@ contains
 
         type(bounds_info) :: ix, iy, iz
 
-#:if not MFC_HARD_CODE
+#:if not MFC_CASE_OPTIMIZATION
         ! Determining the degree of the WENO polynomials
         weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
@@ -936,7 +935,7 @@ contains
     !> Initializes parallel infrastructure
     subroutine s_initialize_parallel_io() ! --------------------------------
 
-#:if not MFC_HARD_CODE
+#:if not MFC_CASE_OPTIMIZATION
         num_dims = 1 + min(1, n) + min(1, p)
 #:endif
 

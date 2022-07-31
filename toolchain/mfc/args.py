@@ -55,14 +55,14 @@ def parse(mfc):
 
     # === TEST ===
     add_common_arguments(test, "t")
-    test.add_argument("-g", "--generate",   action="store_true", help="Generate golden files.")
-    test.add_argument("-l", "--list",       action="store_true", help="List all available tests.")
-    test.add_argument("-f", "--from",       default=mfc.test.cases[0].get_uuid(), type=str, help="First test UUID to run.")
-    test.add_argument("-t", "--to",         default=mfc.test.cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
-    test.add_argument("-o", "--only",       nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
-    test.add_argument("-b", "--binary",     choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
-    test.add_argument("-r", "--relentless", action="store_true", default=False, help="Run all tests, even if multiple fail.")
-    test.add_argument(      "--hard-code",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    test.add_argument("-g", "--generate",    action="store_true", help="Generate golden files.")
+    test.add_argument("-l", "--list",        action="store_true", help="List all available tests.")
+    test.add_argument("-f", "--from",        default=mfc.test.cases[0].get_uuid(), type=str, help="First test UUID to run.")
+    test.add_argument("-t", "--to",          default=mfc.test.cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
+    test.add_argument("-o", "--only",        nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
+    test.add_argument("-b", "--binary",      choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
+    test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
+    test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
 
     # === RUN ===
     engines = [ e.slug for e in ENGINES ]
@@ -82,7 +82,7 @@ def parse(mfc):
     run.add_argument("-b", "--binary",        choices=binaries,                type=str, default=None,                        help="(Interactive) Override MPI execution binary")
     run.add_argument("-s", "--scratch",       action="store_true",                       default=False,                       help="Build from scratch.")
     run.add_argument(      "--dry-run",       action="store_true",                       default=False,                       help="(Batch) Run without submitting batch file.")
-    run.add_argument(      "--hard-code",     action="store_true",                       default=False,                       help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    run.add_argument("--case-optimization",   action="store_true",                       default=False,                       help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",      action="store_true",                       default=False,                       help="(Testing) Do not rebuild MFC.")
 
     args: dict = vars(parser.parse_args())
