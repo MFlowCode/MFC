@@ -1,5 +1,3 @@
-
-import sys
 import json
 import hashlib
 import binascii
@@ -110,13 +108,17 @@ class Case:
         self.ppn    = ppn if ppn is not None else 1
 
     def run(self, args: dict) -> subprocess.CompletedProcess:
+        filepath      = f'"{self.get_dirpath()}/case.py"'
+        mode          = f'-m "{args["mode"]}"'
+        tasks         = f"-n {self.ppn} "
         binary_option = f"-b {args['binary']}" if args["binary"] is not None else ""
         hard_code     =   "--hard-code"        if args["hard_code"]          else "--no-build"
         jobs          = f"-j {args['jobs']}"   if args["hard_code"]          else ""
+        gpus          = f"-g {self.ppn}"       if "gpu" in args["mode"]      else ""
 
         command: str = f'''\
-./mfc.sh run "{self.get_dirpath()}/case.py" -m "{args["mode"]}" -n {self.ppn} \
--t pre_process simulation {binary_option} {hard_code} {jobs} 2>&1\
+./mfc.sh run {filepath} {mode} {tasks} {binary_option} {hard_code} {jobs} {gpus} \
+-t pre_process simulation 2>&1\
 '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
