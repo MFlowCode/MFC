@@ -63,11 +63,11 @@ class MFCTest:
 
     def execute(self):
         # Select the correct number of threads to use to launch test cases
-        # We can't use args["jobs"] when the --hard-code option is set because
-        # running a test case may cause it to rebuild, and thus interfere with
-        # the other test cases. It is a niche feature so we won't engineer
-        # around this issue (for now).
-        self.sched.nAvailable = self.mfc.args["jobs"] if not self.mfc.args["hard_code"] else 1
+        # We can't use args["jobs"] when the --case-optimization option is set
+        # because running a test case may cause it to rebuild, and thus
+        # interfere with the other test cases. It is a niche feature so we won't
+        # engineer around this issue (for now).
+        self.sched.nAvailable = self.mfc.args["jobs"] if not self.mfc.args["case_optimization"] else 1
 
         # Delete UUIDs that are not in the list of cases from tests/
         if self.mfc.args["generate"]:

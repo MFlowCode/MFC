@@ -46,11 +46,11 @@ class MFCInputFile:
 ! passed to ./mfc.sh run, enabling a GPU-oriented optimization that hard-codes
 ! some case parameters in order to improve runtime performance.
 
-#:set MFC_HARD_CODE = {self.args["hard_code"]}
+#:set MFC_CASE_OPTIMIZATION = {self.args["case_optimization"]}
 """
 
 
-        if self.args["hard_code"]:
+        if self.args["case_optimization"]:
             content = content + f"""
 #:set weno_polyn = {int((self.case_dict["weno_order"] - 1) / 2)}
 #:set nb         = {int(self.case_dict.get("nb", -100))}

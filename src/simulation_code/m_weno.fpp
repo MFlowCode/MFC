@@ -1887,6 +1887,7 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
             if(n == 0) return
             if(weno_dir == 2) then
+#if defined(_OPENACC) && defined(__PGI)
                 if (cu_tensor) then
                     if(p == 0) then
                                 block
@@ -1904,6 +1905,7 @@ contains
                                 end block          
                     end if
                 else
+#endif
 !$acc parallel loop collapse(4) gang vector default(present)                 
                     do j = 1, v_size
                         do q = is3%beg, is3%end
@@ -1915,7 +1917,9 @@ contains
                         end do
                     end do
 !$acc end parallel loop 
+#if defined(_OPENACC) && defined(__PGI)
                 end if
+#endif
             end if
 
 
@@ -1926,6 +1930,7 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
             if(p == 0) return 
             if(weno_dir == 3) then 
+#if defined(_OPENACC) && defined(__PGI)
                 if (cu_tensor) then
                         block
                         !use CuTensorEx     
@@ -1934,6 +1939,7 @@ contains
                         !$acc end host_data
                         end block
                 else
+#endif
 !$acc parallel loop collapse(4) gang vector default(present)               
                     do j = 1, v_size
                         do q = is3%beg, is3%end
@@ -1944,8 +1950,10 @@ contains
                             end do
                         end do
                     end do
-!$acc end parallel loop                 
+!$acc end parallel loop      
+#if defined(_OPENACC) && defined(__PGI)
                 end if
+#endif
             end if 
 
 

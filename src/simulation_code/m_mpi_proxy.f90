@@ -1124,6 +1124,7 @@ contains
                       end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1140,6 +1141,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif // #if defined(_OPENACC) && defined(__PGI)
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1152,7 +1154,9 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 else                        ! PBC at the beginning only
 
@@ -1170,6 +1174,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1186,6 +1191,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1198,13 +1204,17 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 end if
 
+#if defined(_OPENACC) && defined(__PGI)
               if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
+#endif
 
                 ! Unpacking buffer received from bc_x%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1238,6 +1248,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1254,6 +1265,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1266,7 +1278,9 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 else                        ! PBC at the end only
 
@@ -1284,6 +1298,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1300,6 +1315,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1312,7 +1328,9 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 end if
 
@@ -1359,6 +1377,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1375,6 +1394,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1387,7 +1407,9 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 else                        ! PBC at the beginning only
 
@@ -1406,6 +1428,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1422,6 +1445,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1434,12 +1458,17 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
+
                 end if
 
+#if defined(_OPENACC) && defined(__PGI)
               if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
+#endif
 
                 ! Unpacking buffer received from bc_y%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1475,6 +1504,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1491,6 +1521,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1503,7 +1534,9 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 else                        ! PBC at the end only
 
@@ -1522,6 +1555,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1538,6 +1572,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1550,13 +1585,17 @@ contains
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 end if
 
+#if defined(_OPENACC) && defined(__PGI)
               if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
+#endif
 
                 ! Unpacking buffer received form bc_y%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1599,6 +1638,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1615,6 +1655,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1627,7 +1668,9 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 else                        ! PBC at the beginning only
 
@@ -1646,6 +1689,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1662,6 +1706,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1674,13 +1719,17 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
 
                 end if
 
+#if defined(_OPENACC) && defined(__PGI)
               if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
+#endif
 
                 ! Unpacking buffer from bc_z%beg
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
@@ -1717,6 +1766,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1733,6 +1783,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1745,7 +1796,10 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
+
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_z%end
@@ -1764,6 +1818,7 @@ contains
                         end do
                     end do
 
+#if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1780,6 +1835,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
+#endif
 !$acc update host(q_cons_buff_send)
 
 ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1792,13 +1848,17 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
+#if defined(_OPENACC) && defined(__PGI)
                     end if
+#endif
                       
                 end if
 
+#if defined(_OPENACC) && defined(__PGI)
               if(cu_mpi .eqv. .false.) then
 !$acc update device(q_cons_buff_recv)
               end if
+#endif
 
                 ! Unpacking buffer received from bc_z%end
 !$acc parallel loop collapse(4) gang vector default(present) private(r)
