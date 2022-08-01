@@ -4478,19 +4478,34 @@ contains
                     grad_x%sf(j, k, l) = &
                         (var%sf(j + 1, k, l) - var%sf(j - 1, k, l)) / &
                         (x_cc(j + 1) - x_cc(j - 1))
-                    if (n > 0) then
+                    end do
+                end do
+            end do
+        if (n > 0) then
+!$acc parallel loop collapse(3) gang vector default(present)
+            do l = iz%beg + 1, iz%end - 1
+                do k = iy%beg + 1, iy%end - 1           
+                    do j = ix%beg + 1, ix%end - 1                  
                         grad_y%sf(j, k, l) = &
                             (var%sf(j, k + 1, l) - var%sf(j, k - 1, l)) / &
                             (y_cc(k + 1) - y_cc(k - 1))
-                        if (p > 0) then
-                            grad_z%sf(j, k, l) = &
-                                (var%sf(j, k, l + 1) - var%sf(j, k, l - 1)) / &
-                                (z_cc(l + 1) - z_cc(l - 1))
-                        end if
-                    end if
+                    end do
                 end do
             end do
-        end do
+        end if
+
+        if (p > 0) then
+!$acc parallel loop collapse(3) gang vector default(present)
+            do l = iz%beg + 1, iz%end - 1
+                do k = iy%beg + 1, iy%end - 1           
+                    do j = ix%beg + 1, ix%end - 1                       
+                        grad_z%sf(j, k, l) = &
+                            (var%sf(j, k, l + 1) - var%sf(j, k, l - 1)) / &
+                            (z_cc(l + 1) - z_cc(l - 1))
+                    end do
+                end do
+            end do
+        end if    
 
         ix%beg = -buff_size; ix%end = m + buff_size; 
         if (n > 0) then
