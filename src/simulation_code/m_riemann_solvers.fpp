@@ -1017,7 +1017,7 @@ contains
         real(kind(0d0)), dimension(nb, nmom) ::       moms_L, moms_R
         real(kind(0d0))                              ::     ptilde_L, ptilde_R
 
-        real(kind(0d0)) :: alpha_L_sum, alpha_R_sum
+        real(kind(0d0)) :: alpha_L_sum, alpha_R_sum, nbub_L_denom, nbub_R_denom
 
         real(kind(0d0)) :: PbwR3Lbar, Pbwr3Rbar
         real(kind(0d0)) :: R3Lbar, R3Rbar
@@ -1881,8 +1881,17 @@ contains
                                         !call s_comp_n_from_prim(qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + num_fluids), R0_L, nbub_L)
                                         !call s_comp_n_from_prim(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + num_fluids), R0_R, nbub_R)
 
-                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + num_fluids)/dot_product(R0_L**3d0, weight)
-                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + num_fluids)/dot_product(R0_R**3d0, weight)
+                                        nbub_L_denom = 0d0
+                                        nbub_R_denom = 0d0
+
+                                        !$acc loop seq
+                                        do i = 1, nb
+                                            nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
+                                            nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
+                                        end do
+
+                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + num_fluids)/nbub_L_denom
+                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + num_fluids)/nbub_R_denom
 
 
 !$acc loop seq
@@ -1909,14 +1918,28 @@ contains
                                             R3V2Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 3)
                                         else
 
-                                            PbwR3Lbar = dot_product(pbw_L*(R0_L**3.d0), weight)
-                                            PbwR3Rbar = dot_product(pbw_R*(R0_R**3.d0), weight)
+                                            PbwR3Lbar = 0d0
+                                            PbwR3Rbar = 0d0
 
-                                            R3Lbar = dot_product((R0_L**3.d0), weight)
-                                            R3Rbar = dot_product((R0_R**3.d0), weight)
+                                            R3Lbar = 0d0
+                                            R3Rbar = 0d0
 
-                                            R3V2Lbar = dot_product((R0_L**3.d0)*(V0_L**2.d0), weight)
-                                            R3V2Rbar = dot_product((R0_R**3.d0)*(V0_R**2.d0), weight)
+                                            R3V2Lbar = 0d0
+                                            R3V2Rbar = 0d0
+
+                                            !$acc loop seq
+                                            do i = 1, nb
+
+                                                PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3.d0)*weight(i)
+                                                PbwR3Rbar = PbwR3Rbar +pbw_R(i)*(R0_R(i)**3.d0)*weight(i)
+
+                                                R3Lbar = R3Lbar + (R0_L(i)**3.d0)*weight(i)
+                                                R3Rbar = R3Rbar + (R0_R(i)**3.d0)*weight(i)
+
+                                                R3V2Lbar = R3V2Lbar + (R0_L(i)**3.d0)*(V0_L(i)**2.d0)*weight(i)
+                                                R3V2Rbar = R3V2Rbar + (R0_R(i)**3.d0)*(V0_R(i)**2.d0)*weight(i)
+
+                                            end do
                                         end if
 
                                         if (qL_prim_rs${XYZ}$_vf_flat(j , k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then

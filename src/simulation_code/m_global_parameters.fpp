@@ -45,7 +45,6 @@ module m_global_parameters
     real(kind(0d0)), PARAMETER :: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
     ! Computational Domain Parameters ==========================================
-
     integer :: proc_rank !< Rank of the local processor
 
     !> @name Number of cells in the x-, y- and z-directions, respectively

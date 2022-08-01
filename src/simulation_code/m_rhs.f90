@@ -4460,13 +4460,14 @@ contains
         ix%beg = -buff_size; ix%end = m + buff_size; 
         if (n > 0) then
             iy%beg = -buff_size; iy%end = n + buff_size
-            if (p > 0) then
-                iz%beg = -buff_size; iz%end = p + buff_size
-            else
-                iz%beg = -1; iz%end = 1
-            end if
         else
             iy%beg = -1; iy%end = 1
+        end if
+
+        if (p > 0) then
+            iz%beg = -buff_size; iz%end = p + buff_size
+        else
+            iz%beg = -1; iz%end = 1
         end if
 
         !$acc update device(ix, iy, iz)
@@ -4481,6 +4482,7 @@ contains
                     end do
                 end do
             end do
+
         if (n > 0) then
 !$acc parallel loop collapse(3) gang vector 
             do l = iz%beg + 1, iz%end - 1
@@ -4510,13 +4512,14 @@ contains
         ix%beg = -buff_size; ix%end = m + buff_size; 
         if (n > 0) then
             iy%beg = -buff_size; iy%end = n + buff_size
-            if (p > 0) then
-                iz%beg = -buff_size; iz%end = p + buff_size
-            else
-                iz%beg = 0; iz%end = 0
-            end if
         else
             iy%beg = 0; iy%end = 0
+        end if
+
+        if (p > 0) then
+            iz%beg = -buff_size; iz%end = p + buff_size
+        else
+            iz%beg = 0; iz%end = 0
         end if
 
         !$acc update device(ix, iy, iz)

@@ -118,16 +118,19 @@ class MFCTest:
             cons.print(f"Tested [bold green]✓[/bold green]")
             cons.unindent()
         else:
-            raise MFCException("Testing: There were [bold red]{self.nFail}[/bold red] failures.")
+            if self.nFail == 1:
+                raise MFCException(f"Testing: There was [bold red]1[/bold red] failure.")
+            else:
+                raise MFCException(f"Testing: There were [bold red]{self.nFail}[/bold red] failures.")
 
 
     def handle_case(self, test: Case):
         try:
             test.create_directory()
 
-            if test.params.get("qbmm", False):
+            if test.params.get("qbmm", 'F') == 'T':
                 tol = 1e-7
-            elif test.params.get("bubbles", False):
+            elif test.params.get("bubbles", 'F') == 'T':
                 tol = 1e-10
             else:
                 tol = 1e-12
