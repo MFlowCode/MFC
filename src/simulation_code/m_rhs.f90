@@ -4482,7 +4482,7 @@ contains
                 end do
             end do
         if (n > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+!$acc parallel loop collapse(3) gang vector 
             do l = iz%beg + 1, iz%end - 1
                 do k = iy%beg + 1, iy%end - 1           
                     do j = ix%beg + 1, ix%end - 1                  
@@ -4495,7 +4495,7 @@ contains
         end if
 
         if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+!$acc parallel loop collapse(3) gang vector 
             do l = iz%beg + 1, iz%end - 1
                 do k = iy%beg + 1, iy%end - 1           
                     do j = ix%beg + 1, ix%end - 1                       
