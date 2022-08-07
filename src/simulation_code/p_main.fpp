@@ -296,6 +296,12 @@ program p_main
             t_step = t_step + 1
         end if
 
+        print*, "m_compress timings:"
+        print*, " - nCalls_time  ", nCalls_time
+        print*, " - s_compress   ", (compress_time   / nCalls_time), "s"
+        print*, " - mpi_sendrecv ", (mpi_time        / nCalls_time), "s"
+        print*, " - s_decompress ", (decompress_time / nCalls_time), "s"
+
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
