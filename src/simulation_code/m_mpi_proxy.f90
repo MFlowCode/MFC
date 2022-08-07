@@ -1130,6 +1130,8 @@ contains
                       end do
                     end do
 
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
@@ -1186,6 +1188,8 @@ mpi_time = mpi_time + (e_time - s_time)
                             end do
                         end do
                     end do
+
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
@@ -1270,6 +1274,8 @@ decompress_time = decompress_time + (e_time - s_time)
                         end do
                     end do
 
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
@@ -1325,6 +1331,8 @@ mpi_time = mpi_time + (e_time - s_time)
                             end do
                         end do
                     end do
+
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
@@ -1414,6 +1422,8 @@ decompress_time = decompress_time + (e_time - s_time)
                         end do
                     end do
 
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
@@ -1470,6 +1480,8 @@ mpi_time = mpi_time + (e_time - s_time)
                             end do
                         end do
                     end do
+
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
@@ -1556,6 +1568,8 @@ decompress_time = decompress_time + (e_time - s_time)
                         end do
                     end do
 
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
@@ -1612,6 +1626,8 @@ mpi_time = mpi_time + (e_time - s_time)
                             end do
                         end do
                     end do
+
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
@@ -1705,6 +1721,8 @@ decompress_time = decompress_time + (e_time - s_time)
                         end do
                     end do
 
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
@@ -1761,6 +1779,8 @@ mpi_time = mpi_time + (e_time - s_time)
                             end do
                         end do
                     end do
+
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
@@ -1848,6 +1868,8 @@ decompress_time = decompress_time + (e_time - s_time)
                         end do
                     end do
 
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
@@ -1905,6 +1927,8 @@ mpi_time = mpi_time + (e_time - s_time)
                             end do
                         end do
                     end do
+
+                    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(_OPENACC) && defined(__PGI)
                     if(cu_mpi) then
