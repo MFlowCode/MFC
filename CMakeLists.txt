@@ -53,12 +53,12 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     )
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
-        -r8
+        #-r8
         -cpp
         -Mfreeform
         -lcutensor
         -Minfo=accel
-        -Mr8intrinsics
+        #-Mr8intrinsics
     )
 ENDIF()
 
