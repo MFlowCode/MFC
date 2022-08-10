@@ -132,7 +132,7 @@ module m_cbc
 !    procedure(s_compute_abstract_L), pointer :: s_compute_L => null() !<
     !! Pointer to procedure used to calculate L variables, based on choice of CBC
 
-    type(bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
+    type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
 
     integer :: dj
 
@@ -825,7 +825,7 @@ contains
 
         integer, intent(IN) :: cbc_dir, cbc_loc
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
@@ -2201,7 +2201,7 @@ contains
             intent(IN) :: flux_vf, flux_src_vf
 
         integer, intent(IN) :: cbc_dir, cbc_loc
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
 
         integer :: i, j, k, r !< Generic loop iterators
@@ -2514,7 +2514,7 @@ contains
             intent(INOUT) :: flux_vf, flux_src_vf
 
         integer, intent(IN) :: cbc_dir, cbc_loc
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
 
         integer :: i, j, k, r !< Generic loop iterators

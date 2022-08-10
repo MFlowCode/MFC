@@ -2353,7 +2353,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_data_output_module() ! -------------------------
 
-        type(bounds_info) :: ix, iy, iz
+        type(int_bounds_info) :: ix, iy, iz
 
         integer :: i !< Generic loop iterator
 

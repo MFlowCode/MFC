@@ -10,8 +10,6 @@ module m_derived_types
 
     implicit none
 
-    PUBLIC :: probe_parameters
-
     INTEGER, parameter :: num_fluids_max  = 10 !<
     !! Maximum number of fluids in the simulation
 

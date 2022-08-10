@@ -89,7 +89,7 @@ module m_riemann_solvers
                                              flux_gsrc_vf, &
                                              norm_dir, ix, iy, iz)
 
-            import :: scalar_field, bounds_info, sys_size, startx, starty, startz
+            import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz
 
             real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat
             type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -109,7 +109,7 @@ module m_riemann_solvers
 
             integer, intent(IN) :: norm_dir
 
-            type(bounds_info), intent(IN) :: ix, iy, iz
+            type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         end subroutine s_abstract_riemann_solver
 
@@ -121,7 +121,7 @@ module m_riemann_solvers
         !!  @param j Second coordinate location index
         !!  @param k Third coordinate location index
         subroutine s_compute_abstract_average_state(qL_prim_rs_vf, qR_prim_rs_vf,i, j, k)
-            import :: scalar_field, bounds_info, sys_size
+            import :: scalar_field, int_bounds_info, sys_size
             integer, intent(IN) :: i, j, k
             type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
 
@@ -159,7 +159,7 @@ module m_riemann_solvers
                                                           norm_dir, &
                                                           ix, iy, iz)
 
-            import :: scalar_field, bounds_info, num_dims, sys_size
+            import :: scalar_field, int_bounds_info, num_dims, sys_size
 
             type(scalar_field), &
                 dimension(num_dims), &
@@ -174,7 +174,7 @@ module m_riemann_solvers
 
             integer, intent(IN) :: norm_dir
 
-            type(bounds_info), intent(IN) :: ix, iy, iz
+            type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         end subroutine s_compute_abstract_viscous_source_flux
 
@@ -386,8 +386,8 @@ module m_riemann_solvers
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
-    type(bounds_info) :: is1, is2, is3
-    type(bounds_info) :: isx, isy, isz
+    type(int_bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: isx, isy, isz
     !> @}
 !$acc declare create(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
 !$acc    is1, is2, is3, isx, isy, isz,  vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
@@ -450,7 +450,7 @@ contains
             intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(IN) :: norm_dir
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)),dimension(num_fluids)   :: alpha_rho_L, alpha_rho_R
         real(kind(0d0))                              ::       rho_L, rho_R
@@ -982,7 +982,7 @@ contains
             intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
         integer, intent(IN) :: norm_dir
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
 
         real(kind(0d0)),dimension(num_fluids)   :: alpha_rho_L, alpha_rho_R 
@@ -3054,7 +3054,7 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterator
 
@@ -3427,7 +3427,7 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         integer :: i, j, k, l ! Generic loop iterators
 
@@ -3572,7 +3572,7 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
@@ -4103,7 +4103,7 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
@@ -4575,7 +4575,7 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterators
 
