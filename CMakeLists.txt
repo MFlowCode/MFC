@@ -53,12 +53,12 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     )
 ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
     ADD_COMPILE_OPTIONS(
-        #-r8
+        -r8
         -cpp
         -Mfreeform
         -lcutensor
         -Minfo=accel
-        #-Mr8intrinsics
+        -Mr8intrinsics
     )
 ENDIF()
 
@@ -131,7 +131,7 @@ ENDIF()
 
 
 # Find Dependencies
-IF (MFC_BUILD_SIMULATION OR MFC_BUILD_POST_PROCESS)
+IF ((MFC_BUILD_SIMULATION AND (NOT MFC_WITH_OPEN_ACC)) OR MFC_BUILD_POST_PROCESS)
     FIND_PACKAGE(FFTW3 REQUIRED)
 ENDIF()
 
