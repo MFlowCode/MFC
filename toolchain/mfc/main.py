@@ -85,7 +85,7 @@ class MFCState:
         if not does_command_exist("cmake"):
             raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
 
-        if not does_command_exist("mpif90"):
+        if not does_command_exist("mpif90") and not self.args["no_mpi"]:
             raise MFCException("mpif90 couldn't be located on your system. We therefore assume MPI is not available on your system. It is required to build MFC. Please ensure it is installed and discoverable (e.g in your system's $PATH).")
 
 

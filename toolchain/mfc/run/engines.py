@@ -63,13 +63,16 @@ MPI Binary    (-b)  {self.mpibin.bin}\
         # Silo doesn't support static library generation.
         cd = f'cd "{self.input.case_dirpath}"'
 
+        if self.mfc.args["no_mpi"]:
+            return f'{cd} && "{binpath}"'
+            
         flags = ""
         for flag in self.mfc.args["flags"]:
             flags += f"\"{flag}\" "
 
         exec_params = self.mpibin.gen_params(self.mfc.args)
-
         return f'{cd} && {self.mpibin.bin} {exec_params} {flags} "{binpath}"'
+                            
 
     def run(self, target_name: str) -> None:
         cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")

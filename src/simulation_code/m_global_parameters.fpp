@@ -16,7 +16,9 @@
 module m_global_parameters
 
     ! Dependencies =============================================================
+#ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
+#endif
 
     use m_derived_types        !< Definitions of the derived types
 
@@ -942,11 +944,19 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
-        ! Option for Lustre file system (Darter/Comet/Stampede)
-        write (mpiiofs, '(A)') '/lustre_'
-        mpiiofs = trim(mpiiofs)
-        call MPI_INFO_CREATE(mpi_info_int, ierr)
-        call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
+#ifndef MFC_MPI
+
+        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
+
+#else
+
+    ! Option for Lustre file system (Darter/Comet/Stampede)
+    write (mpiiofs, '(A)') '/lustre_'
+    mpiiofs = trim(mpiiofs)
+
+
+    call MPI_INFO_CREATE(mpi_info_int, ierr)
+    call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
         ! Option for UNIX file system (Hooke/Thomson)
         ! WRITE(mpiiofs, '(A)') '/ufs_'
@@ -954,6 +964,8 @@ contains
         ! mpi_info_int = MPI_INFO_NULL
 
         allocate (start_idx(1:num_dims))
+
+#endif
 
     end subroutine s_initialize_parallel_io ! ------------------------------
 

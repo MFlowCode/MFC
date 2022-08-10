@@ -30,11 +30,8 @@ modes:
   type: Release
   flags:
   - -DMFC_WITH_OPEN_ACC=ON
-  - -GNinja
-  - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 - name: debug-gpu
   type: Debug
   flags:
   - -DMFC_WITH_OPEN_ACC=ON
-  - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON

@@ -718,6 +718,12 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_start_up] s_read_parallel_data_files not supported without MPI.'
+
+#else
+
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
@@ -864,6 +870,9 @@ contains
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+#endif
+
     end subroutine s_read_parallel_data_files ! -------------------------------
 
     !> The purpose of this subroutine is to populate the buffers

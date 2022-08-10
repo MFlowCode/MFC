@@ -22,7 +22,9 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
+#ifdef _OPENACC 
     use openacc
+#endif
 
     use m_mpi_proxy
     ! ==========================================================================

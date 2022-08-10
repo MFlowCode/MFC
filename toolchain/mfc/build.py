@@ -16,7 +16,7 @@ class MFCTarget:
 
 
 TARGETS: typing.List[MFCTarget] = [
-    MFCTarget(name='fftw3', flags=['-DMFC_BUILD_FFTW3=ON'],
+    MFCTarget(name='fftw', flags=['-DMFC_BUILD_FFTW=ON'],
               isDependency=True, requires=[]),
     MFCTarget(name='hdf5', flags=['-DMFC_BUILD_HDF5=ON'],
               isDependency=True, requires=[]),
@@ -25,9 +25,9 @@ TARGETS: typing.List[MFCTarget] = [
     MFCTarget(name='pre_process', flags=['-DMFC_BUILD_PRE_PROCESS=ON'],
               isDependency=False, requires=[]),
     MFCTarget(name='simulation', flags=['-DMFC_BUILD_SIMULATION=ON'],
-              isDependency=False, requires=["fftw3"]),
+              isDependency=False, requires=["fftw"]),
     MFCTarget(name='post_process', flags=['-DMFC_BUILD_POST_PROCESS=ON'],
-              isDependency=False, requires=['fftw3', 'silo'])
+              isDependency=False, requires=['fftw', 'silo'])
 ]
 
 
@@ -122,13 +122,17 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
     flags: list = target.flags.copy() + mode.flags + [
         f"-Wno-dev",
+        f"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
         f"-DCMAKE_BUILD_TYPE={mode.type}",
         f"-DCMAKE_PREFIX_PATH=\"{install_dirpath}\"",
         f"-DCMAKE_INSTALL_PREFIX=\"{install_dirpath}\"",
     ]
 
+    if mfc.args["no_mpi"]:
+        flags.append("-DMFC_WITH_MPI=OFF")
+
     configure = f"cd \"{build_dirpath}\" && cmake {' '.join(flags)} \"{cmake_dirpath}\""
-    build     = f"cd \"{build_dirpath}\" && cmake --build . --verbose -j {mfc.args['jobs']} --target {name} --config {mode.type}"
+    build     = f"cd \"{build_dirpath}\" && cmake --build .{' --verbose' if mfc.args['verbose'] else ''} -j {mfc.args['jobs']} --target {name} --config {mode.type}"
     install   = f"cd \"{build_dirpath}\" && cmake --install ."
 
     # Only configure the first time

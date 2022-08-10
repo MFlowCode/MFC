@@ -115,10 +115,11 @@ class Case:
         gpus              = f"-g {self.ppn}"        if "gpu" in args["mode"]      else ""
         binary_option     = f"-b {args['binary']}"  if args["binary"] is not None else ""
         case_optimization =   "--case-optimization" if args["case_optimization"]  else "--no-build"
-
+        no_mpi            = f"--no-mpi" if args["no_mpi"] else ""
+        
         command: str = f'''\
 ./mfc.sh run {filepath} {mode} {tasks} {binary_option} {case_optimization} \
-{jobs} {gpus} -t pre_process simulation 2>&1\
+{jobs} {gpus} {no_mpi} -t pre_process simulation 2>&1\
 '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
