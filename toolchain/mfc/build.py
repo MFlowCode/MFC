@@ -128,7 +128,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     ]
 
     configure = f"cd \"{build_dirpath}\" && cmake {' '.join(flags)} \"{cmake_dirpath}\""
-    build     = f"cd \"{build_dirpath}\" && cmake --build . -j {mfc.args['jobs']} --target {name} --config {mode.type}"
+    build     = f"cd \"{build_dirpath}\" && cmake --build . --verbose -j {mfc.args['jobs']} --target {name} --config {mode.type}"
     install   = f"cd \"{build_dirpath}\" && cmake --install ."
 
     # Only configure the first time

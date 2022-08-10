@@ -27,7 +27,7 @@ def compute_error(measured: float, expected: float) -> Error:
     absolute = abs(measured - expected)
 
     if expected != 0:
-        relative = absolute / expected
+        relative = absolute / abs(expected)
     elif measured == expected:
         relative = 0
     else:
