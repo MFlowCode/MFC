@@ -11,7 +11,9 @@
 module m_global_parameters
 
     ! Dependencies =============================================================
+#ifdef MFC_MPI
     use mpi                     ! Message passing interface (MPI) module
+#endif
 
     use m_derived_types         ! Definitions of the derived types
 
@@ -114,11 +116,15 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
+#ifdef MFC_MPI
+
     type(mpi_io_var), public :: MPI_IO_DATA
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
     !! MPI info for parallel IO with Lustre file systems
+
+#endif
 
     integer, private :: ierr
     ! ==========================================================================
@@ -548,6 +554,9 @@ contains
         end if
         ! ==================================================================
 
+
+#ifdef MFC_MPI
+
         allocate (MPI_IO_DATA%view(1:sys_size))
         allocate (MPI_IO_DATA%var(1:sys_size))
 
@@ -555,6 +564,8 @@ contains
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
+
+#endif
 
         ! Allocating grid variables for the x-direction
         allocate (x_cc(0:m), x_cb(-1:m))
@@ -733,6 +744,12 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
+
+#else
+
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
         mpiiofs = trim(mpiiofs)
@@ -745,6 +762,8 @@ contains
         ! mpi_info_int = MPI_INFO_NULL
 
         allocate (start_idx(1:num_dims))
+
+#endif
 
     end subroutine s_initialize_parallel_io ! ------------------------------
 
@@ -763,6 +782,9 @@ contains
         end if
 
         deallocate (proc_coords)
+
+#ifdef MFC_MPI
+
         if (parallel_io) then
             deallocate (start_idx)
             do i = 1, sys_size
@@ -772,6 +794,8 @@ contains
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
         end if
+
+#endif
 
     end subroutine s_finalize_global_parameters_module ! ----------------------
 

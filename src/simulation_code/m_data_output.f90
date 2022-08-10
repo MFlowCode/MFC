@@ -837,6 +837,12 @@ contains
 
         integer, intent(IN) :: t_step
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_data_output] s_write_parallel_data_files not supported without MPI.'
+
+#else
+
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
@@ -903,6 +909,8 @@ contains
         end if
 
         call MPI_FILE_CLOSE(ifile, ierr)
+
+#endif
 
     end subroutine s_write_parallel_data_files ! ---------------------------
 

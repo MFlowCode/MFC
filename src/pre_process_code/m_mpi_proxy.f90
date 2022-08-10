@@ -13,7 +13,9 @@
 module m_mpi_proxy
 
     ! Dependencies =============================================================
+#ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
+#endif
 
     use m_derived_types         !< Definitions of the derived types
 
@@ -32,6 +34,15 @@ contains
         !!      the job as well as the local processor rank.
     subroutine s_mpi_initialize() ! ----------------------------
 
+#ifndef MFC_MPI
+
+        ! Serial run only has 1 processor
+        num_procs = 1
+        ! Local processor rank is 0
+        proc_rank = 0
+
+#else
+
         ! Establishing the MPI environment
         call MPI_INIT(ierr)
 
@@ -47,13 +58,23 @@ contains
         ! Identifying the rank of the local processor
         call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
 
+#endif
+
     end subroutine s_mpi_initialize ! --------------------------
 
     !> The subroutine terminates the MPI execution environment.
     subroutine s_mpi_abort() ! ---------------------------------------------
 
+#ifndef MFC_MPI
+
+        stop 1
+
+#else
+
         ! Terminating the MPI environment
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+
+#endif
 
     end subroutine s_mpi_abort ! -------------------------------------------
 
@@ -63,6 +84,12 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_initialize_mpi_data not supported without MPI.'
+
+#else
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer :: ierr
@@ -90,13 +117,23 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
+#endif
+
     end subroutine s_initialize_mpi_data ! ---------------------------------
 
     !> Halts all processes until all have reached barrier.
     subroutine s_mpi_barrier() ! -------------------------------------------
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_barrier not supported without MPI.'
+
+#else
+
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+#endif
 
     end subroutine s_mpi_barrier ! -----------------------------------------
 
@@ -106,6 +143,12 @@ contains
         !!       subroutine is then in charge of broadcasting the required
         !!       information.
     subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_bcast_user_inputs not supported without MPI.'
+
+#else
 
         ! Generic loop iterator
         integer :: i
@@ -375,15 +418,26 @@ contains
                        MPI_INTEGER, 0, &
                        MPI_COMM_WORLD, ierr)
 
+#endif
+
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
 
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time 
         real(kind(0d0)), intent(INOUT) :: time_avg
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] mpi_bcast_time_step_values not supported without MPI.'
+
+#else
+
         integer :: j
 
         call MPI_GATHER(time_avg, 1, MPI_DOUBLE_PRECISION, proc_time(0), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr )
+
+#endif
 
     end subroutine mpi_bcast_time_step_values
 
@@ -393,6 +447,12 @@ contains
         !!              that they reflect the configuration of sub-domain that is
         !!              overseen by the local processor.
     subroutine s_mpi_decompose_computational_domain() ! --------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_decompose_computational_domain not supported without MPI.'
+
+#else
 
         ! # of processors in the x-, y- and z-coordinate directions
         integer :: num_procs_x, num_procs_y, num_procs_z
@@ -798,6 +858,8 @@ contains
 
         ! ==================================================================
 
+#endif
+
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
     !>  The following subroutine takes the inputted variable and
@@ -809,6 +871,12 @@ contains
     subroutine s_mpi_reduce_min(var_loc) ! ---------------------------------
 
         real(kind(0d0)), intent(INOUT) :: var_loc
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_reduce_min not supported without MPI.'
+
+#else
 
         ! Temporary storage variable that holds the reduced minimum value
         real(kind(0d0)) :: var_glb
@@ -823,13 +891,23 @@ contains
 
         var_loc = var_glb
 
+#endif
+
     end subroutine s_mpi_reduce_min ! --------------------------------------
 
     !> Finalization of all MPI related processes
     subroutine s_mpi_finalize() ! ------------------------------
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_finalize not supported without MPI.'
+
+#else
+
         ! Terminating the MPI environment
         call MPI_FINALIZE(ierr)
+
+#endif
 
     end subroutine s_mpi_finalize ! ----------------------------
 

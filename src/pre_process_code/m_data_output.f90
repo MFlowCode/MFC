@@ -19,7 +19,9 @@ module m_data_output
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+#ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
+#endif
 
     use m_compile_specific
 
@@ -268,6 +270,12 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_data_output] s_write_parallel_data_files not supported without MPI.'
+
+#else
+
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
@@ -335,6 +343,8 @@ contains
         end if
 
         call MPI_FILE_CLOSE(ifile, ierr)
+
+#endif
 
     end subroutine s_write_parallel_data_files ! ---------------------------
 

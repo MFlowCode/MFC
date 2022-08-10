@@ -74,7 +74,10 @@ program p_main
 #ifdef _OPENACC
     real(kind(0d0)) :: starttime, endtime
     integer :: num_devices, local_size, num_nodes, ppn, my_device_num
-    integer :: dev, devNum, local_rank, local_comm
+    integer :: dev, devNum, local_rank
+#ifdef MFC_MPI
+    integer :: local_comm
+#endif
     integer(acc_device_kind) :: devtype
 #endif
 
@@ -86,10 +89,15 @@ program p_main
 
 ! Bind GPUs if OpenACC is enabled
 #ifdef _OPENACC
+#ifndef MFC_MPI
+    local_size = 1
+    local_rank = 0
+#else
     call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
         MPI_INFO_NULL, local_comm, ierr)
     call MPI_Comm_size(local_comm, local_size, ierr)
     call MPI_Comm_rank(local_comm, local_rank, ierr)
+#endif
 
     devtype = acc_get_device_type()
     devNum  = acc_get_num_devices(devtype)

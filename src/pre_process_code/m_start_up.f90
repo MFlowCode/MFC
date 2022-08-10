@@ -19,7 +19,9 @@ module m_start_up
     use m_data_output            !< Procedures to write the grid data and the
                                  !! conservative variables to files
 
+#ifdef MFC_MPI
     use mpi                      !< Message passing interface (MPI) module
+#endif
 
     use m_compile_specific
     ! ==========================================================================
@@ -1907,6 +1909,12 @@ contains
 
         integer, intent(IN) :: dflt_int
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_start_up] s_read_parallel_grid_data_files not supported without MPI.'
+
+#else
+
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
@@ -2001,6 +2009,8 @@ contains
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
+#endif
+
     end subroutine s_read_parallel_grid_data_files ! -----------------------
 
     !> The goal of this subroutine is to read in any preexisting
@@ -2013,6 +2023,12 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_start_up] s_read_parallel_ic_data_files not supported without MPI.'
+
+#else
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -2073,6 +2089,8 @@ contains
         end if
         call s_mpi_barrier()
         if (proc_rank == 0) call SYSTEM('rm -f '//trim(file_loc))
+
+#endif
 
     end subroutine s_read_parallel_ic_data_files ! -------------------------
 

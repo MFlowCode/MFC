@@ -30,26 +30,30 @@ ADD_EXECUTABLE(post_process "${common_f90s}" "${post_process_f90s}")
 
 TARGET_INCLUDE_DIRECTORIES(
     post_process
-    PRIVATE "${FFTW3_INCLUDE_DIRS}"
+    PRIVATE "${FFTW_INCLUDE_DIRS}"
             "${SILO_INCLUDE_DIRS}"
             "${HDF5_INCLUDE_DIRS}"
 )
 
 TARGET_LINK_DIRECTORIES(
     post_process
-    PRIVATE "${FFTW3_LIBRARY_DIRS}"
-            "${SILO_LIBRARY_DIRS}"
+    PRIVATE "${SILO_LIBRARY_DIRS}"
             "${HDF5_LIBRARY_DIRS}"
 )
 
 TARGET_LINK_LIBRARIES(
     post_process
-    PRIVATE "${FFTW3_LIBRARIES}"
+    PRIVATE "${FFTW_LIBRARIES}"
             "${SILO_LIBRARIES}"
             "${HDF5_LIBRARIES}"
 )
 
 
 INSTALL(TARGETS post_process RUNTIME DESTINATION bin)
-TARGET_LINK_LIBRARIES(post_process PRIVATE MPI::MPI_Fortran)
+
+IF (MFC_WITH_MPI)
+    TARGET_COMPILE_DEFINITIONS(post_process PRIVATE MFC_MPI)
+    TARGET_LINK_LIBRARIES     (post_process PRIVATE MPI::MPI_Fortran)
+ENDIF()
+
 TARGET_COMPILE_OPTIONS(post_process PRIVATE -DMFC_POST_PROCESS)

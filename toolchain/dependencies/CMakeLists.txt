@@ -12,14 +12,14 @@ INCLUDE(ExternalProject)
 
 
 # Options
-OPTION(MFC_BUILD_FFTW3 "Build the FFTW3 dependency" OFF)
-OPTION(MFC_BUILD_HDF5  "Build the HDF5  dependency" OFF)
-OPTION(MFC_BUILD_SILO  "Build the SILO  dependency" OFF)
+OPTION(MFC_BUILD_FFTW "Build the FFTW3 dependency" OFF)
+OPTION(MFC_BUILD_HDF5 "Build the HDF5  dependency" OFF)
+OPTION(MFC_BUILD_SILO "Build the SILO  dependency" OFF)
 
 
 # FFTW3
-IF (MFC_BUILD_FFTW3)
-    ExternalProject_Add(fftw3
+IF (MFC_BUILD_FFTW)
+    ExternalProject_Add(fftw
         URL        "http://www.fftw.org/fftw-3.3.10.tar.gz"
         CMAKE_ARGS -DBUILD_TESTS=OFF
                    -DBUILD_SHARED_LIBS=OFF
