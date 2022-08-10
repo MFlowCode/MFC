@@ -112,7 +112,7 @@ if [ "$u_computer" == "s" ]; then # For Summit
 
     MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
              "hsi/5.0.2.p5"  "xalt/1.2.1"    "lsf-tools/2.0"
-             "cmake/3.23.1")
+             "cmake/3.23.1" "ninja/1.10.2")
 elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
@@ -222,9 +222,9 @@ for module_name in ${MODULES[@]}; do
     # Handle Success / Failure
     code=$?
     if [ "$code" == "0" ]; then
-        echo -e "[$GREEN""SUCCESSFUL$COLOR_RESET]"
+        echo -e "[$GREEN""OK$COLOR_RESET]"
     else
-        echo -e "[$RED""FAILED$COLOR_RESET]"
+        echo -e "[$RED""NOT OK$COLOR_RESET]"
 
         # Run load again to show error message
         module load "$module_name"
