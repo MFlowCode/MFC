@@ -1124,7 +1124,7 @@ contains
 
     subroutine s_initialize_start_up_module() !-----------------------------
 
-        type(bounds_info) :: ix, iy, iz
+        type(int_bounds_info) :: ix, iy, iz
 
         integer :: i !< Generic loop iterator
 

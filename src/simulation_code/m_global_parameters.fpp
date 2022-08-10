@@ -156,11 +156,11 @@ module m_global_parameters
     !! size and the configuration of the system of equations to which they belong
     !> @{
     integer           :: sys_size                  !< Number of unknowns in system of eqns.
-    type(bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
-    type(bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
+    type(int_bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
+    type(int_bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
     integer           :: E_idx                     !< Index of energy equation
-    type(bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
-    type(bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
+    type(int_bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
+    type(int_bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
     integer               :: alf_idx               !< Index of void fraction
     integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
@@ -460,7 +460,7 @@ contains
         integer :: fac
         integer :: i1, i2, i3
 
-        type(bounds_info) :: ix, iy, iz
+        type(int_bounds_info) :: ix, iy, iz
 
 #:if not MFC_CASE_OPTIMIZATION
         ! Determining the degree of the WENO polynomials

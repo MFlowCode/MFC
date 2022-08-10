@@ -27,7 +27,7 @@ module m_qbmm
     real(kind(0d0)), parameter :: verysmall = 1.d-12
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :)  :: momrhs
     integer :: nterms  !< Number of rhs terms in each moment transport equations
-    type(bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1, is2, is3
 
     integer :: momxb, momxe
     integer :: contxb, contxe
@@ -228,7 +228,7 @@ contains
         type(scalar_field), dimension(:), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(:), intent(INOUT) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)), dimension(nmom) :: moms
         real(kind(0d0)), dimension(nb) :: Rvec

@@ -140,10 +140,10 @@ module m_rhs
 
     !> @name Indical bounds in the x-, y- and z-directions
     !> @{
-    type(bounds_info) :: ix, iy, iz
+    type(int_bounds_info) :: ix, iy, iz
     !> @}
 
-    type(bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1, is2, is3
 
     !> @name Bubble dynamic source terms
     !> @{
@@ -191,6 +191,15 @@ module m_rhs
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 !$acc declare create(Res)
+
+    real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
+!$acc declare create(mag, length, npulse, dir, delay)
+
+    integer, allocatable, dimension(:) :: pulse, support
+!$acc declare create(pulse, support)
+
+    real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
+!$acc declare create(loc_mono)
 
     character(50) :: file_path !< Local file path for saving debug files
 
@@ -925,6 +934,24 @@ contains
             
         end if
 
+        if(monopole) then
+            allocate(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono),  loc_mono(1:3, 1:num_mono))
+
+            do i = 1, num_mono
+                mag(i) = mono(i)%mag
+                support(i) = mono(i)%support
+                length(i) = mono(i)%length
+                npulse(i) = mono(i)%npulse
+                pulse(i) = mono(i)%pulse
+                dir(i) = mono(i)%dir
+                delay(i) = mono(i)%delay
+                do j = 1, 3
+                    loc_mono(j, i) = mono(i)%loc(j)
+                end do
+            end do
+        !$acc update device(mag, support, length, npulse, pulse, dir, delay, loc_mono)
+        end if
+
 !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx)
         
 
@@ -1571,7 +1598,7 @@ contains
                                     do q = 1, num_mono
 
                                         mytime = t_step*dt
-                                        if ((mytime >= mono(q)%delay) .or. (mono(q)%delay == dflt_real)) then
+                                        if ((mytime >= delay(q)) .or. (delay(q) == dflt_real)) then
 
 
 !$acc loop seq
@@ -1620,7 +1647,7 @@ contains
                                             const_sos = dsqrt(n_tait)
 
                                             s2 = f_g(mytime, sound, const_sos, q) * &
-                                                f_delta(j, k, l, mono(q)%loc, mono(q)%length, q)
+                                                f_delta(j, k, l, loc_mono(:,q),length(q), q)
 
                                             !s2 = 1d0
 
@@ -1628,7 +1655,7 @@ contains
                                             if (n == 0) then
 
                                                 ! 1D
-                                                if (mono(q)%dir < -0.1d0) then
+                                                if (dir(q) < -0.1d0) then
                                                     !left-going wave
                                                     mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
                                                 else
@@ -1639,18 +1666,18 @@ contains
                                                 ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                                                 !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mono(q))
 
-                                                if (mono(q)%dir .ne. dflt_real) then
+                                                if (dir(q) .ne. dflt_real) then
                                                     ! 2d
                                                     !mono_mom_src(1,j,k,l) = s2
                                                     !mono_mom_src(2,j,k,l) = s2
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                                 end if
                                             else
                                                 ! 3D
-                                                if (mono(q)%dir .ne. dflt_real) then
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                if (dir(q) .ne. dflt_real) then
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                                 end if
                                             end if
 
@@ -2036,7 +2063,7 @@ contains
                                     do q = 1, num_mono
 
                                         mytime = t_step*dt
-                                        if ((mytime >= mono(q)%delay) .or. (mono(q)%delay == dflt_real)) then
+                                        if ((mytime >= delay(q)) .or. (delay(q) == dflt_real)) then
 
 
 !$acc loop seq
@@ -2085,7 +2112,7 @@ contains
                                             const_sos = dsqrt(n_tait)
 
                                             s2 = f_g(mytime, sound, const_sos, q) * &
-                                                f_delta(j, k, l, mono(q)%loc, mono(q)%length, q)
+                                                f_delta(j, k, l, loc_mono(:,q),length(q), q)
 
                                             !s2 = 1d0
 
@@ -2093,7 +2120,7 @@ contains
                                             if (n == 0) then
 
                                                 ! 1D
-                                                if (mono(q)%dir < -0.1d0) then
+                                                if (dir(q) < -0.1d0) then
                                                     !left-going wave
                                                     mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
                                                 else
@@ -2104,18 +2131,18 @@ contains
                                                 ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                                                 !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mono(q))
 
-                                                if (mono(q)%dir .ne. dflt_real) then
+                                                if (dir(q) .ne. dflt_real) then
                                                     ! 2d
                                                     !mono_mom_src(1,j,k,l) = s2
                                                     !mono_mom_src(2,j,k,l) = s2
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                                 end if
                                             else
                                                 ! 3D
-                                                if (mono(q)%dir .ne. dflt_real) then
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                if (dir(q) .ne. dflt_real) then
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                                 end if
                                             end if
 
@@ -2693,7 +2720,7 @@ contains
                                     do q = 1, num_mono
 
                                         mytime = t_step*dt
-                                        if ((mytime >= mono(q)%delay) .or. (mono(q)%delay == dflt_real)) then
+                                        if ((mytime >= delay(q)) .or. (delay(q) == dflt_real)) then
 
 
 !$acc loop seq
@@ -2742,7 +2769,7 @@ contains
                                             const_sos = dsqrt(n_tait)
 
                                             s2 = f_g(mytime, sound, const_sos, q) * &
-                                                f_delta(j, k, l, mono(q)%loc, mono(q)%length, q)
+                                                f_delta(j, k, l, loc_mono(:,q),length(q), q)
 
                                             !s2 = 1d0
 
@@ -2750,7 +2777,7 @@ contains
                                             if (n == 0) then
 
                                                 ! 1D
-                                                if (mono(q)%dir < -0.1d0) then
+                                                if (dir(q) < -0.1d0) then
                                                     !left-going wave
                                                     mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
                                                 else
@@ -2761,18 +2788,18 @@ contains
                                                 ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                                                 !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mono(q))
 
-                                                if (mono(q)%dir .ne. dflt_real) then
+                                                if (dir(q) .ne. dflt_real) then
                                                     ! 2d
                                                     !mono_mom_src(1,j,k,l) = s2
                                                     !mono_mom_src(2,j,k,l) = s2
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                                 end if
                                             else
                                                 ! 3D
-                                                if (mono(q)%dir .ne. dflt_real) then
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(mono(q)%dir)
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(mono(q)%dir)
+                                                if (dir(q) .ne. dflt_real) then
+                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                                 end if
                                             end if
 
@@ -4308,27 +4335,27 @@ contains
         real(kind(0d0)) :: f_g
 
         offset = 0d0
-        if (mono(nm)%delay /= dflt_real) offset = mono(nm)%delay
+        if (delay(nm) /= dflt_real) offset = delay(nm)
 
-        if (mono(nm)%pulse == 1) then
+        if (pulse(nm) == 1) then
             ! Sine wave
-            period = mono(nm)%length/sos
+            period = length(nm)/sos
             f_g = 0d0
-            if (mytime <= (mono(nm)%npulse*period + offset)) then
-                f_g = mono(nm)%mag*sin((mytime + offset)*2.d0*pi/period)
+            if (mytime <= (npulse(nm)*period + offset)) then
+                f_g = mag(nm)*sin((mytime + offset)*2.d0*pi/period)
             end if
-        else if (mono(nm)%pulse == 2) then
+        else if (pulse(nm) == 2) then
             ! Gaussian pulse
-            sigt = mono(nm)%length/sos/7.d0
+            sigt = length(nm)/sos/7.d0
             t0 = 3.5d0*sigt
-            f_g = mono(nm)%mag/(dsqrt(2.d0*pi)*sigt)* &
+            f_g = mag(nm)/(dsqrt(2.d0*pi)*sigt)* &
                   dexp(-0.5d0*((mytime - t0)**2.d0)/(sigt**2.d0))
-        else if (mono(nm)%pulse == 3) then
+        else if (pulse(nm) == 3) then
             ! Square wave
-            sigt = mono(nm)%length/sos
+            sigt = length(nm)/sos
             t0 = 0d0; f_g = 0d0
             if (mytime > t0 .and. mytime < sigt) then
-                f_g = mono(nm)%mag
+                f_g = mag(nm)
             end if
         else
         end if
@@ -4366,49 +4393,49 @@ contains
         end if
 
         if (n == 0) then      !1D
-            if (mono(nm)%support == 1) then
+            if (support(nm) == 1) then
                 ! 1D delta function
                 hx = abs(mono_loc(1) - x_cc(j))
 
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
                           dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
-            else if (mono(nm)%support == 0) then
+            else if (support(nm) == 0) then
                 ! Support for all x
                 f_delta = 1.d0
             end if
         else if (p == 0) then !2D
             hx = mono_loc(1) - x_cc(j)
             hy = mono_loc(2) - y_cc(k)
-            if (mono(nm)%support == 1) then
+            if (support(nm) == 1) then
                 ! 2D delta function
                 sig = mono_leng/20.d0
                 h = dsqrt(hx**2.d0 + hy**2.d0)
 
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
                           dexp(-0.5d0*((h/(sig/2.d0))**2.d0))
-            else if (mono(nm)%support == 2) then
+            else if (support(nm) == 2) then
                 !only support for y \pm some value
-                if (abs(hy) < mono(nm)%length) then
+                if (abs(hy) < length(nm)) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
                               dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
-            else if (mono(nm)%support == 3) then
+            else if (support(nm) == 3) then
                 ! Only support along some line
                 hx = x_cc(j) - mono_loc(1)
                 hy = y_cc(k) - mono_loc(2)
 
                 ! Rotate actual point by -theta
-                hxnew = cos(mono(nm)%dir)*hx + sin(mono(nm)%dir)*hy
-                hynew = -1.d0*sin(mono(nm)%dir)*hx + cos(mono(nm)%dir)*hy
-                if (abs(hynew) < mono(nm)%loc(3)/2.d0) then
+                hxnew = cos(dir(nm))*hx + sin(dir(nm))*hy
+                hynew = -1.d0*sin(dir(nm))*hx + cos(dir(nm))*hy
+                if (abs(hynew) < mono_loc(3)/2.d0) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
                               dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
-            else if (mono(nm)%support == 4) then
+            else if (support(nm) == 4) then
                 ! Support for all y
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
                           dexp(-0.5d0*(hx/sig)**2.d0)
@@ -4418,20 +4445,20 @@ contains
             hx = x_cc(j) - mono_loc(1)
             hy = y_cc(k) - mono_loc(2)
             hz = z_cc(l) - mono_loc(3)
-            if (mono(nm)%support == 3) then
+            if (support(nm) == 3) then
 
                 ! Rotate actual point by -theta
-                hxnew = cos(mono(nm)%dir)*hx + sin(mono(nm)%dir)*hy
-                hynew = -1.d0*sin(mono(nm)%dir)*hx + cos(mono(nm)%dir)*hy
+                hxnew = cos(dir(nm))*hx + sin(dir(nm))*hy
+                hynew = -1.d0*sin(dir(nm))*hx + cos(dir(nm))*hy
 
-                if (abs(hynew) < mono(nm)%length/2. .and. &
-                    abs(hz) < mono(nm)%length/2.) then
+                if (abs(hynew) < length(nm)/2. .and. &
+                    abs(hz) < length(nm)/2.) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
                               dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
-            else if (mono(nm)%support == 4) then
+            else if (support(nm) == 4) then
                 ! Support for all x,y
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
                           dexp(-0.5d0*(hz/sig)**2.d0)

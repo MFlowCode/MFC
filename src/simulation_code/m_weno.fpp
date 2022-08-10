@@ -113,7 +113,7 @@ module m_weno
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
-    type(bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1, is2, is3
     !> @}
 
     real(kind(0d0)) :: test
@@ -253,7 +253,7 @@ contains
     subroutine s_compute_weno_coefficients(weno_dir, is) ! -------
 
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: is
+        type(int_bounds_info), intent(IN) :: is
         integer :: s
 
         real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
@@ -296,9 +296,6 @@ contains
 
                     d_cbR_${XYZ}$( 1, i+1) = 1d0 - d_cbR_${XYZ}$(0, i + 1)
                     d_cbL_${XYZ}$( 1, i+1) = 1d0 - d_cbL_${XYZ}$(0, i + 1)
-
-                    d_cbR_${XYZ}$( 2, i+1) = 0d0
-                    d_cbL_${XYZ}$( 2, i+1) = 0d0
 
                     beta_coef_${XYZ}$(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i) - s_cb(i + 2))**2d0
@@ -503,7 +500,7 @@ contains
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) ::  vL_rs_vf_x_flat, vL_rs_vf_y_flat, vL_rs_vf_z_flat, vR_rs_vf_x_flat, vR_rs_vf_y_flat, vR_rs_vf_z_flat
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: is1_d, is2_d, is3_d
+        type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
 
         real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd 
         real(kind(0d0)), dimension(0:weno_polyn) ::  poly 

@@ -497,14 +497,7 @@ contains
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
 
-        !$acc update device(monopole, num_mono, mono)
-        do i = 1, num_mono
-            !$acc update device(mono(i)%mag)
-            !$acc update device(mono(i)%length)
-            !$acc update device(mono(i)%npulse)
-            !$acc update device(mono(i)%dir)
-            !$acc update device(mono(i)%delay)
-        end do
+        !$acc update device(monopole, num_mono)
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -548,7 +541,7 @@ contains
             allocatable, dimension(:), &
             intent(IN) :: gm_alphaK_vf
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)),   dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -684,7 +677,7 @@ contains
             allocatable, dimension(:), &
             intent(IN) :: gm_alphaK_vf
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         integer :: j, k, l !< Generic loop iterators
 
@@ -727,7 +720,7 @@ contains
         real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(INOUT) :: FK_vf 
         real(kind(0d0)), dimension(0:, s2b:, s3b:, advxb:), intent(INOUT) :: FK_src_vf
  
-        type(bounds_info), intent(IN) :: is1, is2, is3
+        type(int_bounds_info), intent(IN) :: is1, is2, is3
 
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
