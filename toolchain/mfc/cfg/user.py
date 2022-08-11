@@ -2,7 +2,7 @@ import os
 import typing
 import dataclasses
 
-from mfc.util.common import MFC_USER_FILEPATH, MFCException, create_file, \
+from ..util.common import MFC_USER_FILEPATH, MFCException, create_file, \
                             file_load_yaml
 
 

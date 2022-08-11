@@ -6,12 +6,12 @@ import dataclasses
 from pathlib import Path
 
 
-import mfc.util.common as common
+from ..util import common
 
-import tests.case  as case
-import tests.tests
+from . import case
+from . import tests
 
-from mfc.util.common import MFCException
+from ..util.common import MFCException
 
 
 @dataclasses.dataclass(repr=False)
@@ -104,10 +104,10 @@ def generate(case: case.Case) -> Pack:
     entries = []
 
     case_dir = case.get_dirpath()
-    D_dir    = f"{case_dir}/D/"
+    D_dir    = os.path.join(case_dir, "D")
 
     for filepath in list(Path(D_dir).rglob("*.dat")):
-        short_filepath = str(filepath).replace(f'{case_dir}/', '')
+        short_filepath = str(filepath).replace(f'{case_dir}', '')[1:].replace("\\", "/")
 
         data_content = common.file_read(filepath)
 

@@ -9,22 +9,22 @@ import itertools
 from mfc.util.common  import MFC_LOGO, MFCException, quit, delete_directory, format_list_to_string, does_command_exist
 from mfc.util.printer import cons
 
-import mfc.args
-import mfc.build
-import mfc.cfg.user
-import mfc.cfg.lock
+from mfc     import args
+from mfc     import build
+from mfc.cfg import user
+from mfc.cfg import lock
 
-import mfc.run.run
-import mfc.tests.tests
+from mfc.run   import run
+from mfc.tests import tests
 
 
 class MFCState:
     def __init__(self) -> None:
-        self.user = mfc.cfg.user.MFCUser()
-        self.lock = mfc.cfg.lock.MFCLock(self.user)
-        self.test = mfc.tests.tests.MFCTest(self)
-        self.args = mfc.args.parse(self)
-        self.run  = mfc.run.run.MFCRun(self)
+        self.user = user.MFCUser()
+        self.lock = lock.MFCLock(self.user)
+        self.test = tests.MFCTest(self)
+        self.args = args.parse(self)
+        self.run  = run.MFCRun(self)
 
         self.__handle_mode()
         self.__print_greeting()
@@ -39,9 +39,9 @@ class MFCState:
             self.lock.mode = self.args["mode"]
             self.lock.write()
 
-            for target_name in mfc.build.get_mfc_target_names():
-                t = mfc.build.get_target(target_name)
-                dirpath = mfc.build.get_build_dirpath(t)
+            for target_name in build.get_mfc_target_names():
+                t = build.get_target(target_name)
+                dirpath = build.get_build_dirpath(t)
                 cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
                 delete_directory(dirpath)
 
@@ -95,10 +95,10 @@ class MFCState:
         elif self.args["command"] == "run":
             self.run.run()
         elif self.args["command"] == "build":
-            mfc.build.build(self)
+            build.build(self)
         elif self.args["command"] == "clean":
             for target in self.args["targets"]:
-                mfc.build.clean_target(self, target)
+                build.clean_target(self, target)
 
 
 if __name__ == "__main__":

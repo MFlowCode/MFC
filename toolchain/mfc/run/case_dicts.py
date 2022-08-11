@@ -1,4 +1,4 @@
-import mfc.util.common as common
+from ..util import common
 
 
 PRE_PROCESS = ['case_dir', 'old_grid', 'old_ic', 't_step_old', 'm', 'n', 'p',

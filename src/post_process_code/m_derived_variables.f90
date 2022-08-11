@@ -633,7 +633,7 @@ MODULE m_derived_variables
             INTEGER, DIMENSION(ndim) :: ipiv
 
             INTEGER :: nrhs, lda, ldb, info
-            EXTERNAL DGESV
+            !EXTERNAL DGESV
 
             INTEGER :: i,j,k
 

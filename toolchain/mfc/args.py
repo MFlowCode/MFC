@@ -1,18 +1,15 @@
 import argparse
 
 
-from build import get_mfc_target_names
-from build import get_target_names
-from build import get_dependencies_names
-from util.common import format_list_to_string
+from .build import get_mfc_target_names
+from .build import get_target_names
+from .build import get_dependencies_names
+from .util.common import format_list_to_string
 
 
 def parse(mfc):
-    from main         import MFCState
-    from run.engines  import ENGINES
-    from run.mpi_bins import BINARIES
-
-    mfc: MFCState
+    from .run.engines  import ENGINES
+    from .run.mpi_bins import BINARIES
 
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",

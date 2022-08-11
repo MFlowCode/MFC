@@ -5,15 +5,15 @@ import copy
 import datetime
 import dataclasses
 
-from mfc.util.printer import cons
+from ..util.printer import cons
 
-import build
-import mfc.util.common as common
+from .. import build
+from ..util import common
 
-import run.queues   as queues
-import run.mpi_bins as mpi_bins
+from ..run import queues
+from ..run import mpi_bins
 
-from run.input import MFCInputFile
+from ..run.input import MFCInputFile
 
 @dataclasses.dataclass
 class Engine:
@@ -89,7 +89,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             end_time   = time.monotonic()
             cons.print(no_indent=True)
 
-            cons.print(f"Done [bold green]✓[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
+            cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
 
         cons.unindent()
 

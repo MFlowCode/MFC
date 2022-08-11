@@ -2,9 +2,9 @@ import time
 import threading
 import dataclasses
 
-from mfc.util.printer import cons
+from ..util.printer import cons
 
-from tests.case import Case
+from .case import Case
 
 
 import rich
