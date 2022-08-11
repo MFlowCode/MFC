@@ -4,6 +4,7 @@ import argparse
 from build import get_mfc_target_names
 from build import get_target_names
 from build import get_dependencies_names
+from util.common import format_list_to_string
 
 
 def parse(mfc):
@@ -15,8 +16,12 @@ def parse(mfc):
 
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
-        description="Wecome to the MFC master script. This tool automates and manages the building, testing, running, and cleaning of MFC in various configurations on all supported platforms. The README documents this tool and its various commands in more detail.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description=f"""\
+Wecome to the MFC master script. This tool automates and manages building, testing,\
+running, and cleaning of MFC in various configurations on all supported platforms.\
+The README documents this tool and its various commands in more detail. To get\
+started, run ./mfc.sh build -h.""",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     mode_names = [ e.name for e in mfc.user.modes ]
@@ -30,22 +35,22 @@ def parse(mfc):
 
     def add_common_arguments(p, mask=""):
         if "t" not in mask:
-            p.add_argument("-t", "--targets", nargs="+", type=str.lower, choices=get_target_names(),
-                           default=get_mfc_target_names(), help="")
+            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=get_target_names(),
+                           default=get_mfc_target_names(), help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string(get_target_names())}.")
 
         if "m" not in mask:
-            p.add_argument("-m", "--mode", type=str.lower, choices=mode_names, default=mfc.lock.mode,
-                           help="Mode used to compile, run, and test MFC.")
+            p.add_argument("-m", "--mode", metavar="MODE", type=str.lower, choices=mode_names, default=mfc.lock.mode,
+                           help=f"Change MFC's mode. Allowed values are: {format_list_to_string(mode_names)}")
 
         if "j" not in mask:
-            p.add_argument("-j", "--jobs", metavar="N", type=int, default=int(mfc.user.build.threads),
-                           help="Allows for N concurrent jobs.")
+            p.add_argument("-j", "--jobs", metavar="JOBS", type=int, default=int(mfc.user.build.threads),
+                           help="Allows for JOBS concurrent jobs.")
 
         if "v" not in mask:
             p.add_argument("-v", "--verbose", action="store_true", help="Enables verbose compiler & linker output.")
 
         for name in get_dependencies_names():
-            p.add_argument(f"--no-{name}", action="store_true", help=f"Do not build the {name} dependency. Use the system version instead.")
+            p.add_argument(f"--no-{name}", action="store_true", help=f"Do not build the {name} dependency. Use the system's instead.")
 
         p.add_argument(f"--no-mpi", action="store_true", help="Build without MPI.")
 
