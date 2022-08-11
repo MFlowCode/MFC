@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 
 
-# Script Constants (use MFC_xx prefix because this file can be source'd)
-MFC_GET_PIP_PATH="$MFC_ENV_DIR/get-pip.py"
-
 MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=6
 
 
 # Check whether this script was called from MFC's root directory.
-if [ ! -f "$(pwd)/toolchain/mfc/main.py" ]; then
+if [ ! -f "$(pwd)/toolchain/main.py" ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
     exit 1
 fi
@@ -67,23 +64,20 @@ if (($?)); then
 fi
 
 
-python3 -c "import mfc" > /dev/null 2>&1
-if (($?)); then
-    if ! command -v pip3 > /dev/null 2>&1; then
-        wget -O "$(pwd)/build/get-pip.py" https://bootstrap.pypa.io/pip/get-pip.py
-        if (($?)); then
-            echo "[mfc.sh] Error: Couldn't download get-pip.py."
-            exit $?
-        fi
+if ! command -v pip3 > /dev/null 2>&1; then
+    wget -O "$(pwd)/build/get-pip.py" https://bootstrap.pypa.io/pip/get-pip.py
+    if (($?)); then
+        echo "[mfc.sh] Error: Couldn't download get-pip.py."
+        exit $?
+    fi
 
-        # Suppress PIP version warning (out of date)
-        export PIP_DISABLE_PIP_VERSION_CHECK=1
-        python3 "$(pwd)/build/get-pip.py" --user
-        
-        if (($?)); then
-            echo "[mfc.sh] Error: Coudln't install pip with get-pip.py."
-            exit $?
-        fi
+    # Suppress PIP version warning (out of date)
+    export PIP_DISABLE_PIP_VERSION_CHECK=1
+    python3 "$(pwd)/build/get-pip.py" --user
+    
+    if (($?)); then
+        echo "[mfc.sh] Error: Coudln't install pip with get-pip.py."
+        exit $?
     fi
 fi
 
@@ -93,7 +87,7 @@ if [ ! -d "$(pwd)/build/venv" ]; then
     python3 -m venv "$(pwd)/build/venv"
 
     if (($?)); then
-        echo "[mfc.sh] Error: Failed to create a Python virtual environment."
+        echo "[mfc.sh] Error: Failed to create a Python virtual environment. Delete the build/venv folder and try again."
         exit 1
     fi
 fi
@@ -128,22 +122,28 @@ fi
 source "$(pwd)/build/venv/bin/activate"
 
 
-# Fetch required Python modules, including
-# the MFC toolchain/kit and its dependencies,
-# inside the Python venv.
+# Fetch required Python modules.
+# Some modules which are now in Python's standard library
+#                    are imported as backports to support Python v3.6.
+declare -a REQUIRED_PYTHON_MODULES=("wheel,wheel" "argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "rich,rich" "fypp,fypp")
 
-python3 -c "import mfc" > /dev/null 2>&1
-if (($?)); then
-    python3 -m pip install -e "$(pwd)/toolchain/"
+for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
+    import_name=$(echo $module | tr ',' '\n' | head -n 1)
+    install_name=$(echo $module | tr ',' '\n' | tail -n 1)
 
+    python3 -c "import $import_name" > /dev/null 2>&1
     if (($?)); then
-        echo "[mfc.sh] Error: Failed to install MFC's toolchain through Python3's pip."
-        exit $?
+        pip3 install "$install_name"
+        if (($?)); then
+            echo "[mfc.sh] Error: Failed to install $import_name/$install_name through Python3's pip."
+            exit 1
+        fi
     fi
-fi
+done
+
 
 # Run the mfc.py bootstrap script
-python3 "$(pwd)/toolchain/mfc/main.py" "$@"
+python3 "$(pwd)/toolchain/main.py" "$@"
 code=$?
 
 

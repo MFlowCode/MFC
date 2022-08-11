@@ -1663,7 +1663,7 @@ contains
         proc_rank_dir = trim(case_dir)//trim(proc_rank_dir)
 
         write (t_step_dir, '(A,I0)') '/', t_step_old
-        t_step_dir = trim(proc_rank_dir)//trim(t_step_dir)
+        t_step_dir = trim(proc_rank_dir)//trim(t_step_dir)        
 
         ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir)//'/.'
@@ -1784,7 +1784,7 @@ contains
         ! the time-step directory that will contain the new grid and initial
         ! condition data are also generated.
         if (old_ic .neqv. .true.) then
-            call SYSTEM('rm -rf '//trim(proc_rank_dir)//'/*')
+            call s_delete_directory(trim(proc_rank_dir)//'/*')
             call s_create_directory(trim(proc_rank_dir)//'/0')
         end if
 
@@ -1895,7 +1895,7 @@ contains
         ! process may be cleaned out to make room for new pre-process data.
         ! In addition, the time-step folder that will contain the new grid
         ! and initial condition data are also generated.
-        call SYSTEM('rm -rf '//trim(proc_rank_dir)//'/*')
+        call s_create_directory(trim(proc_rank_dir)//'/*')
         call s_create_directory(trim(proc_rank_dir)//'/0')
 
     end subroutine s_read_serial_ic_data_files ! ----------------------------------
@@ -2088,7 +2088,7 @@ contains
             call s_mpi_abort()
         end if
         call s_mpi_barrier()
-        if (proc_rank == 0) call SYSTEM('rm -f '//trim(file_loc))
+        if (proc_rank == 0) call s_create_directory(trim(file_loc))
 
 #endif
 

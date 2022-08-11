@@ -4,19 +4,19 @@ import os
 
 import rich
 
-from mfc.util.printer import cons
+from ..util.printer import cons
 
-import mfc.util.common as common
+from ..util import common
 
-from tests.case    import Case
-from tests.cases   import generate_cases
-from tests.threads import MFCTestThreadManager
+from .case    import Case
+from .cases   import generate_cases
+from .threads import MFCTestThreadManager
 
-from mfc.util.common import MFCException
+from ..util.common import MFCException
 
-from mfc.build import build_target
+from ..build import build_target
 
-import tests.pack
+from . import pack as packer
 
 
 import rich
@@ -137,18 +137,20 @@ class MFCTest:
 
             cmd = test.run(self.mfc.args)
 
-            common.file_write(f"{test.get_dirpath()}/out.txt", cmd.stdout)
+            out_filepath = os.path.join(test.get_dirpath(), "out.txt")
+
+            common.file_write(out_filepath, cmd.stdout)
 
             if cmd.returncode != 0:
                 cons.print(cmd.stdout)
                 raise MFCException(f"""\
     {os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
-    You can find the output in {test.get_dirpath()}/out.txt, and the case dictionary in {test.get_dirpath()}/case.py.""")
+    You can find the output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
 
-            pack = tests.pack.generate(test)
-            pack.save(f"{test.get_dirpath()}/pack.txt")
+            pack = packer.generate(test)
+            pack.save(os.path.join(test.get_dirpath(), "pack.txt"))
 
-            golden_filepath = f"{test.get_dirpath()}/golden.txt"
+            golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
 
             if self.mfc.args["generate"]:
                 common.delete_file(golden_filepath)
@@ -157,7 +159,7 @@ class MFCTest:
                 if not os.path.isfile(golden_filepath):
                     raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
 
-                tests.pack.check_tolerance(test, pack, tests.pack.load(golden_filepath), tol)
+                packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
             
             cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
         except Exception as exc:

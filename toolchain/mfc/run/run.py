@@ -1,12 +1,13 @@
 import re
 
-from mfc.util.printer import cons
+from ..util.printer import cons
 
-import run.engines as engines
-import run.input   as input
+from . import engines
+from . import input
 
-import mfc.util.common as common
-import build
+from ..util import common
+
+from .. import build
 
 
 class MFCRun:

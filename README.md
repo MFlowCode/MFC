@@ -153,12 +153,29 @@ correct binaries.
 <details>
   <summary><h3>Windows</h3></summary>
 
-  On Windows, you can either use [Docker](https://docs.docker.com/get-docker/) or
-  the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/).
+  On Windows, you can either use Intel Compilers with the standard Microsoft toolchain, [Docker](https://docs.docker.com/get-docker/) or
+  the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) for a Linux experience.
+
+  #### Windows + Intel (Native)
   
+  Install the latest version of:
+  - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
+  - [Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
+  - [Intel® oneAPI HPC Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)
+
+  Then, in order to initialize your development environment, open a terminal window and run:
+  ```console
+  "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+  ```
+
+  To follow this guide, please replace `./mfc.sh` with `mfc.bat` when running any
+  commands. `./mfc.sh` is intended Unix-like systems. You will also have access to the `.sln`
+  Microsoft Visual Studio solution files for an IDE (Integrated Development 
+  Environment).
+
   #### Windows + Docker
   
-  See the instructions above.
+  See the instructions in the "Docker (Cross-Platform)" section of this document.
   
   #### Windows + WSL
   
@@ -258,9 +275,13 @@ correct binaries.
  
 ## Fetch, Configure, Build, and Test MFC
 
-The following commands fetch and build MFC and its required dependencies. 
-The dependencies are built to the `build/common/` directory within your MFC installation. 
-This should have no impact on your local installation(s) of these packages.
+MFC can be built without a helper script by directly running CMake but they
+(`mfc.sh` on Linux and `mfc.bat` on Windows) offer convenience features that
+assist in building, testing, optimization, as well as interactive and batch execution. To
+build MFC without a helper script, consult the [CMakeLists.txt](CMakeLists.txt)
+file for a full list of options, as well as [toolchain/dependencies/CMakeLists.txt](toolchain/dependencies/CMakeLists.txt)
+for a CMake superbuild file that fetches and builds MFC's main dependencies with
+supported versions.
 
 + **Fetch MFC:**
 
@@ -307,24 +328,25 @@ equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
 of available arguments can be acquired with `./mfc.sh run -h`. Example Python input
 files can be found in the [samples/](samples/) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/).
+can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/case.py).
 
 The skeleton for an input file may look like the following:
 
 ```python
 #!/usr/bin/env python3
 
-from mfc.case import *
-
-# Calculations (if necessary)
-...
+import json
 
 # Configuring case dictionary
-print(Case(
+print(json.dumps({
   # Insert case parameters here
   ...
-))
+}))
 ```
+
+Thus, you can run your case file with Python to view the computed case dictionary
+that will be processed by MFC when you run. This is particularly useful when
+computations are done in Python to generate the case.
 
 <details>
   <summary><h3>Interactive Execution</h3></summary>
@@ -472,42 +494,44 @@ To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
   Internally a test case is described as:
   ```python
   @dataclasses.dataclass(init=False)
-  class TestCase:
-      trace: str
-      case:  Case
-      ppn:   int
+  class Case:
+      trace:  str
+      params: dict
+      ppn:    int
   ```
   
   where:
   - The `trace` is a string that contains a human-readable description of what parameters were varied, or more generally what the case is meant to test. **Each `trace` must be distinct.**
-  - `case` is the mfc case that should be executed.
+  - `params` is the fully resolved case dictionary, as would appear in a Python case input file.
   - `ppn` is the number of processes per node to use when running the case.
   
   To illustrate, consider the following excerpt from `generate_cases`:
   
   ```python
   for weno_order in [3, 5]:
-    stack.push(TCVS(f"weno_order={weno_order}", [
-      TCV("algorithm.weno.order", weno_order)
-    ]))
+    stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
 
     for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-      stack.push(TCVS(f"(mapped_weno={mapped_weno},mp_weno={mp_weno})", [
-        TCV("algorithm.weno.mapped", mapped_weno == 'T'),
-        TCV("algorithm.weno.mp",     mp_weno == 'T')
-      ]))
+        stack.push(f"(mapped_weno={mapped_weno},mp_weno={mp_weno})", {
+            'mapped_weno': mapped_weno,
+            'mp_weno':     mp_weno
+        })
 
-      if not (mp_weno == 'T' and weno_order != 5):
-        cases.append(create_case(stack))
+        if not (mp_weno == 'T' and weno_order != 5):
+            cases.append(create_case(stack, '', {}))
 
-      stack.pop()
+        stack.pop()
 
     stack.pop()
   ```
   
   When pushing to the stack, or creating a new case with the `create_case` function, you must specify:
+  - `stack`: The current stack.
   - `trace`: A human-readable string describing what you are currently varying.
-  - `variations`: A list of `TCV` objects that contains the parameters you currently wish to to vary.
+  - `variations`: A Python dictionary with case parameter variations.
+  - (Optional) `ppn`: The number of processes per node to use (default is 1).
+
+  If a trace is empty (that is, the empty string `""`), it will not appear in the final trace, but any case parameter variations associated with it will still be applied.
 
   Finally, the case is appended to the `cases` list, which will be returned by the `generate_cases` function.
   

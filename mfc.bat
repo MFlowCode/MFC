@@ -22,7 +22,7 @@ exit /b 0
 
 :label_windows
 
-if not exist "%cd%\toolchain\mfc\main.py" (
+if not exist "%cd%\toolchain\main.py" (
   echo.
   echo ^[mfc.bat^] You must call this script from within MFC's root folder
   echo.
@@ -33,10 +33,17 @@ mkdir "%cd%\build" 2> NUL
 
 if not exist "%cd%\build\venv" (
 	python3 -m venv "%cd%\build\venv"
-
 	if %errorlevel% neq 0 (
 		echo.
-		echo ^[mfc.bat^] Failed to create the Python virtual environment.
+		echo ^[mfc.bat^] Failed to create the Python virtual environment. Delete the build/venv folder and try again.
+		echo.
+		exit /b %errorlevel%
+	)
+
+	pip3 install pyyaml fypp rich argparse dataclasses 
+	if %errorlevel% neq 0 (
+		echo.
+		echo ^[mfc.bat^] Failed to install Python dependencies via Pip. Delete the build/venv folder and try again.
 		echo.
 		exit /b %errorlevel%
 	)
@@ -50,18 +57,7 @@ if %errorlevel% neq 0 (
 	exit /b %errorlevel%
 )
 
-python3 -c "import mfc" > NUL
-if %errorlevel% neq 0 (
-	pip3 install -e "%cd%\toolchain"
-	if %errorlevel% neq 0 (
-		echo.
-		echo ^[mfc.bat^] Failed to install the MFC toolchain Python module.
-		echo.
-		exit /b %errorlevel%
-	)
-)
-
-python3 "%cd%\toolchain\mfc\main.py" %*
+python3 "%cd%\toolchain\main.py" %*
 set main_py_err=%errorlevel%
 
 call "%cd%\build\venv\Scripts\deactivate.bat"

@@ -373,7 +373,8 @@ contains
 
                 call my_inquire(file_loc, dir_check)
 
-                if (dir_check) call SYSTEM('rm -rf '//trim(t_step_dir))
+                if (dir_check) call s_delete_directory(trim(t_step_dir))
+
                 call s_create_directory(trim(t_step_dir))
 
             end if
@@ -388,7 +389,7 @@ contains
                 file_loc = trim(restart_dir)//'/'
                 call my_inquire(file_loc, dir_check)
 
-                if (dir_check) call SYSTEM('rm -rf '//trim(restart_dir))
+                if (dir_check) call s_delete_directory(trim(restart_dir))
                 call s_create_directory(trim(restart_dir))
             end if
 

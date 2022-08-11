@@ -5,7 +5,7 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-#:include '../common/case.fpp'
+#:include '../common_code/case.fpp'
 
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data

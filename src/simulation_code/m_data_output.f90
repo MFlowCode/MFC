@@ -155,7 +155,7 @@ contains
 
             read (2, '(A)') dir_name; close (2)
 
-            call SYSTEM('rm -f dir_name')
+            call s_delete_directory("dir_name")
 
             write (1, '(A)') 'MFC - Case - '//trim(dir_name)// &
                 ': '//trim(file_name)
@@ -633,7 +633,7 @@ contains
 
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
-        if (file_exist) call SYSTEM('rm -rf '//trim(t_step_dir))
+        if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
 
         ! Writing the grid data file in the x-direction

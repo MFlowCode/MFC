@@ -1,10 +1,11 @@
+import os
 import json
 import hashlib
 import binascii
 import subprocess
 import dataclasses
 
-import mfc.util.common as common
+from ..util import common
 
 Tend = 0.25
 Nt   = 50
@@ -117,8 +118,10 @@ class Case:
         case_optimization =   "--case-optimization" if args["case_optimization"]  else "--no-build"
         no_mpi            = f"--no-mpi" if args["no_mpi"] else ""
         
+        mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
+        
         command: str = f'''\
-./mfc.sh run {filepath} {mode} {tasks} {binary_option} {case_optimization} \
+{mfc_script} run {filepath} {mode} {tasks} {binary_option} {case_optimization} \
 {jobs} {gpus} {no_mpi} -t pre_process simulation 2>&1\
 '''
 
@@ -140,7 +143,7 @@ class Case:
         return hex(binascii.crc32(hashlib.sha1(str(self.trace).encode()).digest())).upper()[2:].zfill(8)
 
     def get_dirpath(self):
-        return f"{common.MFC_TESTDIR}/{self.get_uuid()}"
+        return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
     def create_directory(self):
         dirpath = self.get_dirpath()

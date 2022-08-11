@@ -1,7 +1,7 @@
 import typing
 import dataclasses
 
-import mfc.util.common as common
+from ..util import common
 
 # Note: This file is now only used when running
 #       in serial mode.

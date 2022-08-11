@@ -57,7 +57,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_time_steppers_module() ! -----------------------
 
-        type(bounds_info) :: ix, iy, iz !<
+        type(int_bounds_info) :: ix, iy, iz !<
             !! Indical bounds in the x-, y- and z-directions
 
         integer :: i, j !< Generic loop iterators

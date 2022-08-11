@@ -5,7 +5,7 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-#:include '../common/case.fpp'
+#:include '../common_code/case.fpp'
 
 !> @brief The module contains all of the parameters describing the program
 !!              logistics, the computational domain and the simulation algorithm.

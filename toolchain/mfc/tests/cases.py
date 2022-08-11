@@ -1,8 +1,8 @@
-import mfc.util.common as common
+from ..util import common
 
-from tests.case import Case
-from tests.case import create_case
-from tests.case import CaseGeneratorStack
+from .case import Case
+from .case import create_case
+from .case import CaseGeneratorStack
 
 
 def get_dimensions():
@@ -237,7 +237,7 @@ def generate_cases() -> list:
         stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
 
         if len(dimInfo[0]) > 0:
-            stack.push(f"bubbles=T,weno_order=1", {"bubbles": 'T', "weno_order": 1})
+            stack.push(f"bubbles=T", {"bubbles": 'T'})
 
             stack.push(f'', {
                 'nb' : 3, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,

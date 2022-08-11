@@ -1,6 +1,6 @@
-from mfc.util.printer import cons
+from .util.printer import cons
 
-import mfc.util.common as common
+from .util import common as common
 
 import os
 import typing
@@ -121,10 +121,26 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     install_dirpath = get_install_dirpath()
 
     flags: list = target.flags.copy() + mode.flags + [
+        # Disable CMake warnings intended for developers (us).
+        # See: https://cmake.org/cmake/help/latest/manual/cmake.1.html.
         f"-Wno-dev",
+        # Save a compile_commands.json file with the compile commands used to
+        # build the configured targets. This is mostly useful for debugging.
+        # See: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html.
         f"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        # Set build type (e.g Debug, Release, etc.).
+        # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
         f"-DCMAKE_BUILD_TYPE={mode.type}",
+        # Used by FIND_PACKAGE (/FindXXX) to search for packages, with the
+        # second heighest level of priority, still letting users manually
+        # specify <PackageName>_ROOT, which has precedent over CMAKE_PREFIX_PATH.
+        # See: https://cmake.org/cmake/help/latest/command/find_package.html.
         f"-DCMAKE_PREFIX_PATH=\"{install_dirpath}\"",
+        # First directory that FIND_LIBRARY searches.
+        # See: https://cmake.org/cmake/help/latest/command/find_library.html.
+        f"-DCMAKE_FIND_ROOT_PATH=\"{install_dirpath}\"",
+        # Location prefix to install bin/, lib/, include/, etc.
+        # See: https://cmake.org/cmake/help/latest/command/install.html.
         f"-DCMAKE_INSTALL_PREFIX=\"{install_dirpath}\"",
     ]
 

@@ -1,7 +1,7 @@
 import os
 import dataclasses
 
-import mfc.util.common as common
+from ..util import common
 
 
 @dataclasses.dataclass
