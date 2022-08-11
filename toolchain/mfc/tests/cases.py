@@ -237,7 +237,7 @@ def generate_cases() -> list:
         stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
 
         if len(dimInfo[0]) > 0:
-            stack.push(f"bubbles={'T'}", {"bubbles": 'T'})
+            stack.push(f"bubbles=T,weno_order=1", {"bubbles": 'T', "weno_order": 1})
 
             stack.push(f'', {
                 'nb' : 3, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
@@ -251,7 +251,7 @@ def generate_cases() -> list:
                 'patch_icpp(3)%pres': 1.0
             })
 
-            stack.push(f"Monopole={'T'}", {"Monopole": 'T'})
+            stack.push(f"Monopole=T", {"Monopole": 'T'})
 
             if len(dimInfo[0]) >= 2:
                 stack.push("", {'Mono(1)%loc(2)': 0.5})
@@ -275,7 +275,7 @@ def generate_cases() -> list:
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
             cases.append(create_case(stack, 'nb=1', {'nb': 1}))
 
-            stack.push(f"qbmm={'T'}", {'qbmm': 'T'})
+            stack.push(f"qbmm=T", {'qbmm': 'T'})
             cases.append(create_case(stack, '', {}))
 
             stack.push('bubble_model=3', {'bubble_model': 3})
