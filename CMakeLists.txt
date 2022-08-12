@@ -4,22 +4,25 @@ PROJECT(MFC LANGUAGES C CXX Fortran)
 
 
 # === Options
-OPTION(MFC_WITH_MPI           "Build with MPI"                                   ON)
-OPTION(MFC_WITH_OPEN_ACC      "Build with OpenACC"                              OFF)
-OPTION(MFC_BUILD_PRE_PROCESS  "Build pre_process"                               OFF)
-OPTION(MFC_BUILD_SIMULATION   "Build simulation"                                OFF)
-OPTION(MFC_BUILD_POST_PROCESS "Build post_process"                              OFF)
-OPTION(MFC_BUILD_ALL          "Build pre_process, simulation, and post_process" OFF)
+OPTION(MFC_WITH_MPI            "Build with MPI"                                   ON)
+OPTION(MFC_WITH_OPEN_ACC       "Build with OpenACC"                              OFF)
+OPTION(MFC_BUILD_PRE_PROCESS   "Build pre_process"                               OFF)
+OPTION(MFC_BUILD_SIMULATION    "Build simulation"                                OFF)
+OPTION(MFC_BUILD_POST_PROCESS  "Build post_process"                              OFF)
+OPTION(MFC_BUILD_DOC           "Build documentation"                             OFF)
+OPTION(MFC_BUILD_ALL           "Build pre_process, simulation, and post_process" OFF)
 
 IF (MFC_BUILD_ALL)
     SET(MFC_BUILD_PRE_PROCESS  ON FORCE)
     SET(MFC_BUILD_SIMULATION   ON FORCE)
     SET(MFC_BUILD_POST_PROCESS ON FORCE)
+    SET(MFC_BUILD_DOC          ON FORCE)
 ENDIF()
 
 
 # === Imports
 INCLUDE(GNUInstallDirs)
+INCLUDE(ExternalProject)
 INCLUDE(CheckIPOSupported)
 INCLUDE(CheckFortranCompilerFlag)
 
@@ -49,7 +52,7 @@ ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang")
 ENDIF()
 
 # === === Find Fypp
-FIND_PROGRAM(FYPP_PATH fypp REQUIRED)
+FIND_PROGRAM(FYPP_EXE fypp REQUIRED)
 
 
 # === Miscellaneous Configuration
@@ -133,7 +136,7 @@ ENDIF()
 
 # === Locate Libraries
 # === === MPI
-IF (MFC_WITH_MPI)
+IF (MFC_WITH_MPI AND (MFC_BUILD_PRE_PROCESS OR MFC_BUILD_SIMULATION OR MFC_BUILD_POST_PROCESS))
     FIND_PACKAGE(MPI COMPONENTS Fortran REQUIRED)
 ENDIF()
 
@@ -187,7 +190,7 @@ MACRO(HANDLE_FYPP target)
 
         ADD_CUSTOM_COMMAND(
             OUTPUT   "${f90_filepath}"
-            COMMAND  "fypp" "${fpp_filepath}" "${f90_filepath}"
+            COMMAND  "${FYPP_EXE}" "${fpp_filepath}" "${f90_filepath}"
             DEPENDS  "${fpp_filepath}" "${CMAKE_CURRENT_SOURCE_DIR}/src/common_code/case.fpp"
             COMMENT  "Preprocessing ${fpp_filename}"
             VERBATIM
@@ -200,14 +203,15 @@ ENDMACRO()
 
 
 # === Handle src/ Folder
-# === === src/common_code
+# === === Fypp / Sources
 HANDLE_FYPP(common)
+HANDLE_FYPP(pre_process)
+HANDLE_FYPP(simulation)
+HANDLE_FYPP(post_process)
 
 
 # === === src/pre_process_code
 IF (MFC_BUILD_PRE_PROCESS)
-    HANDLE_FYPP(pre_process)
-
     ADD_EXECUTABLE(pre_process "${pre_process_srcs}" "${common_srcs}")
 
 
@@ -226,8 +230,6 @@ ENDIF()
 
 # === === src/simulation_code
 IF (MFC_BUILD_SIMULATION)
-    HANDLE_FYPP(simulation)
-
     ADD_EXECUTABLE(simulation "${simulation_srcs}" "${common_srcs}")
 
 
@@ -286,8 +288,6 @@ ENDIF()
 
 # === === src/post_process_code
 IF (MFC_BUILD_POST_PROCESS)
-    HANDLE_FYPP(post_process)
-
     ADD_EXECUTABLE(post_process "${post_process_srcs}" "${common_srcs}")
 
     TARGET_LINK_LIBRARIES(post_process PRIVATE SILO::SILO HDF5::HDF5 FFTW::FFTW)
@@ -301,4 +301,98 @@ IF (MFC_BUILD_POST_PROCESS)
 
 
     INSTALL(TARGETS post_process RUNTIME DESTINATION bin)
+ENDIF()
+
+
+ADD_CUSTOM_TARGET("doc")
+
+MACRO(GEN_DOCS target name)
+
+    SET(DOXYGEN_PROJECT_NAME "${name}")
+
+    FILE(
+        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
+        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
+    )
+
+    CONFIGURE_FILE(
+        "${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/Doxyfile"
+        @ONLY
+    )
+
+    FILE(
+        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/res"
+        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
+    )
+
+    FILE(
+        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/config.js"
+        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
+    )
+
+    ADD_CUSTOM_COMMAND(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/Doxyfile"
+                "${${target}_srcs}"
+        COMMAND "${DOXYGEN_EXECUTABLE}"
+                "Doxyfile"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}"
+        COMMENT "${target}: Generating docs"
+    )
+
+    ADD_CUSTOM_TARGET(
+        "${target}_doxygen" ALL
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
+    )
+
+    ADD_DEPENDENCIES("${target}_doxygen" doxygen-awesome-css)
+    ADD_DEPENDENCIES("doc" "${target}_doxygen")
+
+    INSTALL(
+        DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/"
+        DESTINATION "doc/${target}"
+    )
+
+    INSTALL(
+        DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/doxygen/res/"
+        DESTINATION "doc/res"
+    )
+
+    INSTALL(
+        FILES       "${CMAKE_CURRENT_SOURCE_DIR}/doc/index.html"
+        DESTINATION "doc"
+    )
+
+ENDMACRO()
+
+
+# === Documentation
+IF (MFC_BUILD_DOC)
+
+    # === === Find Doxygen
+    FIND_PACKAGE(Doxygen REQUIRED dot REQUIRED)
+
+    # === === Fetch CSS Theme
+    ExternalProject_Add(doxygen-awesome-css
+        PREFIX            doxygen-awesome-css
+        GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
+        GIT_TAG           "a5efba07a3d4fd6317d95657b3095b97e134b791"
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND     ""
+        INSTALL_COMMAND   ""
+    )
+
+    SET(theme_dirpath "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css/src/doxygen-awesome-css/")
+
+    SET(DOXYGEN_HTML_EXTRA_STYLESHEET "\"${theme_dirpath}/doxygen-awesome.css\"")
+
+    # === === Generate Documentation
+    GEN_DOCS(pre_process  "MFC: Pre-Process")
+    GEN_DOCS(simulation   "MFC: Simulation")
+    GEN_DOCS(post_process "MFC: Post-Process")
+
+    # === === Generate Landing Page
+    GEN_DOCS(landing "MFC")
+
 ENDIF()

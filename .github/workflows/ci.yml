@@ -68,6 +68,7 @@ jobs:
           name: ${{ matrix.os }}
           path: |
             build/**/*.log
+            build/**/*.txt
             tests/**/*.dat
             tests/**/*.out
             tests/**/*.inp
