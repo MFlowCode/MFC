@@ -13,26 +13,29 @@ class MFCTarget:
     flags:        typing.List[str]
     requires:     typing.List[str]
     isDependency: bool
+    isDefault:    bool
 
 
 TARGETS: typing.List[MFCTarget] = [
     MFCTarget(name='fftw', flags=['-DMFC_BUILD_FFTW=ON'],
-              isDependency=True, requires=[]),
+              isDependency=True, isDefault=False, requires=[]),
     MFCTarget(name='hdf5', flags=['-DMFC_BUILD_HDF5=ON'],
-              isDependency=True, requires=[]),
+              isDependency=True, isDefault=False, requires=[]),
     MFCTarget(name='silo', flags=['-DMFC_BUILD_SILO=ON'],
-              isDependency=True, requires=["hdf5"]),
+              isDependency=True, isDefault=False, requires=["hdf5"]),
     MFCTarget(name='pre_process', flags=['-DMFC_BUILD_PRE_PROCESS=ON'],
-              isDependency=False, requires=[]),
+              isDependency=False, isDefault=True, requires=[]),
     MFCTarget(name='simulation', flags=['-DMFC_BUILD_SIMULATION=ON'],
-              isDependency=False, requires=["fftw"]),
+              isDependency=False, isDefault=True, requires=["fftw"]),
     MFCTarget(name='post_process', flags=['-DMFC_BUILD_POST_PROCESS=ON'],
-              isDependency=False, requires=['fftw', 'silo'])
+              isDependency=False, isDefault=True, requires=['fftw', 'silo']),
+    MFCTarget(name="doc", flags=['-DMFC_BUILD_DOC=ON'],
+              isDependency=False, isDefault=False, requires=[])
 ]
 
 
 def get_mfc_target_names() -> typing.List[str]:
-    return [ target.name for target in TARGETS if not target.isDependency ]
+    return [ target.name for target in TARGETS if target.isDefault ]
 
 
 def get_dependencies_names() -> typing.List[str]:
