@@ -131,7 +131,7 @@ class MFCTest:
             if test.params.get("qbmm", 'F') == 'T':
                 tol = 1e-7
             elif test.params.get("bubbles", 'F') == 'T':
-                tol = 1e-10
+                tol = 1e-6
             else:
                 tol = 1e-12
 
@@ -144,8 +144,8 @@ class MFCTest:
             if cmd.returncode != 0:
                 cons.print(cmd.stdout)
                 raise MFCException(f"""\
-    {os.sep.join(['tests', test.get_uuid()])}: Failed to execute MFC [{test.trace}]. Above is the output of MFC.
-    You can find the output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+Test {test}: Failed to execute MFC. Above is the output of MFC.
+You can find the output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
 
             pack = packer.generate(test)
             pack.save(os.path.join(test.get_dirpath(), "pack.txt"))
@@ -157,7 +157,7 @@ class MFCTest:
                 pack.save(golden_filepath)
             else:
                 if not os.path.isfile(golden_filepath):
-                    raise MFCException(f"{os.sep.join(['tests', test.get_uuid()])}: Golden file doesn't exist! To generate golden files, use the '-g' flag. [{test.trace}]")
+                    raise MFCException(f"Test {test}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
 
                 packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
             
@@ -168,5 +168,5 @@ class MFCTest:
             if not self.mfc.args["relentless"]:
                 raise exc
             
-            cons.print(f"[bold red]Failed Test [bold magenta]{test.get_uuid()}[/bold magenta] ! [/bold red] ({test.trace})")
+            cons.print(f"[bold red]Failed test {test}.[/bold red]")
             cons.print(f"{exc}")

@@ -64,7 +64,7 @@ if (($?)); then
 fi
 
 
-if ! command -v pip3 > /dev/null 2>&1; then
+if ! command -v pip3 > /dev/null 2>&1 && [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
     wget -O "$(pwd)/build/get-pip.py" https://bootstrap.pypa.io/pip/get-pip.py
     if (($?)); then
         echo "[mfc.sh] Error: Couldn't download get-pip.py."
