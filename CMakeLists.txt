@@ -94,11 +94,19 @@ ELSEIF ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR
         (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
 
     ADD_COMPILE_OPTIONS(-r8 -cpp -Mfreeform -Minfo=accel -Mr8intrinsics)
+    
+    IF (MFC_WITH_OPEN_ACC)
+        IF     (CMAKE_BUILD_TYPE STREQUAL "Release")
+            ADD_COMPILE_OPTIONS(-gpu=keep,ptxinfo,lineinfo)
+        ELSEIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            ADD_COMPILE_OPTIONS(-gpu=keep,ptxinfo,lineinfo,autocompare,debug)
+        ENDIF()
+    ENDIF()
 
 ENDIF()
 
 
-# === CMake Build Configurations
+# === Release Optimizations
 IF (CMAKE_BUILD_TYPE STREQUAL "Release")
 
     # === === Processor tuning
@@ -235,7 +243,7 @@ IF (MFC_BUILD_SIMULATION)
 
 
     IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-        TARGET_LINK_LIBRARIES(simulation PRIVATE CUDA::nvToolsExt cutensor)
+        TARGET_LINK_LIBRARIES(simulation PRIVATE CUDA::nvToolsExt)
     ENDIF()
 
 
@@ -243,7 +251,28 @@ IF (MFC_BUILD_SIMULATION)
         TARGET_LINK_LIBRARIES(simulation PRIVATE OpenACC::OpenACC_Fortran)
 
         IF (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-            TARGET_LINK_LIBRARIES(simulation PRIVATE CUDA::cufft)
+            TARGET_LINK_LIBRARIES(simulation PRIVATE CUDA::cudart CUDA::cufft cutensor)
+
+            # In the case of the NVHPC SDK, cuTENSOR can be found at a path similar to:
+            # /opt/nvidia/hpc_sdk/Linux_x86_64/xx.yy/math_libs/lib64/ on a regular installation.
+            # CUDAToolkit_LIBRARY_ROOT would then point to /opt/nvidia/hpc_sdk/Linux_x86_64/xx.yy/cuda/zz.ww.
+            # Since the linker doesn't usually consider math_libs/ (for it wasn't told to),
+            # we attempt to add it as a link directory.
+
+            SET(_warn_msg_begin "Can't automatically determine the location of cuTENSOR.")
+            SET(_warn_msg_end   "If linking fails, please explicitly specify a link directory.")
+
+            IF (EXISTS "${CUDAToolkit_LIBRARY_ROOT}/../../math_libs/lib")
+                TARGET_LINK_DIRECTORIES(simulation PRIVATE "${CUDAToolkit_LIBRARY_ROOT}/../../math_libs/lib")
+
+                MESSAGE(WARNING "${_warn_msg_begin} Gave linker ${CUDAToolkit_LIBRARY_ROOT}/../../math_libs/lib   as a potential search path for cuTENSOR (based on a regular NVHPC installation). ${_warn_msg_end} Fortunately, linking will likely succeed.")
+            ELSEIF (EXISTS "${CUDAToolkit_LIBRARY_ROOT}/../../math_libs/lib64")
+                TARGET_LINK_DIRECTORIES(simulation PRIVATE "${CUDAToolkit_LIBRARY_ROOT}/../../math_libs/lib64")
+
+                MESSAGE(WARNING "${_warn_msg_begin} Gave linker ${CUDAToolkit_LIBRARY_ROOT}/../../math_libs/lib64 as a potential search path for cuTENSOR (based on a regular NVHPC installation). ${_warn_msg_end} Fortunately, linking will likely succeed.")
+            ELSE()
+                MESSAGE(WARNING "${_warn_msg_begin} No common potential search directories were found. ${_warn_msg_end}")
+            ENDIF()
         ENDIF()
     ENDIF()
 
@@ -261,7 +290,7 @@ IF (MFC_BUILD_POST_PROCESS)
 
     ADD_EXECUTABLE(post_process "${post_process_srcs}" "${common_srcs}")
 
-    TARGET_LINK_LIBRARIES(post_process PRIVATE HDF5::HDF5 SILO::SILO FFTW::FFTW)
+    TARGET_LINK_LIBRARIES(post_process PRIVATE SILO::SILO HDF5::HDF5 FFTW::FFTW)
 
     IF (MFC_WITH_MPI)
         TARGET_COMPILE_DEFINITIONS(post_process PRIVATE MFC_MPI)

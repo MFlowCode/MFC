@@ -112,10 +112,10 @@ class Case:
         filepath          = f'"{self.get_dirpath()}/case.py"'
         mode              = f'-m "{args["mode"]}"'
         tasks             = f"-n {self.ppn} "
-        jobs              = f"-j {args['jobs']}"    if args["case_optimization"]  else ""
-        gpus              = f"-g {self.ppn}"        if "gpu" in args["mode"]      else ""
-        binary_option     = f"-b {args['binary']}"  if args["binary"] is not None else ""
-        case_optimization =   "--case-optimization" if args["case_optimization"]  else "--no-build"
+        jobs              = f"-j {args['jobs']}"   if args["case_optimization"]  else ""
+        gpus              = f"-g {self.ppn}"       if "gpu" in args["mode"]      else ""
+        binary_option     = f"-b {args['binary']}" if args["binary"] is not None else ""
+        case_optimization =  "--case-optimization" if args["case_optimization"]  else "--no-build"
         no_mpi            = f"--no-mpi" if args["no_mpi"] else ""
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
@@ -166,6 +166,10 @@ print(json.dumps({self.gen_json_dict_str()}))
 
     def __setitem__(self, key: str, val: str):
         self.params[key] = val
+    
+    def __str__(self) -> str:
+        return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
+
 
 
 @dataclasses.dataclass

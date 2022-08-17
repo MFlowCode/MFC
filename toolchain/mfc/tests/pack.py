@@ -120,7 +120,7 @@ def generate(case: case.Case) -> Pack:
 
         for double in doubles:
             if math.isnan(double):
-                raise MFCException(f"A NaN was found while generating a pack file for test with UUID [bold magenta]{case.get_uuid()}[/bold magenta].")
+                raise MFCException(f"Test {case}: A NaN was found while generating a pack file.")
 
         entries.append(PackEntry(short_filepath,doubles))
 
@@ -152,7 +152,7 @@ def check_tolerance(case: case.Case, candidate: Pack, golden: Pack, tol: float) 
 
     # Compare entry-count
     if len(candidate.entries) != len(golden.entries):
-        raise MFCException(f"{os.sep.join(['tests', uuid])}: Line count didn't match.")
+        raise MFCException(f"Test {case}: Line count didn't match.")
 
     # For every entry in the golden's pack
     for gIndex, gEntry in enumerate(golden.entries):
@@ -160,13 +160,13 @@ def check_tolerance(case: case.Case, candidate: Pack, golden: Pack, tol: float) 
         cIndex, cEntry = common.find(lambda i, e: e.filepath == gEntry.filepath, candidate.entries)
 
         if cIndex == None:
-            raise MFCException(f"{os.sep.join(['tests', uuid])}: No reference of {gEntry.filepath} in the candidate's pack.")
+            raise MFCException(f"Test {case}: No reference of {gEntry.filepath} in the candidate's pack.")
 
         filepath: str = gEntry.filepath
 
         # Compare variable-count
         if len(gEntry.doubles) != len(cEntry.doubles):
-            raise MFCException(f"{os.sep.join(['tests', uuid])}: Variable count didn't match for {filepath}.")
+            raise MFCException(f"Test {case}: Variable count didn't match for {filepath}.")
 
         # Check if each variable is within tolerance
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
@@ -176,7 +176,7 @@ def check_tolerance(case: case.Case, candidate: Pack, golden: Pack, tol: float) 
 
             def raise_err(msg: str):
                 raise MFCException(f"""\
-{os.sep.join(['tests', uuid])}: Variable n°{valIndex+1} (1-indexed) in {filepath} {msg}:
+Test {case}: Variable n°{valIndex+1} (1-indexed) in {filepath} {msg}:
   - Description: {case.trace}
   - Candidate:   {cVal}
   - Golden:      {gVal}
