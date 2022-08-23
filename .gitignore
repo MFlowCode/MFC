@@ -2,6 +2,7 @@ tags
 src/*/tags
 
 .vscode/
+.nfs*
 defaults.yaml
 
 __pycache__
