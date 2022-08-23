@@ -18,23 +18,23 @@ correct binaries.
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
 ```console
-sudo apt update
-sudo apt upgrade
-sudo apt install tar wget make cmake gcc g++ \
-                 python3 python3-dev         \
-                 "openmpi-*" libopenmpi-dev
+$ sudo apt update
+$ sudo apt upgrade
+$ sudo apt install tar wget make cmake gcc g++ \
+                   python3 python3-dev         \
+                   "openmpi-*" libopenmpi-dev
 ```
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
 
 ```console
-sudo pacman -Syu
-sudo pacman -S base-devel coreutils  \
-               git ninja gcc-fortran \
-               cmake openmpi python3 \
-               python-pip openssh    \
-               python-virtualenv vim \
-               wget tree
+$ sudo pacman -Syu
+$ sudo pacman -S base-devel coreutils  \
+                 git ninja gcc-fortran \
+                 cmake openmpi python3 \
+                 python-pip openssh    \
+                 python-virtualenv vim \
+                 wget tree
 ```
 
 If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com/hpc-sdk), follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk-downloads).
@@ -82,15 +82,15 @@ If you run into issues, we suggest you try using Docker (instructions above).
   - **MacOS v10.15 (Catalina) or newer [ZSH]** (Verify with `echo $SHELL`)
 
 ```console
-touch ~/.zshrc
-open ~/.zshrc
+$ touch ~/.zshrc
+$ open ~/.zshrc
 ```
 
   - **Older than MacOS v10.15 (Catalina) [BASH]** (Verify with `echo $SHELL`)
   
 ```console
-touch ~/.bash_profile
-open ~/.bash_profile
+$ touch ~/.bash_profile
+$ open ~/.bash_profile
 ```
   
 An editor should open. Please paste the following lines into it before saving the file. If you wish to use a version of GNU's GCC other than 11, modify the first assignment. These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't be used to compile MFC. Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
@@ -110,8 +110,8 @@ export FC=gfortran-$MFC_GCC_VER
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands bellow.
 
 ```console
-brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
-HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
+$ brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
+$ HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
 ```
 
 They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`. Building this package might take a while.
@@ -126,23 +126,23 @@ First install Docker and Git:
 - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
 - Other systems:
 ```console
-sudo apt install git docker # Debian / Ubuntu via Aptitude
-sudo pacman -S git docker   # Arch Linux via Pacman
+$ sudo apt install git docker # Debian / Ubuntu via Aptitude
+$ sudo pacman -S git docker   # Arch Linux via Pacman
 ```
 
 Once Docker and Git are installed on your system, clone MFC with
 
 ```console
-git clone https://github.com/MFlowCode/MFC
-cd MFC 
+$ git clone https://github.com/MFlowCode/MFC
+$ cd MFC 
 ```
 
 To fetch the prebuilt Docker image and enter an interactive bash session with the
 recommended settings applied, run
 
 ```console
-./mfc.sh  docker # If on \*nix/macOS
-.\mfc.bat docker # If on Windows
+$ ./mfc.sh  docker # If on \*nix/macOS
+  .\mfc.bat docker # If on Windows
 ```
 
 We automatically mount and configure the proper permissions in order for you to
@@ -166,8 +166,8 @@ supported versions.
 + **Fetch MFC:**
 
 ```console
-git clone https://github.com/MFlowCode/MFC
-cd MFC
+$ git clone https://github.com/MFlowCode/MFC
+$ cd MFC
 ```
 
 + **(Optional) Configure MFC defaults in [defaults.yaml](defaults.yaml):**
@@ -177,7 +177,7 @@ If you wish, you can override MFC's default build parameters in [defaults.yaml](
 + **Build MFC's codes in `release-cpu` mode with 8 threads:**
 
 ```console
-./mfc.sh build -t pre_process simulation post_process -j 8
+$ ./mfc.sh build -t pre_process simulation post_process -j 8
 ```
 
 To build MFC in different configurations (herein, *modes*), the `-m <mode>` option
@@ -191,7 +191,7 @@ you can use others such as `release-gpu`.
 + **Run MFC's tests in `release-cpu` mode with 8 threads:**
 
 ```console
-./mfc.sh test -j 8
+$ ./mfc.sh test -j 8
 ```
 
 Please refer to the [Testing](#testing-mfc) section of this document for more information. 

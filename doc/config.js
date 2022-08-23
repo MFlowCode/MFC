@@ -7,7 +7,8 @@ MathJax.Hub.Config({
     tex2jax: {
       inlineMath:  [ ['$',  '$'], ["\\(","\\)"] ],
       displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
-      processEscapes: true
+      processEscapes: true,
+      ignoreClass: "line" // Ignore code blocks: https://web.archive.org/web/20120430100225/http://www.mathjax.org/docs/1.1/options/tex2jax.html
     },
     "HTML-CSS": {
       fonts: ["TeX"]
