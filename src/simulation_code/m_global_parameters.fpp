@@ -1008,7 +1008,7 @@ contains
 !$acc routine seq
 
         real(kind(0d0)), intent(IN) :: vftmp
-        real(kind(0d0)), dimension(:), intent(IN) :: nRtmp
+        real(kind(0d0)), dimension(nb), intent(IN) :: nRtmp
         real(kind(0d0)), intent(OUT) :: ntmp
         real(kind(0d0)) :: nR3
         integer :: i
@@ -1049,7 +1049,7 @@ contains
 !$acc routine seq
 
         real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(:), intent(IN) :: Rtmp
+        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
         real(kind(0.d0)) :: R3
         integer :: i
@@ -1078,7 +1078,7 @@ contains
     subroutine s_quad(func, mom)
 !$acc routine seq
 
-        real(kind(0.d0)), dimension(:), intent(IN) :: func
+        real(kind(0.d0)), dimension(nb), intent(IN) :: func
         real(kind(0.d0)), intent(OUT) :: mom
         integer :: i
 

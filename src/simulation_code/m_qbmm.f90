@@ -188,7 +188,7 @@ contains
     subroutine s_coeff(pres, rho, c, coeffs)
 !$acc routine seq
         real(kind(0.d0)), intent(IN) :: pres, rho, c
-        real(kind(0.d0)), dimension(:, 0:, 0:), intent(OUT) :: coeffs
+        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
         integer :: i1, i2
 
         coeffs = 0d0
@@ -236,7 +236,6 @@ contains
         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
         real(kind(0d0)) :: pres, rho, nbub, c, alf
         real(kind(0d0)) :: n_tait, B_tait
-        real(kind(0d0)), dimension(3) :: momrhs_vec
 
         integer :: j, k, l, q, r, s !< Loop variables
         integer :: id1, id2, id3
@@ -247,7 +246,7 @@ contains
         !$acc update device(is1, is2, is3)
 
 
-!$acc parallel loop collapse(3) gang vector default(present) private(moms, Rvec, wght, abscX, abscY, mom3d_terms, coeff, momrhs_vec)
+!$acc parallel loop collapse(3) gang vector default(present) private(moms, Rvec, wght, abscX, abscY, mom3d_terms, coeff)
         do id3 = is3%beg, is3%end 
             do id2 = is2%beg, is2%end 
                 do id1 = is1%beg, is1%end
@@ -386,8 +385,8 @@ contains
 
     subroutine s_chyqmom(momin, wght, abscX, abscY)
 !$acc routine seq
-        real(kind(0d0)), dimension(:), intent(INOUT) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(:), intent(IN) :: momin
+        real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
+        real(kind(0d0)), dimension(nmom), intent(IN) :: momin
 
         real(kind(0d0)), dimension(0:nmom, 0:nmom) :: moms
         real(kind(0d0)), dimension(3) :: M1, M3
@@ -464,7 +463,7 @@ contains
 
     function f_quad(abscX, abscY, wght, q, r, s)
     !$acc routine seq
-        real(kind(0.d0)), dimension(:, :), intent(IN) :: abscX, abscY, wght
+        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
         real(kind(0.d0)), intent(IN) :: q, r, s
         real(kind(0.d0)) :: f_quad_RV, f_quad
         integer :: i
@@ -479,8 +478,8 @@ contains
 
     function f_quad2D(abscX, abscY, wght, pow)
     !$acc routine seq
-        real(kind(0.d0)), dimension(:), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), dimension(:), intent(IN) :: pow
+        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght
+        real(kind(0.d0)), dimension(3), intent(IN) :: pow
         real(kind(0.d0)) :: f_quad2D
 
         f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))

@@ -1948,9 +1948,11 @@ contains
     subroutine s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
@@ -1972,9 +1974,11 @@ contains
     subroutine s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !< Generic loop iterator
 
@@ -2009,9 +2013,11 @@ contains
     subroutine s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
@@ -2031,9 +2037,11 @@ contains
     subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -2067,9 +2075,11 @@ contains
     subroutine s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -2099,9 +2109,11 @@ contains
     subroutine s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -2132,9 +2144,11 @@ contains
     subroutine s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
@@ -2152,9 +2166,11 @@ contains
     subroutine s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !< Generic loop iterator
 
