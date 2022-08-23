@@ -1,6 +1,5 @@
 #!/usr/bin/env python2
 
-import sys
 import math
 import json
 
@@ -28,7 +27,7 @@ Nx     = Ny*2+1
 dx, dy = x0*Lx/float(Nx), x0*Ly/float(Ny)
 
 # Select type of simulation
-restart_name = sys.argv[1].strip()
+restart_name = 'init'
 
 Ntend   = 1E5
 if restart_name == 'init':
