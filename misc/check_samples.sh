@@ -1,20 +1,40 @@
 #!/usr/bin/env bash
 
+RED="\u001b[31m"
+CYAN="\u001b[36m"
+GREEN="\u001b[32m"
+YELLOW="\u001b[33m"
+MAGENTA="\u001b[35m"
+COLOR_RESET="\033[m"
+
+TIMEOUT="10s"
+
+./mfc.sh build -j $(nproc) -t pre_process simulation
+
+index=1
 failed=()
 
-for d in samples/*/; do
-    echo "Running $d.."
-    # 2D_shearlayer a large amount of timesteps so one might want to skip it
-    #if [[ ! "$d" == *"2D_shearlayer"* ]]; then
-        mkdir -p "$d""D"
-        ./mfc.sh run "$d"case.py -j $(nproc) -c 4 -b mpirun -t pre_process simulation
-        if [[ "$?" != "0" ]]; then
-            failed=(${failed[@]} "$d""case.py")
-        fi
-    #fi
+files=samples/*/*.py
+
+echo "$files"
+
+for f in samples/*/*.py; do
+
+    echo -en "($index) Running $MAGENTA$f$COLOR_RESET - ($TIMEOUT timeout): "
+    timeout "$TIMEOUT" ./mfc.sh run "$f" -j $(nproc) -n 4 -b mpirun -t pre_process simulation > /dev/null 2>&1
+    code="$?"
+    if [[ "$code" != "0" ]] && [[ "$code" != "124" ]]; then
+        echo -e "[$RED""Failed$COLOR_RESET]"
+        failed=(${failed[@]} "$f")
+    else
+        echo -e "[$GREEN""Passed$COLOR_RESET]"
+    fi
+
+    index=$((index+1))
+
 done
 
-echo "Samples that failed:"
+echo -e "\nSamples that failed:"
 for value in "${failed[@]}"; do
     echo " - $value"
 done
