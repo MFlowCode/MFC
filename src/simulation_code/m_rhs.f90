@@ -298,7 +298,7 @@ contains
 
         if (qbmm) then
             allocate (mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
-!$acc enter data create(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
+            
             do i = 0, 2; do j = 0, 2; do k = 1, nb
                     allocate (mom_3d(i, j, k)%sf( &
                               ix%beg:ix%end, &
@@ -4370,7 +4370,7 @@ contains
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm)
 !$acc routine seq
-        real(kind(0d0)), dimension(:), intent(IN) :: mono_loc
+        real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
         integer, intent(IN) :: nm
         real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l

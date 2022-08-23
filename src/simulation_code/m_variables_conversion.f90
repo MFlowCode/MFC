@@ -326,8 +326,8 @@ contains
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
 
-        real(kind(0d0)), dimension(:), intent(INOUT) :: alpha_rho_K, alpha_K !<
-        real(kind(0d0)), dimension(:), intent(OUT) :: Re_K 
+        real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_rho_K, alpha_K !<
+        real(kind(0d0)), dimension(2), intent(OUT) :: Re_K 
             !! Partial densities and volume fractions
 
         integer, intent(IN) :: k, l, r
@@ -390,7 +390,7 @@ contains
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
 
 
-        real(kind(0d0)), dimension(:), intent(IN) :: alpha_rho_K, alpha_K !<
+        real(kind(0d0)), dimension(num_fluids), intent(IN) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
         integer, intent(IN) :: k, l, r
         integer :: i, j !< Generic loop iterators
