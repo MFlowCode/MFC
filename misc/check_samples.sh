@@ -34,7 +34,8 @@ for f in samples/*/*.py; do
 
 done
 
-echo -e "\nSamples that failed:"
+
+echo -e "\n${#failed[@]} samples failed:"
 for value in "${failed[@]}"; do
     echo " - $value"
 done
