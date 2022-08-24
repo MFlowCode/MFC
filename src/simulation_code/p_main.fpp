@@ -304,13 +304,13 @@ program p_main
             t_step = t_step + 1
         end if
 
-        if (num_procs > 0) then
-            print*, "m_compress timings:"
-            print*, " - nCalls_time  ", nCalls_time
-            print*, " - s_compress   ", (compress_time   / nCalls_time), "s"
-            print*, " - mpi_sendrecv ", (mpi_time        / nCalls_time), "s"
-            print*, " - s_decompress ", (decompress_time / nCalls_time), "s"
-        end if
+        !if (num_procs > 1) then
+        !    print*, "m_compress timings:"
+        !    print*, " - nCalls_time  ", nCalls_time
+        !    print*, " - s_compress   ", (compress_time   / nCalls_time), "s"
+        !    print*, " - mpi_sendrecv ", (mpi_time        / nCalls_time), "s"
+        !    print*, " - s_decompress ", (decompress_time / nCalls_time), "s"
+        !end if
 
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data

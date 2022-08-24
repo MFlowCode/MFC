@@ -105,14 +105,14 @@ if [ "$u_computer" == "s" ]; then # For Summit
     COMPUTER="$SUMMIT"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("gcc/11.1.0" "spectrum-mpi/10.4.0.3-20210112")
+        MODULES=("gcc/12.1.0")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("spectrum-mpi/10.4.0.3-20210112" "nvhpc/21.9" "cuda/11.4.2")
+        MODULES=("nvhpc/22.5" "cuda/nvhpc")
     fi
 
     MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
              "hsi/5.0.2.p5"  "xalt/1.2.1"    "lsf-tools/2.0"
-             "cmake/3.23.1" "ninja/1.10.2")
+             "cmake/3.23.1" "ninja/1.10.2"   "spectrum-mpi/10.4.0.3-20210112")
 elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 

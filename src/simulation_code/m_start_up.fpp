@@ -5,7 +5,7 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-#:include '../common_code/case.fpp'
+#:include 'case.fpp'
 
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data
@@ -81,7 +81,7 @@ contains
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_vars, &
-            weno_order, weno_eps, weno_flat, riemann_flat, cu_mpi, cu_tensor, &
+            weno_eps, weno_flat, riemann_flat, cu_mpi, cu_tensor, &
             mapped_weno, mp_weno, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
@@ -93,7 +93,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, &
+            nb, weno_order, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
