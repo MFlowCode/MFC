@@ -131,7 +131,7 @@ class MFCTest:
             if test.params.get("qbmm", 'F') == 'T':
                 tol = 1e-7
             elif test.params.get("bubbles", 'F') == 'T':
-                tol = 1e-10
+                tol = 1e-7
             else:
                 tol = 1e-12
 

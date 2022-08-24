@@ -191,7 +191,7 @@ MACRO(HANDLE_FYPP target)
         ADD_CUSTOM_COMMAND(
             OUTPUT   "${f90_filepath}"
             COMMAND  "${FYPP_EXE}" "${fpp_filepath}" "${f90_filepath}"
-            DEPENDS  "${fpp_filepath}" "${CMAKE_CURRENT_SOURCE_DIR}/src/common_code/case.fpp"
+            DEPENDS  "${fpp_filepath}" "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/case.fpp"
             COMMENT  "Preprocessing ${fpp_filename}"
             VERBATIM
         )

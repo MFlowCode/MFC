@@ -151,15 +151,15 @@ module m_global_parameters
 
     !> @name Bubble modeling
     !> @{
-    integer         :: nb
-    real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
+    integer          :: nb
+    real(kind(0d0))  :: R0ref
+    real(kind(0d0))  :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
-    logical         :: bubbles
-    logical         :: qbmm !< Quadrature moment method
-    integer         :: nmom !< Number of carried moments
-    integer         :: nnode !< Number of QBMM nodes
-    real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
+    logical          :: bubbles
+    logical          :: qbmm      !< Quadrature moment method
+    integer          :: nmom  !< Number of carried moments
+    integer          :: nnode !< Number of QBMM nodes
+    real(kind(0d0))  :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -392,7 +392,7 @@ contains
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
                     if (nnode == 4) then
-                        nmom = 6
+                        nmom = 6 !! Already set as a parameter
                     end if
                     bub_idx%end = adv_idx%end + nb*nmom
                 else

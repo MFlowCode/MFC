@@ -5,7 +5,7 @@
 !! @version 1.0
 !! @date JUNE 06 2019
 
-#:include '../common_code/case.fpp'
+#:include 'case.fpp'
 
 !> @brief The module contains all of the parameters describing the program
 !!              logistics, the computational domain and the simulation algorithm.
@@ -105,12 +105,13 @@ module m_global_parameters
     logical         :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer         :: time_stepper   !< Time-stepper algorithm
     integer         :: weno_vars      !< WENO-reconstructed state variables type
-    integer         :: weno_order     !< Order of the WENO reconstruction
 
 #:if MFC_CASE_OPTIMIZATION
     integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
+    integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
 #:else
     integer         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+    integer         :: weno_order     !< Order of the WENO reconstruction
 #:endif
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -261,12 +262,12 @@ module m_global_parameters
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
     real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
-    logical         :: qbmm !< Quadrature moment method
-    integer         :: nmom !< Number of carried moments per R0 location
-    integer         :: nnode !< Number of QBMM nodes
-    integer         :: nmomsp !< Number of moments required by ensemble-averaging
-    integer         :: nmomtot !< Total number of carried moments moments/transport equations
-    integer         :: R0_type
+    logical :: qbmm      !< Quadrature moment method
+    integer :: nmom      !< Number of carried moments per R0 location  
+    integer :: nnode     !< Number of QBMM nodes
+    integer :: nmomsp    !< Number of moments required by ensemble-averaging
+    integer :: nmomtot   !< Total number of carried moments moments/transport equations
+    integer :: R0_type
 
 !$acc declare create(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
@@ -341,7 +342,9 @@ contains
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_vars = dflt_int
+#:if not MFC_CASE_OPTIMIZATION
         weno_order = dflt_int
+#:endif
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.

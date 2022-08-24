@@ -149,9 +149,19 @@ for fl_id in range(1,10+1):
         POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
 
 
-def get_input_dict_keys(target_name: str) -> list:
-    if target_name == "pre_process":  return PRE_PROCESS.copy()
-    if target_name == "simulation":   return SIMULATION.copy()
-    if target_name == "post_process": return POST_PROCESS.copy()
+CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 
-    raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
+
+def get_input_dict_keys(target_name: str, args: list) -> list:
+    result = None
+    if target_name == "pre_process":  result = PRE_PROCESS.copy()
+    if target_name == "simulation":   result = SIMULATION.copy()
+    if target_name == "post_process": result = POST_PROCESS.copy()
+
+    if result == None:
+        raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
+
+    if not args["case_optimization"] or target_name != "simulation":
+        return result
+    
+    return [ x for x in result if x not in CASE_OPTIMIZATION ]
