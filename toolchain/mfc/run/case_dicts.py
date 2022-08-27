@@ -8,7 +8,7 @@ PRE_PROCESS = ['case_dir', 'old_grid', 'old_ic', 't_step_old', 'm', 'n', 'p',
                'fluid_rho', 'hypoelasticity', 'num_patches', 'Ca', 'Web',
                'Re_inv', 'pref', 'rhoref', 'bubbles' , 'polytropic',
                'polydisperse', 'poly_sigma', 'thermal', 'nb', 'R0ref', 'qbmm',
-               'dist_type', 'R0_type', 'nnode', 'sigR', 'sigV', 'rhoRV']
+               'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV']
 
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
@@ -71,7 +71,7 @@ SIMULATION = ['case_dir', 'run_time_info', 't_step_old', 't_tol', 'debug', 'm',
               'threshold_mf', 'moment_order', 'pref', 'rhoref', 'polydisperse',
               'poly_sigma', 'bubbles', 'bubble_model', 'polytropic', 'thermal',
               'R0ref', 'Ca', 'Web', 'Re_inv', 'nb', 'Monopole', 'num_mono',
-              'qbmm', 'R0_type', 'nnode', 'integral_wrt', 'num_integrals',
+              'qbmm', 'R0_type', 'integral_wrt', 'num_integrals',
               "cu_mpi"]
 
 for cmp in ["x", "y", "z"]:

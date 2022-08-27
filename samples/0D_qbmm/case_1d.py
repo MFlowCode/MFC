@@ -200,7 +200,6 @@ print(json.dumps({
     'Re_inv'                : Re_inv,
     # 'Web'                   : We,
     'qbmm'               : 'T',
-    'nnode'              : 4,
     'dist_type'          : 1,
     'sigR'               : 0.01,
     'sigV'               : 0.01,

@@ -128,7 +128,11 @@ module m_global_parameters
 
     integer         :: cpu_start, cpu_end, cpu_rate
 
-!$acc declare create(weno_polyn, mpp_lim, num_fluids, model_eqns, num_dims, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
+#:if not MFC_CASE_OPTIMIZATION
+    !$acc declare create(num_dims, weno_polyn, weno_order)
+#:endif
+
+!$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -263,13 +267,17 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     logical :: qbmm      !< Quadrature moment method
-    integer :: nmom      !< Number of carried moments per R0 location  
-    integer :: nnode     !< Number of QBMM nodes
+    integer, parameter :: nmom  = 6 !< Number of carried moments per R0 location  
+    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     integer :: nmomsp    !< Number of moments required by ensemble-averaging
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
 
-!$acc declare create(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmom, nnode, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+#:if not MFC_CASE_OPTIMIZATION
+    !$acc declare create(nb)
+#:endif
+
+!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -342,9 +350,6 @@ contains
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_vars = dflt_int
-#:if not MFC_CASE_OPTIMIZATION
-        weno_order = dflt_int
-#:endif
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.
@@ -393,12 +398,12 @@ contains
 
 #:if not MFC_CASE_OPTIMIZATION
         nb = dflt_int
+        weno_order = dflt_int
 #:endif
         R0_type = dflt_int
 
         ! User inputs for qbmm for simulation code
         qbmm = .false.
-        nnode = 1
 
         Ca = dflt_real
         Re_inv = dflt_real
@@ -534,7 +539,7 @@ contains
                     if (qbmm) then
                         nmomsp = 4 !number of special moments
                         if (nnode == 4) then
-                            nmom = 6
+                            ! nmom = 6 : It is already a parameter
                             nmomtot = nmom*nb
                         end if
                         bub_idx%end = adv_idx%end + nb*nmom

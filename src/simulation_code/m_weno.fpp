@@ -1885,23 +1885,26 @@ contains
 
                 ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
             if(n == 0) return
+            
             if(weno_dir == 2) then
-#if defined(_OPENACC) && defined(__PGI)
+#if MFC_cuTENSOR
                 if (cu_tensor) then
                     if(p == 0) then
-                                block
-                                !use CuTensorEx 
-                                !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
-                                !v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
-                                !$acc end host_data
-                                end block          
+                        block
+                            use CuTensorEx
+
+                            !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
+                            v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
+                            !$acc end host_data
+                        end block
                     else
-                                block
-                                !use CuTensorEx 
-                                !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
-                                !v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
-                                !$acc end host_data
-                                end block          
+                        block
+                            use CuTensorEx
+
+                            !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
+                            v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
+                            !$acc end host_data
+                        end block
                     end if
                 else
 #endif
@@ -1916,7 +1919,7 @@ contains
                         end do
                     end do
 !$acc end parallel loop 
-#if defined(_OPENACC) && defined(__PGI)
+#if MFC_cuTENSOR
                 end if
 #endif
             end if
@@ -1929,14 +1932,15 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
             if(p == 0) return 
             if(weno_dir == 3) then 
-#if defined(_OPENACC) && defined(__PGI)
+#if MFC_cuTENSOR
                 if (cu_tensor) then
-                        block
-                        !use CuTensorEx     
+                    block
+                        use CuTensorEx
+                            
                         !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_z_flat)        
-                        !v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
+                        v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
                         !$acc end host_data
-                        end block
+                    end block
                 else
 #endif
 !$acc parallel loop collapse(4) gang vector default(present)               
@@ -1950,7 +1954,7 @@ contains
                         end do
                     end do
 !$acc end parallel loop      
-#if defined(_OPENACC) && defined(__PGI)
+#if MFC_cuTENSOR
                 end if
 #endif
             end if 
