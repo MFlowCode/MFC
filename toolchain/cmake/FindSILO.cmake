@@ -3,15 +3,15 @@
 # DOCS: https://cmake.org/cmake/help/latest/command/find_library.html
 #       https://cmake.org/cmake/help/latest/module/FindPackageHandleStandardArgs.html
 
-INCLUDE(FindPackageHandleStandardArgs)
+include(FindPackageHandleStandardArgs)
 
 
-FIND_PATH(SILO_INCLUDE_DIR
+find_path(SILO_INCLUDE_DIR
     NAMES         silo.h
     PATH_SUFFIXES silo
 )
 
-FIND_LIBRARY(SILO_LIBRARY
+find_library(SILO_LIBRARY
     NAMES         siloh5 silo
     PATH_SUFFIXES silo
     NAMES_PER_DIR
@@ -26,14 +26,14 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(
 )
 
 
-IF (SILO_FOUND AND NOT TARGET SILO::SILO)
-    SET(SILO_LIBRARIES    "${SILO_LIBRARY}")
-    SET(SILO_INCLUDE_DIRS "${SILO_INCLUDE_DIR}")
+if (SILO_FOUND AND NOT TARGET SILO::SILO)
+    set(SILO_LIBRARIES    "${SILO_LIBRARY}")
+    set(SILO_INCLUDE_DIRS "${SILO_INCLUDE_DIR}")
 
-    ADD_LIBRARY(SILO::SILO UNKNOWN IMPORTED)
+    add_library(SILO::SILO UNKNOWN IMPORTED)
 
-    SET_TARGET_PROPERTIES(SILO::SILO PROPERTIES
+    set_target_properties(SILO::SILO PROPERTIES
         IMPORTED_LOCATION             "${SILO_LIBRARIES}"
         INTERFACE_INCLUDE_DIRECTORIES "${SILO_INCLUDE_DIRS}"
     )
-ENDIF()
+endif()

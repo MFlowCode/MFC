@@ -99,7 +99,7 @@ contains
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
-            polydisperse, poly_sigma, qbmm, nnode, &
+            polydisperse, poly_sigma, qbmm, &
             R0_type, DEBUG
 
         ! Checking that an input file has been provided by the user. If it
@@ -167,6 +167,14 @@ contains
         if(cu_mpi) then
             print '(A)', 'Unsupported value of cu_mpi. Exiting ...'
             call s_mpi_abort()            
+        end if
+#endif
+
+#ifndef MFC_cuTENSOR
+        if (cu_tensor) then
+            print '(A)', 'Unsupported value of cu_tensor. MFC was not built '//&
+                'with the NVIDIA cuTENSOR library. Exiting ...'
+            call s_mpi_abort()
         end if
 #endif
 

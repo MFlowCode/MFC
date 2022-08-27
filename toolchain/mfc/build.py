@@ -147,6 +147,10 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
         f"-DCMAKE_INSTALL_PREFIX=\"{install_dirpath}\"",
     ]
 
+    # Use the faster and more modern Ninja generator if present
+    if common.does_command_exist("ninja"):
+        flags.append("-GNinja")
+
     if mfc.args["no_mpi"]:
         flags.append("-DMFC_WITH_MPI=OFF")
 

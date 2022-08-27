@@ -388,9 +388,6 @@ contains
         call MPI_BCAST(qbmm, 1, &
                        MPI_LOGICAL, 0, &
                        MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(nnode, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
 
         !Acoustic monopole
         call MPI_BCAST(monopole, 1, &

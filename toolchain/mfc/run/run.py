@@ -62,6 +62,11 @@ Engine        (-e)  {self.mfc.args['engine']}
             cons.print(f"[bold]Running [magenta]{target_name}[/magenta][/bold]:")
             cons.indent()
 
+            # We generate the /path/to/case/{target_name}.inp and
+            # src/{target_name}/case.fpp input files before building so that, in
+            # order for the target to be built with case optimization, if
+            # args["case_optimization"] is true. Doing so later, would require
+            # there be two builds of a target.
             input_file.generate(target_name)
 
             if not self.mfc.args["no_build"]:

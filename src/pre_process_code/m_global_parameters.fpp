@@ -158,7 +158,7 @@ module m_global_parameters
     logical          :: bubbles
     logical          :: qbmm      !< Quadrature moment method
     integer          :: nmom  !< Number of carried moments
-    integer          :: nnode !< Number of QBMM nodes
+    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     real(kind(0d0))  :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
@@ -304,7 +304,6 @@ contains
 
         qbmm = .false.
         nmom = 1
-        nnode = 1
         sigR = dflt_real
         sigV = dflt_real
         rhoRV = 0d0

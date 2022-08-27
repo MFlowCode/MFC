@@ -29,7 +29,11 @@ module m_qbmm
     real(kind(0d0)), parameter :: verysmall = 1.d-12
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :)  :: momrhs
 
+#:if MFC_CASE_OPTIMIZATION
+    integer, parameter :: nterms = ${nterms}$
+#:else
     integer :: nterms
+#:endif
 
     type(int_bounds_info) :: is1, is2, is3
 
@@ -51,6 +55,8 @@ contains
 
         integer :: i1, i2, q, i, j
 
+#:if not MFC_CASE_OPTIMIZATION
+
         if (bubble_model == 2) then
             ! Keller-Miksis without viscosity/surface tension
             nterms = 12
@@ -60,6 +66,8 @@ contains
         end if
 
         !$acc update device(nterms)
+
+#:endif
 
         allocate (momrhs(3, 0:2, 0:2, nterms, nb))
         momrhs = 0d0
