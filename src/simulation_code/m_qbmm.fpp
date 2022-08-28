@@ -400,7 +400,7 @@ contains
         real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
         real(kind(0d0)), dimension(nmom), intent(IN) :: momin
 
-        real(kind(0d0)), dimension(0:nmom, 0:nmom) :: moms
+        real(kind(0d0)), dimension(0:2, 0:2) :: moms
         real(kind(0d0)), dimension(3) :: M1, M3
         real(kind(0d0)), dimension(2) :: myrho, myrho3, up, up3, Vf
         real(kind(0d0)) :: bu, bv, d20, d11, d02, c20, c11, c02
