@@ -11,6 +11,11 @@ if [ ! -f "$(pwd)/toolchain/main.py" ]; then
     exit 1
 fi
 
+# Handle upgrading from older MFC build systems
+if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/build/mfc.lock.yaml" ]; then
+    echo "[mfc.sh] Error: You are upgrading from an older version of MFC. Please remove, if applicable, the dependencies/, bootstrap/, and build/ directories before running this command again."
+    exit 1
+fi
 
 # If the user wishes to run the "load" script
 if [ "$1" == "load" ]; then
