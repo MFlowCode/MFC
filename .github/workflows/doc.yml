@@ -37,7 +37,7 @@ jobs:
         mv .github ..
         rm -rf $(pwd)/*
         mv ../.github       .
-        mv ../install/doc/* .
+        mv ../install/doc/mfc/* .
         git add -A
         git commit -m "${{ github.sha }}: $(date +%d/%m/%Y-%H:%M:%S)" || true
         git push
