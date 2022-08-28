@@ -287,8 +287,8 @@ add_custom_target("doc")
 
 macro(GEN_DOCS target name)
 
-    set(DOXYGEN_PROJECT_NAME  "${name}")
-    set(DOXYGEN_INPUT         "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code")
+    set(DOXYGEN_PROJECT_NAME "${name}")
+    set(DOXYGEN_INPUT        "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/ ${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/")
 
     file(
         COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
@@ -331,17 +331,17 @@ macro(GEN_DOCS target name)
 
     install(
         DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/"
-        DESTINATION "doc/${target}"
+        DESTINATION "doc/mfc/${target}"
     )
 
     install(
         DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/doxygen/res/"
-        DESTINATION "doc/res"
+        DESTINATION "doc/mfc/res"
     )
 
     install(
         FILES       "${CMAKE_CURRENT_SOURCE_DIR}/doc/index.html"
-        DESTINATION "doc"
+        DESTINATION "doc/mfc"
     )
 
 endmacro()
