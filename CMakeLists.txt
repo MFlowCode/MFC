@@ -70,8 +70,10 @@ list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake")
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     add_compile_options(
-        -w                      -fdefault-real-8
-        -ffree-line-length-none -fdefault-double-8
+        -w
+        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
+        $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
+        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-double-8>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -82,29 +84,34 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
-        add_compile_options(-fallow-invalid-boz -fallow-argument-mismatch)
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
+            -fallow-argument-mismatch
+        )
     endif()
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
 
-    add_compile_options(-Mfreeform -Mpreprocess -fdefault-real-8)
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>
+        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
+    )
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
 
-    add_compile_options(-free)
+    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR
         (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
 
-    add_compile_options(-r8 -cpp -Mfreeform -Minfo=accel -Mr8intrinsics)
-
-    if (MFC_WITH_OPEN_ACC)
-        if     (CMAKE_BUILD_TYPE STREQUAL "Release")
-            add_compile_options(-gpu=keep,ptxinfo,lineinfo)
-        elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
-            add_compile_options(-gpu=keep,ptxinfo,lineinfo,autocompare,debug)
-        endif()
-    endif()
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:Fortran>:-r8>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mr8intrinsics>
+        $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
+        -Minfo=accel
+    )
 
 endif()
 
@@ -115,11 +122,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     # === === Processor tuning
     CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
     if (SUPPORTS_MARCH_NATIVE)
-        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -march=native")
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-march=native>)
     else()
     	CHECK_FORTRAN_COMPILER_FLAG("-mcpu=native" SUPPORTS_MCPU_NATIVE)
         if (SUPPORTS_MCPU_NATIVE)
-            set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mcpu=native")
+            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mcpu=native>)
         endif()
     endif()
 
@@ -129,6 +136,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     if (SUPPORTS_IPO)
         message(STATUS "IPO / LTO enabled")
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(STATUS "IPO / LTO not available")
     endif()
 
 endif()
@@ -219,6 +228,7 @@ if (MFC_BUILD_SIMULATION)
                         CUDA::cufft
             )
 
+
             find_package(cuTENSOR)
 
             if (NOT cuTENSOR_FOUND)
@@ -231,6 +241,18 @@ if (MFC_BUILD_SIMULATION)
 
                 target_compile_definitions(simulation PRIVATE MFC_cuTENSOR)
             endif()
+
+
+            if     (CMAKE_BUILD_TYPE STREQUAL "Release")
+                target_compile_options(simulation
+                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                )
+            elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+                target_compile_options(simulation
+                    PRIVATE -gpu=keep,ptxinfo,lineinfo,autocompare,debug
+                )
+            endif()
+
         endif()
     else()
         find_package(FFTW REQUIRED)
@@ -248,6 +270,8 @@ if (MFC_BUILD_SIMULATION)
 
 
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+        find_package(CUDAToolkit REQUIRED)
+        
         target_link_libraries(simulation PRIVATE CUDA::nvToolsExt)
     endif()
 
