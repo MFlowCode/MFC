@@ -300,7 +300,8 @@ if (MFC_BUILD_POST_PROCESS)
         target_link_libraries     (post_process PRIVATE MPI::MPI_Fortran)
     endif()
 
-    target_compile_options(post_process PRIVATE -DMFC_POST_PROCESS)
+    # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
+    target_compile_options(post_process PRIVATE -DMFC_POST_PROCESS -O0)
 
 
     install(TARGETS post_process RUNTIME DESTINATION bin)
