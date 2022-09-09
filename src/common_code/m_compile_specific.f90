@@ -28,8 +28,6 @@ contains
     subroutine s_delete_directory(dir_name)
         character(LEN=*), intent(IN) :: dir_name
 
-        print*, "Deleting directory", dir_name
-
 #ifdef _WIN32
         call system('rmdir "'//dir_name//'" /s /q')
 #else
