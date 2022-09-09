@@ -1,48 +1,55 @@
 #!/usr/bin/env bash
 
-RED="\u001b[31m"
-CYAN="\u001b[36m"
-GREEN="\u001b[32m"
-YELLOW="\u001b[33m"
-MAGENTA="\u001b[35m"
-COLOR_RESET="\033[m"
+if [ ! -f "$(pwd)/misc/util.sh" ]; then
+    echo ""
+    echo "[misc/check_samples.sh] Please execute this script from the top-level MFC directory (currently in: $(pwd))."
+
+    exit 1
+fi
+
+source $(pwd)/misc/util.sh
 
 TIMEOUT="60s"
 
-./mfc.sh build -j $(nproc) -t pre_process simulation
+if ! ./mfc.sh build -j $(nproc) -t pre_process simulation; then
+    exit 1
+fi
+
+echo ""
+echo -e "Simulation's successful timeout is $TIMEOUT."
+echo ""
 
 index=1
 failed=()
 
 files=samples/*/*.py
 
-nFiles=$(find samples/*/*.py | wc -l) 
+nFiles=$(find samples/*/*.py | wc -l)
 
 for f in samples/*/*.py; do
 
-    echo -e "($index/$nFiles) Running $MAGENTA$f$COLOR_RESET:" 
-    echo -en " - pre_process... "
-    ./mfc.sh run "$f" -j $(nproc) -n 4 -b mpirun -t pre_process --no-build > /dev/null 2>&1
-    
-    code="$?"
-    if [[ "$code" != "0" ]]; then
-        echo -e "$RED""FAILED$COLOR_RESET"
+    echo -e "($index/$nFiles) Running $MAGENTA$f$COLOR_RESET:"
+    echo -en " - pre_process "
+    if ! ./mfc.sh run "$f" -j $(nproc) -n 4 -t pre_process --no-build > /dev/null 2>&1; then
+        echo -e "$RED""CRASHED$COLOR_RESET"
+
         failed=(${failed[@]} "$f")
         index=$((index+1))
+
         continue
     else
-        echo -e "$GREEN""PASSED$COLOR_RESET"
+        echo -e "$GREEN""RAN$COLOR_RESET"
     fi
 
-    echo -en " - simulation ($TIMEOUT timeout)... "
-    timeout "$TIMEOUT" ./mfc.sh run "$f" -j $(nproc) -n 4 -b mpirun -t simulation --no-build > /dev/null 2>&1
-    
+    echo -en " - simulation  "
+    timeout "$TIMEOUT" ./mfc.sh run "$f" -j $(nproc) -n 4 -t simulation --no-build > /dev/null 2>&1
+
     code="$?"
     if [[ "$code" != "0" ]] && [[ "$code" != "124" ]]; then
-        echo -e "$RED""FAILED$COLOR_RESET"
+        echo -e "$RED""CRASHED$COLOR_RESET"
         failed=(${failed[@]} "$f")
     else
-        echo -e "$GREEN""PASSED$COLOR_RESET"
+        echo -e "$GREEN""RAN$COLOR_RESET"
     fi
 
     index=$((index+1))
@@ -55,3 +62,4 @@ for value in "${failed[@]}"; do
 done
 
 exit "${#failed[@]}"
+

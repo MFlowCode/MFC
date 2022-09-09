@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
-RED="\u001b[31m"
-CYAN="\u001b[36m"
-GREEN="\u001b[32m"
-YELLOW="\u001b[33m"
-MAGENTA="\u001b[35m"
-COLOR_RESET="\033[m"
+# Load <MFC>/misc/util.sh
+if [ ! -f "$(pwd)/misc/util.sh" ]; then
+    echo "[load.sh]: This script must be source from within MFC's root directory."
+    return
+fi
+
+source "(pwd)/misc/util.sh"
 
 echo -en "$YELLOW"
 echo -e "Please source this script:"
@@ -117,9 +118,13 @@ elif [ "$u_computer" == "b" ]; then # Bridges2
     COMPUTER="$BRIDGES2"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("gcc/10.2.0" "openmpi/4.0.5-gcc10.2.0")
+        MODULES=("intel/2021.3.0" "intelmpi/2021.3.0-intel2021.3.0")
+
+        echo ""
+        echo -e "$YELLOW""WARNING: Please set CC=icc, CXX=icx, and FC=ifort.$COLOR_RESET"
+        echo ""
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("nvhpc/22.1" "cuda/11.1.1" "openmpi/4.0.5-nvhpc22.1")
+        MODULES=("openmpi/4.0.5-nvhpc21.7")
     fi
 
     MODULES=("${MODULES[@]}" "python/3.8.6")
@@ -160,9 +165,13 @@ elif [ "$u_computer" == "e" ]; then # Expanse
     COMPUTER="$EXPANSE"
 
     if [ "$u_cg" == "c" ]; then
-        MODULES=("cpu/0.15.4" "gcc/10.2.0" "openmpi/4.0.4" "cmake/3.18.2")
+        echo ""
+        echo -e "$YELLOW""WARNING: Please set CC=icc, CXX=icx, and FC=ifort.$COLOR_RESET"
+        echo ""
+
+        MODULES=("cpu/0.15.4" "intel/19.1.1.217" "mvapich2/2.3.4" "cmake/3.18.2")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
+        MODULES=("gpu/0.15.4" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
     fi
 
     MODULES=("${MODULES[@]}" "python/3.8.5")
@@ -186,11 +195,16 @@ fi
 echo -e "$MAGENTA[ MFC ]$COLOR_RESET Loading modules for $COMPUTER ($CG mode):"
 
 # Reset modules to default system configuration
-module reset > /dev/null 2>&1
-code="$?"
+if [ "$u_computer" != "p" ]; then
+    module reset > /dev/null 2>&1
+    code="$?"
 
-# Purge if reset is not available
-if [ "$code" -ne "0" ]; then
+
+    # Purge if reset is not available
+    if [ "$code" -ne "0" ]; then
+        module purge > /dev/null 2>&1
+    fi
+else
     module purge > /dev/null 2>&1
 fi
 

@@ -346,10 +346,9 @@ contains
         allocate (myflux_src_vf(1:num_dims))
 
         if(mpp_lim .and. bubbles) then
-          allocate (alf_sum%sf( &
-                    ix%beg:ix%end, &
-                    iy%beg:iy%end, &
-                    iz%beg:iz%end))
+            allocate(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+
+            !$acc enter data create(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end if
 
         do i = 1, num_dims
@@ -6669,6 +6668,12 @@ contains
             deallocate (qL_cons_n(i)%vf, qL_prim_n(i)%vf)
             deallocate (qR_cons_n(i)%vf, qR_prim_n(i)%vf)
         end do
+
+        if(mpp_lim .and. bubbles) then
+            !deallocate(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+
+            !$acc exit data delete(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        end if
 
         deallocate (qL_cons_n, qR_cons_n, qL_prim_n, qR_prim_n)
 
