@@ -87,7 +87,7 @@ Nt = int(Nout*Nfiles)
 print(json.dumps({                                                                           \
     # Logistics ================================================
     'case_dir'                     : '\'.\'',                   \
-    'run_time_info'                : 'T',                       \
+    #'run_time_info'                : 'T',                       \
     # ==========================================================
                                                                 \
     # Computational Domain Parameters ==========================
