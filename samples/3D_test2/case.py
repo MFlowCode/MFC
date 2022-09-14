@@ -37,7 +37,6 @@ print(json.dumps({
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
-    'cu_mpi'                       : 'T',
     'bc_x%beg'                     : -1,
     'bc_y%beg'                     : -1,
     'bc_z%beg'                     : -1,

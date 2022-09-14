@@ -80,7 +80,7 @@ print(json.dumps({
     'p'                            : 0,
     'dt'                           : dt,
     't_step_start'                 : t_start,
-    't_step_stop'                  : Nt,
+    't_step_stop'                  : int(Nt),
     't_step_save'                  : t_save ,
     # ==========================================================================
 
@@ -113,7 +113,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
+    'parallel_io'                  :'F',
     'probe_wrt'                    :'T',
     'num_probes'                   : 1,
     'probe(1)%x'                   : 0.,
