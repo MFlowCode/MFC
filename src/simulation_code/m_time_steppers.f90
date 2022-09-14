@@ -128,7 +128,7 @@ contains
         ! Allocating the cell-average primitive variables
         allocate (q_prim_vf(1:sys_size))
 
-        do i = mom_idx%beg, E_idx
+        do i = 1, adv_idx%end
             allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
@@ -153,16 +153,6 @@ contains
 !$acc enter data create(q_prim_vf(i)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
         end if
-
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
-
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
         ! Allocating the cell-average RHS variables
         allocate (rhs_vf(1:sys_size))
@@ -460,6 +450,10 @@ contains
 
         integer :: i !< Generic loop iterator
 
+        do i = 1, sys_size
+!$acc update host(q_prim_vf(i)%sf)
+        end do
+
         if (t_step == t_step_start) then
             do i = 1, sys_size
                 q_prim_ts(3)%vf(i)%sf(:, :, :) = q_prim_vf(i)%sf(:, :, :)
@@ -493,16 +487,6 @@ contains
         integer :: i, j !< Generic loop iterators
 
 
-        do i = 1, cont_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
-
-
-        do i = adv_idx%beg, adv_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
@@ -529,9 +513,14 @@ contains
         end if
 
         ! Deallocating the cell-average primitive variables
-        do i = mom_idx%beg, E_idx
+        do i = 1, adv_idx%end
             deallocate (q_prim_vf(i)%sf)
         end do
+        if(bubbles) then
+            do i = bub_idx%beg, bub_idx%end
+                deallocate (q_prim_vf(i)%sf)
+            end do
+        end if
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 deallocate (q_prim_vf(i)%sf)

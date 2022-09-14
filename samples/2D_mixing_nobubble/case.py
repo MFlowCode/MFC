@@ -112,7 +112,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
+    'parallel_io'                  :'F',
     'probe_wrt'                    :'T',
     'num_probes'                   : 1,
     'probe(1)%x'                   : 0.,
