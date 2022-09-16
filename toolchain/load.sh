@@ -169,7 +169,7 @@ elif [ "$u_computer" == "e" ]; then # Expanse
         echo -e "$YELLOW""WARNING: Please set CC=icc, CXX=icx, and FC=ifort.$COLOR_RESET"
         echo ""
 
-        MODULES=("cpu/0.15.4" "intel/19.1.1.217" "mvapich2/2.3.4" "cmake/3.18.2")
+        MODULES=("cpu/0.15.4" "intel/19.1.1.217" "intel-mpi/2019.8.254" "cmake/3.18.2")
     elif [ "$u_cg" == "g" ]; then
         MODULES=("gpu/0.15.4" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
     fi

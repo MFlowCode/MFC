@@ -4,6 +4,10 @@
 MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=6
 
+MFC_CMAKE_MIN_MAJOR=3
+MFC_CMAKE_MIN_MINOR=18
+MFC_CMAKE_MIN_PATCH=0
+MFC_CMAKE_MIN_VERSION="$(printf %05d%05d%05d $MFC_CMAKE_MIN_MAJOR $MFC_CMAKE_MIN_MINOR $MFC_CMAKE_MIN_PATCH)"
 
 # Check whether this script was called from MFC's root directory.
 if [ ! -f "$(pwd)/toolchain/main.py" ]; then
@@ -67,6 +71,64 @@ if [ "$1" == "docker" ]; then
 fi
 
 mkdir -p "$(pwd)/build"
+
+
+# CMake
+cmake_verstr=$(cmake --version | tr ' ' '\n' | sed -n 3p)
+cmake_major=$(echo $cmake_verstr | tr '.' '\n' | sed -n 1p)
+cmake_minor=$(echo $cmake_verstr | tr '.' '\n' | sed -n 2p)
+cmake_patch=$(echo $cmake_verstr | tr '.' '\n' | sed -n 3p)
+cmake_version="$(printf %05d%05d%05d $cmake_major $cmake_minor $cmake_patch)"
+
+if [ ! -d "$(pwd)/build/cmake/bin" ]; then
+    if ! command -v cmake > /dev/null 2>&1 || [ "$cmake_version" -lt "$MFC_CMAKE_MIN_VERSION" ]; then
+        # Cmake is either not installed or too old for our use
+
+        mkdir -p "$(pwd)/build/cmake"
+
+        version="3.24.2"
+        filename="cmake-$version-linux-$(uname -m).sh"
+        url="https://github.com/Kitware/CMake/releases/download/v$version/$filename"
+
+        if ! wget -P "$(pwd)/build/cmake" "$url"; then
+            echo -en "$RED"
+            echo "[mfc.sh] Error: Failed to download a compatible version of CMake."
+            echo "CMake is not discoverable or is an older release, incompatible with MFC. Please download"
+            echo "or install a recent version of CMake to get past this step. If you are currently on a"
+            echo "managed system like a cluster, provided there is no suitable environment module, you can"
+            echo "either build it from source, or get it via Spack."
+            echo "- The minimum required version is currently CMake v$MFC_CMAKE_MIN_MAJOR.$MFC_CMAKE_MIN_MINOR.$MFC_CMAKE_MIN_PATCH."
+            echo "- We attempted to download CMake v$version from $url."
+            echo -en "$COLOR_RESET"
+
+            exit 1
+        fi
+
+        if ! $SHELL "$(pwd)/build/cmake/$filename" "--skip-license" "--prefix=$(pwd)/build/cmake"; then
+            echo -en "$RED"
+            echo "[mfc.sh] Error: Failed to install a compatible version of CMake."
+            echo "CMake is not discoverable or is an older release, incompatible with MFC. Please download"
+            echo "or install a recent version of CMake to get past this step. If you are currently on a"
+            echo "managed system like a cluster, provided there is no suitable environment module, you can"
+            echo "either build it from source, or get it via Spack."
+            echo "- The minimum required version is currently CMake v$MFC_CMAKE_MIN_MAJOR.$MFC_CMAKE_MIN_MINOR.$MFC_CMAKE_MIN_PATCH."
+            echo "- We attempted to install CMake v$version from $url."
+            echo -en "$COLOR_RESET"
+
+            exit 1
+        fi
+
+        rm "$(pwd)/build/cmake/$filename"
+    fi
+fi
+
+# If we downloaded our own version of CMake, let us make it accessible to
+# any command we run hereafter.
+
+if [ -d "$(pwd)/build/cmake" ]; then
+    export PATH="$(pwd)/build/cmake/bin:$PATH"
+    export MANPATH="$(pwd)/build/cmake/man:$MANPATH"
+fi
 
 # Check whether python3 is in the $PATH / is accessible.
 if ! command -v python3 > /dev/null 2>&1; then

@@ -43,7 +43,7 @@ class MFCTest:
                 self.cases = self.cases[from_i:i+1]
                 bFoundTo = True
                 break
-        
+
         if not bFoundTo:
             raise MFCException("Testing: Your specified range [--from,--to] is incorrect. Please ensure both IDs exist and are in the correct order.")
 
@@ -73,7 +73,7 @@ class MFCTest:
         if self.mfc.args["generate"]:
             dir_uuids = set([name for name in os.listdir(".") if os.path.isdir(name)])
             new_uuids = set([case.get_uuid() for case in self.cases])
-            
+
             for old_uuid in dir_uuids - new_uuids:
                 common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
 
@@ -87,7 +87,7 @@ class MFCTest:
 
             for case in self.cases:
                 table.add_row(case.get_uuid(), case.trace)
-                
+
             rich.print(table)
 
             return
@@ -101,7 +101,7 @@ class MFCTest:
             range_str = "Only " + common.format_list_to_string([
                 f"[bold magenta]{uuid}[/bold magenta]" for uuid in self.mfc.args["only"]
             ], "Nothing to run")
-        
+
 
         cons.print(f"[bold]Test[/bold] | {range_str} ({len(self.cases)} test{'s' if len(self.cases) != 1 else ''})")
         cons.indent()
@@ -143,9 +143,7 @@ class MFCTest:
 
             if cmd.returncode != 0:
                 cons.print(cmd.stdout)
-                raise MFCException(f"""\
-Test {test}: Failed to execute MFC. Above is the output of MFC.
-You can find the output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+                raise MFCException(f"""Test {test}: Failed to execute MFC. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
 
             pack = packer.generate(test)
             pack.save(os.path.join(test.get_dirpath(), "pack.txt"))
@@ -160,13 +158,13 @@ You can find the output in {out_filepath}, and the case dictionary in {os.path.j
                     raise MFCException(f"Test {test}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
 
                 packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
-            
+
             cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
         except Exception as exc:
             self.nFail = self.nFail + 1
 
             if not self.mfc.args["relentless"]:
                 raise exc
-            
+
             cons.print(f"[bold red]Failed test {test}.[/bold red]")
             cons.print(f"{exc}")
