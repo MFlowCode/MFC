@@ -2,7 +2,6 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ GPU ]
     paths:
       - '**.f90'
       - '**.fpp'
@@ -17,7 +16,6 @@ on:
       - Dockerfile
 
   pull_request:
-    branches: [ GPU ]
 
   workflow_dispatch:
 

@@ -6,7 +6,7 @@ if [ ! -f "$(pwd)/misc/util.sh" ]; then
     return
 fi
 
-source "(pwd)/misc/util.sh"
+source "$(pwd)/misc/util.sh"
 
 echo -en "$YELLOW"
 echo -e "Please source this script:"
