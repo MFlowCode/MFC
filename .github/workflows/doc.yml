@@ -1,0 +1,46 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - GPU
+
+  workflow_dispatch:
+
+jobs:
+  doc:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build Documentation
+      run: |
+        sudo apt install cmake ninja-build doxygen graphviz
+        pip3 install fypp
+        mkdir -p build/install
+        cd build
+        cmake -GNinja -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DMFC_BUILD_DOC=ON ..
+        ninja install
+
+    - name: Publish Documentation
+      run: |
+        set +e
+        cd build
+        git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q
+        code=$?
+        if [ "$code" -ne "0" ]; then exit 0; fi
+        git config --global user.name  "MFC Action"
+        git config --global user.email "MFC Action"
+        git clone "${{ secrets.DOC_PUSH_URL }}"
+        cd MFC-DOC
+        mv .github ..
+        rm -rf $(pwd)/*
+        mv ../.github       .
+        mv ../install/doc/mfc/* .
+        git add -A
+        git commit -m "${{ github.sha }}: $(date +%d/%m/%Y-%H:%M:%S)" || true
+        git push
+
+# DOC_PUSH_URL should be of the format:
+# - "https://${{ github.repository_owner }}:${{ TOKEN }}@github.com/${{ github.repository_owner }}/${{ github.repository_owner }}.github.io"

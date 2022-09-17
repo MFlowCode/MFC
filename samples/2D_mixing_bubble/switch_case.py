@@ -1,10 +1,7 @@
 #!/usr/bin/env python2
 
-import sys
 import math
 import json
-
-restart_name = sys.argv[1].strip()
 
 # x0      = 10.E-06
 x0   = 1.
@@ -45,6 +42,8 @@ t_save    = int(math.ceil(Ntrestart/float(Nfiles)))
 Nt        = t_save*Nfiles
 Ntrestart = Nt
 bc_y      = 8
+
+restart_name = "init"
 
 if restart_name == 'run':
     # Simulate
@@ -217,7 +216,6 @@ print(json.dumps({                                                              
     # 'Web'                   : We,                   \
     # 'Re_inv'                : Re_inv,               \
     #'qbmm'               : 'T',                     \
-    #'nnode'              : 4,                       \
     #'dist_type'          : 2,                       \
     #'sigR'               : 0.1,                     \
     #'sigV'               : 0.1,                     \

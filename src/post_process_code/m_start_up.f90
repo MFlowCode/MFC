@@ -157,7 +157,7 @@ contains
             call s_mpi_abort()
         elseif (num_fluids /= dflt_int &
                 .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids_max)) then
+                (num_fluids < 1 .or. num_fluids > num_fluids)) then
             print '(A)', 'Unsupported value of num_fluids. Exiting ...'
             call s_mpi_abort()
         elseif ((model_eqns == 1 .and. num_fluids /= dflt_int) &
@@ -297,15 +297,10 @@ contains
                 'values for p, bc_z%beg and bc_z%end. '// &
                 'Exiting ...'
             call s_mpi_abort()
-
-            ! Constraints on Fourier decomposition options
-        elseif (fourier_decomp) then 
-            print '(A)', 'fourier not supported'
-            call s_mpi_abort()
         end if
 
         ! Constraints on the stiffened equation of state fluids parameters
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids
 
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
@@ -387,7 +382,7 @@ contains
         end if
 
         ! Constraints on the post-processing of the partial densities
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids
             if (((i > num_fluids .or. model_eqns == 1) &
                  .and. &
                  alpha_rho_wrt(i)) &
@@ -451,7 +446,7 @@ contains
         end if
 
         ! Constraints on the post-processing of the volume fractions
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids
             if (((i > num_fluids .or. model_eqns == 1) &
                  .and. &
                  alpha_wrt(i)) &
@@ -520,7 +515,7 @@ contains
         end if
 
         ! Constraints on the coefficients of numerical Schlieren function
-        do i = 1, num_fluids_max
+        do i = 1, num_fluids
             if (schlieren_alpha(i) /= dflt_real &
                 .and. &
                 schlieren_alpha(i) <= 0d0) then

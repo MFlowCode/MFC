@@ -11,7 +11,9 @@
 module m_data_input
 
     ! Dependencies =============================================================
+#ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
+#endif
 
     use m_derived_types         !< Definitions of the derived types
 
@@ -222,10 +224,17 @@ contains
 
         integer, intent(IN) :: t_step
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_read_parallel_data_files not supported without MPI.'
+
+#else
+
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
+        real(kind(0d0)) :: start, finish
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
@@ -341,7 +350,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                        MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             else
@@ -353,7 +362,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                        MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             end if
@@ -367,6 +376,9 @@ contains
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+#endif
+
     end subroutine s_read_parallel_data_files ! -------------------------------
 
     !>  The following subroutine populates the buffer regions of

@@ -19,7 +19,9 @@ module m_data_output
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
+#ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
+#endif
 
     use m_compile_specific
 
@@ -95,7 +97,7 @@ contains
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
         open (1, FILE=trim(file_loc), FORM='unformatted', STATUS='new')
-        write (1) x_cb
+        write (1) x_cb(-1:m)
         close (1)
 
         ! y- and z-coordinate directions
@@ -104,7 +106,7 @@ contains
             file_loc = trim(t_step_dir)//'/y_cb.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS='new')
-            write (1) y_cb
+            write (1) y_cb(-1:n)
             close (1)
 
             ! z-coordinate direction
@@ -112,7 +114,7 @@ contains
                 file_loc = trim(t_step_dir)//'/z_cb.dat'
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
                       STATUS='new')
-                write (1) z_cb
+                write (1) z_cb(-1:p)
                 close (1)
             end if
         end if
@@ -145,7 +147,7 @@ contains
 
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (.not. file_exist) call SYSTEM('mkdir -p '//trim(t_step_dir))
+        if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         !1D
         if (n == 0 .and. p == 0) then
@@ -268,6 +270,12 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_data_output] s_write_parallel_data_files not supported without MPI.'
+
+#else
+
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND) :: disp
@@ -336,6 +344,8 @@ contains
 
         call MPI_FILE_CLOSE(ifile, ierr)
 
+#endif
+
     end subroutine s_write_parallel_data_files ! ---------------------------
 
     !> Computation of parameters, allocation procedures, and/or
@@ -363,8 +373,9 @@ contains
 
                 call my_inquire(file_loc, dir_check)
 
-                if (dir_check) call SYSTEM('rm -rf '//trim(t_step_dir))
-                call SYSTEM('mkdir -p '//trim(t_step_dir))
+                if (dir_check) call s_delete_directory(trim(t_step_dir))
+
+                call s_create_directory(trim(t_step_dir))
 
             end if
 
@@ -378,8 +389,8 @@ contains
                 file_loc = trim(restart_dir)//'/'
                 call my_inquire(file_loc, dir_check)
 
-                if (dir_check) call SYSTEM('rm -rf '//trim(restart_dir))
-                call SYSTEM('mkdir -p '//trim(restart_dir))
+                if (dir_check) call s_delete_directory(trim(restart_dir))
+                call s_create_directory(trim(restart_dir))
             end if
 
             call s_mpi_barrier()

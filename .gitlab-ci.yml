@@ -31,11 +31,17 @@ before_script:
   # Check "$CI_PROJECT_NAME" contains "MFC" so we are sure
   # we won't clone into or delete from an unsuspecting directory
   # due to an unfortunate error.
-  - echo "[CI] Running fin $(pwd):"
+  - echo "[CI] Running in $(pwd):"
   - if [[ ! "$CI_PROJECT_NAME" == *"MFC"* ]]; then exit 1; fi;
 
+  # (Tidy) Delete clones/builds on the same branch older than 10 days
+  - echo "Removing:"
+  - export CI_MFC_BRANCH_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH"
+  - find "$CI_MFC_BRANCH_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +10 | sed s/^/\ -\ Removing\ /g
+  - find "$CI_MFC_BRANCH_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +10 | xargs rm -rf
+
   # Define MFC directory path
-  - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH"
+  - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH/$CI_COMMIT_SHORT_SHA"
 
 # Clone MFC after removing artifacts from previous run(s). 
 clone-job:
@@ -52,15 +58,6 @@ clone-job:
   tags:
     - nobatch
 
-cpu-build-job:
-  stage: cpu
-  script:
-    - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./mfc.sh load -c a -m g
-    - ./mfc.sh build -j 8 -m release-cpu
-  tags:
-    - nobatch
-
 cpu-test-job:
   stage: cpu
   needs:
@@ -68,18 +65,9 @@ cpu-test-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m g
-    - ./mfc.sh test -j 8
+    - ./mfc.sh test -j 8 -m release-cpu
   tags:
     - batch
-
-gpu-build-job:
-  stage: gpu
-  script:
-    - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./mfc.sh load -c a -m g
-    - ./mfc.sh build -j 8 -m release-gpu
-  tags:
-    - nobatch
 
 gpu-test-job:
   stage: gpu
@@ -88,6 +76,6 @@ gpu-test-job:
   script:
     - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m g
-    - ./mfc.sh test -j 8
+    - ./mfc.sh test -j 8 -m release-gpu
   tags:
     - batch

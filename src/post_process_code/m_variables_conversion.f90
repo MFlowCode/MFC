@@ -79,6 +79,8 @@ module m_variables_conversion
     !! is non-zero. Note that a similar procedure does not have to be applied to
     !! the second dimension since in 1D, the buffer size is always zero.
 
+    integer, private :: flg_2d
+
 contains
 
     !>  This subroutine is constructed for the gamma/pi_inf model
@@ -297,7 +299,9 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        allocate (nRtmp(nb))
+        if (bubbles) then
+            allocate (nRtmp(nb))
+        end if
 
         ! Converting the conservative variables to the primitive variables
         do l = -buff_size*flg, (p + buff_size)*flg
@@ -383,7 +387,9 @@ contains
             end do
         end do
 
-        deallocate (nRtmp)
+        if (bubbles) then
+            deallocate (nRtmp)
+        end if
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 

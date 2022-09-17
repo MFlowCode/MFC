@@ -80,11 +80,6 @@ print(json.dumps({
     # Logistics ================================================
     'case_dir'                     : '\'.\'',
     'run_time_info'                : 'F',
-    'nodes'                        : 1,
-    'ppn'                          : 4,
-    'queue'                        : 'normal',
-    'walltime'                     : '24:00:00',
-    'mail_list'                    : '',
     # ==========================================================
 
     # Computational Domain Parameters ==========================
@@ -129,7 +124,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
+    'parallel_io'                  :'F',
     'fd_order'                     : 1,
     #'schlieren_wrt'                :'T',
     'probe_wrt'                    :'T',
@@ -205,7 +200,6 @@ print(json.dumps({
     # 'Web'                   : We,
     # 'Re_inv'                : Re_inv,
     'qbmm'               : 'T',
-    'nnode'              : 4,
     'dist_type'          : 2,
     'sigR'               : 0.1,
     'sigV'               : 0.1,

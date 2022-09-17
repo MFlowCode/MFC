@@ -304,8 +304,6 @@ contains
 
         f_rddot_RP = (-1.5d0*(fV**2d0) + (fCpbw - fCp)/fRho)/fR
 
-        if (Re_inv /= dflt_real) f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
-
     end function f_rddot_RP
 
     !>  Function that computes the bubble radial acceleration

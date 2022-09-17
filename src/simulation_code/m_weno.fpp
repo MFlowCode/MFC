@@ -22,14 +22,16 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
+#ifdef _OPENACC 
     use openacc
+#endif
 
     use m_mpi_proxy
     ! ==========================================================================
 
     !implicit none
 
-    private; public :: s_initialize_weno_module, s_initialize_weno, s_weno, s_finalize_weno, s_finalize_weno_module, s_weno_alt
+    private; public :: s_initialize_weno_module, s_initialize_weno,  s_finalize_weno_module, s_weno_alt
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
     !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
@@ -113,7 +115,7 @@ module m_weno
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
-    type(bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1, is2, is3
     !> @}
 
     real(kind(0d0)) :: test
@@ -123,7 +125,7 @@ module m_weno
 !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
 !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
 !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
-!$acc                is1, is2, is3, test)
+!$acc                v_size, is1, is2, is3, test)
 
 contains
 
@@ -161,8 +163,8 @@ contains
         allocate (poly_coef_cbR_x(is1%beg + weno_polyn:is1%end - weno_polyn,0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        allocate (d_cbL_x( 0:2,is1%beg + weno_polyn:is1%end - weno_polyn))
-        allocate (d_cbR_x( 0:2,is1%beg + weno_polyn:is1%end - weno_polyn))
+        allocate (d_cbL_x( 0:weno_polyn,is1%beg + weno_polyn:is1%end - weno_polyn))
+        allocate (d_cbR_x( 0:weno_polyn,is1%beg + weno_polyn:is1%end - weno_polyn))
 
         allocate (beta_coef_x(is1%beg + weno_polyn:is1%end - weno_polyn,0:weno_polyn, &
                               0:2*(weno_polyn - 1) ))
@@ -200,8 +202,8 @@ contains
         allocate (poly_coef_cbR_y(is2%beg + weno_polyn:is2%end - weno_polyn,0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        allocate (d_cbL_y( 0:2,is2%beg + weno_polyn:is2%end - weno_polyn))
-        allocate (d_cbR_y( 0:2,is2%beg + weno_polyn:is2%end - weno_polyn))
+        allocate (d_cbL_y( 0:weno_polyn,is2%beg + weno_polyn:is2%end - weno_polyn))
+        allocate (d_cbR_y( 0:weno_polyn,is2%beg + weno_polyn:is2%end - weno_polyn))
 
         allocate (beta_coef_y(is2%beg + weno_polyn:is2%end - weno_polyn,0:weno_polyn, &
                               0:2*(weno_polyn - 1) ))
@@ -227,8 +229,8 @@ contains
         allocate (poly_coef_cbR_z(is3%beg + weno_polyn:is3%end - weno_polyn,0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        allocate (d_cbL_z( 0:2,is3%beg + weno_polyn:is3%end - weno_polyn))
-        allocate (d_cbR_z( 0:2,is3%beg + weno_polyn:is3%end - weno_polyn))
+        allocate (d_cbL_z( 0:weno_polyn,is3%beg + weno_polyn:is3%end - weno_polyn))
+        allocate (d_cbR_z( 0:weno_polyn,is3%beg + weno_polyn:is3%end - weno_polyn))
 
         allocate (beta_coef_z(is3%beg + weno_polyn:is3%end - weno_polyn,0:weno_polyn, &
                               0:2*(weno_polyn - 1) ))
@@ -253,13 +255,13 @@ contains
     subroutine s_compute_weno_coefficients(weno_dir, is) ! -------
 
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: is
+        type(int_bounds_info), intent(IN) :: is
         integer :: s
 
         real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
             !! Cell-boundary locations in the s-direction
 
-        type(bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
+        type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
 
         integer :: i !< Generic loop iterator
 
@@ -296,9 +298,6 @@ contains
 
                     d_cbR_${XYZ}$( 1, i+1) = 1d0 - d_cbR_${XYZ}$(0, i + 1)
                     d_cbL_${XYZ}$( 1, i+1) = 1d0 - d_cbL_${XYZ}$(0, i + 1)
-
-                    d_cbR_${XYZ}$( 2, i+1) = 0d0
-                    d_cbL_${XYZ}$( 2, i+1) = 0d0
 
                     beta_coef_${XYZ}$(i+1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
                                              (s_cb(i) - s_cb(i + 2))**2d0
@@ -499,23 +498,26 @@ contains
                       norm_dir, weno_dir,  &
                       is1_d, is2_d, is3_d)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: v_vf
+        type(scalar_field), dimension(1:), intent(IN) :: v_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) ::  vL_rs_vf_x_flat, vL_rs_vf_y_flat, vL_rs_vf_z_flat, vR_rs_vf_x_flat, vR_rs_vf_y_flat, vR_rs_vf_z_flat
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
-        type(bounds_info), intent(IN) :: is1_d, is2_d, is3_d
+        type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
 
-        real(kind(0d0)), dimension(-2:1) :: dvd 
-        real(kind(0d0)), dimension(0:2) ::  poly 
-        real(kind(0d0)), dimension(0:2) :: alpha 
-        real(kind(0d0)), dimension(0:2) :: omega 
-        real(kind(0d0)), dimension(0:2) :: beta 
+        real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd 
+        real(kind(0d0)), dimension(0:weno_polyn) ::  poly 
+        real(kind(0d0)), dimension(0:weno_polyn) :: alpha 
+        real(kind(0d0)), dimension(0:weno_polyn) :: omega 
+        real(kind(0d0)), dimension(0:weno_polyn) :: beta 
         real(kind(0d0)), pointer :: beta_p(:)
 
-        integer :: i, j, k, l, r, s
+        integer :: i, j, k, l, r, s, w
 
         
         integer :: t1, t2, c_rate, c_max
+
+
+
 
 
 
@@ -531,7 +533,6 @@ contains
         real(kind(0d0)) :: beta_mp  = 4d0/3d0
 
         integer :: is1b, is2b, is3b, is1e, is2e, is3e
-
 
 
         is1 = is1_d
@@ -613,25 +614,16 @@ contains
                                               + weno_eps
                                     beta(1) = beta_coef_x(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
-                                    
+
+                                    alpha = d_cbL_x(:, j)/(beta*beta)
+
+                                    omega = alpha/sum(alpha)                                    
 
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbL_x(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = (d_cbL_x(:, j)*(1d0 + d_cbL_x(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbL_x(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_x(:, j))))  
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
-
-
-                                    !if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbL_x(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    !end if
+                                    omega = alpha/sum(alpha)
 
                                     vL_rs_vf_x_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -642,23 +634,15 @@ contains
                                     poly(1) = v_rs_ws_x_flat(j, k, l, i) &
                                                 + poly_coef_cbR_x(j, 1, 0)*dvd(-1)
 
+                                    alpha = d_cbR_x(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbR_x(w, j)/(beta(w)*beta(w))
-                                    end do
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
                                     
 
-                                    !if (mapped_weno) then
+                                    alpha = (d_cbR_x(:, j)*(1d0 + d_cbR_x(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbR_x(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_x(:, j))))  
 
-                                        call s_map_nonlinear_weights_weno3(d_cbR_x(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    !end if
+                                    omega = alpha/sum(alpha)
 
 
                                     vR_rs_vf_x_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -692,17 +676,9 @@ contains
                                     beta(1) = beta_coef_x(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
                                     
+                                    alpha = d_cbL_x(:, j)/(beta*beta)
 
-
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbL_x(w, j)/(beta(w)*beta(w))
-                                    end do
-
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
 
                                     vL_rs_vf_x_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -714,14 +690,9 @@ contains
                                                 + poly_coef_cbR_x(j, 1, 0)*dvd(-1)
 
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbR_x(w, j)/(beta(w)*beta(w))
-                                    end do
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    alpha = d_cbR_x(:, j)/(beta*beta)
+
+                                    omega = alpha/sum(alpha)
                                     
 
                                     vR_rs_vf_x_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -756,21 +727,14 @@ contains
                                     beta(1) = beta_coef_y(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbL_y(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbL_y(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
 
-                                    !if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbL_y(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    !end if
+                                    alpha = (d_cbL_y(:, j)*(1d0 + d_cbL_y(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbL_y(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_y(:, j))))  
+
+                                    omega = alpha/sum(alpha)
 
                                     vL_rs_vf_y_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -784,21 +748,14 @@ contains
 
 
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbR_y(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbR_y(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
 
-                                    !if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbR_y(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    !end if
+                                    alpha = (d_cbR_y(:, j)*(1d0 + d_cbR_y(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbR_y(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_y(:, j))))  
+
+                                    omega = alpha/sum(alpha)
 
 
                                     vR_rs_vf_y_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -831,16 +788,9 @@ contains
                                     beta(1) = beta_coef_y(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbL_y(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbL_y(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
-
+                                    omega = alpha/sum(alpha)
 
 
                                     vL_rs_vf_y_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -853,19 +803,9 @@ contains
                                     poly(1) = v_rs_ws_y_flat(j, k, l, i) &
                                                 + poly_coef_cbR_y(j, 1, 0)*dvd(-1)
 
+                                    alpha = d_cbR_y(:, j)/(beta*beta)
 
-
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbR_y(w, j)/(beta(w)*beta(w))
-                                    end do
-
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
-
-
+                                    omega = alpha/sum(alpha)
 
 
                                     vR_rs_vf_y_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -900,21 +840,16 @@ contains
                                     beta(1) = beta_coef_z(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbL_z(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbL_z(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
 
-                                    if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbL_z(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    end if
+                                    
+                                    alpha = (d_cbL_z(:, j)*(1d0 + d_cbL_z(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbL_z(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_z(:, j))))  
+
+                                    omega = alpha/sum(alpha)
+                                   
 
                                     vL_rs_vf_z_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -927,21 +862,16 @@ contains
 
 
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbR_z(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbR_z(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
 
-                                    if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbR_z(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    end if
+                                    
+                                    alpha = (d_cbR_z(:, j)*(1d0 + d_cbR_z(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbR_z(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_z(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
+                                    
 
 
                                     vR_rs_vf_z_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -974,21 +904,10 @@ contains
                                     beta(1) = beta_coef_z(j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbL_z(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbL_z(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
+                                    omega = alpha/sum(alpha)
 
-                                    if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbL_z(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    end if
 
                                     vL_rs_vf_z_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -1001,21 +920,9 @@ contains
 
 
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        alpha(w) = d_cbR_z(w, j)/(beta(w)*beta(w))
-                                    end do
+                                    alpha = d_cbR_z(:, j)/(beta*beta)
 
-!$acc loop seq
-                                    do w = 0, weno_polyn
-                                        omega(w) = alpha(w)/(alpha(0) + alpha(1))
-                                    end do
-
-                                    if (mapped_weno) then
-                                        call s_map_nonlinear_weights_weno3(d_cbR_z(0:1, j), &
-                                                                     alpha(0:1), &
-                                                                     omega(0:1))
-                                    end if
+                                    omega = alpha/sum(alpha)
 
 
                                     vR_rs_vf_z_flat(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
@@ -1075,9 +982,14 @@ contains
                                     omega = alpha/sum(alpha)
 
                                     !if (mapped_weno) then
-                                        call s_map_nonlinear_weights(d_cbL_x(:, j), &
-                                                                     alpha, &
-                                                                     omega)
+                                        !call s_map_nonlinear_weights(d_cbL_x(:, j), &
+                                                                     !alpha, &
+                                                                     !omega)
+
+                                    alpha = (d_cbL_x(:, j)*(1d0 + d_cbL_x(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbL_x(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_x(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
                                     !end if
 
                                     vL_rs_vf_x_flat(j, k, l, i) = sum(omega*poly)
@@ -1100,11 +1012,15 @@ contains
                                     omega = alpha/sum(alpha)
 
                                     !if (mapped_weno) then
-                                        call s_map_nonlinear_weights(d_cbR_x(:, j), &
-                                                                     alpha, &
-                                                                     omega)
+                                        !call s_map_nonlinear_weights(d_cbR_x(:, j), &
+                                                                     !alpha, &
+                                                                     !omega)
                                     !end if
 
+                                    alpha = (d_cbR_x(:, j)*(1d0 + d_cbR_x(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbR_x(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_x(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
 
                                     vR_rs_vf_x_flat(j, k, l, i) = sum(omega*poly)
 
@@ -1368,9 +1284,10 @@ contains
                                     omega = alpha/sum(alpha)
 
                                     !if (mapped_weno) then
-                                        call s_map_nonlinear_weights(d_cbL_y(:, j), &
-                                                                     alpha, &
-                                                                     omega)
+                                    alpha = (d_cbL_y(:, j)*(1d0 + d_cbL_y(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbL_y(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_y(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
                                     !end if
 
                                     vL_rs_vf_y_flat(j, k, l, i) = sum(omega*poly)
@@ -1393,9 +1310,10 @@ contains
                                     omega = alpha/sum(alpha)
 
                                     !if (mapped_weno) then
-                                        call s_map_nonlinear_weights(d_cbR_y(:, j), &
-                                                                     alpha, &
-                                                                     omega)
+                                    alpha = (d_cbR_y(:, j)*(1d0 + d_cbR_y(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbR_y(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_y(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
                                     !end if
 
 
@@ -1661,9 +1579,10 @@ contains
                                     omega = alpha/sum(alpha)
 
                                     !if (mapped_weno) then
-                                        call s_map_nonlinear_weights(d_cbL_z(:, j), &
-                                                                     alpha, &
-                                                                     omega)
+                                    alpha = (d_cbL_z(:, j)*(1d0 + d_cbL_z(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbL_z(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_z(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
                                     !end if
 
                                     vL_rs_vf_z_flat(j, k, l, i) = sum(omega*poly)
@@ -1686,9 +1605,10 @@ contains
                                     omega = alpha/sum(alpha)
 
                                     !if (mapped_weno) then
-                                        call s_map_nonlinear_weights(d_cbR_z(:, j), &
-                                                                     alpha, &
-                                                                     omega)
+                                    alpha = (d_cbR_z(:, j)*(1d0 + d_cbR_z(:, j) - 3d0*omega) + omega**2d0) &
+                                    *(omega/(d_cbR_z(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_z(:, j))))                  
+            
+                                    omega = alpha/sum(alpha)
                                     !end if
 
 
@@ -1910,7 +1830,7 @@ contains
             end if            
  
 
-      
+            
 
     end subroutine s_weno_alt
 
@@ -1942,7 +1862,9 @@ contains
         ! y- and z-directions to those in the s1-, s2- and s3-directions
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
-        v_size = sys_size
+        v_size = ubound(v_vf, 1)
+        
+        !$acc update device(v_size)
 
 
             if(weno_dir == 1) then
@@ -1963,24 +1885,29 @@ contains
 
                 ! Reshaping/Projecting onto Characteristic Fields in y-direction ===
             if(n == 0) return
+            
             if(weno_dir == 2) then
-                if(cu_tensor) then
+#if MFC_cuTENSOR
+                if (cu_tensor) then
                     if(p == 0) then
-                                block
-                                !use CuTensorEx 
-                                !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
-                                !v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
-                                !$acc end host_data
-                                end block          
+                        block
+                            use CuTensorEx
+
+                            !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
+                            v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1,sys_size], order = [2, 1, 3, 4])
+                            !$acc end host_data
+                        end block
                     else
-                                block
-                                !use CuTensorEx 
-                                !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
-                                !v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
-                                !$acc end host_data
-                                end block          
+                        block
+                            use CuTensorEx
+
+                            !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_y_flat)        
+                            v_rs_ws_y_flat = reshape(v_rs_ws_x_flat, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
+                            !$acc end host_data
+                        end block
                     end if
                 else
+#endif
 !$acc parallel loop collapse(4) gang vector default(present)                 
                     do j = 1, v_size
                         do q = is3%beg, is3%end
@@ -1992,7 +1919,9 @@ contains
                         end do
                     end do
 !$acc end parallel loop 
+#if MFC_cuTENSOR
                 end if
+#endif
             end if
 
 
@@ -2003,14 +1932,17 @@ contains
                 ! Reshaping/Projecting onto Characteristic Fields in z-direction ===
             if(p == 0) return 
             if(weno_dir == 3) then 
-                if(cu_tensor) then
-                        block
-                        !use CuTensorEx     
+#if MFC_cuTENSOR
+                if (cu_tensor) then
+                    block
+                        use CuTensorEx
+                            
                         !$acc host_data use_device(v_rs_ws_x_flat, v_rs_ws_z_flat)        
-                        !v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
+                        v_rs_ws_z_flat = reshape(v_rs_ws_x_flat, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
                         !$acc end host_data
-                        end block
+                    end block
                 else
+#endif
 !$acc parallel loop collapse(4) gang vector default(present)               
                     do j = 1, v_size
                         do q = is3%beg, is3%end
@@ -2021,8 +1953,10 @@ contains
                             end do
                         end do
                     end do
-!$acc end parallel loop                 
-                end if  
+!$acc end parallel loop      
+#if MFC_cuTENSOR
+                end if
+#endif
             end if 
 
 
@@ -2044,9 +1978,9 @@ contains
     !$acc routine seq
 
         ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(0:2), intent(IN)    ::     d_K
-        real(kind(0d0)), dimension(0:2), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(0:2), intent(INOUT) :: omega_K
+        real(kind(0d0)), dimension(0:), intent(IN)    ::     d_K
+        real(kind(0d0)), dimension(0:), intent(INOUT) :: alpha_K
+        real(kind(0d0)), dimension(0:), intent(INOUT) :: omega_K
 
         ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
         if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
@@ -2062,9 +1996,9 @@ contains
     !$acc routine seq
 
         ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(0:1), intent(IN)    ::     d_K
-        real(kind(0d0)), dimension(0:1), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(0:1), intent(INOUT) :: omega_K
+        real(kind(0d0)), dimension(0:), intent(IN)    ::     d_K
+        real(kind(0d0)), dimension(0:), intent(INOUT) :: alpha_K
+        real(kind(0d0)), dimension(0:), intent(INOUT) :: omega_K
 
         ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
         if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
