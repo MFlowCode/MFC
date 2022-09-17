@@ -22,11 +22,11 @@ echo ""
 index=1
 failed=()
 
-files=samples/*/*.py
+files=examples/*/*.py
 
-nFiles=$(find samples/*/*.py | wc -l)
+nFiles=$(find examples/*/*.py | wc -l)
 
-for f in samples/*/*.py; do
+for f in examples/*/*.py; do
 
     echo -e "($index/$nFiles) Running $MAGENTA$f$COLOR_RESET:"
     echo -en " - pre_process "

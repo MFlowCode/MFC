@@ -13,17 +13,18 @@
 #  - User Read:
 #    - $MEMBERWORK -> e.g /gpfs/wolf/scratch/henrylb
 
+
 stages:
-  - clone # Clone MFC after removing artifacts from previous run(s). 
-  - cpu   # Build MFC & Test it on/with CPUs
-  - gpu   # Build MFC & Test it on/with GPUs
+  - main
+
 
 # Variables for all jobs
 variables:
   # Tell runner to not clone MFC
-  GIT_STRATEGY: none 
+  GIT_STRATEGY: none
   # Ascent Job Scheduler parameters
   SCHEDULER_PARAMETERS: "-P CFD154 -nnodes 1 -W 00:30"
+
 
 # This script runs before each job's main script is executed.
 # It defines useful environment variables used at runtime.
@@ -37,45 +38,79 @@ before_script:
   # (Tidy) Delete clones/builds on the same branch older than 10 days
   - echo "Removing:"
   - export CI_MFC_BRANCH_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH"
+  - mkdir -p "$CI_MFC_BRANCH_DIR"
   - find "$CI_MFC_BRANCH_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +10 | sed s/^/\ -\ Removing\ /g
   - find "$CI_MFC_BRANCH_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +10 | xargs rm -rf
 
   # Define MFC directory path
   - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH/$CI_COMMIT_SHORT_SHA"
 
-# Clone MFC after removing artifacts from previous run(s). 
-clone-job:
-  stage: clone
+
+.clone:
+  stage: main
   script:
     # Clean MFC directory if it exists (from a previous run)
-    - if [ -d "$CI_MFC_DIR" ]; then rm -rf "$CI_MFC_DIR"; fi 
-    # Create empty MFC directory
-    - mkdir -p "$CI_MFC_DIR"
-
+    - if [ -d "$CI_MFC_DIR/$JOB_MODE" ]; then rm -rf "$CI_MFC_DIR/$JOB_MODE"; fi 
+    
     # Clone MFC into MFC directory & cd into it
-    - git clone --single-branch --branch "$CI_COMMIT_BRANCH" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/"
-    - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
+    - mkdir -p "$CI_MFC_DIR/$JOB_MODE/"
+    - git clone --single-branch --branch "$CI_COMMIT_BRANCH" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/$JOB_MODE/"
   tags:
     - nobatch
 
-cpu-test-job:
-  stage: cpu
-  needs:
-    - cpu-build-job
+.build:
+  stage: main
   script:
-    - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./mfc.sh load -c a -m g
-    - ./mfc.sh test -j 8 -m release-cpu
+    - cd "$CI_MFC_DIR/$JOB_MODE" && echo "[CI] Building in $(pwd):"
+    - . ./mfc.sh load -c a -m $(if [ "$(echo "$JOB_MODE" | grep -i 'cpu' | wc -c)" -gt 0 ]; then echo "c"; else echo "g"; fi)
+    - ./mfc.sh build -j 8 -m "$JOB_MODE"
+  tags:
+    - nobatch
+
+.test:
+  stage: main
+  script:
+    - cd "$CI_MFC_DIR/$JOB_MODE" && echo "[CI] Running in $(pwd):"
+    - . ./mfc.sh load -c a -m $(if [ "$(echo "$JOB_MODE" | grep -i 'cpu' | wc -c)" -gt 0 ]; then echo "c"; else echo "g"; fi)
+    - ./mfc.sh test -j 8 -m "$JOB_MODE"
   tags:
     - batch
 
-gpu-test-job:
-  stage: gpu
+
+clone-cpu:
+  variables:
+    JOB_MODE: "release-cpu"
+  extends: .clone
+
+build-cpu:
+  variables:
+    JOB_MODE: "release-cpu"
+  extends: .build
   needs:
-    - gpu-build-job
-  script:
-    - cd "$CI_MFC_DIR" && echo "[CI] Running in $(pwd):"
-    - . ./mfc.sh load -c a -m g
-    - ./mfc.sh test -j 8 -m release-gpu
-  tags:
-    - batch
+    - clone-cpu
+
+test-cpu:
+  variables:
+    JOB_MODE: "release-cpu"
+  extends: .test
+  needs:
+    - build-cpu
+
+clone-gpu:
+  variables:
+    JOB_MODE: "release-gpu"
+  extends: .clone
+
+build-gpu:
+  variables:
+    JOB_MODE: "release-gpu"
+  extends: .build
+  needs:
+    - clone-gpu
+
+test-gpu:
+  variables:
+    JOB_MODE: "release-gpu"
+  extends: .test
+  needs:
+    - build-gpu

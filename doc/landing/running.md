@@ -449,9 +449,9 @@ MFC can be run using `mfc.sh`'s `run` command. It supports both interactive and
 batch execution, the latter being designed for multi-socket systems, namely supercomputers,
 equipped with a scheduler such as PBS, SLURM, and LSF. A full (and updated) list
 of available arguments can be acquired with `./mfc.sh run -h`. Example Python input
-files can be found in the [samples/](samples/) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
+files can be found in the [examples/](examples/) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in [samples/3d_sphbubcollapse/](samples/3D_sphbubcollapse/case.py).
+can also be found in [examples/3d_sphbubcollapse/](examples/3D_sphbubcollapse/case.py).
 
 The skeleton for an input file may look like the following:
 
@@ -473,10 +473,10 @@ computations are done in Python to generate the case.
 
 ### Interactive Execution
 
-To run all stages of MFC, that is [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/)   on the sample case [2D_shockbubble](samples/2D_shockbubble/),
+To run all stages of MFC, that is [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/)   on the sample case [2D_shockbubble](examples/2D_shockbubble/),
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py
+$ ./mfc.sh run examples/2D_shockbubble/case.py
 ```
 
 If you want to run a subset of the available stages, you can use the `-t` argument.
@@ -489,14 +489,14 @@ For example,
 - Running [pre_process](src/pre_process_code/) with 2 cores:
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -t pre_process -n 2
+$ ./mfc.sh run examples/2D_shockbubble/case.py -t pre_process -n 2
 ```
 
 - Running [simulation](src/simulation_code/) and [post_process](src/post_process_code/)
 using 4 cores:
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -t simulation post_process -n 4
+$ ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
 Most parameters have sensible defaults which can be overridden in [defaults.yaml](defaults.yaml):
@@ -521,7 +521,7 @@ requires you to only specify one target with the `-t` option. The number of node
 respectively be specified with the `-N` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -N 2 -n 4 -g 4 -t simulation
+$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -g 4 -t simulation
 ```
 
 Other useful arguments include:
@@ -566,13 +566,13 @@ allocate resources. Therefore, the MFC constructs equivalent resource-sets in ta
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch    \
+$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch    \
                -N 2 -n 4 -g 4 -t simulation -a <redacted>
 ```
 
 - University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/):
 
 ```console
-$ ./mfc.sh run samples/2D_shockbubble/case.py -e batch -p GPU -t simulation \
+$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch -p GPU -t simulation \
                -N 2 -n 8 -g 8 -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
 ```
