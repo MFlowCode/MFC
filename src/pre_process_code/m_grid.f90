@@ -24,7 +24,9 @@ module m_grid
 
     use m_mpi_proxy             ! Message passing interface (MPI) module proxy
 
+#ifdef MFC_MPI
     use mpi                     ! Message passing interface (MPI) module
+#endif
     ! ==========================================================================
 
     implicit none
@@ -203,6 +205,13 @@ contains
     subroutine s_generate_parallel_grid(dflt_int) !-------------------------
 
         integer, intent(IN) :: dflt_int
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_grid] s_generate_parallel_grid not supported without MPI.'
+
+#else
+
         real(kind(0d0)) :: length   !< domain lengths
 
         ! Locations of cell boundaries
@@ -336,6 +345,8 @@ contains
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+#endif
 
     end subroutine s_generate_parallel_grid ! ------------------------------
 

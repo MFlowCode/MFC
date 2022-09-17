@@ -13,7 +13,9 @@
 module m_mpi_proxy
 
     ! Dependencies =============================================================
+#ifdef MFC_MPI
     use mpi                     !< Message passing interface (MPI) module
+#endif
 
     use m_derived_types         !< Definitions of the derived types
 
@@ -50,6 +52,15 @@ contains
         !!      the job as well as the local processor rank.
     subroutine s_mpi_initialize() ! ----------------------------
 
+#ifndef MFC_MPI
+
+        ! Serial run only has 1 processor
+        num_procs = 1
+        ! Local processor rank is 0
+        proc_rank = 0
+
+#else
+
         ! Establishing the MPI environment
         call MPI_INIT(ierr)
 
@@ -65,13 +76,23 @@ contains
         ! Identifying the rank of the local processor
         call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
 
+#endif
+
     end subroutine s_mpi_initialize ! --------------------------
 
     !> The subroutine terminates the MPI execution environment.
     subroutine s_mpi_abort() ! ---------------------------------------------
 
+#ifndef MFC_MPI
+
+        stop 1
+
+#else
+
         ! Terminating the MPI environment
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+
+#endif
 
     end subroutine s_mpi_abort ! -------------------------------------------
 
@@ -82,6 +103,12 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_initialize_mpi_data not supported without MPI.'
+
+#else
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer :: ierr
@@ -108,19 +135,35 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
+#endif
+
     end subroutine s_initialize_mpi_data ! ---------------------------------
 
     !>Halts all processes until all have reached barrier.
     subroutine s_mpi_barrier() ! -------------------------------------------
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_barrier not supported without MPI.'
+
+#else
+
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+#endif
 
     end subroutine s_mpi_barrier ! -----------------------------------------
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
     subroutine s_initialize_mpi_proxy_module() ! ------------------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_initialize_mpi_proxy_module not supported without MPI.'
+
+#else
 
         integer :: i !< Generic loop iterator
 
@@ -205,6 +248,8 @@ contains
 
         end if
 
+#endif
+
     end subroutine s_initialize_mpi_proxy_module ! ----------------------------
 
     !>  Since only processor with rank 0 is in charge of reading
@@ -213,6 +258,12 @@ contains
         !!      subroutine is then in charge of broadcasting the required
         !!      information.
     subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_bcast_user_inputs not supported without MPI.'
+
+#else
 
         integer :: i !< Generic loop iterator
 
@@ -358,6 +409,9 @@ contains
         call MPI_BCAST(Re_inv, 1, &
                        MPI_DOUBLE_PRECISION, 0, &
                        MPI_COMM_WORLD, ierr)
+
+#endif
+
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
 
     !>  This subroutine takes care of efficiently distributing
@@ -366,6 +420,12 @@ contains
         !!      that they reflect the configuration of sub-domain that
         !!      is overseen by the local processor.
     subroutine s_mpi_decompose_computational_domain() ! --------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_decompose_computational_domain not supported without MPI.'
+
+#else
 
         ! # of processors in the x-, y- and z-coordinate directions
         integer :: num_procs_x, num_procs_y, num_procs_z
@@ -797,6 +857,8 @@ contains
         end if
         ! ==================================================================
 
+#endif
+
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
     !>  Communicates the buffer regions associated with the grid
@@ -810,6 +872,12 @@ contains
 
         character(LEN=3), intent(IN) :: pbc_loc
         character, intent(IN) :: sweep_coord
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_grid_vars_buffer_regions not supported without MPI.'
+
+#else
 
         ! Communications in the x-direction ================================
 
@@ -993,6 +1061,8 @@ contains
 
         ! END: Communications in the z-direction ===========================
 
+#endif
+
     end subroutine s_mpi_sendrecv_grid_vars_buffer_regions ! ---------------
 
     !>  Communicates buffer regions associated with conservative
@@ -1011,6 +1081,12 @@ contains
         character(LEN=3), intent(IN) :: pbc_loc
 
         character, intent(IN) :: sweep_coord
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_cons_vars_buffer_regions not supported without MPI.'
+
+#else
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
@@ -1518,6 +1594,8 @@ contains
 
         ! END: Communications in the z-direction ===========================
 
+#endif
+
     end subroutine s_mpi_sendrecv_cons_vars_buffer_regions ! ---------------
 
     !>  The following subroutine takes the first element of the
@@ -1536,6 +1614,12 @@ contains
 
         real(kind(0d0)), dimension(2), intent(INOUT) :: var_loc
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_reduce_maxloc not supported without MPI.'
+
+#else
+
         real(kind(0d0)), dimension(2) :: var_glb  !<
             !! Temporary storage variable that holds the reduced maximum value
             !! and the rank of the processor with which the value is associated
@@ -1550,6 +1634,8 @@ contains
 
         var_loc = var_glb
 
+#endif
+
     end subroutine s_mpi_reduce_maxloc ! -----------------------------------
 
     !>  This subroutine gathers the Silo database metadata for
@@ -1561,6 +1647,12 @@ contains
     subroutine s_mpi_gather_spatial_extents(spatial_extents) ! -------------
 
         real(kind(0d0)), dimension(1:, 0:), intent(INOUT) :: spatial_extents
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_gather_spatial_extents not supported without MPI.'
+
+#else
 
         ! Simulation is 3D
         if (p > 0) then
@@ -1666,6 +1758,8 @@ contains
 
         end if
 
+#endif
+
     end subroutine s_mpi_gather_spatial_extents ! --------------------------
 
     !>  This subroutine collects the sub-domain cell-boundary or
@@ -1674,6 +1768,12 @@ contains
         !!      domain on the rank 0 processor. This is only done for 1D
         !!      simulations.
     subroutine s_mpi_defragment_1d_grid_variable() ! -----------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_defragment_1d_grid_variable not supported without MPI.'
+
+#else
 
         ! Silo-HDF5 database format
         if (format == 1) then
@@ -1695,6 +1795,8 @@ contains
 
         end if
 
+#endif
+
     end subroutine s_mpi_defragment_1d_grid_variable ! ---------------------
 
     !>  This subroutine gathers the Silo database metadata for
@@ -1713,6 +1815,12 @@ contains
             dimension(1:2, 0:num_procs - 1), &
             intent(INOUT) :: data_extents
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_gather_data_extents not supported without MPI.'
+
+#else
+
         ! Mimimum flow variable extent
         call MPI_GATHERV(minval(q_sf), 1, MPI_DOUBLE_PRECISION, &
                          data_extents(1, 0), recvcounts, 2*displs, &
@@ -1722,6 +1830,8 @@ contains
         call MPI_GATHERV(maxval(q_sf), 1, MPI_DOUBLE_PRECISION, &
                          data_extents(2, 0), recvcounts, 2*displs, &
                          MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+#endif
 
     end subroutine s_mpi_gather_data_extents ! -----------------------------
 
@@ -1741,6 +1851,12 @@ contains
             dimension(0:m_root, 0:0, 0:0), &
             intent(INOUT) :: q_root_sf
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_defragment_1d_flow_variable not supported without MPI.'
+
+#else
+
         ! Gathering the sub-domain flow variable data from all the processes
         ! and putting it back together for the entire computational domain
         ! on the process with rank 0
@@ -1748,10 +1864,18 @@ contains
                          q_root_sf(0, 0, 0), recvcounts, displs, &
                          MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
+#endif
+
     end subroutine s_mpi_defragment_1d_flow_variable ! ---------------------
 
     !> Deallocation procedures for the module
     subroutine s_finalize_mpi_proxy_module() ! ---------------------------
+
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_finalize_mpi_proxy_module not supported without MPI.'
+
+#else
 
         ! Deallocating the conservative variables buffer vectors
         if (buff_size > 0) then
@@ -1766,13 +1890,23 @@ contains
             deallocate (displs)
         end if
 
+#endif
+
     end subroutine s_finalize_mpi_proxy_module ! -------------------------
 
     !> Finalization of all MPI related processes
     subroutine s_mpi_finalize() ! ------------------------------
 
+#ifndef MFC_MPI
+
+        print '(A)', '[m_mpi_proxy] s_mpi_finalize not supported without MPI.'
+
+#else
+
         ! Terminating the MPI environment
         call MPI_FINALIZE(ierr)
+
+#endif
 
     end subroutine s_mpi_finalize ! ----------------------------
 

@@ -132,7 +132,7 @@ module m_cbc
 !    procedure(s_compute_abstract_L), pointer :: s_compute_L => null() !<
     !! Pointer to procedure used to calculate L variables, based on choice of CBC
 
-    type(bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
+    type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
 
     integer :: dj
 
@@ -825,22 +825,23 @@ contains
 
         integer, intent(IN) :: cbc_dir, cbc_loc
 
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
         ! ratio and liquid stiffness functions
-        real(kind(0d0)), dimension(contxe)   :: dalpha_rho_dt
+        real(kind(0d0)), dimension(num_fluids)   :: dalpha_rho_dt
         real(kind(0d0))                            ::       drho_dt
         real(kind(0d0)), dimension(num_dims)       ::       dvel_dt
         real(kind(0d0))                            ::      dpres_dt
-        real(kind(0d0)), dimension(advxe - E_idx) ::       dadv_dt
+        real(kind(0d0)), dimension(num_fluids) ::       dadv_dt
         real(kind(0d0))                            ::     dgamma_dt
         real(kind(0d0))                            ::    dpi_inf_dt
         real(kind(0d0)), dimension(contxe)   :: alpha_rho, dalpha_rho_ds, mf
-        real(kind(0d0)), dimension(1:num_dims)     :: vel, dvel_ds
-        real(kind(0d0)), dimension(1:advxe-E_idx) :: adv, dadv_ds
-        real(kind(0d0)), dimension(1:advxe)       :: L
+        real(kind(0d0)), dimension(2) :: Re_cbc
+        real(kind(0d0)), dimension(num_dims)     :: vel, dvel_ds
+        real(kind(0d0)), dimension(num_fluids) :: adv, dadv_ds
+        real(kind(0d0)), dimension(sys_size)       :: L
         real(kind(0d0)), dimension(3)             ::lambda  
 
 
@@ -961,7 +962,7 @@ contains
             ! ==================================================================
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
-    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
 
@@ -993,7 +994,7 @@ contains
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
@@ -1308,7 +1309,7 @@ contains
             ! ==================================================================
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
-    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
 
@@ -1340,7 +1341,7 @@ contains
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
@@ -1659,7 +1660,7 @@ contains
             ! ==================================================================
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
-    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
+    !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
 
@@ -1691,7 +1692,7 @@ contains
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
@@ -1947,9 +1948,11 @@ contains
     subroutine s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
@@ -1971,9 +1974,11 @@ contains
     subroutine s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !< Generic loop iterator
 
@@ -2008,9 +2013,11 @@ contains
     subroutine s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
@@ -2030,9 +2037,11 @@ contains
     subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -2066,9 +2075,11 @@ contains
     subroutine s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -2098,9 +2109,11 @@ contains
     subroutine s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -2131,9 +2144,11 @@ contains
     subroutine s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
@@ -2151,9 +2166,11 @@ contains
     subroutine s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 !$acc routine seq
         integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) ::  mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) ::  dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(:), intent(INOUT) :: L
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !< Generic loop iterator
 
@@ -2200,7 +2217,7 @@ contains
             intent(IN) :: flux_vf, flux_src_vf
 
         integer, intent(IN) :: cbc_dir, cbc_loc
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
 
         integer :: i, j, k, r !< Generic loop iterators
@@ -2513,7 +2530,7 @@ contains
             intent(INOUT) :: flux_vf, flux_src_vf
 
         integer, intent(IN) :: cbc_dir, cbc_loc
-        type(bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
 
         integer :: i, j, k, r !< Generic loop iterators

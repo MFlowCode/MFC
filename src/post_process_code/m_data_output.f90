@@ -243,7 +243,7 @@ contains
             !           EXIST     = dir_check       )
             call my_inquire(file_loc, dir_check)
             if (dir_check .neqv. .true.) then
-                call SYSTEM('mkdir -p '//trim(proc_rank_dir))
+                call s_create_directory(trim(proc_rank_dir))
             end if
 
             ! Creating the directory associated with the root process
@@ -259,7 +259,7 @@ contains
                 !           EXIST     = dir_check       )
                 call my_inquire(file_loc, dir_check)
                 if (dir_check .neqv. .true.) then
-                    call SYSTEM('mkdir '//trim(rootdir))
+                    call s_create_directory(trim(rootdir))
                 end if
 
             end if
@@ -286,7 +286,7 @@ contains
             call my_inquire(file_loc, dir_check)
 
             if (dir_check .neqv. .true.) then
-                call SYSTEM('mkdir -p '//trim(proc_rank_dir))
+                call s_create_directory(trim(proc_rank_dir))
             end if
 
             ! Creating the directory associated with the root process
@@ -303,7 +303,7 @@ contains
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check .neqv. .true.) then
-                    call SYSTEM('mkdir '//trim(rootdir))
+                    call s_create_directory(trim(rootdir))
                 end if
 
             end if
@@ -833,6 +833,7 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, k
+        real(kind(0d0)) :: start, finish
 
         ! Silo-HDF5 Database Format ========================================
 

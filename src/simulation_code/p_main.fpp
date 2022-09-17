@@ -40,21 +40,22 @@ program p_main
 
     use m_data_output          !< Run-time info & solution data output procedures
 
-    use m_derived_variables    !< Derived variables evaluation procedures
-
     use m_time_steppers        !< Time-stepping algorithms
 
     use m_qbmm                 !< Quadrature MOM
 
-#IFDEF _OPENACC 
+    use m_derived_variables     !< Procedures used to compute quantites derived
+                                !! from the conservative and primitive variables
+
+#ifdef _OPENACC 
     use openacc
-#ENDIF
+#endif
 
     use nvtx
 
 #ifdef _OPENACC
    use openacc
-  #endif
+#endif
     ! ==========================================================================
 
     implicit none
@@ -63,13 +64,20 @@ program p_main
 
     integer :: t_step, i !< Iterator for the time-stepping loop
     real(kind(0d0)) :: time_avg, time_final
+    real(kind(0d0)) :: io_time_avg, io_time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
+    real(kind(0d0)), allocatable, dimension(:) :: io_proc_time
     logical :: file_exists
+    real(kind(0d0)) :: start, finish
+    integer :: nt
 
 #ifdef _OPENACC
     real(kind(0d0)) :: starttime, endtime
     integer :: num_devices, local_size, num_nodes, ppn, my_device_num
-    integer :: dev, devNum, local_rank, local_comm
+    integer :: dev, devNum, local_rank
+#ifdef MFC_MPI
+    integer :: local_comm
+#endif
     integer(acc_device_kind) :: devtype
 #endif
 
@@ -81,10 +89,15 @@ program p_main
 
 ! Bind GPUs if OpenACC is enabled
 #ifdef _OPENACC
+#ifndef MFC_MPI
+    local_size = 1
+    local_rank = 0
+#else
     call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
         MPI_INFO_NULL, local_comm, ierr)
     call MPI_Comm_size(local_comm, local_size, ierr)
     call MPI_Comm_rank(local_comm, local_rank, ierr)
+#endif
 
     devtype = acc_get_device_type()
     devNum  = acc_get_num_devices(devtype)
@@ -99,16 +112,13 @@ program p_main
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
     ! their consistency is checked. The identification of any inconsistencies
- 
-   ! will result in the termination of the simulation.
-
+    ! will result in the termination of the simulation.
     if (proc_rank == 0) then
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
-    
         call s_check_input_file()
     end if
-    
+   
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
@@ -133,6 +143,7 @@ program p_main
     
     call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
+    IF (grid_geometry == 3) call s_initialize_fftw_module()
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
 
@@ -180,7 +191,6 @@ program p_main
     ! Populating the buffers of the grid variables using the boundary conditions
     call s_populate_grid_variables_buffers()
 
-    call s_populate_variables_buffers(q_cons_ts(1)%vf)
 
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure
@@ -200,9 +210,10 @@ program p_main
     call s_initialize_derived_variables()
 
     allocate(proc_time(0:num_procs - 1))
+    allocate(io_proc_time(0:num_procs - 1))
 
 
-!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc)
+!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
 !$acc update device(sys_size, buff_size)
 !$acc update device(m, n, p)
     do i = 1, sys_size
@@ -218,7 +229,6 @@ program p_main
         mytime = t_step*dt
     end if
     finaltime = t_step_stop*dt
-
 
 
     ! Time-stepping Loop =======================================================
@@ -242,24 +252,26 @@ program p_main
 
         ! Time-stepping loop controls
 
-        if (mytime >= finaltime) then
+        if (t_step == t_step_stop) then
 
             call s_mpi_barrier()
 
             if(num_procs > 1) then
                 call mpi_bcast_time_step_values(proc_time, time_avg)
+                
+                call mpi_bcast_time_step_values(io_proc_time, io_time_avg)
             end if 
             
             if(proc_rank == 0) then
                 time_final = 0d0
+                io_time_final = 0d0
                 if(num_procs == 1) then
                    time_final = time_avg 
+                   io_time_final = io_time_avg
                    print*, "Final Time", time_final
                 else    
-                    do i = 0, num_procs - 1
-                        time_final = time_final + proc_time(i)
-                    end do
-                    time_final = time_final/num_procs
+                    time_final = maxval(proc_time)
+                    io_time_final = maxval(io_proc_time)
                     print*, "Final Time", time_final
                 end if               
                 INQUIRE(FILE = 'time_data.dat', EXIST = file_exists)
@@ -271,6 +283,17 @@ program p_main
                     open(1, file = 'time_data.dat', status = 'new')
                     write(1,*) num_procs, time_final
                     close(1)
+                end if               
+
+                INQUIRE(FILE = 'io_time_data.dat', EXIST = file_exists)
+                if(file_exists) then
+                    open(1, file = 'io_time_data.dat', position = 'append',status = 'old')
+                    write(1,*) num_procs, io_time_final
+                    close(1)
+                else
+                    open(1, file = 'io_time_data.dat', status = 'new')
+                    write(1,*) num_procs, io_time_final
+                    close(1)
                 end if                
                 
             end if
@@ -281,16 +304,32 @@ program p_main
             t_step = t_step + 1
         end if
 
+        !if (num_procs > 1) then
+        !    print*, "m_compress timings:"
+        !    print*, " - nCalls_time  ", nCalls_time
+        !    print*, " - s_compress   ", (compress_time   / nCalls_time), "s"
+        !    print*, " - mpi_sendrecv ", (mpi_time        / nCalls_time), "s"
+        !    print*, " - s_decompress ", (decompress_time / nCalls_time), "s"
+        !end if
+
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
-        if (mod(t_step - t_step_start, t_step_save) == 0) then
+        if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
             
+               call CPU_time(start)
           !  call nvtxStartRange("I/O")
                 do i = 1, sys_size
 !$acc update host(q_cons_ts(1)%vf(i)%sf)
                 end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
           !  call nvtxEndRange
+               call CPU_time(finish)
+               nt = int((t_step - t_step_start)/(t_step_save))
+               if(nt == 1) then
+                       io_time_avg = abs(finish - start)
+               else
+                        io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
+               end if
         end if
 
         call system_clock(cpu_end)
@@ -314,6 +353,7 @@ program p_main
     call s_finalize_weno_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()
+    IF(grid_geometry == 3)  call s_finalize_fftw_module
     call s_finalize_mpi_proxy_module()
     call s_finalize_global_parameters_module()
 

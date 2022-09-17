@@ -26,6 +26,8 @@ module m_time_steppers
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_fftw
+    
     use nvtx
     ! ==========================================================================
 
@@ -55,7 +57,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_time_steppers_module() ! -----------------------
 
-        type(bounds_info) :: ix, iy, iz !<
+        type(int_bounds_info) :: ix, iy, iz !<
             !! Indical bounds in the x-, y- and z-directions
 
         integer :: i, j !< Generic loop iterators
@@ -126,7 +128,7 @@ contains
         ! Allocating the cell-average primitive variables
         allocate (q_prim_vf(1:sys_size))
 
-        do i = mom_idx%beg, E_idx
+        do i = 1, adv_idx%end
             allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
                                       iy%beg:iy%end, &
                                       iz%beg:iz%end))
@@ -151,16 +153,6 @@ contains
 !$acc enter data create(q_prim_vf(i)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
             end do
         end if
-
-        do i = 1, cont_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
-
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf => q_cons_ts(1)%vf(i)%sf
-!$acc enter data attach(q_prim_vf(i)%sf)
-        end do
 
         ! Allocating the cell-average RHS variables
         allocate (rhs_vf(1:sys_size))
@@ -228,6 +220,7 @@ contains
         !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(102,0,0)
 
+        IF (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
         
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -290,6 +283,7 @@ contains
             end do
         end do
 
+        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         ! ==================================================================
@@ -312,6 +306,8 @@ contains
                 end do 
             end do
         end do
+
+        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -376,6 +372,8 @@ contains
             end do
         end do
 
+        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
+
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
@@ -399,6 +397,7 @@ contains
             end do
         end do
 
+        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
@@ -422,6 +421,7 @@ contains
             end do
         end do
 
+        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
@@ -449,6 +449,10 @@ contains
         integer, intent(IN) :: t_step
 
         integer :: i !< Generic loop iterator
+
+        do i = 1, sys_size
+!$acc update host(q_prim_vf(i)%sf)
+        end do
 
         if (t_step == t_step_start) then
             do i = 1, sys_size
@@ -483,16 +487,6 @@ contains
         integer :: i, j !< Generic loop iterators
 
 
-        do i = 1, cont_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
-
-
-        do i = adv_idx%beg, adv_idx%end
-!$acc exit data detach(q_prim_vf(i)%sf)
-            q_prim_vf(i)%sf => null()
-        end do
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
@@ -519,9 +513,14 @@ contains
         end if
 
         ! Deallocating the cell-average primitive variables
-        do i = mom_idx%beg, E_idx
+        do i = 1, adv_idx%end
             deallocate (q_prim_vf(i)%sf)
         end do
+        if(bubbles) then
+            do i = bub_idx%beg, bub_idx%end
+                deallocate (q_prim_vf(i)%sf)
+            end do
+        end if
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 deallocate (q_prim_vf(i)%sf)

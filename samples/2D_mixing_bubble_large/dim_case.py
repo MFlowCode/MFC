@@ -29,7 +29,6 @@ print(json.dumps({
     'num_patches'                  : 2,
     'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
-    'anti_diffusion'               : 'F',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'weno_vars'                    : 2,

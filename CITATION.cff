@@ -1,0 +1,30 @@
+# Documentation on this file format is available here:
+# - https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-citation-files
+# - https://citation-file-format.github.io/
+
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Multicomponent Flow Code"
+url: "https://github.com/MFlowCode/MFC"
+preferred-citation:
+  type: article
+  title: "MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver"
+  journal: "Computer Physics Communications"
+  doi: "10.1016/j.cpc.2020.107396"
+  volume: 266
+  start: 107396
+  month: 5
+  year: 2021
+  authors:
+  - given-names:  Spencer H.
+    family-names: Bryngelson
+  - given-names:  Kevin
+    family-names: Schmidmayer
+  - given-names:  Vedran
+    family-names: Coralic
+  - given-names:  Jomela C.
+    family-names: Meng
+  - given-names:  Kazuki
+    family-names: Maeda
+  - given-names:  Tim
+    family-names: Colonius

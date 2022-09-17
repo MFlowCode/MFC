@@ -1,6 +1,5 @@
 #!/usr/bin/env python2
 
-import sys
 import math
 import json
 
@@ -28,7 +27,7 @@ Nx     = Ny*2+1
 dx, dy = x0*Lx/float(Nx), x0*Ly/float(Ny)
 
 # Select type of simulation
-restart_name = sys.argv[1].strip()
+restart_name = 'init'
 
 Ntend   = 1E5
 if restart_name == 'init':
@@ -109,7 +108,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
+    'parallel_io'                  :'F',
     'probe_wrt'                    :'T',
     'num_probes'                   : 1,
     'probe(1)%x'                   : 0.,
@@ -212,7 +211,6 @@ print(json.dumps({
     # 'Web'                   : We,
     # 'Re_inv'                : Re_inv,
     #'qbmm'               : 'T',
-    #'nnode'              : 4,
     #'dist_type'          : 2,
     #'sigR'               : 0.1,
     #'sigV'               : 0.1,

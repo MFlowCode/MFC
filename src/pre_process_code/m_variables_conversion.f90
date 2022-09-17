@@ -253,11 +253,11 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: nbub
+        real(kind(0d0)) :: nbub, nR3, vftmp
         real(kind(0d0)), dimension(nb) :: nRtmp
 
         ! Generic loop iterators
-        integer :: i, j, k, l
+        integer :: i, j, k, l, q
 
         ! Converting the conservative variables to the primitive variables
         do l = 0, p
@@ -330,7 +330,12 @@ contains
                         do i = 1, nb
                             nRtmp(i) = q_cons_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
+                        vftmp = q_cons_vf(alf_idx)%sf(j, k, l)
+                        nR3 = 0d0
+                        do q = 1, nb
+                            nR3 = nR3 + weight(q)*(nRtmp(q)**3d0)
+                        end do
+                        nbub = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
                         do i = bub_idx%beg, bub_idx%end
                             q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/nbub
                         end do
@@ -364,10 +369,10 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: nbub
+        real(kind(0d0)) :: nbub, R3, vftmp
         real(kind(0d0)), dimension(nb) :: Rtmp
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, q !< Generic loop iterators
 
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
@@ -414,7 +419,9 @@ contains
                     if (model_eqns == 3) then
                         do i = internalEnergies_idx%beg, internalEnergies_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i - adv_idx%end)%sf(j, k, l)* &
-                                                       fluid_pp(i - adv_idx%end)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + fluid_pp(i - adv_idx%end)%pi_inf
+                                                       fluid_pp(i - adv_idx%end)%gamma* &
+                                                       q_prim_vf(E_idx)%sf(j, k, l) + &
+                                                       fluid_pp(i - adv_idx%end)%pi_inf
                         end do
                     end if
 
@@ -428,7 +435,13 @@ contains
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
+                        !call s_comp_n_from_prim_cpu(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
+                        vftmp = q_prim_vf(alf_idx)%sf(j, k, l)
+                        R3 = 0d0                        
+                        do q = 1, nb
+                            R3 = R3 + weight(q)*(Rtmp(q)**3d0)
+                        end do
+                        nbub = (3.d0/(4.d0*pi))*vftmp/R3
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub

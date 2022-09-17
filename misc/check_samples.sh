@@ -1,22 +1,65 @@
 #!/usr/bin/env bash
 
+if [ ! -f "$(pwd)/misc/util.sh" ]; then
+    echo ""
+    echo "[misc/check_samples.sh] Please execute this script from the top-level MFC directory (currently in: $(pwd))."
+
+    exit 1
+fi
+
+source $(pwd)/misc/util.sh
+
+TIMEOUT="60s"
+
+if ! ./mfc.sh build -j $(nproc) -t pre_process simulation; then
+    exit 1
+fi
+
+echo ""
+echo -e "Simulation's successful timeout is $TIMEOUT."
+echo ""
+
+index=1
 failed=()
 
-for d in samples/*/; do
-    echo "Running $d.."
-    # 2D_shearlayer a large amount of timesteps so one might want to skip it
-    #if [[ ! "$d" == *"2D_shearlayer"* ]]; then
-        mkdir -p "$d""D"
-        ./mfc.sh run "$d"case.py -j $(nproc) -c 4 -b mpirun -t pre_process simulation
-        if [[ "$?" != "0" ]]; then
-            failed=(${failed[@]} "$d""case.py")
-        fi
-    #fi
+files=samples/*/*.py
+
+nFiles=$(find samples/*/*.py | wc -l)
+
+for f in samples/*/*.py; do
+
+    echo -e "($index/$nFiles) Running $MAGENTA$f$COLOR_RESET:"
+    echo -en " - pre_process "
+    if ! ./mfc.sh run "$f" -j $(nproc) -n 4 -t pre_process --no-build > /dev/null 2>&1; then
+        echo -e "$RED""CRASHED$COLOR_RESET"
+
+        failed=(${failed[@]} "$f")
+        index=$((index+1))
+
+        continue
+    else
+        echo -e "$GREEN""RAN$COLOR_RESET"
+    fi
+
+    echo -en " - simulation  "
+    timeout "$TIMEOUT" ./mfc.sh run "$f" -j $(nproc) -n 4 -t simulation --no-build > /dev/null 2>&1
+
+    code="$?"
+    if [[ "$code" != "0" ]] && [[ "$code" != "124" ]]; then
+        echo -e "$RED""CRASHED$COLOR_RESET"
+        failed=(${failed[@]} "$f")
+    else
+        echo -e "$GREEN""RAN$COLOR_RESET"
+    fi
+
+    index=$((index+1))
+
 done
 
-echo "Samples that failed:"
+echo -e "\n${#failed[@]} samples failed:"
 for value in "${failed[@]}"; do
     echo " - $value"
 done
 
 exit "${#failed[@]}"
+

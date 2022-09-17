@@ -1,16 +1,32 @@
-build/
 tags
 src/*/tags
 
+.vscode/
+.nfs*
+defaults.yaml
+
 __pycache__
+
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+
+*.egg-info
+
+/build/
+toolchain/build/
 
 src/*/*.mod
 src/*/*.o
+src/*/autogen/
+src/common/case.fpp
 src/pre_process_code/pre_process
 src/simulation_code/simulation
 src/post_process_code/post_process
 src/master_scripts/*.pyc
 src/*/.build
+src/*/case.*
 src/master_scripts/__*
 make_doc.sh
 cases/
@@ -33,6 +49,7 @@ samples/*/silo*
 samples/*/restart*
 samples/*/*.out
 samples/*/binary
+samples/*/fort.1
 samples/*/pre_process.sh
 samples/*/simulation.sh
 samples/*/post_process.sh
