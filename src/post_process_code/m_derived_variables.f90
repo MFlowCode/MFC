@@ -1,9 +1,6 @@
 !>
 !! @file m_derived_variables.f90
 !! @brief Contains module m_derived_variables
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module features subroutines that allow for the derivation of
 !!      numerous flow variables from the conservative and primitive ones.
@@ -119,7 +116,6 @@ MODULE m_derived_variables
                 flg = 0
             END IF
             
-            
         END SUBROUTINE s_initialize_derived_variables_module ! --------------------
         
         
@@ -139,7 +135,7 @@ MODULE m_derived_variables
                                                              s_cc, fd_coeff_s  )
            
             INTEGER, INTENT(IN) :: q
-            TYPE(bounds_info), INTENT(IN) :: offset_s
+            TYPE(int_bounds_info), INTENT(IN) :: offset_s
             
             REAL(KIND(0d0)), &
             DIMENSION(-buff_size:q+buff_size), &
@@ -637,7 +633,7 @@ MODULE m_derived_variables
             INTEGER, DIMENSION(ndim) :: ipiv
 
             INTEGER :: nrhs, lda, ldb, info
-            EXTERNAL DGESV
+            !EXTERNAL DGESV
 
             INTEGER :: i,j,k
 
