@@ -1,32 +1,76 @@
-name: CI
+name: Continuous Integration
 
 on:
   push:
-    branches: [ master ]
+    branches: [ GPU ]
+    paths:
+      - '**.f90'
+      - '**.fpp'
+      - 'mfc.sh'
+      - '**.py'
+      - '**.yaml'
+      - '**.yml'
+      - 'golden.txt'
+      - 'Makefile'
+      - 'makefile'
+      - 'CMakeLists.txt'
+      - Dockerfile
+
   pull_request:
-    branches: [ master ]
+    branches: [ GPU ]
 
   workflow_dispatch:
 
 jobs:
-  CI:
-    runs-on: ubuntu-latest
-
+  tests:
+    name:  CI Test Runner
+    strategy:
+      matrix:
+        include:
+          - os:   ubuntu-latest
+            unix: true
+          
+          - os:   macos-latest
+            unix: true
+            gcc:  11
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - name: Clone MFC
+        uses: actions/checkout@v3
 
-      - name: Fetch Aptitude Dependencies
+      - name: (macos-latest) Setup
+        if: matrix.os == 'macos-latest'
         run: |
-          sudo apt install -y tar wget make gcc clang python3 openmpi-* python python-dev python3-dev
+          echo "OMPI_FC=gfortran-${{ matrix.gcc }}" >> $GITHUB_ENV
+          echo "OMPI_CXX=g++-${{ matrix.gcc }}"     >> $GITHUB_ENV
+          echo "OMPI_MPICC=gcc-${{ matrix.gcc }}"   >> $GITHUB_ENV
+          echo "CC=gcc-${{ matrix.gcc }}"           >> $GITHUB_ENV
+          echo "CXX=g++-${{ matrix.gcc }}"          >> $GITHUB_ENV
+          echo "FC=gfortran-${{ matrix.gcc }}"      >> $GITHUB_ENV
+          brew install wget make python make cmake coreutils gcc@${{ matrix.gcc }}
+          HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-${{ matrix.gcc }} --verbose --build-from-source open-mpi
 
-      - name: Fetch & Install Dependencies (/dependencies)
+      - name: (ubuntu-latest) Setup
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cd dependencies
-          ./install.sh -j $(nproc)
-          cd ..
-      
-      - name: Build MFC
-        run: make -j $(nproc)
-      
-      - name: Run MFC Tests
-        run: make test
+          sudo apt update && sudo apt upgrade
+          sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+
+      - name: (${{ matrix.os }}) Test MFC
+        run: |
+          chmod +x ./mfc.sh
+          ./mfc.sh test -j $(nproc)
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v3
+        if:   always()
+        with:
+          name: ${{ matrix.os }}
+          path: |
+            build/**/*.log
+            build/**/*.txt
+            tests/**/*.dat
+            tests/**/*.out
+            tests/**/*.inp
+            tests/**/*.txt
+            tests/*.txt
