@@ -14,7 +14,7 @@ def parse(mfc):
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
         description=f"""\
-Wecome to the MFC master script. This tool automates and manages building, testing, \
+Welcome to the MFC master script. This tool automates and manages building, testing, \
 running, and cleaning of MFC in various configurations on all supported platforms. \
 The README documents this tool and its various commands in more detail. To get \
 started, run ./mfc.sh build -h.""",

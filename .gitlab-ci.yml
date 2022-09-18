@@ -4,9 +4,9 @@
 #  - User Set:
 #    - $GIT_STRATEGY: none -> Runner should not clone repository before executing script
 #  - User Read:
-#    - $CI_PROJECT_NAME   -> e.g MFC, MFC-develop, ...
-#    - $CI_REPOSITORY_URL -> e.g https://gitlab-ci-token:[MASKED]@code.ornl.gov/ecpcitest/cfd154/MFC-develop.git
-#    - $CI_COMMIT_BRANCH  -> e.g GPU, master, ...
+#    - $CI_PROJECT_NAME    -> e.g MFC, MFC-develop, ...
+#    - $CI_REPOSITORY_URL  -> e.g https://gitlab-ci-token:[MASKED]@code.ornl.gov/ecpcitest/cfd154/MFC-develop.git
+#    - $CI_COMMIT_REF_SLUG -> e.g GPU, master, v4.0.0, hypoelastic, ...
 # ORNL's Ascent:
 #  - User Set:
 #    - $SCHEDULER_PARAMETERS
@@ -37,13 +37,13 @@ before_script:
 
   # (Tidy) Delete clones/builds on the same branch older than 10 days
   - echo "Removing:"
-  - export CI_MFC_BRANCH_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH"
+  - export CI_MFC_BRANCH_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_REF_SLUG"
   - mkdir -p "$CI_MFC_BRANCH_DIR"
   - find "$CI_MFC_BRANCH_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +10 | sed s/^/\ -\ Removing\ /g
   - find "$CI_MFC_BRANCH_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +10 | xargs rm -rf
 
   # Define MFC directory path
-  - CI_MFC_DIR="$MEMBERWORK/cfd154/.ci/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH/$CI_COMMIT_SHORT_SHA"
+  - CI_MFC_DIR="$CI_MFC_BRANCH_DIR/$CI_COMMIT_SHORT_SHA"
 
 
 .clone:
@@ -54,7 +54,7 @@ before_script:
     
     # Clone MFC into MFC directory & cd into it
     - mkdir -p "$CI_MFC_DIR/$JOB_MODE/"
-    - git clone --single-branch --branch "$CI_COMMIT_BRANCH" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/$JOB_MODE/"
+    - git clone --single-branch --branch "$CI_COMMIT_REF_SLUG" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/$JOB_MODE/"
   tags:
     - nobatch
 
