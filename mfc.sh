@@ -183,7 +183,7 @@ fi
 
 
 # Create a Python virtualenv if it hasn't already been created
-if [ ! -d "$(pwd)/build/venv" ]; then
+if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
     if ! python3 -m venv "$(pwd)/build/venv"; then
         echo -en "$RED"
         echo "[mfc.sh] Error: Failed to create a Python virtual environment. Delete the build/venv folder and try again."
@@ -238,7 +238,7 @@ for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
             echo "[mfc.sh] Error: Failed to install $import_name/$install_name through Python3's pip."
             echo -en "$COLOR_RESET"
 
-            exit $?
+            exit 1
         fi
     fi
 done
