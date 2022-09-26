@@ -507,7 +507,8 @@ contains
 #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
         if (norm_dir == ${NORM_DIR}$) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, Re_L, Re_R)
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, Re_L, Re_R, &
+            !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S)
             do l = is3%beg, is3%end
               do k = is2%beg, is2%end
                 do j = is1%beg, is1%end
@@ -1058,7 +1059,8 @@ contains
                 if(model_eqns == 3) then
                     !ME3
 
-!$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R)
+!$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
+!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms)
 
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -1448,7 +1450,8 @@ contains
                 end do
                 elseif(model_eqns == 4) then
                     !ME4
-                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg)
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, &
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -1789,7 +1792,8 @@ contains
                     end do
                 end do
                 elseif(model_eqns == 2 .and. bubbles) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R)
+                !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2260,7 +2264,8 @@ contains
                     end do
                 !$acc end parallel loop
                 else
-        !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R)        
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
+            !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms)        
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
