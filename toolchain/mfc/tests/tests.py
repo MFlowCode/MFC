@@ -129,9 +129,9 @@ class MFCTest:
             test.create_directory()
 
             if test.params.get("qbmm", 'F') == 'T':
-                tol = 1e-7
+                tol = 1e-10
             elif test.params.get("bubbles", 'F') == 'T':
-                tol = 1e-7
+                tol = 1e-10
             else:
                 tol = 1e-12
 
