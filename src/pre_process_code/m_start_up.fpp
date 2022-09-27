@@ -31,16 +31,16 @@ module m_start_up
     implicit none
 
     private; public :: s_initialize_start_up_module, &
-                       s_read_input_file, &
-                       s_check_input_file, &
-                       s_read_grid_data_files, &
-                       s_read_ic_data_files, &
-                       s_read_serial_grid_data_files, &
-                       s_read_serial_ic_data_files, &
-                       s_read_parallel_grid_data_files, &
-                       s_read_parallel_ic_data_files, &
-                       s_check_grid_data_files, &
-                       s_finalize_start_up_module
+ s_read_input_file, &
+ s_check_input_file, &
+ s_read_grid_data_files, &
+ s_read_ic_data_files, &
+ s_read_serial_grid_data_files, &
+ s_read_serial_ic_data_files, &
+ s_read_parallel_grid_data_files, &
+ s_read_parallel_ic_data_files, &
+ s_check_grid_data_files, &
+ s_finalize_start_up_module
 
     abstract interface ! ===================================================
 
@@ -156,7 +156,7 @@ contains
         call my_inquire(file_loc, dir_check)
 
         ! Startup checks for bubbles and bubble variables
-        if (bubbles .and. (model_eqns .ne. 4 .and. model_eqns .ne. 2)) then
+        if (bubbles .and. (model_eqns /= 4 .and. model_eqns /= 2)) then
             print '(A)', 'Unsupported combination of values of '// &
                 'bubbles and model_eqns. '// &
                 'Exiting ...'
@@ -277,7 +277,7 @@ contains
         else if (qbmm .and. dist_type == dflt_int) then
             print '(A)', 'Dist type must be set if using QBMM. Exiting ...'
             call s_mpi_abort()
-        else if (qbmm .and. (dist_type .ne. 1) .and. rhoRV > 0d0) then
+        else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0d0) then
             print '(A)', 'rhoRV cannot be used with dist_type \ne 1. Exiting ...'
             call s_mpi_abort()
         else if (polydisperse .and. R0_type == dflt_int) then
@@ -1118,7 +1118,7 @@ contains
         ! Constraints on the geometric parameters of the analytical patch
         if (n > 0 .or. p > 0 &
             .or. &
-            (model_eqns .ne. 4 .and. model_eqns .ne. 2) &
+            (model_eqns /= 4 .and. model_eqns /= 2) &
             .or. &
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
@@ -1665,7 +1665,7 @@ contains
         proc_rank_dir = trim(case_dir)//trim(proc_rank_dir)
 
         write (t_step_dir, '(A,I0)') '/', t_step_old
-        t_step_dir = trim(proc_rank_dir)//trim(t_step_dir)        
+        t_step_dir = trim(proc_rank_dir)//trim(t_step_dir)
 
         ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir)//'/.'

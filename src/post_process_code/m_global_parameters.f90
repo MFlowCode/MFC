@@ -22,14 +22,14 @@ module m_global_parameters
 
     !> @name Logistics
     !> @{
-    integer                    :: num_procs            !< Number of processors
+    integer :: num_procs            !< Number of processors
     integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
     integer, parameter :: path_len = 400  !< Maximum path length
     integer, parameter :: name_len = 50   !< Maximum name length
     real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
     integer, parameter :: dflt_int = -100 !< Default integer value
     real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
-    character(LEN=path_len)  :: case_dir             !< Case folder location
+    character(LEN=path_len) :: case_dir             !< Case folder location
     !> @}
 
     ! Computational Domain Parameters ==========================================
@@ -103,13 +103,13 @@ module m_global_parameters
     !> @{
     type(bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
     type(bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
-    integer           :: E_idx                     !< Index of energy equation
+    integer :: E_idx                     !< Index of energy equation
     type(bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
     type(bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
-    integer           :: alf_idx                   !< Index of specific heat ratio func. eqn.
-    integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
+    integer :: alf_idx                   !< Index of specific heat ratio func. eqn.
+    integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -172,29 +172,29 @@ module m_global_parameters
     !! and the numerical Schlieren function.
     !> @{
     logical, dimension(num_fluids_max) :: alpha_rho_wrt
-    logical                            :: rho_wrt
-    logical, dimension(3)              :: mom_wrt
-    logical, dimension(3)              :: vel_wrt
-    integer                            :: flux_lim
-    logical, dimension(3)              :: flux_wrt
-    logical                            :: E_wrt
-    logical                            :: pres_wrt
+    logical :: rho_wrt
+    logical, dimension(3) :: mom_wrt
+    logical, dimension(3) :: vel_wrt
+    integer :: flux_lim
+    logical, dimension(3) :: flux_wrt
+    logical :: E_wrt
+    logical :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
-    logical                            :: gamma_wrt
-    logical                            :: heat_ratio_wrt
-    logical                            :: pi_inf_wrt
-    logical                            :: pres_inf_wrt
-    logical                            :: prim_vars_wrt
-    logical                            :: cons_vars_wrt
-    logical                            :: c_wrt
-    logical, dimension(3)              :: omega_wrt
-    logical                            :: schlieren_wrt
+    logical :: gamma_wrt
+    logical :: heat_ratio_wrt
+    logical :: pi_inf_wrt
+    logical :: pres_inf_wrt
+    logical :: prim_vars_wrt
+    logical :: cons_vars_wrt
+    logical :: c_wrt
+    logical, dimension(3) :: omega_wrt
+    logical :: schlieren_wrt
     !> @}
 
     !> @name Options for Fourier decomposition in the azimuthal direction if 3D
     !! cylindrical coordinates are used
     !> @{
-    logical                            :: fourier_decomp
+    logical :: fourier_decomp
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -222,14 +222,14 @@ module m_global_parameters
 
     !> @name Bubble modeling variables and parameters
     !> @{
-    integer         :: nb
+    integer :: nb
     real(kind(0d0)) :: R0ref
     real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
-    logical         :: bubbles
-    logical         :: polytropic
-    logical         :: polydisperse
-    integer         :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
+    logical :: bubbles
+    logical :: polytropic
+    logical :: polydisperse
+    integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN

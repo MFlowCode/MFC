@@ -28,7 +28,7 @@ program p_main
 
     use m_data_output           !< Procedures to write the grid data and the
                                 !! conservative variables to files
-    
+
     use m_compile_specific      !< Compile-specific procedures
     ! ==========================================================================
 
@@ -39,21 +39,20 @@ program p_main
     real(kind(0d0)) :: start, finish, time_avg, time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
 
+    ! Initialization of the MPI environment
 
-   ! Initialization of the MPI environment
-
-   call s_mpi_initialize()
+    call s_mpi_initialize()
 
     ! Rank 0 processor assigns default values to user inputs prior to reading
     ! those in from the input file. Next, the user inputs are read in and their
     ! consistency is checked. The detection of any inconsistencies automatically
     ! leads to the termination of the pre-process.
 
-    IF (proc_rank == 0) THEN
+    if (proc_rank == 0) then
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
-        CALL s_check_input_file()
-    END IF
+        call s_check_input_file()
+    end if
 
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -99,9 +98,9 @@ program p_main
 
     ! Setting up grid and initial condition
 
-    allocate(proc_time(0:num_procs - 1))
+    allocate (proc_time(0:num_procs - 1))
 
-    call CPU_time(start)
+    call cpu_time(start)
 
     if (old_grid) then
         call s_read_grid_data_files(dflt_int)
@@ -123,48 +122,42 @@ program p_main
 
     call s_write_data_files(q_cons_vf)
 
-    call CPU_time(finish)
+    call cpu_time(finish)
 
     time_avg = abs(finish - start)
 
     call s_mpi_barrier()
 
-
-    if(num_procs > 1) then
+    if (num_procs > 1) then
         call mpi_bcast_time_step_values(proc_time, time_avg)
     end if
 
-    
-
-    if(proc_rank == 0) then
+    if (proc_rank == 0) then
         time_final = 0d0
-        if(num_procs == 1) then
-           time_final = time_avg 
-           print*, "Final Time", time_final
-        else    
-            time_final = maxval(proc_time)
-            print*, "Final Time", time_final
-        end if               
-        INQUIRE(FILE = 'pre_time_data.dat', EXIST = file_exists)
-        if(file_exists) then
-            open(1, file = 'pre_time_data.dat', position = 'append',status = 'old')
-            write(1,*) num_procs, time_final
-            close(1)
+        if (num_procs == 1) then
+            time_final = time_avg
+            print *, "Final Time", time_final
         else
-            open(1, file = 'pre_time_data.dat', status = 'new')
-            write(1,*) num_procs, time_final
-            close(1)
+            time_final = maxval(proc_time)
+            print *, "Final Time", time_final
         end if
-   end if
-
-    
+        inquire (FILE='pre_time_data.dat', EXIST=file_exists)
+        if (file_exists) then
+            open (1, file='pre_time_data.dat', position='append', status='old')
+            write (1, *) num_procs, time_final
+            close (1)
+        else
+            open (1, file='pre_time_data.dat', status='new')
+            write (1, *) num_procs, time_final
+            close (1)
+        end if
+    end if
 
     ! Disassociate pointers for serial and parallel I/O
     s_generate_grid => null()
     s_read_grid_data_files => null()
     s_read_ic_data_files => null()
     s_write_data_files => null()
-
 
     ! Deallocation procedures for the modules
     call s_finalize_initial_condition_module()

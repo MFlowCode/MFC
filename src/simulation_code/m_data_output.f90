@@ -64,14 +64,14 @@ module m_data_output
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) ::   Rc_sf  !< Rc stability criterion
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
 
 !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-    real(kind(0d0)) ::   Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+    real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
 
 !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
@@ -80,26 +80,26 @@ module m_data_output
     real(kind(0d0)) :: icfl_max !< ICFL criterion maximum
     real(kind(0d0)) :: vcfl_max !< VCFL criterion maximum
     real(kind(0d0)) :: ccfl_max !< CCFL criterion maximum
-    real(kind(0d0)) ::   Rc_min !< Rc criterion maximum
+    real(kind(0d0)) :: Rc_min !< Rc criterion maximum
     !> @}
 
     ! @name Generic storage for flow variable(s) that are to be written to CoM data file
     !> @{
-    real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: accel_mag
-    real(kind(0d0)), public, allocatable, dimension(:, :)    :: q_com
-    real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: moments
-    real(kind(0d0)), public, allocatable, dimension(:, :)    :: cb_mass
-    real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: bounds
-    real(kind(0d0)), public, allocatable, dimension(:, :)    :: cntrline
-    real(kind(0d0)), public, allocatable, dimension(:, :, :)  :: x_accel, y_accel, z_accel
-    type(scalar_field), allocatable, dimension(:)           :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-    real(kind(0d0)), target, allocatable, dimension(:, :, :)  :: energy
+    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
+    real(kind(0d0)), public, allocatable, dimension(:, :) :: q_com
+    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: moments
+    real(kind(0d0)), public, allocatable, dimension(:, :) :: cb_mass
+    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: bounds
+    real(kind(0d0)), public, allocatable, dimension(:, :) :: cntrline
+    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
+    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: energy
 
     integer :: momxb, momxe
     integer :: contxb, contxe
     integer :: bubxb, bubxe
     integer :: advxb, advxe
-    real(kind(0d0)),allocatable, dimension(:) :: gammas, pi_infs
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
     !$acc declare create(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, gammas, pi_infs)
     !> @}
 
@@ -350,15 +350,15 @@ contains
         end do
 
         if (integral_wrt) then
-        do i = 1, num_integrals
-            write (file_path, '(A,I0,A)') '/D/integral', i, '_prim.dat'
-            file_path = trim(case_dir)//trim(file_path)
+            do i = 1, num_integrals
+                write (file_path, '(A,I0,A)') '/D/integral', i, '_prim.dat'
+                file_path = trim(case_dir)//trim(file_path)
 
-            open (i + 70, FILE=trim(file_path), &
-                  FORM='formatted', &
-                  POSITION='append', &
-                  STATUS='unknown')
-        end do
+                open (i + 70, FILE=trim(file_path), &
+                      FORM='formatted', &
+                      POSITION='append', &
+                      STATUS='unknown')
+            end do
         end if
 
     end subroutine s_open_probe_files ! ------------------------------------
@@ -375,20 +375,20 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)), dimension(num_fluids)          :: alpha_rho  !< Cell-avg. partial density
-        real(kind(0d0))                                   :: rho        !< Cell-avg. density
-        real(kind(0d0)), dimension(num_dims)              :: vel        !< Cell-avg. velocity
-        real(kind(0d0))                                   :: pres       !< Cell-avg. pressure
-        real(kind(0d0)), dimension(num_fluids)            :: alpha      !< Cell-avg. volume fraction
-        real(kind(0d0))                                   :: gamma      !< Cell-avg. sp. heat ratio
-        real(kind(0d0))                                   :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0))                                   :: c          !< Cell-avg. sound speed
-        real(kind(0d0)), dimension(2)                     :: Re         !< Cell-avg. Reynolds numbers
+        real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
+        real(kind(0d0)) :: rho        !< Cell-avg. density
+        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(kind(0d0)) :: pres       !< Cell-avg. pressure
+        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
+        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(kind(0d0)) :: c          !< Cell-avg. sound speed
+        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
 
         ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
         ! time-step and located on both the local (loc) and the global (glb)
         ! computational domains
- 
+
         real(kind(0d0)) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
 
@@ -406,10 +406,10 @@ contains
 
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                        alpha(i) = q_prim_vf(E_idx+i)%sf(j, k, l)
+                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                     end do
 
-                    if(bubbles) then
+                    if (bubbles) then
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, j, k, l)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
@@ -532,11 +532,11 @@ contains
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
 
-        if (any(Re_size > 0)) then 
-        !$acc kernels
+        if (any(Re_size > 0)) then
+            !$acc kernels
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
-        !$acc end kernels
+            !$acc end kernels
         end if
 
         !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
@@ -619,7 +619,7 @@ contains
         real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)), dimension(2)                   :: Re !< Temporary Reynolds number
+        real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -706,14 +706,14 @@ contains
                         call s_convert_to_mixture_variables(q_cons_vf, rho, gamma, pi_inf, Re, j, 0, 0)
                         lit_gamma = 1d0/gamma + 1d0
 
-                        if (((i .ge. cont_idx%beg) .and. (i .le. cont_idx%end)) &
+                        if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                             .or. &
-                            ((i .ge. adv_idx%beg) .and. (i .le. adv_idx%end)) &
+                            ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
                             ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i .eq. mom_idx%beg) then !u
+                        else if (i == mom_idx%beg) then !u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i .eq. E_idx) then !p
+                        else if (i == E_idx) then !p
                             if (model_eqns == 4) then
                                 !Tait pressure from density
                                 write (2, FMT) x_cb(j), &
@@ -744,13 +744,13 @@ contains
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
-                            
+
                             !call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
 
                             vftmp = q_cons_vf(alf_idx)%sf(j, 0, 0)
 
                             nR3 = 0d0
-                            
+
                             do k = 1, nb
                                 nR3 = nR3 + weight(k)*(nRtmp(k)**3d0)
                             end do
@@ -787,10 +787,10 @@ contains
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_path))
                 do j = 0, m
-                do k = 0, n
-                    write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
-                end do
-                write (2, *)
+                    do k = 0, n
+                        write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                    end do
+                    write (2, *)
                 end do
                 close (2)
             end do
@@ -808,13 +808,13 @@ contains
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_path))
                 do j = 0, m
-                do k = 0, n
-                do l = 0, p
-                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
-                end do
-                write (2, *)
-                end do
-                write (2, *)
+                    do k = 0, n
+                        do l = 0, p
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        write (2, *)
+                    end do
+                    write (2, *)
                 end do
                 close (2)
             end do
@@ -1641,26 +1641,26 @@ contains
         ! The cell-averaged partial densities, density, velocity, pressure,
         ! volume fractions, specific heat ratio function, liquid stiffness
         ! function, and sound speed.
-        real(kind(0d0))                                   :: lit_gamma, nbub
-        real(kind(0d0))                                   :: rho
-        real(kind(0d0)), dimension(num_dims)              :: vel
-        real(kind(0d0))                                   :: pres
-        real(kind(0d0))                                   :: ptilde
-        real(kind(0d0))                                   :: ptot
-        real(kind(0d0))                                   :: alf
-        real(kind(0d0))                                   :: alfgr
-        real(kind(0d0)), dimension(num_fluids)            :: alpha
-        real(kind(0d0))                                   :: gamma
-        real(kind(0d0))                                   :: pi_inf
-        real(kind(0d0))                                   :: c
-        real(kind(0d0))                                   :: M00, M10, M01, M20, M11, M02
-        real(kind(0d0))                                   :: varR, varV
-        real(kind(0d0)), dimension(Nb)                    :: nR, R, nRdot, Rdot
-        real(kind(0d0))                                   :: nR3
-        real(kind(0d0))                                   :: accel
-        real(kind(0d0))                                   :: int_pres
-        real(kind(0d0))                                   :: max_pres
-        real(kind(0d0)), dimension(2)             :: Re
+        real(kind(0d0)) :: lit_gamma, nbub
+        real(kind(0d0)) :: rho
+        real(kind(0d0)), dimension(num_dims) :: vel
+        real(kind(0d0)) :: pres
+        real(kind(0d0)) :: ptilde
+        real(kind(0d0)) :: ptot
+        real(kind(0d0)) :: alf
+        real(kind(0d0)) :: alfgr
+        real(kind(0d0)), dimension(num_fluids) :: alpha
+        real(kind(0d0)) :: gamma
+        real(kind(0d0)) :: pi_inf
+        real(kind(0d0)) :: c
+        real(kind(0d0)) :: M00, M10, M01, M20, M11, M02
+        real(kind(0d0)) :: varR, varV
+        real(kind(0d0)), dimension(Nb) :: nR, R, nRdot, Rdot
+        real(kind(0d0)) :: nR3
+        real(kind(0d0)) :: accel
+        real(kind(0d0)) :: int_pres
+        real(kind(0d0)) :: max_pres
+        real(kind(0d0)), dimension(2) :: Re
 
         integer :: i, j, k, l, s !< Generic loop iterator
 
@@ -1767,7 +1767,6 @@ contains
                             nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
                         end do
                         !call s_comp_n_from_cons(alf, nR, nbub)
-
 
                         nR3 = 0d0
                         do s = 1, nb
@@ -1885,14 +1884,12 @@ contains
                             end do
                             !call s_comp_n_from_cons(alf, nR, nbub)
 
-
                             nR3 = 0d0
                             do s = 1, nb
                                 nR3 = nR3 + weight(s)*(nR(s)**3d0)
                             end do
 
                             nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
-
 
                             R(:) = nR(:)/nbub
                             Rdot(:) = nRdot(:)/nbub
@@ -2200,7 +2197,7 @@ contains
                     end if
                 end do
             elseif (p == 0) then
-                if (num_integrals .ne. 3) then
+                if (num_integrals /= 3) then
                     print '(A)', 'Incorrect number of integrals'
                     call s_mpi_abort()
                 end if
@@ -2368,8 +2365,8 @@ contains
         contxb = cont_idx%beg; contxe = cont_idx%end
 !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe)
 
-        allocate(gammas(1:num_fluids))
-        allocate(pi_infs(1:num_fluids))
+        allocate (gammas(1:num_fluids))
+        allocate (pi_infs(1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma

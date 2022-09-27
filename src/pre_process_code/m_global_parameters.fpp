@@ -22,16 +22,16 @@ module m_global_parameters
     implicit none
 
     ! Logistics ================================================================
-    integer                    :: num_procs            !< Number of processors
+    integer :: num_procs            !< Number of processors
     integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
     integer, parameter :: path_len = 400  !< Maximum path length
     integer, parameter :: name_len = 50   !< Maximum name length
     real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
     integer, parameter :: dflt_int = -100 !< Default integer value
-    character(LEN=path_len)  :: case_dir             !< Case folder location
-    logical                    :: old_grid             !< Use existing grid data
-    logical                    :: old_ic               !< Use existing IC data
-    integer                    :: t_step_old           !< Existing IC/grid folder
+    character(LEN=path_len) :: case_dir             !< Case folder location
+    logical :: old_grid             !< Use existing grid data
+    logical :: old_ic               !< Use existing IC data
+    integer :: t_step_old           !< Existing IC/grid folder
     ! ==========================================================================
 
     ! Computational Domain Parameters ==========================================
@@ -72,7 +72,7 @@ module m_global_parameters
     ! is stretched while the remaining parameters are indicative of the location
     ! on the grid at which the stretching begins.
     real(kind(0d0)) :: a_x, a_y, a_z
-    integer         :: loops_x, loops_y, loops_z
+    integer :: loops_x, loops_y, loops_z
     real(kind(0d0)) :: x_a, y_a, z_a
     real(kind(0d0)) :: x_b, y_b, z_b
 
@@ -89,13 +89,13 @@ module m_global_parameters
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx                   !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx                    !< Indexes of first & last momentum eqns.
-    integer               :: E_idx                      !< Index of total energy equation
-    integer               :: alf_idx                    !< Index of void fraction
+    integer :: E_idx                      !< Index of total energy equation
+    integer :: alf_idx                    !< Index of void fraction
     type(int_bounds_info) :: adv_idx                    !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx       !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx                    !< Indexes of first & last bubble variable eqns.
-    integer               :: gamma_idx                  !< Index of specific heat ratio func. eqn.
-    integer               :: pi_inf_idx                 !< Index of liquid stiffness func. eqn.
+    integer :: gamma_idx                  !< Index of specific heat ratio func. eqn.
+    integer :: pi_inf_idx                 !< Index of liquid stiffness func. eqn.
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
@@ -151,28 +151,28 @@ module m_global_parameters
 
     !> @name Bubble modeling
     !> @{
-    integer          :: nb
-    real(kind(0d0))  :: R0ref
-    real(kind(0d0))  :: Ca, Web, Re_inv
+    integer :: nb
+    real(kind(0d0)) :: R0ref
+    real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
-    logical          :: bubbles
-    logical          :: qbmm      !< Quadrature moment method
-    integer          :: nmom  !< Number of carried moments
+    logical :: bubbles
+    logical :: qbmm      !< Quadrature moment method
+    integer :: nmom  !< Number of carried moments
     integer, parameter :: nnode = 4 !< Number of QBMM nodes
-    real(kind(0d0))  :: sigR, sigV, rhoRV !< standard deviations in R/V
+    real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
     !> @name Non-polytropic bubble gas compression
     !> @{
-    logical         :: polytropic
-    logical         :: polydisperse
-    integer         :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
+    logical :: polytropic
+    logical :: polydisperse
+    integer :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: poly_sigma
-    integer         :: dist_type !1 = binormal, 2 = lognormal-normal
-    integer         :: R0_type   !1 = simpson
+    integer :: dist_type !1 = binormal, 2 = lognormal-normal
+    integer :: R0_type   !1 = simpson
     !> @}
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -378,7 +378,6 @@ contains
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
 
-
             sys_size = adv_idx%end
 
             if (bubbles) then
@@ -448,8 +447,8 @@ contains
                 else if (nb > 1) then
                     if (R0_type == 1) then
                         call s_simpson
-                    else 
-                        print*, 'Invalid R0 type - abort'
+                    else
+                        print *, 'Invalid R0 type - abort'
                         stop
                     end if
                     V0(:) = 1d0
@@ -534,8 +533,8 @@ contains
                 else if (nb > 1) then
                     if (R0_type == 1) then
                         call s_simpson
-                    else 
-                        print*, 'Invalid R0 type - abort'
+                    else
+                        print *, 'Invalid R0 type - abort'
                         stop
                     end if
                     V0(:) = 1d0
@@ -552,7 +551,6 @@ contains
             end if
         end if
         ! ==================================================================
-
 
 #ifdef MFC_MPI
 

@@ -161,14 +161,14 @@ contains
 
                         lit_gamma = 1d0/gamma + 1d0
 
-                        if (((i .ge. cont_idx%beg) .and. (i .le. cont_idx%end)) &
+                        if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                             .or. &
-                            ((i .ge. adv_idx%beg) .and. (i .le. adv_idx%end)) &
+                            ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
                             ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i .eq. mom_idx%beg) then !u
+                        else if (i == mom_idx%beg) then !u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i .eq. E_idx) then !p
+                        else if (i == E_idx) then !p
                             if (model_eqns == 4) then
                                 !Tait pressure from density
                                 write (2, FMT) x_cb(j), &
@@ -195,7 +195,7 @@ contains
                                     pi_inf &
                                     )/gamma
                             end if
-                        else if ((i .ge. bub_idx%beg) .and. (i .le. bub_idx%end) .and. bubbles) then
+                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
@@ -231,10 +231,10 @@ contains
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
-                do k = 0, n
-                    write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
-                end do
-                write (2, *)
+                    do k = 0, n
+                        write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                    end do
+                    write (2, *)
                 end do
                 close (2)
             end do
@@ -246,13 +246,13 @@ contains
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
-                do k = 0, n
-                do l = 0, p
-                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
-                end do
-                write (2, *)
-                end do
-                write (2, *)
+                    do k = 0, n
+                        do l = 0, p
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        write (2, *)
+                    end do
+                    write (2, *)
                 end do
                 close (2)
             end do
