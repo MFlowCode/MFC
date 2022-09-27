@@ -16,7 +16,7 @@ contains
         !!  @param dir_name Directory path
     subroutine s_create_directory(dir_name)
         character(LEN=*), intent(IN) :: dir_name
-        
+
 #ifdef _WIN32
         call system('mkdir "'//dir_name//'" 2> NUL')
 #else

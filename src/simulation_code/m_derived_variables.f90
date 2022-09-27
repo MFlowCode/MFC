@@ -24,9 +24,9 @@ module m_derived_variables
     implicit none
 
     private; public :: s_initialize_derived_variables_module, &
-         s_initialize_derived_variables, &
-         s_compute_derived_variables, &
-         s_finalize_derived_variables_module
+ s_initialize_derived_variables, &
+ s_compute_derived_variables, &
+ s_finalize_derived_variables_module
 
     !> @name Finite-difference coefficients
     !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
@@ -429,9 +429,9 @@ contains
                                 ! x-acceleration weighted
                                 q_com(i, 8) = q_com(i, 8) + dV*(11d0*(q_prim_vf(i)%sf(j, k, l) &
                                                                       *q_prim_vf(mom_idx%beg)%sf(j, k, l)) &
-                                                                - 18d0*(q_prim_vf1(i)%sf(j, k, l)*q_prim_vf1(mom_idx%beg)%sf(j, k, l)) &
-                                                                + 9d0*(q_prim_vf2(i)%sf(j, k, l)*q_prim_vf2(mom_idx%beg)%sf(j, k, l)) &
-                                                                - 2d0*(q_prim_vf3(i)%sf(j, k, l)*q_prim_vf3(mom_idx%beg)%sf(j, k, l)))/(6d0*dt)
+                                                            - 18d0*(q_prim_vf1(i)%sf(j, k, l)*q_prim_vf1(mom_idx%beg)%sf(j, k, l)) &
+                                                             + 9d0*(q_prim_vf2(i)%sf(j, k, l)*q_prim_vf2(mom_idx%beg)%sf(j, k, l)) &
+                                                     - 2d0*(q_prim_vf3(i)%sf(j, k, l)*q_prim_vf3(mom_idx%beg)%sf(j, k, l)))/(6d0*dt)
                             end do
                         end do
                     end do
@@ -607,7 +607,7 @@ contains
                                                   (11d0*(q_prim_vf(i)%sf(j, k, l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)) &
                                                    - 18d0*(q_prim_vf1(i)%sf(j, k, l)*q_prim_vf1(mom_idx%beg + 1)%sf(j, k, l)) &
                                                    + 9d0*(q_prim_vf2(i)%sf(j, k, l)*q_prim_vf2(mom_idx%beg + 1)%sf(j, k, l)) &
-                                                   - 2d0*(q_prim_vf3(i)%sf(j, k, l)*q_prim_vf3(mom_idx%beg + 1)%sf(j, k, l)))/(6d0*dt)
+                                                 - 2d0*(q_prim_vf3(i)%sf(j, k, l)*q_prim_vf3(mom_idx%beg + 1)%sf(j, k, l)))/(6d0*dt)
                                     ! z-acceleration weighted
                                     q_com(i, 10) = q_com(i, 10) + dV* &
                                                    (11d0*(q_prim_vf(i)%sf(j, k, l)*q_prim_vf(mom_idx%end)%sf(j, k, l)) &

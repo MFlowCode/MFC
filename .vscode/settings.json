@@ -1,0 +1,17 @@
+{
+    "editor.detectIndentation": false,
+    "editor.insertSpaces":      true,
+    "editor.tabSize":           4,
+    "files.exclude": {
+        "**/.git":      true,
+        "**/.DS_Store": true,
+        "**/build":     true
+    },
+
+    "cmake.configureOnOpen": false,
+
+    "fortran.linter.includePaths": [
+        "${workspacefolder}/src/**"
+    ],
+    "fortran.preferredCase": "lowercase"
+}

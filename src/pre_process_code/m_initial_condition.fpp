@@ -64,7 +64,7 @@ module m_initial_condition
     real(kind(0d0)) :: length_x, length_y, length_z
     real(kind(0d0)) :: radius
     real(kind(0d0)) :: epsilon, beta
-    integer         :: smooth_patch_id
+    integer :: smooth_patch_id
     real(kind(0d0)) :: smooth_coeff !<
     !! These variables are analogous in both meaning and use to the similarly
     !! named components in the ic_patch_parameters type (see m_derived_types.f90
@@ -125,10 +125,10 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(IN) :: j, k, l
 
-        real(kind(0d0))                               :: rho    !< density
-        real(kind(0d0)), dimension(INT(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(kind(0d0))                               :: pres   !< pressure
-        real(kind(0d0))                               :: gamma  !< specific heat ratio function
+        real(kind(0d0)) :: rho    !< density
+        real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+        real(kind(0d0)) :: pres   !< pressure
+        real(kind(0d0)) :: gamma  !< specific heat ratio function
 
         integer :: i !< generic loop operator
 
@@ -305,7 +305,7 @@ contains
         end if
 
         ! Partial densities
-        if (model_eqns .ne. 4) then
+        if (model_eqns /= 4) then
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
             end do
@@ -365,7 +365,7 @@ contains
 
         ! Computing Mixture Variables of Smoothing Patch ===================
 
-        if (model_eqns .ne. 4) then
+        if (model_eqns /= 4) then
             ! Partial densities
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
@@ -458,7 +458,7 @@ contains
         end if
 
         ! Partial densities \alpha \rho
-        if (model_eqns .ne. 4) then
+        if (model_eqns /= 4) then
             !mixture density is an input
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = &
@@ -909,19 +909,18 @@ contains
             do j = 0, n
                 do i = 0, m
                     call random_number(rand_real)
-                    
+
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
-                    
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
 !                        IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
                     if ((perturb_alpha /= 0d0) .and. (perturb_alpha /= 1d0)) then
-                        
+
                         ! Derive new partial densities
                         do l = 1, num_fluids
                             q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
                         end do
-                        
+
                     end if
                 end do
             end do
@@ -1230,23 +1229,23 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
         do k = 0, p
-        do j = 0, n
-            do i = 0, m
-                myr = dsqrt((x_cc(i) - x_centroid)**2 &
-                            + (y_cc(j) - y_centroid)**2)
+            do j = 0, n
+                do i = 0, m
+                    myr = dsqrt((x_cc(i) - x_centroid)**2 &
+                                + (y_cc(j) - y_centroid)**2)
 
-                if (myr <= radius + thickness/2.d0 .and. &
-                    myr >= radius - thickness/2.d0 .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
+                    if (myr <= radius + thickness/2.d0 .and. &
+                        myr >= radius - thickness/2.d0 .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
 
-                    q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
-                                                     dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
-                end if
+                        q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
+                                                         dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                    end if
 
+                end do
             end do
-        end do
         end do
 
     end subroutine s_3dvarcircle ! ----------------------------------------------
@@ -1597,7 +1596,7 @@ contains
                 !what variables to alter
                 !bump in pressure
                 q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                    (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                                               (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                 !bump in void fraction
                 !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
@@ -1749,12 +1748,12 @@ contains
 
                     !what variables to alter
                     !x-y bump in pressure
-                    q_prim_vf(E_idx)%sf(i,j,0) = q_prim_vf(E_idx)%sf(i,j,0) * &
-                        ( 1d0 + 0.2d0*dexp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
+                    q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
+                               (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !x-bump
                     !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                                                   !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                    !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !bump in void fraction
                     !q_prim_vf(adv_idx%beg)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * &
@@ -1766,8 +1765,8 @@ contains
 
                     !reassign density
                     !q_prim_vf(1)%sf(i, j, 0) = &
-                        !(((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                        !rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
+                    !(((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                    !rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
 
                     ! ================================================================================
 
@@ -1884,25 +1883,25 @@ contains
                         !bump in pressure
                         q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)* &
                                                        (1d0 + 0.2d0*exp(-1d0* &
-                                                                        ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
+                                      ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
                                                                         /(2.d0*0.5d0)))
 
                         !bump in void fraction
- !                       q_prim_vf(adv_idx%beg)%sf(i, j, k) = q_prim_vf(adv_idx%beg)%sf(i, j, k)* &
-  !                                                           (1d0 + 0.2d0*exp(-1d0* &
-   !                                                                           ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-    !                                                                          /(2.d0*0.005d0)))
+                        !                       q_prim_vf(adv_idx%beg)%sf(i, j, k) = q_prim_vf(adv_idx%beg)%sf(i, j, k)* &
+                        !                                                           (1d0 + 0.2d0*exp(-1d0* &
+                        !                                                                           ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
+                        !                                                                          /(2.d0*0.005d0)))
 
                         !bump in R(x)
-                 !       q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
-                  !                                               (1d0 + 0.2d0*exp(-1d0* &
-   !                                                                               ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
+                        !       q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
+                        !                                               (1d0 + 0.2d0*exp(-1d0* &
+                        !                                                                               ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
 !                                                                                  /(2.d0*0.005d0)))
 
                         !reassign density
-               !         q_prim_vf(1)%sf(i, j, k) = &
-               !             (((q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                !            rhoref*(1d0 - q_prim_vf(E_idx + 1)%sf(i, j, k))
+                        !         q_prim_vf(1)%sf(i, j, k) = &
+                        !             (((q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                        !            rhoref*(1d0 - q_prim_vf(E_idx + 1)%sf(i, j, k))
 
                         ! ================================================================================
 

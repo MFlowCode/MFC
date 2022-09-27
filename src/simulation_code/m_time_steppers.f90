@@ -24,7 +24,7 @@ module m_time_steppers
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_fftw
-    
+
     use nvtx
     ! ==========================================================================
 
@@ -141,7 +141,6 @@ contains
             end do
         end if
 
-
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
@@ -159,7 +158,6 @@ contains
 !$acc enter data create(rhs_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
-
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_open_run_time_information_file()
@@ -174,13 +172,12 @@ contains
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-
-        integer :: i,j,k,l !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         ! Stage 1 of 1 =====================================================
 
-        call CPU_time(start)
+        call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
 
@@ -198,17 +195,16 @@ contains
 
         if (t_step == t_step_stop) return
 
-
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
                             + dt*rhs_vf(i)%sf(j, k, l)
-                    end do 
-                end do 
+                    end do
+                end do
             end do
         end do
 
@@ -217,21 +213,19 @@ contains
         !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(102,0,0)
 
-        IF (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
-        
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         call nvtxEndRange
 
-        call CPU_time(finish)
+        call cpu_time(finish)
 
-        if(t_step >= 4) then
+        if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
-        end if     
-
-
+        end if
 
         ! ==================================================================
 
@@ -244,13 +238,12 @@ contains
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-
-        integer :: i,j,k,l !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         ! Stage 1 of 2 =====================================================
 
-        call CPU_time(start)
+        call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
 
@@ -266,21 +259,20 @@ contains
 
         if (t_step == t_step_stop) return
 
-
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
                             + dt*rhs_vf(i)%sf(j, k, l)
-                    end do 
-                end do 
+                    end do
+                end do
             end do
         end do
 
-        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         ! ==================================================================
@@ -289,36 +281,33 @@ contains
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
-
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                               ( q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                               + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l))/2d0
-                    end do 
-                end do 
+                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/2d0
+                    end do
+                end do
             end do
         end do
 
-        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         call nvtxEndRange
 
-        call CPU_time(finish)
+        call cpu_time(finish)
 
-        if(t_step >= 4) then
+        if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
-        end if  
-
-
+        end if
 
         ! ==================================================================
 
@@ -331,13 +320,12 @@ contains
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-
-        integer :: i,j,k,l !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         ! Stage 1 of 3 =====================================================
 
-        call CPU_time(start)
+        call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
 
@@ -353,30 +341,26 @@ contains
 
         if (t_step == t_step_stop) return
 
-
-
-
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
                             + dt*rhs_vf(i)%sf(j, k, l)
-                    end do 
-                end do 
+                    end do
+                end do
             end do
         end do
 
-        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
-
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
@@ -386,15 +370,15 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                               (3d0* q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                               + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l))/4d0
-                    end do 
-                end do 
+                            (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                    end do
+                end do
             end do
         end do
 
-        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
@@ -403,40 +387,37 @@ contains
         ! Stage 3 of 3 =====================================================
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
-
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                               ( q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                               + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                            + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
-                    end do 
-                end do 
+                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                    end do
+                end do
             end do
         end do
 
-        IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(1)%vf)
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         call nvtxEndRange
 
-        call CPU_time(finish)
+        call cpu_time(finish)
 
-        if(t_step >= 4) then
+        if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
-        end if  
+        end if
 
         ! ==================================================================
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
-
-
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
@@ -483,8 +464,6 @@ contains
 
         integer :: i, j !< Generic loop iterators
 
-
-
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
 
@@ -513,7 +492,7 @@ contains
         do i = 1, adv_idx%end
             deallocate (q_prim_vf(i)%sf)
         end do
-        if(bubbles) then
+        if (bubbles) then
             do i = bub_idx%beg, bub_idx%end
                 deallocate (q_prim_vf(i)%sf)
             end do
