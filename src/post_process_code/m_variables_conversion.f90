@@ -346,7 +346,7 @@ contains
                              q_cons_vf(1)%sf(j, k, l)/ &
                              (rhoref*(1.d0 - q_cons_vf(alf_idx)%sf(j, k, l))) &
                              )**(1.d0/fluid_pp(1)%gamma + 1.d0)) - fluid_pp(1)%pi_inf
-                    else if ((model_eqns .ne. 4) .and. bubbles .neqv. .true.) then
+                    else if ((model_eqns /= 4) .and. bubbles .neqv. .true.) then
                         ! Computing the pressure from the energy
                         q_prim_vf(E_idx)%sf(j, k, l) = &
                             (q_cons_vf(E_idx)%sf(j, k, l) &

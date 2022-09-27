@@ -144,7 +144,7 @@ program p_main
                                            -offset_y%beg:n + offset_y%end, &
                                            -offset_z%beg:p + offset_z%end)
 
-                    if (model_eqns .ne. 4) then
+                    if (model_eqns /= 4) then
                         write (varname, '(A,I0)') 'alpha_rho', i
                     else
                         write (varname, '(A,I0)') 'rho', i
@@ -225,7 +225,6 @@ program p_main
         end do
         ! ----------------------------------------------------------------------
 
-
         ! Adding the energy to the formatted database file ---------------------
         if (E_wrt .or. cons_vars_wrt) then
 
@@ -281,12 +280,10 @@ program p_main
                 .or. &
                 (cons_vars_wrt .or. prim_vars_wrt)) then
 
-                
                 q_sf = q_cons_vf(adv_idx%end)%sf( &
                        -offset_x%beg:m + offset_x%end, &
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end)
-                
 
                 write (varname, '(A,I0)') 'alpha', num_fluids
                 call s_write_variable_to_formatted_database_file(varname, t_step)

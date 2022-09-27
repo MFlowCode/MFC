@@ -47,14 +47,14 @@ program p_main
     use m_derived_variables     !< Procedures used to compute quantites derived
                                 !! from the conservative and primitive variables
 
-#ifdef _OPENACC 
+#ifdef _OPENACC
     use openacc
 #endif
 
     use nvtx
 
 #ifdef _OPENACC
-   use openacc
+    use openacc
 #endif
     ! ==========================================================================
 
@@ -81,11 +81,11 @@ program p_main
     integer(acc_device_kind) :: devtype
 #endif
 
-    CALL system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate) 
+    call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
     ! Initializing MPI execution environment
 
-    CALL s_mpi_initialize()
+    call s_mpi_initialize()
 
 ! Bind GPUs if OpenACC is enabled
 #ifdef _OPENACC
@@ -94,20 +94,20 @@ program p_main
     local_rank = 0
 #else
     call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
-        MPI_INFO_NULL, local_comm, ierr)
+                             MPI_INFO_NULL, local_comm, ierr)
     call MPI_Comm_size(local_comm, local_size, ierr)
     call MPI_Comm_rank(local_comm, local_rank, ierr)
 #endif
 
     devtype = acc_get_device_type()
-    devNum  = acc_get_num_devices(devtype)
-    dev     = mod(local_rank, devNum)
+    devNum = acc_get_num_devices(devtype)
+    dev = mod(local_rank, devNum)
 
     ! Note: I0 (Iw, where w=0) is a Fortran 95 feature.
     print '("Global Rank "I0" (/"I0") - Local Rank "I0" (/"I0") - OpenACC (Local) Device "I0" (/"I0")")', proc_rank, num_procs, local_rank, local_size, dev, devNum
 
-    call acc_set_device_num(dev, devtype)   
-#endif   
+    call acc_set_device_num(dev, devtype)
+#endif
 
     ! The rank 0 processor assigns default values to the user inputs prior to
     ! reading them in from the input file. Next, the user inputs are read and
@@ -118,19 +118,14 @@ program p_main
         call s_read_input_file()
         call s_check_input_file()
     end if
-   
+
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
 
- 
-
     call s_mpi_bcast_user_inputs()
     call s_initialize_parallel_io()
     call s_mpi_decompose_computational_domain()
-
-
-
 
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -140,15 +135,14 @@ program p_main
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    
+
     call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
-    IF (grid_geometry == 3) call s_initialize_fftw_module()
+    if (grid_geometry == 3) call s_initialize_fftw_module()
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
 
     if (qbmm) call s_initialize_qbmm_module()
-
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -156,22 +150,17 @@ program p_main
 
     call s_initialize_rhs_module()
 
-
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    
+
     call s_initialize_data_output_module()
     call s_initialize_derived_variables_module()
     call s_initialize_time_steppers_module()
 
-
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)    
-
-    
-    
+#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -186,11 +175,8 @@ program p_main
     call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
-    
-
     ! Populating the buffers of the grid variables using the boundary conditions
     call s_populate_grid_variables_buffers()
-
 
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or execution of any other tasks that are needed to properly configure
@@ -198,20 +184,16 @@ program p_main
     call s_initialize_weno_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    PRINT *, "[MEM-INST] After: s_initialize_weno_module"
+    print *, "[MEM-INST] After: s_initialize_weno_module"
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
-    
-
 
     call s_initialize_cbc_module()
 
-
     call s_initialize_derived_variables()
 
-    allocate(proc_time(0:num_procs - 1))
-    allocate(io_proc_time(0:num_procs - 1))
-
+    allocate (proc_time(0:num_procs - 1))
+    allocate (io_proc_time(0:num_procs - 1))
 
 !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
 !$acc update device(sys_size, buff_size)
@@ -220,7 +202,6 @@ program p_main
 !$acc update device(q_cons_ts(1)%vf(i)%sf)
     end do
 
-    
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
     if (t_step == 0) then
@@ -229,7 +210,6 @@ program p_main
         mytime = t_step*dt
     end if
     finaltime = t_step_stop*dt
-
 
     ! Time-stepping Loop =======================================================
     do
@@ -256,46 +236,46 @@ program p_main
 
             call s_mpi_barrier()
 
-            if(num_procs > 1) then
+            if (num_procs > 1) then
                 call mpi_bcast_time_step_values(proc_time, time_avg)
-                
+
                 call mpi_bcast_time_step_values(io_proc_time, io_time_avg)
-            end if 
-            
-            if(proc_rank == 0) then
+            end if
+
+            if (proc_rank == 0) then
                 time_final = 0d0
                 io_time_final = 0d0
-                if(num_procs == 1) then
-                   time_final = time_avg 
-                   io_time_final = io_time_avg
-                   print*, "Final Time", time_final
-                else    
+                if (num_procs == 1) then
+                    time_final = time_avg
+                    io_time_final = io_time_avg
+                    print *, "Final Time", time_final
+                else
                     time_final = maxval(proc_time)
                     io_time_final = maxval(io_proc_time)
-                    print*, "Final Time", time_final
-                end if               
-                INQUIRE(FILE = 'time_data.dat', EXIST = file_exists)
-                if(file_exists) then
-                    open(1, file = 'time_data.dat', position = 'append',status = 'old')
-                    write(1,*) num_procs, time_final
-                    close(1)
+                    print *, "Final Time", time_final
+                end if
+                inquire (FILE='time_data.dat', EXIST=file_exists)
+                if (file_exists) then
+                    open (1, file='time_data.dat', position='append', status='old')
+                    write (1, *) num_procs, time_final
+                    close (1)
                 else
-                    open(1, file = 'time_data.dat', status = 'new')
-                    write(1,*) num_procs, time_final
-                    close(1)
-                end if               
+                    open (1, file='time_data.dat', status='new')
+                    write (1, *) num_procs, time_final
+                    close (1)
+                end if
 
-                INQUIRE(FILE = 'io_time_data.dat', EXIST = file_exists)
-                if(file_exists) then
-                    open(1, file = 'io_time_data.dat', position = 'append',status = 'old')
-                    write(1,*) num_procs, io_time_final
-                    close(1)
+                inquire (FILE='io_time_data.dat', EXIST=file_exists)
+                if (file_exists) then
+                    open (1, file='io_time_data.dat', position='append', status='old')
+                    write (1, *) num_procs, io_time_final
+                    close (1)
                 else
-                    open(1, file = 'io_time_data.dat', status = 'new')
-                    write(1,*) num_procs, io_time_final
-                    close(1)
-                end if                
-                
+                    open (1, file='io_time_data.dat', status='new')
+                    write (1, *) num_procs, io_time_final
+                    close (1)
+                end if
+
             end if
 
             exit
@@ -315,21 +295,21 @@ program p_main
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
-            
-               call CPU_time(start)
-          !  call nvtxStartRange("I/O")
-                do i = 1, sys_size
+
+            call cpu_time(start)
+            !  call nvtxStartRange("I/O")
+            do i = 1, sys_size
 !$acc update host(q_cons_ts(1)%vf(i)%sf)
-                end do
+            end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
-          !  call nvtxEndRange
-               call CPU_time(finish)
-               nt = int((t_step - t_step_start)/(t_step_save))
-               if(nt == 1) then
-                       io_time_avg = abs(finish - start)
-               else
-                        io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
-               end if
+            !  call nvtxEndRange
+            call cpu_time(finish)
+            nt = int((t_step - t_step_start)/(t_step_save))
+            if (nt == 1) then
+                io_time_avg = abs(finish - start)
+            else
+                io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
+            end if
         end if
 
         call system_clock(cpu_end)
@@ -342,7 +322,7 @@ program p_main
 
     ! Deallocation and/or disassociation procedures for the modules
 
-    deallocate(proc_time)
+    deallocate (proc_time)
 
     call s_finalize_time_steppers_module()
     call s_finalize_derived_variables_module()
@@ -353,7 +333,7 @@ program p_main
     call s_finalize_weno_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()
-    IF(grid_geometry == 3)  call s_finalize_fftw_module
+    if (grid_geometry == 3) call s_finalize_fftw_module
     call s_finalize_mpi_proxy_module()
     call s_finalize_global_parameters_module()
 

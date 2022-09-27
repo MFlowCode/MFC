@@ -31,7 +31,7 @@ module m_global_parameters
     implicit none
 
     ! Logistics ================================================================
-    integer                    :: num_procs             !< Number of processors
+    integer :: num_procs             !< Number of processors
     integer, parameter :: num_stcls_min = 5     !< Mininum # of stencils
     integer, parameter :: path_len = 400   !< Maximum path length
     integer, parameter :: name_len = 50    !< Maximum name length
@@ -40,11 +40,11 @@ module m_global_parameters
     integer, parameter :: dflt_int = -100  !< Default integer value
     real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
-    character(LEN=path_len)  :: case_dir              !< Case folder location
-    logical                    :: run_time_info         !< Run-time output flag
-    logical                    :: debug                 !< Debug mode print statements
-    integer                    :: t_step_old            !< Existing IC/grid folder
-    real(kind(0d0)), PARAMETER :: small_alf = 1d-7 !< Small alf tolerance
+    character(LEN=path_len) :: case_dir              !< Case folder location
+    logical :: run_time_info         !< Run-time output flag
+    logical :: debug                 !< Debug mode print statements
+    integer :: t_step_old            !< Existing IC/grid folder
+    real(kind(0d0)), parameter :: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
     ! Computational Domain Parameters ==========================================
     integer :: proc_rank !< Rank of the local processor
@@ -94,43 +94,43 @@ module m_global_parameters
     ! ==========================================================================
 
     ! Simulation Algorithm Parameters ==========================================
-    integer         :: model_eqns     !< Multicomponent flow model
-#:if MFC_CASE_OPTIMIZATION
-    integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
-#:else
-    integer         :: num_dims       !< Number of spatial dimensions
-#:endif
-    integer         :: num_fluids     !< Number of fluids in the flow
-    logical         :: adv_alphan     !< Advection of the last volume fraction
-    logical         :: mpp_lim        !< Mixture physical parameters (MPP) limits
-    integer         :: time_stepper   !< Time-stepper algorithm
-    integer         :: weno_vars      !< WENO-reconstructed state variables type
+    integer :: model_eqns     !< Multicomponent flow model
+    #:if MFC_CASE_OPTIMIZATION
+        integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
+    #:else
+        integer :: num_dims       !< Number of spatial dimensions
+    #:endif
+    integer :: num_fluids     !< Number of fluids in the flow
+    logical :: adv_alphan     !< Advection of the last volume fraction
+    logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
+    integer :: time_stepper   !< Time-stepper algorithm
+    integer :: weno_vars      !< WENO-reconstructed state variables type
 
-#:if MFC_CASE_OPTIMIZATION
-    integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
-    integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
-#:else
-    integer         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
-    integer         :: weno_order     !< Order of the WENO reconstruction
-#:endif
+    #:if MFC_CASE_OPTIMIZATION
+        integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
+        integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+    #:else
+        integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+        integer :: weno_order     !< Order of the WENO reconstruction
+    #:endif
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-    logical         :: mapped_weno    !< WENO with mapping of nonlinear weights
-    logical         :: mp_weno        !< Monotonicity preserving (MP) WENO
-    logical         :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer         :: riemann_solver !< Riemann solver algorithm
-    integer         :: wave_speeds    !< Wave speeds estimation method
-    integer         :: avg_state      !< Average state evaluation method
-    logical         :: alt_soundspeed !< Alternate mixture sound speed
-    logical         :: null_weights   !< Null undesired WENO weights
-    logical         :: mixture_err    !< Mixture properties correction
-    logical         :: cu_tensor   
+    logical :: mapped_weno    !< WENO with mapping of nonlinear weights
+    logical :: mp_weno        !< Monotonicity preserving (MP) WENO
+    logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer :: riemann_solver !< Riemann solver algorithm
+    integer :: wave_speeds    !< Wave speeds estimation method
+    integer :: avg_state      !< Average state evaluation method
+    logical :: alt_soundspeed !< Alternate mixture sound speed
+    logical :: null_weights   !< Null undesired WENO weights
+    logical :: mixture_err    !< Mixture properties correction
+    logical :: cu_tensor
 
-    integer         :: cpu_start, cpu_end, cpu_rate
+    integer :: cpu_start, cpu_end, cpu_rate
 
-#:if not MFC_CASE_OPTIMIZATION
-    !$acc declare create(num_dims, weno_polyn, weno_order)
-#:endif
+    #:if not MFC_CASE_OPTIMIZATION
+        !$acc declare create(num_dims, weno_polyn, weno_order)
+    #:endif
 
 !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps)
 
@@ -162,16 +162,16 @@ module m_global_parameters
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
     !> @{
-    integer           :: sys_size                  !< Number of unknowns in system of eqns.
+    integer :: sys_size                  !< Number of unknowns in system of eqns.
     type(int_bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
-    integer           :: E_idx                     !< Index of energy equation
+    integer :: E_idx                     !< Index of energy equation
     type(int_bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer               :: alf_idx               !< Index of void fraction
-    integer           :: gamma_idx                 !< Index of specific heat ratio func. eqn.
-    integer           :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    integer :: alf_idx               !< Index of void fraction
+    integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
+    integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     !> @}
 
 !$acc declare create(bub_idx)
@@ -180,7 +180,7 @@ module m_global_parameters
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
     !! numbers, will be non-negligible.
     !> @{
-    integer, dimension(2)   :: Re_size
+    integer, dimension(2) :: Re_size
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
 !$acc declare create(Re_size, Re_idx)
@@ -213,7 +213,6 @@ module m_global_parameters
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
-
     ! ==========================================================================
 
     integer :: fd_order !<
@@ -244,11 +243,11 @@ module m_global_parameters
 
     !> @name Bubble modeling
     !> @{
-#:if MFC_CASE_OPTIMIZATION
-    integer, parameter :: nb = ${nb}$ !< Number of eq. bubble sizes
-#:else
-    integer            :: nb       !< Number of eq. bubble sizes
-#:endif
+    #:if MFC_CASE_OPTIMIZATION
+        integer, parameter :: nb = ${nb}$ !< Number of eq. bubble sizes
+    #:else
+        integer :: nb       !< Number of eq. bubble sizes
+    #:endif
 
     real(kind(0d0)) :: R0ref    !< Reference bubble size
     real(kind(0d0)) :: Ca       !< Cavitation number
@@ -257,25 +256,25 @@ module m_global_parameters
     real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
     real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
-    logical         :: bubbles      !< Bubbles on/off
-    logical         :: polytropic   !< Polytropic  switch
-    logical         :: polydisperse !< Polydisperse bubbles
+    logical :: bubbles      !< Bubbles on/off
+    logical :: polytropic   !< Polytropic  switch
+    logical :: polydisperse !< Polydisperse bubbles
 
-    integer         :: bubble_model !< Gilmore or Keller--Miksis bubble model
-    integer         :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
+    integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
+    integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
     real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     logical :: qbmm      !< Quadrature moment method
-    integer, parameter :: nmom  = 6 !< Number of carried moments per R0 location  
+    integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
     integer, parameter :: nnode = 4 !< Number of QBMM nodes
     integer :: nmomsp    !< Number of moments required by ensemble-averaging
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
 
-#:if not MFC_CASE_OPTIMIZATION
-    !$acc declare create(nb)
-#:endif
+    #:if not MFC_CASE_OPTIMIZATION
+        !$acc declare create(nb)
+    #:endif
 
 !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
@@ -296,23 +295,21 @@ module m_global_parameters
 !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     !> @name Acoustic monopole parameters
     !> @{
-    logical         :: monopole !< Monopole switch
+    logical :: monopole !< Monopole switch
     type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
-    integer         :: num_mono !< Number of monopoles
+    integer :: num_mono !< Number of monopoles
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 
-
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
-
 
     logical :: weno_flat, riemann_flat, cu_mpi
 
     ! ======================================================================
 
     ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), PARAMETER :: pi = 3.141592653589793d0 !< Pi
+    real(kind(0d0)), parameter :: pi = 3.141592653589793d0 !< Pi
 
     ! ==========================================================================
 
@@ -396,10 +393,10 @@ contains
         thermal = dflt_int
         R0ref = dflt_real
 
-#:if not MFC_CASE_OPTIMIZATION
-        nb = dflt_int
-        weno_order = dflt_int
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION
+            nb = dflt_int
+            weno_order = dflt_int
+        #:endif
         R0_type = dflt_int
 
         ! User inputs for qbmm for simulation code
@@ -472,14 +469,13 @@ contains
 
         type(int_bounds_info) :: ix, iy, iz
 
-#:if not MFC_CASE_OPTIMIZATION
-        ! Determining the degree of the WENO polynomials
-        weno_polyn = (weno_order - 1)/2
+        #:if not MFC_CASE_OPTIMIZATION
+            ! Determining the degree of the WENO polynomials
+            weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
-#:endif
+        #:endif
 
 !$acc update device(nb)
-
 
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces
@@ -524,7 +520,6 @@ contains
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
-
 
                 sys_size = adv_idx%end
 
@@ -591,7 +586,6 @@ contains
                         end do
                     end if
 
-
                     if (nb == 1) then
                         weight(:) = 1d0
                         R0(:) = 1d0
@@ -599,8 +593,8 @@ contains
                     else if (nb > 1) then
                         if (R0_type == 1) then
                             call s_simpson
-                        else 
-                            print*, 'Invalid R0 type - abort'
+                        else
+                            print *, 'Invalid R0 type - abort'
                             stop
                         end if
                         V0(:) = 1d0
@@ -618,7 +612,6 @@ contains
                         pref = 1.d0
                     end if
                 end if
-
 
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
@@ -676,8 +669,8 @@ contains
                     else if (nb > 1) then
                         if (R0_type == 1) then
                             call s_simpson
-                        else 
-                            print*, 'Invalid R0 type - abort'
+                        else
+                            print *, 'Invalid R0 type - abort'
                             stop
                         end if
                         V0(:) = 1d0
@@ -745,10 +738,6 @@ contains
             buff_size = weno_polyn + 2
         end if
 
-
-
-
-
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -764,14 +753,13 @@ contains
             buff_size = buff_size + fd_number
         end if
 
-
         startx = -buff_size
         starty = 0
         startz = 0
-        if(n > 0) then
+        if (n > 0) then
             starty = -buff_size
         end if
-        if(p > 0) then
+        if (p > 0) then
             startz = -buff_size
         end if
 
@@ -944,9 +932,9 @@ contains
     !> Initializes parallel infrastructure
     subroutine s_initialize_parallel_io() ! --------------------------------
 
-#:if not MFC_CASE_OPTIMIZATION
-        num_dims = 1 + min(1, n) + min(1, p)
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION
+            num_dims = 1 + min(1, n) + min(1, p)
+        #:endif
 
         allocate (proc_coords(1:num_dims))
 
@@ -958,13 +946,12 @@ contains
 
 #else
 
-    ! Option for Lustre file system (Darter/Comet/Stampede)
-    write (mpiiofs, '(A)') '/lustre_'
-    mpiiofs = trim(mpiiofs)
+        ! Option for Lustre file system (Darter/Comet/Stampede)
+        write (mpiiofs, '(A)') '/lustre_'
+        mpiiofs = trim(mpiiofs)
 
-
-    call MPI_INFO_CREATE(mpi_info_int, ierr)
-    call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
+        call MPI_INFO_CREATE(mpi_info_int, ierr)
+        call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
         ! Option for UNIX file system (Hooke/Thomson)
         ! WRITE(mpiiofs, '(A)') '/ufs_'
@@ -1026,22 +1013,21 @@ contains
             nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
         end do
 
-
         !if (nR3 < 0d0) then
-            ! DO i = 1,nb
-            ! IF (nRtmp(i) < small_alf) THEN
-            ! nRtmp(i) = small_alf
-            ! END IF
-            ! END DO
-            ! nR3 = 1.d-12
-            !print *, vftmp, nR3, nRtmp(:)
-         !   stop 'nR3 is negative'
+        ! DO i = 1,nb
+        ! IF (nRtmp(i) < small_alf) THEN
+        ! nRtmp(i) = small_alf
+        ! END IF
+        ! END DO
+        ! nR3 = 1.d-12
+        !print *, vftmp, nR3, nRtmp(:)
+        !   stop 'nR3 is negative'
         !end if
         !if (vftmp < 0d0) then
-            ! vftmp = small_alf
-            ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
-            !print *, vftmp, nR3, nRtmp(:)
-         !   stop 'vf negative'
+        ! vftmp = small_alf
+        ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
+        !print *, vftmp, nR3, nRtmp(:)
+        !   stop 'vf negative'
         !end if
 
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
@@ -1067,14 +1053,14 @@ contains
             R3 = R3 + weight(i)*(Rtmp(i)**3d0)
         end do
 
-        IF ( R3 < 0d0 ) THEN
+        if (R3 < 0d0) then
             !PRINT*, vftmp, R3, Rtmp(:)
-            STOP 'R3 is negative'
-        END IF
-        IF (vftmp < 0d0) THEN
+            stop 'R3 is negative'
+        end if
+        if (vftmp < 0d0) then
             !PRINT*, vftmp, R3, Rtmp(:)
-            STOP 'vf negative'
-        END IF
+            stop 'vf negative'
+        end if
 
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
 
@@ -1094,7 +1080,6 @@ contains
         do i = 1, nb
             mom = mom + weight(i)*func(i)
         end do
-
 
     end subroutine s_quad
 

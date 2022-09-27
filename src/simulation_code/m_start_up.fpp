@@ -33,16 +33,15 @@ module m_start_up
 
     implicit none
 
-    PRIVATE; PUBLIC :: s_initialize_start_up_module, &
-                       s_read_input_file, &
-                       s_check_input_file, &
-                       s_read_data_files, &
-                       s_read_serial_data_files, &
-                       s_read_parallel_data_files, &
-                       s_populate_grid_variables_buffers, &
-                       s_initialize_internal_energy_equations, &
-                       s_finalize_start_up_module
-
+    private; public :: s_initialize_start_up_module, &
+ s_read_input_file, &
+ s_check_input_file, &
+ s_read_data_files, &
+ s_read_serial_data_files, &
+ s_read_parallel_data_files, &
+ s_populate_grid_variables_buffers, &
+ s_initialize_internal_energy_equations, &
+ s_finalize_start_up_module
 
     abstract interface ! ===================================================
 
@@ -59,7 +58,7 @@ module m_start_up
 
     end interface ! ========================================================
 
-    type(scalar_field), allocatable, dimension(:)  :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -164,15 +163,15 @@ contains
         ! ==================================================================
 
 #if !(defined(_OPENACC) && defined(__PGI))
-        if(cu_mpi) then
+        if (cu_mpi) then
             print '(A)', 'Unsupported value of cu_mpi. Exiting ...'
-            call s_mpi_abort()            
+            call s_mpi_abort()
         end if
 #endif
 
 #ifndef MFC_cuTENSOR
         if (cu_tensor) then
-            print '(A)', 'Unsupported value of cu_tensor. MFC was not built '//&
+            print '(A)', 'Unsupported value of cu_tensor. MFC was not built '// &
                 'with the NVIDIA cuTENSOR library. Exiting ...'
             call s_mpi_abort()
         end if
@@ -251,7 +250,7 @@ contains
         elseif (qbmm .and. (bubbles .neqv. .true.)) then
             print '(A)', 'QBMM requires bubbles'
             call s_mpi_abort()
-        elseif (qbmm .and. (nnode .ne. 4)) then
+        elseif (qbmm .and. (nnode /= 4)) then
             print '(A)', 'nnode not supported'
             call s_mpi_abort()
         elseif (model_eqns == 3 .and. riemann_solver /= 2) then
@@ -627,7 +626,7 @@ contains
             print '(A)', trim(file_path)//' is missing. Exiting ...'
             call s_mpi_abort()
         end if
-        
+
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
         ! ==================================================================
@@ -1095,7 +1094,6 @@ contains
 
     end subroutine s_populate_grid_variables_buffers ! ---------------------
 
-
     !> The purpose of this procedure is to initialize the
         !!      values of the internal-energy equations of each phase
         !!      from the mass of each phase, the mixture momentum and
@@ -1103,13 +1101,13 @@ contains
         !! @param v_vf conservative variables
     subroutine s_initialize_internal_energy_equations(v_vf) !---------------
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) ::     v_vf
-        real(kind(0d0))                                        ::      rho
-        real(kind(0d0))                                        :: dyn_pres
-        real(kind(0d0))                                        ::    gamma
-        real(kind(0d0))                                        ::   pi_inf
-        real(kind(0d0)), dimension(2)                          ::       Re
-        real(kind(0d0))                                        ::     pres
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: v_vf
+        real(kind(0d0)) :: rho
+        real(kind(0d0)) :: dyn_pres
+        real(kind(0d0)) :: gamma
+        real(kind(0d0)) :: pi_inf
+        real(kind(0d0)), dimension(2) :: Re
+        real(kind(0d0)) :: pres
 
         integer :: i, j, k, l
 
@@ -1124,7 +1122,6 @@ contains
                         dyn_pres = dyn_pres + 5d-1*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
-
 
                     pres = (v_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
@@ -1144,7 +1141,6 @@ contains
         type(int_bounds_info) :: ix, iy, iz
 
         integer :: i !< Generic loop iterator
-
 
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files

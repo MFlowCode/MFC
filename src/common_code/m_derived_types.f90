@@ -10,7 +10,7 @@ module m_derived_types
 
     implicit none
 
-    INTEGER, parameter :: num_fluids_max  = 10 !<
+    integer, parameter :: num_fluids_max = 10 !<
     !! Maximum number of fluids in the simulation
 
     integer, parameter :: num_probes_max = 10 !<
@@ -19,28 +19,24 @@ module m_derived_types
     integer, parameter :: num_patches_max = 10
 
     !> Derived type adding the field position (fp) as an attribute
-    TYPE field_position
-        REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:,:,:) :: fp !< Field position
-    END TYPE field_position
-
+    type field_position
+        real(kind(0d0)), allocatable, dimension(:, :, :) :: fp !< Field position
+    end type field_position
 
     !> Derived type annexing a scalar field (SF)
     type scalar_field
         real(kind(0d0)), pointer, dimension(:, :, :) :: sf => null()
     end type scalar_field
 
-
     type mpi_io_var
         integer, allocatable, dimension(:) :: view
         type(scalar_field), allocatable, dimension(:) :: var
     end type mpi_io_var
 
-
     !> Derived type annexing a vector field (VF)
-    TYPE vector_field
-        TYPE(scalar_field), ALLOCATABLE, DIMENSION(:) :: vf !< Vector field
-    END TYPE vector_field
-
+    type vector_field
+        type(scalar_field), allocatable, dimension(:) :: vf !< Vector field
+    end type vector_field
 
     !> Integer boounds for variables
     type int_bounds_info
@@ -48,13 +44,11 @@ module m_derived_types
         integer :: end
     end type int_bounds_info
 
-
     !> Derived type adding beginning (beg) and end bounds info as attributes
     type bounds_info
         real(kind(0d0)) :: beg
         real(kind(0d0)) :: end
     end type bounds_info
-
 
     !> bounds for the bubble dynamic variables
     type bub_bounds_info
@@ -67,7 +61,6 @@ module m_derived_types
         integer, dimension(:, :), allocatable :: moms !< Moment indices for qbmm
         integer, dimension(:, :, :), allocatable :: fullmom !< Moment indices for qbmm
     end type bub_bounds_info
-
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
     !! NOTE: The requirements for the specification of the above parameters
@@ -114,12 +107,12 @@ module m_derived_types
         !! cells across which boundaries of the current patch will be smeared out
 
         real(kind(0d0)), dimension(num_fluids_max) :: alpha_rho
-        real(kind(0d0))                            :: rho
-        real(kind(0d0)), dimension(3)              :: vel
-        real(kind(0d0))                            :: pres
+        real(kind(0d0)) :: rho
+        real(kind(0d0)), dimension(3) :: vel
+        real(kind(0d0)) :: pres
         real(kind(0d0)), dimension(num_fluids_max) :: alpha
-        real(kind(0d0))                            :: gamma
-        real(kind(0d0))                            :: pi_inf !<
+        real(kind(0d0)) :: gamma
+        real(kind(0d0)) :: pi_inf !<
 
         !! Primitive variables associated with the patch. In order, these include
         !! the partial densities, density, velocity, pressure, volume fractions,
@@ -133,23 +126,21 @@ module m_derived_types
 
     end type ic_patch_parameters
 
-
     !> Derived type annexing the physical parameters (PP) of the fluids. These
     !! include the specific heat ratio function and liquid stiffness function.
     type physical_parameters
-        real(kind(0d0))               :: gamma   !< Sp. heat ratio
-        real(kind(0d0))               :: pi_inf  !< Liquid stiffness
+        real(kind(0d0)) :: gamma   !< Sp. heat ratio
+        real(kind(0d0)) :: pi_inf  !< Liquid stiffness
         real(kind(0d0)), dimension(2) :: Re      !< Reynolds number
-        real(kind(0d0))               :: mul0    !< Bubble viscosity
-        real(kind(0d0))               :: ss      !< Bubble surface tension
-        real(kind(0d0))               :: pv      !< Bubble vapour pressure
-        real(kind(0d0))               :: gamma_v !< Bubble constants (see Preston (2007), Ando (2010))
-        real(kind(0d0))               :: M_v     !< Bubble constants (see Preston (2007), Ando (2010))
-        real(kind(0d0))               :: mu_v    !< Bubble constants (see Preston (2007), Ando (2010))
-        real(kind(0d0))               :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
-        real(kind(0d0))               :: G
+        real(kind(0d0)) :: mul0    !< Bubble viscosity
+        real(kind(0d0)) :: ss      !< Bubble surface tension
+        real(kind(0d0)) :: pv      !< Bubble vapour pressure
+        real(kind(0d0)) :: gamma_v !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: M_v     !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: mu_v    !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: G
     end type physical_parameters
-
 
     !> Derived type annexing the flow probe location
     type probe_parameters
@@ -157,7 +148,6 @@ module m_derived_types
         real(kind(0d0)) :: y !< Second coordinate location
         real(kind(0d0)) :: z !< Third coordinate location
     end type probe_parameters
-
 
     !> Derived type annexing integral regions
     type integral_parameters
@@ -168,7 +158,6 @@ module m_derived_types
         real(kind(0d0)) :: zmin !< Min. boundary third coordinate direction
         real(kind(0d0)) :: zmax !< Max. boundary third coordinate direction
     end type integral_parameters
-
 
     !> Monopole acoustic source parameters
     type mono_parameters
@@ -181,6 +170,5 @@ module m_derived_types
         integer :: pulse
         integer :: support
     end type mono_parameters
-
 
 end module m_derived_types
