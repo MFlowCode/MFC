@@ -86,8 +86,8 @@ contains
                 do i = -1, m
                     x_cb(i) = x_cb(i)/a_x* &
                               (a_x + log(cosh(a_x*(x_cb(i) - x_a))) &
-                                   + log(cosh(a_x*(x_cb(i) - x_b))) &
-                                   - 2d0*log(cosh(a_x*(x_b - x_a) / 2d0)))
+                               + log(cosh(a_x*(x_cb(i) - x_b))) &
+                               - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
                 end do
             end do
             x_cb = x_cb*length
@@ -104,7 +104,7 @@ contains
         ! Grid Generation in the y-direction ===============================
         if (n == 0) return
 
-        if (grid_geometry == 2 .and. y_domain%beg .eq. 0.0d0) then
+        if (grid_geometry == 2 .and. y_domain%beg == 0.0d0) then
             !IF (grid_geometry == 2) THEN
 
             dy = (y_domain%end - y_domain%beg)/real(2*n + 1, kind(0d0))
@@ -132,21 +132,21 @@ contains
 
         if (stretch_y) then
 
-            length = abs(y_cb(n)-y_cb(-1))
-            y_cb = y_cb / length
-            y_a = y_a / length
-            y_b = y_b / length
+            length = abs(y_cb(n) - y_cb(-1))
+            y_cb = y_cb/length
+            y_a = y_a/length
+            y_b = y_b/length
 
             do j = 1, loops_y
                 do i = -1, n
                     y_cb(i) = y_cb(i)/a_y* &
                               (a_y + log(cosh(a_y*(y_cb(i) - y_a))) &
-                                   + log(cosh(a_y*(y_cb(i) - y_b))) &
-                                   - 2d0*log(cosh(a_y*(y_b - y_a) / 2d0)))
+                               + log(cosh(a_y*(y_cb(i) - y_b))) &
+                               - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
                 end do
             end do
 
-            y_cb = y_cb * length
+            y_cb = y_cb*length
             y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2d0
 
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
@@ -170,21 +170,21 @@ contains
 
         if (stretch_z) then
 
-            length = abs(z_cb(p)-z_cb(-1))
-            z_cb = z_cb / length
-            z_a = z_a / length
-            z_b = z_b / length
+            length = abs(z_cb(p) - z_cb(-1))
+            z_cb = z_cb/length
+            z_a = z_a/length
+            z_b = z_b/length
 
             do j = 1, loops_z
                 do i = -1, p
                     z_cb(i) = z_cb(i)/a_z* &
                               (a_z + log(cosh(a_z*(z_cb(i) - z_a))) &
-                                   + log(cosh(a_z*(z_cb(i) - z_b))) &
-                                   - 2d0*log(cosh(a_z*(z_b - z_a) / 2d0)))
+                               + log(cosh(a_z*(z_cb(i) - z_b))) &
+                               - 2d0*log(cosh(a_z*(z_b - z_a)/2d0)))
                 end do
             end do
 
-            z_cb = z_cb * length
+            z_cb = z_cb*length
             z_cc = (z_cb(0:p) + z_cb(-1:p - 1))/2d0
 
             dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
@@ -237,28 +237,28 @@ contains
         end do
         x_cb_glb(m_glb) = x_domain%end
         if (stretch_x) then
-            length = abs( x_cb_glb(m_glb) - x_cb_glb(-1) )
+            length = abs(x_cb_glb(m_glb) - x_cb_glb(-1))
 
-            x_cb_glb = x_cb_glb / length
-            x_a = x_a / length
-            x_b = x_b / length
+            x_cb_glb = x_cb_glb/length
+            x_a = x_a/length
+            x_b = x_b/length
 
             do j = 1, loops_x
                 do i = -1, m_glb
                     x_cb_glb(i) = x_cb_glb(i)/a_x* &
                                   (a_x + log(cosh(a_x*(x_cb_glb(i) - x_a))) &
-                                       + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
-                                       - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
+                                   + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
+                                   - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
                 end do
             end do
 
-            x_cb_glb = x_cb_glb * length
+            x_cb_glb = x_cb_glb*length
         end if
 
         ! Grid generation in the y-direction
         if (n_glb > 0) then
 
-            if (grid_geometry == 2 .and. y_domain%beg .eq. 0.0d0) then
+            if (grid_geometry == 2 .and. y_domain%beg == 0.0d0) then
                 dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, kind(0d0))
                 y_cb_glb(-1) = y_domain%beg
                 do i = 1, n_glb
@@ -272,22 +272,22 @@ contains
             end if
             y_cb_glb(n_glb) = y_domain%end
             if (stretch_y) then
-                length = abs( y_cb_glb(n_glb) - y_cb_glb(-1) )
+                length = abs(y_cb_glb(n_glb) - y_cb_glb(-1))
 
-                y_cb_glb = y_cb_glb / length
-                y_a = y_a / length
-                y_b = y_b / length
-                
+                y_cb_glb = y_cb_glb/length
+                y_a = y_a/length
+                y_b = y_b/length
+
                 do j = 1, loops_y
                     do i = -1, n_glb
                         y_cb_glb(i) = y_cb_glb(i)/a_y* &
                                       (a_y + log(cosh(a_y*(y_cb_glb(i) - y_a))) &
-                                           + log(cosh(a_y*(y_cb_glb(i) - y_b))) &
-                                           - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
+                                       + log(cosh(a_y*(y_cb_glb(i) - y_b))) &
+                                       - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
                     end do
                 end do
 
-                y_cb_glb = y_cb_glb * length
+                y_cb_glb = y_cb_glb*length
             end if
 
             ! Grid generation in the z-direction
@@ -298,11 +298,11 @@ contains
                 end do
                 z_cb_glb(p_glb) = z_domain%end
                 if (stretch_z) then
-                	length = abs( z_cb_glb(p_glb) - z_cb_glb(-1) )
+                    length = abs(z_cb_glb(p_glb) - z_cb_glb(-1))
 
-                    z_cb_glb = z_cb_glb / length
-                    z_a = z_a / length
-                    z_b = z_b / length
+                    z_cb_glb = z_cb_glb/length
+                    z_a = z_a/length
+                    z_b = z_b/length
 
                     do j = 1, loops_z
                         do i = -1, p_glb
@@ -313,7 +313,7 @@ contains
                         end do
                     end do
 
-                    z_cb_glb = z_cb_glb * length
+                    z_cb_glb = z_cb_glb*length
                 end if
             end if
         end if

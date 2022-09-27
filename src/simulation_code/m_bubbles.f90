@@ -44,25 +44,25 @@ contains
         type(scalar_field), intent(IN) :: mydivu
         integer, intent(IN) :: idir
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) ::  bub_adv_src
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb), intent(INOUT) ::  bub_r_src, &
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: bub_adv_src
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb), intent(INOUT) :: bub_r_src, &
                                                                           bub_v_src, &
                                                                           bub_p_src, &
                                                                           bub_m_src
 
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub !< Bubble number density
 
-        real(kind(0d0)) ::  tmp1, tmp2, tmp3, tmp4, &
+        real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
                            Cpbw, Cpinf, Cpinf_dot, &
                            myH, myHdot, rddot, alf_gas
 
-        real(kind(0d0))   :: pb, mv, vflux, pldot, pbdot
+        real(kind(0d0)) :: pb, mv, vflux, pldot, pbdot
 
         real(kind(0d0)) :: n_tait, B_tait
 
-        real(kind(0d0)), dimension(nb)  :: Rtmp, Vtmp
-        real(kind(0d0))   :: myR, myV, alf, myP, myRho, R2Vav
+        real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
+        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
 
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
@@ -77,82 +77,82 @@ contains
 
             ! advection source
             do j = 0, m; do k = 0, n; do l = 0, p
-                    ! = 3 \alpha \bar{R^2 V} / \bar{R^3} = 4 pi nbub \bar{R^2 V}
-                    do q = 1, nb
-                        Rtmp(q) = q_prim_vf(bub_idx%rs(q))%sf(j, k, l)
-                        Vtmp(q) = q_prim_vf(bub_idx%vs(q))%sf(j, k, l)
-                    end do
+                        ! = 3 \alpha \bar{R^2 V} / \bar{R^3} = 4 pi nbub \bar{R^2 V}
+                        do q = 1, nb
+                            Rtmp(q) = q_prim_vf(bub_idx%rs(q))%sf(j, k, l)
+                            Vtmp(q) = q_prim_vf(bub_idx%vs(q))%sf(j, k, l)
+                        end do
 
-                    ! Computes n_bub number bubble density
-                    call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), &
-                                            Rtmp, nbub(j, k, l))
+                        ! Computes n_bub number bubble density
+                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), &
+                                                Rtmp, nbub(j, k, l))
 
-                    call s_quad((Rtmp**2.d0)*Vtmp, R2Vav)
-                    bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
-                end do; end do; end do
+                        call s_quad((Rtmp**2.d0)*Vtmp, R2Vav)
+                        bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
+                    end do; end do; end do
 
             ! bubble radius and radial velocity source
             do q = 1, nb; do j = 0, m; do k = 0, n; do l = 0, p
-                    bub_r_src( j, k, l, q) = q_cons_vf(bub_idx%vs(q))%sf(j, k, l)
+                            bub_r_src(j, k, l, q) = q_cons_vf(bub_idx%vs(q))%sf(j, k, l)
 
-                    call s_convert_to_mixture_variables(q_cons_vf, myRho, n_tait, B_tait, Re, j, k, l)
+                            call s_convert_to_mixture_variables(q_cons_vf, myRho, n_tait, B_tait, Re, j, k, l)
 
-                    n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                            n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
-                    myRho = q_prim_vf(1)%sf(j, k, l)
-                    myP = q_prim_vf(E_idx)%sf(j, k, l)
-                    alf = q_prim_vf(alf_idx)%sf(j, k, l)
-                    myR = q_prim_vf(bub_idx%rs(q))%sf(j, k, l)
-                    myV = q_prim_vf(bub_idx%vs(q))%sf(j, k, l)
+                            myRho = q_prim_vf(1)%sf(j, k, l)
+                            myP = q_prim_vf(E_idx)%sf(j, k, l)
+                            alf = q_prim_vf(alf_idx)%sf(j, k, l)
+                            myR = q_prim_vf(bub_idx%rs(q))%sf(j, k, l)
+                            myV = q_prim_vf(bub_idx%vs(q))%sf(j, k, l)
 
-                    if (.not. polytropic) then
-                        pb = q_prim_vf(bub_idx%ps(q))%sf(j, k, l)
-                        mv = q_prim_vf(bub_idx%ms(q))%sf(j, k, l)
-                        call s_bwproperty(pb, q)
-                        vflux = f_vflux(myR, myV, mv, q)
-                        pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
+                            if (.not. polytropic) then
+                                pb = q_prim_vf(bub_idx%ps(q))%sf(j, k, l)
+                                mv = q_prim_vf(bub_idx%ms(q))%sf(j, k, l)
+                                call s_bwproperty(pb, q)
+                                vflux = f_vflux(myR, myV, mv, q)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
-                        bub_p_src( j, k, l, q) = nbub(j, k, l)*pbdot
-                        bub_m_src( j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
-                    else
-                        pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
-                    end if
+                                bub_p_src(j, k, l, q) = nbub(j, k, l)*pbdot
+                                bub_m_src(j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
+                            else
+                                pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
+                            end if
 
-                    if (bubble_model == 1) then
-                        ! Gilmore bubbles
-                        Cpinf = myP - pref
-                        Cpbw = f_cpbw(R0(q), myR, myV, pb)
-                        myH = f_H(Cpbw, Cpinf, n_tait, B_tait)
-                        c_gas = f_cgas(Cpinf, n_tait, B_tait, myH)
-                        Cpinf_dot = f_cpinfdot(myRho, myP, alf, n_tait, B_tait, bub_adv_src(j, k, l), mydivu%sf(j, k, l))
-                        myHdot = f_Hdot(Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, myR, myV, R0(q), pbdot)
-                        rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
-                    else if (bubble_model == 2) then
-                        ! Keller-Miksis bubbles
-                        Cpinf = myP
-                        Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                        ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                        c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
-                        rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
-                    else if (bubble_model == 3) then
-                        ! Rayleigh-Plesset bubbles
-                        Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                        rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
-                    end if
+                            if (bubble_model == 1) then
+                                ! Gilmore bubbles
+                                Cpinf = myP - pref
+                                Cpbw = f_cpbw(R0(q), myR, myV, pb)
+                                myH = f_H(Cpbw, Cpinf, n_tait, B_tait)
+                                c_gas = f_cgas(Cpinf, n_tait, B_tait, myH)
+                                Cpinf_dot = f_cpinfdot(myRho, myP, alf, n_tait, B_tait, bub_adv_src(j, k, l), mydivu%sf(j, k, l))
+                                myHdot = f_Hdot(Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, myR, myV, R0(q), pbdot)
+                                rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
+                            else if (bubble_model == 2) then
+                                ! Keller-Miksis bubbles
+                                Cpinf = myP
+                                Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
+                                c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
+                                rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
+                            else if (bubble_model == 3) then
+                                ! Rayleigh-Plesset bubbles
+                                Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
+                            end if
 
-                    bub_v_src( j, k, l, q) = nbub(j, k, l)*rddot
+                            bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
 
-                    if (alf < 1.d-11) then
-                        bub_adv_src(j, k, l) = 0d0
-                        bub_r_src( j, k, l, q) = 0d0
-                        bub_v_src( j, k, l, q) = 0d0
-                        if (.not. polytropic) then
-                            bub_p_src( j, k, l, q) = 0d0
-                            bub_m_src( j, k, l, q) = 0d0
-                        end if
-                    end if
+                            if (alf < 1.d-11) then
+                                bub_adv_src(j, k, l) = 0d0
+                                bub_r_src(j, k, l, q) = 0d0
+                                bub_v_src(j, k, l, q) = 0d0
+                                if (.not. polytropic) then
+                                    bub_p_src(j, k, l, q) = 0d0
+                                    bub_m_src(j, k, l, q) = 0d0
+                                end if
+                            end if
 
-                end do; end do; end do; end do
+                        end do; end do; end do; end do
         end if
 
     end subroutine s_compute_bubble_source
@@ -166,7 +166,7 @@ contains
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
 
-        real(kind(0d0))             :: f_cpbw
+        real(kind(0d0)) :: f_cpbw
 
         if (polytropic) then
             f_cpbw = (Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
@@ -185,8 +185,8 @@ contains
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fntait, fBtait
 
-        real(kind(0d0))             :: tmp1, tmp2, tmp3
-        real(kind(0d0))             :: f_H
+        real(kind(0d0)) :: tmp1, tmp2, tmp3
+        real(kind(0d0)) :: f_H
 
         tmp1 = (fntait - 1.d0)/fntait
         tmp2 = (fCpbw/(1.d0 + fBtait) + 1.d0)**tmp1
@@ -205,8 +205,8 @@ contains
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpinf, fntait, fBtait, fH
 
-        real(kind(0d0))             :: tmp
-        real(kind(0d0))             :: f_cgas
+        real(kind(0d0)) :: tmp
+        real(kind(0d0)) :: f_cgas
 
         ! get sound speed for Gilmore equations "C" -> c_gas
         tmp = (fCpinf/(1.d0 + fBtait) + 1.d0)**((fntait - 1.d0)/fntait)
@@ -228,8 +228,8 @@ contains
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
-        real(kind(0d0))             :: c2_liquid
-        real(kind(0d0))             :: f_cpinfdot
+        real(kind(0d0)) :: c2_liquid
+        real(kind(0d0)) :: f_cpinfdot
 
         ! get sound speed squared for liquid (only needed for pbdot)
         ! c_l^2 = gam (p+B) / (rho*(1-alf))
@@ -259,8 +259,8 @@ contains
         real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
         real(kind(0d0)), intent(IN) :: fR, fV, fR0, fpbdot
 
-        real(kind(0d0))             :: tmp1, tmp2
-        real(kind(0d0))             :: f_Hdot
+        real(kind(0d0)) :: tmp1, tmp2
+        real(kind(0d0)) :: f_Hdot
 
         if (polytropic) then
             tmp1 = (fR0/fR)**(3.d0*gam)
@@ -293,7 +293,7 @@ contains
     function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: fCp, fRho, fR, fV, fR0, fCpbw
-        real(kind(0d0))             :: f_rddot_RP
+        real(kind(0d0)) :: f_rddot_RP
 
             !! rddot = (1/r) (  -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho )
             !! rddot = (1/r) (  -3/2 rdot^2 + (tmp1 - Cp)/rho )
@@ -317,8 +317,8 @@ contains
         real(kind(0d0)), intent(IN) :: fCpbw, fR, fV, fH, fHdot
         real(kind(0d0)), intent(IN) :: fcgas, fntait, fBtait
 
-        real(kind(0d0))             :: tmp1, tmp2, tmp3
-        real(kind(0d0))             :: f_rddot
+        real(kind(0d0)) :: tmp1, tmp2, tmp3
+        real(kind(0d0)) :: f_rddot
 
         tmp1 = fV/fcgas
         tmp2 = 1.d0 + 4.d0*Re_inv/fcgas/fR*(fCpbw/(1.d0 + fBtait) + 1.d0) &
@@ -338,7 +338,7 @@ contains
     function f_cpbw_KM(fR0, fR, fV, fpb)
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
-        real(kind(0d0))             :: f_cpbw_KM
+        real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
@@ -367,8 +367,8 @@ contains
         real(kind(0d0)), intent(IN) :: fpbdot, fCp, fCpbw
         real(kind(0d0)), intent(IN) :: fRho, fR, fV, fR0, fC
 
-        real(kind(0d0))             :: tmp1, tmp2, cdot_star
-        real(kind(0d0))             :: f_rddot_KM
+        real(kind(0d0)) :: tmp1, tmp2, cdot_star
+        real(kind(0d0)) :: f_rddot_KM
 
         if (polytropic) then
             cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR

@@ -195,7 +195,6 @@ contains
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
 
-
         rho = 0d0; gamma = 0d0; pi_inf = 0d0
 
         do i = 1, num_fluids
@@ -203,9 +202,6 @@ contains
             gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
             pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
         end do
-
-       
-
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
 
@@ -266,7 +262,7 @@ contains
 
                     ! Obtaining the density, specific heat ratio function
                     ! and the liquid stiffness function, respectively
-                    if (model_eqns .ne. 4) then
+                    if (model_eqns /= 4) then
                         call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
                                                             rho, gamma, pi_inf)
                     end if
@@ -282,7 +278,7 @@ contains
 
                     ! Computing velocity and dynamic pressure from momenta
                     do i = mom_idx%beg, mom_idx%end
-                        if (model_eqns .ne. 4) then
+                        if (model_eqns /= 4) then
                             q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/rho
                             dyn_pres = dyn_pres + q_cons_vf(i)%sf(j, k, l)* &
                                        q_prim_vf(i)%sf(j, k, l)/2d0
@@ -292,11 +288,11 @@ contains
                         end if
                     end do
 
-                    if ((model_eqns .ne. 4) .and. (bubbles .neqv. .true.)) then
+                    if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
                         ! Computing the pressure from the energy
                         q_prim_vf(E_idx)%sf(j, k, l) = &
                             (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
-                    else if ((model_eqns .ne. 4) .and. bubbles) then
+                    else if ((model_eqns /= 4) .and. bubbles) then
                         print *, 'getting model_eqns 2 with bubbles. cons to prim'
                         ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                         q_prim_vf(E_idx)%sf(j, k, l) = &
@@ -401,11 +397,11 @@ contains
                     end do
 
                     ! Computing the energy from the pressure
-                    if ((model_eqns .ne. 4) .and. (bubbles .neqv. .true.)) then
+                    if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
                         ! E = Gamma*P + \rho u u /2 + \pi_inf
                         q_cons_vf(E_idx)%sf(j, k, l) = &
                             gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf
-                    else if ((model_eqns .ne. 4) .and. (bubbles)) then
+                    else if ((model_eqns /= 4) .and. (bubbles)) then
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                         q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
@@ -437,7 +433,7 @@ contains
                         end do
                         !call s_comp_n_from_prim_cpu(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
                         vftmp = q_prim_vf(alf_idx)%sf(j, k, l)
-                        R3 = 0d0                        
+                        R3 = 0d0
                         do q = 1, nb
                             R3 = R3 + weight(q)*(Rtmp(q)**3d0)
                         end do
