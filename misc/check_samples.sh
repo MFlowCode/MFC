@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-if [ ! -f "$(pwd)/misc/util.sh" ]; then
+if [ ! -f "$(pwd)/toolchain/util.sh" ]; then
     echo ""
-    echo "[misc/check_samples.sh] Please execute this script from the top-level MFC directory (currently in: $(pwd))."
+    echo "[samples/check_samples.sh] Please execute this script from the top-level MFC directory (currently in: $(pwd))."
 
     exit 1
 fi
 
-source $(pwd)/misc/util.sh
+source $(pwd)/toolchain/util.sh
 
 TIMEOUT="60s"
 

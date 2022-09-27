@@ -10,13 +10,13 @@ MFC_CMAKE_MIN_PATCH=0
 MFC_CMAKE_MIN_VERSION="$(printf %05d%05d%05d $MFC_CMAKE_MIN_MAJOR $MFC_CMAKE_MIN_MINOR $MFC_CMAKE_MIN_PATCH)"
 
 # Check whether this script was called from MFC's root directory.
-if [ ! -f "$(pwd)/toolchain/main.py" ]; then
+if [ ! -f "$(pwd)/toolchain/mfc.py" ]; then
     echo "[mfc.sh] Error: You must call this script from within MFC's root folder."
     exit 1
 fi
 
 # Load utility script
-source "$(pwd)/misc/util.sh"
+source "$(pwd)/toolchain/util.sh"
 
 # Handle upgrading from older MFC build systems
 if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/build/mfc.lock.yaml" ]; then
@@ -30,8 +30,13 @@ fi
 # If the user wishes to run the "load" script
 if [ "$1" == "load" ]; then
     shift;
-    source "$(pwd)/toolchain/load.sh" "$@"
+    source "$(pwd)/toolchain/scripts/load.sh" "$@"
+
     return
+elif [ "$1" == "format" ]; then
+    "$SHELL" "$(pwd)/toolchain/scripts/format.sh"
+
+    exit $?
 fi
 
 if [ "$1" == "docker" ]; then
@@ -245,7 +250,7 @@ done
 
 
 # Run the mfc.py bootstrap script
-python3 "$(pwd)/toolchain/main.py" "$@"
+python3 "$(pwd)/toolchain/mfc.py" "$@"
 code=$?
 
 

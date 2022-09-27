@@ -7,4 +7,3 @@ GREEN="\u001b[32m"
 YELLOW="\u001b[33m"
 MAGENTA="\u001b[35m"
 COLOR_RESET="\033[m"
-
