@@ -54,7 +54,7 @@ before_script:
     
     # Clone MFC into MFC directory & cd into it
     - mkdir -p "$CI_MFC_DIR/$JOB_MODE/"
-    - git clone --single-branch --branch "$CI_COMMIT_REF_SLUG" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/$JOB_MODE/"
+    - git clone --single-branch --branch "$CI_COMMIT_REF_NAME" "$CI_REPOSITORY_URL" "$CI_MFC_DIR/$JOB_MODE/"
   tags:
     - nobatch
 
@@ -114,3 +114,4 @@ test-gpu:
   extends: .test
   needs:
     - build-gpu
+
