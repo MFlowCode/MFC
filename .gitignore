@@ -21,9 +21,9 @@ src/*/*.mod
 src/*/*.o
 src/*/autogen/
 src/common/case.fpp
-src/pre_process_code/pre_process
-src/simulation_code/simulation
-src/post_process_code/post_process
+src/pre_process/pre_process
+src/simulation/simulation
+src/post_process/post_process
 src/master_scripts/*.pyc
 src/*/.build
 src/*/case.*

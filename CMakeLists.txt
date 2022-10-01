@@ -143,19 +143,19 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 
-# This macro locates Fypp files in src/<target>_code/ and instructs CMake how to
+# This macro locates Fypp files in src/<target>/ and instructs CMake how to
 # preprocess them to generate their .f90 counterparts, should they be requested
 # by an executable or library. They are preprocessed again if they are modified
-# or if src/common_code/case.fpp changes because some #:include it, and produce
+# or if src/common/case.fpp changes because some #:include it, and produce
 # a different .f90 file depending on case.fpp's contents. This macro sets the
 # <target>_srcs CMake cache variaible the full list of .f90 files, including the
 # preprocessed Fypp files.
 macro(HANDLE_FYPP target)
-    file(GLOB ${target}_f90s "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/*.f90")
-    file(GLOB ${target}_fpps "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/*.fpp")
+    file(GLOB ${target}_f90s "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/*.f90")
+    file(GLOB ${target}_fpps "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/*.fpp")
 
-    # Create src/<target>_code/autogen folder in which to generate Fypp'd .f90 files.
-    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/autogen")
+    # Create src/<target>/autogen folder in which to generate Fypp'd .f90 files.
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/autogen")
 
     set(${target}_srcs "${${target}_f90s}")
 
@@ -171,7 +171,7 @@ macro(HANDLE_FYPP target)
         add_custom_command(
             OUTPUT   "${f90_filepath}"
             COMMAND  "${FYPP_EXE}" "${fpp_filepath}" "${f90_filepath}"
-            DEPENDS  "${fpp_filepath}" "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/case.fpp"
+            DEPENDS  "${fpp_filepath}" "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/case.fpp"
             COMMENT  "Preprocessing ${fpp_filename}"
             VERBATIM
         )
@@ -190,7 +190,7 @@ HANDLE_FYPP(simulation)
 HANDLE_FYPP(post_process)
 
 
-# === === src/pre_process_code
+# === === src/pre_process
 if (MFC_BUILD_PRE_PROCESS)
     add_executable(pre_process "${pre_process_srcs}" "${common_srcs}")
 
@@ -210,7 +210,7 @@ if (MFC_BUILD_PRE_PROCESS)
 endif()
 
 
-# === === src/simulation_code
+# === === src/simulation
 if (MFC_BUILD_SIMULATION)
     add_executable(simulation "${simulation_srcs}" "${common_srcs}")
 
@@ -283,7 +283,7 @@ if (MFC_BUILD_SIMULATION)
 endif()
 
 
-# === === src/post_process_code
+# === === src/post_process
 if (MFC_BUILD_POST_PROCESS)
     add_executable(post_process "${post_process_srcs}" "${common_srcs}")
 
@@ -313,7 +313,7 @@ add_custom_target("doc")
 macro(GEN_DOCS target name)
 
     set(DOXYGEN_PROJECT_NAME "${name}")
-    set(DOXYGEN_INPUT        "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}_code/ ${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/")
+    set(DOXYGEN_INPUT        "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/ ${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/")
 
     file(
         COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
