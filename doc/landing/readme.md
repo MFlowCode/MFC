@@ -1,12 +1,6 @@
+# Welcome to MFC!
 
-## Presentation & User Guide
-
-- [Authors](authors.md)
-- [Building](building.md)
-- [Testing](testing.md)
-- [Running](running.md)
-- [Flow Visualisation](visualisation.md)
-- [References](references.md)
+The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows. The source code of MFC is available [on GitHub](https://github.com/MFlowCode/MFC) and is open to contributions!
 
 ## Code Documentation
 
@@ -113,7 +107,7 @@ The list of modules offered by a system is subject to change. The aforementioned
 
 ### OpenACC Memory Profiling
 
-You can append `-DMFC_MEMORY_DUMP` to `release-gpu`'s Fortran compiler options in [defaults.yaml](defaults.yaml) to make the [simulation code](src/simulation_code/) call `acc_present_dump()` at various stages of program execution to obtain a printout of on-device memory usage. The [mem_parse.sh](misc/mem_parse.sh) script can be given as an argument the path to a file containing MFC's output, in order to aggregate the data and produce tables with formatted output.
+You can append `-DMFC_MEMORY_DUMP` to `release-gpu`'s Fortran compiler options in [defaults.yaml](defaults.yaml) to make the [simulation code](src/simulation/) call `acc_present_dump()` at various stages of program execution to obtain a printout of on-device memory usage. The [mem_parse.sh](misc/mem_parse.sh) script can be given as an argument the path to a file containing MFC's output, in order to aggregate the data and produce tables with formatted output.
 
 ## License
  

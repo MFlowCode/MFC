@@ -234,7 +234,7 @@ print(json.dumps({                                                              
     # Preston's model shows up. polytropic = False means complicated Preston model
     # = True means simpler Rayleigh--Plesset model
     # if polytropic == False then you will end up calling s_initialize_nonpoly in 
-    # m_global_parameters.f90 in both the pre_process and simulation_code
+    # m_global_parameters.f90 in both the pre_process and simulation
     'polytropic'            : 'T',                  \
     'polydisperse'          : 'F',                  \
     #'poly_sigma'            : 0.3,                  \
