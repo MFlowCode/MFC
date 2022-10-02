@@ -473,7 +473,7 @@ computations are done in Python to generate the case.
 
 ### Interactive Execution
 
-To run all stages of MFC, that is [pre_process](src/pre_process_code/), [simulation](src/simulation_code/), and [post_process](src/post_process_code/)   on the sample case [2D_shockbubble](examples/2D_shockbubble/),
+To run all stages of MFC, that is [pre_process](src/pre_process/), [simulation](src/simulation/), and [post_process](src/post_process/)   on the sample case [2D_shockbubble](examples/2D_shockbubble/),
 
 ```console
 $ ./mfc.sh run examples/2D_shockbubble/case.py
@@ -486,13 +486,13 @@ specified with the `-j` option.
 
 For example,
 
-- Running [pre_process](src/pre_process_code/) with 2 cores:
+- Running [pre_process](src/pre_process/) with 2 cores:
 
 ```console
 $ ./mfc.sh run examples/2D_shockbubble/case.py -t pre_process -n 2
 ```
 
-- Running [simulation](src/simulation_code/) and [post_process](src/post_process_code/)
+- Running [simulation](src/simulation/) and [post_process](src/post_process/)
 using 4 cores:
 
 ```console
