@@ -19,8 +19,8 @@ print(json.dumps({
     'p'                            : 0,
     'dt'                           : 10.000000000000000E-7,
     't_step_start'                 : 0,
-    't_step_stop'                  : 4E6,
-    't_step_save'                  : 1E4,
+    't_step_stop'                  : int(4E6),
+    't_step_save'                  : int(1E4),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
