@@ -65,7 +65,7 @@ print(json.dumps({
     'p'                            : 0,
     'dt'                           : dt,
     't_step_start'                 : t_start,
-    't_step_stop'                  : Nt,
+    't_step_stop'                  : int(Nt),
     't_step_save'                  : t_save ,
     # ==========================================================
 
