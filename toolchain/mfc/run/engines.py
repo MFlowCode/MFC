@@ -2,8 +2,12 @@ import re
 import os
 import time
 import copy
+import queue
+import typing
 import datetime
+import subprocess
 import dataclasses
+import multiprocessing
 
 from ..util.printer import cons
 
@@ -14,6 +18,7 @@ from ..run import queues
 from ..run import mpi_bins
 
 from ..run.input import MFCInputFile
+
 
 @dataclasses.dataclass
 class Engine:
@@ -29,7 +34,7 @@ class Engine:
     def _init(self) -> None:
         pass
 
-    def get_args(self) -> str:
+    def get_args(self) -> typing.List[str]:
         raise common.MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
 
     def run(self, target_name: str) -> None:
@@ -41,12 +46,18 @@ class Engine:
     def get_binpath(self, target: str) -> str:
         return os.sep.join([build.get_install_dirpath(), "bin", target])
 
+
+def _interactive_working_worker(cmd, q):
+	q.put(common.system(cmd, no_exception=True, stdout=subprocess.DEVNULL,
+                                                stderr=subprocess.DEVNULL) == 0)
+
 class InteractiveEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Interactive", "interactive")
 
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary(self.mfc.args)
+        self.bWorks = False # We don't know yet whether this engine works
 
     def get_args(self) -> str:
         return f"""\
@@ -56,36 +67,58 @@ GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
 MPI Binary    (-b)  {self.mpibin.bin}\
 """
 
-    def get_exec_cmd(self, target_name: str):
+    def get_exec_cmd(self, target_name: str) -> typing.List[str]:
         binpath = self.get_binpath(target_name)
 
-        # Setting LD_LIBRARY_PATH is necessary because
-        # Silo doesn't support static library generation.
-        cd = f'cd "{self.input.case_dirpath}"'
-
         if self.mfc.args["no_mpi"]:
-            return f'{cd} && "{binpath}"'
-            
-        flags = ""
-        for flag in self.mfc.args["flags"]:
-            flags += f"\"{flag}\" "
+            return cd + [binpath]
 
-        exec_params = self.mpibin.gen_params(self.mfc.args)
-        return f'{cd} && {self.mpibin.bin} {exec_params} {flags} "{binpath}"'
-                            
+        flags = self.mfc.args["flags"][:]
+
+        return [self.mpibin.bin] + self.mpibin.gen_params(self.mfc.args) + flags + [binpath]
+
 
     def run(self, target_name: str) -> None:
+        if not self.bWorks:
+            # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
+            # forever. This can happen when using the wrong queue system.
+
+            work_timeout = 10
+
+            cons.print(f"Ensuring the [bold magenta]Interactive Engine[/bold magenta] works ({work_timeout}s timeout):")
+
+            q = multiprocessing.Queue()
+
+            p = multiprocessing.Process(
+                target=_interactive_working_worker,
+                args=([self.mpibin.bin] +
+                      self.mpibin.gen_params(self.mfc.args) +
+                      [ "hostname" ], q, ))
+            p.start()
+            p.join(work_timeout)
+
+            try:
+                self.bWorks = q.get(block=False)
+            except queue.Empty as e:
+                self.bWorks = False
+
+            if p.is_alive() or not self.bWorks:
+                raise common.MFCException(
+                      "The [bold magenta]Interactive Engine[/bold magenta] appears to hang or exit with a non-zero status code. "
+                    + "This may indicate that the wrong MPI binary is being used to launch parallel jobs. You can specify the correct one for your system "
+                    + "using the <-b,--binary> option. For example:\n"
+                    + " - ./mfc.sh run <myfile.py> -b mpirun\n"
+                    + " - ./mfc.sh run <myfile.py> -b srun\n"
+                    + f"[bold magenta]Reason[/bold magenta]: {'Time limit.' if p.is_alive() else 'Exit code.'}"
+                )
+
+
         cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
         cons.indent()
 
-        cmd = self.get_exec_cmd(target_name)
-
         if not self.mfc.args["dry_run"]:
-            cons.print(no_indent=True)
-            cons.print(f"$ {cmd.split('&&')[-1].strip()}")
-            cons.print(no_indent=True)
             start_time = time.monotonic()
-            common.system(cmd)
+            common.system(self.get_exec_cmd(target_name), cwd=self.input.case_dirpath)
             end_time   = time.monotonic()
             cons.print(no_indent=True)
 
@@ -274,13 +307,9 @@ exit $code
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
-        cmd = system.gen_submit_cmd(self.__get_batch_dirpath(), self.__get_batch_filename(target_name))
+        cmd = system.gen_submit_cmd(self.__get_batch_filename(target_name))
 
-        cons.print(no_indent=True)
-        cons.print(f"$ {cmd}")
-        cons.print(no_indent=True)
-
-        if os.system(cmd) != 0:
+        if common.system(cmd, cwd=self.__get_batch_dirpath()) != 0:
             raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:
@@ -304,3 +333,4 @@ def get_engine(slug: str) -> Engine:
         raise common.MFCException(f"Unsupported engine {slug}.")
 
     return engine
+

@@ -1,4 +1,5 @@
 import os
+import typing
 import dataclasses
 
 from ..util import common
@@ -16,7 +17,7 @@ class QueueSystem:
     def is_active(self) -> bool:
         raise common.MFCException("QueueSystem::is_active: not implemented.")
 
-    def gen_submit_cmd(self, workdir: str, filepath: str) -> None:
+    def gen_submit_cmd(self, filepath: str) -> typing.List[str]:
         raise common.MFCException("QueueSystem::gen_submit_cmd: not implemented.")
 
 
@@ -27,8 +28,8 @@ class PBSSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_command_exist("qsub")
 
-    def gen_submit_cmd(self, workdir: str, filename: str) -> None:
-        return f"cd '{workdir}' && qsub {filename}"
+    def gen_submit_cmd(self, filename: str) -> typing.List[str]:
+        return ["qsub", filename]
 
 
 class LSFSystem(QueueSystem):
@@ -38,8 +39,8 @@ class LSFSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_command_exist("bsub") and common.does_command_exist("bqueues")
 
-    def gen_submit_cmd(self, workdir: str, filename: str) -> None:
-        return f"cd '{workdir}' && bsub {filename}"
+    def gen_submit_cmd(self, filename: str) -> None:
+        return ["bsub", filename]
 
 
 class SLURMSystem(QueueSystem):
@@ -49,8 +50,8 @@ class SLURMSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_command_exist("sbatch")
 
-    def gen_submit_cmd(self, workdir: str, filename: str) -> None:
-        return f"cd '{workdir}' && sbatch {filename}"
+    def gen_submit_cmd(self, filename: str) -> None:
+        return ["sbatch", filename]
 
 
 QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]

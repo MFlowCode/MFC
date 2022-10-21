@@ -1,14 +1,20 @@
 from ..util import common
 
 
-PRE_PROCESS = ['case_dir', 'old_grid', 'old_ic', 't_step_old', 'm', 'n', 'p',
-               'cyl_coord', 'model_eqns', 'num_fluids', 'adv_alphan', 'mpp_lim',
-               'weno_order', 'precision', 'parallel_io', 'perturb_flow',
-               'perturb_flow_fluid', 'perturb_sph', 'perturb_sph_fluid',
-               'fluid_rho', 'hypoelasticity', 'num_patches', 'Ca', 'Web',
-               'Re_inv', 'pref', 'rhoref', 'bubbles' , 'polytropic',
-               'polydisperse', 'poly_sigma', 'thermal', 'nb', 'R0ref', 'qbmm',
-               'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV']
+COMMON = [
+    "hypoelasticity", "cyl_coord", "pref", "p", "parallel_io",
+    "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
+    "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
+    "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
+    "Ca", "polydisperse"
+]
+
+
+PRE_PROCESS = COMMON + [
+    'old_grid', 'old_ic', 't_step_old', 'perturb_flow', 'perturb_flow_fluid',
+    'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV'
+]
 
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
@@ -56,23 +62,18 @@ for p_id in range(1, 10+1):
             PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
 
 
-SIMULATION = ['case_dir', 'run_time_info', 't_step_old', 't_tol', 'debug', 'm',
-              'n', 'p', 'cyl_coord', 'dt', 't_step_start', 't_step_stop',
-              't_step_save', 'model_eqns', 'num_fluids', 'adv_alphan',
-              'mpp_lim', 'time_stepper', 'weno_vars', 'weno_order', 'weno_eps',
-              'char_decomp', 'mapped_weno', 'mp_weno', 'weno_avg',
-              'weno_Re_flux', 'riemann_solver', 'wave_speeds', 'avg_state',
-              'commute_err', 'split_err', 'alt_crv', 'alt_soundspeed',
-              'regularization', 'reg_eps', 'null_weights', 'mixture_err',
-              'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds', 'flux_lim',
-              'We_riemann_flux', 'We_rhs_flux', 'We_src', 'We_wave_speeds',
-              'lsq_deriv', 'parallel_io', 'precision', 'hypoelasticity',
-              'fd_order' , 'com_wrt', 'num_probes', 'probe_wrt', 'cb_wrt',
-              'threshold_mf', 'moment_order', 'pref', 'rhoref', 'polydisperse',
-              'poly_sigma', 'bubbles', 'bubble_model', 'polytropic', 'thermal',
-              'R0ref', 'Ca', 'Web', 'Re_inv', 'nb', 'Monopole', 'num_mono',
-              'qbmm', 'R0_type', 'integral_wrt', 'num_integrals',
-              "cu_mpi"]
+SIMULATION = COMMON + [
+    'run_time_info', 't_step_old', 't_tol', 'debug', 'dt', 't_step_start',
+    't_step_stop', 't_step_save', 'time_stepper', 'weno_vars', 'weno_eps',
+    'char_decomp', 'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
+    'riemann_solver', 'wave_speeds', 'avg_state', 'commute_err', 'split_err',
+    'alt_crv', 'alt_soundspeed', 'regularization', 'reg_eps', 'null_weights',
+    'mixture_err', 'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds',
+    'flux_lim', 'We_riemann_flux', 'We_rhs_flux', 'We_src', 'We_wave_speeds',
+    'lsq_deriv', 'fd_order', 'com_wrt', 'num_probes', 'probe_wrt', 'cb_wrt',
+    'threshold_mf', 'moment_order', 'bubble_model', 'Monopole', 'num_mono',
+    'qbmm', 'R0_type', 'integral_wrt', 'num_integrals', 'cu_mpi'
+]
 
 for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')
@@ -117,20 +118,15 @@ for f_id in range(1,10+1):
             SIMULATION.append(f"integral({int_id})%{cmp}max")
 
 
-POST_PROCESS = ['case_dir', 'cyl_coord', 'm', 'n', 'p', 't_step_start',
-                't_step_stop', 't_step_save', 'model_eqns', 'num_fluids',
-                'adv_alphan', 'mpp_lim', 'weno_order', 'alt_soundspeed',
-                'mixture_err', 'parallel_io', 'hypoelasticity',
-                'polydisperse', 'poly_sigma', 'polytropic', 'thermal',
-                'pref', 'Ca', 'Web', 'Re_inv', 'rhoref', 'bubbles',
-                'R0ref', 'nb', 'format', 'precision', 'coarsen_silo',
-                'fourier_decomp', 'fourier_modes%beg',
-                'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
-                'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt',
-                'pres_wrt', 'alpha_wrt', 'kappa_wrt', 'gamma_wrt',
-                'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt',
-                'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
-                'schlieren_wrt', 'schlieren_alpha', 'fd_order']
+POST_PROCESS = COMMON + [
+    't_step_start', 't_step_stop', 't_step_save', 'alt_soundspeed',
+    'mixture_err', 'format', 'coarsen_silo', 'fourier_decomp',
+    'fourier_modes%beg', 'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
+    'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
+    'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
+    'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
+    'schlieren_wrt', 'schlieren_alpha', 'fd_order'
+]
 
 for cmp_id in range(1,3+1):
     cmp = ["x", "y", "z"][cmp_id-1]
