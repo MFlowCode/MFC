@@ -1,0 +1,13 @@
+# Spencer H. Bryngelson (sbryngelson) is the
+# default owner of all files in the repository.
+*                  @sbryngelson
+
+# Henry Le Berre (henryleberre)
+toolchain/         @sbryngelson @henryleberre
+tests/             @sbryngelson @henryleberre
+mfc.sh             @sbryngelson @henryleberre
+mfc.bat            @sbryngelson @henryleberre
+defaults.yaml      @sbryngelson @henryleberre
+CMakeLists.txt     @sbryngelson @henryleberre
+.gitlab-ci.yml     @sbryngelson @henryleberre
+.github/workflows/ @sbryngelson @henryleberre

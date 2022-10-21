@@ -109,10 +109,11 @@ def load(args: dict) -> MFCInputFile:
         json_str = common.file_read(filename)
     else:
         raise common.MFCException("Unrecognized input file format. Only .py and .json files are supported. Please check the README and sample cases in the examples directory.")
-    
+
     try:
         dictionary = json.loads(json_str)
     except Exception as exc:
         raise common.MFCException(f"Input file {filename} did not produce valid JSON. It should only print the case dictionary.\n\n{exc}\n")
 
     return MFCInputFile(filename, dirpath, dictionary, args)
+

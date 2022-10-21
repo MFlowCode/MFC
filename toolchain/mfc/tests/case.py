@@ -102,7 +102,7 @@ class Case:
     params: dict
     ppn:    int
 
-    def __init__(self, trace: str, mods: dict, ppn = None) -> None:
+    def __init__(self, trace: str, mods: dict, ppn: int = None) -> None:
         self.trace  = trace
         self.params = {**BASE_CFG.copy(), **mods}
         self.ppn    = ppn if ppn is not None else 1
@@ -197,8 +197,11 @@ def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: in
         mods.update(dict)
     mods.update(newMods)
 
+    if isinstance(newTrace, str):
+        newTrace = [newTrace]
+
     traces: list = []
-    for trace in stack.trace[:] + [newTrace]:
+    for trace in stack.trace[:] + newTrace:
         if not common.isspace(trace):
             traces.append(trace)
 

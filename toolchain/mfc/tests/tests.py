@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 
 import rich
@@ -170,3 +168,4 @@ class MFCTest:
 
             cons.print(f"[bold red]Failed test {test}.[/bold red]")
             cons.print(f"{exc}")
+
