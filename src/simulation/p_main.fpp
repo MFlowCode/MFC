@@ -218,6 +218,12 @@ program p_main
         end if
         mytime = mytime + dt
 
+        if (probe_wrt) then
+            do i = 1, sys_size
+!$acc update host(q_cons_ts(1)%vf(i)%sf)
+            end do
+        end if
+
         call s_compute_derived_variables(t_step)
         if (DEBUG) print *, 'Computed derived vars'
 

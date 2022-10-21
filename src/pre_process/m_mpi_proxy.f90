@@ -222,6 +222,7 @@ contains
                        0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_z%end, 1, MPI_DOUBLE_PRECISION, &
                        0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(hypoelasticity, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
         call MPI_BCAST(parallel_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(precision, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -297,6 +298,9 @@ contains
             call MPI_BCAST(patch_icpp(i)%pi_inf, 1, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%tau_e(1), 6, &
+                           MPI_DOUBLE_PRECISION, 0, &
+                           MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alter_patch(0), &
                            num_patches_max, MPI_LOGICAL, 0, &
                            MPI_COMM_WORLD, ierr)
@@ -351,6 +355,9 @@ contains
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%k_v, 1, &
+                           MPI_DOUBLE_PRECISION, 0, &
+                           MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%G, 1, &
                            MPI_DOUBLE_PRECISION, 0, &
                            MPI_COMM_WORLD, ierr)
         end do

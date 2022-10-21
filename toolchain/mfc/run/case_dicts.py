@@ -105,7 +105,7 @@ for f_id in range(1,10+1):
 
     for mono_id in range(1,4+1):
         for attribute in ["mag", "length", "dir", "npulse", "pulse", "support",
-                          "delay"]:
+                          "delay", "foc_length", "aperture"]:
             SIMULATION.append(f"Mono({mono_id})%{attribute}")
 
         for cmp_id in range(1,3+1):

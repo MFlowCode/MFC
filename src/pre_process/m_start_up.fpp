@@ -95,7 +95,7 @@ contains
             model_eqns, num_fluids, &
             adv_alphan, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            patch_icpp, fluid_pp, &
+            hypoelasticity, patch_icpp, fluid_pp, &
             precision, parallel_io, &
             perturb_flow, perturb_flow_fluid, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
@@ -197,6 +197,10 @@ contains
         elseif (bubbles .and. (thermal > 3)) then
             print '(a)', 'unsupported combination of values of '// &
                 'bubbles and thermal. '// &
+                'exiting ...'
+            call s_mpi_abort()
+        elseif (hypoelasticity .and. (model_eqns /= 2)) then
+            print '(a)', 'hypoelasticity requires model_eqns = 2'// &
                 'exiting ...'
             call s_mpi_abort()
         end if
@@ -2069,7 +2073,7 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             ! Read the data for each variable
-            do i = 1, adv_idx%end
+            do i = 1, sys_size
                 var_MOK = int(i, MPI_OFFSET_KIND)
 
                 ! Initial displacement to skip at beginning of file
