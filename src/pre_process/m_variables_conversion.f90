@@ -33,7 +33,7 @@ module m_variables_conversion
         !!  @param gamma Specific heat ratio function
         !!  @param pi_inf Liquid stiffness function
         subroutine s_convert_xxxxx_to_mixture_variables(q_vf, i, j, k, &
-                                                        rho, gamma, pi_inf)
+                                                        rho, gamma, pi_inf, G)
 
             ! Importing the derived type scalar_field from m_derived_types.f90
             ! and global variable sys_size, from m_global_variables.f90, as
@@ -47,6 +47,8 @@ module m_variables_conversion
             real(kind(0d0)), intent(OUT) :: rho
             real(kind(0d0)), intent(OUT) :: gamma
             real(kind(0d0)), intent(OUT) :: pi_inf
+
+            real(kind(0d0)), optional, intent(OUT) :: G
 
         end subroutine s_convert_xxxxx_to_mixture_variables
 
@@ -76,7 +78,7 @@ contains
         !! @param gamma  specific heat ratio function
         !! @param pi_inf liquid stiffness
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
-                                                      rho, gamma, pi_inf)
+                                                      rho, gamma, pi_inf, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
         integer, intent(IN) :: i, j, k
@@ -84,6 +86,8 @@ contains
         real(kind(0d0)), intent(OUT) :: rho
         real(kind(0d0)), intent(OUT) :: gamma
         real(kind(0d0)), intent(OUT) :: pi_inf
+
+        real(kind(0d0)), optional, intent(OUT) :: G
 
         ! Transfering the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
@@ -108,8 +112,8 @@ contains
         !! @param l Cell index
     subroutine s_convert_species_to_mixture_variables_bubbles(qK_vf, &
                                                               j, k, l, &
-                                                              rho_K, gamma_K, pi_inf_K &
-                                                              )
+                                                              rho_K, gamma_K, pi_inf_K, &
+                                                              G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -117,6 +121,8 @@ contains
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
+
+        real(kind(0d0)), optional, intent(OUT) :: G
 
         integer, intent(IN) :: j, k, l
         integer :: i
@@ -149,6 +155,7 @@ contains
                 gamma_K = fluid_pp(1)%gamma
                 pi_inf_K = fluid_pp(1)%pi_inf
             else if (num_fluids > 2) then
+                !TODO: This may need fixing for hypo + bubbles
                 do i = 1, num_fluids - 1 !leave out bubble part of mixture
                     rho_k = rho_k + qK_vf(i)%sf(j, k, l)
                     gamma_k = gamma_k + qK_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
@@ -179,7 +186,7 @@ contains
         !! @param k Cell index
         !! @param l Cell index
     subroutine s_convert_species_to_mixture_variables(q_vf, j, k, l, &
-                                                      rho, gamma, pi_inf)
+                                                      rho, gamma, pi_inf, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
 
@@ -189,6 +196,8 @@ contains
         real(kind(0d0)), intent(OUT) :: rho
         real(kind(0d0)), intent(OUT) :: gamma
         real(kind(0d0)), intent(OUT) :: pi_inf
+
+        real(kind(0d0)), optional, intent(OUT) :: G
 
         integer :: i !< Generic loop iterator
 
@@ -202,6 +211,14 @@ contains
             gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
             pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
         end do
+
+        if (present(G)) then
+            G = 0d0
+            do i = 1, num_fluids
+                G = G + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%G
+            end do
+            G = max(0d0, G)
+        end if
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
 
@@ -252,6 +269,8 @@ contains
         real(kind(0d0)) :: nbub, nR3, vftmp
         real(kind(0d0)), dimension(nb) :: nRtmp
 
+        real(kind(0d0)) :: G
+
         ! Generic loop iterators
         integer :: i, j, k, l, q
 
@@ -263,8 +282,13 @@ contains
                     ! Obtaining the density, specific heat ratio function
                     ! and the liquid stiffness function, respectively
                     if (model_eqns /= 4) then
-                        call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
-                                                            rho, gamma, pi_inf)
+                        if (hypoelasticity) then
+                            call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
+                                                                rho, gamma, pi_inf, G)
+                        else
+                            call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
+                                                                rho, gamma, pi_inf)
+                        end if
                     end if
 
                     ! Transferring the continuity equation(s) variable(s)
@@ -337,6 +361,24 @@ contains
                         end do
                     end if
 
+                    if (hypoelasticity) then
+                        do i = stress_idx%beg, stress_idx%end
+                            q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/rho
+                            ! subtracting elastic contribution for pressure calculation
+                            if (G > 1000) then !TODO: Change to >0 if stable
+                                q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                                                               ((q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G))/gamma
+                                ! extra terms in 2 and 3D
+                                if ((i == stress_idx%beg + 1) .or. &
+                                    (i == stress_idx%beg + 3) .or. &
+                                    (i == stress_idx%beg + 4)) then
+                                    q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                   ((q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G))/gamma
+                                end if
+                            end if
+                        end do
+                    end if
+
                 end do
             end do
         end do
@@ -367,6 +409,8 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: nbub, R3, vftmp
         real(kind(0d0)), dimension(nb) :: Rtmp
+
+        real(kind(0d0)) :: G
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -445,7 +489,24 @@ contains
                             !     PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
                             ! END IF
                         end do
+                    end if
 
+                    if (hypoelasticity) then
+                        do i = stress_idx%beg, stress_idx%end
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                            ! adding elastic contribution
+                            if (G > 1000) then
+                                q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                               (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
+                                ! extra terms in 2 and 3D
+                                if ((i == stress_idx%beg + 1) .or. &
+                                    (i == stress_idx%beg + 3) .or. &
+                                    (i == stress_idx%beg + 4)) then
+                                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                                   (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
+                                end if
+                            end if
+                        end do
                     end if
                 end do
             end do

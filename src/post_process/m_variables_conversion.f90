@@ -40,18 +40,21 @@ module m_variables_conversion
         !! @param i cell index to transfer mixture variables
         !! @param j cell index to transfer mixture variables
         !! @param k cell index to transfer mixture variables
-        subroutine s_convert_xxxxx_to_mixture_variables(q_cons_vf, i, j, k)
+        subroutine s_convert_xxxxx_to_mixture_variables(q_cons_vf, i, j, k, G_K, G)
 
             ! Importing the derived type scalar_field from m_derived_types.f90
             ! and global variable sys_size, from m_global_variables.f90, as
             ! the abstract interface does not inherently have access to them
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, num_fluids
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(IN) :: q_cons_vf
 
             integer, intent(IN) :: i, j, k
+
+            real(kind(0d0)), optional, intent(out) :: G_K
+            real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         end subroutine s_convert_xxxxx_to_mixture_variables
 
@@ -92,13 +95,16 @@ contains
         !! @param i cell index to transfer mixture variables
         !! @param j cell index to transfer mixture variables
         !! @param k cell index to transfer mixture variables
-    subroutine s_convert_mixture_to_mixture_variables(q_cons_vf, i, j, k) ! --
+    subroutine s_convert_mixture_to_mixture_variables(q_cons_vf, i, j, k, G_K, G) ! --
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
         integer, intent(IN) :: i, j, k
+
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         ! Transfering the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
@@ -118,10 +124,13 @@ contains
         !!  @param j cell index to transfer mixture variables
         !!  @param k cell index to transfer mixture variables
         !!  @param l cell index to transfer mixture variables
-    subroutine s_convert_species_to_mixture_variables_bubbles(q_cons_vf, j, k, l)
+    subroutine s_convert_species_to_mixture_variables_bubbles(q_cons_vf, j, k, l, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         integer, intent(IN) :: j, k, l
+
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i !< Generic loop iterator
 
@@ -162,11 +171,14 @@ contains
         !!  @param j cell index to transfer mixture variables
         !!  @param k cell index to transfer mixture variables
         !!  @param l cell index to transfer mixture variables
-    subroutine s_convert_species_to_mixture_variables(q_cons_vf, j, k, l) ! --
+    subroutine s_convert_species_to_mixture_variables(q_cons_vf, j, k, l, G_K, G) ! --
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         integer, intent(IN) :: j, k, l
 
@@ -193,6 +205,14 @@ contains
             rho_sf(j, k, l) = q_cons_vf(1)%sf(j, k, l)
             gamma_sf(j, k, l) = fluid_pp(1)%gamma
             pi_inf_sf(j, k, l) = fluid_pp(1)%pi_inf
+        end if
+
+        if (present(G_K)) then
+            G_K = 0d0
+            do i = 1, num_fluids
+                G_K = G_K + q_cons_vf(i + E_idx)%sf(j, k, l)*G(i)
+            end do
+            G_K = max(0d0, G_K)
         end if
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
@@ -297,6 +317,8 @@ contains
         real(kind(0d0)) :: nbub
         real(kind(0d0)), dimension(:), allocatable :: nRtmp
 
+        real(kind(0d0)) :: G_K
+
         integer :: i, j, k, l !< Generic loop iterators
 
         if (bubbles) then
@@ -310,7 +332,12 @@ contains
 
                     ! Obtaining the density, specific heat ratio function
                     ! and the liquid stiffness function, respectively
-                    call s_convert_to_mixture_variables(q_cons_vf, j, k, l)
+                    if (hypoelasticity) then
+                        call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
+                                                            G_K, fluid_pp(:)%G)
+                    else
+                        call s_convert_to_mixture_variables(q_cons_vf, j, k, l)
+                    end if
 
                     ! Transferring the continuity equation(s) variable(s)
                     do i = 1, cont_idx%end
@@ -381,6 +408,24 @@ contains
                         call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
                         do i = bub_idx%beg, sys_size
                             q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/nbub
+                        end do
+                    end if
+
+                    if (hypoelasticity) then
+                        do i = stress_idx%beg, stress_idx%end
+                            q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/ &
+                                                       rho_sf(j, k, l)
+                            if (G_K > 1000) then
+                                q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                                                               ((q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_sf(j, k, l)
+                                ! 2D and 3D terms
+                                if ((i == stress_idx%beg + 1) .or. &
+                                    (i == stress_idx%beg + 3) .or. &
+                                    (i == stress_idx%beg + 4)) then
+                                    q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                   ((q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_sf(j, k, l)
+                                end if
+                            end if
                         end do
                     end if
                 end do

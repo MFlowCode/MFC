@@ -132,6 +132,8 @@ class MFCTest:
                 tol = 1e-10
             elif test.params.get("bubbles", 'F') == 'T':
                 tol = 1e-10
+            elif test.params.get("hypoelasticity", 'F') == 'T':
+                tol = 1e-7
             else:
                 tol = 1e-12
 

@@ -37,6 +37,17 @@ tests/*.txt
 tests/*/**
 !**/golden.txt
 
+tests_hypoelastic/*/D/*
+tests_hypoelastic/*/p*
+tests_hypoelastic/*/D_*
+tests_hypoelastic/*/*.inp
+tests_hypoelastic/*/*.inf
+tests_hypoelastic/*/*.dat
+tests_hypoelastic/*/silo*
+tests_hypoelastic/*/restart*
+tests_hypoelastic/*/*.out
+tests_hypoelastic/*/binary
+
 examples/*batch/*/
 examples/*/D/*
 examples/*/p*

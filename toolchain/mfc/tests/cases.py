@@ -290,6 +290,61 @@ def generate_cases() -> list:
             if len(dimInfo[0]) >= 3:
                 stack.pop()
 
+        # Hypoelasticity checks
+        for num_fluids in [1,2]:
+            stack.push(f"hypoelasticity=T", {"hypoelasticity": 'T'})
+            stack.push(f"num_fluids={num_fluids}", {"num_fluids": num_fluids})
+
+
+            stack.push("", {
+                    'riemann_solver':             1,
+                    'fluid_pp(1)%gamma':          0.3,    'fluid_pp(1)%pi_inf':         7.8E+05,
+                    'patch_icpp(1)%pres':         1.E+06, 'patch_icpp(1)%alpha_rho(1)': 1000.E+00,
+                    'patch_icpp(2)%pres':         1.E+05, 'patch_icpp(2)%alpha_rho(1)': 1000.E+00,
+                    'patch_icpp(3)%pres':         5.E+05, 'patch_icpp(3)%alpha_rho(1)': 1000.E+00,
+                    'patch_icpp(1)%tau_e(1)':     0.E+00, 'patch_icpp(2)%tau_e(1)':     0.E+00,
+                    'patch_icpp(3)%tau_e(1)':     0.E+00, 'fluid_pp(1)%G':              1.E+05,
+            })
+
+            if num_fluids == 2:
+                stack.push("", {
+                    'fluid_pp(2)%gamma':          0.3,    'fluid_pp(2)%pi_inf':      7.8E+05, 'patch_icpp(1)%alpha_rho(1)': 900.E+00,
+                    'patch_icpp(1)%alpha(1)':     0.9,    'patch_icpp(1)%alpha_rho(2)':  100, 'patch_icpp(1)%alpha(2)':     0.1,
+                    'patch_icpp(2)%alpha_rho(1)': 100,    'patch_icpp(2)%alpha(1)':     0.1,  'patch_icpp(2)%alpha_rho(2)': 900,
+                    'patch_icpp(2)%alpha(2)':     0.9,    'patch_icpp(3)%alpha_rho(1)': 900,  'patch_icpp(3)%alpha(1)':     0.9,
+                    'patch_icpp(3)%alpha_rho(2)': 100,    'patch_icpp(3)%alpha(2)':     0.1,
+                    'fluid_pp(2)%G':              5.E+04
+                })
+
+            if len(dimInfo[0]) >= 2:
+                stack.push("", {
+                    'patch_icpp(1)%tau_e(2)':    0.E+00,  'patch_icpp(1)%tau_e(3)':     0.0E+00,
+                    'patch_icpp(2)%tau_e(2)':    0.E+00,  'patch_icpp(2)%tau_e(3)':     0.0E+00,
+                    'patch_icpp(3)%tau_e(2)':    0.E+00,  'patch_icpp(3)%tau_e(3)':     0.0E+00
+                })
+
+            if len(dimInfo[0]) == 3:
+                stack.push("", {
+                    'patch_icpp(1)%tau_e(4)': 0.E+00, 'patch_icpp(1)%tau_e(5)': 0.0E+00, 'patch_icpp(1)%tau_e(6)': 0.0E+00,
+                    'patch_icpp(2)%tau_e(4)': 0.E+00, 'patch_icpp(2)%tau_e(5)': 0.0E+00, 'patch_icpp(2)%tau_e(6)': 0.0E+00,
+                    'patch_icpp(3)%tau_e(4)': 0.E+00, 'patch_icpp(3)%tau_e(5)': 0.0E+00, 'patch_icpp(3)%tau_e(6)': 0.0E+00
+                })
+
+            cases.append(create_case(stack, '', {}))
+
+            for i in range(3):
+                stack.pop()
+
+            if num_fluids == 2:
+                stack.pop()
+
+            if len(dimInfo[0]) == 2:
+                stack.pop()
+
+            if len(dimInfo[0]) == 3:
+                for i in range(2):
+                    stack.pop()
+
         for i in range(3):
             stack.pop()
 

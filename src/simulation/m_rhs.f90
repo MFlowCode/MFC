@@ -171,8 +171,17 @@ module m_rhs
 !$acc declare create(intxb, intxe)
 
     integer :: bubxb, bubxe
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-!$acc declare create(gammas, pi_infs)
+    integer :: strxb, strxe
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs, Gs
+!$acc declare create(gammas, pi_infs, Gs)
+
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
+!$acc declare create(rho_K_field, G_K_field)
+
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
+!$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
 
     real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
 !$acc declare create(gamma_min, pres_inf)
@@ -189,6 +198,9 @@ module m_rhs
     real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
 !$acc declare create(loc_mono)
 
+    real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
+!$acc declare create(foc_length, aperture)
+
     character(50) :: file_path !< Local file path for saving debug files
 
 !$acc declare create(q_cons_qp,q_prim_qp,qL_cons_n,qR_cons_n,qL_prim_n,qR_prim_n,  &
@@ -196,7 +208,7 @@ module m_rhs
 !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
 !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
-!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, &
+!$acc   bub_mom_src, mono_mass_src, mono_e_src,mono_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, strxb, strxe, &
 !$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
 !$acc     dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat)
 
@@ -255,6 +267,13 @@ contains
 !$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
+!        if (hypoelasticity) then
+!            do l = stress_idx%beg, stress_idx%end
+!                allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+!!$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+!            end do
+!        end if
+
         do l = adv_idx%end + 1, sys_size
             allocate (q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
 !$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -271,6 +290,12 @@ contains
                 q_cons_qp%vf(l)%sf
 !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
+
+!        do l = stress_idx%beg, stress_idx%end
+!            q_prim_qp%vf(l)%sf => &
+!                q_cons_qp%vf(l)%sf
+!!$acc enter data attach(q_prim_qp%vf(l)%sf)
+!        end do
 
         ! ==================================================================
 
@@ -336,13 +361,6 @@ contains
             allocate (qR_prim_n(i)%vf(1:sys_size))
             allocate (myflux_vf(i)%vf(1:sys_size))
             allocate (myflux_src_vf(i)%vf(1:sys_size))
-
-            !$acc enter data create(qL_cons_n(i)%vf(1:sys_size))
-            !$acc enter data create(qR_cons_n(i)%vf(1:sys_size))
-            !$acc enter data create(qL_prim_n(i)%vf(1:sys_size))
-            !$acc enter data create(qR_prim_n(i)%vf(1:sys_size))
-            !$acc enter data create(myflux_vf(i)%vf(1:sys_size))
-            !$acc enter data create(myflux_src_vf(i)%vf(1:sys_size))
         end do
         ! END: Allocation/Association of qK_cons_n and qK_prim_n =====
 
@@ -659,13 +677,29 @@ contains
        allocate (blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
         end if
 
-        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
+        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids), Gs(1:num_fluids))
+
+        if (hypoelasticity) then
+            allocate (rho_K_field(0:m, 0:n, 0:p), G_K_field(0:m, 0:n, 0:p))
+            allocate (du_dx(0:m, 0:n, 0:p))
+            if (n > 0) then
+                allocate (du_dy(0:m, 0:n, 0:p), dv_dx(0:m, 0:n, 0:p), dv_dy(0:m, 0:n, 0:p))
+                !$acc enter data create(du_dy, dv_dx, dv_dy)
+                if (p > 0) then
+                    allocate (du_dz(0:m, 0:n, 0:p), dv_dz(0:m, 0:n, 0:p))
+                    allocate (dw_dx(0:m, 0:n, 0:p), dw_dy(0:m, 0:n, 0:p), dw_dz(0:m, 0:n, 0:p))
+                    !$acc enter data create(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
+                end if
+            end if
+            !$acc enter data create(rho_K_field,G_K_field,du_dx)
+        end if
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
+            Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device(gammas, pi_infs)
+!$acc update device(gammas, pi_infs, Gs)
 
         allocate (gamma_min(1:num_fluids), pres_inf(1:num_fluids))
 
@@ -696,6 +730,8 @@ contains
         contxe = cont_idx%end
         bubxb = bub_idx%beg
         bubxe = bub_idx%end
+        strxb = stress_idx%beg
+        strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
@@ -724,7 +760,7 @@ contains
         end if
 
         if (monopole) then
-            allocate(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono),  loc_mono(1:3, 1:num_mono))
+            allocate(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono))
 
             do i = 1, num_mono
                 mag(i) = mono(i)%mag
@@ -734,14 +770,16 @@ contains
                 pulse(i) = mono(i)%pulse
                 dir(i) = mono(i)%dir
                 delay(i) = mono(i)%delay
+                foc_length(i) = mono(i)%foc_length
+                aperture(i) = mono(i)%aperture
                 do j = 1, 3
                     loc_mono(j, i) = mono(i)%loc(j)
                 end do
             end do
-            !$acc update device(mag, support, length, npulse, pulse, dir, delay, loc_mono)
+            !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono)
         end if
 
-!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx)
+!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -804,6 +842,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: t_step
 
+        !these are necessary for hypoelasticity (currently in rhs_full)
+        real(kind(0d0)) :: Re_K, rho_K, G_K
+        real(kind(0d0)) :: gamma_K, pi_inf_K
+
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
@@ -814,16 +856,17 @@ contains
 
         real(kind(0d0)) :: pb, mv, vflux, pldot, pbdot
 
-        real(kind(0d0)) :: n_tait, B_tait
+        real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
         integer :: ndirs
 
         real(kind(0d0)) :: mytime, sound
-        real(kind(0d0)) :: s2, const_sos
+        real(kind(0d0)) :: s2, const_sos, s1
 
         integer :: i, j, k, l, r, q, ii, id !< Generic loop iterators
+        integer :: term_index
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -850,7 +893,6 @@ contains
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange
-
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -903,7 +945,6 @@ contains
 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ===============================================================
-
             ! Reconstructing Primitive/Conservative Variables ===============
 
             if (all(Re_size == 0)) then
@@ -972,10 +1013,10 @@ contains
             else
                 ix%beg = 0; iy%beg = 0; iz%beg = -1
             end if
-
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
             call nvtxStartRange("RHS-Riemann")
+
             ! Computing Riemann Solver Flux and Source Flux =================
             call s_riemann_solver(qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
                                   dqR_prim_dx_n(id)%vf, &
@@ -993,6 +1034,8 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
+
+!            iv%beg = 1; iv%end = sys_size
 
             ! ===============================================================
 
@@ -1338,7 +1381,6 @@ contains
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                     if (id == ndirs) then
-
 !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
                         do l = 0, p
                             do k = 0, n
@@ -1392,14 +1434,30 @@ contains
                                             sound = n_tait*(q_prim_qp%vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                                             sound = dsqrt(sound)
 
-                                            const_sos = dsqrt(n_tait)
+!                                            const_sos = dsqrt(n_tait)
+                                            const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                                            const_sos = dsqrt(const_sos)
+                                            !TODO: does const_sos need to be changed?
 
-                                            s2 = f_g(mytime, sound, const_sos, q)* &
-                                                 f_delta(j, k, l, loc_mono(:, q), length(q), q)
+                                            term_index = 2
+
+                                            angle = 0.d0
+                                            angle_z = 0.d0
+
+                                            s2 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                                 f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
 
                                             !s2 = 1d0
 
+                                            if (support(q) == 5) then
+                                                term_index = 1
+                                                s1 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                                     f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                                            end if
+
                                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
+!                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
+
                                             if (n == 0) then
 
                                                 ! 1D
@@ -1413,24 +1471,38 @@ contains
                                             else if (p == 0) then
                                                 ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                                                 !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mono(q))
-
                                                 if (dir(q) /= dflt_real) then
                                                     ! 2d
                                                     !mono_mom_src(1,j,k,l) = s2
                                                     !mono_mom_src(2,j,k,l) = s2
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    if (support(q) == 5) then
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                                    else
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    end if
                                                 end if
                                             else
                                                 ! 3D
                                                 if (dir(q) /= dflt_real) then
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    if (support(q) == 5) then
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                                    else
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    end if
                                                 end if
                                             end if
 
                                             if (model_eqns /= 4) then
-                                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                                if (support(q) == 5) then
+!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
+                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+                                                else
+                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                                end if
                                             end if
 
                                         end if
@@ -1793,7 +1865,6 @@ contains
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                     if (id == ndirs) then
-
 !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
                         do l = 0, p
                             do k = 0, n
@@ -1847,14 +1918,29 @@ contains
                                             sound = n_tait*(q_prim_qp%vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                                             sound = dsqrt(sound)
 
-                                            const_sos = dsqrt(n_tait)
+!                                            const_sos = dsqrt(n_tait)
+                                            const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                                            const_sos = dsqrt(const_sos)
 
-                                            s2 = f_g(mytime, sound, const_sos, q)* &
-                                                 f_delta(j, k, l, loc_mono(:, q), length(q), q)
+                                            term_index = 2
+
+                                            angle = 0.d0
+                                            angle_z = 0.d0
+
+                                            s2 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                                 f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
 
                                             !s2 = 1d0
 
+                                            if (support(q) == 5) then
+                                                term_index = 1
+                                                s1 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                                     f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                                            end if
                                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
+!                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
+!                                            end if
+
                                             if (n == 0) then
 
                                                 ! 1D
@@ -1873,19 +1959,34 @@ contains
                                                     ! 2d
                                                     !mono_mom_src(1,j,k,l) = s2
                                                     !mono_mom_src(2,j,k,l) = s2
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    if (support(q) == 5) then
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                                    else
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    end if
                                                 end if
                                             else
                                                 ! 3D
                                                 if (dir(q) /= dflt_real) then
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    if (support(q) == 5) then
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                                    else
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    end if
                                                 end if
                                             end if
 
                                             if (model_eqns /= 4) then
-                                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                                if (support(q) == 5) then
+                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
+                                                else
+                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                                end if
                                             end if
 
                                         end if
@@ -2444,7 +2545,6 @@ contains
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                     if (id == ndirs) then
-
 !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
                         do l = 0, p
                             do k = 0, n
@@ -2498,14 +2598,30 @@ contains
                                             sound = n_tait*(q_prim_qp%vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                                             sound = dsqrt(sound)
 
-                                            const_sos = dsqrt(n_tait)
+!                                            const_sos = dsqrt(n_tait)
+                                            const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                                            const_sos = dsqrt(const_sos)
+                                            !TODO: change const_sos expression?
 
-                                            s2 = f_g(mytime, sound, const_sos, q)* &
-                                                 f_delta(j, k, l, loc_mono(:, q), length(q), q)
+                                            term_index = 2
+
+                                            angle = 0.d0
+                                            angle_z = 0.d0
+
+                                            s2 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                                 f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
 
                                             !s2 = 1d0
 
+                                            if (support(q) == 5) then
+                                                term_index = 1
+                                                s1 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                                     f_delta(j, k, l, mono(q)%loc, mono(q)%length, q, angle, angle_z)
+                                            end if
+
                                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
+!                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
+
                                             if (n == 0) then
 
                                                 ! 1D
@@ -2524,19 +2640,34 @@ contains
                                                     ! 2d
                                                     !mono_mom_src(1,j,k,l) = s2
                                                     !mono_mom_src(2,j,k,l) = s2
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    if (support(q) == 5) then
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                                    else
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    end if
                                                 end if
                                             else
                                                 ! 3D
                                                 if (dir(q) /= dflt_real) then
-                                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    if (support(q) == 5) then
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                                    else
+                                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                                    end if
                                                 end if
                                             end if
 
                                             if (model_eqns /= 4) then
-                                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                                if (support(q) == 5) then
+!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
+                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+                                                else
+                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                                end if
                                             end if
 
                                         end if
@@ -2623,6 +2754,246 @@ contains
             end if  ! id loop
             call nvtxEndRange
 
+            ! RHS additions for hypoelasticity
+            call nvtxStartRange("RHS_Hypoelasticity")
+
+            if (hypoelasticity) then
+
+                if (id == 1) then
+                    ! calculate velocity gradients + rho_K and G_K
+                    ! TODO: re-organize these loops one by one for GPU efficiency if possible?
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                du_dx(k, l, q) = &
+                                    (q_prim_qp%vf(momxb)%sf(k - 2, l, q) &
+                                     - 8d0*q_prim_qp%vf(momxb)%sf(k - 1, l, q) &
+                                     + 8d0*q_prim_qp%vf(momxb)%sf(k + 1, l, q) &
+                                     - q_prim_qp%vf(momxb)%sf(k + 2, l, q)) &
+                                    !                                    / (12d0*(x_cc(k+1) - x_cc(k) ))
+                                    /(12d0*dx(k))
+                            end do
+                        end do
+                    end do
+
+                    ! 2D
+                    if (n > 0) then
+!$acc parallel loop collapse(3) gang vector default(present)
+                        do q = 0, p
+                            do l = 0, n
+                                do k = 0, m
+                                    du_dy(k, l, q) = &
+                                        (q_prim_qp%vf(momxb)%sf(k, l - 2, q) &
+                                         - 8d0*q_prim_qp%vf(momxb)%sf(k, l - 1, q) &
+                                         + 8d0*q_prim_qp%vf(momxb)%sf(k, l + 1, q) &
+                                         - q_prim_qp%vf(momxb)%sf(k, l + 2, q)) &
+                                        !                                        / (12d0*(y_cc(l+1) - y_cc(l) ))
+                                        /(12d0*dy(l))
+                                    dv_dx(k, l, q) = &
+                                        (q_prim_qp%vf(momxb + 1)%sf(k - 2, l, q) &
+                                         - 8d0*q_prim_qp%vf(momxb + 1)%sf(k - 1, l, q) &
+                                         + 8d0*q_prim_qp%vf(momxb + 1)%sf(k + 1, l, q) &
+                                         - q_prim_qp%vf(momxb + 1)%sf(k + 2, l, q)) &
+                                        !                                        / (12d0*(x_cc(k+1) - x_cc(k) ))
+                                        /(12d0*dx(k))
+                                    dv_dy(k, l, q) = &
+                                        (q_prim_qp%vf(momxb + 1)%sf(k, l - 2, q) &
+                                         - 8d0*q_prim_qp%vf(momxb + 1)%sf(k, l - 1, q) &
+                                         + 8d0*q_prim_qp%vf(momxb + 1)%sf(k, l + 1, q) &
+                                         - q_prim_qp%vf(momxb + 1)%sf(k, l + 2, q)) &
+                                        !                                        / (12d0*(y_cc(l+1) - y_cc(l) ))
+                                        /(12d0*dy(l))
+                                end do
+                            end do
+                        end do
+
+                        ! 3D
+                        if (p > 0) then
+!$acc parallel loop collapse(3) gang vector default(present)
+                            do q = 0, p
+                                do l = 0, n
+                                    do k = 0, m
+                                        du_dz(k, l, q) = &
+                                            (q_prim_qp%vf(momxb)%sf(k, l, q - 2) &
+                                             - 8d0*q_prim_qp%vf(momxb)%sf(k, l, q - 1) &
+                                             + 8d0*q_prim_qp%vf(momxb)%sf(k, l, q + 1) &
+                                             - q_prim_qp%vf(momxb)%sf(k, l, q + 2)) &
+                                            !                                            / (12d0*(z_cc(q+1) - z_cc(q) ))
+                                            /(12d0*dz(q))
+                                        dv_dz(k, l, q) = &
+                                            (q_prim_qp%vf(momxb + 1)%sf(k, l, q - 2) &
+                                             - 8d0*q_prim_qp%vf(momxb + 1)%sf(k, l, q - 1) &
+                                             + 8d0*q_prim_qp%vf(momxb + 1)%sf(k, l, q + 1) &
+                                             - q_prim_qp%vf(momxb + 1)%sf(k, l, q + 2)) &
+                                            !                                            / (12d0*(z_cc(q+1) - z_cc(q) ))
+                                            /(12d0*dz(q))
+                                        dw_dx(k, l, q) = &
+                                            (q_prim_qp%vf(momxe)%sf(k - 2, l, q) &
+                                             - 8d0*q_prim_qp%vf(momxe)%sf(k - 1, l, q) &
+                                             + 8d0*q_prim_qp%vf(momxe)%sf(k + 1, l, q) &
+                                             - q_prim_qp%vf(momxe)%sf(k + 2, l, q)) &
+                                            !                                            / (12d0*(x_cc(k+1) - x_cc(k) ))
+                                            /(12d0*dx(k))
+                                        dw_dy(k, l, q) = &
+                                            (q_prim_qp%vf(momxe)%sf(k, l - 2, q) &
+                                             - 8d0*q_prim_qp%vf(momxe)%sf(k, l - 1, q) &
+                                             + 8d0*q_prim_qp%vf(momxe)%sf(k, l + 1, q) &
+                                             - q_prim_qp%vf(momxe)%sf(k, l + 2, q)) &
+                                            !                                            / (12d0*(y_cc(l+1) - y_cc(l) ))
+                                            /(12d0*dy(l))
+                                        dw_dz(k, l, q) = &
+                                            (q_prim_qp%vf(momxe)%sf(k, l, q - 2) &
+                                             - 8d0*q_prim_qp%vf(momxe)%sf(k, l, q - 1) &
+                                             + 8d0*q_prim_qp%vf(momxe)%sf(k, l, q + 1) &
+                                             - q_prim_qp%vf(momxe)%sf(k, l, q + 2)) &
+                                            !                                            / (12d0*(z_cc(q+1) - z_cc(q) ))
+                                            /(12d0*dz(q))
+                                    end do
+                                end do
+                            end do
+                        end if
+                    end if
+
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rho_K = 0d0; G_K = 0d0
+                                do i = 1, num_fluids
+                                    rho_K = rho_K + q_prim_qp%vf(i)%sf(k, l, q) !alpha_rho_K(1)
+                                    G_K = G_K + q_prim_qp%vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)  !alpha_K(1) * Gs(1)
+                                end do
+                                rho_K_field(k, l, q) = rho_K
+                                G_K_field(k, l, q) = G_K
+                                !TODO: take this out if not needed
+                                if (G_K < 1000) then
+                                    G_K_field(k, l, q) = 0
+                                end if
+                            end do
+                        end do
+                    end do
+
+                    ! apply rhs source term to elastic stress equation
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(strxb)%sf(k, l, q) = &
+                                    rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                    ((4d0*G_K_field(k, l, q)/3d0) + &
+                                     q_prim_qp%vf(strxb)%sf(k, l, q))* &
+                                    du_dx(k, l, q)
+                            end do
+                        end do
+                    end do
+
+                elseif (id == 2) then
+
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                            (q_prim_qp%vf(strxb + 1)%sf(k, l, q)*du_dy(k, l, q) + &
+                                                             q_prim_qp%vf(strxb + 1)%sf(k, l, q)*du_dy(k, l, q) - &
+                                                             q_prim_qp%vf(strxb)%sf(k, l, q)*dv_dy(k, l, q) - &
+                                                             2d0*G_K_field(k, l, q)*(1d0/3d0)*dv_dy(k, l, q))
+
+                                rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                                (q_prim_qp%vf(strxb + 1)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb)%sf(k, l, q)*dv_dx(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*du_dy(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dv_dy(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dv_dy(k, l, q) + &
+                                                                 2d0*G_K_field(k, l, q)*(1d0/2d0)*(du_dy(k, l, q) + &
+                                                                                                   dv_dx(k, l, q)))
+
+                                rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                                (q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dv_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dv_dx(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) + &
+                                                                 2d0*G_K_field(k, l, q)*(dv_dy(k, l, q) - (1d0/3d0)* &
+                                                                                         (du_dx(k, l, q) + &
+                                                                                          dv_dy(k, l, q))))
+                            end do
+                        end do
+                    end do
+
+                elseif (id == 3) then
+!$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+
+                                rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                            (q_prim_qp%vf(strxb + 3)%sf(k, l, q)*du_dz(k, l, q) + &
+                                                             q_prim_qp%vf(strxb + 3)%sf(k, l, q)*du_dz(k, l, q) - &
+                                                             q_prim_qp%vf(strxb)%sf(k, l, q)*dw_dz(k, l, q) - &
+                                                             2d0*G_K_field(k, l, q)*(1d0/3d0)*dw_dz(k, l, q))
+
+                                rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                                (q_prim_qp%vf(strxb + 4)%sf(k, l, q)*du_dz(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 3)%sf(k, l, q)*dv_dz(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dw_dz(k, l, q))
+
+                                rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                                (q_prim_qp%vf(strxb + 4)%sf(k, l, q)*dv_dz(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*dv_dz(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*dw_dz(k, l, q) - &
+                                                                 2d0*G_K_field(k, l, q)*(1d0/3d0)*dw_dz(k, l, q))
+
+                                rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                                (q_prim_qp%vf(strxb + 3)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb)%sf(k, l, q)*dw_dx(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 3)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*du_dy(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dw_dy(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 3)%sf(k, l, q)*dv_dy(k, l, q) + &
+!!                            q_prim_qp%vf(j+2)%sf(k,l,q) * dw_dz(k,l,q) + &
+                                                                 q_prim_qp%vf(strxb + 5)%sf(k, l, q)*du_dz(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 3)%sf(k, l, q)*dw_dz(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 3)%sf(k, l, q)*dw_dz(k, l, q) + &
+                                                                 2d0*G_K_field(k, l, q)*(1d0/2d0)*(du_dz(k, l, q) + &
+                                                                                                   dw_dx(k, l, q)))
+
+                                rhs_vf(strxb + 4)%sf(k, l, q) = rhs_vf(strxb + 4)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                                (q_prim_qp%vf(strxb + 3)%sf(k, l, q)*dv_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 1)%sf(k, l, q)*dw_dx(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*dv_dy(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 2)%sf(k, l, q)*dw_dy(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*dv_dy(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 5)%sf(k, l, q)*dv_dz(k, l, q) + &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*dw_dz(k, l, q) - &
+                                                                 q_prim_qp%vf(strxb + 4)%sf(k, l, q)*dw_dz(k, l, q) + &
+                                                                 2d0*G_K_field(k, l, q)*(1d0/2d0)*(dv_dz(k, l, q) + &
+                                                                                                   dw_dy(k, l, q)))
+
+                                rhs_vf(strxe)%sf(k, l, q) = rhs_vf(strxe)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                            (q_prim_qp%vf(strxe - 2)%sf(k, l, q)*dw_dx(k, l, q) + &
+                                                             q_prim_qp%vf(strxe - 2)%sf(k, l, q)*dw_dx(k, l, q) - &
+                                                             q_prim_qp%vf(strxe)%sf(k, l, q)*du_dx(k, l, q) + &
+                                                             q_prim_qp%vf(strxe - 1)%sf(k, l, q)*dw_dy(k, l, q) + &
+                                                             q_prim_qp%vf(strxe - 1)%sf(k, l, q)*dw_dy(k, l, q) - &
+                                                             q_prim_qp%vf(strxe)%sf(k, l, q)*dv_dy(k, l, q) + &
+                                                             q_prim_qp%vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) + &
+                                                             q_prim_qp%vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) - &
+                                                             q_prim_qp%vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) + &
+                                                             2d0*G_K_field(k, l, q)*(dw_dz(k, l, q) - (1d0/3d0)* &
+                                                                                     (du_dx(k, l, q) + &
+                                                                                      dv_dy(k, l, q) + &
+                                                                                      dw_dz(k, l, q))))
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+            call nvtxEndRange
         end do
         ! END: Dimensional Splitting Loop =================================
 
@@ -3100,13 +3471,14 @@ contains
         !! @param mytime Simulation time
         !! @param sos Sound speed
         !! @param mysos Alternative speed of sound for testing
-    function f_g(mytime, sos, mysos, nm)
+    function f_g(mytime, sos, mysos, nm, term_index)
 !$acc routine seq
         real(kind(0d0)), intent(IN) :: mytime, sos, mysos
         integer, intent(IN) :: nm
         real(kind(0d0)) :: period, t0, sigt, pa
         real(kind(0d0)) :: offset
         real(kind(0d0)) :: f_g
+        integer :: term_index
 
         offset = 0d0
         if (delay(nm) /= dflt_real) offset = delay(nm)
@@ -3115,7 +3487,11 @@ contains
             ! Sine wave
             period = length(nm)/sos
             f_g = 0d0
-            if (mytime <= (npulse(nm)*period + offset)) then
+            if (term_index == 1) then
+                f_g = mag(nm)*sin((mytime)*2.d0*pi/period)/mysos &
+                      + mag(nm)/foc_length(nm)*(1.d0/(2.d0*pi/period)*cos((mytime)*2.d0*pi/period) &
+                                                - 1.d0/(2.d0*pi/period))
+            elseif (mytime <= (npulse(nm)*period + offset)) then
                 f_g = mag(nm)*sin((mytime + offset)*2.d0*pi/period)
             end if
         else if (pulse(nm) == 2) then
@@ -3142,7 +3518,7 @@ contains
         !! @param l Third coordinate-direction location index
         !! @param mono_loc Nominal source term location
         !! @param mono_leng Length of source term in space
-    function f_delta(j, k, l, mono_loc, mono_leng, nm)
+    function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
         integer, intent(IN) :: nm
@@ -3154,6 +3530,8 @@ contains
         real(kind(0d0)) :: hxnew, hynew
         real(kind(0d0)) :: sig
         real(kind(0d0)) :: f_delta
+        real(kind(0d0)) :: angle
+        real(kind(0d0)) :: angle_z
 
         if (n == 0) then
             sig = dx(j)
@@ -3213,6 +3591,19 @@ contains
                 ! Support for all y
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
                           dexp(-0.5d0*(hx/sig)**2.d0)
+            else if (support(nm) == 5) then
+                ! Support along 'transducer'
+                hx = x_cc(j) - mono_loc(1)
+                hy = y_cc(k) - mono_loc(2)
+
+                hxnew = foc_length(nm) - dsqrt(hy**2.d0 + (foc_length(nm) - hx)**2.d0)
+                if ((abs(hy) < aperture(nm)/2.d0) .and. (hx < foc_length(nm))) then
+                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                              dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    angle = -atan(hy/(foc_length(nm) - hx))
+                else
+                    f_delta = 0d0
+                end if
             end if
         else !3D
 
@@ -3236,6 +3627,24 @@ contains
                 ! Support for all x,y
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
                           dexp(-0.5d0*(hz/sig)**2.d0)
+            else if (support(nm) == 5) then
+                ! Support along 'transducer'
+                hx = x_cc(j) - mono_loc(1)
+                hy = y_cc(k) - mono_loc(2)
+                hz = z_cc(l) - mono_loc(3)
+
+                hxnew = foc_length(nm) - dsqrt(hy**2.d0 + hz**2.d0 + (foc_length(nm) - hx)**2.d0)
+                if ((dsqrt(hy**2.d0 + hz**2.d0) < aperture(nm)/2.d0) .and. &
+                    (hx < foc_length(nm))) then
+
+                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                              dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+
+                    angle = -atan(hy/(foc_length(nm) - hx))
+                    angle_z = -atan(hz/(foc_length(nm) - hx))
+                else
+                    f_delta = 0d0
+                end if
             end if
         end if
 
@@ -4928,7 +5337,6 @@ contains
         end if
 
         ! ==================================================================
-
     end subroutine s_reconstruct_cell_boundary_values_alt ! --------------------
 
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -

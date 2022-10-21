@@ -118,6 +118,9 @@ module m_derived_types
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
 
+        real(kind(0d0)), dimension(6) :: tau_e
+        !! Elastic stresses added to primitive variables if hypoelasticity = True
+
         real(kind(0d0)) :: R0 !< Bubble size
         real(kind(0d0)) :: V0 !< Bubble velocity
 
@@ -169,6 +172,8 @@ module m_derived_types
         real(kind(0d0)) :: delay !< Time-delay of pulse start
         integer :: pulse
         integer :: support
+        real(kind(0d0)) :: aperture
+        real(kind(0d0)) :: foc_length
     end type mono_parameters
 
 end module m_derived_types
