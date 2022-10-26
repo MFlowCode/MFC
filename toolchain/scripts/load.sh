@@ -172,7 +172,7 @@ elif [ "$u_computer" == "e" ]; then # Expanse
 
         MODULES=("cpu/0.15.4" "gcc/9.2.0" "openmpi/4.1.1" "cmake/3.18.2")
     elif [ "$u_cg" == "g" ]; then
-        MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.4" "cmake/3.19.8")
+        MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
     fi
 
     MODULES=("${MODULES[@]}" "python/3.8.5")
