@@ -152,7 +152,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     if common.does_command_exist("ninja"):
         flags.append("-GNinja")
 
-    if mfc.args["no_mpi"]:
+    if not mfc.args["mpi"]:
         flags.append("-DMFC_WITH_MPI=OFF")
 
     configure = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]

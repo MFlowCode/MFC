@@ -70,8 +70,8 @@ MPI Binary    (-b)  {self.mpibin.bin}\
     def get_exec_cmd(self, target_name: str) -> typing.List[str]:
         binpath = self.get_binpath(target_name)
 
-        if self.mfc.args["no_mpi"]:
-            return cd + [binpath]
+        if not self.mfc.args["mpi"]:
+            return [binpath]
 
         flags = self.mfc.args["flags"][:]
 

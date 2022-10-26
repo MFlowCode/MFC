@@ -115,7 +115,7 @@ class Case:
         gpus              = f"-g {self.ppn}"       if "gpu" in args["mode"]      else ""
         binary_option     = f"-b {args['binary']}" if args["binary"] is not None else ""
         case_optimization =  "--case-optimization" if args["case_optimization"]  else "--no-build"
-        no_mpi            = f"--no-mpi" if args["no_mpi"] else ""
+        no_mpi            = f"--no-mpi" if not args["mpi"] else ""
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
         

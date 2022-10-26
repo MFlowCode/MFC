@@ -4,17 +4,19 @@ from ..cfg.user import MFCUser
 import os
 import dataclasses
 
-MFC_LOCK_CURRENT_VERSION: int = 1
+MFC_LOCK_CURRENT_VERSION: int = 2
 
 @dataclasses.dataclass
 class MFCLock:
     mode:    str
+    mpi:     bool
     version: int
 
     def __init__(self, user: MFCUser):
         if not os.path.exists(common.MFC_LOCK_FILEPATH):
             common.create_file(common.MFC_LOCK_FILEPATH)
             common.file_dump_yaml(common.MFC_LOCK_FILEPATH, {
+                "mpi":     True,
                 "mode":    user.modes[0].name,
                 "version": MFC_LOCK_CURRENT_VERSION
             })
@@ -22,6 +24,7 @@ class MFCLock:
         data: dict = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
 
         self.mode    = data["mode"]
+        self.mpi     = data['mpi']
         self.version = int(data.get("version", "0"))
 
         # 0 is the default version in order to accommodate versions of mfc.sh
@@ -35,3 +38,4 @@ build/ directory and run MFC again. (v{self.version} -> v{MFC_LOCK_CURRENT_VERSI
 
     def write(self):
         common.file_dump_yaml(common.MFC_LOCK_FILEPATH, dataclasses.asdict(self))
+
