@@ -47,6 +47,8 @@ program p_main
     use m_derived_variables     !< Procedures used to compute quantites derived
                                 !! from the conservative and primitive variables
 
+    use m_hypoelastic
+
 #ifdef _OPENACC
     use openacc
 #endif
@@ -154,6 +156,7 @@ program p_main
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
+    if (hypoelasticity) call s_initialize_hypoelastic_module()
     call s_initialize_data_output_module()
     call s_initialize_derived_variables_module()
     call s_initialize_time_steppers_module()
