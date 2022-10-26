@@ -50,7 +50,10 @@ started, run ./mfc.sh build -h.""",
             for name in get_dependencies_names():
                 p.add_argument(f"--no-{name}", action="store_true", help=f"Do not build the {name} dependency. Use the system's instead.")
 
-            p.add_argument(f"--no-mpi", action="store_true", help="Build without MPI.")
+            p.add_argument(f"--mpi",    action="store_true",              help="Build with    MPI.")
+            p.add_argument(f"--no-mpi", action="store_false", dest="mpi", help="Build without MPI.")
+
+            p.set_defaults(mpi=mfc.lock.mpi)
 
     # === BUILD ===
     add_common_arguments(build)

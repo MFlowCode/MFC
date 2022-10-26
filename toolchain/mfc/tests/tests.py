@@ -58,6 +58,11 @@ class MFCTest:
                 if not doKeep:
                     self.cases.remove(case)
 
+        if not self.mfc.args["mpi"]:
+            for case in self.cases[:]:
+                if case.ppn > 1:
+                    self.cases.remove(case)
+
 
     def execute(self):
         # Select the correct number of threads to use to launch test cases
