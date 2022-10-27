@@ -37,8 +37,6 @@ The paper that describes the MFC's capabilities:
   journal = {Computer Physics Communications},
   doi = {10.1016/j.cpc.2020.107396},
   year = 2021,
-  month = {may},
-  publisher = {Elsevier {BV}},
   pages = {107396},
 }
 ```
