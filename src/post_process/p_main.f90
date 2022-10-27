@@ -240,6 +240,34 @@ program p_main
         end if
         ! ----------------------------------------------------------------------
 
+        ! Adding the elastic shear stresses to the formatted database file -----
+        if (hypoelasticity) then
+            do i = 1, stress_idx%end - stress_idx%beg + 1
+                if (prim_vars_wrt) then
+                    q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
+
+!                    if (fourier_decomp) then
+!                        dft_q_sf(:,:,:) = q_sf(:,:,:)
+!                        do j = fourier_modes%beg, fourier_modes%end
+!                            IF (ANY(j == (/1,2,3,5,7,9/))) THEN
+!                            q_sf(:,:,:) = dft_q_sf(:,:,:)
+!                            CALL s_apply_fourier_decomposition(q_sf,j)
+!                            WRITE(varname, '(A,I0,A,I0)') 'tau', i, '_', j
+!                            CALL s_write_variable_to_formatted_database_file(varname,t_step)
+!                           END IF
+!                        end do
+!                    else
+                    write (varname, '(A,I0)') 'tau', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                end if
+                varname(:) = ' '
+            end do
+        end if
+        ! ----------------------------------------------------------------------
+
         ! Adding the pressure to the formatted database file -------------------
         if (pres_wrt .or. prim_vars_wrt) then
 

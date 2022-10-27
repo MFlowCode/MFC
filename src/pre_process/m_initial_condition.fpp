@@ -444,6 +444,15 @@ contains
                 + (1d0 - eta)*orig_prim_vf(i)
         end do
 
+        ! Elastic Shear Stress
+        if (hypoelasticity) then
+            do i = 1, (stress_idx%end - stress_idx%beg) + 1
+                q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
+                    (eta*patch_icpp(patch_id)%tau_e(i) &
+                     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+            end do
+        end if
+
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0d0
@@ -679,6 +688,15 @@ contains
         q_prim_vf(E_idx)%sf(j, k, l) = &
             (eta*patch_icpp(patch_id)%pres &
              + (1d0 - eta)*orig_prim_vf(E_idx))
+
+        ! Elastic Shear Stress
+        if (hypoelasticity) then
+            do i = 1, (stress_idx%end - stress_idx%beg) + 1
+                q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
+                    (eta*patch_icpp(patch_id)%tau_e(i) &
+                     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+            end do
+        end if
 
         ! Set partial pressures to mixture pressure
         if (model_eqns == 3) then
@@ -1883,7 +1901,9 @@ contains
                         !bump in pressure
                         q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)* &
                                                        (1d0 + 0.2d0*exp(-1d0* &
-                                      ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
+                                                                        ((x_cb(i) - x_centroid)**2.d0 + &
+                                                                         (y_cb(j) - y_centroid)**2.d0 + &
+                                                                         (z_cb(k) - z_centroid)**2.d0) &
                                                                         /(2.d0*0.5d0)))
 
                         !bump in void fraction

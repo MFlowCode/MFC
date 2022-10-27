@@ -71,17 +71,18 @@
 #>srun                                   \
 #>     --nodes={nodes}                   \
 #>     --ntasks-per-node {cpus_per_node} \
+#>     --mpi=pmi2		       \
 #>     "{MFC::BIN}"
 #>
 #> srun --mpi=pmix   \
 #>      "{MFC::BIN}"
 #>
- mpirun                           \
+mpirun                            \
         -np {cpus_per_node*nodes} \
         "{MFC::BIN}"
-#>
 
 {MFC::EPILOGUE}
+
 #>
 #> Note: Lines after the MFC Epilogue will not be executed.
 #>

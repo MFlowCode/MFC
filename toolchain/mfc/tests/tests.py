@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 
 import rich
@@ -58,6 +56,11 @@ class MFCTest:
                         break
 
                 if not doKeep:
+                    self.cases.remove(case)
+
+        if not self.mfc.args["mpi"]:
+            for case in self.cases[:]:
+                if case.ppn > 1:
                     self.cases.remove(case)
 
 
@@ -132,6 +135,8 @@ class MFCTest:
                 tol = 1e-10
             elif test.params.get("bubbles", 'F') == 'T':
                 tol = 1e-10
+            elif test.params.get("hypoelasticity", 'F') == 'T':
+                tol = 1e-7
             else:
                 tol = 1e-12
 
@@ -168,3 +173,4 @@ class MFCTest:
 
             cons.print(f"[bold red]Failed test {test}.[/bold red]")
             cons.print(f"{exc}")
+

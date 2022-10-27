@@ -2,6 +2,7 @@
     "editor.detectIndentation": false,
     "editor.insertSpaces":      true,
     "editor.tabSize":           4,
+    "editor.rulers":            [ 80, 120 ],
     "files.exclude": {
         "**/.git":      true,
         "**/.DS_Store": true,
@@ -10,8 +11,7 @@
 
     "cmake.configureOnOpen": false,
 
-    "fortran.linter.includePaths": [
-        "${workspacefolder}/src/**"
-    ],
-    "fortran.preferredCase": "lowercase"
+    "fortran.preferredCase":       "lowercase",
+    "fortran.linter.includePaths": [ "${workspacefolder}/src/**" ],
+    "fortran.linter.fypp.enabled": true
 }

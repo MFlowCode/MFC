@@ -102,7 +102,7 @@ class Case:
     params: dict
     ppn:    int
 
-    def __init__(self, trace: str, mods: dict, ppn = None) -> None:
+    def __init__(self, trace: str, mods: dict, ppn: int = None) -> None:
         self.trace  = trace
         self.params = {**BASE_CFG.copy(), **mods}
         self.ppn    = ppn if ppn is not None else 1
@@ -115,7 +115,7 @@ class Case:
         gpus              = f"-g {self.ppn}"       if "gpu" in args["mode"]      else ""
         binary_option     = f"-b {args['binary']}" if args["binary"] is not None else ""
         case_optimization =  "--case-optimization" if args["case_optimization"]  else "--no-build"
-        no_mpi            = f"--no-mpi" if args["no_mpi"] else ""
+        no_mpi            = f"--no-mpi" if not args["mpi"] else ""
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
         
@@ -197,8 +197,11 @@ def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: in
         mods.update(dict)
     mods.update(newMods)
 
+    if isinstance(newTrace, str):
+        newTrace = [newTrace]
+
     traces: list = []
-    for trace in stack.trace[:] + [newTrace]:
+    for trace in stack.trace[:] + newTrace:
         if not common.isspace(trace):
             traces.append(trace)
 

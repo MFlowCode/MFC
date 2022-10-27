@@ -255,6 +255,24 @@ module m_riemann_solvers
     !! variables are left and right states of the Riemann problem obtained from
     !! qK_prim_rs_vf and kappaK_rs_vf.
     !> @{
+    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho_L, alpha_rho_R
+    real(kind(0d0)) :: rho_L, rho_R
+    real(kind(0d0)), allocatable, dimension(:) :: vel_L, vel_R
+    real(kind(0d0)) :: pres_L, pres_R
+    real(kind(0d0)) :: E_L, E_R
+    real(kind(0d0)) :: H_L, H_R
+    real(kind(0d0)), allocatable, dimension(:) :: alpha_L, alpha_R
+    real(kind(0d0)) :: Y_L, Y_R
+    real(kind(0d0)) :: gamma_L, gamma_R
+    real(kind(0d0)) :: pi_inf_L, pi_inf_R
+    real(kind(0d0)) :: c_L, c_R
+    real(kind(0d0)), dimension(2) :: Re_L, Re_R
+    real(kind(0d0)), allocatable, dimension(:) :: tau_e_L, tau_e_R
+    real(kind(0d0)), allocatable, dimension(:) :: G_L, G_R
+
+!$acc declare create(alpha_rho_L, alpha_rho_R,rho_L, rho_R,vel_L, vel_R,pres_L, pres_R, &
+!$acc    E_L, E_R, H_L, H_R, alpha_L, alpha_R, Y_L, Y_R, gamma_L, gamma_R,pi_inf_L, pi_inf_R, &
+!$acc    c_L, c_R,Re_L, Re_R,tau_e_L, tau_e_R, G_L, G_R)
 
     !> @}
 
@@ -391,11 +409,12 @@ module m_riemann_solvers
     integer :: advxb, advxe
     integer :: bubxb, bubxe
     integer :: intxb, intxe
+    integer :: strxb, strxe
 
-!$acc declare create(momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, intxb, intxe)
+!$acc declare create(momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, intxb, intxe, strxb, strxe)
 
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-!$acc declare create(gammas, pi_infs)
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs, Gs
+!$acc declare create(gammas, pi_infs, Gs)
 
     integer, allocatable, dimension(:) :: rs, vs, ps, ms
 !$acc declare create(rs, vs, ps, ms)
@@ -448,6 +467,8 @@ contains
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
         real(kind(0d0)) :: c_L, c_R
+        real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
+        real(kind(0d0)) :: G_L, G_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
 
         real(kind(0d0)) :: rho_avg
@@ -492,7 +513,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, Re_L, Re_R, &
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
                 !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -606,6 +627,37 @@ contains
 
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
+
+                            if (hypoelasticity) then
+                                !$acc loop seq
+                                do i = 1, strxe - strxb + 1
+                                    tau_e_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, strxb - 1 + i)
+                                    tau_e_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, strxb - 1 + i)
+                                end do
+
+                                G_L = 0d0
+                                G_R = 0d0
+
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    G_L = G_L + alpha_L(i)*Gs(i)
+                                    G_R = G_R + alpha_R(i)*Gs(i)
+                                end do
+
+                                do i = 1, strxe - strxb + 1
+                                    ! Elastic contribution to energy if G large enough
+                                    !TODO take out if statement if stable without
+                                    if ((G_L > 1000) .and. (G_R > 1000)) then
+                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
+                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
+                                        ! Additional terms in 2D and 3D
+                                        if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
+                                        end if
+                                    end if
+                                end do
+                            end if
 
                             if (avg_state == 2) then
                                 rho_avg = 5d-1*(rho_L + rho_R)
@@ -726,8 +778,24 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+
+                                if (hypoelasticity) then
+                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
+                                                                       (((4d0*G_L)/3d0) + &
+                                                                        tau_e_L(dir_idx_tau(1)))/rho_L) &
+                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                                         (((4d0*G_R)/3d0) + &
+                                                                          tau_e_R(dir_idx_tau(1)))/rho_R))
+                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
+                                                                       (((4d0*G_R)/3d0) + &
+                                                                        tau_e_R(dir_idx_tau(1)))/rho_R) &
+                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                                         (((4d0*G_L)/3d0) + &
+                                                                          tau_e_L(dir_idx_tau(1)))/rho_L))
+                                else
+                                    s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
+                                    s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+                                end if
 
                                 s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
                                        (s_L - vel_L(dir_idx(1))) - &
@@ -792,6 +860,22 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
+                            else if (hypoelasticity) then
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                        (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                              *vel_R(dir_idx(i)) &
+                                              + dir_flg(dir_idx(i))*pres_R &
+                                              - tau_e_R(dir_idx_tau(i))) &
+                                         - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                                *vel_L(dir_idx(i)) &
+                                                + dir_flg(dir_idx(i))*pres_L &
+                                                - tau_e_L(dir_idx_tau(i))) &
+                                         + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
+                                                    - rho_R*vel_R(dir_idx(i)))) &
+                                        /(s_M - s_P)
+                                end do
                             else
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -815,12 +899,59 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
+                            else if (hypoelasticity) then
+                                !TODO: simplify this so it's not split into 3
+                                if (num_dims == 1) then
+                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
+                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1)))) &
+                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
+                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1)))) &
+                                         + s_M*s_P*(E_L - E_R)) &
+                                        /(s_M - s_P)
+                                else if (num_dims == 2) then
+                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
+                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
+                                              - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2)))) &
+                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
+                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1))) &
+                                                - (tau_e_L(dir_idx_tau(2))*vel_L(dir_idx(2)))) &
+                                         + s_M*s_P*(E_L - E_R)) &
+                                        /(s_M - s_P)
+                                else if (num_dims == 3) then
+                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                        (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
+                                              - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
+                                              - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2))) &
+                                              - (tau_e_R(dir_idx_tau(3))*vel_R(dir_idx(3)))) &
+                                         - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
+                                                - (tau_e_L(dir_idx_tau(1))*vel_L(dir_idx(1))) &
+                                                - (tau_e_L(dir_idx_tau(2))*vel_L(dir_idx(2))) &
+                                                - (tau_e_L(dir_idx_tau(3))*vel_L(dir_idx(3)))) &
+                                         + s_M*s_P*(E_L - E_R)) &
+                                        /(s_M - s_P)
+                                end if
                             else
                                 flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
+                            end if
+
+                            ! Elastic Stresses
+                            if (hypoelasticity) then
+                                do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
+                                    flux_rs${XYZ}$_vf_flat(j, k, l, strxb - 1 + i) = &
+                                        (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                              *tau_e_R(i)) &
+                                         - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                                *tau_e_L(i)) &
+                                         + s_M*s_P*(rho_L*tau_e_L(i) &
+                                                    - rho_R*tau_e_R(i))) &
+                                        /(s_M - s_P)
+                                end do
                             end if
 
                             ! Advection
@@ -2673,19 +2804,22 @@ contains
 
         allocate (gammas(1:num_fluids))
         allocate (pi_infs(1:num_fluids))
+        allocate (Gs(1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
+            Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device(gammas, pi_infs)
+!$acc update device(gammas, pi_infs, Gs)
 
         momxb = mom_idx%beg; momxe = mom_idx%end
         contxb = cont_idx%beg; contxe = cont_idx%end
         bubxb = bub_idx%beg; bubxe = bub_idx%end
         advxb = adv_idx%beg; advxe = adv_idx%end
         intxb = internalEnergies_idx%beg; intxe = internalEnergies_idx%end
-!$acc update device(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, intxb, intxe)
+        strxb = stress_idx%beg; strxe = stress_idx%end
+!$acc update device(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, intxb, intxe, strxb, strxe)
 
         if (bubbles) then
             allocate (rs(1:nb))
@@ -2747,6 +2881,9 @@ contains
         end if
 
         allocate (vel_avg(1:num_dims))
+
+        allocate (G_L(1:num_fluids))
+        allocate (G_R(1:num_fluids))
 
         if (riemann_solver == 3) then
             allocate (alpha_rho_IC(1:cont_idx%end), vel_IC(1:num_dims))
@@ -2950,9 +3087,19 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
         end if
 
+        if (hypoelasticity) then
+            if (norm_dir == 1) then
+                dir_idx_tau = (/1, 2, 4/)
+            else if (norm_dir == 2) then
+                dir_idx_tau = (/3, 2, 5/)
+            else
+                dir_idx_tau = (/6, 4, 5/)
+            end if
+        end if
+
         isx = ix; isy = iy; isz = iz
 
-!$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz)
+!$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then
@@ -4446,7 +4593,6 @@ contains
         integer :: i, j, k, l !< Generic loop iterators
 
         ! Reshaping Outputted Data in y-direction ==========================
-
         if (norm_dir == 2) then
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -4486,7 +4632,7 @@ contains
 
             if (riemann_solver == 1) then
                 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, sys_size
+                do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -4499,7 +4645,6 @@ contains
 
             end if
             ! ==================================================================
-
             ! Reshaping Outputted Data in z-direction ==========================
         elseif (norm_dir == 3) then
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -4541,7 +4686,7 @@ contains
 
             if (riemann_solver == 1) then
                 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, sys_size
+                do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
@@ -4578,7 +4723,7 @@ contains
 
             if (riemann_solver == 1) then
                 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, sys_size
+                do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -4608,6 +4753,11 @@ contains
 
         deallocate (vel_avg)
 
+!TODO: check that deallocate statements aren't missing here (alpha_rho_L, alpha_L, etc.)
+!        deallocate (alpha_L, alpha_R, G_L, G_R)
+
+!        if (any(Re_size > 0)) deallocate (Re_avg_rs_vf)
+
         if (riemann_solver == 3) then
             deallocate (alpha_rho_IC, vel_IC)
             deallocate (alpha_IC)
@@ -4621,7 +4771,7 @@ contains
             deallocate (V0_L, V0_R)
         end if
 
-        deallocate (gammas, pi_infs)
+        deallocate (gammas, pi_infs, Gs)
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()
