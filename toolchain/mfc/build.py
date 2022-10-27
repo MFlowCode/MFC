@@ -87,12 +87,13 @@ def clean_target(mfc, name: str):
         cons.unindent()
         return
 
-    clean = f"cmake --build . --target clean --config {mode.type}"
+    clean = ["cmake", "--build",  build_dirpath, "--target", "clean",
+                      "--config", mode.type]
 
-    cons.print()
-    cons.print(f"$ {clean}", highlight=False)
-    cons.print()
-    common.system(f"cd \"{build_dirpath}\" && {clean}", exception_text=f"Failed to clean the [bold magenta]{name}[/bold magenta] target.")
+    if mfc.args["verbose"]:
+        clean.append("--verbose")
+
+    common.system(clean, exception_text=f"Failed to clean the [bold magenta]{name}[/bold magenta] target.")
 
     cons.unindent()
 
@@ -138,34 +139,35 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
         # second heighest level of priority, still letting users manually
         # specify <PackageName>_ROOT, which has precedent over CMAKE_PREFIX_PATH.
         # See: https://cmake.org/cmake/help/latest/command/find_package.html.
-        f"-DCMAKE_PREFIX_PATH=\"{install_dirpath}\"",
+        f"-DCMAKE_PREFIX_PATH={install_dirpath}",
         # First directory that FIND_LIBRARY searches.
         # See: https://cmake.org/cmake/help/latest/command/find_library.html.
-        f"-DCMAKE_FIND_ROOT_PATH=\"{install_dirpath}\"",
+        f"-DCMAKE_FIND_ROOT_PATH={install_dirpath}",
         # Location prefix to install bin/, lib/, include/, etc.
         # See: https://cmake.org/cmake/help/latest/command/install.html.
-        f"-DCMAKE_INSTALL_PREFIX=\"{install_dirpath}\"",
+        f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
     ]
 
     # Use the faster and more modern Ninja generator if present
     if common.does_command_exist("ninja"):
         flags.append("-GNinja")
 
-    if mfc.args["no_mpi"]:
+    if not mfc.args["mpi"]:
         flags.append("-DMFC_WITH_MPI=OFF")
 
-    configure = f"cd \"{build_dirpath}\" && cmake {' '.join(flags)} \"{cmake_dirpath}\""
-    build     = f"cd \"{build_dirpath}\" && cmake --build .{' --verbose' if mfc.args['verbose'] else ''} -j {mfc.args['jobs']} --target {name} --config {mode.type}"
-    install   = f"cd \"{build_dirpath}\" && cmake --install ."
+    configure = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
+    build     = ["cmake", "--build", build_dirpath,    "--target", name,
+                          "-j",      mfc.args["jobs"], "--config", mode.type]
+    if mfc.args['verbose']:
+        build.append("--verbose")
+
+    install   = ["cmake", "--install", build_dirpath]
 
     # Only configure the first time
     if not is_target_configured(target):
         for dependency_name in target.requires:
             build_target(mfc, dependency_name, history)
 
-        cons.print(no_indent=True)
-        cons.print(f"$ {configure}")
-        cons.print(no_indent=True)
         common.create_directory(build_dirpath)
 
         if common.system(configure, no_exception=True) != 0:
@@ -173,13 +175,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
             raise common.MFCException(f"Failed to configure the [bold magenta]{name}[/bold magenta] target.")
 
-    cons.print(no_indent=True)
-    cons.print(f"$ {build}")
-    cons.print(no_indent=True)
     common.system(build, exception_text=f"Failed to build the [bold magenta]{name}[/bold magenta] target.")
-    cons.print(no_indent=True)
-    cons.print(f"$ {install}")
-    cons.print(no_indent=True)
     common.system(install, exception_text=f"Failed to install the [bold magenta]{name}[/bold magenta] target.")
     cons.print(no_indent=True)
 
@@ -194,3 +190,4 @@ def build(mfc):
         build_target(mfc, target_name)
 
     cons.unindent()
+

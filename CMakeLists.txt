@@ -4,13 +4,13 @@ project(MFC LANGUAGES C CXX Fortran)
 
 
 # === Options
-option(MFC_WITH_MPI            "Build with MPI"                                   ON)
-option(MFC_WITH_OPEN_ACC       "Build with OpenACC"                              OFF)
-option(MFC_BUILD_PRE_PROCESS   "Build pre_process"                               OFF)
-option(MFC_BUILD_SIMULATION    "Build simulation"                                OFF)
-option(MFC_BUILD_POST_PROCESS  "Build post_process"                              OFF)
-option(MFC_BUILD_DOC           "Build documentation"                             OFF)
-option(MFC_BUILD_ALL           "Build pre_process, simulation, and post_process" OFF)
+option(MFC_WITH_MPI            "Build with MPI"       ON)
+option(MFC_WITH_OPEN_ACC       "Build with OpenACC"  OFF)
+option(MFC_BUILD_PRE_PROCESS   "Build pre_process"   OFF)
+option(MFC_BUILD_SIMULATION    "Build simulation"    OFF)
+option(MFC_BUILD_POST_PROCESS  "Build post_process"  OFF)
+option(MFC_BUILD_DOC           "Build documentation" OFF)
+option(MFC_BUILD_ALL           "Build everything"    OFF)
 
 if (MFC_BUILD_ALL)
     set(MFC_BUILD_PRE_PROCESS  ON FORCE)
@@ -151,8 +151,8 @@ endif()
 # <target>_srcs CMake cache variaible the full list of .f90 files, including the
 # preprocessed Fypp files.
 macro(HANDLE_FYPP target)
-    file(GLOB ${target}_f90s "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/*.f90")
-    file(GLOB ${target}_fpps "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/*.fpp")
+    file(GLOB ${target}_f90s CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/*.f90")
+    file(GLOB ${target}_fpps CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/*.fpp")
 
     # Create src/<target>/autogen folder in which to generate Fypp'd .f90 files.
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/autogen")

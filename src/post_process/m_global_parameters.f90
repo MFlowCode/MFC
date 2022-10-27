@@ -97,6 +97,7 @@ module m_global_parameters
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
+    logical :: hypoelasticity  !< Turn hypoelasticity on
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -110,6 +111,7 @@ module m_global_parameters
     integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer :: alf_idx                   !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    type(bounds_info) :: stress_idx                !< Indices of elastic stresses
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -230,7 +232,7 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
+    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: poly_sigma
@@ -271,6 +273,7 @@ contains
         weno_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
+        hypoelasticity = .false.
 
         bc_x%beg = dflt_int
         bc_x%end = dflt_int
@@ -283,6 +286,7 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
+            fluid_pp(i)%G = dflt_real
         end do
 
         ! Formatted database file(s) structure parameters
@@ -429,6 +433,12 @@ contains
                     rhoref = 1.d0
                     pref = 1.d0
                 end if
+            end if
+
+            if (hypoelasticity) then
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                sys_size = stress_idx%end
             end if
 
             ! ==================================================================

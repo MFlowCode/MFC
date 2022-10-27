@@ -41,6 +41,7 @@ contains
             num_fluids, mpp_lim, adv_alphan, &
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
+            hypoelasticity, G, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &

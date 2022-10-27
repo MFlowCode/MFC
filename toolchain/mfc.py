@@ -13,7 +13,9 @@ from mfc.cfg   import lock
 from mfc.run   import run
 from mfc.tests import tests
 
-from mfc.util.common  import MFC_LOGO, MFCException, quit, delete_directory, format_list_to_string, does_command_exist
+from mfc.util.common  import MFC_LOGO, MFCException, quit
+from mfc.util.common  import delete_directory, format_list_to_string
+from mfc.util.common  import does_command_exist
 from mfc.util.printer import cons
 
 
@@ -33,16 +35,20 @@ class MFCState:
 
     def __handle_mode(self):
         # Handle mode change
-        if self.args["mode"] != self.lock.mode:
-            cons.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode:[/bold yellow]")
-            self.lock.mode = self.args["mode"]
-            self.lock.write()
+        if self.args["mode"] == self.lock.mode and self.args["mpi"] == self.lock.mpi:
+            return
 
-            for target_name in build.get_mfc_target_names():
-                t = build.get_target(target_name)
-                dirpath = build.get_build_dirpath(t)
-                cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
-                delete_directory(dirpath)
+        cons.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode:[/bold yellow]")
+        
+        self.lock.mode = self.args["mode"]
+        self.lock.mpi  = self.args["mpi"]
+        self.lock.write()
+
+        for target_name in build.get_mfc_target_names():
+            t = build.get_target(target_name)
+            dirpath = build.get_build_dirpath(t)
+            cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
+            delete_directory(dirpath)
 
 
     def __print_greeting(self):
@@ -84,7 +90,7 @@ class MFCState:
         if not does_command_exist("cmake"):
             raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
 
-        if not does_command_exist("mpif90") and not self.args["no_mpi"]:
+        if not does_command_exist("mpif90") and self.args["mpi"]:
             raise MFCException("mpif90 couldn't be located on your system. We therefore assume MPI is not available on your system. It is required to build MFC. Please ensure it is installed and discoverable (e.g in your system's $PATH).")
 
 
@@ -123,3 +129,4 @@ if __name__ == "__main__":
 """)
 
         quit(signal.SIGTERM)
+

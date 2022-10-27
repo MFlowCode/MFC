@@ -1,3 +1,5 @@
+import typing
+
 import rich
 import rich.console
 
@@ -22,14 +24,14 @@ class MFCPrinter:
         for _ in range(times):
             self.stack.pop()
 
-    def print(self, msg: str = None, no_indent: bool = False, *args, **kwargs):
+    def print(self, msg: typing.Any = None, no_indent: bool = False, *args, **kwargs):
         if msg is None:
             msg = ""
         
         if no_indent:
-            self.raw.print(msg, *args, **kwargs)
+            self.raw.print(str(msg), *args, **kwargs)
         else:
-            print_s, lines = "", msg.split('\n', maxsplit=-1)
+            print_s, lines = "", str(msg).split('\n', maxsplit=-1)
             for i, s in enumerate(lines):
                 newline = '\n' if (i != len(lines)-1) else ''
                 print_s += f"{''.join(self.stack)}{s}{newline}"
