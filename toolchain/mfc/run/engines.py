@@ -89,11 +89,15 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
             q = multiprocessing.Queue()
 
+            test_cmd = ["cmd", "/c", "ver"] if os.name == "nt" else ["hostname"]
+
             p = multiprocessing.Process(
                 target=_interactive_working_worker,
-                args=([self.mpibin.bin] +
-                      self.mpibin.gen_params(self.mfc.args) +
-                      [ "hostname" ], q, ))
+                args=(
+                    [self.mpibin.bin] + self.mpibin.gen_params(self.mfc.args) + test_cmd,
+                    q,
+                ))
+
             p.start()
             p.join(work_timeout)
 
