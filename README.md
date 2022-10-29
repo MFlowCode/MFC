@@ -37,8 +37,6 @@ The paper that describes the MFC's capabilities:
   journal = {Computer Physics Communications},
   doi = {10.1016/j.cpc.2020.107396},
   year = 2021,
-  month = {may},
-  publisher = {Elsevier {BV}},
   pages = {107396},
 }
 ```
@@ -51,6 +49,6 @@ MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 ## Acknowledgements
  
 <p align="justify">
-  The development of the MFC was supported in part by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
-  MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and ORNL Summit under allocation CFD154 (PI Bryngelson).
+   MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
+  MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit under allocation CFD154 (PI Bryngelson).
 </p>
