@@ -129,6 +129,8 @@ contains
         logical :: file_exist !<
             !! Logical used to check existence of run-time information file
 
+        character(LEN=path_len) :: cwd
+
         ! Opening the run-time information file
         file_path = trim(case_dir)//'/'//trim(file_name)
 
@@ -142,17 +144,8 @@ contains
         ! Generating file header for a new run-time information file
         if (file_exist .neqv. .true.) then
 
-            call SYSTEM('basename `pwd` > dir_name')
-
-            file_path = trim(case_dir)//'/dir_name'
-
-            open (2, FILE=trim(file_path), &
-                  FORM='formatted', &
-                  STATUS='old')
-
-            read (2, '(A)') dir_name; close (2)
-
-            call s_delete_directory("dir_name")
+            call s_get_cwd(cwd)
+            call s_get_basename(cwd, dir_name)
 
             write (1, '(A)') 'MFC - Case - '//trim(dir_name)// &
                 ': '//trim(file_name)

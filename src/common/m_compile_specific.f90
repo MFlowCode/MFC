@@ -51,4 +51,26 @@ contains
 
     end subroutine my_inquire
 
+    subroutine s_get_cwd(cwd)
+        character(LEN=*), intent(OUT) :: cwd
+
+        call GETCWD(cwd)
+    end subroutine s_get_cwd
+
+    subroutine s_get_basename(dirpath, basename)
+        character(LEN=*), intent(IN)  :: dirpath
+        character(LEN=*), intent(OUT) :: basename
+
+#ifdef _WIN32
+        call system('for /F %i in ("'//dirpath//'") do @echo %~ni > basename')
+#else
+        call system('basename "'//dirpath//'" > basename')
+#endif
+
+        open (100, FILE='basename', FORM='formatted', STATUS='old')
+        read (100, '(A)') basename; close (100)
+
+        call s_delete_directory("dir_name")
+    end subroutine s_get_basename
+
 end module m_compile_specific
