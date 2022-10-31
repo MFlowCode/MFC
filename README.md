@@ -19,6 +19,9 @@
   <a href="https://hub.docker.com/repository/docker/henryleberre/mfc">
     <img src="https://shields.io/docker/image-size/henryleberre/mfc" />
   </a>
+  <a href="https://zenodo.org/badge/latestdoi/198475661">
+    <img src="https://zenodo.org/badge/198475661.svg" alt="DOI">
+  </a>
 </p>
 
 Welcome to MFC! The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows.
