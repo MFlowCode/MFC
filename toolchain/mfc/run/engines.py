@@ -37,7 +37,7 @@ class Engine:
     def get_args(self) -> typing.List[str]:
         raise common.MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
 
-    def run(self, target_name: str) -> None:
+    def run(self, names: typing.List[str]) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
     def validate_job_options(self) -> None:
@@ -78,7 +78,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
         return [self.mpibin.bin] + self.mpibin.gen_params(self.mfc.args) + flags + [binpath]
 
 
-    def run(self, target_name: str) -> None:
+    def run(self, names: typing.List[str]) -> None:
         if not self.bWorks:
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
@@ -116,19 +116,19 @@ MPI Binary    (-b)  {self.mpibin.bin}\
                     + f"[bold magenta]Reason[/bold magenta]: {'Time limit.' if p.is_alive() else 'Exit code.'}"
                 )
 
+        for name in names:
+            cons.print(f"[bold]Running [magenta]{name}[/magenta][/bold]:")
+            cons.indent()
 
-        cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
-        cons.indent()
+            if not self.mfc.args["dry_run"]:
+                start_time = time.monotonic()
+                common.system(self.get_exec_cmd(name), cwd=self.input.case_dirpath)
+                end_time   = time.monotonic()
+                cons.print(no_indent=True)
 
-        if not self.mfc.args["dry_run"]:
-            start_time = time.monotonic()
-            common.system(self.get_exec_cmd(target_name), cwd=self.input.case_dirpath)
-            end_time   = time.monotonic()
-            cons.print(no_indent=True)
+                cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
 
-            cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
-
-        cons.unindent()
+            cons.unindent()
 
     def validate_job_options(self, mfc) -> None:
         if mfc.args["nodes"] != 1:
@@ -150,19 +150,17 @@ Account       (-a)  {self.mfc.args["account"]}
 Email         (-@)  {self.mfc.args["email"]}
 """
 
-    def run(self, target_name: str) -> None:
-        cons.print(f"Running [bold magenta]{target_name}[/bold magenta]:")
-        cons.indent()
-
+    def run(self, names: typing.List[str]) -> None:
         system = queues.get_system()
         cons.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
-        self.__create_batch_file(system, target_name)
+        cons.print(f"Running [bold magenta]{common.format_list_to_string(names)}[/bold magenta]:")
+        cons.indent()
+
+        self.__create_batch_file(system, names)
 
         if not self.mfc.args["dry_run"]:
-            cons.print(no_indent=True)
-            self.__execute_batch_file(system, target_name)
-            cons.print(no_indent=True)
+            self.__execute_batch_file(system, names)
 
             cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
             cons.print("[bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
@@ -173,16 +171,16 @@ Email         (-@)  {self.mfc.args["email"]}
     def __get_batch_dirpath(self) -> str:
         return copy.copy(self.input.case_dirpath)
 
-    def __get_batch_filename(self, target_name: str) -> str:
-        return f"{target_name}.sh"
+    def __get_batch_filename(self, names: typing.List[str]) -> str:
+        return f"{self.mfc.args['name']}.sh"
 
-    def __get_batch_filepath(self, target_name: str):
+    def __get_batch_filepath(self, names: typing.List[str]):
         return os.path.abspath(os.sep.join([
             self.__get_batch_dirpath(),
-            self.__get_batch_filename(target_name)
+            self.__get_batch_filename(names)
         ]))
 
-    def __generate_prologue(self, system: queues.QueueSystem,) -> str:
+    def __generate_prologue(self, system: queues.QueueSystem, names: typing.List[str]) -> str:
         modules = f""
 
         if common.does_system_use_modules():
@@ -270,11 +268,11 @@ exit $code
         except Exception as exc:
             raise common.MFCException(f"BatchEngine: {expr_original} (interpreted as {expr}) is not a valid expression in the template file. Please check your spelling.")
 
-    def __batch_evaluate(self, s: str, system: queues.QueueSystem, target_name: str):
+    def __batch_evaluate(self, s: str, system: queues.QueueSystem, names: typing.List[str]):
         replace_list = [
-            ("{MFC::PROLOGUE}", self.__generate_prologue(system)),
+            ("{MFC::PROLOGUE}", self.__generate_prologue(system, names)),
             ("{MFC::EPILOGUE}", self.__generate_epilogue()),
-            ("{MFC::BIN}",      self.get_binpath(target_name))
+            ("{MFC::BINARIES}", ' '.join([f"'{self.get_binpath(x)}'" for x in names]))
         ]
 
         for (key, value) in replace_list:
@@ -298,27 +296,25 @@ exit $code
 
         return s
 
-    def __create_batch_file(self, system: queues.QueueSystem, target_name: str):
-        cons.print("> > Generating batch file...")
-        filepath = self.__get_batch_filepath(target_name)
-        cons.print("> > Evaluating template file...")
-        content = self.__batch_evaluate(system.template, system, target_name)
+    def __create_batch_file(self, system: queues.QueueSystem, names: typing.List[str]):
+        cons.print("> Generating batch file...")
+        filepath = self.__get_batch_filepath(names)
+        cons.print("> Evaluating template file...")
+        content = self.__batch_evaluate(system.template, system, names)
 
-        cons.print("> > Writing batch file...")
+        cons.print("> Writing batch file...")
         common.file_write(filepath, content)
 
-    def __execute_batch_file(self, system: queues.QueueSystem, target_name: str):
+    def __execute_batch_file(self, system: queues.QueueSystem, names: typing.List[str]):
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
-        cmd = system.gen_submit_cmd(self.__get_batch_filename(target_name))
+        cmd = system.gen_submit_cmd(self.__get_batch_filename(names))
 
         if common.system(cmd, cwd=self.__get_batch_dirpath()) != 0:
             raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
 
     def validate_job_options(self, mfc) -> None:
-        if len(mfc.args["targets"]) != 1:
-            raise common.MFCException(f"The Batch engine requires a unique target (-t) to run.")
         pass
 
 
@@ -337,4 +333,3 @@ def get_engine(slug: str) -> Engine:
         raise common.MFCException(f"Unsupported engine {slug}.")
 
     return engine
-

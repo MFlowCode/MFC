@@ -25,6 +25,17 @@ contains
 
     end subroutine s_create_directory
 
+    subroutine s_delete_file(filepath)
+        character(LEN=*), intent(IN) :: filepath
+
+#ifdef _WIN32
+        call system('del "'//filepath//'"')
+#else
+        call system('rm "'//filepath//'"')
+#endif
+
+    end subroutine s_delete_file
+
     subroutine s_delete_directory(dir_name)
         character(LEN=*), intent(IN) :: dir_name
 
@@ -70,7 +81,8 @@ contains
         open (100, FILE='basename', FORM='formatted', STATUS='old')
         read (100, '(A)') basename; close (100)
 
-        call s_delete_directory("dir_name")
+        call s_delete_file("basename")
+
     end subroutine s_get_basename
 
 end module m_compile_specific
