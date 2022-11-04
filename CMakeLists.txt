@@ -315,10 +315,14 @@ macro(GEN_DOCS target name)
     set(DOXYGEN_PROJECT_NAME "${name}")
     set(DOXYGEN_INPUT        "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/ ${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/")
 
-    file(
-        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
-    )
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
+
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/header.html"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}")
+
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/footer.html"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}")
 
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in"
@@ -326,15 +330,11 @@ macro(GEN_DOCS target name)
         @ONLY
     )
 
-    file(
-        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/res"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
-    )
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/res"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
 
-    file(
-        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/config.js"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
-    )
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/config.js"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
 
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
