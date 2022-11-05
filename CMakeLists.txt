@@ -216,7 +216,13 @@ if (MFC_BUILD_SIMULATION)
 
 
     if (MFC_WITH_OPEN_ACC)
-        find_package(OpenACC REQUIRED)
+        find_package(OpenACC)
+
+        # This should be equivalent to if (NOT OpenACC_FC_FOUND)
+        if (NOT TARGET OpenACC::OpenACC_Fortran)
+            message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
+        endif()
+
         target_link_libraries(simulation PRIVATE OpenACC::OpenACC_Fortran)
 
 
