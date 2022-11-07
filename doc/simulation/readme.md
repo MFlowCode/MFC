@@ -1,7 +1,7 @@
 # MFC Simulation
 
 This documentation page is for MFC Simulation. You can also visit:
-- [Home & User Guide](../landing/)
+- [Home & User Guide](../documentation/)
 - [Pre Process](../pre_process/)
 - [Post Process](../post_process/)
 
