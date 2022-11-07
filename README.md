@@ -1,4 +1,6 @@
-<center><img src="doc/res/banner.png" alt="MFC Banner" width="500"/></center>
+<p align="center">
+  <img src="doc/res/banner.png" alt="MFC Banner" width="500"/></center>
+</p>
 
 <p align="center">
   <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396">
