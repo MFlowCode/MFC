@@ -1,4 +1,4 @@
-![MFC Banner](doc/res/banner.png)
+<img src="doc/res/banner.png" alt="MFC Banner" width="400"/>
 
 <p align="center">
   <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396">
