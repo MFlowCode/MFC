@@ -26,9 +26,11 @@
   </a>
 </p>
 
-Welcome to MFC! The MFC is a fully-documented parallel simulation software for multi-component, multi-phase, and bubbly flows.
+Welcome to MFC! 
+MFC simulates compressible multi-component and multi-phase flows. 
+It scales to tens of thousands of GPUs with ideal scaling.
 
-Documentation is available on [our website](https://mflowcode.github.io/) and in markdown format at [doc/landing/readme.md](doc/landing/readme.md).
+Documentation is available on [the website](https://mflowcode.github.io/) and in markdown format at [doc/landing/readme.md](doc/landing/readme.md).
 
 The paper that describes the MFC's capabilities:
 * <a href="https://doi.org/10.1016/j.cpc.2020.107396">
