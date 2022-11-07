@@ -26,10 +26,10 @@
   </a>
 </p>
 
-Welcome to MFC! 
-MFC simulates compressible multi-component and multi-phase flows. 
+Welcome to the home of MFC!
+MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
 It scales ideally to tens of thousands of GPUs.
-MFC is a Fortran codebase that makes use of metaprogramming that makes the codebase readable and compact.
+MFC is a Fortran codebase that makes use of metaprogramming to keep the codebase readable and compact.
 Please contact the developers, like [Spencer](mailto:shb@gatech.edu), if you have any questions.
 We have an active Slack channel to help ease in new MFC users and support development.
 
