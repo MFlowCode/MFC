@@ -36,6 +36,8 @@ program p_main
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
+    use m_monopole             !< Monopole calculations
+
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
     use m_data_output          !< Run-time info & solution data output procedures
@@ -150,6 +152,9 @@ program p_main
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
+    if (monopole) then
+        call s_initialize_monopole_module()
+    end if
     call s_initialize_rhs_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
