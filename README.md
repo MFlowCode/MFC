@@ -34,7 +34,7 @@ Please contact the developers, like [Spencer](mailto:shb@gatech.edu), if you hav
 We have an active Slack channel to help ease in new MFC users and support development.
 
 MFC has both API and high-level documentation. 
-It is available on [the website](https://mflowcode.github.io/) and in markdown format at [doc/landing/readme.md](doc/landing/readme.md).
+It is available on [the website](https://mflowcode.github.io/) and in markdown format at [doc/documentation/readme.md](doc/documentation/readme.md).
 
 If you use MFC, consider citing it:
 * <a href="https://doi.org/10.1016/j.cpc.2020.107396">
