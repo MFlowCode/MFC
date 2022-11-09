@@ -51,8 +51,6 @@ program p_main
 
     use m_hypoelastic
 
-    use m_viscous
-
 #ifdef _OPENACC
     use openacc
 #endif
@@ -157,9 +155,6 @@ program p_main
     if (monopole) then
         call s_initialize_monopole_module()
     end if
-    if (any(Re_size > 0)) then
-        call s_initialize_viscous_module()
-    endif
     call s_initialize_rhs_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
