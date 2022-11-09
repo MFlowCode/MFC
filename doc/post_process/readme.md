@@ -1,7 +1,7 @@
 # MFC Post-Process
 
 This documentation page is for MFC Post-Process. You can also visit:
-- [Home & User Guide](../landing/)
+- [Home & User Guide](../documentation/)
 - [Pre Process](../pre_process/)
 - [Simulation](../simulation/)
 

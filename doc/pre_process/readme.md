@@ -1,7 +1,7 @@
 # MFC Pre-Process
 
 This documentation page is for MFC Pre-Process. You can also visit:
-- [Home & User Guide](../landing/)
+- [Home & User Guide](../documentation/)
 - [Simulation](../simulation/)
 - [Post Process](../post_process/)
 

@@ -4,10 +4,79 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MFC: High-fidelity Multiphase Flow Simulation</title>
-    <meta http-equiv="refresh" content="0; url=./landing/index.html" />
+    <title>MFC | Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="logo.png" />
+    <style type="text/css">
+        .custom-shape-divider-bottom-1667801056 {
+            width: 100%;
+            overflow: hidden;
+            line-height: 0;
+            rotate: 180deg;
+        }
+        
+        .custom-shape-divider-bottom-1667801056 svg {
+            position: relative;
+            display: block;
+            width: calc(100% + 1.3px);
+            height: 35px;
+        }
+        
+        .custom-shape-divider-bottom-1667801056 .shape-fill {
+            fill: #0F172A;
+        }        
+    </style>
 </head>
-<body>
-    We are redirecting you to the landing page for the MFC. If you are not redirected immediately, <a href="landing/index.html">click here</a>.
+<body class="flex flex-col min-h-screen">
+    <div class="bg-slate-900 w-full flex flex-col">
+        <header class="w-full top-0 bg-slate-900 text-white flex flex-col items-center drop-shadow-2xl">
+            <div class="px-4 md:px-0 container mx-auto py-8 flex flex-row items-center justify-between">
+                <div class="flex flex-row items-center gap-x-2">
+                    <a href="https://mflowcode.github.io/" class="flex flex-row items-center gap-x-2">
+                        <img class="h-8 md:h-12 rounded-full bg-white" src="res/logo.png" />
+                        <h1 class="font-bold text-3xl">MFC</h1>
+                    </a>
+                </div>
+                <div class="flex flex-row items-center gap-x-2">
+                    <a href="https://github.com/MFlowCode/MFC">
+                        <img class="h-8 md:h-12" src="res/github.png" />
+                    </a>
+                </div>
+            </div>
+        </header>
+        
+        <div class="px-4 md:px-0 container mx-auto py-12 md:py-24 w-full flex flex-col">
+            <div class="columns-2 gap-8 w-full flex flex-col md:flex-row items-center">
+                <div class="w-full flex flex-col gap-4">
+                    <img src="res/logo_light.png" class="h-20 md:h-24 mx-auto">
+                    <span class="text-2xl md:text-4xl text-center font-bold text-white">
+                        Multi-Component Flow Code
+                    </span>
+                    <div class="flex flex-row mt-4 justify-center gap-4 text-md md:text-xl text-center text-white font-medium">
+                        <a class="hover:border-b" href="https://github.com/MFlowCode/MFC">GitHub</a> |
+                        <a class="hover:border-b" href="https://github.com/MFlowCode/MFC/releases/latest">Download</a> |
+                        <a class="hover:border-b" href="documentation/index.html">Documentation</a>
+                    </div>
+                </div>
+                <div class="w-full bg-slate-900 text-white text-center text-md md:text-lg text-justify">
+                    Welcome to the home of MFC! MFC simulates compressible multi-component and multi-phase flows, amongst other things. It scales ideally to tens of thousands of GPUs. MFC is a Fortran codebase that makes use of metaprogramming to keep the codebase readable and compact. Please contact the developers, like Spencer, if you have any questions. We have an active Slack channel to help ease in new MFC users and support development.                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="custom-shape-divider-bottom-1667801056">
+        <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1132.19,118.92,1055.71,111.31,985.66,92.83Z" class="shape-fill"></path>
+        </svg>
+    </div>
+    <main class="px-4 md:px-0 container mx-auto py-6 md:py-12 flex-1">
+        <h1 class="text-center font-bold text-2xl">
+            Acknowledgements
+        </h1>
+        <br />
+        <div class="text-justify text-md md:text-lg">
+            MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF). MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit under allocation CFD154 (PI Bryngelson).
+        </div>
+    </main>
 </body>
 </html>
