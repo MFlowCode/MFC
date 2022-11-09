@@ -113,7 +113,7 @@ if [ "$bShouldInstallCMake" = true ]; then
         bErrorDoSelfDownload=true
     fi
 
-    if ! [[ "$arch" -eq "x86_64" || "$arch" -eq "aarch64" ]]; then
+    if ! [[ "$arch" == "x86_64" || "$arch" == "aarch64" ]]; then
         error "Cannot fetch$MAGENTA CMake$COLOR_RESET for architecture $MAGENTA$arch$COLOR_RESET."
         bErrorDoSelfDownload=true
     fi
