@@ -41,9 +41,9 @@ If there are sub-grid bubbles `bubbles` $=$ `T`, then the bubble variables are a
 These depend on the bubble dynamics model used.
 If `polytropic` $=$ `T` then the conservative variables are appended by 
 
-$$ n_b R_1, n_b \dot{R_1}, \dots, n_b R_{N_b}, n_b \dot{R}_{N_b} $$
+$$ n_b R_1, n_b {\\dot R}_1, \dots, n_b R_{N_b}, n_b {\\dot R}_{N_b} $$
 
 where $n_B$ is the bubble number density and $N_b$ are the number of bubble sizes (see matching variable in the input file, `Nb`).
 The primitive bubble variables do not include $n_B$:
 
-$$ R_1, \dot{R_1}, \dots, R_{N_b}, \dot{R_{N_b}} $$
+$$ R_1, {\\dot R}_1, \dots, R_{N_b}, {\\dot R}_{N_b} $$

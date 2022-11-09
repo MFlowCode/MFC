@@ -30,8 +30,8 @@ jobs:
         git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q
         code=$?
         if [ "$code" -ne "0" ]; then exit 0; fi
-        git config --global user.name  "MFC Action"
-        git config --global user.email "MFC Action"
+        git config --global user.name  'MFC Action'
+        git config --global user.email '<>'
         git clone "${{ secrets.DOC_PUSH_URL }}"
         cd "$(find . -name '*.github.io')"
         mv .github ..
@@ -39,8 +39,9 @@ jobs:
         mv ../.github       .
         mv ../install/doc/mfc/* .
         git add -A
-        git commit -m "${GITHUB_SHA::7}: $(date +%d/%m/%Y-%H:%M:%S)" || true
+        git commit -m "Docs @ ${GITHUB_SHA::7}" || true
         git push
 
 # DOC_PUSH_URL should be of the format:
-# - "https://${{ github.repository_owner }}:${{ TOKEN }}@github.com/${{ github.repository_owner }}/${{ github.repository_owner }}.github.io"
+# --> https://<username>:<token>@github.com/<username>/<repository>
+
