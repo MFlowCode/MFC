@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #>
-#>           - PBS Batch File Template -             
+#>           - PBS Batch File Template -
 #>
 #> This file is part of the ./mfc.sh run subsystem.
 #> For more information, please consult the README.
-#> 
+#>
 #> - You are invited to modify this file to suit your
 #>   needs, in order to get MFC running properly on
 #>   your system.
@@ -23,7 +23,7 @@
 #>
 #> - Statements of the form {MFC::expression} tell MFC
 #>   where to place the common code, across all batch
-#>   files that is required to run MFC. They are not 
+#>   files that is required to run MFC. They are not
 #>   intended to be modified by users.
 #>
 #PBS -N {name}
@@ -41,11 +41,11 @@
 
 
 
-#> 
+#>
 #> Note: If your system requires you to load environment
 #>       modules inside of your batch script, please load
 #>       them bellow.
-#> 
+#>
 
 
 
@@ -60,10 +60,18 @@
 #>       on your system - if at all. {MFC::BIN} refers to
 #>       the path the MFC executable.
 #>
-srun                                   \ 
-     --nodes={nodes}                   \
-     --ntasks-per-node {cpus_per_node} \
-     "{MFC::BIN}"
+
+for binpath in {MFC::BINARIES}; do
+
+    echo -e ":) Running $binpath:"
+
+    srun                                  \
+        --nodes={nodes}                   \
+        --ntasks-per-node {cpus_per_node} \
+        "$binpath"
+
+done
+
 #>
 #> srun --mpi=pmix   \
 #>      "{MFC::BIN}"
@@ -77,3 +85,4 @@ srun                                   \
 #>
 #> Note: Lines after the MFC Epilogue will not be executed.
 #>
+

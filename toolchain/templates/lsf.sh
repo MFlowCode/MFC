@@ -64,12 +64,22 @@
 #>       on your system - if at all. {MFC::BIN} refers to
 #>       the path the MFC executable.
 #>
-jsrun {'--smpiargs="-gpu"' if gpus_per_node > 0 else ''} \
-      --nrs          {cpus_per_node*nodes}               \
-      --cpu_per_rs   1                                   \
-      --gpu_per_rs   {min(gpus_per_node, 1)}             \
-      --tasks_per_rs 1                                   \
-      "{MFC::BIN}"
+
+for binpath in {MFC::BINARIES}; do
+
+    echo -e ":) Running $binpath:"
+    echo ""
+
+    jsrun {'--smpiargs="-gpu"' if gpus_per_node > 0 else ''} \
+        --nrs          {cpus_per_node*nodes}               \
+        --cpu_per_rs   1                                   \
+        --gpu_per_rs   {min(gpus_per_node, 1)}             \
+        --tasks_per_rs 1                                   \
+        "$binpath"
+
+    echo ""
+
+done
 
 {MFC::EPILOGUE}
 #>

@@ -175,7 +175,7 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
             raise common.MFCException(f"Failed to configure the [bold magenta]{name}[/bold magenta] target.")
 
-    common.system(build, exception_text=f"Failed to build the [bold magenta]{name}[/bold magenta] target.")
+    common.system(build,   exception_text=f"Failed to build the [bold magenta]{name}[/bold magenta] target.")
     common.system(install, exception_text=f"Failed to install the [bold magenta]{name}[/bold magenta] target.")
     cons.print(no_indent=True)
 
@@ -183,11 +183,6 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
 
 
 def build(mfc):
-    cons.print("[bold]Build:[/bold]")
-    cons.indent()
-
     for target_name in mfc.args["targets"]:
         build_target(mfc, target_name)
-
-    cons.unindent()
 

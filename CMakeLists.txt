@@ -216,7 +216,13 @@ if (MFC_BUILD_SIMULATION)
 
 
     if (MFC_WITH_OPEN_ACC)
-        find_package(OpenACC REQUIRED)
+        find_package(OpenACC)
+
+        # This should be equivalent to if (NOT OpenACC_FC_FOUND)
+        if (NOT TARGET OpenACC::OpenACC_Fortran)
+            message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
+        endif()
+
         target_link_libraries(simulation PRIVATE OpenACC::OpenACC_Fortran)
 
 
@@ -315,10 +321,11 @@ macro(GEN_DOCS target name)
     set(DOXYGEN_PROJECT_NAME "${name}")
     set(DOXYGEN_INPUT        "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/ ${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/")
 
-    file(
-        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
-    )
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/${target}"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
+
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}")
 
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in"
@@ -326,15 +333,11 @@ macro(GEN_DOCS target name)
         @ONLY
     )
 
-    file(
-        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/res"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
-    )
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/res"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
 
-    file(
-        COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/config.js"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen"
-    )
+    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/doc/config.js"
+         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
 
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
@@ -382,7 +385,7 @@ if (MFC_BUILD_DOC)
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
-        GIT_TAG           "a5efba07a3d4fd6317d95657b3095b97e134b791"
+        GIT_TAG           "8a34f701d3435309a21080f44fbd4a466979aa19"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND     ""
         INSTALL_COMMAND   ""
@@ -398,6 +401,6 @@ if (MFC_BUILD_DOC)
     GEN_DOCS(post_process "MFC: Post-Process")
 
     # === === Generate Landing Page
-    GEN_DOCS(landing "MFC")
+    GEN_DOCS(documentation "MFC")
 
 endif()
