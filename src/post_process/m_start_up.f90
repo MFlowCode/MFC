@@ -1,9 +1,6 @@
 !>
 !! @file m_start_up.f90
 !! @brief  Contains module m_start_up
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module contains the subroutines that read in and check the
 !!              consistency of the user provided inputs.

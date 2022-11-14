@@ -1,9 +1,6 @@
 !>
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module enables the restructuring of the raw simulation data
 !!              file(s) into formatted database file(s). The formats that may be
