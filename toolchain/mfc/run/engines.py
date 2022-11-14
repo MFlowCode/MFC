@@ -57,7 +57,8 @@ class InteractiveEngine(Engine):
 
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary(self.mfc.args)
-        self.bWorks = False # We don't know yet whether this engine works
+        # If using MPI, we don't know yet whether this engine works
+        self.bKnowWorks = not self.mfc.args["mpi"]
 
     def get_args(self) -> str:
         return f"""\
@@ -79,7 +80,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
 
     def run(self, names: typing.List[str]) -> None:
-        if not self.bWorks:
+        if not self.bKnowWorks:
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
 
@@ -102,11 +103,11 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p.join(work_timeout)
 
             try:
-                self.bWorks = q.get(block=False)
+                self.bKnowWorks = q.get(block=False)
             except queue.Empty as e:
-                self.bWorks = False
+                self.bKnowWorks = False
 
-            if p.is_alive() or not self.bWorks:
+            if p.is_alive() or not self.bKnowWorks:
                 raise common.MFCException(
                       "The [bold magenta]Interactive Engine[/bold magenta] appears to hang or exit with a non-zero status code. "
                     + "This may indicate that the wrong MPI binary is being used to launch parallel jobs. You can specify the correct one for your system "
