@@ -105,6 +105,11 @@ def build_target(mfc, name: str, history: typing.List[str] = None):
     if history is None:
         history = []
 
+    if mfc.args["no_build"]:
+        cons.print("--no-build specified, skipping...")
+        cons.unindent()
+        return
+
     if name in history:
         cons.print("Already built, skipping...")
         cons.unindent()
