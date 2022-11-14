@@ -1,9 +1,6 @@
 !>
 !! @file m_data_input.f90
 !> @brief Contains module m_data_input
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief This module features procedures, which for a specific time-step,
 !!             read in the raw simulation data for the grid and the conservative
