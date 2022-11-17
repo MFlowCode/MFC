@@ -21,7 +21,8 @@ module m_viscous
     s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
-
+    type(int_bounds_info) :: is1, is2, is3
+ !$acc declare create(is1, is2, is3, iv)   
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
 !$acc declare create(gammas, pi_infs)
 
@@ -1282,7 +1283,6 @@ module m_viscous
 
         integer :: i, j, k, l
 
-        type(int_bounds_info) :: is1, is2, is3
         type(int_bounds_info) :: ix, iy, iz
         ! Reconstruction in s1-direction ===================================
 
