@@ -5,7 +5,7 @@
 !> @brief The module contains the subroutines used to calculate the right-
 !!              hand-side (RHS) in the quasi-conservative, shock- and interface-
 !!              capturing finite-volume framework for the multicomponent Navier-
-!!       f       Stokes equations supplemented by appropriate advection equations
+!!              Stokes equations supplemented by appropriate advection equations
 !!              used to capture the material interfaces. The system of equations
 !!              is closed by the stiffened gas equation of state, as well as any
 !!              required mixture relationships. Capillarity effects are included

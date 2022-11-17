@@ -356,6 +356,10 @@ program p_main
     call s_finalize_mpi_proxy_module()
     call s_finalize_global_parameters_module()
 
+    if (any(Re_size > 0)) then
+        call s_finalize_viscous_module()
+    end if
+
     ! Terminating MPI execution environment
     call s_mpi_finalize()
 
