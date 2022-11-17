@@ -646,7 +646,7 @@ module m_viscous
     !!  @param q_cons_vf Cell-averaged conservative variables
     !!  @param q_prim_vf Cell-averaged primitive variables
     !!  @param rhs_vf Cell-averaged RHS variables
-    subroutine s_get_viscous() ! -------
+    subroutine s_get_viscous()
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
@@ -1184,5 +1184,106 @@ module m_viscous
         ! END: First-Order Spatial Derivatives in z-direction ==============
 
     end subroutine s_apply_scalar_divergence_theorem ! ---------------------
+
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -
+                                                       norm_dir, vL_prim_vf, vR_prim_vf)
+
+        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
+
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat 
+
+        integer, intent(IN) :: norm_dir
+
+        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+
+        integer :: i, j, k, l
+        ! Reconstruction in s1-direction ===================================
+
+        if (norm_dir == 1) then
+            is1 = ix; is2 = iy; is3 = iz
+            weno_dir = 1; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+
+        elseif (norm_dir == 2) then
+            is1 = iy; is2 = ix; is3 = iz
+            weno_dir = 2; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+
+        else
+            is1 = iz; is2 = iy; is3 = ix
+            weno_dir = 3; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+
+        end if
+
+        !$acc update device(is1, is2, is3, iv)
+
+        if (n > 0) then
+            if (p > 0) then
+
+                call s_weno_alt(v_vf(iv%beg:iv%end), &
+                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, iv%beg:iv%end), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, iv%beg:iv%end), &
+                                norm_dir, weno_dir, &
+                                is1, is2, is3)
+            else
+                call s_weno_alt(v_vf(iv%beg:iv%end), &
+                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, :), &
+                                norm_dir, weno_dir, &
+                                is1, is2, is3)
+            end if
+        else
+
+            call s_weno_alt(v_vf(iv%beg:iv%end), &
+                        vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, :), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, :), vR_z_flat(:, :, :, :), &
+                            norm_dir, weno_dir, &
+                            is1, is2, is3)
+        end if
+
+        if (any(Re_size > 0)) then
+            if (weno_Re_flux) then
+                if (norm_dir == 2) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do j = is1%beg, is1%end
+                                do k = is2%beg, is2%end
+                                    vL_prim_vf(i)%sf(k, j, l) = vL_y_flat(j, k, l, i)
+                                    vR_prim_vf(i)%sf(k, j, l) = vR_y_flat(j, k, l, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                elseif (norm_dir == 3) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                    do i = iv%beg, iv%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                do l = is3%beg, is3%end
+                                    vL_prim_vf(i)%sf(l, k, j) = vL_z_flat(j, k, l, i)
+                                    vR_prim_vf(i)%sf(l, k, j) = vR_z_flat(j, k, l, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                elseif (norm_dir == 1) then
+!$acc parallel loop collapse(4) gang vector default(present)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_prim_vf(i)%sf(j, k, l) = vL_x_flat(j, k, l, i)
+                                    vR_prim_vf(i)%sf(j, k, l) = vR_x_flat(j, k, l, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+        end if
+
+        ! ==================================================================
+
+    end subroutine s_reconstruct_cell_boundary_values_visc ! --------------------
 
 end module m_viscous
