@@ -4,14 +4,49 @@ module m_viscous
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
+
+    use m_weno
     ! ==========================================================================
 
-    private; public  s_get_viscous
+    private; public  s_get_viscous, &
+    s_compute_viscous_stress_tensor, &
+    s_initialize_viscous_module
 
-    type(int_bounds_info) :: ix, iy, iz
     type(int_bounds_info) :: iv
 
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+!$acc declare create(gammas, pi_infs)
+
+    real(kind(0d0)), allocatable, dimension(:, :) :: Res
+!$acc declare create(Res)
+
     contains
+
+    subroutine s_initialize_viscous_module()
+        integer :: i, j !< generic loop iterators
+
+        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
+
+        do i = 1, num_fluids
+            gammas(i) = fluid_pp(i)%gamma
+            pi_infs(i) = fluid_pp(i)%pi_inf
+        end do
+!$acc update device(gammas, pi_infs)
+
+        if (any(Re_size > 0)) then
+            allocate (Res(1:2, 1:maxval(Re_size)))
+        end if
+
+        if (any(Re_size > 0)) then
+            do i = 1, 2
+                do j = 1, Re_size(i)
+                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                end do
+            end do
+!$acc update device(Res, Re_idx, Re_size)
+        end if
+
+    end subroutine s_initialize_viscous_module
 
     !> The purpose of this subroutine is to compute the viscous
     !      stress tensor for the cells directly next to the axis in
@@ -22,10 +57,14 @@ module m_viscous
     !  @param grad_x_vf Cell-average primitive variable derivatives, x-dir
     !  @param grad_y_vf Cell-average primitive variable derivatives, y-dir
     !  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
-    subroutine s_compute_viscous_stress_tensor(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf) ! ---
+    subroutine s_compute_viscous_stress_tensor(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, &
+                                               tau_Re_vf, &
+                                               ix, iy, iz) ! ---
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(num_dims), intent(IN) :: grad_x_vf, grad_y_vf, grad_z_vf
+
+        type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
 
         real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_visc
@@ -34,6 +73,8 @@ module m_viscous
         real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
 
         integer :: i, j, k, l, q !< Generic loop iterator
+
+        type(int_bounds_info) :: ix, iy, iz
 
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
         if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
@@ -464,7 +505,8 @@ module m_viscous
         !!  @param grad_y Second coordinate direction component of the derivative
         !!  @param grad_z Third coordinate direction component of the derivative
         !!  @param norm Norm of the gradient vector
-    subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, norm)
+    subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, norm, &
+                                     ix, iy, iz)
 
         type(scalar_field), intent(IN) :: var
         type(scalar_field), intent(INOUT) :: grad_x
@@ -473,6 +515,8 @@ module m_viscous
         type(scalar_field), intent(INOUT) :: norm
 
         integer :: j, k, l !< Generic loop iterators
+
+        type(int_bounds_info) :: ix, iy, iz
 
         ix%beg = -buff_size; ix%end = m + buff_size; 
         if (n > 0) then
@@ -646,11 +690,35 @@ module m_viscous
     !!  @param q_cons_vf Cell-averaged conservative variables
     !!  @param q_prim_vf Cell-averaged primitive variables
     !!  @param rhs_vf Cell-averaged RHS variables
-    subroutine s_get_viscous()
+    subroutine s_get_viscous(qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, &
+                             dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+                             qL_prim, & 
+                             qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, &
+                             dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+                             qR_prim, &
+                             q_prim_qp, &
+                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, gm_vel_qp,  &
+                             ix, iy, iz)
+
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
+             intent(INOUT) :: qL_prim_rsx_vf_flat, qR_prim_rsx_vf_flat, &
+                              qL_prim_rsy_vf_flat, qR_prim_rsy_vf_flat, &
+                              qL_prim_rsz_vf_flat, qR_prim_rsz_vf_flat
+
+        type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
+
+        type(vector_field) :: q_prim_qp
+
+        type(vector_field), allocatable, dimension(:), &
+            intent(INOUT) :: dqL_prim_dx_n, dqR_prim_dx_n, &
+                             dqL_prim_dy_n, dqR_prim_dy_n, &
+                             dqL_prim_dz_n, dqR_prim_dz_n
+
+        type(vector_field) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
+        type(vector_field) :: gm_vel_qp
 
         integer :: i, j, k, l, r !< Generic loop iterators
-
-        !$acc update device(ix, iy, iz)
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         do i = 1, num_dims
 
@@ -660,9 +728,10 @@ module m_viscous
 
             call s_reconstruct_cell_boundary_values_visc( &
                 q_prim_qp%vf(iv%beg:iv%end), &
-                qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
-                qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
-                i, qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end))
+                qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, &
+                qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, &
+                i, qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
+                ix, iy, iz)
         end do
 
         if (weno_Re_flux) then
@@ -673,17 +742,20 @@ module m_viscous
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
-                        dq_prim_dx_qp%vf(iv%beg:iv%end), i)
+                        dq_prim_dx_qp%vf(iv%beg:iv%end), i, &
+                        ix, iy, iz)
                 elseif (i == 2) then
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
-                        dq_prim_dy_qp%vf(iv%beg:iv%end), i)
+                        dq_prim_dy_qp%vf(iv%beg:iv%end), i, &
+                        ix, iy, iz)
                 else
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
-                        dq_prim_dz_qp%vf(iv%beg:iv%end), i)
+                        dq_prim_dz_qp%vf(iv%beg:iv%end), i, &
+                        ix, iy, iz)
                 end if
             end do
 
@@ -1039,7 +1111,8 @@ module m_viscous
                                                 dq_prim_dx_qp%vf(i), &
                                                 dq_prim_dy_qp%vf(i), &
                                                 dq_prim_dz_qp%vf(i), &
-                                                gm_vel_qp%vf(i))
+                                                gm_vel_qp%vf(i), &
+                                                ix, iy, iz)
                     end do
 
                 else
@@ -1049,7 +1122,8 @@ module m_viscous
                                                 dq_prim_dx_qp%vf(i), &
                                                 dq_prim_dy_qp%vf(i), &
                                                 dq_prim_dy_qp%vf(i), &
-                                                gm_vel_qp%vf(i))
+                                                gm_vel_qp%vf(i), &
+                                                ix, iy, iz)
                     end do
 
                 end if
@@ -1060,7 +1134,8 @@ module m_viscous
                                             dq_prim_dx_qp%vf(i), &
                                             dq_prim_dx_qp%vf(i), &
                                             dq_prim_dx_qp%vf(i), &
-                                            gm_vel_qp%vf(i))
+                                            gm_vel_qp%vf(i), &
+                                            ix, iy, iz)
                 end do
 
             end if
@@ -1080,7 +1155,8 @@ module m_viscous
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, & ! --------
                                                  dv_ds_vf, &
-                                                 norm_dir)
+                                                 norm_dir, &
+                                                 ix, iy, iz)
 
         type(scalar_field), &
             dimension(iv%beg:iv%end), &
@@ -1093,6 +1169,8 @@ module m_viscous
         integer, intent(IN) :: norm_dir
 
         integer :: i, j, k, l !< Generic loop iterators
+
+        type(int_bounds_info) :: ix, iy, iz
 
         !$acc update device(ix, iy, iz, iv)
 
@@ -1186,7 +1264,7 @@ module m_viscous
     end subroutine s_apply_scalar_divergence_theorem ! ---------------------
 
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -
-                                                       norm_dir, vL_prim_vf, vR_prim_vf)
+                                                       norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
@@ -1198,6 +1276,9 @@ module m_viscous
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
+
+        type(int_bounds_info) :: is1, is2, is3
+        type(int_bounds_info) :: ix, iy, iz
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
