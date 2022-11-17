@@ -1,3 +1,10 @@
+!>
+!! @file m_viscous.f90
+!! @brief Contains module m_viscous
+
+!> @brief The module contains the subroutines used to
+
+
 module m_viscous
 
     ! Dependencies =============================================================
@@ -10,7 +17,8 @@ module m_viscous
 
     private; public  s_get_viscous, &
     s_compute_viscous_stress_tensor, &
-    s_initialize_viscous_module
+    s_initialize_viscous_module, &
+    s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
 
@@ -36,19 +44,14 @@ module m_viscous
         end do
 !$acc update device(gammas, pi_infs)
 
-        if (any(Re_size > 0)) then
-            allocate (Res(1:2, 1:maxval(Re_size)))
-        end if
+        allocate (Res(1:2, 1:maxval(Re_size)))
 
-        if (any(Re_size > 0)) then
-            do i = 1, 2
-                do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-                end do
+        do i = 1, 2
+            do j = 1, Re_size(i)
+                Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
             end do
+        end do
 !$acc update device(Res, Re_idx, Re_size)
-        end if
-
 
         momxb = mom_idx%beg
         momxe = mom_idx%end
@@ -84,27 +87,6 @@ module m_viscous
         integer :: i, j, k, l, q !< Generic loop iterator
 
         type(int_bounds_info) :: ix, iy, iz
-
-        !ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        !if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        !ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-        !$acc update device(ix, iy, iz)
-
-        do i = 1, num_dims
-            allocate (tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-                                                     iy%beg:iy%end, &
-                                                     iz%beg:iz%end))
-!$acc enter data create(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-!$acc                                                  iy%beg:iy%end, &
-!$acc                                                  iz%beg:iz%end))
-        end do
-        allocate (tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
-!$acc enter data create (tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
-!$acc                                        iy%beg:iy%end, &
-!$acc                                        iz%beg:iz%end))
 
     !$acc parallel loop collapse(3) gang vector default(present)
         do l = iz%beg, iz%end
@@ -1389,5 +1371,10 @@ module m_viscous
         ! ==================================================================
 
     end subroutine s_reconstruct_cell_boundary_values_visc ! --------------------
+
+    subroutine s_finalize_viscous_module()
+        deallocate (gammas, pi_infs)
+        allocate (Res(1:2, 1:maxval(Re_size)))
+    end subroutine s_finalize_viscous_module
 
 end module m_viscous
