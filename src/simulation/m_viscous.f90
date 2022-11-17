@@ -20,6 +20,9 @@ module m_viscous
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 !$acc declare create(Res)
 
+    integer :: momxb, momxe
+    integer :: contxb, contxe
+
     contains
 
     subroutine s_initialize_viscous_module()
@@ -46,6 +49,12 @@ module m_viscous
 !$acc update device(Res, Re_idx, Re_size)
         end if
 
+
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+
     end subroutine s_initialize_viscous_module
 
     !> The purpose of this subroutine is to compute the viscous
@@ -64,7 +73,7 @@ module m_viscous
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(num_dims), intent(IN) :: grad_x_vf, grad_y_vf, grad_z_vf
 
-        type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
+        type(scalar_field), dimension(1:sys_size) :: tau_Re_vf
 
         real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_visc
@@ -76,11 +85,26 @@ module m_viscous
 
         type(int_bounds_info) :: ix, iy, iz
 
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        !ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+        !if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+        !ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
 
         !$acc update device(ix, iy, iz)
+
+        do i = 1, num_dims
+            allocate (tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+                                                     iy%beg:iy%end, &
+                                                     iz%beg:iz%end))
+!$acc enter data create(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+!$acc                                                  iy%beg:iy%end, &
+!$acc                                                  iz%beg:iz%end))
+        end do
+        allocate (tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+                                      iy%beg:iy%end, &
+                                      iz%beg:iz%end))
+!$acc enter data create (tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+!$acc                                        iy%beg:iy%end, &
+!$acc                                        iz%beg:iz%end))
 
     !$acc parallel loop collapse(3) gang vector default(present)
         do l = iz%beg, iz%end
@@ -99,13 +123,13 @@ module m_viscous
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
-
+    
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                         end do
-
+                        
                         if (bubbles) then
                             rho_visc = 0d0
                             gamma_visc = 0d0
@@ -173,21 +197,21 @@ module m_viscous
                                 end do
                             end if
                         end if
-
+                        
                         tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + &
                                         grad_x_vf(2)%sf(j, k, l))/ &
                                     Re_visc(1)
-
+                        
                         tau_Re(2, 2) = (4d0*grad_y_vf(2)%sf(j, k, l) &
                                         - 2d0*grad_x_vf(1)%sf(j, k, l) &
                                         - 2d0*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
-                                    (3d0*Re_visc(1))
+                                    (3d0*Re_visc(1))       
     !$acc loop seq
                         do i = 1, 2
                             tau_Re_vf(contxe + i)%sf(j, k, l) = &
                                 tau_Re_vf(contxe + i)%sf(j, k, l) - &
                                 tau_Re(2, i)
-
+                            
                             tau_Re_vf(E_idx)%sf(j, k, l) = &
                                 tau_Re_vf(E_idx)%sf(j, k, l) - &
                                 q_prim_vf(contxe + i)%sf(j, k, l)*tau_Re(2, i)
@@ -496,7 +520,6 @@ module m_viscous
                 end do
             end do
         end if
-
     end subroutine s_compute_viscous_stress_tensor ! ----------------------------------------
 
     !>  Computes the scalar gradient fields via finite differences
@@ -705,11 +728,11 @@ module m_viscous
                               qL_prim_rsy_vf_flat, qR_prim_rsy_vf_flat, &
                               qL_prim_rsz_vf_flat, qR_prim_rsz_vf_flat
 
-        type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
+        type(vector_field), dimension(sys_size) :: qL_prim, qR_prim
 
         type(vector_field) :: q_prim_qp
 
-        type(vector_field), allocatable, dimension(:), &
+        type(vector_field), dimension(sys_size), &
             intent(INOUT) :: dqL_prim_dx_n, dqR_prim_dx_n, &
                              dqL_prim_dy_n, dqR_prim_dy_n, &
                              dqL_prim_dz_n, dqR_prim_dz_n

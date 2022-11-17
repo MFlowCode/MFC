@@ -144,6 +144,8 @@ module m_rhs
 
     type(int_bounds_info) :: is1, is2, is3
 
+    type(int_bounds_info) :: ixt, iyt, izt
+
     !> @name Bubble dynamic source terms
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
@@ -237,6 +239,10 @@ contains
 !$acc                                        iy%beg:iy%end, &
 !$acc                                        iz%beg:iz%end))
         end if
+
+        ixt = ix
+        iyt = iy
+        izt = iz
 
         allocate (q_cons_qp%vf(1:sys_size))
         allocate (q_prim_qp%vf(1:sys_size))
@@ -838,6 +844,7 @@ contains
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange
+        
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -870,7 +877,7 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-
+        
         if (t_step == t_step_stop) return
         ! ==================================================================
 
@@ -887,7 +894,7 @@ contains
                                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, gm_vel_qp, &
                                             ix, iy, iz)
         call nvtxEndRange()
-
+        
         ! Dimensional Splitting Loop =======================================
         do id = 1, num_dims
 
@@ -899,7 +906,7 @@ contains
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
-
+            
             if (all(Re_size == 0)) then
                     iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
@@ -987,7 +994,6 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-
 !            iv%beg = 1; iv%end = sys_size
 
             ! ===============================================================
@@ -1704,14 +1710,14 @@ contains
                                                                  dq_prim_dy_qp%vf(mom_idx%beg:mom_idx%end), &
                                                                  dq_prim_dz_qp%vf(mom_idx%beg:mom_idx%end), &
                                                                  tau_Re_vf, &
-                                                                 ix, iy, iz)
+                                                                 ixt, iyt, izt)
                         else
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
                                                                  dq_prim_dx_qp%vf(mom_idx%beg:mom_idx%end), &
                                                                  dq_prim_dy_qp%vf(mom_idx%beg:mom_idx%end), &
                                                                  dq_prim_dy_qp%vf(mom_idx%beg:mom_idx%end), &
                                                                  tau_Re_vf, &
-                                                                 ix, iy, iz)
+                                                                 ixt, iyt, izt)
                         end if
 !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
