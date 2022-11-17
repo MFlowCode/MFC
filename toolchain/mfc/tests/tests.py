@@ -154,6 +154,7 @@ class MFCTest:
             pack.save(os.path.join(test.get_dirpath(), "pack.txt"))
 
             golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
+
             if self.mfc.args["generate"]:
                 common.delete_file(golden_filepath)
                 pack.save(golden_filepath)
