@@ -197,7 +197,8 @@ module m_rhs
 !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
 !$acc   bub_mom_src, myflux_vf, myflux_src_vf,alf_sum, momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, strxb, strxe, &
 !$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
-!$acc     dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat)
+!$acc   dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat, &
+!$acc   ixt, iyt, izt)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     integer, allocatable, dimension(:) :: rs, vs, ps, ms
@@ -239,10 +240,8 @@ contains
 !$acc                                        iy%beg:iy%end, &
 !$acc                                        iz%beg:iz%end))
         end if
-
-        ixt = ix
-        iyt = iy
-        izt = iz
+        print*, ix, iy, iz
+        ixt = ix; iyt = iy; izt = iz
 
         allocate (q_cons_qp%vf(1:sys_size))
         allocate (q_prim_qp%vf(1:sys_size))
@@ -570,6 +569,7 @@ contains
            allocate (mono_mass_src(0:m, 0:n, 0:p))
            allocate (mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
            allocate (mono_E_src(0:m, 0:n, 0:p))
+!$acc enter data create(mono_mass_src(0:m, 0:n, 0:p), mono_mom_src(1:num_dims, 0:m, 0:n, 0:p), mono_E_src(0:m, 0:n, 0:p))
         end if
 
         allocate (divu%sf( &
@@ -796,7 +796,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: t_step
-
+        
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
