@@ -1325,7 +1325,7 @@ contains
                 if (monopole) then
                     call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha,&
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                            rhs_vf, gammas, pi_infs)
+                                            rhs_vf)
                 end if
 
                 if (model_eqns == 3) then
@@ -1647,7 +1647,7 @@ contains
                 if (monopole) then
                     call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha,&
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                             rhs_vf, gammas, pi_infs)
+                                             rhs_vf)
                 end if
 
                 if (model_eqns == 3) then
@@ -2170,7 +2170,7 @@ contains
                 if (monopole) then
                     call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha,&
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                             rhs_vf, gammas, pi_infs)
+                                             rhs_vf)
                 end if
 
                 call nvtxEndRange()

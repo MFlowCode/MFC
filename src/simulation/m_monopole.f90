@@ -32,6 +32,9 @@ module m_monopole
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
 
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+    !$acc declare create(gammas, pi_infs)
+
 contains
 
     subroutine s_initialize_monopole_module()
@@ -54,10 +57,18 @@ contains
             end do
         end do
         !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono)
+
+        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
+
+        do i = 1, num_fluids
+            gammas(i) = fluid_pp(i)%gamma
+            pi_infs(i) = fluid_pp(i)%pi_inf
+        end do
+        !$acc update device(gammas, pi_infs)
     end subroutine
 
     subroutine s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha, q_cons_vf, &
-                                         q_prim_vf, t_step, id, rhs_vf, gammas, pi_infs)
+                                         q_prim_vf, t_step, id, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -74,8 +85,6 @@ contains
 
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
         integer, intent(IN) :: t_step
-
-        real(kind(0d0)), dimension(1:num_fluids) :: gammas, pi_infs
 
         integer :: i, j, k, l, q, ii, id !< generic loop variables
         integer :: term_index
