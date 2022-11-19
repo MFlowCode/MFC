@@ -91,6 +91,8 @@ module m_viscous
 
         type(int_bounds_info) :: ix, iy, iz
 
+    !$acc update device(ix, iy, iz)
+
     !$acc parallel loop collapse(3) gang vector default(present)
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
@@ -107,7 +109,7 @@ module m_viscous
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
-                        print*, j, k, l
+
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
