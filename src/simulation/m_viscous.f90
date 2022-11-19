@@ -31,6 +31,7 @@ module m_viscous
 
     integer :: momxb, momxe
     integer :: contxb, contxe
+!$acc declare create(momxb, momxe, contxb, contxe)
 
     contains
 
@@ -58,6 +59,7 @@ module m_viscous
         momxe = mom_idx%end
         contxb = cont_idx%beg
         contxe = cont_idx%end
+!$acc update device(momxb, momxe, contxb, contxe)
 
     end subroutine s_initialize_viscous_module
 
@@ -100,13 +102,11 @@ module m_viscous
                 end do
             end do
         end do
-
         if (Re_size(1) > 0) then    ! Shear stresses
     !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
-    
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
@@ -180,7 +180,7 @@ module m_viscous
                                 end do
                             end if
                         end if
-                        
+
                         tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + &
                                         grad_x_vf(2)%sf(j, k, l))/ &
                                     Re_visc(1)
@@ -188,7 +188,7 @@ module m_viscous
                         tau_Re(2, 2) = (4d0*grad_y_vf(2)%sf(j, k, l) &
                                         - 2d0*grad_x_vf(1)%sf(j, k, l) &
                                         - 2d0*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
-                                    (3d0*Re_visc(1))       
+                                    (3d0*Re_visc(1))      
     !$acc loop seq
                         do i = 1, 2
                             tau_Re_vf(contxe + i)%sf(j, k, l) = &
@@ -715,7 +715,7 @@ module m_viscous
 
         type(vector_field) :: q_prim_qp
 
-        type(vector_field), dimension(sys_size), &
+        type(vector_field), dimension(1:num_dims), &
             intent(INOUT) :: dqL_prim_dx_n, dqR_prim_dx_n, &
                              dqL_prim_dy_n, dqR_prim_dy_n, &
                              dqL_prim_dz_n, dqR_prim_dz_n
@@ -1374,7 +1374,7 @@ module m_viscous
 
     subroutine s_finalize_viscous_module()
         deallocate (gammas, pi_infs)
-        allocate (Res(1:2, 1:maxval(Re_size)))
+        deallocate (Res(1:2, 1:maxval(Re_size)))
     end subroutine s_finalize_viscous_module
 
 end module m_viscous
