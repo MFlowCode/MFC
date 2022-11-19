@@ -107,12 +107,13 @@ module m_viscous
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
+                        print*, j, k, l
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                         end do
-                        
+
                         if (bubbles) then
                             rho_visc = 0d0
                             gamma_visc = 0d0
