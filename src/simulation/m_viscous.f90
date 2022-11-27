@@ -1376,8 +1376,8 @@ module m_viscous
     end subroutine s_reconstruct_cell_boundary_values_visc ! --------------------
 
     subroutine s_finalize_viscous_module()
-        deallocate (gammas, pi_infs)
-        deallocate (Res(1:2, 1:maxval(Re_size)))
+        !deallocate (gammas, pi_infs)
+        !deallocate (Res(1:2, 1:maxval(Re_size)))
     end subroutine s_finalize_viscous_module
 
 end module m_viscous
