@@ -77,9 +77,16 @@
 #> srun --mpi=pmix   \
 #>      "{MFC::BIN}"
 #>
-mpirun                            \
+
+for binpath in {MFC::BINARIES}; do
+
+    echo -e ":) Running $binpath:"
+
+    mpirun                        \
         -np {cpus_per_node*nodes} \
-        "{MFC::BIN}"
+        "$binpath"
+
+done
 
 {MFC::EPILOGUE}
 

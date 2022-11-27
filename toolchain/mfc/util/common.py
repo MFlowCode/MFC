@@ -37,7 +37,7 @@ class MFCException(Exception):
 
 def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None) -> int:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
-    
+
     cons.print(no_indent=True)
     cons.print(f"$ {' '.join(cmd)}")
     cons.print(no_indent=True)

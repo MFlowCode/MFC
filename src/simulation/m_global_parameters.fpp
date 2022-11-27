@@ -1,9 +1,6 @@
 !>
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 #:include 'case.fpp'
 

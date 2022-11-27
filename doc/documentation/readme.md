@@ -81,9 +81,9 @@ Ph.D. Disserations:
     V. Coralic (2014) Ph.D. thesis, California Institute of Technology
   </a>
 
-### User Configuration (`defaults.yaml`)
+### User Configuration
 
-The `mfc.sh` script used in the previous section is configured through the file named `defaults.yaml`.
+The [mfc.sh](https://github.com/MFlowCode/MFC/blob/master/mfc.sh) script used in the previous section is configured through the [defaults.yaml](https://github.com/MFlowCode/MFC/blob/master/defaults.yaml) file.
 
 ## Development
 
@@ -112,7 +112,7 @@ You can append `-DMFC_MEMORY_DUMP` to `release-gpu`'s Fortran compiler options i
 ## License
  
 Copyright 2022.
-MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
+MFC is under the MIT license (see [LICENSE](https://github.com/MFlowCode/MFC/blob/master/LICENSE) file for full text).
 
 ## Acknowledgements
  
