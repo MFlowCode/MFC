@@ -1,9 +1,6 @@
 !>
 !! @file m_grid.f90
 !! @brief Contains module m_grid
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief  This module takes care of creating the rectilinear grid on which
 !!              the data for the initial condition will be laid out and on which

@@ -33,6 +33,9 @@ class MFCRun:
         engines.get_engine(self.mfc.args["engine"]).validate_job_options(self.mfc)
 
     def run(self) -> None:
+        for name in self.mfc.args["targets"]:
+            build.build_target(self.mfc, name)
+
         cons.print("[bold]Run[/bold]")
         cons.indent()
 
@@ -57,23 +60,9 @@ Engine        (-e)  {self.mfc.args['engine']}
 
         self.validate_job_options()
 
-        for target_name in self.mfc.args["targets"]:
-            cons.print(no_indent=True)
-            cons.print(f"[bold]Running [magenta]{target_name}[/magenta][/bold]:")
-            cons.indent()
+        cons.print("Generating input files...")
+        for name in self.mfc.args["targets"]:
+            input_file.generate(name)
 
-            # We generate the /path/to/case/{target_name}.inp and
-            # src/{target_name}/case.fpp input files before building so that, in
-            # order for the target to be built with case optimization, if
-            # args["case_optimization"] is true. Doing so later, would require
-            # there be two builds of a target.
-            input_file.generate(target_name)
+        engine.run(self.mfc.args["targets"])
 
-            if not self.mfc.args["no_build"]:
-                build.build_target(self.mfc, target_name)
-
-            engine.run(target_name)
-
-            cons.unindent()
-
-        cons.unindent()

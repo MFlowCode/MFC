@@ -1,9 +1,7 @@
 !>
 !! @file m_derived_types.f90
 !! @brief Contains module m_derived_types
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
+
 !> @brief This file contains the definitions of all of the custom-defined
 !!              types used in the pre-process code.
 module m_derived_types
