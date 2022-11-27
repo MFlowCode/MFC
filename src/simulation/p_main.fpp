@@ -253,7 +253,7 @@ program p_main
             call s_mpi_barrier()
 
             if (num_procs > 1) then
-                call mpi_bcast_time_step_values(proc_time, time)
+                call mpi_bcast_time_step_values(proc_time, time_avg)
 
                 call mpi_bcast_time_step_values(io_proc_time, io_time_avg)
             end if
