@@ -103,16 +103,11 @@ module m_variables_conversion
     !> @}
 
     integer :: ixb, ixe, iyb, iye, izb, ize
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-    integer :: bubxb, bubxe
-    integer :: advxb, advxe
-    integer :: strxb, strxe
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs, Gs
+    real(kind(0d0)), allocatable, dimension(:) ::  Gs
     integer, allocatable, dimension(:) :: bubrs
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(ixb, ixe, iyb, iye, izb, ize, momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, strxb, strxe, gammas, pi_infs, bubrs, Gs, Res)
+!$acc declare create(ixb, ixe, iyb, iye, izb, ize,  bubrs, Gs, Res)
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
 !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
@@ -461,13 +456,6 @@ contains
 
         integer :: i, j
 
-        momxb = mom_idx%beg; momxe = mom_idx%end
-        bubxb = bub_idx%beg; bubxe = bub_idx%end
-        advxb = adv_idx%beg; advxe = adv_idx%end
-        contxb = cont_idx%beg; contxe = cont_idx%end
-        strxb = stress_idx%beg; strxe = stress_idx%end
-!$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
-
         ixb = -buff_size
         ixe = m - ixb
 
@@ -484,8 +472,6 @@ contains
 
 !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
         allocate (Gs(1:num_fluids))
 
         if (any(Re_size > 0)) then
@@ -495,11 +481,9 @@ contains
         allocate (bubrs(1:nb))
 
         do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
             Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device(gammas, pi_infs, Gs)
+!$acc update device(Gs)
 
 !TODO: this update was in previous version: (no longer needed?)
 !!!$acc update device(small_alf, dflt_real, dflt_int, pi, nnode, sgm_eps)
@@ -593,6 +577,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
+
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
 !$acc parallel loop collapse(3) gang vector default(present) private( alpha_K, alpha_rho_K, Re_K)
             do l = izb, ize
@@ -649,6 +634,8 @@ contains
                 end do
             end do
 !$acc end parallel loop
+
+        print *, "Fail Here"
         elseif ((model_eqns /= 4)) then !TODO: add routine below for bubble + hypo
 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_K, alpha_K, nRtmp)
             do l = izb, ize
@@ -897,7 +884,7 @@ contains
 
     subroutine s_finalize_variables_conversion_module() ! ------------------
 
-        deallocate (gammas, pi_infs, Gs)
+        deallocate ( Gs)
         deallocate (bubrs)
 
         s_convert_to_mixture_variables => null()

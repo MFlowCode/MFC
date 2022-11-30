@@ -301,6 +301,20 @@ module m_global_parameters
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 
+
+
+     integer :: momxb, momxe
+     integer :: advxb, advxe
+     integer :: contxb, contxe
+     integer :: intxb, intxe
+     integer :: bubxb, bubxe
+     integer :: strxb, strxe
+     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
+
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+    !$acc declare create(gammas, pi_infs)
+
+
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
@@ -487,6 +501,7 @@ contains
         ! of fluids for which the physical and geometric curvatures of the
         ! interfaces will be computed
         Re_size = 0
+
 
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
@@ -786,6 +801,30 @@ contains
             grid_geometry = 3
         end if
 
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+        bubxb = bub_idx%beg
+        bubxe = bub_idx%end
+        strxb = stress_idx%beg
+        strxe = stress_idx%end
+        intxb = internalEnergies_idx%beg
+        intxe = internalEnergies_idx%end
+
+
+!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+
+        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
+
+        do i = 1, num_fluids
+            gammas(i) = fluid_pp(i)%gamma
+            pi_infs(i) = fluid_pp(i)%pi_inf
+        end do
+!$acc update device(gammas, pi_infs)
+
         ! Allocating grid variables for the x-, y- and z-directions
         allocate (x_cb(-1 - buff_size:m + buff_size))
         allocate (x_cc(-buff_size:m + buff_size))
@@ -798,6 +837,9 @@ contains
         if (p == 0) return; allocate (z_cb(-1 - buff_size:p + buff_size))
         allocate (z_cc(-buff_size:p + buff_size))
         allocate (dz(-buff_size:p + buff_size))
+
+
+
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 

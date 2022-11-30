@@ -401,20 +401,10 @@ module m_riemann_solvers
 !$acc    flux_rsx_vf_flat, flux_src_rsx_vf_flat, flux_rsy_vf_flat, flux_src_rsy_vf_flat, flux_rsz_vf_flat, flux_src_rsz_vf_flat, vel_src_rsx_vf_flat, vel_src_rsy_vf_flat, vel_src_rsz_vf_flat, &
 !$acc    flux_gsrc_rsx_vf_flat, flux_gsrc_rsy_vf_flat, flux_gsrc_rsz_vf_flat, mom_sp_rsx_vf_flat, mom_sp_rsy_vf_flat, mom_sp_rsz_vf_flat)
 
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-    integer :: advxb, advxe
-    integer :: bubxb, bubxe
-    integer :: intxb, intxe
-    integer :: strxb, strxe
+ 
+    real(kind(0d0)), allocatable, dimension(:) ::  Gs
+!$acc declare create( Gs)
 
-!$acc declare create(momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, intxb, intxe, strxb, strxe)
-
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs, Gs
-!$acc declare create(gammas, pi_infs, Gs)
-
-    integer, allocatable, dimension(:) :: rs, vs, ps, ms
-!$acc declare create(rs, vs, ps, ms)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 !$acc declare create(Res)
@@ -2799,48 +2789,13 @@ contains
         ! the Riemann problem solution
         integer :: i, j
 
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
         allocate (Gs(1:num_fluids))
 
         do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
             Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device(gammas, pi_infs, Gs)
+!$acc update device( Gs)
 
-        momxb = mom_idx%beg; momxe = mom_idx%end
-        contxb = cont_idx%beg; contxe = cont_idx%end
-        bubxb = bub_idx%beg; bubxe = bub_idx%end
-        advxb = adv_idx%beg; advxe = adv_idx%end
-        intxb = internalEnergies_idx%beg; intxe = internalEnergies_idx%end
-        strxb = stress_idx%beg; strxe = stress_idx%end
-!$acc update device(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, intxb, intxe, strxb, strxe)
-
-        if (bubbles) then
-            allocate (rs(1:nb))
-            allocate (vs(1:nb))
-            if (.not. polytropic) then
-                allocate (ps(1:nb))
-                allocate (ms(1:nb))
-            end if
-
-            do i = 1, nb
-                rs(i) = bub_idx%rs(i)
-                vs(i) = bub_idx%vs(i)
-                if (.not. polytropic) then
-                    ps(i) = bub_idx%ps(i)
-                    ms(i) = bub_idx%ms(i)
-                end if
-            end do
-
-!$acc update device(rs, vs)
-            if (.not. polytropic) then
-!$acc update device(ps, ms)
-            end if
-
-        end if
 
         if (any(Re_size > 0)) then
             allocate (Res(1:2, 1:maxval(Re_size)))

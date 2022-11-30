@@ -95,13 +95,7 @@ module m_data_output
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: energy
 
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-    integer :: bubxb, bubxe
-    integer :: advxb, advxe
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-    !$acc declare create(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, gammas, pi_infs)
-    !> @}
+
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
@@ -2456,20 +2450,6 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        momxb = mom_idx%beg; momxe = mom_idx%end
-        bubxb = bub_idx%beg; bubxe = bub_idx%end
-        advxb = adv_idx%beg; advxe = adv_idx%end
-        contxb = cont_idx%beg; contxe = cont_idx%end
-!$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe)
-
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
-
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-!$acc update device(gammas, pi_infs)
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         allocate (icfl_sf(0:m, 0:n, 0:p)); icfl_max = 0d0

@@ -34,16 +34,11 @@ module m_qbmm
 
     type(int_bounds_info) :: is1, is2, is3
 
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-    integer :: bubxb, bubxe
-    integer :: advxb, advxe
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
 
 !$acc declare create(momrhs, nterms, is1, is2, is3)
-!$acc declare create(momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, gammas, pi_infs, bubrs, bubmoms)
+!$acc declare create( bubrs, bubmoms)
 
 contains
 
@@ -159,24 +154,11 @@ contains
 
         !$acc update device(momrhs)
 
-        momxb = mom_idx%beg; momxe = mom_idx%end
-        bubxb = bub_idx%beg; bubxe = bub_idx%end
-        advxb = adv_idx%beg; advxe = adv_idx%end
-        contxb = cont_idx%beg; contxe = cont_idx%end
-!$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe)
-
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
-
         allocate (bubrs(1:nb))
 
         allocate (bubmoms(1:nb, 1:nmom))
 
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-!$acc update device(gammas, pi_infs)
+
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
