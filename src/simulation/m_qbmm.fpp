@@ -34,16 +34,11 @@ module m_qbmm
 
     type(int_bounds_info) :: is1, is2, is3
 
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-    integer :: bubxb, bubxe
-    integer :: advxb, advxe
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
 
 !$acc declare create(momrhs, nterms, is1, is2, is3)
-!$acc declare create(momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, gammas, pi_infs, bubrs, bubmoms)
+!$acc declare create( bubrs, bubmoms)
 
 contains
 
@@ -159,24 +154,11 @@ contains
 
         !$acc update device(momrhs)
 
-        momxb = mom_idx%beg; momxe = mom_idx%end
-        bubxb = bub_idx%beg; bubxe = bub_idx%end
-        advxb = adv_idx%beg; advxe = adv_idx%end
-        contxb = cont_idx%beg; contxe = cont_idx%end
-!$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe)
-
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
-
         allocate (bubrs(1:nb))
 
         allocate (bubmoms(1:nb, 1:nmom))
 
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-!$acc update device(gammas, pi_infs)
+
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
@@ -200,7 +182,7 @@ contains
 
         coeffs = 0d0
 
-        do i1 = 0, 2; do i2 = 0, 2
+        do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
@@ -241,7 +223,8 @@ contains
         real(kind(0d0)), dimension(nb) :: Rvec
         real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf
+        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum
+        real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: n_tait, B_tait
 
         integer :: j, k, l, q, r, s !< Loop variables
@@ -252,7 +235,8 @@ contains
 
         !$acc update device(is1, is2, is3)
 
-!$acc parallel loop collapse(3) gang vector default(present) private(moms, Rvec, wght, abscX, abscY, mom3d_terms, coeff)
+
+!$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
         do id3 = is3%beg, is3%end
             do id2 = is2%beg, is2%end
                 do id1 = is1%beg, is1%end
@@ -279,12 +263,14 @@ contains
 
                     if (alf > small_alf) then
 
+                        R3 = 0d0
+
                         !$acc loop seq
                         do q = 1, nb
-                            Rvec(q) = q_prim_vf(bubrs(q))%sf(id1, id2, id3)
+                            R3 = R3 + weight(q)*q_prim_vf(bubrs(q))%sf(id1, id2, id3)**3d0
                         end do
 
-                        call s_comp_n_from_prim(alf, Rvec, nbub)
+                        nbub = (3.d0/(4.d0*pi))*alf/R3
 
                         !$acc loop seq
                         do q = 1, nb
@@ -293,48 +279,29 @@ contains
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
 
-                            ! IF(id1==0) THEN
-                            !     PRINT*, 'pres: ', pres
-                            !     PRINT*, 'nb : ', nbub
-                            !     PRINT*, 'alf: ', alf
-                            !     DO s = 1,nmom
-                            !         PRINT*, 'mom: ', moms(s)
-                            !     END DO
-                            ! END IF
+                           
 
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
-                            !$acc loop seq
-                            do j = 1, nterms
-                                !$acc loop seq
-                                do i2 = 0, 2
-                                    !$acc loop seq
-                                    do i1 = 0, 2
-                                        if ((i1 + i2) <= 2) then
-
-                                            mom3d_terms(j, i1, i2) = coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
-                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
-                                        end if
-                                    end do
-                                end do
-                            end do
 
                             !$acc loop seq
-                            do i1 = 0, 2
+                            do i2 = 0, 2
                                 !$acc loop seq
-                                do i2 = 0, 2
+                                do i1 = 0, 2
                                     if ((i1 + i2) <= 2) then
-                                        moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub*sum(mom3d_terms(:, i1, i2))
-                                        ! IF (moms3d(i1,i2,q)%sf(id1,id2,id3) .NE. moms3d(i1,i2,q)%sf(id1,id2,id3)) THEN
-                                        !     PRINT*, 'nan in mom3d', i1,i2,id1
-                                        !     PRINT*, 'nbu: ', nbub
-                                        !     PRINT*, 'alf: ', alf
-                                        !     PRINT*, 'moms: ', moms(:)
-                                        !     CALL s_mpi_abort()
-                                        ! END IF
+                                        momsum = 0d0
+                                        !$acc loop seq
+                                        do j = 1, nterms           
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
+                                        end do
+                                        moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub * momsum
+
                                     end if
                                 end do
                             end do
+
+                            
                         end do
 
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
@@ -347,19 +314,7 @@ contains
                             momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
                         end if
 
-                    !!$acc loop seq
-                        !do i1 = 1, 4
-                        ! if (momsp(i1)%sf(id1, id2, id3) /= momsp(i1)%sf(id1, id2, id3)) then
-                        !     print *, 'NaN in sp moment', i1, 'location', id1, id2, id3
-                        !     print *, 'Rs', Rvec(:)
-                        !     print *, 'alpha', alf
-                        !     print *, 'nbub', nbub
-                        !     print *, 'abscX', abscX(:, :)
-                        !     print *, 'abscY', abscY(:, :)
-                        !     print *, 'wght', wght(:, :)
-                        !    call s_mpi_abort()
-                        !end if
-                        !end do
+                    
                     else
                         !$acc loop seq
                         do q = 1, nb
@@ -382,6 +337,7 @@ contains
                 end do
             end do
         end do
+
 
     end subroutine s_mom_inv
 
