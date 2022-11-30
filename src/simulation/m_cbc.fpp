@@ -132,14 +132,12 @@ module m_cbc
 
     integer :: dj
 
-    integer :: momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
 
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
 !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,alpha_rho,vel,adv,mf,Re, &
 !$acc                dalpha_rho_ds,dvel_ds,dadv_ds,lambda,L,ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-!$acc                pi_coef_x,pi_coef_y,pi_coef_z, momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, gammas, pi_infs, bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj)
+!$acc                pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj)
 
 contains
 
@@ -312,14 +310,6 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         allocate (ds(0:buff_size))
 
-        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
-
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-
-        !$acc update device(gammas, pi_infs)
 
         ! Allocating/Computing CBC Coefficients in x-direction =============
         if (all((/bc_x%beg, bc_x%end/) <= -5)) then
@@ -439,17 +429,6 @@ contains
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
 
-        momxb = mom_idx%beg
-        momxe = mom_idx%end
-        advxb = adv_idx%beg
-        advxe = adv_idx%end
-        contxb = cont_idx%beg
-        contxe = cont_idx%end
-        bubxb = bub_idx%beg
-        bubxe = bub_idx%end
-
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe)
-
         bcxb = bc_x%beg
         bcxe = bc_x%end
 
@@ -496,208 +475,77 @@ contains
         end do
 
         ! Computing CBC1 Coefficients ======================================
-        if (cbc_dir == 1) then
+        #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+        if (cbc_dir == ${CBC_DIR}$) then
             if (weno_order == 1) then
 
-                fd_coef_x(:, cbc_loc) = 0d0
-                fd_coef_x(0, cbc_loc) = -2d0/(ds(0) + ds(1))
-                fd_coef_x(1, cbc_loc) = -fd_coef_x(0, cbc_loc)
+                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc) = -2d0/(ds(0) + ds(1))
+                fd_coef_${XYZ}$(1, cbc_loc) = -fd_coef_${XYZ}$(0, cbc_loc)
 
                 ! ==================================================================
 
                 ! Computing CBC2 Coefficients ======================================
             elseif (weno_order == 3) then
 
-                fd_coef_x(:, cbc_loc) = 0d0
-                fd_coef_x(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                fd_coef_x(1, cbc_loc) = -4d0*fd_coef_x(0, cbc_loc)/3d0
-                fd_coef_x(2, cbc_loc) = fd_coef_x(0, cbc_loc)/3d0
+                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
+                fd_coef_${XYZ}$(1, cbc_loc) = -4d0*fd_coef_${XYZ}$(0, cbc_loc)/3d0
+                fd_coef_${XYZ}$(2, cbc_loc) = fd_coef_${XYZ}$(0, cbc_loc)/3d0
 
-                pi_coef_x(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
-
-                ! ==================================================================
-
-                ! Computing CBC4 Coefficients ======================================
-            else
-
-                fd_coef_x(:, cbc_loc) = 0d0
-                fd_coef_x(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
-                                               - 1d1*ds(2) + 1d1*ds(3) &
-                                               - 3d0*ds(4))
-                fd_coef_x(1, cbc_loc) = -48d0*fd_coef_x(0, cbc_loc)/25d0
-                fd_coef_x(2, cbc_loc) = 36d0*fd_coef_x(0, cbc_loc)/25d0
-                fd_coef_x(3, cbc_loc) = -16d0*fd_coef_x(0, cbc_loc)/25d0
-                fd_coef_x(4, cbc_loc) = 3d0*fd_coef_x(0, cbc_loc)/25d0
-
-                pi_coef_x(0, 0, cbc_loc) = &
-                    ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
-                     (s_cb(1) - s_cb(3)))/((s_cb(1) - s_cb(4))* &
-                                           (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
-                pi_coef_x(0, 1, cbc_loc) = &
-                    ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))* &
-                     ((s_cb(1) - s_cb(3))*(s_cb(1) - s_cb(3)) - &
-                      (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + &
-                                           (s_cb(4) - s_cb(1)))))/ &
-                    ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
-                     (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_x(0, 2, cbc_loc) = &
-                    (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))* &
-                                         (s_cb(1) - s_cb(3)) + ((s_cb(0) - s_cb(2)) + &
-                                                                (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/ &
-                    ((s_cb(2) - s_cb(0))*(s_cb(0) - s_cb(3))* &
-                     (s_cb(0) - s_cb(4)))
-                pi_coef_x(1, 0, cbc_loc) = &
-                    ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))* &
-                     (s_cb(2) - s_cb(3)))/((s_cb(2) - s_cb(4))* &
-                                           (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
-                pi_coef_x(1, 1, cbc_loc) = &
-                    ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))* &
-                     ((s_cb(1) - s_cb(3))*(s_cb(2) - s_cb(3)) + &
-                      (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + &
-                                           (s_cb(2) - s_cb(4)))))/ &
-                    ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
-                     (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_x(1, 2, cbc_loc) = &
-                    ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))* &
-                     (s_cb(2) - s_cb(4)))/((s_cb(0) - s_cb(2))* &
-                                           (s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
-
-            end if
-        elseif (cbc_dir == 2) then
-            if (weno_order == 1) then
-
-                fd_coef_y(:, cbc_loc) = 0d0
-                fd_coef_y(0, cbc_loc) = -2d0/(ds(0) + ds(1))
-                fd_coef_y(1, cbc_loc) = -fd_coef_y(0, cbc_loc)
-
-                ! ==================================================================
-
-                ! Computing CBC2 Coefficients ======================================
-            elseif (weno_order == 3) then
-
-                fd_coef_y(:, cbc_loc) = 0d0
-                fd_coef_y(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                fd_coef_y(1, cbc_loc) = -4d0*fd_coef_y(0, cbc_loc)/3d0
-                fd_coef_y(2, cbc_loc) = fd_coef_y(0, cbc_loc)/3d0
-
-                pi_coef_y(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
+                pi_coef_${XYZ}$(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
                 ! ==================================================================
 
                 ! Computing CBC4 Coefficients ======================================
             else
 
-                fd_coef_y(:, cbc_loc) = 0d0
-                fd_coef_y(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
+                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
                                                - 1d1*ds(2) + 1d1*ds(3) &
                                                - 3d0*ds(4))
-                fd_coef_y(1, cbc_loc) = -48d0*fd_coef_y(0, cbc_loc)/25d0
-                fd_coef_y(2, cbc_loc) = 36d0*fd_coef_y(0, cbc_loc)/25d0
-                fd_coef_y(3, cbc_loc) = -16d0*fd_coef_y(0, cbc_loc)/25d0
-                fd_coef_y(4, cbc_loc) = 3d0*fd_coef_y(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(1, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(4, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
 
-                pi_coef_y(0, 0, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 0, cbc_loc) = &
                     ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
                      (s_cb(1) - s_cb(3)))/((s_cb(1) - s_cb(4))* &
                                            (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
-                pi_coef_y(0, 1, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 1, cbc_loc) = &
                     ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))* &
                      ((s_cb(1) - s_cb(3))*(s_cb(1) - s_cb(3)) - &
                       (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + &
                                            (s_cb(4) - s_cb(1)))))/ &
                     ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
                      (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_y(0, 2, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 2, cbc_loc) = &
                     (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))* &
                                          (s_cb(1) - s_cb(3)) + ((s_cb(0) - s_cb(2)) + &
                                                                 (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/ &
                     ((s_cb(2) - s_cb(0))*(s_cb(0) - s_cb(3))* &
                      (s_cb(0) - s_cb(4)))
-                pi_coef_y(1, 0, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 0, cbc_loc) = &
                     ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))* &
                      (s_cb(2) - s_cb(3)))/((s_cb(2) - s_cb(4))* &
                                            (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
-                pi_coef_y(1, 1, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 1, cbc_loc) = &
                     ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))* &
                      ((s_cb(1) - s_cb(3))*(s_cb(2) - s_cb(3)) + &
                       (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + &
                                            (s_cb(2) - s_cb(4)))))/ &
                     ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
                      (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_y(1, 2, cbc_loc) = &
-                    ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))* &
-                     (s_cb(2) - s_cb(4)))/((s_cb(0) - s_cb(2))* &
-                                           (s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
-
-            end if
-        else
-            if (weno_order == 1) then
-
-                fd_coef_z(:, cbc_loc) = 0d0
-                fd_coef_z(0, cbc_loc) = -2d0/(ds(0) + ds(1))
-                fd_coef_z(1, cbc_loc) = -fd_coef_z(0, cbc_loc)
-
-                ! ==================================================================
-
-                ! Computing CBC2 Coefficients ======================================
-            elseif (weno_order == 3) then
-
-                fd_coef_z(:, cbc_loc) = 0d0
-                fd_coef_z(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                fd_coef_z(1, cbc_loc) = -4d0*fd_coef_z(0, cbc_loc)/3d0
-                fd_coef_z(2, cbc_loc) = fd_coef_z(0, cbc_loc)/3d0
-
-                pi_coef_z(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
-
-                ! ==================================================================
-
-                ! Computing CBC4 Coefficients ======================================
-            else
-
-                fd_coef_z(:, cbc_loc) = 0d0
-                fd_coef_z(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
-                                               - 1d1*ds(2) + 1d1*ds(3) &
-                                               - 3d0*ds(4))
-                fd_coef_z(1, cbc_loc) = -48d0*fd_coef_z(0, cbc_loc)/25d0
-                fd_coef_z(2, cbc_loc) = 36d0*fd_coef_z(0, cbc_loc)/25d0
-                fd_coef_z(3, cbc_loc) = -16d0*fd_coef_z(0, cbc_loc)/25d0
-                fd_coef_z(4, cbc_loc) = 3d0*fd_coef_z(0, cbc_loc)/25d0
-
-                pi_coef_z(0, 0, cbc_loc) = &
-                    ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
-                     (s_cb(1) - s_cb(3)))/((s_cb(1) - s_cb(4))* &
-                                           (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
-                pi_coef_z(0, 1, cbc_loc) = &
-                    ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))* &
-                     ((s_cb(1) - s_cb(3))*(s_cb(1) - s_cb(3)) - &
-                      (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + &
-                                           (s_cb(4) - s_cb(1)))))/ &
-                    ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
-                     (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_z(0, 2, cbc_loc) = &
-                    (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))* &
-                                         (s_cb(1) - s_cb(3)) + ((s_cb(0) - s_cb(2)) + &
-                                                                (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/ &
-                    ((s_cb(2) - s_cb(0))*(s_cb(0) - s_cb(3))* &
-                     (s_cb(0) - s_cb(4)))
-                pi_coef_z(1, 0, cbc_loc) = &
-                    ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))* &
-                     (s_cb(2) - s_cb(3)))/((s_cb(2) - s_cb(4))* &
-                                           (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
-                pi_coef_z(1, 1, cbc_loc) = &
-                    ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))* &
-                     ((s_cb(1) - s_cb(3))*(s_cb(2) - s_cb(3)) + &
-                      (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + &
-                                           (s_cb(2) - s_cb(4)))))/ &
-                    ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
-                     (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_z(1, 2, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 2, cbc_loc) = &
                     ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))* &
                      (s_cb(2) - s_cb(4)))/((s_cb(0) - s_cb(2))* &
                                            (s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
 
             end if
         end if
+        #:endfor
+ 
         ! END: Computing CBC4 Coefficients =================================
 
         ! Nullifying CBC coefficients
@@ -843,24 +691,25 @@ contains
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
 
-        if (cbc_dir == 1) then
+        #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+        if (cbc_dir == ${CBC_DIR}$) then
 
             ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
             if (weno_order == 3) then
 
-                call s_convert_primitive_to_flux_variables(q_prim_rsx_vf, &
-                                                           F_rsx_vf, &
-                                                           F_src_rsx_vf, &
+                call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
+                                                           F_rs${XYZ}$_vf, &
+                                                           F_src_rs${XYZ}$_vf, &
                                                            is1, is2, is3, starty, startz)
 
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            flux_rsx_vf(0, k, r, i) = F_rsx_vf(0, k, r, i) &
-                                                      + pi_coef_x(0, 0, cbc_loc)* &
-                                                      (F_rsx_vf(1, k, r, i) - &
-                                                       F_rsx_vf(0, k, r, i))
+                            flux_rs${XYZ}$_vf(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) &
+                                                      + pi_coef_${XYZ}$(0, 0, cbc_loc)* &
+                                                      (F_rs${XYZ}$_vf(1, k, r, i) - &
+                                                       F_rs${XYZ}$_vf(0, k, r, i))
                         end do
                     end do
                 end do
@@ -869,10 +718,10 @@ contains
                 do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            flux_src_rsx_vf(0, k, r, i) = F_src_rsx_vf(0, k, r, i) + &
-                                                          (F_src_rsx_vf(1, k, r, i) - &
-                                                           F_src_rsx_vf(0, k, r, i)) &
-                                                          *pi_coef_x(0, 0, cbc_loc)
+                            flux_src_rs${XYZ}$_vf(0, k, r, i) = F_src_rs${XYZ}$_vf(0, k, r, i) + &
+                                                          (F_src_rs${XYZ}$_vf(1, k, r, i) - &
+                                                           F_src_rs${XYZ}$_vf(0, k, r, i)) &
+                                                          *pi_coef_${XYZ}$(0, 0, cbc_loc)
                         end do
                     end do
                 end do
@@ -881,9 +730,9 @@ contains
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
             elseif (weno_order == 5) then
 
-                call s_convert_primitive_to_flux_variables(q_prim_rsx_vf, &
-                                                           F_rsx_vf, &
-                                                           F_src_rsx_vf, &
+                call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
+                                                           F_rs${XYZ}$_vf, &
+                                                           F_src_rs${XYZ}$_vf, &
                                                            is1, is2, is3, starty, startz)
 
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -891,16 +740,16 @@ contains
                     do j = 0, 1
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
-                                flux_rsx_vf(j, k, r, i) = F_rsx_vf(j, k, r, i) &
-                                                          + pi_coef_x(j, 0, cbc_loc)* &
-                                                          (F_rsx_vf(3, k, r, i) - &
-                                                           F_rsx_vf(2, k, r, i)) &
-                                                          + pi_coef_x(j, 1, cbc_loc)* &
-                                                          (F_rsx_vf(2, k, r, i) - &
-                                                           F_rsx_vf(1, k, r, i)) &
-                                                          + pi_coef_x(j, 2, cbc_loc)* &
-                                                          (F_rsx_vf(1, k, r, i) - &
-                                                           F_rsx_vf(0, k, r, i))
+                                flux_rs${XYZ}$_vf(j, k, r, i) = F_rs${XYZ}$_vf(j, k, r, i) &
+                                                          + pi_coef_${XYZ}$(j, 0, cbc_loc)* &
+                                                          (F_rs${XYZ}$_vf(3, k, r, i) - &
+                                                           F_rs${XYZ}$_vf(2, k, r, i)) &
+                                                          + pi_coef_${XYZ}$(j, 1, cbc_loc)* &
+                                                          (F_rs${XYZ}$_vf(2, k, r, i) - &
+                                                           F_rs${XYZ}$_vf(1, k, r, i)) &
+                                                          + pi_coef_${XYZ}$(j, 2, cbc_loc)* &
+                                                          (F_rs${XYZ}$_vf(1, k, r, i) - &
+                                                           F_rs${XYZ}$_vf(0, k, r, i))
                             end do
                         end do
                     end do
@@ -911,16 +760,16 @@ contains
                     do j = 0, 1
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
-                                flux_src_rsx_vf(j, k, r, i) = F_src_rsx_vf(j, k, r, i) + &
-                                                              (F_src_rsx_vf(3, k, r, i) - &
-                                                               F_src_rsx_vf(2, k, r, i)) &
-                                                              *pi_coef_x(j, 0, cbc_loc) + &
-                                                              (F_src_rsx_vf(2, k, r, i) - &
-                                                               F_src_rsx_vf(1, k, r, i)) &
-                                                              *pi_coef_x(j, 1, cbc_loc) + &
-                                                              (F_src_rsx_vf(1, k, r, i) - &
-                                                               F_src_rsx_vf(0, k, r, i)) &
-                                                              *pi_coef_x(j, 2, cbc_loc)
+                                flux_src_rs${XYZ}$_vf(j, k, r, i) = F_src_rs${XYZ}$_vf(j, k, r, i) + &
+                                                              (F_src_rs${XYZ}$_vf(3, k, r, i) - &
+                                                               F_src_rs${XYZ}$_vf(2, k, r, i)) &
+                                                              *pi_coef_${XYZ}$(j, 0, cbc_loc) + &
+                                                              (F_src_rs${XYZ}$_vf(2, k, r, i) - &
+                                                               F_src_rs${XYZ}$_vf(1, k, r, i)) &
+                                                              *pi_coef_${XYZ}$(j, 1, cbc_loc) + &
+                                                              (F_src_rs${XYZ}$_vf(1, k, r, i) - &
+                                                               F_src_rs${XYZ}$_vf(0, k, r, i)) &
+                                                              *pi_coef_${XYZ}$(j, 2, cbc_loc)
                             end do
                         end do
                     end do
@@ -937,12 +786,12 @@ contains
                     ! Transferring the Primitive Variables =======================
                     !$acc loop seq
                     do i = 1, contxe
-                        alpha_rho(i) = q_prim_rsx_vf(0, k, r, i)
+                        alpha_rho(i) = q_prim_rs${XYZ}$_vf(0, k, r, i)
                     end do
 
                     !$acc loop seq
                     do i = 1, num_dims
-                        vel(i) = q_prim_rsx_vf(0, k, r, contxe + i)
+                        vel(i) = q_prim_rs${XYZ}$_vf(0, k, r, contxe + i)
                     end do
 
                     vel_K_sum = 0d0
@@ -951,11 +800,11 @@ contains
                         vel_K_sum = vel_K_sum + vel(i)**2d0
                     end do
 
-                    pres = q_prim_rsx_vf(0, k, r, E_idx)
+                    pres = q_prim_rs${XYZ}$_vf(0, k, r, E_idx)
 
                     !$acc loop seq
                     do i = 1, advxe - E_idx
-                        adv(i) = q_prim_rsx_vf(0, k, r, E_idx + i)
+                        adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
                     end do
 
                     if (bubbles) then
@@ -985,7 +834,7 @@ contains
                         c = 0d0
                         !$acc loop seq
                         do i = 1, num_fluids
-                            c = c + q_prim_rsx_vf(0, k, r, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                            c = c + q_prim_rs${XYZ}$_vf(0, k, r, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
                                 (pres + pi_infs(i)/(gammas(i) + 1d0))
                         end do
                         c = c/rho
@@ -1026,24 +875,24 @@ contains
 
                         !$acc loop seq
                         do i = 1, contxe
-                            dalpha_rho_ds(i) = q_prim_rsx_vf(j, k, r, i)* &
-                                               fd_coef_x(j, cbc_loc) + &
+                            dalpha_rho_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, i)* &
+                                               fd_coef_${XYZ}$(j, cbc_loc) + &
                                                dalpha_rho_ds(i)
                         end do
                         !$acc loop seq
                         do i = 1, num_dims
-                            dvel_ds(i) = q_prim_rsx_vf(j, k, r, contxe + i)* &
-                                         fd_coef_x(j, cbc_loc) + &
+                            dvel_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, contxe + i)* &
+                                         fd_coef_${XYZ}$(j, cbc_loc) + &
                                          dvel_ds(i)
                         end do
 
-                        dpres_ds = q_prim_rsx_vf(j, k, r, E_idx)* &
-                                   fd_coef_x(j, cbc_loc) + &
+                        dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, E_idx)* &
+                                   fd_coef_${XYZ}$(j, cbc_loc) + &
                                    dpres_ds
                         !$acc loop seq
                         do i = 1, advxe - E_idx
-                            dadv_ds(i) = q_prim_rsx_vf(j, k, r, E_idx + i)* &
-                                         fd_coef_x(j, cbc_loc) + &
+                            dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, E_idx + i)* &
+                                         fd_coef_${XYZ}$(j, cbc_loc) + &
                                          dadv_ds(i)
                         end do
                     end do
@@ -1134,18 +983,18 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
                     ! flux_rs_vf and flux_src_rs_vf at j = -1/2 ==================
                     !$acc loop seq
                     do i = 1, contxe
-                        flux_rsx_vf(-1, k, r, i) = flux_rsx_vf(0, k, r, i) &
+                        flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
                                                    + ds(0)*dalpha_rho_dt(i)
                     end do
 
                     !$acc loop seq
                     do i = momxb, momxe
-                        flux_rsx_vf(-1, k, r, i) = flux_rsx_vf(0, k, r, i) &
+                        flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
                                                    + ds(0)*(vel(i - contxe)*drho_dt &
                                                             + rho*dvel_dt(i - contxe))
                     end do
 
-                    flux_rsx_vf(-1, k, r, E_idx) = flux_rsx_vf(0, k, r, E_idx) &
+                    flux_rs${XYZ}$_vf(-1, k, r, E_idx) = flux_rs${XYZ}$_vf(0, k, r, E_idx) &
                                                    + ds(0)*(pres*dgamma_dt &
                                                             + gamma*dpres_dt &
                                                             + dpi_inf_dt &
@@ -1155,17 +1004,17 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
                     if (riemann_solver == 1) then
                         !$acc loop seq
                         do i = advxb, advxe
-                            flux_rsx_vf(-1, k, r, i) = 0d0
+                            flux_rs${XYZ}$_vf(-1, k, r, i) = 0d0
                         end do
 
                         !$acc loop seq
                         do i = advxb, advxe
-                            flux_src_rsx_vf(-1, k, r, i) = &
+                            flux_src_rs${XYZ}$_vf(-1, k, r, i) = &
                                 1d0/max(abs(vel(dir_idx(1))), sgm_eps) &
                                 *sign(1d0, vel(dir_idx(1))) &
-                                *(flux_rsx_vf(0, k, r, i) &
+                                *(flux_rs${XYZ}$_vf(0, k, r, i) &
                                   + vel(dir_idx(1)) &
-                                  *flux_src_rsx_vf(0, k, r, i) &
+                                  *flux_src_rs${XYZ}$_vf(0, k, r, i) &
                                   + ds(0)*dadv_dt(i - E_idx))
                         end do
 
@@ -1173,706 +1022,14 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
 
                         !$acc loop seq
                         do i = advxb, advxe
-                            flux_rsx_vf(-1, k, r, i) = flux_rsx_vf(0, k, r, i) - &
-                                                       adv(i - E_idx)*flux_src_rsx_vf(0, k, r, i) + &
+                            flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) - &
+                                                       adv(i - E_idx)*flux_src_rs${XYZ}$_vf(0, k, r, i) + &
                                                        ds(0)*dadv_dt(i - E_idx)
                         end do
 
                         !$acc loop seq
                         do i = advxb, advxe
-                            flux_src_rsx_vf(-1, k, r, i) = 0d0
-                        end do
-
-                    end if
-                    ! END: flux_rs_vf and flux_src_rs_vf at j = -1/2 =============
-
-                end do
-            end do
-
-        else if (cbc_dir == 2) then
-            ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
-            if (weno_order == 3) then
-
-                call s_convert_primitive_to_flux_variables(q_prim_rsy_vf, &
-                                                           F_rsy_vf, &
-                                                           F_src_rsy_vf, &
-                                                           is1, is2, is3, startx, startz)
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, advxe
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            flux_rsy_vf(0, k, r, i) = F_rsy_vf(0, k, r, i) &
-                                                      + pi_coef_y(0, 0, cbc_loc)* &
-                                                      (F_rsy_vf(1, k, r, i) - &
-                                                       F_rsy_vf(0, k, r, i))
-                        end do
-                    end do
-                end do
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = advxb, advxe
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            flux_src_rsy_vf(0, k, r, i) = F_src_rsy_vf(0, k, r, i) + &
-                                                          (F_src_rsy_vf(1, k, r, i) - &
-                                                           F_src_rsy_vf(0, k, r, i)) &
-                                                          *pi_coef_y(0, 0, cbc_loc)
-                        end do
-                    end do
-                end do
-                ! ==================================================================
-
-                ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
-            elseif (weno_order == 5) then
-
-                call s_convert_primitive_to_flux_variables(q_prim_rsy_vf, &
-                                                           F_rsy_vf, &
-                                                           F_src_rsy_vf, &
-                                                           is1, is2, is3, startx, startz)
-
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
-                    do j = 0, 1
-                        do r = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                flux_rsy_vf(j, k, r, i) = F_rsy_vf(j, k, r, i) &
-                                                          + pi_coef_y(j, 0, cbc_loc)* &
-                                                          (F_rsy_vf(3, k, r, i) - &
-                                                           F_rsy_vf(2, k, r, i)) &
-                                                          + pi_coef_y(j, 1, cbc_loc)* &
-                                                          (F_rsy_vf(2, k, r, i) - &
-                                                           F_rsy_vf(1, k, r, i)) &
-                                                          + pi_coef_y(j, 2, cbc_loc)* &
-                                                          (F_rsy_vf(1, k, r, i) - &
-                                                           F_rsy_vf(0, k, r, i))
-                            end do
-                        end do
-                    end do
-                end do
-
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb, advxe
-                    do j = 0, 1
-                        do r = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                flux_src_rsy_vf(j, k, r, i) = F_src_rsy_vf(j, k, r, i) + &
-                                                              (F_src_rsy_vf(3, k, r, i) - &
-                                                               F_src_rsy_vf(2, k, r, i)) &
-                                                              *pi_coef_y(j, 0, cbc_loc) + &
-                                                              (F_src_rsy_vf(2, k, r, i) - &
-                                                               F_src_rsy_vf(1, k, r, i)) &
-                                                              *pi_coef_y(j, 1, cbc_loc) + &
-                                                              (F_src_rsy_vf(1, k, r, i) - &
-                                                               F_src_rsy_vf(0, k, r, i)) &
-                                                              *pi_coef_y(j, 2, cbc_loc)
-                            end do
-                        end do
-                    end do
-                end do
-
-            end if
-            ! ==================================================================
-
-            ! FD2 or FD4 of RHS at j = 0 =======================================
-            !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-
-                    ! Transferring the Primitive Variables =======================
-                    !$acc loop seq
-                    do i = 1, contxe
-                        alpha_rho(i) = q_prim_rsy_vf(0, k, r, i)
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        vel(i) = q_prim_rsy_vf(0, k, r, contxe + i)
-                    end do
-
-                    vel_K_sum = 0d0
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        vel_K_sum = vel_K_sum + vel(i)**2d0
-                    end do
-
-                    pres = q_prim_rsy_vf(0, k, r, E_idx)
-
-                    !$acc loop seq
-                    do i = 1, advxe - E_idx
-                        adv(i) = q_prim_rsy_vf(0, k, r, E_idx + i)
-                    end do
-
-                    if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
-
-                    else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
-                    end if
-
-                    E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
-
-                    H = (E + pres)/rho
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        mf(i) = alpha_rho(i)/rho
-                    end do
-
-                    ! Compute mixture sound speed
-                    if (alt_soundspeed) then
-                        blkmod1 = ((gammas(1) + 1d0)*pres + &
-                                   pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1d0)*pres + &
-                                   pi_infs(2))/gammas(2)
-                        c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-                    elseif (model_eqns == 3) then
-                        c = 0d0
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            c = c + q_prim_rsy_vf(0, k, r, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                (pres + pi_infs(i)/(gammas(i) + 1d0))
-                        end do
-                        c = c/rho
-                    else
-                        c = ((H - 5d-1*vel_K_sum)/gamma)
-                    end if
-
-                    c = sqrt(c)
-
-                    !                  IF (mixture_err .AND. c < 0d0) THEN
-                    !                    c = sgm_eps
-                    !                  ELSE
-                    !                    c = SQRT(c)
-                    !                  END IF
-
-                    ! ============================================================
-
-                    ! First-Order Spatial Derivatives of Primitive Variables =====
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        dalpha_rho_ds(i) = 0d0
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        dvel_ds(i) = 0d0
-                    end do
-
-                    dpres_ds = 0d0
-                    !$acc loop seq
-                    do i = 1, advxe - E_idx
-                        dadv_ds(i) = 0d0
-                    end do
-
-                    !$acc loop seq
-                    do j = 0, buff_size
-
-                        !$acc loop seq
-                        do i = 1, contxe
-                            dalpha_rho_ds(i) = q_prim_rsy_vf(j, k, r, i)* &
-                                               fd_coef_y(j, cbc_loc) + &
-                                               dalpha_rho_ds(i)
-                        end do
-                        !$acc loop seq
-                        do i = 1, num_dims
-                            dvel_ds(i) = q_prim_rsy_vf(j, k, r, contxe + i)* &
-                                         fd_coef_y(j, cbc_loc) + &
-                                         dvel_ds(i)
-                        end do
-
-                        dpres_ds = q_prim_rsy_vf(j, k, r, E_idx)* &
-                                   fd_coef_y(j, cbc_loc) + &
-                                   dpres_ds
-                        !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            dadv_ds(i) = q_prim_rsy_vf(j, k, r, E_idx + i)* &
-                                         fd_coef_y(j, cbc_loc) + &
-                                         dadv_ds(i)
-                        end do
-
-                    end do
-                    ! ============================================================
-
-                    ! First-Order Temporal Derivatives of Primitive Variables ====
-                    lambda(1) = vel(dir_idx(1)) - c
-                    lambda(2) = vel(dir_idx(1))
-                    lambda(3) = vel(dir_idx(1)) + c
-
-                    !   call s_compute_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-
-                    if ((cbc_loc == -1 .and. bcyb == -5) .or. (cbc_loc == 1 .and. bcye == -5)) then
-                        call s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcyb == -6) .or. (cbc_loc == 1 .and. bcye == -6)) then
-call s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcyb == -7) .or. (cbc_loc == 1 .and. bcye == -7)) then
-call s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcyb == -8) .or. (cbc_loc == 1 .and. bcye == -8)) then
-call s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcyb == -9) .or. (cbc_loc == 1 .and. bcye == -9)) then
-call s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcyb == -10) .or. (cbc_loc == 1 .and. bcye == -10)) then
-call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcyb == -11) .or. (cbc_loc == 1 .and. bcye == -11)) then
-     call s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else
-    call s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    end if
-
-                    ! Be careful about the cylindrical coordinate!
-                    if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                        dpres_dt = -5d-1*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
-                                   /y_cc(n)
-                    else
-                        dpres_dt = -5d-1*(L(advxe) + L(1))
-                    end if
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        dalpha_rho_dt(i) = &
-                            -(L(i + 1) - mf(i)*dpres_dt)/(c*c)
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
-                                              (L(1) - L(advxe))/(2d0*rho*c) + &
-                                              (dir_flg(dir_idx(i)) - 1d0)* &
-                                              L(momxb + i)
-                    end do
-
-                    vel_dv_dt_sum = 0d0
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
-                    end do
-
-                    ! The treatment of void fraction source is unclear
-                    if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                        !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(dir_idx(1))/y_cc(n)
-                        end do
-                    else
-                        !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            dadv_dt(i) = -L(momxe + i)
-                        end do
-                    end if
-
-                    drho_dt = 0d0; dgamma_dt = 0d0; dpi_inf_dt = 0d0
-
-                    if (model_eqns == 1) then
-                        drho_dt = dalpha_rho_dt(1)
-                        dgamma_dt = dadv_dt(1)
-                        dpi_inf_dt = dadv_dt(2)
-                    else
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            drho_dt = drho_dt + dalpha_rho_dt(i)
-                            dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
-                            dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
-                        end do
-                    end if
-                    ! ============================================================
-
-                    ! flux_rs_vf and flux_src_rs_vf at j = -1/2 ==================
-                    !$acc loop seq
-                    do i = 1, contxe
-                        flux_rsy_vf(-1, k, r, i) = flux_rsy_vf(0, k, r, i) &
-                                                   + ds(0)*dalpha_rho_dt(i)
-                    end do
-
-                    !$acc loop seq
-                    do i = momxb, momxe
-                        flux_rsy_vf(-1, k, r, i) = flux_rsy_vf(0, k, r, i) &
-                                                   + ds(0)*(vel(i - contxe)*drho_dt &
-                                                            + rho*dvel_dt(i - contxe))
-                    end do
-
-                    flux_rsy_vf(-1, k, r, E_idx) = flux_rsy_vf(0, k, r, E_idx) &
-                                                   + ds(0)*(pres*dgamma_dt &
-                                                            + gamma*dpres_dt &
-                                                            + dpi_inf_dt &
-                                                            + rho*vel_dv_dt_sum &
-                                                            + 5d-1*drho_dt*vel_K_sum)
-
-                    if (riemann_solver == 1) then
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_rsy_vf(-1, k, r, i) = 0d0
-                        end do
-
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_src_rsy_vf(-1, k, r, i) = &
-                                1d0/max(abs(vel(dir_idx(1))), sgm_eps) &
-                                *sign(1d0, vel(dir_idx(1))) &
-                                *(flux_rsy_vf(0, k, r, i) &
-                                  + vel(dir_idx(1)) &
-                                  *flux_src_rsy_vf(0, k, r, i) &
-                                  + ds(0)*dadv_dt(i - E_idx))
-                        end do
-
-                    else
-
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_rsy_vf(-1, k, r, i) = flux_rsy_vf(0, k, r, i) - &
-                                                       adv(i - E_idx)*flux_src_rsy_vf(0, k, r, i) + &
-                                                       ds(0)*dadv_dt(i - E_idx)
-                        end do
-
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_src_rsy_vf(-1, k, r, i) = 0d0
-                        end do
-
-                    end if
-                    ! END: flux_rs_vf and flux_src_rs_vf at j = -1/2 =============
-
-                end do
-            end do
-
-        else
-            ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
-            if (weno_order == 3) then
-
-                call s_convert_primitive_to_flux_variables(q_prim_rsz_vf, &
-                                                           F_rsz_vf, &
-                                                           F_src_rsz_vf, &
-                                                           is1, is2, is3, starty, startx)
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = 1, advxe
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            flux_rsz_vf(0, k, r, i) = F_rsz_vf(0, k, r, i) &
-                                                      + pi_coef_z(0, 0, cbc_loc)* &
-                                                      (F_rsz_vf(1, k, r, i) - &
-                                                       F_rsz_vf(0, k, r, i))
-                        end do
-                    end do
-                end do
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do i = advxb, advxe
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            flux_src_rsz_vf(0, k, r, i) = F_src_rsz_vf(0, k, r, i) + &
-                                                          (F_src_rsz_vf(1, k, r, i) - &
-                                                           F_src_rsz_vf(0, k, r, i)) &
-                                                          *pi_coef_z(0, 0, cbc_loc)
-                        end do
-                    end do
-                end do
-                ! ==================================================================
-
-                ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
-            elseif (weno_order == 5) then
-
-                call s_convert_primitive_to_flux_variables(q_prim_rsz_vf, &
-                                                           F_rsz_vf, &
-                                                           F_src_rsz_vf, &
-                                                           is1, is2, is3, starty, startx)
-
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
-                    do j = 0, 1
-                        do r = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                flux_rsz_vf(j, k, r, i) = F_rsz_vf(j, k, r, i) &
-                                                          + pi_coef_z(j, 0, cbc_loc)* &
-                                                          (F_rsz_vf(3, k, r, i) - &
-                                                           F_rsz_vf(2, k, r, i)) &
-                                                          + pi_coef_z(j, 1, cbc_loc)* &
-                                                          (F_rsz_vf(2, k, r, i) - &
-                                                           F_rsz_vf(1, k, r, i)) &
-                                                          + pi_coef_z(j, 2, cbc_loc)* &
-                                                          (F_rsz_vf(1, k, r, i) - &
-                                                           F_rsz_vf(0, k, r, i))
-                            end do
-                        end do
-                    end do
-                end do
-
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb, advxe
-                    do j = 0, 1
-                        do r = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                flux_src_rsz_vf(j, k, r, i) = F_src_rsz_vf(j, k, r, i) + &
-                                                              (F_src_rsz_vf(3, k, r, i) - &
-                                                               F_src_rsz_vf(2, k, r, i)) &
-                                                              *pi_coef_z(j, 0, cbc_loc) + &
-                                                              (F_src_rsz_vf(2, k, r, i) - &
-                                                               F_src_rsz_vf(1, k, r, i)) &
-                                                              *pi_coef_z(j, 1, cbc_loc) + &
-                                                              (F_src_rsz_vf(1, k, r, i) - &
-                                                               F_src_rsz_vf(0, k, r, i)) &
-                                                              *pi_coef_z(j, 2, cbc_loc)
-                            end do
-                        end do
-                    end do
-                end do
-
-            end if
-            ! ==================================================================
-
-            ! FD2 or FD4 of RHS at j = 0 =======================================
-            !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-
-                    ! Transferring the Primitive Variables =======================
-                    !$acc loop seq
-                    do i = 1, contxe
-                        alpha_rho(i) = q_prim_rsz_vf(0, k, r, i)
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        vel(i) = q_prim_rsz_vf(0, k, r, contxe + i)
-                    end do
-
-                    vel_K_sum = 0d0
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        vel_K_sum = vel_K_sum + vel(i)**2d0
-                    end do
-
-                    pres = q_prim_rsz_vf(0, k, r, E_idx)
-
-                    !$acc loop seq
-                    do i = 1, advxe - E_idx
-                        adv(i) = q_prim_rsz_vf(0, k, r, E_idx + i)
-                    end do
-
-                    if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
-
-                    else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
-                    end if
-
-                    E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
-
-                    H = (E + pres)/rho
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        mf(i) = alpha_rho(i)/rho
-                    end do
-
-                    ! Compute mixture sound speed
-                    if (alt_soundspeed) then
-                        blkmod1 = ((gammas(1) + 1d0)*pres + &
-                                   pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1d0)*pres + &
-                                   pi_infs(2))/gammas(2)
-                        c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-                    elseif (model_eqns == 3) then
-                        c = 0d0
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            c = c + q_prim_rsz_vf(0, k, r, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                (pres + pi_infs(i)/(gammas(i) + 1d0))
-                        end do
-                        c = c/rho
-                    else
-                        c = ((H - 5d-1*vel_K_sum)/gamma)
-                    end if
-
-                    c = sqrt(c)
-
-                    !                  IF (mixture_err .AND. c < 0d0) THEN
-                    !                    c = sgm_eps
-                    !                  ELSE
-                    !                    c = SQRT(c)
-                    !                  END IF
-
-                    ! ============================================================
-
-                    ! First-Order Spatial Derivatives of Primitive Variables =====
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        dalpha_rho_ds(i) = 0d0
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        dvel_ds(i) = 0d0
-                    end do
-
-                    dpres_ds = 0d0
-                    !$acc loop seq
-                    do i = 1, advxe - E_idx
-                        dadv_ds(i) = 0d0
-                    end do
-
-                    !$acc loop seq
-                    do j = 0, buff_size
-
-                        !$acc loop seq
-                        do i = 1, contxe
-                            dalpha_rho_ds(i) = q_prim_rsz_vf(j, k, r, i)* &
-                                               fd_coef_z(j, cbc_loc) + &
-                                               dalpha_rho_ds(i)
-                        end do
-                        !$acc loop seq
-                        do i = 1, num_dims
-                            dvel_ds(i) = q_prim_rsz_vf(j, k, r, contxe + i)* &
-                                         fd_coef_z(j, cbc_loc) + &
-                                         dvel_ds(i)
-                        end do
-
-                        dpres_ds = q_prim_rsz_vf(j, k, r, E_idx)* &
-                                   fd_coef_z(j, cbc_loc) + &
-                                   dpres_ds
-                        !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            dadv_ds(i) = q_prim_rsz_vf(j, k, r, E_idx + i)* &
-                                         fd_coef_z(j, cbc_loc) + &
-                                         dadv_ds(i)
-                        end do
-
-                    end do
-                    ! ============================================================
-
-                    ! First-Order Temporal Derivatives of Primitive Variables ====
-                    lambda(1) = vel(dir_idx(1)) - c
-                    lambda(2) = vel(dir_idx(1))
-                    lambda(3) = vel(dir_idx(1)) + c
-
-                    ! call s_compute_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-
-                    if ((cbc_loc == -1 .and. bczb == -5) .or. (cbc_loc == 1 .and. bcze == -5)) then
-                        call s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bczb == -6) .or. (cbc_loc == 1 .and. bcze == -6)) then
-call s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bczb == -7) .or. (cbc_loc == 1 .and. bcze == -7)) then
-call s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bczb == -8) .or. (cbc_loc == 1 .and. bcze == -8)) then
-call s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bczb == -9) .or. (cbc_loc == 1 .and. bcze == -9)) then
-call s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bczb == -10) .or. (cbc_loc == 1 .and. bcze == -10)) then
-call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bczb == -11) .or. (cbc_loc == 1 .and. bcze == -11)) then
-     call s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else
-    call s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    end if
-
-                    ! Be careful about the cylindrical coordinate!
-                    if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                        dpres_dt = -5d-1*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
-                                   /y_cc(n)
-                    else
-                        dpres_dt = -5d-1*(L(advxe) + L(1))
-                    end if
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        dalpha_rho_dt(i) = &
-                            -(L(i + 1) - mf(i)*dpres_dt)/(c*c)
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
-                                              (L(1) - L(advxe))/(2d0*rho*c) + &
-                                              (dir_flg(dir_idx(i)) - 1d0)* &
-                                              L(momxb + i)
-                    end do
-
-                    vel_dv_dt_sum = 0d0
-                    !$acc loop seq
-                    do i = 1, num_dims
-                        vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
-                    end do
-
-                    ! The treatment of void fraction source is unclear
-                    if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                        !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            dadv_dt(i) = -L(momxe + i) !+ adv(i) * vel(dir_idx(1))/y_cc(n)
-                        end do
-                    else
-                        !$acc loop seq
-                        do i = 1, advxe - E_idx
-                            dadv_dt(i) = -L(momxe + i)
-                        end do
-                    end if
-
-                    drho_dt = 0d0; dgamma_dt = 0d0; dpi_inf_dt = 0d0
-
-                    if (model_eqns == 1) then
-                        drho_dt = dalpha_rho_dt(1)
-                        dgamma_dt = dadv_dt(1)
-                        dpi_inf_dt = dadv_dt(2)
-                    else
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            drho_dt = drho_dt + dalpha_rho_dt(i)
-                            dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
-                            dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
-                        end do
-                    end if
-                    ! ============================================================
-
-                    ! flux_rs_vf and flux_src_rs_vf at j = -1/2 ==================
-                    !$acc loop seq
-                    do i = 1, contxe
-                        flux_rsz_vf(-1, k, r, i) = flux_rsz_vf(0, k, r, i) &
-                                                   + ds(0)*dalpha_rho_dt(i)
-                    end do
-
-                    !$acc loop seq
-                    do i = momxb, momxe
-                        flux_rsz_vf(-1, k, r, i) = flux_rsz_vf(0, k, r, i) &
-                                                   + ds(0)*(vel(i - contxe)*drho_dt &
-                                                            + rho*dvel_dt(i - contxe))
-                    end do
-
-                    flux_rsz_vf(-1, k, r, E_idx) = flux_rsz_vf(0, k, r, E_idx) &
-                                                   + ds(0)*(pres*dgamma_dt &
-                                                            + gamma*dpres_dt &
-                                                            + dpi_inf_dt &
-                                                            + rho*vel_dv_dt_sum &
-                                                            + 5d-1*drho_dt*vel_K_sum)
-
-                    if (riemann_solver == 1) then
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_rsz_vf(-1, k, r, i) = 0d0
-                        end do
-
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_src_rsz_vf(-1, k, r, i) = &
-                                1d0/max(abs(vel(dir_idx(1))), sgm_eps) &
-                                *sign(1d0, vel(dir_idx(1))) &
-                                *(flux_rsz_vf(0, k, r, i) &
-                                  + vel(dir_idx(1)) &
-                                  *flux_src_rsz_vf(0, k, r, i) &
-                                  + ds(0)*dadv_dt(i - E_idx))
-                        end do
-
-                    else
-
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_rsz_vf(-1, k, r, i) = flux_rsz_vf(0, k, r, i) - &
-                                                       adv(i - E_idx)*flux_src_rsz_vf(0, k, r, i) + &
-                                                       ds(0)*dadv_dt(i - E_idx)
-                        end do
-
-                        !$acc loop seq
-                        do i = advxb, advxe
-                            flux_src_rsz_vf(-1, k, r, i) = 0d0
+                            flux_src_rs${XYZ}$_vf(-1, k, r, i) = 0d0
                         end do
 
                     end if
@@ -1881,6 +1038,7 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
                 end do
             end do
         end if
+        #:endfor
 
         ! END: FD2 or FD4 of RHS at j = 0 ==================================
 

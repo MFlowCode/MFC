@@ -73,11 +73,11 @@ module m_riemann_solvers
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-        subroutine s_abstract_riemann_solver(qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, dqL_prim_dx_vf, &
+        subroutine s_abstract_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                              dqL_prim_dy_vf, &
                                              dqL_prim_dz_vf, &
                                              qL_prim_vf, &
-                                             qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, dqR_prim_dx_vf, &
+                                             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
                                              dqR_prim_dy_vf, &
                                              dqR_prim_dz_vf, &
                                              qR_prim_vf, &
@@ -88,7 +88,7 @@ module m_riemann_solvers
 
             import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz
 
-            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat
+            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
             type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
             type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -175,61 +175,22 @@ module m_riemann_solvers
 
     end interface ! ============================================================
 
-    type(scalar_field), allocatable, dimension(:) :: qL_prim_rs_vf
-    type(scalar_field), allocatable, dimension(:) :: qR_prim_rs_vf
-    type(scalar_field), allocatable, dimension(:) :: flux_rs_vf, flux_src_rs_vf
-    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rs_vf !<
-    type(scalar_field), allocatable, dimension(:) :: vel_src_rs_vf
 
-    !> The left (L) and right (R) WENO-reconstructed cell-boundary values of the
-    !! cell-average primitive variables that define the left and right states of
-    !! the Riemann problem. Variables qK_prim_rs_vf, K = L or R, are obtained by
-    !! reshaping (RS) qK_prim_vf in a coordinate direction that is normal to the
-    !! cell-boundaries along which the fluxes are to be determined.
-    !> @{
-    type(scalar_field), allocatable, dimension(:) :: qL_prim_rsx_vf
-    type(scalar_field), allocatable, dimension(:) :: qR_prim_rsx_vf
-
-    type(scalar_field), allocatable, dimension(:) :: qL_prim_rsy_vf
-    type(scalar_field), allocatable, dimension(:) :: qR_prim_rsy_vf
-
-    type(scalar_field), allocatable, dimension(:) :: qL_prim_rsz_vf
-    type(scalar_field), allocatable, dimension(:) :: qR_prim_rsz_vf
-
-    !> @}
-
-    !> @}
-
-    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rsx_vf !<
-    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rsy_vf !<
-    type(scalar_field), allocatable, dimension(:) :: flux_gsrc_rsz_vf !<
-
-    !! The cell-boundary values of the geometrical source flux that are computed
-    !! through the chosen Riemann problem solver by using the left and right
-    !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
-
-    ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
-    ! part of Riemann problem solution and is used to evaluate the source flux.
-    type(scalar_field), allocatable, dimension(:) :: vel_src_rsx_vf
-    type(scalar_field), allocatable, dimension(:) :: vel_src_rsy_vf
-    type(scalar_field), allocatable, dimension(:) :: vel_src_rsz_vf
-
-    !> @}
 
     !> The cell-boundary values of the fluxes (src - source) that are computed
     !! through the chosen Riemann problem solver, and the direct evaluation of
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
     !! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_flat, flux_src_rsx_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_flat, flux_src_rsy_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_flat, flux_src_rsz_vf_flat
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
 
     !> @}
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf_flat !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf_flat !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf_flat !<
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
 
     !! The cell-boundary values of the geometrical source flux that are computed
     !! through the chosen Riemann problem solver by using the left and right
@@ -237,13 +198,13 @@ module m_riemann_solvers
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf_flat
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf_flat
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
 
     !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
     !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
@@ -334,14 +295,10 @@ module m_riemann_solvers
     type(scalar_field), allocatable, dimension(:) :: alpha_avg_rs_vf
     real(kind(0d0)) :: gamma_avg
     real(kind(0d0)) :: c_avg
-    type(scalar_field), allocatable, dimension(:) :: Re_avg_rs_vf
-    type(scalar_field), allocatable, dimension(:) :: Re_avg_rsx_vf
-    type(scalar_field), allocatable, dimension(:) :: Re_avg_rsy_vf
-    type(scalar_field), allocatable, dimension(:) :: Re_avg_rsz_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf_flat
-!$acc declare create(rho_avg, vel_avg, H_avg, alpha_avg_rs_vf, gamma_avg, c_avg, Re_avg_rs_vf, Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf, Re_avg_rsx_vf_flat, Re_avg_rsy_vf_flat, Re_avg_rsz_vf_flat)
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
+!$acc declare create(rho_avg, vel_avg, H_avg, alpha_avg_rs_vf, gamma_avg, c_avg,  Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
     !> @}
 
     !> @name Left, right and star (S) region wave speeds
@@ -393,39 +350,28 @@ module m_riemann_solvers
     type(int_bounds_info) :: is1, is2, is3
     type(int_bounds_info) :: isx, isy, isz
     !> @}
-!$acc declare create(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
-!$acc    is1, is2, is3, isx, isy, isz,  vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
-!$acc    flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf)
+!$acc declare create( &
+!$acc    is1, is2, is3, isx, isy, isz)
 
 !$acc declare create(&
-!$acc    flux_rsx_vf_flat, flux_src_rsx_vf_flat, flux_rsy_vf_flat, flux_src_rsy_vf_flat, flux_rsz_vf_flat, flux_src_rsz_vf_flat, vel_src_rsx_vf_flat, vel_src_rsy_vf_flat, vel_src_rsz_vf_flat, &
-!$acc    flux_gsrc_rsx_vf_flat, flux_gsrc_rsy_vf_flat, flux_gsrc_rsz_vf_flat, mom_sp_rsx_vf_flat, mom_sp_rsy_vf_flat, mom_sp_rsz_vf_flat)
+!$acc    flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf, vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
+!$acc    flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf, mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-    integer :: advxb, advxe
-    integer :: bubxb, bubxe
-    integer :: intxb, intxe
-    integer :: strxb, strxe
+ 
+    real(kind(0d0)), allocatable, dimension(:) ::  Gs
+!$acc declare create( Gs)
 
-!$acc declare create(momxb, momxe, contxb, contxe, advxb, advxe, bubxb, bubxe, intxb, intxe, strxb, strxe)
-
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs, Gs
-!$acc declare create(gammas, pi_infs, Gs)
-
-    integer, allocatable, dimension(:) :: rs, vs, ps, ms
-!$acc declare create(rs, vs, ps, ms)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 !$acc declare create(Res)
 
 contains
 
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, dqL_prim_dx_vf, & ! -------
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
-                                    qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, dqR_prim_dx_vf, &
+                                    qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
                                     dqR_prim_dy_vf, &
                                     dqR_prim_dz_vf, &
                                     qR_prim_vf, &
@@ -434,7 +380,7 @@ contains
                                     flux_gsrc_vf, &
                                     norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
         type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -491,11 +437,11 @@ contains
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers( &
-            qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, dqL_prim_dx_vf, &
+            qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
             qL_prim_vf, &
-            qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, dqR_prim_dx_vf, &
+            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
             qR_prim_vf, &
@@ -517,14 +463,14 @@ contains
                         do j = is1%beg, is1%end
                             !$acc loop seq
                             do i = 1, contxe
-                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
+                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                             end do
 
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, contxe + i)
-                                vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
+                                vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
+                                vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                             end do
 
                             vel_L_rms = 0d0; vel_R_rms = 0d0
@@ -537,12 +483,12 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
-                                alpha_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                             end do
 
-                            pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
-                            pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
+                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                             rho_L = 0d0
                             gamma_L = 0d0
@@ -628,8 +574,8 @@ contains
                             if (hypoelasticity) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
-                                    tau_e_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, strxb - 1 + i)
-                                    tau_e_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, strxb - 1 + i)
+                                    tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                    tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                 end do
 
                                 G_L = 0d0
@@ -722,11 +668,11 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    c_L = c_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                          (qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                    c_L = c_L + qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                          (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
 
-                                    c_R = c_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                          (qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                    c_R = c_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                          (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
                                 end do
 
                                 c_L = c_L/rho_L
@@ -770,7 +716,7 @@ contains
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
                                 do i = 1, 2
-                                    Re_avg_rs${XYZ}$_vf_flat(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
+                                    Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
                                 end do
                             end if
 
@@ -834,7 +780,7 @@ contains
                             ! Mass
                             !$acc loop seq
                             do i = 1, contxe
-                                flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
+                                flux_rs${XYZ}$_vf(j, k, l, i) = &
                                     (s_M*alpha_rho_R(i)*vel_R(dir_idx(1)) &
                                      - s_P*alpha_rho_L(i)*vel_L(dir_idx(1)) &
                                      + s_M*s_P*(alpha_rho_L(i) &
@@ -846,7 +792,7 @@ contains
                             if (bubbles) then
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *vel_R(dir_idx(i)) &
                                               + dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
@@ -860,7 +806,7 @@ contains
                             else if (hypoelasticity) then
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *vel_R(dir_idx(i)) &
                                               + dir_flg(dir_idx(i))*pres_R &
@@ -876,7 +822,7 @@ contains
                             else
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *vel_R(dir_idx(i)) &
                                               + dir_flg(dir_idx(i))*pres_R) &
@@ -891,7 +837,7 @@ contains
 
                             ! Energy
                             if (bubbles) then
-                                flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
@@ -899,7 +845,7 @@ contains
                             else if (hypoelasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                         (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
                                               - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1)))) &
                                          - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) &
@@ -907,7 +853,7 @@ contains
                                          + s_M*s_P*(E_L - E_R)) &
                                         /(s_M - s_P)
                                 else if (num_dims == 2) then
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                         (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
                                               - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
                                               - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2)))) &
@@ -917,7 +863,7 @@ contains
                                          + s_M*s_P*(E_L - E_R)) &
                                         /(s_M - s_P)
                                 else if (num_dims == 3) then
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                         (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) &
                                               - (tau_e_R(dir_idx_tau(1))*vel_R(dir_idx(1))) &
                                               - (tau_e_R(dir_idx_tau(2))*vel_R(dir_idx(2))) &
@@ -930,7 +876,7 @@ contains
                                         /(s_M - s_P)
                                 end if
                             else
-                                flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     (s_M*vel_R(dir_idx(1))*(E_R + pres_R) &
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L) &
                                      + s_M*s_P*(E_L - E_R)) &
@@ -940,7 +886,7 @@ contains
                             ! Elastic Stresses
                             if (hypoelasticity) then
                                 do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, strxb - 1 + i) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
                                               *tau_e_R(i)) &
                                          - s_P*(rho_L*vel_L(dir_idx(1)) &
@@ -954,20 +900,20 @@ contains
                             ! Advection
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                    (qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
-                                     - qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)) &
+                                flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                    (qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                     - qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)) &
                                     *s_M*s_P/(s_M - s_P)
-                                flux_src_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                    (s_M*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
-                                     - s_P*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)) &
+                                flux_src_rs${XYZ}$_vf(j, k, l, i) = &
+                                    (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                     - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
                                     /(s_M - s_P)
                             end do
 
                             ! Div(U)?
                             !$acc loop seq
                             do i = 1, num_dims
-                                vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = &
+                                vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
                                     (xi_M*(rho_L*vel_L(dir_idx(i))* &
                                            (s_L - vel_L(dir_idx(1))) - &
                                            pres_L*dir_flg(dir_idx(i))) - &
@@ -981,7 +927,7 @@ contains
                             if (bubbles) then
                                 ! From HLLC: Kills mass transport @ bubble gas density
                                 if (num_fluids > 1) then
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe) = 0d0
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe) = 0d0
                                 end if
                             end if
                         end do
@@ -1056,11 +1002,11 @@ contains
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
 
-    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, dqL_prim_dx_vf, & ! ------
+    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! ------
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
                                      qL_prim_vf, &
-                                     qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, dqR_prim_dx_vf, &
+                                     qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
                                      dqR_prim_dy_vf, &
                                      dqR_prim_dz_vf, &
                                      qR_prim_vf, &
@@ -1069,7 +1015,7 @@ contains
                                      flux_gsrc_vf, &
                                      norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
         type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
@@ -1129,17 +1075,18 @@ contains
         real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
+        real(kind(0d0)) :: start, finish
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers( &
-            qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, dqL_prim_dx_vf, &
+            qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             dqL_prim_dy_vf, &
             dqL_prim_dz_vf, &
             qL_prim_vf, &
-            qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, dqR_prim_dx_vf, &
+            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
             dqR_prim_dy_vf, &
             dqR_prim_dz_vf, &
             qR_prim_vf, &
@@ -1168,14 +1115,14 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, contxe + i)
-                                    vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
+                                    vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
+                                    vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                     vel_L_rms = vel_L_rms + vel_L(i)**2d0
                                     vel_R_rms = vel_R_rms + vel_R(i)**2d0
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
-                                pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                                 rho_L = 0d0
                                 gamma_L = 0d0
@@ -1191,38 +1138,38 @@ contains
                                 if (mpp_lim) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf_flat(j, k, l, i))
-                   qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)), 1d0)
-                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
+                   qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
+                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                     qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)), 1d0)
-                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
+                                     qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
+           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*pi_infs(i)
+                                    rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
 
-                                    rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
-                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                    rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
                                 end do
 
                                 if (any(Re_size > 0)) then
@@ -1234,7 +1181,7 @@ contains
 
                                         !$acc loop seq
                                         do q = 1, Re_size(i)
-                                            Re_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_L(i)
                                         end do
 
@@ -1250,7 +1197,7 @@ contains
 
                                         !$acc loop seq
                                         do q = 1, Re_size(i)
-                                            Re_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_R(i)
                                         end do
 
@@ -1312,25 +1259,25 @@ contains
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_L + &
                                                pi_infs(2))/gammas(2)
-                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 1)/blkmod1 &
-                                                      + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 2)/blkmod2))
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 &
+                                                      + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
 
                                     blkmod1 = ((gammas(1) + 1d0)*pres_R + &
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_R + &
                                                pi_infs(2))/gammas(2)
-                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + 1)/blkmod1 &
-                                                      + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, e_idx + 2)/blkmod2))
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + 1)/blkmod1 &
+                                                      + qR_prim_rs${XYZ}$_vf(j + 1, k, l, e_idx + 2)/blkmod2))
 
                                 else
                                     c_L = 0d0
                                     c_R = 0d0
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        c_L = c_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                              (qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
-                                        c_R = c_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                              (qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                        c_L = c_L + qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                              (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                        c_R = c_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                              (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
                                     end do
                                     c_L = c_L/rho_L
                                     c_R = c_R/rho_R
@@ -1350,7 +1297,7 @@ contains
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
                                     do i = 1, 2
-                                        Re_avg_rs${XYZ}$_vf_flat(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
+                                        Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
                                     end do
                                 end if
 
@@ -1390,26 +1337,26 @@ contains
                                     p_Star = pres_L ! Only usefull to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1)*s_S
+                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*s_S
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + contxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + contxb - 1)*vel_L(dir_idx(1))
+                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*vel_L(dir_idx(1))
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + intxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1)* &
+                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
                                             (gammas(i)*pres_L + pi_infs(i))*vel_L(dir_idx(1))
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, momxb - 1 + dir_idx(i)) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
                                             rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
 
-                                        vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
+                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
                                                                                        dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
 
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
@@ -1417,26 +1364,26 @@ contains
                                     ! Only usefull to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + advxb - 1)*s_S
+                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*s_S
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + contxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + contxb - 1)*vel_R(dir_idx(1))
+                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*vel_R(dir_idx(1))
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + intxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + advxb - 1)* &
+                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
                                             (gammas(i)*pres_R + pi_infs(i))*vel_R(dir_idx(1))
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, momxb - 1 + dir_idx(i)) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
                                             rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
 
-                                        vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
+                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
                                                                                        dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1450,27 +1397,27 @@ contains
                                         p_K_Star = (pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
                                                    xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1)*s_S
+                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*s_S
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + contxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + contxb - 1)*xi_L*s_S
+                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*xi_L*s_S
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + intxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1)* &
+                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
                                             (gammas(i)*p_K_Star + pi_infs(i))*s_S
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, momxb - 1 + dir_idx(i)) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
                                             rho_Star*s_S*(s_S*dir_flg(dir_idx(i)) + vel_L(dir_idx(i))* &
                                                           (1d0 - dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
 
-                                        vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
+                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
                                                                                   dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
                                     ! Compute right star solution state
                                 else
@@ -1487,51 +1434,51 @@ contains
                                         p_K_Star = (pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
                                                    xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + advxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + advxb - 1)*s_S
+                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*s_S
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + contxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + contxb - 1)*xi_R*s_S
+                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*xi_R*s_S
 
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i + intxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i + advxb - 1)* &
+                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
                                             (gammas(i)*p_K_Star + pi_infs(i))*s_S
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, momxb - 1 + dir_idx(i)) = rho_Star*s_S* &
+                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = rho_Star*s_S* &
                                                        (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
                                                                                                   dir_flg(dir_idx(i))*p_Star
 
-                                        vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
+                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
                                                                                   dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
                                 end if
 
-                                flux_src_rs${XYZ}$_vf_flat(j, k, l, advxb) = vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(1))
+                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 if (cyl_coord .and. norm_dir == 2) then
                                     ! Substituting the advective flux into the inviscid geometrical source flux
                                     !$acc loop seq
                                     do i = 1, E_idx
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = flux_rs${XYZ}$_vf_flat(j, k, l, i)
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                     !$acc loop seq
                                     do i = intxb, intxe
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = flux_rs${XYZ}$_vf_flat(j, k, l, i)
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                     ! Recalculating the radial momentum geometric source flux (substracting the pressure part)
-                                    flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxb - 1 + dir_idx(1)) = &
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
+                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
                                     ! Geometrical source of the void fraction(s) is zero
                                     !$acc loop seq
                                     do i = advxb, advxe
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                     end do
                                 end if
 
@@ -1547,14 +1494,14 @@ contains
                             do j = is1%beg, is1%end
                                 !$acc loop seq
                                 do i = 1, contxe
-                                    alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                    alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
+                                    alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                 end do
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, contxe + i)
-                                    vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
+                                    vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
+                                    vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                 end do
 
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
@@ -1566,12 +1513,12 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
-                                pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                                 rho_L = 0d0
                                 gamma_L = 0d0
@@ -1737,7 +1684,7 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, contxe
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*alpha_rho_L(i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
                                         + xi_P*alpha_rho_R(i) &
@@ -1749,7 +1696,7 @@ contains
                                 if (bubbles .neqv. .true.) then
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                             xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                          vel_L(dir_idx(i)) + &
                                                          s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
@@ -1768,7 +1715,7 @@ contains
                                     ! Include p_tilde
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                             xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                          vel_L(dir_idx(i)) + &
                                                          s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
@@ -1786,14 +1733,14 @@ contains
 
                                 end if
 
-                                flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = 0.d0
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0.d0
 
                                 !$acc loop seq
                                 do i = alf_idx, alf_idx !only advect the void fraction
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
@@ -1801,20 +1748,20 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
 
-                                    vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = 0d0
+                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = 0d0
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 end do
 
-                                flux_src_rs${XYZ}$_vf_flat(j, k, l, advxb) = vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(1))
+                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
                                 if (bubbles) then
                                     !$acc loop seq
                                     do i = bubxb, bubxe
-                                        flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                            xi_M*nbub_L*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                            xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                             *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                            + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                            + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                             *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                     end do
                                 end if
@@ -1826,10 +1773,10 @@ contains
                                         ! Substituting the advective flux into the inviscid geometrical source flux
                                         !$acc loop seq
                                         do i = 1, E_idx
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = flux_rs${XYZ}$_vf_flat(j, k, l, i)
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(1)) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
                                             xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                          vel_L(dir_idx(1)) + &
                                                          s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
@@ -1843,7 +1790,7 @@ contains
                                         ! Geometrical source of the void fraction(s) is zero
                                         !$acc loop seq
                                         do i = advxb, advxe
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
                                     end if
                                 #:endif
@@ -1851,9 +1798,9 @@ contains
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
                                         do i = 1, sys_size
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxb + 1) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
                                             -xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                           vel_L(dir_idx(1)) + &
                                                           s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
@@ -1864,14 +1811,15 @@ contains
                                                            s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
                                                                       (1d0 - dir_flg(dir_idx(1)))* &
                                                                       vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxe) = flux_rs${XYZ}$_vf_flat(j, k, l, momxb + 1)
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
                                     end if
                                 #:endif
                             end do
                         end do
                     end do
+                
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, & 
                     !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1881,14 +1829,14 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, contxe + i)
-                                    vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
+                                    vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
+                                    vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                     vel_L_rms = vel_L_rms + vel_L(i)**2d0
                                     vel_R_rms = vel_R_rms + vel_R(i)**2d0
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
-                                pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                                 rho_L = 0d0
                                 gamma_L = 0d0
@@ -1897,19 +1845,19 @@ contains
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*pi_infs(i)
+                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
+                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*pi_infs(i)
+                                        rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
+                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else
-                                    rho_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, 1)
+                                    rho_L = qL_prim_rs${XYZ}$_vf(j, k, l, 1)
                                     gamma_L = gammas(1)
                                     pi_inf_L = pi_infs(1)
                                 end if
@@ -1921,19 +1869,19 @@ contains
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
-                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
+                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     !$acc loop seq
                                     do i = 1, num_fluids - 1
-                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
-                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                        rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
+                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
                                     end do
                                 else
-                                    rho_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, 1)
+                                    rho_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, 1)
                                     gamma_R = gammas(1)
                                     pi_inf_R = pi_infs(1)
                                 end if
@@ -1948,19 +1896,19 @@ contains
 
 !$acc loop seq
                                     do i = 1, nb
-                                        R0_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, rs(i))
-                                        R0_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, rs(i))
+                                        R0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, rs(i))
+                                        R0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, rs(i))
 
-                                        V0_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, vs(i))
-                                        V0_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, vs(i))
+                                        V0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, vs(i))
+                                        V0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, vs(i))
                                         if (.not. polytropic) then
-                                            P0_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, ps(i))
-                                            P0_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, ps(i))
+                                            P0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, ps(i))
+                                            P0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, ps(i))
                                         end if
                                     end do
 
-                                    !call s_comp_n_from_prim(qL_prim_rs${XYZ}$_vf_flat(j, k, l,  E_idx + num_fluids), R0_L, nbub_L)
-                                    !call s_comp_n_from_prim(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + num_fluids), R0_R, nbub_R)
+                                    !call s_comp_n_from_prim(qL_prim_rs${XYZ}$_vf(j, k, l,  E_idx + num_fluids), R0_L, nbub_L)
+                                    !call s_comp_n_from_prim(qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + num_fluids), R0_R, nbub_R)
 
                                     nbub_L_denom = 0d0
                                     nbub_R_denom = 0d0
@@ -1971,8 +1919,8 @@ contains
                                         nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
                                     end do
 
-                                    nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                   nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
+                                    nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
+                                    nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
 
 !$acc loop seq
                                     do i = 1, nb
@@ -1988,14 +1936,14 @@ contains
                                     end do
 
                                     if (qbmm) then
-                                        PbwR3Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 4)
-                                        PbwR3Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 4)
+                                        PbwR3Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 4)
+                                        PbwR3Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 4)
 
-                                        R3Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 1)
-                                        R3Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 1)
+                                        R3Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 1)
+                                        R3Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 1)
 
-                                        R3V2Lbar = mom_sp_rs${XYZ}$_vf_flat(j, k, l, 3)
-                                        R3V2Rbar = mom_sp_rs${XYZ}$_vf_flat(j + 1, k, l, 3)
+                                        R3V2Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 3)
+                                        R3V2Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 3)
                                     else
 
                                         PbwR3Lbar = 0d0
@@ -2022,17 +1970,17 @@ contains
                                         end do
                                     end if
 
-                                if (qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
-                                        ptilde_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + num_fluids)*pres_L
+                                    if (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
+                                        ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*pres_L
                                     else
-                                    ptilde_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
+                                        ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
                                                                                                            rho_L*R3V2Lbar/R3Lbar)
                                     end if
 
-                            if (qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
-                                        ptilde_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)*pres_R
+                                     if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
+                                        ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
                                     else
-                                ptilde_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
+                                        ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
                                                                                                               rho_R*R3V2Rbar/R3Rbar)
                                     end if
 
@@ -2089,13 +2037,13 @@ contains
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_L + &
                                                pi_infs(2))/gammas(2)
-   c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 1)/blkmod1 + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 2)/blkmod2))
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
 
                                     blkmod1 = ((gammas(1) + 1d0)*pres_R + &
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_R + &
                                                pi_infs(2))/gammas(2)
-                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + 1)/blkmod1 + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l,  E_idx + 2)/blkmod2))
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + 1)/blkmod1 + qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + 2)/blkmod2))
 
                                 else
                                     ! Sound speed for bubble mmixture to order O(\alpha)
@@ -2109,11 +2057,11 @@ contains
                                         c_L = &
                                             (1d0/gamma_L + 1d0)* &
                                             (pres_L + pi_inf_L)/ &
-                                            (rho_L*(1d0 - qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + num_fluids)))
+                                            (rho_L*(1d0 - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)))
                                         c_R = &
                                             (1d0/gamma_R + 1d0)* &
                                             (pres_R + pi_inf_R)/ &
-                                            (rho_R*(1d0 - qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + num_fluids)))
+                                            (rho_R*(1d0 - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)))
                                     end if
                                 end if
 
@@ -2176,16 +2124,16 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, contxe
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
                                 if (bubbles .and. (num_fluids > 1)) then
                                     ! Kill mass transport @ gas density
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe) = 0.d0
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe) = 0.d0
                                 end if
 
                                 ! Momentum flux.
@@ -2194,7 +2142,7 @@ contains
                                 ! Include p_tilde
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(i)) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                      vel_L(dir_idx(i)) + &
                                                      s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
@@ -2213,7 +2161,7 @@ contains
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
 
-                                flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
                                                      (rho_L*s_S + (pres_L - ptilde_L)/ &
@@ -2227,17 +2175,17 @@ contains
 
                                 !$acc loop seq
                                 do i = advxb, advxe
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
                                 ! Source for volume fraction advection equation
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(i)) = &
+                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
                                         xi_M*(vel_L(dir_idx(i)) + &
                                               dir_flg(dir_idx(i))* &
                                               s_M*(xi_L - 1d0)) &
@@ -2248,16 +2196,16 @@ contains
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 end do
 
-                                flux_src_rs${XYZ}$_vf_flat(j, k, l, advxb) = vel_src_rs${XYZ}$_vf_flat(j, k, l, dir_idx(1))
+                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
 
                                 !$acc loop seq
                                 do i = bubxb, bubxe
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*nbub_L*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                        + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
@@ -2268,10 +2216,10 @@ contains
                                         ! Substituting the advective flux into the inviscid geometrical source flux
                                         !$acc loop seq
                                         do i = 1, E_idx
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = flux_rs${XYZ}$_vf_flat(j, k, l, i)
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, contxe + dir_idx(1)) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
                                             xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                          vel_L(dir_idx(1)) + &
                                                          s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
@@ -2285,7 +2233,7 @@ contains
                                         ! Geometrical source of the void fraction(s) is zero
                                         !$acc loop seq
                                         do i = advxb, advxe
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
                                     end if
                                 #:endif
@@ -2293,10 +2241,10 @@ contains
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
                                         do i = 1, sys_size
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
 
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxb + 1) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
                                             -xi_M*(rho_L*(vel_L(dir_idx(1))* &
                                                           vel_L(dir_idx(1)) + &
                                                           s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
@@ -2307,7 +2255,7 @@ contains
                                                            s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
                                                                       (1d0 - dir_flg(dir_idx(1)))* &
                                                                       vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxe) = flux_rs${XYZ}$_vf_flat(j, k, l, momxb + 1)
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
 
                                     end if
                                 #:endif
@@ -2326,14 +2274,14 @@ contains
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    vel_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, contxe + i)
-                                    vel_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, contxe + i)
+                                    vel_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i)
+                                    vel_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
                                     vel_L_rms = vel_L_rms + vel_L(i)**2d0
                                     vel_R_rms = vel_R_rms + vel_R(i)**2d0
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx)
-                                pres_R = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                                 rho_L = 0d0
                                 gamma_L = 0d0
@@ -2349,38 +2297,38 @@ contains
                                 if (mpp_lim) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf_flat(j, k, l, i))
-                   qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)), 1d0)
-                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
+                   qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
+                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                     qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)), 1d0)
-                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)
+                                     qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
+           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    rho_L = rho_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, i)
-                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + i)*pi_infs(i)
+                                    rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
 
-                                    rho_R = rho_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i)
-                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                    rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
                                 end do
 
                                 if (any(Re_size > 0)) then
@@ -2392,7 +2340,7 @@ contains
 
                                         !$acc loop seq
                                         do q = 1, Re_size(i)
-                                            Re_L(i) = qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_L(i)
                                         end do
 
@@ -2408,7 +2356,7 @@ contains
 
                                         !$acc loop seq
                                         do q = 1, Re_size(i)
-                                            Re_R(i) = qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
                                                       + Re_R(i)
                                         end do
 
@@ -2477,15 +2425,15 @@ contains
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_L + &
                                                pi_infs(2))/gammas(2)
-                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 1)/blkmod1 &
-                                                      + qL_prim_rs${XYZ}$_vf_flat(j, k, l, E_idx + 2)/blkmod2))
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 &
+                                                      + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
 
                                     blkmod1 = ((gammas(1) + 1d0)*pres_R + &
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_R + &
                                                pi_infs(2))/gammas(2)
-                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, E_idx + 1)/blkmod1 &
-                                                      + qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, e_idx + 2)/blkmod2))
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + 1)/blkmod1 &
+                                                      + qR_prim_rs${XYZ}$_vf(j + 1, k, l, e_idx + 2)/blkmod2))
 
                                 else
                                     c_L = ((H_L - 5d-1*vel_L_rms)/gamma_L)
@@ -2507,7 +2455,7 @@ contains
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
                                     do i = 1, 2
-                                        Re_avg_rs${XYZ}$_vf_flat(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
+                                        Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
                                     end do
                                 end if
 
@@ -2559,10 +2507,10 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, contxe
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
@@ -2572,7 +2520,7 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, contxe + idxi) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                         xi_M*(rho_L*(vel_L(idx1)* &
                                                      vel_L(idxi) + &
                                                      s_M*(xi_L*(dir_flg(idxi)*s_S + &
@@ -2591,7 +2539,7 @@ contains
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
 
-                                flux_rs${XYZ}$_vf_flat(j, k, l, E_idx) = &
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
                                                      (rho_L*s_S + pres_L/ &
@@ -2605,10 +2553,10 @@ contains
 
                                 !$acc loop seq
                                 do i = advxb, advxe
-                                    flux_rs${XYZ}$_vf_flat(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf_flat(j, k, l, i) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf_flat(j + 1, k, l, i) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
@@ -2616,7 +2564,7 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
-                                    vel_src_rs${XYZ}$_vf_flat(j, k, l, idxi) = &
+                                    vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
                                         xi_M*(vel_L(idxi) + &
                                               dir_flg(idxi)* &
                                               s_M*(xi_L - 1d0)) &
@@ -2627,7 +2575,7 @@ contains
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 end do
 
-                                flux_src_rs${XYZ}$_vf_flat(j, k, l, advxb) = vel_src_rs${XYZ}$_vf_flat(j, k, l, idx1)
+                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
                                 ! Geometrical source flux for cylindrical coordinates
 
@@ -2636,10 +2584,10 @@ contains
                                         !Substituting the advective flux into the inviscid geometrical source flux
                                         !$acc loop seq
                                         do i = 1, E_idx
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = flux_rs${XYZ}$_vf_flat(j, k, l, i)
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, contxe + idx1) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
                                             xi_M*(rho_L*(vel_L(idx1)* &
                                                          vel_L(idx1) + &
                                                          s_M*(xi_L*(dir_flg(idx1)*s_S + &
@@ -2653,7 +2601,7 @@ contains
                                         ! Geometrical source of the void fraction(s) is zero
                                         !$acc loop seq
                                         do i = advxb, advxe
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
                                     end if
                                 #:endif
@@ -2661,10 +2609,10 @@ contains
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
                                         do i = 1, sys_size
-                                            flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, i) = 0d0
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
 
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxb + 1) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
                                             -xi_M*(rho_L*(vel_L(idx1)* &
                                                           vel_L(idx1) + &
                                                           s_M*(xi_L*(dir_flg(idx1)*s_S + &
@@ -2675,7 +2623,7 @@ contains
                                                            s_P*(xi_R*(dir_flg(idx1)*s_S + &
                                                                       (1d0 - dir_flg(idx1))* &
                                                                       vel_R(idx1)) - vel_R(idx1))))
-                                        flux_gsrc_rs${XYZ}$_vf_flat(j, k, l, momxe) = flux_rs${XYZ}$_vf_flat(j, k, l, momxb + 1)
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
 
                                     end if
                                 #:endif
@@ -2799,48 +2747,13 @@ contains
         ! the Riemann problem solution
         integer :: i, j
 
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
         allocate (Gs(1:num_fluids))
 
         do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
             Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device(gammas, pi_infs, Gs)
+!$acc update device( Gs)
 
-        momxb = mom_idx%beg; momxe = mom_idx%end
-        contxb = cont_idx%beg; contxe = cont_idx%end
-        bubxb = bub_idx%beg; bubxe = bub_idx%end
-        advxb = adv_idx%beg; advxe = adv_idx%end
-        intxb = internalEnergies_idx%beg; intxe = internalEnergies_idx%end
-        strxb = stress_idx%beg; strxe = stress_idx%end
-!$acc update device(momxb, momxe, contxb, contxe, bubxb, bubxe, advxb, advxe, intxb, intxe, strxb, strxe)
-
-        if (bubbles) then
-            allocate (rs(1:nb))
-            allocate (vs(1:nb))
-            if (.not. polytropic) then
-                allocate (ps(1:nb))
-                allocate (ms(1:nb))
-            end if
-
-            do i = 1, nb
-                rs(i) = bub_idx%rs(i)
-                vs(i) = bub_idx%vs(i)
-                if (.not. polytropic) then
-                    ps(i) = bub_idx%ps(i)
-                    ms(i) = bub_idx%ms(i)
-                end if
-            end do
-
-!$acc update device(rs, vs)
-            if (.not. polytropic) then
-!$acc update device(ps, ms)
-            end if
-
-        end if
 
         if (any(Re_size > 0)) then
             allocate (Res(1:2, 1:maxval(Re_size)))
@@ -2855,27 +2768,6 @@ contains
 !$acc update device(Res, Re_idx, Re_size)
         end if
 
-        allocate (qL_prim_rsx_vf(1:sys_size), qR_prim_rsx_vf(1:sys_size))
-        allocate (qL_prim_rsy_vf(1:sys_size), qR_prim_rsy_vf(1:sys_size))
-        allocate (qL_prim_rsz_vf(1:sys_size), qR_prim_rsz_vf(1:sys_size))
-
-        allocate (flux_gsrc_rsx_vf(1:sys_size))
-        allocate (flux_gsrc_rsy_vf(1:sys_size))
-        allocate (flux_gsrc_rsz_vf(1:sys_size))
-
-        allocate (vel_src_rsx_vf(1:num_dims))
-        allocate (vel_src_rsy_vf(1:num_dims))
-        allocate (vel_src_rsz_vf(1:num_dims))
-
-        if (any(Re_size > 0)) then
-            ! TODO: check this is the proper allocation for
-            ! Re_avg_rs_vf
-            allocate (Re_avg_rs_vf(1:2))
-
-            allocate (Re_avg_rsx_vf(1:2))
-            allocate (Re_avg_rsy_vf(1:2))
-            allocate (Re_avg_rsz_vf(1:2))
-        end if
 
         allocate (vel_avg(1:num_dims))
 
@@ -2936,26 +2828,26 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        !allocate(qL_prim_rsx_vf_flat(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsx_vf_flat(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        allocate (flux_rsx_vf_flat(is1%beg:is1%end, &
+        !allocate(qL_prim_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        !allocate(qR_prim_rsx_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        allocate (flux_rsx_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        allocate (flux_gsrc_rsx_vf_flat(is1%beg:is1%end, &
+        allocate (flux_gsrc_rsx_vf(is1%beg:is1%end, &
                                         is2%beg:is2%end, &
                                         is3%beg:is3%end, 1:sys_size))
-        allocate (flux_src_rsx_vf_flat(is1%beg:is1%end, &
+        allocate (flux_src_rsx_vf(is1%beg:is1%end, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, advxb:sys_size))
-        allocate (vel_src_rsx_vf_flat(is1%beg:is1%end, &
+        allocate (vel_src_rsx_vf(is1%beg:is1%end, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, 1:num_dims))
         if (qbmm) then
-            allocate (mom_sp_rsx_vf_flat(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            allocate (mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            allocate (Re_avg_rsx_vf_flat(is1%beg:is1%end, &
+            allocate (Re_avg_rsx_vf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end, 1:2))
         end if
@@ -2965,27 +2857,27 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
 
-        !allocate(qL_prim_rsy_vf_flat(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsy_vf_flat(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        allocate (flux_rsy_vf_flat(is1%beg:is1%end, &
+        !allocate(qL_prim_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        !allocate(qR_prim_rsy_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        allocate (flux_rsy_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        allocate (flux_gsrc_rsy_vf_flat(is1%beg:is1%end, &
+        allocate (flux_gsrc_rsy_vf(is1%beg:is1%end, &
                                         is2%beg:is2%end, &
                                         is3%beg:is3%end, 1:sys_size))
-        allocate (flux_src_rsy_vf_flat(is1%beg:is1%end, &
+        allocate (flux_src_rsy_vf(is1%beg:is1%end, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, advxb:sys_size))
-        allocate (vel_src_rsy_vf_flat(is1%beg:is1%end, &
+        allocate (vel_src_rsy_vf(is1%beg:is1%end, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            allocate (mom_sp_rsy_vf_flat(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            allocate (mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            allocate (Re_avg_rsy_vf_flat(is1%beg:is1%end, &
+            allocate (Re_avg_rsy_vf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end, 1:2))
         end if
@@ -2995,27 +2887,27 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
 
-        !allocate(qL_prim_rsz_vf_flat(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsz_vf_flat(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        allocate (flux_rsz_vf_flat(is1%beg:is1%end, &
+        !allocate(qL_prim_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        !allocate(qR_prim_rsz_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        allocate (flux_rsz_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        allocate (flux_gsrc_rsz_vf_flat(is1%beg:is1%end, &
+        allocate (flux_gsrc_rsz_vf(is1%beg:is1%end, &
                                         is2%beg:is2%end, &
                                         is3%beg:is3%end, 1:sys_size))
-        allocate (flux_src_rsz_vf_flat(is1%beg:is1%end, &
+        allocate (flux_src_rsz_vf(is1%beg:is1%end, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, advxb:sys_size))
-        allocate (vel_src_rsz_vf_flat(is1%beg:is1%end, &
+        allocate (vel_src_rsz_vf(is1%beg:is1%end, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            allocate (mom_sp_rsz_vf_flat(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            allocate (mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            allocate (Re_avg_rsz_vf_flat(is1%beg:is1%end, &
+            allocate (Re_avg_rsz_vf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end, 1:2))
         end if
@@ -3048,17 +2940,17 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
     subroutine s_populate_riemann_states_variables_buffers( & ! ------------
-        qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, dqL_prim_dx_vf, &
+        qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
         dqL_prim_dy_vf, &
         dqL_prim_dz_vf, &
         qL_prim_vf, &
-        qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, dqR_prim_dx_vf, &
+        qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
         dqR_prim_dy_vf, &
         dqR_prim_dz_vf, &
         qR_prim_vf, &
         norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
@@ -3106,8 +2998,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            qL_prim_rsx_vf_flat(-1, k, l, i) = &
-                                qR_prim_rsx_vf_flat(0, k, l, i)
+                            qL_prim_rsx_vf(-1, k, l, i) = &
+                                qR_prim_rsx_vf(0, k, l, i)
                         end do
                     end do
                 end do
@@ -3161,8 +3053,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            qR_prim_rsx_vf_flat(m + 1, k, l, i) = &
-                                qL_prim_rsx_vf_flat(m, k, l, i)
+                            qR_prim_rsx_vf(m + 1, k, l, i) = &
+                                qL_prim_rsx_vf(m, k, l, i)
                         end do
                     end do
                 end do
@@ -3220,8 +3112,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            qL_prim_rsy_vf_flat(-1, k, l, i) = &
-                                qR_prim_rsy_vf_flat(0, k, l, i)
+                            qL_prim_rsy_vf(-1, k, l, i) = &
+                                qR_prim_rsy_vf(0, k, l, i)
                         end do
                     end do
                 end do
@@ -3270,8 +3162,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            qR_prim_rsy_vf_flat(n + 1, k, l, i) = &
-                                qL_prim_rsy_vf_flat(n, k, l, i)
+                            qR_prim_rsy_vf(n + 1, k, l, i) = &
+                                qL_prim_rsy_vf(n, k, l, i)
                         end do
                     end do
                 end do
@@ -3323,8 +3215,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            qL_prim_rsz_vf_flat(-1, k, l, i) = &
-                                qR_prim_rsz_vf_flat(0, k, l, i)
+                            qL_prim_rsz_vf(-1, k, l, i) = &
+                                qR_prim_rsz_vf(0, k, l, i)
                         end do
                     end do
                 end do
@@ -3367,8 +3259,8 @@ contains
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            qR_prim_rsz_vf_flat(p + 1, k, l, i) = &
-                                qL_prim_rsz_vf_flat(p, k, l, i)
+                            qR_prim_rsz_vf(p + 1, k, l, i) = &
+                                qL_prim_rsz_vf(p, k, l, i)
                         end do
                     end do
                 end do
@@ -3467,7 +3359,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end + 1
-                                mom_sp_rsx_vf_flat(j, k, l, i) = mom_sp(i)%sf(j, k, l)
+                                mom_sp_rsx_vf(j, k, l, i) = mom_sp(i)%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -3498,7 +3390,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end + 1
-                                mom_sp_rsy_vf_flat(j, k, l, i) = mom_sp(i)%sf(k, j, l)
+                                mom_sp_rsy_vf(j, k, l, i) = mom_sp(i)%sf(k, j, l)
                             end do
                         end do
                     end do
@@ -3529,7 +3421,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end + 1
-                                mom_sp_rsz_vf_flat(j, k, l, i) = mom_sp(i)%sf(l, k, j)
+                                mom_sp_rsz_vf(j, k, l, i) = mom_sp(i)%sf(l, k, j)
                             end do
                         end do
                     end do
@@ -3611,7 +3503,7 @@ contains
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = (4d0/3d0)*dvel_avg_dx(1)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -3619,7 +3511,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -3637,7 +3529,7 @@ contains
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dx(1)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 2)
+                                           Re_avg_rsx_vf(j, k, l, 2)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -3645,7 +3537,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -3676,10 +3568,10 @@ contains
 
                             tau_Re(1, 1) = -(2d0/3d0)*(dvel_avg_dy(2) + &
                                                        avg_vel(2)/y_cc(k))/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
 !$acc loop seq
                             do i = 1, 2
@@ -3690,7 +3582,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsx_vf_flat(j, k, l, i)* &
+                                    vel_src_rsx_vf(j, k, l, i)* &
                                     tau_Re(1, i)
 
                             end do
@@ -3714,7 +3606,7 @@ contains
 
                             tau_Re(1, 1) = (dvel_avg_dy(2) + &
                                             avg_vel(2)/y_cc(k))/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 2)
+                                           Re_avg_rsx_vf(j, k, l, 2)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -3722,7 +3614,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -3749,10 +3641,10 @@ contains
                                                    + dvelR_dx_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2d0/3d0)*dvel_avg_dz(3)/y_cc(k)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
                             tau_Re(1, 3) = (dvel_avg_dz(1)/y_cc(k) + dvel_avg_dx(3))/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
 !$acc loop seq
                             do i = 1, 3, 2
@@ -3763,7 +3655,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsx_vf_flat(j, k, l, i)* &
+                                    vel_src_rsx_vf(j, k, l, i)* &
                                     tau_Re(1, i)
 
                             end do
@@ -3783,7 +3675,7 @@ contains
                                                    + dvelR_dz_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dz(3)/y_cc(k)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 2)
+                                           Re_avg_rsx_vf(j, k, l, 2)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -3791,7 +3683,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -3826,12 +3718,12 @@ contains
                             end do
 
                             tau_Re(2, 1) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 1)
+                                           Re_avg_rsy_vf(k, j, l, 1)
 
                             tau_Re(2, 2) = (4d0*dvel_avg_dy(2) &
                                             - 2d0*dvel_avg_dx(1) &
                                             - 2d0*avg_vel(2)/y_cb(k))/ &
-                                           (3d0*Re_avg_rsy_vf_flat(k, j, l, 1))
+                                           (3d0*Re_avg_rsy_vf(k, j, l, 1))
 
 !$acc loop seq
                             do i = 1, 2
@@ -3842,7 +3734,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsy_vf_flat(k, j, l, i)* &
+                                    vel_src_rsy_vf(k, j, l, i)* &
                                     tau_Re(2, i)
 
                             end do
@@ -3869,7 +3761,7 @@ contains
 
                             tau_Re(2, 2) = (dvel_avg_dx(1) + dvel_avg_dy(2) + &
                                             avg_vel(2)/y_cb(k))/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 2)
+                                           Re_avg_rsy_vf(k, j, l, 2)
 
                             flux_src_vf(momxb + 1)%sf(j, k, l) = &
                                 flux_src_vf(momxb + 1)%sf(j, k, l) - &
@@ -3877,7 +3769,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsy_vf_flat(k, j, l, 2)* &
+                                vel_src_rsy_vf(k, j, l, 2)* &
                                 tau_Re(2, 2)
 
                         end do
@@ -3907,11 +3799,11 @@ contains
                                                    + dvelR_dy_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = -(2d0/3d0)*dvel_avg_dz(3)/y_cb(k)/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 1)
+                                           Re_avg_rsy_vf(k, j, l, 1)
 
                             tau_Re(2, 3) = ((dvel_avg_dz(2) - avg_vel(3))/ &
                                             y_cb(k) + dvel_avg_dy(3))/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 1)
+                                           Re_avg_rsy_vf(k, j, l, 1)
 
 !$acc loop seq
                             do i = 2, 3
@@ -3922,7 +3814,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsy_vf_flat(k, j, l, i)* &
+                                    vel_src_rsy_vf(k, j, l, i)* &
                                     tau_Re(2, i)
 
                             end do
@@ -3942,7 +3834,7 @@ contains
                                                    + dvelR_dz_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = dvel_avg_dz(3)/y_cb(k)/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 2)
+                                           Re_avg_rsy_vf(k, j, l, 2)
 
                             flux_src_vf(momxb + 1)%sf(j, k, l) = &
                                 flux_src_vf(momxb + 1)%sf(j, k, l) - &
@@ -3950,7 +3842,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsy_vf_flat(k, j, l, 2)* &
+                                vel_src_rsy_vf(k, j, l, 2)* &
                                 tau_Re(2, 2)
 
                         end do
@@ -3995,19 +3887,19 @@ contains
                             end do
 
                             tau_Re(3, 1) = (dvel_avg_dz(1)/y_cc(k) + dvel_avg_dx(3))/ &
-                                           Re_avg_rsz_vf_flat(l, k, j, 1)/ &
+                                           Re_avg_rsz_vf(l, k, j, 1)/ &
                                            y_cc(k)
 
                             tau_Re(3, 2) = ((dvel_avg_dz(2) - avg_vel(3))/ &
                                             y_cc(k) + dvel_avg_dy(3))/ &
-                                           Re_avg_rsz_vf_flat(l, k, j, 1)/ &
+                                           Re_avg_rsz_vf(l, k, j, 1)/ &
                                            y_cc(k)
 
                             tau_Re(3, 3) = (4d0*dvel_avg_dz(3)/y_cc(k) &
                                             - 2d0*dvel_avg_dx(1) &
                                             - 2d0*dvel_avg_dy(2) &
                                             + 4d0*avg_vel(2)/y_cc(k))/ &
-                                           (3d0*Re_avg_rsz_vf_flat(l, k, j, 1))/ &
+                                           (3d0*Re_avg_rsz_vf(l, k, j, 1))/ &
                                            y_cc(k)
 
 !$acc loop seq
@@ -4019,7 +3911,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsz_vf_flat(l, k, j, i)* &
+                                    vel_src_rsz_vf(l, k, j, i)* &
                                     tau_Re(3, i)
 
                             end do
@@ -4051,7 +3943,7 @@ contains
                                             + dvel_avg_dy(2) &
                                             + dvel_avg_dz(3)/y_cc(k) &
                                             + avg_vel(2)/y_cc(k))/ &
-                                           Re_avg_rsz_vf_flat(l, k, j, 2)/ &
+                                           Re_avg_rsz_vf(l, k, j, 2)/ &
                                            y_cc(k)
 
                             flux_src_vf(momxe)%sf(j, k, l) = &
@@ -4060,7 +3952,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsz_vf_flat(l, k, j, 3)* &
+                                vel_src_rsz_vf(l, k, j, 3)* &
                                 tau_Re(3, 3)
 
                         end do
@@ -4140,7 +4032,7 @@ contains
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = (4d0/3d0)*dvel_avg_dx(1)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -4148,7 +4040,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -4166,7 +4058,7 @@ contains
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dx(1)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 2)
+                                           Re_avg_rsx_vf(j, k, l, 2)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -4174,7 +4066,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -4201,10 +4093,10 @@ contains
                                                    + dvelR_dx_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2d0/3d0)*dvel_avg_dy(2)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
 !$acc loop seq
                             do i = 1, 2
@@ -4215,7 +4107,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsx_vf_flat(j, k, l, i)* &
+                                    vel_src_rsx_vf(j, k, l, i)* &
                                     tau_Re(1, i)
 
                             end do
@@ -4235,7 +4127,7 @@ contains
                                                    + dvelR_dy_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dy(2)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 2)
+                                           Re_avg_rsx_vf(j, k, l, 2)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -4243,7 +4135,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -4270,10 +4162,10 @@ contains
                                                    + dvelR_dx_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2d0/3d0)*dvel_avg_dz(3)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
                             tau_Re(1, 3) = (dvel_avg_dz(1) + dvel_avg_dx(3))/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 1)
+                                           Re_avg_rsx_vf(j, k, l, 1)
 
 !$acc loop seq
                             do i = 1, 3, 2
@@ -4283,7 +4175,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsx_vf_flat(j, k, l, i)* &
+                                    vel_src_rsx_vf(j, k, l, i)* &
                                     tau_Re(1, i)
 
                             end do
@@ -4303,7 +4195,7 @@ contains
                                                    + dvelR_dz_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dz(3)/ &
-                                           Re_avg_rsx_vf_flat(j, k, l, 2)
+                                           Re_avg_rsx_vf(j, k, l, 2)
 
                             flux_src_vf(momxb)%sf(j, k, l) = &
                                 flux_src_vf(momxb)%sf(j, k, l) - &
@@ -4311,7 +4203,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsx_vf_flat(j, k, l, 1)* &
+                                vel_src_rsx_vf(j, k, l, 1)* &
                                 tau_Re(1, 1)
 
                         end do
@@ -4343,11 +4235,11 @@ contains
                             end do
 
                             tau_Re(2, 1) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 1)
+                                           Re_avg_rsy_vf(k, j, l, 1)
 
                             tau_Re(2, 2) = (4d0*dvel_avg_dy(2) &
                                             - 2d0*dvel_avg_dx(1))/ &
-                                           (3d0*Re_avg_rsy_vf_flat(k, j, l, 1))
+                                           (3d0*Re_avg_rsy_vf(k, j, l, 1))
 
 !$acc loop seq
                             do i = 1, 2
@@ -4358,7 +4250,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsy_vf_flat(k, j, l, i)* &
+                                    vel_src_rsy_vf(k, j, l, i)* &
                                     tau_Re(2, i)
 
                             end do
@@ -4381,7 +4273,7 @@ contains
                                                    + dvelR_dy_vf(2)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = (dvel_avg_dx(1) + dvel_avg_dy(2))/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 2)
+                                           Re_avg_rsy_vf(k, j, l, 2)
 
                             flux_src_vf(momxb + 1)%sf(j, k, l) = &
                                 flux_src_vf(momxb + 1)%sf(j, k, l) - &
@@ -4389,7 +4281,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsy_vf_flat(k, j, l, 2)* &
+                                vel_src_rsy_vf(k, j, l, 2)* &
                                 tau_Re(2, 2)
 
                         end do
@@ -4416,10 +4308,10 @@ contains
                                                    + dvelR_dy_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = -(2d0/3d0)*dvel_avg_dz(3)/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 1)
+                                           Re_avg_rsy_vf(k, j, l, 1)
 
                             tau_Re(2, 3) = (dvel_avg_dz(2) + dvel_avg_dy(3))/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 1)
+                                           Re_avg_rsy_vf(k, j, l, 1)
 
 !$acc loop seq
                             do i = 2, 3
@@ -4430,7 +4322,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsy_vf_flat(k, j, l, i)* &
+                                    vel_src_rsy_vf(k, j, l, i)* &
                                     tau_Re(2, i)
 
                             end do
@@ -4450,7 +4342,7 @@ contains
                                                    + dvelR_dz_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = dvel_avg_dz(3)/ &
-                                           Re_avg_rsy_vf_flat(k, j, l, 2)
+                                           Re_avg_rsy_vf(k, j, l, 2)
 
                             flux_src_vf(momxb + 1)%sf(j, k, l) = &
                                 flux_src_vf(momxb + 1)%sf(j, k, l) - &
@@ -4458,7 +4350,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsy_vf_flat(k, j, l, 2)* &
+                                vel_src_rsy_vf(k, j, l, 2)* &
                                 tau_Re(2, 2)
 
                         end do
@@ -4498,15 +4390,15 @@ contains
                             end do
 
                             tau_Re(3, 1) = (dvel_avg_dz(1) + dvel_avg_dx(3))/ &
-                                           Re_avg_rsz_vf_flat(l, k, j, 1)
+                                           Re_avg_rsz_vf(l, k, j, 1)
 
                             tau_Re(3, 2) = (dvel_avg_dz(2) + dvel_avg_dy(3))/ &
-                                           Re_avg_rsz_vf_flat(l, k, j, 1)
+                                           Re_avg_rsz_vf(l, k, j, 1)
 
                             tau_Re(3, 3) = (4d0*dvel_avg_dz(3) &
                                             - 2d0*dvel_avg_dx(1) &
                                             - 2d0*dvel_avg_dy(2))/ &
-                                           (3d0*Re_avg_rsz_vf_flat(l, k, j, 1))
+                                           (3d0*Re_avg_rsz_vf(l, k, j, 1))
 
 !$acc loop seq
                             do i = 1, 3
@@ -4517,7 +4409,7 @@ contains
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
-                                    vel_src_rsz_vf_flat(l, k, j, i)* &
+                                    vel_src_rsz_vf(l, k, j, i)* &
                                     tau_Re(3, i)
 
                             end do
@@ -4545,7 +4437,7 @@ contains
                             tau_Re(3, 3) = (dvel_avg_dx(1) &
                                             + dvel_avg_dy(2) &
                                             + dvel_avg_dz(3))/ &
-                                           Re_avg_rsz_vf_flat(l, k, j, 2)
+                                           Re_avg_rsz_vf(l, k, j, 2)
 
                             flux_src_vf(momxe)%sf(j, k, l) = &
                                 flux_src_vf(momxe)%sf(j, k, l) - &
@@ -4553,7 +4445,7 @@ contains
 
                             flux_src_vf(E_idx)%sf(j, k, l) = &
                                 flux_src_vf(E_idx)%sf(j, k, l) - &
-                                vel_src_rsz_vf_flat(l, k, j, 3)* &
+                                vel_src_rsz_vf(l, k, j, 3)* &
                                 tau_Re(3, 3)
 
                         end do
@@ -4597,7 +4489,7 @@ contains
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             flux_vf(i)%sf(k, j, l) = &
-                                flux_rsy_vf_flat(j, k, l, i)
+                                flux_rsy_vf(j, k, l, i)
                         end do
                     end do
                 end do
@@ -4610,7 +4502,7 @@ contains
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
                                 flux_gsrc_vf(i)%sf(k, j, l) = &
-                                    flux_gsrc_rsy_vf_flat(j, k, l, i)
+                                    flux_gsrc_rsy_vf(j, k, l, i)
                             end do
                         end do
                     end do
@@ -4622,7 +4514,7 @@ contains
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
                         flux_src_vf(advxb)%sf(k, j, l) = &
-                            flux_src_rsy_vf_flat(j, k, l, advxb)
+                            flux_src_rsy_vf(j, k, l, advxb)
                     end do
                 end do
             end do
@@ -4634,7 +4526,7 @@ contains
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
                                 flux_src_vf(i)%sf(k, j, l) = &
-                                    flux_src_rsy_vf_flat(j, k, l, i)
+                                    flux_src_rsy_vf(j, k, l, i)
                             end do
                         end do
                     end do
@@ -4651,7 +4543,7 @@ contains
                         do l = is3%beg, is3%end
 
                             flux_vf(i)%sf(l, k, j) = &
-                                flux_rsz_vf_flat(j, k, l, i)
+                                flux_rsz_vf(j, k, l, i)
                         end do
                     end do
                 end do
@@ -4664,7 +4556,7 @@ contains
                             do l = is3%beg, is3%end
 
                                 flux_gsrc_vf(i)%sf(l, k, j) = &
-                                    flux_gsrc_rsz_vf_flat(j, k, l, i)
+                                    flux_gsrc_rsz_vf(j, k, l, i)
                             end do
                         end do
                     end do
@@ -4676,7 +4568,7 @@ contains
                 do k = is2%beg, is2%end
                     do l = is3%beg, is3%end
                         flux_src_vf(advxb)%sf(l, k, j) = &
-                            flux_src_rsz_vf_flat(j, k, l, advxb)
+                            flux_src_rsz_vf(j, k, l, advxb)
                     end do
                 end do
             end do
@@ -4688,7 +4580,7 @@ contains
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
                                 flux_src_vf(i)%sf(l, k, j) = &
-                                    flux_src_rsz_vf_flat(j, k, l, i)
+                                    flux_src_rsz_vf(j, k, l, i)
                             end do
                         end do
                     end do
@@ -4702,7 +4594,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
                             flux_vf(i)%sf(j, k, l) = &
-                                flux_rsx_vf_flat(j, k, l, i)
+                                flux_rsx_vf(j, k, l, i)
                         end do
                     end do
                 end do
@@ -4713,7 +4605,7 @@ contains
                 do k = is2%beg, is2%end
                     do j = is1%beg, is1%end
                         flux_src_vf(advxb)%sf(j, k, l) = &
-                            flux_src_rsx_vf_flat(j, k, l, advxb)
+                            flux_src_rsx_vf(j, k, l, advxb)
                     end do
                 end do
             end do
@@ -4725,7 +4617,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 flux_src_vf(i)%sf(j, k, l) = &
-                                    flux_src_rsx_vf_flat(j, k, l, i)
+                                    flux_src_rsx_vf(j, k, l, i)
                             end do
                         end do
                     end do
@@ -4786,47 +4678,47 @@ contains
         s_convert_to_mixture_variables => null()
 
         if (Re_size(1) > 0) then
-            deallocate (Re_avg_rsx_vf_flat)
+            deallocate (Re_avg_rsx_vf)
         end if
-        deallocate (vel_src_rsx_vf_flat)
-        deallocate (flux_rsx_vf_flat)
-        deallocate (flux_src_rsx_vf_flat)
-        deallocate (flux_gsrc_rsx_vf_flat)
+        deallocate (vel_src_rsx_vf)
+        deallocate (flux_rsx_vf)
+        deallocate (flux_src_rsx_vf)
+        deallocate (flux_gsrc_rsx_vf)
         if (qbmm) then
-            deallocate (mom_sp_rsx_vf_flat)
+            deallocate (mom_sp_rsx_vf)
         end if
-        !deallocate(qL_prim_rsx_vf_flat)
-        !deallocate(qR_prim_rsx_vf_flat)
+        !deallocate(qL_prim_rsx_vf)
+        !deallocate(qR_prim_rsx_vf)
 
         if (n == 0) return
 
         if (Re_size(1) > 0) then
-            deallocate (Re_avg_rsy_vf_flat)
+            deallocate (Re_avg_rsy_vf)
         end if
-        deallocate (vel_src_rsy_vf_flat)
-        deallocate (flux_rsy_vf_flat)
-        deallocate (flux_src_rsy_vf_flat)
-        deallocate (flux_gsrc_rsy_vf_flat)
+        deallocate (vel_src_rsy_vf)
+        deallocate (flux_rsy_vf)
+        deallocate (flux_src_rsy_vf)
+        deallocate (flux_gsrc_rsy_vf)
         if (qbmm) then
-            deallocate (mom_sp_rsy_vf_flat)
+            deallocate (mom_sp_rsy_vf)
         end if
-        !deallocate(qL_prim_rsy_vf_flat)
-        !deallocate(qR_prim_rsy_vf_flat)
+        !deallocate(qL_prim_rsy_vf)
+        !deallocate(qR_prim_rsy_vf)
 
         if (p == 0) return
 
         if (Re_size(1) > 0) then
-            deallocate (Re_avg_rsz_vf_flat)
+            deallocate (Re_avg_rsz_vf)
         end if
-        deallocate (vel_src_rsz_vf_flat)
-        deallocate (flux_rsz_vf_flat)
-        deallocate (flux_src_rsz_vf_flat)
-        deallocate (flux_gsrc_rsz_vf_flat)
+        deallocate (vel_src_rsz_vf)
+        deallocate (flux_rsz_vf)
+        deallocate (flux_src_rsz_vf)
+        deallocate (flux_gsrc_rsz_vf)
         if (qbmm) then
-            deallocate (mom_sp_rsz_vf_flat)
+            deallocate (mom_sp_rsz_vf)
         end if
-        !deallocate(qL_prim_rsz_vf_flat)
-        !deallocate(qR_prim_rsz_vf_flat)
+        !deallocate(qL_prim_rsz_vf)
+        !deallocate(qR_prim_rsz_vf)
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
 

@@ -20,11 +20,9 @@ module m_hypoelastic
     private; public :: s_initialize_hypoelastic_module, &
             s_compute_hypoelastic_rhs
 
-    integer :: momxb, momxe
-    integer :: advxb, advxe
-    integer :: strxb, strxe
+
     real(kind(0d0)), allocatable, dimension(:) :: Gs
-!$acc declare create(momxb, momxe, advxb, advxe, strxb, strxe, Gs)
+!$acc declare create( Gs)
 
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
@@ -56,13 +54,6 @@ contains
         end if
         !$acc enter data create(rho_K_field,G_K_field,du_dx)
 
-        momxb = mom_idx%beg
-        momxe = mom_idx%end
-        advxb = adv_idx%beg
-        advxe = adv_idx%end
-        strxb = stress_idx%beg
-        strxe = stress_idx%end
-!$acc update device(momxb, momxe, advxb, advxe, strxb, strxe)
 
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G

@@ -33,6 +33,8 @@ program p_main
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
+    use m_monopole             !< Monopole calculations
+
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
     use m_data_output          !< Run-time info & solution data output procedures
@@ -45,6 +47,10 @@ program p_main
                                 !! from the conservative and primitive variables
 
     use m_hypoelastic
+
+    use m_viscous
+
+    use m_bubbles
 
 #ifdef _OPENACC
     use openacc
@@ -141,12 +147,20 @@ program p_main
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
 
+    if(bubbles) call s_initialize_bubbles_module()
+
     if (qbmm) call s_initialize_qbmm_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
 #endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
 
+    if (monopole) then
+        call s_initialize_monopole_module()
+    end if
+    if (any(Re_size > 1)) then
+        call s_initialize_viscous_module()
+    end if
     call s_initialize_rhs_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
@@ -342,6 +356,10 @@ program p_main
     if (grid_geometry == 3) call s_finalize_fftw_module
     call s_finalize_mpi_proxy_module()
     call s_finalize_global_parameters_module()
+
+    if (any(Re_size > 0)) then
+        call s_finalize_viscous_module()
+    end if
 
     ! Terminating MPI execution environment
     call s_mpi_finalize()

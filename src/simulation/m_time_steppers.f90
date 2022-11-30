@@ -124,7 +124,7 @@ contains
 
         ! Allocating the cell-average primitive variables
         allocate (q_prim_vf(1:sys_size))
-
+        
         do i = 1, adv_idx%end
             allocate (q_prim_vf(i)%sf(ix%beg:ix%end, &
                                       iy%beg:iy%end, &
