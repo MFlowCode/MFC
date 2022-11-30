@@ -23,28 +23,17 @@ module m_viscous
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1, is2, is3
  !$acc declare create(is1, is2, is3, iv)   
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-!$acc declare create(gammas, pi_infs)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 !$acc declare create(Res)
 
-    integer :: momxb, momxe
-    integer :: contxb, contxe
-!$acc declare create(momxb, momxe, contxb, contxe)
 
     contains
 
     subroutine s_initialize_viscous_module()
         integer :: i, j !< generic loop iterators
 
-        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
-
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-!$acc update device(gammas, pi_infs)
+        
 
         allocate (Res(1:2, 1:maxval(Re_size)))
 
@@ -55,11 +44,6 @@ module m_viscous
         end do
 !$acc update device(Res, Re_idx, Re_size)
 
-        momxb = mom_idx%beg
-        momxe = mom_idx%end
-        contxb = cont_idx%beg
-        contxe = cont_idx%end
-!$acc update device(momxb, momxe, contxb, contxe)
 
     end subroutine s_initialize_viscous_module
 
@@ -1376,7 +1360,6 @@ module m_viscous
     end subroutine s_reconstruct_cell_boundary_values_visc ! --------------------
 
     subroutine s_finalize_viscous_module()
-        deallocate (gammas, pi_infs)
         deallocate (Res(1:2, 1:maxval(Re_size)))
     end subroutine s_finalize_viscous_module
 

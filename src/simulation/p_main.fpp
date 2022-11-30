@@ -50,6 +50,8 @@ program p_main
 
     use m_viscous
 
+    use m_bubbles
+
 #ifdef _OPENACC
     use openacc
 #endif
@@ -144,6 +146,8 @@ program p_main
     if (grid_geometry == 3) call s_initialize_fftw_module()
     call s_initialize_start_up_module()
     call s_initialize_riemann_solvers_module()
+
+    if(bubbles) call s_initialize_bubbles_module()
 
     if (qbmm) call s_initialize_qbmm_module()
 

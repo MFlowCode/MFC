@@ -132,14 +132,12 @@ module m_cbc
 
     integer :: dj
 
-    integer :: momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
 
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
 !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,alpha_rho,vel,adv,mf,Re, &
 !$acc                dalpha_rho_ds,dvel_ds,dadv_ds,lambda,L,ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-!$acc                pi_coef_x,pi_coef_y,pi_coef_z, momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, gammas, pi_infs, bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj)
+!$acc                pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj)
 
 contains
 
@@ -312,14 +310,6 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         allocate (ds(0:buff_size))
 
-        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
-
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-
-        !$acc update device(gammas, pi_infs)
 
         ! Allocating/Computing CBC Coefficients in x-direction =============
         if (all((/bc_x%beg, bc_x%end/) <= -5)) then
@@ -438,17 +428,6 @@ contains
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
-
-        momxb = mom_idx%beg
-        momxe = mom_idx%end
-        advxb = adv_idx%beg
-        advxe = adv_idx%end
-        contxb = cont_idx%beg
-        contxe = cont_idx%end
-        bubxb = bub_idx%beg
-        bubxe = bub_idx%end
-
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe)
 
         bcxb = bc_x%beg
         bcxe = bc_x%end
