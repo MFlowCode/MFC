@@ -814,6 +814,7 @@ contains
         integer :: ndirs
 
         real(kind(0d0)) :: mytime, sound
+        real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
         integer :: i, j, k, l, r, q, ii, id !< Generic loop iterators
@@ -1323,9 +1324,9 @@ contains
                 end if
 
                 if (monopole) then
-                    call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha,&
+                    call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                            rhs_vf)
+                                             rhs_vf)
                 end if
 
                 if (model_eqns == 3) then
@@ -1645,7 +1646,7 @@ contains
                 end if
 
                 if (monopole) then
-                    call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha,&
+                    call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
                                              rhs_vf)
                 end if
@@ -2168,7 +2169,8 @@ contains
                 call nvtxStartRange("Monopole")
 
                 if (monopole) then
-                    call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha,&
+                        
+                    call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
                                              rhs_vf)
                 end if

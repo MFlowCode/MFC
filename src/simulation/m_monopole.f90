@@ -35,6 +35,12 @@ module m_monopole
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
     !$acc declare create(gammas, pi_infs)
 
+     integer :: momxb, momxe
+     integer :: advxb, advxe
+     integer :: contxb, contxe
+     integer :: intxb, intxe
+     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe)
+
 contains
 
     subroutine s_initialize_monopole_module()
@@ -65,9 +71,20 @@ contains
             pi_infs(i) = fluid_pp(i)%pi_inf
         end do
         !$acc update device(gammas, pi_infs)
+        
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+        intxb = internalEnergies_idx%beg
+        intxe = internalEnergies_idx%end
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe)
+    
     end subroutine
 
-    subroutine s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, myalpha_rho, myalpha, q_cons_vf, &
+    subroutine s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src,  q_cons_vf, &
                                          q_prim_vf, t_step, id, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
@@ -81,42 +98,29 @@ contains
         !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-
-
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
-        integer, intent(IN) :: t_step
-
-        integer :: i, j, k, l, q, ii, id !< generic loop variables
-        integer :: term_index
-        
         !> @name Monopole source terms
         !> @{
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(inout) :: mono_mass_src, mono_e_src
         real(kind(0d0)), dimension(1:num_dims, 0:m, 0:n, 0:p), intent(inout) :: mono_mom_src
         !> @}
+
+        integer, intent(IN) :: t_step, id
+
+        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
+
+        integer :: i, j, k, l, q, ii !< generic loop variables
+        integer :: term_index
+        
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
         real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
 
-        integer :: momxb, momxe
-        integer :: advxb, advxe
-        integer :: contxb, contxe
-        integer :: intxb, intxe
-!$acc declare create(intxb, intxe)
 
         integer :: ndirs
         
         real(kind(0d0)) :: mytime, sound
         real(kind(0d0)) :: s2, const_sos, s1
 
-        momxb = mom_idx%beg
-        momxe = mom_idx%end
-        advxb = adv_idx%beg
-        advxe = adv_idx%end
-        contxb = cont_idx%beg
-        contxe = cont_idx%end
-        intxb = internalEnergies_idx%beg
-        intxe = internalEnergies_idx%end
 
         if (id == 1) then
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -169,6 +173,10 @@ contains
                                                 myRho = myRho + myalpha_rho(ii)
                                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
                                                 B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                            end do
+                                        else
+                                            myRho = myalpha_rho(1)
+                                            n_tait = gammas(1)
                                             end do
                                         else
                                             myRho = myalpha_rho(1)
@@ -744,10 +752,6 @@ contains
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
-                hy = y_cc(k) - mono_loc(2)
-
-                hxnew = foc_length(nm) - dsqrt(hy**2.d0 + (foc_length(nm) - hx)**2.d0)
-                if ((abs(hy) < aperture(nm)/2.d0) .and. (hx < foc_length(nm))) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
                                 dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                     angle = -atan(hy/(foc_length(nm) - hx))
