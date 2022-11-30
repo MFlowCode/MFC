@@ -97,14 +97,14 @@ contains
         real(kind(0d0)) :: n_tait, B_tait
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
+        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(kind(0d0)), dimension(num_fluids) :: myalpha, myalpha_rho
+        real(kind(0d0)) :: start, finish
 
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
-
 
         !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
@@ -123,8 +123,6 @@ contains
             end do
         end do
 
-
-
         !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
             do k = 0, n
@@ -136,10 +134,21 @@ contains
                         Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
                     end do
 
-                    call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), &
-                                            Rtmp, nbub(j, k, l))
+                    R3 = 0d0
 
-                    call s_quad((Rtmp**2.d0)*Vtmp, R2Vav)
+                    !$acc loop seq
+                    do q = 1, nb
+                        R3 = R3 + weight(q)*Rtmp(q)**3.d0
+                    end do
+
+                    nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+
+                    R2Vav = 0d0
+
+                    !$acc loop seq
+                    do q = 1, nb
+                        R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
+                    end do
 
                     bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
 

@@ -491,9 +491,10 @@ contains
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
 !$acc update device(weno_polyn)
+!$acc update device(nb)
         #:endif
 
-!$acc update device(nb)
+
 
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces

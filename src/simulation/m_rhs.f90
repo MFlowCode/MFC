@@ -817,7 +817,6 @@ contains
 
         end if
 
-
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -825,6 +824,7 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
+
 
         
         if (t_step == t_step_stop) return
@@ -928,6 +928,7 @@ contains
             call nvtxStartRange("RHS-Riemann")
 
             ! Computing Riemann Solver Flux and Source Flux =================
+
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &

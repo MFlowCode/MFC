@@ -1075,6 +1075,7 @@ contains
         real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
+        real(kind(0d0)) :: start, finish
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
@@ -1816,8 +1817,9 @@ contains
                             end do
                         end do
                     end do
+                
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, & 
                     !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1918,7 +1920,7 @@ contains
                                     end do
 
                                     nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                   nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
+                                    nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
 
 !$acc loop seq
                                     do i = 1, nb
@@ -1968,17 +1970,17 @@ contains
                                         end do
                                     end if
 
-                                if (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
+                                    if (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
                                         ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*pres_L
                                     else
-                                    ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
+                                        ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
                                                                                                            rho_L*R3V2Lbar/R3Lbar)
                                     end if
 
-                            if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
+                                     if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
                                         ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
                                     else
-                                ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
+                                        ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
                                                                                                               rho_R*R3V2Rbar/R3Rbar)
                                     end if
 
@@ -2035,7 +2037,7 @@ contains
                                                pi_infs(1))/gammas(1)
                                     blkmod2 = ((gammas(2) + 1d0)*pres_L + &
                                                pi_infs(2))/gammas(2)
-   c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
 
                                     blkmod1 = ((gammas(1) + 1d0)*pres_R + &
                                                pi_infs(1))/gammas(1)
