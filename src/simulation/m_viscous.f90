@@ -683,10 +683,10 @@ module m_viscous
     !!  @param q_cons_vf Cell-averaged conservative variables
     !!  @param q_prim_vf Cell-averaged primitive variables
     !!  @param rhs_vf Cell-averaged RHS variables
-    subroutine s_get_viscous(qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, &
+    subroutine s_get_viscous(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
                              dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                              qL_prim, & 
-                             qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, &
+                             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
                              dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
                              qR_prim, &
                              q_prim_qp, &
@@ -694,9 +694,9 @@ module m_viscous
                              ix, iy, iz)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
-             intent(INOUT) :: qL_prim_rsx_vf_flat, qR_prim_rsx_vf_flat, &
-                              qL_prim_rsy_vf_flat, qR_prim_rsy_vf_flat, &
-                              qL_prim_rsz_vf_flat, qR_prim_rsz_vf_flat
+             intent(INOUT) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
+                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
+                              qL_prim_rsz_vf, qR_prim_rsz_vf
 
         type(vector_field), dimension(sys_size) :: qL_prim, qR_prim
 
@@ -721,8 +721,8 @@ module m_viscous
 
             call s_reconstruct_cell_boundary_values_visc( &
                 q_prim_qp%vf(iv%beg:iv%end), &
-                qL_prim_rsx_vf_flat, qL_prim_rsy_vf_flat, qL_prim_rsz_vf_flat, &
-                qR_prim_rsx_vf_flat, qR_prim_rsy_vf_flat, qR_prim_rsz_vf_flat, &
+                qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
+                qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
                 i, qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
                 ix, iy, iz)
         end do
@@ -1256,13 +1256,13 @@ module m_viscous
 
     end subroutine s_apply_scalar_divergence_theorem ! ---------------------
 
-    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
 
         integer, intent(IN) :: norm_dir
 
@@ -1295,20 +1295,20 @@ module m_viscous
         if (n > 0) then
             if (p > 0) then
 
-                call s_weno_alt(v_vf(iv%beg:iv%end), &
-                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, iv%beg:iv%end), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, iv%beg:iv%end), &
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                                 norm_dir, weno_dir, &
                                 is1, is2, is3)
             else
-                call s_weno_alt(v_vf(iv%beg:iv%end), &
-                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, :), &
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                                 norm_dir, weno_dir, &
                                 is1, is2, is3)
             end if
         else
 
-            call s_weno_alt(v_vf(iv%beg:iv%end), &
-                        vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, :), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, :), vR_z_flat(:, :, :, :), &
+            call s_weno(v_vf(iv%beg:iv%end), &
+                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
                             is1, is2, is3)
         end if
@@ -1321,8 +1321,8 @@ module m_viscous
                         do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
                                 do k = is2%beg, is2%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y_flat(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y_flat(j, k, l, i)
+                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
+                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -1333,8 +1333,8 @@ module m_viscous
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
                                 do l = is3%beg, is3%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z_flat(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z_flat(j, k, l, i)
+                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -1345,8 +1345,8 @@ module m_viscous
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x_flat(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x_flat(j, k, l, i)
+                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
                                 end do
                             end do
                         end do

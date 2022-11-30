@@ -49,7 +49,6 @@ module m_rhs
     private; public :: s_initialize_rhs_module, &
  s_compute_rhs, &
  s_pressure_relaxation_procedure, &
- s_populate_variables_buffers, &
  s_finalize_rhs_module
 
 
@@ -168,8 +167,8 @@ module m_rhs
     !> @}
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
 
    
 
@@ -187,8 +186,8 @@ module m_rhs
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
 !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
 !$acc   bub_mom_src, myflux_vf, myflux_src_vf,alf_sum, &
-!$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
-!$acc   dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat, &
+!$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+!$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
 !$acc   ixt, iyt, izt)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
@@ -230,7 +229,7 @@ contains
 !$acc                                        iy%beg:iy%end, &
 !$acc                                        iz%beg:iz%end))
         end if
-        print*, ix, iy, iz
+        
         ixt = ix; iyt = iy; izt = iz
 
         allocate (q_cons_qp%vf(1:sys_size))
@@ -344,33 +343,33 @@ contains
         end do
         ! END: Allocation/Association of qK_cons_n and qK_prim_n =====
 
-        allocate (qL_rsx_vf_flat(ix%beg:ix%end, &
+        allocate (qL_rsx_vf(ix%beg:ix%end, &
                                  iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
-        allocate (qR_rsx_vf_flat(ix%beg:ix%end, &
+        allocate (qR_rsx_vf(ix%beg:ix%end, &
                                  iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         if (n > 0) then
 
-            allocate (qL_rsy_vf_flat(iy%beg:iy%end, &
+            allocate (qL_rsy_vf(iy%beg:iy%end, &
                                      ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
-            allocate (qR_rsy_vf_flat(iy%beg:iy%end, &
+            allocate (qR_rsy_vf(iy%beg:iy%end, &
                                      ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
         else
-            allocate (qL_rsy_vf_flat(ix%beg:ix%end, &
+            allocate (qL_rsy_vf(ix%beg:ix%end, &
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
-            allocate (qR_rsy_vf_flat(ix%beg:ix%end, &
+            allocate (qR_rsy_vf(ix%beg:ix%end, &
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
         end if
 
         if (p > 0) then
-            allocate (qL_rsz_vf_flat(iz%beg:iz%end, &
+            allocate (qL_rsz_vf(iz%beg:iz%end, &
                                      iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
-            allocate (qR_rsz_vf_flat(iz%beg:iz%end, &
+            allocate (qR_rsz_vf(iz%beg:iz%end, &
                                      iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
         else
-            allocate (qL_rsz_vf_flat(ix%beg:ix%end, &
+            allocate (qL_rsz_vf(ix%beg:ix%end, &
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
-            allocate (qR_rsz_vf_flat(ix%beg:ix%end, &
+            allocate (qR_rsz_vf(ix%beg:ix%end, &
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
@@ -502,34 +501,34 @@ contains
 
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
-                allocate (dqL_rsx_vf_flat(ix%beg:ix%end, &
+                allocate (dqL_rsx_vf(ix%beg:ix%end, &
                                           iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
-                allocate (dqR_rsx_vf_flat(ix%beg:ix%end, &
+                allocate (dqR_rsx_vf(ix%beg:ix%end, &
                                           iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 if (n > 0) then
 
-                    allocate (dqL_rsy_vf_flat(iy%beg:iy%end, &
+                    allocate (dqL_rsy_vf(iy%beg:iy%end, &
                                               ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
-                    allocate (dqR_rsy_vf_flat(iy%beg:iy%end, &
+                    allocate (dqR_rsy_vf(iy%beg:iy%end, &
                                               ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                 else
-                    allocate (dqL_rsy_vf_flat(ix%beg:ix%end, &
+                    allocate (dqL_rsy_vf(ix%beg:ix%end, &
                                               iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
-                    allocate (dqR_rsy_vf_flat(ix%beg:ix%end, &
+                    allocate (dqR_rsy_vf(ix%beg:ix%end, &
                                               iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 end if
 
                 if (p > 0) then
-                    allocate (dqL_rsz_vf_flat(iz%beg:iz%end, &
+                    allocate (dqL_rsz_vf(iz%beg:iz%end, &
                                               iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
-                    allocate (dqR_rsz_vf_flat(iz%beg:iz%end, &
+                    allocate (dqR_rsz_vf(iz%beg:iz%end, &
                                               iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
                 else
-                    allocate (dqL_rsz_vf_flat(ix%beg:ix%end, &
+                    allocate (dqL_rsz_vf(ix%beg:ix%end, &
                                               iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
-                    allocate (dqR_rsz_vf_flat(ix%beg:ix%end, &
+                    allocate (dqR_rsz_vf(ix%beg:ix%end, &
                                               iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 end if
@@ -834,10 +833,10 @@ contains
         if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
 
         call nvtxStartRange("Viscous")
-        if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
+        if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                             dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                                             qL_prim, &
-                                            qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
+                                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                             dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
                                             qR_prim, &
                                             q_prim_qp, &
@@ -846,6 +845,7 @@ contains
         call nvtxEndRange()
         
         ! Dimensional Splitting Loop =======================================
+
         do id = 1, num_dims
 
             ! Configuring Coordinate Direction Indexes ======================
@@ -861,60 +861,59 @@ contains
                     iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
                 call nvtxStartRange("RHS-WENO")
-                call s_reconstruct_cell_boundary_values_alt( &
+                call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &
-                    qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
-                    qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
                 call nvtxEndRange
             else
                 call nvtxStartRange("RHS-WENO")
                 iv%beg = 1; iv%end = contxe
-                call s_reconstruct_cell_boundary_values_alt( &
+                call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
-                    qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
 
                 iv%beg = E_idx; iv%end = E_idx
-                call s_reconstruct_cell_boundary_values_alt( &
+                call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
-                    qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
 
                 iv%beg = advxb; iv%end = advxe
-                call s_reconstruct_cell_boundary_values_alt( &
+                call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
-                    qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
 
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
                 if (weno_Re_flux) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
                         dq_prim_dx_qp%vf(iv%beg:iv%end), &
-                        dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, &
-                        dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat, &
+                        dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
+                        dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                         id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end))
                     if (n > 0) then
                         call s_reconstruct_cell_boundary_values_visc_deriv( &
                             dq_prim_dy_qp%vf(iv%beg:iv%end), &
-                            dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, &
-                            dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat, &
+                            dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
+                            dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                             id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end))
                         if (p > 0) then
                             call s_reconstruct_cell_boundary_values_visc_deriv( &
                                 dq_prim_dz_qp%vf(iv%beg:iv%end), &
-                                dqL_rsx_vf_flat, dqL_rsy_vf_flat, dqL_rsz_vf_flat, &
-                                dqR_rsx_vf_flat, dqR_rsy_vf_flat, dqR_rsz_vf_flat, &
+                                dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
+                                dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                                 id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
                         end if
                     end if
                 end if
                 call nvtxEndRange
             end if
-
 
             ! Configuring Coordinate Direction Indexes ======================
             if (id == 1) then
@@ -929,12 +928,12 @@ contains
             call nvtxStartRange("RHS-Riemann")
 
             ! Computing Riemann Solver Flux and Source Flux =================
-            call s_riemann_solver(qR_rsx_vf_flat, qR_rsy_vf_flat, qR_rsz_vf_flat, &
+            call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
                                   dqR_prim_dz_n(id)%vf, &
                                   qR_prim(id)%vf, &
-                                  qL_rsx_vf_flat, qL_rsy_vf_flat, qL_rsz_vf_flat, &
+                                  qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                   dqL_prim_dx_n(id)%vf, &
                                   dqL_prim_dy_n(id)%vf, &
                                   dqL_prim_dz_n(id)%vf, &
@@ -945,7 +944,6 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-!            iv%beg = 1; iv%end = sys_size
 
             ! ===============================================================
 
@@ -2055,340 +2053,6 @@ contains
 
     end subroutine s_pressure_relaxation_procedure ! -----------------------
 
-    !>  The purpose of this procedure is to populate the buffers
-        !!      of the conservative variables, depending on the selected
-        !!      boundary conditions.
-        !!  @param v_vf Scalar field for which buffers are populated
-    subroutine s_populate_variables_buffers(v_vf) ! ---------------
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: v_vf
-
-        integer :: i, j, k !< Generic loop iterators
-
-        ! Population of Buffers in x-direction =============================
-        if (bc_x%beg <= -3) then         ! Ghost-cell extrap. BC at beginning
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(-j, 0:n, 0:p) = &
-                        v_vf(i)%sf(0, 0:n, 0:p)
-                end do
-            end do
-
-        elseif (bc_x%beg == -2) then     ! Symmetry BC at beginning
-
-            do j = 1, buff_size
-
-                do i = 1, cont_idx%end
-                    v_vf(i)%sf(-j, 0:n, 0:p) = &
-                        v_vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-
-                v_vf(mom_idx%beg)%sf(-j, 0:n, 0:p) = &
-                    -v_vf(mom_idx%beg)%sf(j - 1, 0:n, 0:p)
-
-                do i = mom_idx%beg + 1, sys_size
-                    v_vf(i)%sf(-j, 0:n, 0:p) = &
-                        v_vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-
-            end do
-
-        elseif (bc_x%beg == -1) then     ! Periodic BC at beginning
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(-j, 0:n, 0:p) = &
-                        v_vf(i)%sf(m - (j - 1), 0:n, 0:p)
-                end do
-            end do
-
-        else                            ! Processor BC at beginning
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                v_vf, 1, -1)
-
-        end if
-
-        if (bc_x%end <= -3) then         ! Ghost-cell extrap. BC at end
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        v_vf(i)%sf(m, 0:n, 0:p)
-                end do
-            end do
-
-        elseif (bc_x%end == -2) then     ! Symmetry BC at end
-
-            do j = 1, buff_size
-
-                do i = 1, cont_idx%end
-                    v_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        v_vf(i)%sf(m - (j - 1), 0:n, 0:p)
-                end do
-
-                v_vf(mom_idx%beg)%sf(m + j, 0:n, 0:p) = &
-                    -v_vf(mom_idx%beg)%sf(m - (j - 1), 0:n, 0:p)
-
-                do i = mom_idx%beg + 1, sys_size
-                    v_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        v_vf(i)%sf(m - (j - 1), 0:n, 0:p)
-                end do
-
-            end do
-
-        elseif (bc_x%end == -1) then     ! Periodic BC at end
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        v_vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-            end do
-
-        else                            ! Processor BC at end
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                v_vf, 1, 1)
-
-        end if
-
-        ! END: Population of Buffers in x-direction ========================
-
-        ! Population of Buffers in y-direction =============================
-
-        if (n == 0) then
-
-            return
-
-        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -13) then     ! Ghost-cell extrap. BC at beginning
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, -j, 0:p) = &
-                        v_vf(i)%sf(:, 0, 0:p)
-                end do
-            end do
-
-        elseif (bc_y%beg == -13) then    ! Axis BC at beginning
-
-            do j = 1, buff_size
-                do k = 0, p
-                    if (z_cc(k) < pi) then
-                        do i = 1, mom_idx%beg
-                            v_vf(i)%sf(:, -j, k) = &
-                                v_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
-                        end do
-
-                        v_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                            -v_vf(mom_idx%beg + 1)%sf(:, j - 1, k + ((p + 1)/2))
-
-                        v_vf(mom_idx%end)%sf(:, -j, k) = &
-                            -v_vf(mom_idx%end)%sf(:, j - 1, k + ((p + 1)/2))
-
-                        do i = E_idx, sys_size
-                            v_vf(i)%sf(:, -j, k) = &
-                                v_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
-                        end do
-                    else
-                        do i = 1, mom_idx%beg
-                            v_vf(i)%sf(:, -j, k) = &
-                                v_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
-                        end do
-
-                        v_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                            -v_vf(mom_idx%beg + 1)%sf(:, j - 1, k - ((p + 1)/2))
-
-                        v_vf(mom_idx%end)%sf(:, -j, k) = &
-                            -v_vf(mom_idx%end)%sf(:, j - 1, k - ((p + 1)/2))
-
-                        do i = E_idx, sys_size
-                            v_vf(i)%sf(:, -j, k) = &
-                                v_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
-                        end do
-                    end if
-                end do
-            end do
-
-        elseif (bc_y%beg == -2) then     ! Symmetry BC at beginning
-
-            do j = 1, buff_size
-
-                do i = 1, mom_idx%beg
-                    v_vf(i)%sf(:, -j, 0:p) = &
-                        v_vf(i)%sf(:, j - 1, 0:p)
-                end do
-
-                v_vf(mom_idx%beg + 1)%sf(:, -j, 0:p) = &
-                    -v_vf(mom_idx%beg + 1)%sf(:, j - 1, 0:p)
-
-                do i = mom_idx%beg + 2, sys_size
-                    v_vf(i)%sf(:, -j, 0:p) = &
-                        v_vf(i)%sf(:, j - 1, 0:p)
-                end do
-
-            end do
-
-        elseif (bc_y%beg == -1) then     ! Periodic BC at beginning
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, -j, 0:p) = &
-                        v_vf(i)%sf(:, n - (j - 1), 0:p)
-                end do
-            end do
-
-        else                            ! Processor BC at beginning
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                v_vf, 2, -1)
-
-        end if
-
-        if (bc_y%end <= -3) then         ! Ghost-cell extrap. BC at end
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, n + j, 0:p) = &
-                        v_vf(i)%sf(:, n, 0:p)
-                end do
-            end do
-
-        elseif (bc_y%end == -2) then     ! Symmetry BC at end
-
-            do j = 1, buff_size
-
-                do i = 1, mom_idx%beg
-                    v_vf(i)%sf(:, n + j, 0:p) = &
-                        v_vf(i)%sf(:, n - (j - 1), 0:p)
-                end do
-
-                v_vf(mom_idx%beg + 1)%sf(:, n + j, 0:p) = &
-                    -v_vf(mom_idx%beg + 1)%sf(:, n - (j - 1), 0:p)
-
-                do i = mom_idx%beg + 2, sys_size
-                    v_vf(i)%sf(:, n + j, 0:p) = &
-                        v_vf(i)%sf(:, n - (j - 1), 0:p)
-                end do
-
-            end do
-
-        elseif (bc_y%end == -1) then     ! Periodic BC at end
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, n + j, 0:p) = &
-                        v_vf(i)%sf(:, j - 1, 0:p)
-                end do
-            end do
-
-        else                            ! Processor BC at end
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                v_vf, 2, 1)
-
-        end if
-
-        ! END: Population of Buffers in y-direction ========================
-
-        ! Population of Buffers in z-direction =============================
-
-        if (p == 0) then
-
-            return
-
-        elseif (bc_z%beg <= -3) then     ! Ghost-cell extrap. BC at beginning
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, :, -j) = &
-                        v_vf(i)%sf(:, :, 0)
-                end do
-            end do
-
-        elseif (bc_z%beg == -2) then     ! Symmetry BC at beginning
-
-            do j = 1, buff_size
-
-                do i = 1, mom_idx%beg + 1
-                    v_vf(i)%sf(:, :, -j) = &
-                        v_vf(i)%sf(:, :, j - 1)
-                end do
-
-                v_vf(mom_idx%end)%sf(:, :, -j) = &
-                    -v_vf(mom_idx%end)%sf(:, :, j - 1)
-
-                do i = E_idx, sys_size
-                    v_vf(i)%sf(:, :, -j) = &
-                        v_vf(i)%sf(:, :, j - 1)
-                end do
-
-            end do
-
-        elseif (bc_z%beg == -1) then     ! Periodic BC at beginning
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, :, -j) = &
-                        v_vf(i)%sf(:, :, p - (j - 1))
-                end do
-            end do
-
-        else                            ! Processor BC at beginning
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                v_vf, 3, -1)
-
-        end if
-
-        if (bc_z%end <= -3) then         ! Ghost-cell extrap. BC at end
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, :, p + j) = &
-                        v_vf(i)%sf(:, :, p)
-                end do
-            end do
-
-        elseif (bc_z%end == -2) then     ! Symmetry BC at end
-
-            do j = 1, buff_size
-
-                do i = 1, mom_idx%beg + 1
-                    v_vf(i)%sf(:, :, p + j) = &
-                        v_vf(i)%sf(:, :, p - (j - 1))
-                end do
-
-                v_vf(mom_idx%end)%sf(:, :, p + j) = &
-                    -v_vf(mom_idx%end)%sf(:, :, p - (j - 1))
-
-                do i = E_idx, sys_size
-                    v_vf(i)%sf(:, :, p + j) = &
-                        v_vf(i)%sf(:, :, p - (j - 1))
-                end do
-
-            end do
-
-        elseif (bc_z%end == -1) then     ! Periodic BC at end
-
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    v_vf(i)%sf(:, :, p + j) = &
-                        v_vf(i)%sf(:, :, j - 1)
-                end do
-            end do
-
-        else                            ! Processor BC at end
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                v_vf, 3, 1)
-
-        end if
-
-        ! END: Population of Buffers in z-direction ========================
-
-    end subroutine s_populate_variables_buffers ! -------------
 
     !>  The purpose of this procedure is to populate the buffers
         !!      of the conservative variables, depending on the selected
@@ -2819,12 +2483,12 @@ contains
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_reconstruct_cell_boundary_values_alt(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -
+    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
                                                       norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 
@@ -2853,34 +2517,34 @@ contains
         if (n > 0) then
             if (p > 0) then
 
-                call s_weno_alt(v_vf(iv%beg:iv%end), &
-                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, iv%beg:iv%end), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, iv%beg:iv%end), &
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                                 norm_dir, weno_dir, &
                                 is1, is2, is3)
             else
-                call s_weno_alt(v_vf(iv%beg:iv%end), &
-                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, :), &
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                                 norm_dir, weno_dir, &
                                 is1, is2, is3)
             end if
         else
 
-            call s_weno_alt(v_vf(iv%beg:iv%end), &
-                        vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, :), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, :), vR_z_flat(:, :, :, :), &
+            call s_weno(v_vf(iv%beg:iv%end), &
+                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
                             is1, is2, is3)
         end if
 
         ! ==================================================================
-    end subroutine s_reconstruct_cell_boundary_values_alt ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values ! --------------------
 
-subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat, & ! -
+subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
                                                              norm_dir, vL_prim_vf, vR_prim_vf)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x_flat, vL_y_flat, vL_z_flat, vR_x_flat, vR_y_flat, vR_z_flat 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
 
         integer, intent(IN) :: norm_dir
 
@@ -2911,20 +2575,20 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
         if (n > 0) then
             if (p > 0) then
 
-                call s_weno_alt(v_vf(iv%beg:iv%end), &
-                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, iv%beg:iv%end), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, iv%beg:iv%end), &
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                                 norm_dir, weno_dir, &
                                 is1, is2, is3)
             else
-                call s_weno_alt(v_vf(iv%beg:iv%end), &
-                    vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, iv%beg:iv%end), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, iv%beg:iv%end), vR_z_flat(:, :, :, :), &
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                                 norm_dir, weno_dir, &
                                 is1, is2, is3)
             end if
         else
 
-            call s_weno_alt(v_vf(iv%beg:iv%end), &
-                        vL_x_flat(:, :, :, iv%beg:iv%end), vL_y_flat(:, :, :, :), vL_z_flat(:, :, :, :), vR_x_flat(:, :, :, iv%beg:iv%end), vR_y_flat(:, :, :, :), vR_z_flat(:, :, :, :), &
+            call s_weno(v_vf(iv%beg:iv%end), &
+                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
                             is1, is2, is3)
         end if
@@ -2937,8 +2601,8 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
                         do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
                                 do k = is2%beg, is2%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y_flat(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y_flat(j, k, l, i)
+                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
+                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -2949,8 +2613,8 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
                                 do l = is3%beg, is3%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z_flat(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z_flat(j, k, l, i)
+                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -2961,8 +2625,8 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x_flat(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x_flat(j, k, l, i)
+                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
                                 end do
                             end do
                         end do
@@ -2975,37 +2639,6 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
 
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
 
-    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_qp, vR_qp, & ! -
-                                                  norm_dir)
-
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        type(vector_field), intent(INOUT) :: vL_qp, vR_qp
-
-        integer, intent(IN) :: norm_dir
-
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
-        !< Indical bounds in the s1-, s2- and s3-directions
-
-        ! Reconstruction in s1-direction ===================================
-
-        if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-        elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            weno_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-        else
-            is1 = iz; is2 = iy; is3 = ix
-            weno_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-        end if
-
-        ! ==================================================================
-
-    end subroutine s_reconstruct_cell_boundary_values ! --------------------
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_rhs_module() ! -----------------------------------
@@ -3029,25 +2662,25 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
 
         deallocate (q_cons_qp%vf, q_prim_qp%vf)
 
-        deallocate (qL_rsx_vf_flat, qR_rsx_vf_flat)
+        deallocate (qL_rsx_vf, qR_rsx_vf)
 
         if (n > 0) then
-            deallocate (qL_rsy_vf_flat, qR_rsy_vf_flat)
+            deallocate (qL_rsy_vf, qR_rsy_vf)
         end if
 
         if (p > 0) then
-            deallocate (qL_rsz_vf_flat, qR_rsz_vf_flat)
+            deallocate (qL_rsz_vf, qR_rsz_vf)
         end if
 
         if (weno_Re_flux) then
-            deallocate (dqL_rsx_vf_flat, dqR_rsx_vf_flat)
+            deallocate (dqL_rsx_vf, dqR_rsx_vf)
 
             if (n > 0) then
-                deallocate (dqL_rsy_vf_flat, dqR_rsy_vf_flat)
+                deallocate (dqL_rsy_vf, dqR_rsy_vf)
             end if
 
             if (p > 0) then
-                deallocate (dqL_rsz_vf_flat, dqR_rsz_vf_flat)
+                deallocate (dqL_rsz_vf, dqR_rsz_vf)
             end if
         end if
 
