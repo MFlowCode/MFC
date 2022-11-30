@@ -144,7 +144,6 @@ contains
     subroutine s_convert_mixture_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
                                                       Re_K, i, j, k, G_K, G)
-!$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -182,7 +181,6 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles(qK_vf, rho_K, &
                                                               gamma_K, pi_inf_K, &
                                                               Re_K, i, j, k, G_K, G)
-!!$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -265,7 +263,6 @@ contains
     subroutine s_convert_species_to_mixture_variables(qK_vf, rho_K, &
                                                       gamma_K, pi_inf_K, &
                                                       Re_K, k, l, r, G_K, G)
-!!$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_vf
 
@@ -635,7 +632,6 @@ contains
             end do
 !$acc end parallel loop
 
-        print *, "Fail Here"
         elseif ((model_eqns /= 4)) then !TODO: add routine below for bubble + hypo
 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_K, alpha_K, nRtmp)
             do l = izb, ize
