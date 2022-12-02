@@ -896,19 +896,22 @@ contains
                         dq_prim_dx_qp%vf(iv%beg:iv%end), &
                         dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                         dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                        id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end))
+                        id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), &
+                        ix, iy, iz)
                     if (n > 0) then
                         call s_reconstruct_cell_boundary_values_visc_deriv( &
                             dq_prim_dy_qp%vf(iv%beg:iv%end), &
                             dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                             dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                            id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end))
+                            id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                            ix, iy, iz)
                         if (p > 0) then
                             call s_reconstruct_cell_boundary_values_visc_deriv( &
                                 dq_prim_dz_qp%vf(iv%beg:iv%end), &
                                 dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                                 dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                                id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
+                                id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
+                                ix, iy, iz)
                         end if
                     end if
                 end if
@@ -2538,108 +2541,6 @@ contains
 
         ! ==================================================================
     end subroutine s_reconstruct_cell_boundary_values ! --------------------
-
-subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                             norm_dir, vL_prim_vf, vR_prim_vf)
-
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-        type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
-
-        integer, intent(IN) :: norm_dir
-
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
-
-        integer :: i, j, k, l
-        ! Reconstruction in s1-direction ===================================
-
-        if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-
-        elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            weno_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-
-        else
-            is1 = iz; is2 = iy; is3 = ix
-            weno_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-
-        end if
-
-        !$acc update device(is1, is2, is3, iv)
-
-        if (n > 0) then
-            if (p > 0) then
-
-                call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                norm_dir, weno_dir, &
-                                is1, is2, is3)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                norm_dir, weno_dir, &
-                                is1, is2, is3)
-            end if
-        else
-
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1, is2, is3)
-        end if
-
-        if (any(Re_size > 0)) then
-            if (weno_Re_flux) then
-                if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do j = is1%beg, is1%end
-                                do k = is2%beg, is2%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (norm_dir == 3) then
-!$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                do l = is3%beg, is3%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (norm_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-            end if
-        end if
-
-        ! ==================================================================
-
-    end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
-
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_rhs_module() ! -----------------------------------
