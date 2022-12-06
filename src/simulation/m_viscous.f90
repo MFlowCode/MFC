@@ -2,7 +2,7 @@
 !! @file m_viscous.f90
 !! @brief Contains module m_viscous
 
-!> @brief The module contains the subroutines used to
+!> @brief The module contains the subroutines used to compute viscous terms.
 module m_viscous
 
     ! Dependencies =============================================================
