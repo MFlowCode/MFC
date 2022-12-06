@@ -3,8 +3,6 @@
 !! @brief Contains module m_viscous
 
 !> @brief The module contains the subroutines used to
-
-
 module m_viscous
 
     ! Dependencies =============================================================
