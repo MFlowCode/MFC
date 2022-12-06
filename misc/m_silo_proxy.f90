@@ -1,9 +1,6 @@
 !>
 !! @file m_mpi_proxy.f90
 !! @brief Contains module m_silo_proxy.f90
-!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
-!! @version 1.0
-!! @date JUNE 06 2019
 
 !> @brief The purpose of this module is to serve as a replacement framework
 !!                           for the Silo library and header file when those are not available
