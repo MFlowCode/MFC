@@ -1,3 +1,7 @@
+!>
+!! @file m_check_patches.f90
+!! @brief Contains module m_check_patches
+
 module m_check_patches
 
     ! Dependencies =============================================================

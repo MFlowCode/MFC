@@ -1,4 +1,6 @@
-
+!>
+!! @file m_assign_variables.f90
+!! @brief Contains module m_assign_variables
 module m_assign_variables
 
     ! Dependencies =============================================================

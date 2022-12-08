@@ -1,9 +1,6 @@
 !>
-!! @file m_derived_types.f90
-!! @brief Contains module m_derived_types
-
-!> @brief This file contains the definitions of all of the custom-defined
-!!              types used in the pre-process code.
+!! @file m_helper.f90
+!! @brief Contains module m_helper
 module m_helper
 
     ! Dependencies =============================================================

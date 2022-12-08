@@ -1,9 +1,13 @@
+!>
+!! @file m_compute_cbc.f90
+!! @brief Contains module m_compute_cbc
+
 module m_compute_cbc
 
     ! Dependencies =============================================================
-    use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
+
     ! ==========================================================================
 
     implicit none
