@@ -33,30 +33,6 @@ module m_cbc
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
 
-    abstract interface ! =======================================================
-
-        !> Abstract interface to the procedures that are utilized to calculate
-        !! the L variables. For additional information refer to the following:
-        !!            1) s_compute_slip_wall_L
-        !!            2) s_compute_nonreflecting_subsonic_buffer_L
-        !!            3) s_compute_nonreflecting_subsonic_inflow_L
-        !!            4) s_compute_nonreflecting_subsonic_outflow_L
-        !!            5) s_compute_force_free_subsonic_outflow_L
-        !!            6) s_compute_constant_pressure_subsonic_outflow_L
-        !!            7) s_compute_supersonic_inflow_L
-        !!            8) s_compute_supersonic_outflow_L
-        !! @param dflt_int Default null integer
-        subroutine s_compute_abstract_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-
-            integer, intent(IN) :: dflt_int
-            real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
-            real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-            real(kind(0d0)), dimension(:), intent(INOUT) :: L
-
-        end subroutine s_compute_abstract_L
-
-    end interface ! ============================================================
-
     !! The cell-average primitive variables. They are obtained by reshaping (RS)
     !! q_prim_vf in the coordinate direction normal to the domain boundary along
     !! which the CBC is applied.
