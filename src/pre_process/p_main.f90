@@ -27,6 +27,10 @@ program p_main
                                 !! conservative variables to files
 
     use m_compile_specific      !< Compile-specific procedures
+
+    use m_patches
+
+    use m_assign_variables
     ! ==========================================================================
 
     implicit none
@@ -66,6 +70,7 @@ program p_main
     call s_initialize_start_up_module()
     call s_initialize_grid_module()
     call s_initialize_initial_condition_module()
+    call s_initialize_assign_variables_module()
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -163,6 +168,7 @@ program p_main
     call s_finalize_variables_conversion_module()
     call s_finalize_data_output_module()
     call s_finalize_global_parameters_module()
+    call s_finialize_assign_variables_module()
 
     ! Finalization of the MPI environment
     call s_mpi_finalize()
