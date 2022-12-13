@@ -217,6 +217,10 @@ contains
                                         if (support(q) == 5) then
                                             mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
                                             mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                        else if (support(q) == 6) then
+                                            ! Cylindrical Coordinate
+                                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l)
                                         else
                                             mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
                                             mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
@@ -318,7 +322,9 @@ contains
 
         integer :: q
         real(kind(0d0)) :: h, hx, hy, hz
+        real(kind(0d0)) :: hx_cyl, hy_cyl, hz_cyl
         real(kind(0d0)) :: hxnew, hynew
+        real(kind(0d0)) :: hxnew_cyl, hynew_cyl
         real(kind(0d0)) :: sig
         real(kind(0d0)) :: f_delta
         real(kind(0d0)) :: angle
@@ -436,6 +442,27 @@ contains
                 else
                     f_delta = 0d0
                 end if
+            else if (support(nm) == 6) then
+                ! Support for cylindrical coordinate system
+                !sig = maxval((/dx(j), dy(k)*sin(dz(l)), dz(l)*cos(dz(l))/))
+                sig = dx(j)
+                sig = sig*2.5d0
+                hx_cyl = x_cc(j) - mono_loc(1)
+                hy_cyl = y_cc(k)*sin(z_cc(l)) - mono_loc(2)
+                hz_cyl = y_cc(k)*cos(z_cc(l)) - mono_loc(3)
+
+                ! Rotate actual point by -theta
+                hxnew_cyl = cos(dir(nm))*hx_cyl + sin(dir(nm))*hy_cyl
+                hynew_cyl = -1.d0*sin(dir(nm))*hx_cyl + cos(dir(nm))*hy_cyl
+
+                if (abs(hynew_cyl) < length(nm)/2. .and. &
+                    abs(hz_cyl) < length(nm)/2.) then
+                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
+                              dexp(-0.5d0*(hxnew_cyl/(sig/2.d0))**2.d0)
+                else
+                    f_delta = 0d0
+                end if
+
             end if
         end if
 
