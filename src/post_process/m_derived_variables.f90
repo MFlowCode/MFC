@@ -15,12 +15,13 @@ module m_derived_variables
     use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_derived_variables_module, &
- s_compute_finite_difference_coefficients, &
  s_derive_unadvected_volume_fraction, &
  s_derive_specific_heat_ratio, &
  s_derive_liquid_stiffness, &
@@ -109,102 +110,6 @@ contains
         end if
 
     end subroutine s_initialize_derived_variables_module ! --------------------
-
-    !> @name The purpose of this subroutine is to compute the finite-
-        !!      difference coefficients for the centered schemes utilized
-        !!      in computations of first order spatial derivatives in the
-        !!      s-coordinate direction. The s-coordinate direction refers
-        !!      to the x-, y- or z-coordinate direction, depending on the
-        !!      subroutine's inputs. Note that coefficients of up to 4th
-        !!      order accuracy are available.
-        !!  @param q Number of cells in the s-coordinate direction
-        !!  @param offset_s  Size of the ghost zone layer in the s-coordinate direction
-        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    subroutine s_compute_finite_difference_coefficients(q, offset_s, &
-                                                        s_cc, fd_coeff_s)
-
-        integer, intent(IN) :: q
-        type(int_bounds_info), intent(IN) :: offset_s
-
-        real(kind(0d0)), &
-            dimension(-buff_size:q + buff_size), &
-            intent(IN) :: s_cc
-
-        real(kind(0d0)), &
-            dimension(-fd_number:fd_number, -offset_s%beg:q + offset_s%end), &
-            intent(INOUT) :: fd_coeff_s
-
-        integer :: i !< Generic loop iterator
-
-        ! Computing the 1st order finite-difference coefficients
-        if (fd_order == 1) then
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
-                fd_coeff_s(1, i) = -fd_coeff_s(0, i)
-            end do
-
-            ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order == 2) then
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-            end do
-
-            ! Computing the 4th order finite-difference coefficients
-        else
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) &
-                                         - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-                fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
-            end do
-
-        end if
-
-    end subroutine s_compute_finite_difference_coefficients ! --------------
-
-    !>  This subroutine is used together with the volume fraction
-        !!      model and when called upon, it computes the values of the
-        !!      unadvected volume fraction from the inputted conservative
-        !!      variables, q_cons_vf. The calculated values are stored in
-        !!      the derived flow quantity storage variable, q_sf.
-        !!  @param q_cons_vf Conservative variables
-        !!  @param q_sf Unadvected volume fraction
-    subroutine s_derive_unadvected_volume_fraction(q_cons_vf, q_sf) ! ------
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_cons_vf
-
-        real(kind(0d0)), &
-            dimension(-offset_x%beg:m + offset_x%end, &
-                      -offset_y%beg:n + offset_y%end, &
-                      -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
-
-        integer :: i, j, k, l !< Generic loop iterators
-
-        ! Computing unadvected volume fraction from conservative variables
-        do l = -offset_z%beg, p + offset_z%end
-            do k = -offset_y%beg, n + offset_y%end
-                do j = -offset_x%beg, m + offset_x%end
-
-                    q_sf(j, k, l) = 1d0
-
-                    do i = adv_idx%beg, adv_idx%end
-                        q_sf(j, k, l) = q_sf(j, k, l) - q_cons_vf(i)%sf(j, k, l)
-                    end do
-
-                end do
-            end do
-        end do
-
-    end subroutine s_derive_unadvected_volume_fraction ! -------------------
 
     !>  This subroutine receives as input the specific heat ratio
         !!      function, gamma_sf, and derives from it the specific heat
