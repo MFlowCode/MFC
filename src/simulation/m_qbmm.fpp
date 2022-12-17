@@ -419,28 +419,4 @@ contains
 
     end subroutine s_hyqmom
 
-    function f_quad(abscX, abscY, wght, q, r, s)
-        !$acc routine seq
-        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), intent(IN) :: q, r, s
-        real(kind(0.d0)) :: f_quad_RV, f_quad
-        integer :: i
-
-        f_quad = 0d0
-        do i = 1, nb
-            f_quad_RV = sum(wght(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
-            f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
-        end do
-
-    end function f_quad
-
-    function f_quad2D(abscX, abscY, wght, pow)
-        !$acc routine seq
-        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), dimension(3), intent(IN) :: pow
-        real(kind(0.d0)) :: f_quad2D
-
-        f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
-    end function f_quad2D
-
 end module m_qbmm

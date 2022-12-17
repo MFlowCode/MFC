@@ -115,6 +115,13 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
+    integer :: buff_sie
+    !! The number of cells that are necessary to be able to store enough boundary
+    !! conditions data to march the solution in the physical computational domain
+    !! to the next time-step.
+
+    
+
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
@@ -805,103 +812,5 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! ----------------------
-
-    !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-
-        call s_quad(nRtmp**3.d0, nR3)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-
-        call s_quad(Rtmp**3.d0, R3)  !returns itself if NR0 = 1
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
-
-    !> Computes the Simpson weights for quadrature
-    subroutine s_simpson
-
-        integer :: ir
-        real(kind(0.d0)) :: R0mn
-        real(kind(0.d0)) :: R0mx
-        real(kind(0.d0)) :: dphi
-        real(kind(0.d0)) :: tmp
-        real(kind(0.d0)) :: sd
-        real(kind(0.d0)), dimension(nb) :: phi
-
-        ! nondiml. min. & max. initial radii for numerical quadrature
-        !sd   = 0.05D0
-        !R0mn = 0.75D0
-        !R0mx = 1.3D0
-
-        !sd   = 0.3D0
-        !R0mn = 0.3D0
-        !R0mx = 6.D0
-
-        !sd   = 0.7D0
-        !R0mn = 0.12D0
-        !R0mx = 150.D0
-
-        sd = poly_sigma
-        R0mn = 0.8d0*DEXP(-2.8d0*sd)
-        R0mx = 0.2d0*DEXP(9.5d0*sd) + 1.d0
-
-        ! phi = ln( R0 ) & return R0
-        do ir = 1, nb
-            phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(nb - 1)
-            R0(ir) = DEXP(phi(ir))
-        end do
-        dphi = phi(2) - phi(1)
-
-        ! weights for quadrature using Simpson's rule
-        do ir = 2, nb - 1
-            ! Gaussian
-            tmp = DEXP(-0.5d0*(phi(ir)/sd)**2)/DSQRT(2.d0*pi)/sd
-            if (mod(ir, 2) == 0) then
-                weight(ir) = tmp*4.d0*dphi/3.d0
-            else
-                weight(ir) = tmp*2.d0*dphi/3.d0
-            end if
-        end do
-
-        tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(1) = tmp*dphi/3.d0
-        tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(nb) = tmp*dphi/3.d0
-
-    end subroutine s_simpson
 
 end module m_global_parameters
