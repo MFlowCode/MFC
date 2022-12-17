@@ -330,7 +330,7 @@ The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i
 The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`mymono_length`/2, `mymono_length`/2].\\
 `Mono(i)%support` $=3$ specifies a semi-infinite source plane in 3-D simulation.
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
-The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2].
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2]. There are a few additional spatial support types available for special source types and coordinate systems.
 
 ### 8. Ensemble-Averaged Bubble Model
 
@@ -455,7 +455,7 @@ The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux
 |    6 | Cyl_coord |
 
 The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
-types exclusive to one-, two-, and three-dimensional problems with special coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
+types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
 $i$ is the monopole source index.
 
 ## Running
