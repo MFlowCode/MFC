@@ -302,7 +302,7 @@ Parallel I/O enables the use of different number of processors in each of the pr
 | `num_mono` 	      | Integer	| Number of acoustic sources |
 | `Mono(i)%pulse`   | Integer	| Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
 | `Mono(i)%npulse`  | Integer	| Number of pulse cycles |
-| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch |
+| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support for monopole acoustic transducer [6] Support for cylindrical coordinate system |
 | `Mono(i)%loc(j)`  | Real		| $j$-th coordinate of the point that consists of $i$-th source plane |
 | `Mono(i)%dir` 	  | Real		| Direction of acoustic propagation	|
 | `Mono(i)%mag`     | Real		| Pulse magnitude	|
@@ -330,7 +330,7 @@ The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i
 The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`mymono_length`/2, `mymono_length`/2].\\
 `Mono(i)%support` $=3$ specifies a semi-infinite source plane in 3-D simulation.
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
-The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2]. There are a few additional spatial support types available for special source types and coordinate systems.
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2]. There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
 
 ### 8. Ensemble-Averaged Bubble Model
 
