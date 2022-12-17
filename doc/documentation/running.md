@@ -443,6 +443,21 @@ also listed in this table.
 
 The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux-limiters). Each limiter can be specified by specifying the value of `flux_lim`. Details of their implementations can be found in [Meng (2016)](references.md#Meng16).
 
+### Monopole supports
+
+| #    | Description |
+| ---: | :----       |
+|    1 | 1D normal to x-axis      |
+|    2 | 2D semi-infinite source plane         |
+|    3 | 3D semi-infinite source plane along some lines       |
+|    4 | 3D semi-infinite source plane    |
+|    5 | Transducer      |
+|    6 | Cyl_coord |
+
+The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
+types exclusive to one-, two-, and three-dimensional problems with special coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
+$i$ is the monopole source index.
+
 ## Running
 
 MFC can be run using `mfc.sh`'s `run` command. It supports both interactive and
