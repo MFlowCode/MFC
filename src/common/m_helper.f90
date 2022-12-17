@@ -184,10 +184,18 @@ contains
     subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, & ! --------
                                                  dv_ds_vf, &
                                                  norm_dir, &
-                                                 ix, iy, iz, iv)
+                                                 ix, iy, iz, iv, &
+                                                 dxL, dyL, dzL, buff_size)
 
         type(int_bounds_info) :: ix, iy, iz, iv
             
+        integer :: buff_size
+
+        real(kind(0d0)), dimension(-buff_size:m + buff_size) :: dxL
+        real(kind(0d0)), dimension(-buff_size:n + buff_size) :: dyL
+        real(kind(0d0)), dimension(-buff_size:p + buff_size) :: dzL
+        ! arrays of cell widths
+
         type(scalar_field), &
             dimension(iv%beg:iv%end), &
             intent(IN) :: vL_vf, vR_vf
@@ -219,7 +227,7 @@ contains
                         do i = iv%beg, iv%end
 
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dx(j) &
+                                1d0/dxL(j) &
                                 *( &
                                 vR_vf(i)%sf(j, k, l) &
                                 - vL_vf(i)%sf(j, k, l) &
@@ -248,7 +256,7 @@ contains
 !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dy(k) &
+                                1d0/dyL(k) &
                                 *( &
                                 vR_vf(i)%sf(j, k, l) &
                                 - vL_vf(i)%sf(j, k, l) &
@@ -276,7 +284,7 @@ contains
 !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dz(l) &
+                                1d0/dzL(l) &
                                 *( &
                                 vR_vf(i)%sf(j, k, l) &
                                 - vL_vf(i)%sf(j, k, l) &
