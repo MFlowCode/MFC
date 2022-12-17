@@ -302,7 +302,7 @@ Parallel I/O enables the use of different number of processors in each of the pr
 | `num_mono` 	      | Integer	| Number of acoustic sources |
 | `Mono(i)%pulse`   | Integer	| Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
 | `Mono(i)%npulse`  | Integer	| Number of pulse cycles |
-| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support for monopole acoustic transducer [6] Support for cylindrical coordinate system |
+| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
 | `Mono(i)%loc(j)`  | Real		| $j$-th coordinate of the point that consists of $i$-th source plane |
 | `Mono(i)%dir` 	  | Real		| Direction of acoustic propagation	|
 | `Mono(i)%mag`     | Real		| Pulse magnitude	|
@@ -452,7 +452,7 @@ The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux
 |    3 | 3D semi-infinite source plane along some lines       |
 |    4 | 3D semi-infinite source plane    |
 |    5 | Transducer      |
-|    6 | Cyl_coord |
+|    6 | Cyl_coord along axial-dir|
 
 The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
 types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
