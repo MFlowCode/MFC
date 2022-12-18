@@ -1096,7 +1096,7 @@ contains
     end subroutine s_quad
 
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson(phi)
+    subroutine s_simpson
 
         integer :: ir
         real(kind(0.d0)) :: R0mn
@@ -1105,6 +1105,7 @@ contains
         real(kind(0.d0)) :: tmp
         real(kind(0.d0)) :: sd
         real(kind(0.d0)), dimension(nb) :: phi
+
 
         sd = poly_sigma
         R0mn = 0.8d0*DEXP(-2.8d0*sd)
