@@ -111,6 +111,44 @@ contains
 
     end subroutine s_initialize_derived_variables_module ! --------------------
 
+        !>  This subroutine is used together with the volume fraction
+        !!      model and when called upon, it computes the values of the
+        !!      unadvected volume fraction from the inputted conservative
+        !!      variables, q_cons_vf. The calculated values are stored in
+        !!      the derived flow quantity storage variable, q_sf.
+        !!  @param q_cons_vf Conservative variables
+        !!  @param q_sf Unadvected volume fraction
+    subroutine s_derive_unadvected_volume_fraction(q_cons_vf, q_sf) ! ------
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(IN) :: q_cons_vf
+
+        real(kind(0d0)), &
+            dimension(-offset_x%beg:m + offset_x%end, &
+                      -offset_y%beg:n + offset_y%end, &
+                      -offset_z%beg:p + offset_z%end), &
+            intent(INOUT) :: q_sf
+
+        integer :: i, j, k, l !< Generic loop iterators
+
+        ! Computing unadvected volume fraction from conservative variables
+        do l = -offset_z%beg, p + offset_z%end
+            do k = -offset_y%beg, n + offset_y%end
+                do j = -offset_x%beg, m + offset_x%end
+
+                    q_sf(j, k, l) = 1d0
+
+                    do i = adv_idx%beg, adv_idx%end
+                        q_sf(j, k, l) = q_sf(j, k, l) - q_cons_vf(i)%sf(j, k, l)
+                    end do
+
+                end do
+            end do
+        end do
+
+    end subroutine s_derive_unadvected_volume_fraction ! -------------------
+
     !>  This subroutine receives as input the specific heat ratio
         !!      function, gamma_sf, and derives from it the specific heat
         !!      ratio. The latter is stored in the derived flow quantity

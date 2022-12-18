@@ -86,11 +86,14 @@ contains
 
         ! Computing centered finite difference coefficients
         if (probe_wrt) then
-            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
+                                                             fd_number, fd_order)
             if (n > 0) then
-                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, fd_number, fd_order)
+                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
+                                                                 fd_number, fd_order)
                 if (p > 0) then
-                    call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, fd_number, fd_order)
+                    call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
+                                                                     fd_number, fd_order)
                 end if
             end if
         end if

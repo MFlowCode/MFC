@@ -23,7 +23,9 @@ module m_helper
         f_r, &
         s_compute_finite_difference_coefficients, &
         s_apply_scalar_divergence_theorem, &
-        s_compute_fd_gradient
+        s_compute_fd_gradient, &
+        f_quad, &
+        f_quad2D
 
 contains
 
