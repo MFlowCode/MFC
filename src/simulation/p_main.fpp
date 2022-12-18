@@ -257,7 +257,7 @@ program p_main
             call s_mpi_barrier()
 
             if (num_procs > 1) then
-                call mpi_bcast_time_step_values(proc_time, time_avg)
+                call mpi_bcast_time_step_values(proc_time, time)
 
                 call mpi_bcast_time_step_values(io_proc_time, io_time_avg)
             end if
@@ -266,7 +266,7 @@ program p_main
                 time_final = 0d0
                 io_time_final = 0d0
                 if (num_procs == 1) then
-                    time_final = time_avg
+                    time_final = time
                     io_time_final = io_time_avg
                     print *, "Final Time", time_final
                 else
