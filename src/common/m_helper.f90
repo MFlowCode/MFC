@@ -21,10 +21,6 @@ module m_helper
     private; public :: s_convert_cylindrical_to_cartesian_coord, &
         s_convert_cylindrical_to_spherical_coord, &
         f_r, &
-        s_comp_n_from_cons, &
-        s_comp_n_from_prim, &
-        s_quad, &
-        s_simpson, &
         s_compute_finite_difference_coefficients, &
         s_apply_scalar_divergence_theorem, &
         s_compute_fd_gradient

@@ -877,15 +877,15 @@ contains
     end subroutine s_quad
 
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson
+    subroutine s_simpson(npt)
 
+        integer, intent(IN) :: npt
         integer :: ir
         real(kind(0.d0)) :: R0mn
         real(kind(0.d0)) :: R0mx
         real(kind(0.d0)) :: dphi
         real(kind(0.d0)) :: tmp
         real(kind(0.d0)) :: sd
-        real(kind(0.d0)), dimension(nb) :: phi
 
         sd = poly_sigma
         R0mn = 0.8d0*DEXP(-2.8d0*sd)
