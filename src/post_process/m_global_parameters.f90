@@ -233,6 +233,7 @@ module m_global_parameters
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: poly_sigma
+    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     !> @}
 
     ! Mathematical and Physical Constants ======================================
@@ -886,6 +887,8 @@ contains
         real(kind(0.d0)) :: dphi
         real(kind(0.d0)) :: tmp
         real(kind(0.d0)) :: sd
+
+        real(kind(0.d0)), dimension(Npt) :: phi
 
         sd = poly_sigma
         R0mn = 0.8d0*DEXP(-2.8d0*sd)
