@@ -302,7 +302,7 @@ Parallel I/O enables the use of different number of processors in each of the pr
 | `num_mono` 	      | Integer	| Number of acoustic sources |
 | `Mono(i)%pulse`   | Integer	| Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
 | `Mono(i)%npulse`  | Integer	| Number of pulse cycles |
-| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch |
+| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
 | `Mono(i)%loc(j)`  | Real		| $j$-th coordinate of the point that consists of $i$-th source plane |
 | `Mono(i)%dir` 	  | Real		| Direction of acoustic propagation	|
 | `Mono(i)%mag`     | Real		| Pulse magnitude	|
@@ -330,7 +330,7 @@ The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i
 The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`mymono_length`/2, `mymono_length`/2].\\
 `Mono(i)%support` $=3$ specifies a semi-infinite source plane in 3-D simulation.
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
-The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2].
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2]. There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
 
 ### 8. Ensemble-Averaged Bubble Model
 
@@ -442,6 +442,21 @@ also listed in this table.
 |    7 | van Leer    |
 
 The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux-limiters). Each limiter can be specified by specifying the value of `flux_lim`. Details of their implementations can be found in [Meng (2016)](references.md#Meng16).
+
+### Monopole supports
+
+| #    | Description |
+| ---: | :----       |
+|    1 | 1D normal to x-axis      |
+|    2 | 2D semi-infinite source plane         |
+|    3 | 3D semi-infinite source plane along some lines       |
+|    4 | 3D semi-infinite source plane    |
+|    5 | Transducer      |
+|    6 | Cyl_coord along axial-dir|
+
+The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
+types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
+$i$ is the monopole source index.
 
 ## Running
 
