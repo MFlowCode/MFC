@@ -15,6 +15,8 @@ module m_variables_conversion
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
+
+    use m_helper
     ! ==========================================================================
 
     implicit none

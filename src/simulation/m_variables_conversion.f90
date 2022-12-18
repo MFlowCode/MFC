@@ -574,6 +574,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
 
+!$acc routine(s_comp_n_from_cons) seq
 
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
 !$acc parallel loop collapse(3) gang vector default(present) private( alpha_K, alpha_rho_K, Re_K)

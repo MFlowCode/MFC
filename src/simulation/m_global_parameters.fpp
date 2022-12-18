@@ -1050,12 +1050,12 @@ contains
         end if
 
     end subroutine s_finalize_global_parameters_module ! -------------------
-
     !> Computes the bubble number density n from the conservative variables
         !! @param vftmp is the void fraction
         !! @param nRtmp is the bubble number  density times the bubble radii
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
+        !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
@@ -1072,6 +1072,7 @@ contains
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
+        !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
@@ -1082,7 +1083,6 @@ contains
         ! ntmp = 1d0
 
     end subroutine s_comp_n_from_prim
-
     !> Computes the quadrature for polydisperse bubble populations
         !! @param func is the bubble dynamic variables for each bin
         !! @param mom is the computed moment
