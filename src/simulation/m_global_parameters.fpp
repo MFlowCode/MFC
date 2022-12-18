@@ -27,6 +27,8 @@ module m_global_parameters
 
     implicit none
 
+    real(kind(0d0)) :: time = 0
+
     ! Logistics ================================================================
     integer :: num_procs             !< Number of processors
     integer, parameter :: num_stcls_min = 5     !< Mininum # of stencils
