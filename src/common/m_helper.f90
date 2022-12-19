@@ -23,9 +23,7 @@ module m_helper
         f_r, &
         s_compute_finite_difference_coefficients, &
         s_apply_scalar_divergence_theorem, &
-        s_compute_fd_gradient, &
-        f_quad, &
-        f_quad2D
+        s_compute_fd_gradient
 
 contains
 
@@ -60,30 +58,6 @@ contains
         b = 2.d0*a/(2.d0*pi)
         f_r = a + b*myth + offset
     end function f_r
-
-    function f_quad(abscX, abscY, wght, q, r, s)
-        !$acc routine seq
-        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), intent(IN) :: q, r, s
-        real(kind(0.d0)) :: f_quad_RV, f_quad
-        integer :: i
-
-        f_quad = 0d0
-        do i = 1, nb
-            f_quad_RV = sum(wght(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
-            f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
-        end do
-
-    end function f_quad
-
-    function f_quad2D(abscX, abscY, wght, pow)
-        !$acc routine seq
-        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), dimension(3), intent(IN) :: pow
-        real(kind(0.d0)) :: f_quad2D
-
-        f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
-    end function f_quad2D
 
         !>  The purpose of this subroutine is to employ the inputted
         !!      left and right cell-boundary integral-averaged variables
