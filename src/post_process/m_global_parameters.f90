@@ -419,7 +419,7 @@ contains
                     R0(:) = 1d0
                     V0(:) = 0d0
                 else if (nb > 1) then
-                    call s_simpson(nb)
+                    call s_simpson
                     V0(:) = 0d0
                 else
                     stop 'Invalid value of nb'
@@ -503,7 +503,7 @@ contains
                     R0(:) = 1d0
                     V0(:) = 0d0
                 else if (nb > 1) then
-                    call s_simpson(nb)
+                    call s_simpson
                     V0(:) = 0d0
                 else
                     stop 'Invalid value of nb'
@@ -833,54 +833,9 @@ contains
 
     end subroutine s_finalize_global_parameters_module ! -----------------
 
-        !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-
-        call s_quad(nRtmp**3.d0, nR3)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-
-        call s_quad(Rtmp**3.d0, R3)  !returns itself if NR0 = 1
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
-
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson(npt)
+    subroutine s_simpson
 
-        integer, intent(IN) :: npt
         integer :: ir
         real(kind(0.d0)) :: R0mn
         real(kind(0.d0)) :: R0mx
@@ -888,7 +843,7 @@ contains
         real(kind(0.d0)) :: tmp
         real(kind(0.d0)) :: sd
 
-        real(kind(0.d0)), dimension(Npt) :: phi
+        real(kind(0.d0)), dimension(nb) :: phi
 
         sd = poly_sigma
         R0mn = 0.8d0*DEXP(-2.8d0*sd)
