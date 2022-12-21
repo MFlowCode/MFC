@@ -10,9 +10,9 @@ module m_viscous
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_weno
-
     use m_helper
+
+    use m_weno
     ! ==========================================================================
 
     private; public  s_get_viscous, &

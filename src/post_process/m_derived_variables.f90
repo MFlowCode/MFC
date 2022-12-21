@@ -14,9 +14,9 @@ module m_derived_variables
 
     use m_global_parameters     !< Global parameters for the code
 
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-
     use m_helper
+
+    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
     ! ==========================================================================
 
     implicit none
