@@ -23,7 +23,10 @@ module m_helper
         f_r, &
         s_compute_finite_difference_coefficients, &
         s_apply_scalar_divergence_theorem, &
-        s_compute_fd_gradient
+        s_compute_fd_gradient, &
+        s_comp_n_from_cons, &
+        s_comp_n_from_prim, &
+        s_quad
 
 contains
 
@@ -430,5 +433,52 @@ contains
         end if
 
     end subroutine s_compute_finite_difference_coefficients ! --------------
+
+            !> Computes the bubble number density n from the conservative variables
+        !! @param vftmp is the void fraction
+        !! @param nRtmp is the bubble number  density times the bubble radii
+        !! @param ntmp is the output number bubble density
+    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weight)
+        real(kind(0.d0)), intent(IN) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
+        real(kind(0.d0)), intent(OUT) :: ntmp
+        real(kind(0.d0)) :: nR3
+        real(kind(0.d0)), dimension(nb) :: weight
+
+        call s_quad(nRtmp**3.d0, nR3, weight)  !returns itself if NR0 = 1
+        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+        ! ntmp = 1d0
+
+    end subroutine s_comp_n_from_cons
+
+    !> Computes the bubble number density n from the primitive variables
+        !! @param vftmp is the void fraction
+        !! @param Rtmp is the  bubble radii
+        !! @param ntmp is the output number bubble density
+    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weight)
+        real(kind(0.d0)), intent(IN) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
+        real(kind(0.d0)), intent(OUT) :: ntmp
+        real(kind(0.d0)) :: R3
+        real(kind(0.d0)), dimension(nb) :: weight
+
+        call s_quad(Rtmp**3.d0, R3, weight)  !returns itself if NR0 = 1
+        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
+        ! ntmp = 1d0
+
+    end subroutine s_comp_n_from_prim
+
+    !> Computes the quadrature for polydisperse bubble populations
+        !! @param func is the bubble dynamic variables for each bin
+        !! @param mom is the computed moment
+    subroutine s_quad(func, mom, weight)
+
+        real(kind(0.d0)), dimension(nb), intent(IN) :: func
+        real(kind(0.d0)), intent(OUT) :: mom
+        real(kind(0.d0)), dimension(nb) :: weight
+
+        mom = dot_product(weight, func)
+
+    end subroutine s_quad
 
 end module m_helper

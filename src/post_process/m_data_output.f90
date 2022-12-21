@@ -19,6 +19,8 @@ module m_data_output
     use m_mpi_proxy             ! Message passing interface (MPI) module proxy
 
     use m_compile_specific
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
