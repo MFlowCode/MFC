@@ -16,13 +16,13 @@ module m_data_output
 
     use m_global_parameters    !< Definitions of the global parameters
 
+    use m_helper
+
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compile_specific
-
-    use m_helper
     ! ==========================================================================
 
     implicit none
