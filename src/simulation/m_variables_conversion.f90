@@ -14,6 +14,8 @@
 module m_variables_conversion
 
     ! Dependencies =============================================================
+    use m_helper
+    
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -21,8 +23,6 @@ module m_variables_conversion
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use nvtx
-
-    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -668,7 +668,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
+                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
 
 !$acc loop seq
                         do i = bubxb, bubxe

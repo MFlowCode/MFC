@@ -14,6 +14,8 @@ module m_data_output
 
     use m_global_parameters     !< Global parameters for the code
 
+    use m_helper
+
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
 #ifdef MFC_MPI
@@ -23,8 +25,6 @@ module m_data_output
     use m_compile_specific
 
     use m_variables_conversion
-
-    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -201,7 +201,7 @@ contains
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
-                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
 
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if
