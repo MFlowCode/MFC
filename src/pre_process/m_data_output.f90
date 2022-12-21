@@ -14,8 +14,6 @@ module m_data_output
 
     use m_global_parameters     !< Global parameters for the code
 
-    use m_helper
-
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
 #ifdef MFC_MPI
@@ -25,6 +23,8 @@ module m_data_output
     use m_compile_specific
 
     use m_variables_conversion
+
+    use m_helper
     ! ==========================================================================
 
     implicit none

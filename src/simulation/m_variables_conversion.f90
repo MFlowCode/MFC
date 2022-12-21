@@ -18,11 +18,11 @@ module m_variables_conversion
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_helper
-    
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use nvtx
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
