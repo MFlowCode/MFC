@@ -668,7 +668,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
 
 !$acc loop seq
                         do i = bubxb, bubxe

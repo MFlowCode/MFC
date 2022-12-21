@@ -404,7 +404,7 @@ contains
                         do i = 1, nb
                             nRtmp(i) = q_cons_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub, weight)
+                        call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, k, l), nRtmp, nbub)
                         do i = bub_idx%beg, sys_size
                             q_prim_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)/nbub
                         end do
