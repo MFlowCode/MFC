@@ -168,11 +168,16 @@ macro(HANDLE_FYPP target)
 
         set(f90_filepath "${f90_dirpath}/autogen/${f90_filename}")
 
+        set(depends_on "${fpp_filepath}")
+        if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/case.fpp")
+            list(APPEND depends_on "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/case.fpp")
+        endif()
+
         add_custom_command(
             OUTPUT   "${f90_filepath}"
             COMMAND  "${FYPP_EXE}" "${fpp_filepath}" "${f90_filepath}"
-            DEPENDS  "${fpp_filepath}" "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/case.fpp"
-            COMMENT  "Preprocessing ${fpp_filename}"
+            DEPENDS  "${depends_on}"
+            COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
             VERBATIM
         )
 

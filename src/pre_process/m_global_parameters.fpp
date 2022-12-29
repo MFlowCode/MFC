@@ -174,6 +174,16 @@ module m_global_parameters
     integer :: R0_type   !1 = simpson
     !> @}
 
+    !> @name Index variables used for m_variables_conversion
+    !> @{
+    integer :: momxb, momxe
+    integer :: advxb, advxe
+    integer :: contxb, contxe
+    integer :: intxb, intxe
+    integer :: bubxb, bubxe
+    integer :: strxb, strxe
+    !> @}
+
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
     ! Mathematical and Physical Constants ======================================
@@ -560,6 +570,20 @@ contains
                 end if
             end if
         end if
+
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+        bubxb = bub_idx%beg
+        bubxe = bub_idx%end
+        strxb = stress_idx%beg
+        strxe = stress_idx%end
+        intxb = internalEnergies_idx%beg
+        intxe = internalEnergies_idx%end
+
         ! ==================================================================
 
 #ifdef MFC_MPI
@@ -843,7 +867,7 @@ contains
         !! @param mom is the computed moment
     subroutine s_quad(func, mom)
 
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
+        real(kind(0.d0)), dimension(nb), intent(IN) :: func 
         real(kind(0.d0)), intent(OUT) :: mom
 
         mom = dot_product(weight, func)

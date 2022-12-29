@@ -818,14 +818,6 @@ contains
 
 !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
-        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
-
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-!$acc update device(gammas, pi_infs)
-
         ! Allocating grid variables for the x-, y- and z-directions
         allocate (x_cb(-1 - buff_size:m + buff_size))
         allocate (x_cc(-buff_size:m + buff_size))
