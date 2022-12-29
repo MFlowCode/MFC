@@ -86,6 +86,7 @@ contains
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
+        real(kind(0d0)) :: pres                         !< Temporary pressure
 
         t_step = 0
 
@@ -168,33 +169,9 @@ contains
                         else if (i == stress_idx%beg) then !tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == E_idx) then !p
-                            if (model_eqns == 4) then
-                                !Tait pressure from density
-                                write (2, FMT) x_cb(j), &
-                                    (pref + pi_inf)*( &
-                                    (q_cons_vf(1)%sf(j, 0, 0)/ &
-                                     (rhoref*(1.d0 - q_cons_vf(4)%sf(j, 0, 0))) &
-                                     )**lit_gamma) &
-                                    - pi_inf
-                                !TODO: add elastic contribution here for cases with initial tau_e nonzero
-                            else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
-                                !Stiffened gas pressure from energy
-                                write (2, FMT) x_cb(j), &
-                                    ( &
-                                    q_cons_vf(E_idx)%sf(j, 0, 0) - &
-                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho - &
-                                    pi_inf &
-                                    )/gamma
-                            else
-                                !Stiffened gas pressure from energy with bubbles
-                                write (2, FMT) x_cb(j), &
-                                    ( &
-                                    (q_cons_vf(E_idx)%sf(j, 0, 0) - &
-                                     0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho)/ &
-                                    (1.d0 - q_cons_vf(alf_idx)%sf(j, 0, 0)) - &
-                                    pi_inf &
-                                    )/gamma
-                            end if
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j, 0, 0), q_cons_vf(alf_idx)%sf(j, 0, 0), &
+                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, pi_inf, gamma, pres)
+                            write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)

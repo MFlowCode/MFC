@@ -100,7 +100,7 @@ module m_initial_condition
     !! Depending on the multicomponent flow model, this variable is a pointer to
     !! either the subroutine s_assign_patch_mixture_primitive_variables, or the
     !! subroutine s_assign_patch_species_primitive_variables
-
+    
 contains
 
     !>  This subroutine assigns the mixture primitive variables
@@ -756,6 +756,7 @@ contains
             s_assign_patch_primitive_variables => &
                 s_assign_patch_species_primitive_variables
         end if
+
 
     end subroutine s_initialize_initial_condition_module ! -----------------
 
