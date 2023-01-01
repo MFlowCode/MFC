@@ -266,9 +266,7 @@ contains
         rho_K => rho_sf(i, j, k)
         gamma_K =>  gamma_sf(i, j, k)
         pi_inf_K => pi_inf_sf(i, j, k)
-#endif
-
-#ifndef MFC_POST_PROCESS
+#else
         rho_K  => rho
         gamma_K => gamma
         pi_inf_K => pi_inf
@@ -323,9 +321,7 @@ contains
         rho_K => rho_sf(j, k, l)
         gamma_K =>  gamma_sf(j, k, l)
         pi_inf_K => pi_inf_sf(j, k, l)
-#endif
-
-#ifndef MFC_POST_PROCESS
+#else
         rho_K  => rho
         gamma_K => gamma
         pi_inf_K => pi_inf
@@ -420,9 +416,7 @@ contains
         rho_K => rho_sf(k, l, r)
         gamma_K =>  gamma_sf(k, l, r)
         pi_inf_K => pi_inf_sf(k, l, r)
-#endif
-
-#ifndef MFC_POST_PROCESS
+#else
         rho_K  => rho
         gamma_K => gamma
         pi_inf_K => pi_inf
@@ -606,7 +600,10 @@ contains
         integer :: i, j
 !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
 
-#ifndef MFC_PRE_PROCESS
+#ifdef MFC_PRE_PROCESS
+        ixb = 0; iyb = 0; izb = 0;
+        ixe = m; iye = n; ize = p;
+#else
         ixb = -buff_size
         ixe = m - ixb
 
@@ -620,11 +617,6 @@ contains
             izb = -buff_size
             ize = p - izb
         end if
-#endif
-
-#ifdef MFC_PRE_PROCESS
-        ixb = 0; iyb = 0; izb = 0;
-        ixe = m; iye = n; ize = p;
 #endif
 
 !$acc update device(ixb, ixe, iyb, iye, izb, ize)
@@ -813,17 +805,6 @@ contains
                     end do
 
                     if (model_eqns /= 4) then
-#ifndef MFC_SIMULATION
-                        ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity) then
-                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                                                                rho_K, gamma_K, pi_inf_K, Re_K, G_K)
-                        else
-                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                                                                rho_K, gamma_K, pi_inf_K)
-                        end if
-#endif
-
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
                         if (hypoelasticity) then
@@ -835,6 +816,15 @@ contains
                         else 
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, &
                                                                                 alpha_K, alpha_rho_K, Re_K, j, k, l)
+                        end if
+#else
+                    ! If pre-processing, use non acc mixture subroutines
+                        if (hypoelasticity) then
+                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                                rho_K, gamma_K, pi_inf_K, Re_K, G_K)
+                        else
+                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                                rho_K, gamma_K, pi_inf_K)
                         end if
 #endif
                     end if
@@ -1032,9 +1022,8 @@ contains
                 end do
             end do
         end do
-#endif
 
-#ifdef MFC_SIMULATION
+#else
         if (proc_rank == 0) then
             print '(A)', 'Conversion from primitive to '// &
                 'conservative variables not '// &
