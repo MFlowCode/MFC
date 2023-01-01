@@ -235,6 +235,16 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma
     !> @}
 
+    !> @name Index variables used for m_variables_conversion
+    !> @{
+    integer :: momxb, momxe
+    integer :: advxb, advxe
+    integer :: contxb, contxe
+    integer :: intxb, intxe
+    integer :: bubxb, bubxe
+    integer :: strxb, strxe
+    !> @}
+
     ! Mathematical and Physical Constants ======================================
     real(kind(0d0)), parameter :: pi = 3.141592653589793d0
     ! ==========================================================================
@@ -516,6 +526,19 @@ contains
                 end if
             end if
         end if
+
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+        bubxb = bub_idx%beg
+        bubxe = bub_idx%end
+        strxb = stress_idx%beg
+        strxe = stress_idx%end
+        intxb = internalEnergies_idx%beg
+        intxe = internalEnergies_idx%end
         ! ==================================================================
 
 #ifdef MFC_MPI

@@ -17,7 +17,6 @@ module m_fftw
 #if defined(_OPENACC) && defined(__PGI)
     use cufft
 #endif
-
     ! ==========================================================================
 
     implicit none
