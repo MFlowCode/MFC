@@ -691,7 +691,7 @@ contains
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
-                        call s_convert_to_mixture_variables(q_cons_vf, rho, gamma, pi_inf, Re, j, 0, 0, &
+                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, Re, &
                                                             G, fluid_pp(:)%G)
                         lit_gamma = 1d0/gamma + 1d0
 
@@ -1743,10 +1743,9 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    call s_convert_to_mixture_variables(q_cons_vf, rho, &
-                                                        gamma, pi_inf, &
-                                                        Re, j - 2, k, l, &
-                                                        G, fluid_pp(:)%G)
+                    call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                                                        rho, gamma, pi_inf, &
+                                                        Re, G, fluid_pp(:)%G)
                     do s = 1, num_dims
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
@@ -1885,10 +1884,9 @@ contains
                         l = 0
 
                         ! Computing/Sharing necessary state variables
-                        call s_convert_to_mixture_variables(q_cons_vf, rho, &
-                                                            gamma, pi_inf, &
-                                                            Re, j - 2, k - 2, l, &
-                                                            G, fluid_pp(:)%G)
+                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, & 
+                                                            rho, gamma, pi_inf, &
+                                                            Re, G, fluid_pp(:)%G)
                         do s = 1, num_dims
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
@@ -2014,10 +2012,9 @@ contains
                             if (l == 1) l = 2 ! Pick first point if probe is at edge
 
                             ! Computing/Sharing necessary state variables
-                            call s_convert_to_mixture_variables(q_cons_vf, rho, &
-                                                                gamma, pi_inf, &
-                                                                Re, j - 2, k - 2, l - 2, &
-                                                                G, fluid_pp(:)%G)
+                            call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, &
+                                                                rho, gamma, pi_inf, &
+                                                                Re, G, fluid_pp(:)%G)
                             do s = 1, num_dims
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
@@ -2257,9 +2254,8 @@ contains
 
                         if ((integral(i)%xmin <= x_cb(j)) .and. (integral(i)%xmax >= x_cb(j))) then
                             npts = npts + 1
-                            call s_convert_to_mixture_variables(q_cons_vf, rho, &
-                                                                gamma, pi_inf, &
-                                                                Re, j, k, l)
+                            call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
+                                                                rho, gamma, pi_inf, Re)
                             do s = 1, num_dims
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                             end do
@@ -2330,9 +2326,8 @@ contains
 
                             if (trigger) then
                                 npts = npts + 1
-                                call s_convert_to_mixture_variables(q_cons_vf, rho, &
-                                                                    gamma, pi_inf, &
-                                                                    Re, j, k, l)
+                                call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
+                                                                    rho, gamma, pi_inf, Re)
                                 do s = 1, num_dims
                                     vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                                 end do

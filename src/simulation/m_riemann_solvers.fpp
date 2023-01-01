@@ -4660,7 +4660,6 @@ contains
             deallocate (V0_L, V0_R)
         end if
 
-        deallocate (gammas, pi_infs, Gs)
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()

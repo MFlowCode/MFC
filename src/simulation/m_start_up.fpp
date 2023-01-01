@@ -1118,7 +1118,7 @@ contains
             do k = 0, n
                 do l = 0, p
 
-                    call s_convert_to_mixture_variables(v_vf, rho, gamma, pi_inf, Re, j, k, l)
+                    call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, Re)
 
                     dyn_pres = 0d0
                     do i = mom_idx%beg, mom_idx%end
