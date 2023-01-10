@@ -5,15 +5,11 @@ on:
     paths:
       - '**.f90'
       - '**.fpp'
-      - 'mfc.sh'
       - '**.py'
-      - '**.yaml'
       - '**.yml'
+      - 'mfc.sh'
       - 'golden.txt'
-      - 'Makefile'
-      - 'makefile'
       - 'CMakeLists.txt'
-      - Dockerfile
 
   pull_request:
 
@@ -21,23 +17,20 @@ on:
 
 jobs:
   tests:
-    name:  CI Test Runner
+    name: Test Suite
     strategy:
       matrix:
         include:
-          - os:   ubuntu-latest
-            unix: true
-          
-          - os:   macos-latest
-            unix: true
-            gcc:  11
+          - os:  ubuntu-latest
+          - os:  macos-latest
+            gcc: 11
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Clone MFC
+      - name: Clone
         uses: actions/checkout@v3
 
-      - name: (macos-latest) Setup
-        if: matrix.os == 'macos-latest'
+      - name: Setup
+        if:   matrix.os == 'macos-latest'
         run: |
           echo "OMPI_FC=gfortran-${{ matrix.gcc }}" >> $GITHUB_ENV
           echo "OMPI_CXX=g++-${{ matrix.gcc }}"     >> $GITHUB_ENV
@@ -48,27 +41,12 @@ jobs:
           brew install wget make python make cmake coreutils gcc@${{ matrix.gcc }}
           HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-${{ matrix.gcc }} --verbose --build-from-source open-mpi
 
-      - name: (ubuntu-latest) Setup
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt update && sudo apt upgrade
-          sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+      - name: Setup
+        if:   matrix.os == 'ubuntu-latest'
+        run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
 
-      - name: (${{ matrix.os }}) Test MFC
-        run: |
-          chmod +x ./mfc.sh
-          ./mfc.sh test -j $(nproc)
+      - name: Build
+        run:  /bin/bash mfc.sh build -j $(nproc)
 
-      - name: Upload logs
-        uses: actions/upload-artifact@v3
-        if:   always()
-        with:
-          name: ${{ matrix.os }}
-          path: |
-            build/**/*.log
-            build/**/*.txt
-            tests/**/*.dat
-            tests/**/*.out
-            tests/**/*.inp
-            tests/**/*.txt
-            tests/*.txt
+      - name: Test Suite
+        run:  /bin/bash mfc.sh test  -j $(nproc)

@@ -247,11 +247,7 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_data_output] s_write_parallel_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status

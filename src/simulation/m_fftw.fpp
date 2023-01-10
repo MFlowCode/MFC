@@ -2,6 +2,8 @@
 !! @file m_fftw.f90
 !! @brief Contains module m_fftw
 
+#:include 'macros.fpp'
+
 !> @brief The module contains the subroutines for the FFT routines
 module m_fftw
 
@@ -42,19 +44,18 @@ module m_fftw
     !! Filtered complex data in Fourier space
 
 #if defined(_OPENACC) && defined(__PGI)
-    real(kind(0d0)), pointer :: data_real_gpu(:)
+    !$acc declare create(real_size, cmplx_size, x_size, batch_size)
 
-    complex(kind(0d0)), pointer :: data_cmplx_gpu(:)
-
-    complex(kind(0d0)), pointer :: data_fltr_cmplx_gpu(:)
+    real(kind(0d0)),    allocatable :: data_real_gpu(:)
+    complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
+    complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
+    !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 
     integer :: fwd_plan_gpu, bwd_plan_gpu, ierr
 
     integer, allocatable :: cufft_size(:), iembed(:), oembed(:)
 
     integer :: istride, ostride, idist, odist, rank
-
-    !$acc declare create(real_size, cmplx_size, x_size, batch_size, data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #endif
 
 contains
@@ -83,7 +84,7 @@ contains
 #if defined(_OPENACC) && defined(__PGI)
         rank = 1; istride = 1; ostride = 1
 
-        allocate (cufft_size(1:rank), iembed(1:rank), oembed(1:rank))
+        allocate(cufft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
         cufft_size(1) = real_size; 
         iembed(1) = 0
@@ -104,14 +105,16 @@ contains
         fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real, data_cmplx, FFTW_ESTIMATE)
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
-#if defined(_OPENACC) && defined(__PGI)
-        allocate (data_real_gpu(1:real_size*x_size*sys_size))
-        allocate (data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
-        allocate (data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
 
-ierr = cufftPlanMany(fwd_plan_gpu, rank, cufft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
-ierr = cufftPlanMany(bwd_plan_gpu, rank, cufft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, CUFFT_Z2D, batch_size)
+#if defined(_OPENACC) && defined(__PGI)
+        @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
+        @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+
+        ierr = cufftPlanMany(fwd_plan_gpu, rank, cufft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
+        ierr = cufftPlanMany(bwd_plan_gpu, rank, cufft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, CUFFT_Z2D, batch_size)
 #endif
+
     end subroutine s_initialize_fftw_module ! ------------------------------
 
     !>  The purpose of this subroutine is to apply a Fourier low-
@@ -268,7 +271,7 @@ ierr = cufftPlanMany(bwd_plan_gpu, rank, cufft_size, iembed, istride, cmplx_size
     subroutine s_finalize_fftw_module() ! ------------------------------------
 
 #if defined(_OPENACC) && defined(__PGI)
-        deallocate (data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+        @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)
 #else

@@ -3,11 +3,13 @@
 *                  @sbryngelson
 
 # Henry Le Berre (henryleberre)
+docs/              @sbryngelson @henryleberre
 toolchain/         @sbryngelson @henryleberre
 tests/             @sbryngelson @henryleberre
 mfc.sh             @sbryngelson @henryleberre
 mfc.bat            @sbryngelson @henryleberre
-defaults.yaml      @sbryngelson @henryleberre
 CMakeLists.txt     @sbryngelson @henryleberre
 .gitlab-ci.yml     @sbryngelson @henryleberre
+.vscode/           @sbryngelson @henryleberre
 .github/workflows/ @sbryngelson @henryleberre
+

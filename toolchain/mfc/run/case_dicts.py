@@ -1,4 +1,5 @@
-from ..util import common
+from ..      import common
+from ..state import ARG
 
 
 COMMON = [
@@ -63,7 +64,7 @@ for p_id in range(1, 10+1):
 
 
 SIMULATION = COMMON + [
-    'run_time_info', 't_step_old', 't_tol', 'debug', 'dt', 't_step_start',
+    'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
     't_step_stop', 't_step_save', 'time_stepper', 'weno_vars', 'weno_eps',
     'char_decomp', 'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
     'riemann_solver', 'wave_speeds', 'avg_state', 'commute_err', 'split_err',
@@ -148,7 +149,7 @@ for fl_id in range(1,10+1):
 CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 
 
-def get_input_dict_keys(target_name: str, args: list) -> list:
+def get_input_dict_keys(target_name: str) -> list:
     result = None
     if target_name == "pre_process":  result = PRE_PROCESS.copy()
     if target_name == "simulation":   result = SIMULATION.copy()
@@ -157,7 +158,7 @@ def get_input_dict_keys(target_name: str, args: list) -> list:
     if result == None:
         raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
 
-    if not args["case_optimization"] or target_name != "simulation":
+    if not ARG("case_optimization") or target_name != "simulation":
         return result
     
     return [ x for x in result if x not in CASE_OPTIMIZATION ]

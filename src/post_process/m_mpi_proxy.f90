@@ -101,11 +101,7 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_data not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer :: ierr
@@ -139,11 +135,7 @@ contains
     !>Halts all processes until all have reached barrier.
     subroutine s_mpi_barrier() ! -------------------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_barrier not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -156,11 +148,7 @@ contains
         !!      any other tasks needed to properly setup the module
     subroutine s_initialize_mpi_proxy_module() ! ------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_proxy_module not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: i !< Generic loop iterator
 
@@ -256,11 +244,7 @@ contains
         !!      information.
     subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_bcast_user_inputs not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: i !< Generic loop iterator
 
@@ -422,11 +406,7 @@ contains
         !!      is overseen by the local processor.
     subroutine s_mpi_decompose_computational_domain() ! --------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_decompose_computational_domain not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! # of processors in the x-, y- and z-coordinate directions
         integer :: num_procs_x, num_procs_y, num_procs_z
@@ -874,11 +854,7 @@ contains
         character(LEN=3), intent(IN) :: pbc_loc
         character, intent(IN) :: sweep_coord
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_grid_vars_buffer_regions not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Communications in the x-direction ================================
 
@@ -1083,11 +1059,7 @@ contains
 
         character, intent(IN) :: sweep_coord
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_cons_vars_buffer_regions not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
@@ -1615,11 +1587,7 @@ contains
 
         real(kind(0d0)), dimension(2), intent(INOUT) :: var_loc
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_reduce_maxloc not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)), dimension(2) :: var_glb  !<
             !! Temporary storage variable that holds the reduced maximum value
@@ -1649,11 +1617,7 @@ contains
 
         real(kind(0d0)), dimension(1:, 0:), intent(INOUT) :: spatial_extents
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_gather_spatial_extents not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Simulation is 3D
         if (p > 0) then
@@ -1770,11 +1734,7 @@ contains
         !!      simulations.
     subroutine s_mpi_defragment_1d_grid_variable() ! -----------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_defragment_1d_grid_variable not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Silo-HDF5 database format
         if (format == 1) then
@@ -1816,11 +1776,7 @@ contains
             dimension(1:2, 0:num_procs - 1), &
             intent(INOUT) :: data_extents
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_gather_data_extents not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Mimimum flow variable extent
         call MPI_GATHERV(minval(q_sf), 1, MPI_DOUBLE_PRECISION, &
@@ -1852,11 +1808,7 @@ contains
             dimension(0:m_root, 0:0, 0:0), &
             intent(INOUT) :: q_root_sf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_defragment_1d_flow_variable not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Gathering the sub-domain flow variable data from all the processes
         ! and putting it back together for the entire computational domain
@@ -1872,11 +1824,7 @@ contains
     !> Deallocation procedures for the module
     subroutine s_finalize_mpi_proxy_module() ! ---------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_finalize_mpi_proxy_module not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Deallocating the conservative variables buffer vectors
         if (buff_size > 0) then
@@ -1898,11 +1846,7 @@ contains
     !> Finalization of all MPI related processes
     subroutine s_mpi_finalize() ! ------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_finalize not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Terminating the MPI environment
         call MPI_FINALIZE(ierr)

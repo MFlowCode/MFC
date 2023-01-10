@@ -85,8 +85,8 @@ contains
             !! is or is not present in the designated location
 
         ! Namelist for all of the parameters to be inputed by the user
-        namelist /user_inputs/ case_dir, old_grid, old_ic, t_step_old, m, &
-            n, p, x_domain, y_domain, z_domain, &
+        namelist /user_inputs/ case_dir, old_grid, old_ic, &
+            t_step_old, m, n, p, x_domain, y_domain, z_domain, &
             stretch_x, stretch_y, stretch_z, a_x, a_y, &
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, &
@@ -157,6 +157,9 @@ contains
             print '(A)', 'Unsupported combination of values of '// &
                 'bubbles and model_eqns. '// &
                 'Exiting ...'
+            call s_mpi_abort()
+        elseif (bubbles .and. nb < 1) then
+            print '(A)', 'The Ensemble-Averaged Bubble Model requires nb >= 1'
             call s_mpi_abort()
         elseif (bubbles .and. polydisperse .and. (nb == 1)) then
             print '(A)', 'Polydisperse bubble dynamics requires nb > 1 '// &
@@ -1912,11 +1915,7 @@ contains
 
         integer, intent(IN) :: dflt_int
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_start_up] s_read_parallel_grid_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
@@ -2027,11 +2026,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_start_up] s_read_parallel_ic_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status

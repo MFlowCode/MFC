@@ -82,11 +82,7 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_data not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer :: ierr
@@ -121,11 +117,7 @@ contains
     !> Halts all processes until all have reached barrier.
     subroutine s_mpi_barrier() ! -------------------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_barrier not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -141,11 +133,7 @@ contains
         !!       information.
     subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_bcast_user_inputs not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Generic loop iterator
         integer :: i
@@ -428,11 +416,7 @@ contains
         real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] mpi_bcast_time_step_values not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: j
 
@@ -449,11 +433,7 @@ contains
         !!              overseen by the local processor.
     subroutine s_mpi_decompose_computational_domain() ! --------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_decompose_computational_domain not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! # of processors in the x-, y- and z-coordinate directions
         integer :: num_procs_x, num_procs_y, num_procs_z
@@ -873,11 +853,7 @@ contains
 
         real(kind(0d0)), intent(INOUT) :: var_loc
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_reduce_min not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Temporary storage variable that holds the reduced minimum value
         real(kind(0d0)) :: var_glb
@@ -899,11 +875,7 @@ contains
     !> Finalization of all MPI related processes
     subroutine s_mpi_finalize() ! ------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_finalize not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Terminating the MPI environment
         call MPI_FINALIZE(ierr)

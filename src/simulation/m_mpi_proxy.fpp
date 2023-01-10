@@ -3,6 +3,7 @@
 !! @brief Contains module m_mpi_proxy
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
 !!          available in the MPI implementation's MPI module. Specifically,
@@ -108,11 +109,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_data not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
@@ -141,11 +138,7 @@ contains
     !> Halts all processes until all have reached barrier.
     subroutine s_mpi_barrier() ! -------------------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_barrier not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -159,36 +152,28 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_mpi_proxy_module() ! ---------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_proxy_module not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Allocating q_cons_buff_send and q_cons_buff_recv. Please note that
         ! for the sake of simplicity, both variables are provided sufficient
         ! storage to hold the largest buffer in the computational domain.
 
         if (n > 0) then
-
             if (p > 0) then
-                allocate (q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                           (m + 2*buff_size + 1)* &
-                                           (n + 2*buff_size + 1)* &
-                                           (p + 2*buff_size + 1)/ &
-                                           (min(m, n, p) + 2*buff_size + 1)))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                                         & (m + 2*buff_size + 1)* &
+                                         & (n + 2*buff_size + 1)* &
+                                         & (p + 2*buff_size + 1)/ &
+                                         & (min(m, n, p) + 2*buff_size + 1)))
             else
-                allocate (q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                           (max(m, n) + 2*buff_size + 1)))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                                         & (max(m, n) + 2*buff_size + 1)))
             end if
-
         else
-
-            allocate (q_cons_buff_send(0:-1 + buff_size*sys_size))
-
+            @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size))
         end if
 
-        allocate (q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+        @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
 #endif
 
@@ -201,11 +186,7 @@ contains
         !!      remaining processors in the communicator.
     subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_bcast_user_inputs not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: i, j !< Generic loop iterator
 
@@ -233,9 +214,6 @@ contains
         call MPI_BCAST(t_step_start, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(t_step_stop, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(t_step_save, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(debug, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
 
         ! Simulation algorithm parameters
         call MPI_BCAST(model_eqns, 1, MPI_INTEGER, &
@@ -487,11 +465,7 @@ contains
         real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] mpi_bcast_time_step_values not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: j
 
@@ -509,11 +483,7 @@ contains
         !!      global parameters.
     subroutine s_mpi_decompose_computational_domain() ! --------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_decompose_computational_domain not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: num_procs_x, num_procs_y, num_procs_z !<
             !! Optimal number of processors in the x-, y- and z-directions
@@ -901,11 +871,7 @@ contains
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_grid_variables_buffers not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! MPI Communication in x-direction =================================
         if (mpi_dir == 1) then
@@ -1110,11 +1076,7 @@ contains
         real(kind(0d0)), intent(OUT) :: ccfl_max_glb
         real(kind(0d0)), intent(OUT) :: Rc_min_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_reduce_stability_criteria_extrema not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
@@ -1147,11 +1109,7 @@ contains
         real(kind(0d0)), intent(IN) :: var_loc
         real(kind(0d0)), intent(OUT) :: var_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_allreduce_sum not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
@@ -1173,11 +1131,7 @@ contains
         real(kind(0d0)), intent(IN) :: var_loc
         real(kind(0d0)), intent(OUT) :: var_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_allreduce_min not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
@@ -1199,11 +1153,7 @@ contains
         real(kind(0d0)), intent(IN) :: var_loc
         real(kind(0d0)), intent(OUT) :: var_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_allreduce_max not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
@@ -1229,11 +1179,7 @@ contains
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_conservative_variables_buffers not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         !nCalls_time = nCalls_time + 1
 
@@ -2137,14 +2083,10 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_proxy_module() ! -----------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_finalize_mpi_proxy_module not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Deallocating q_cons_buff_send and q_cons_buff_recv
-        deallocate (q_cons_buff_send, q_cons_buff_recv)
+        @:DEALLOCATE(q_cons_buff_send, q_cons_buff_recv)
 
 #endif
 
@@ -2153,11 +2095,7 @@ contains
     !> The subroutine finalizes the MPI execution environment.
     subroutine s_mpi_finalize() ! ------------------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_finalize not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Finalizing the MPI environment
         call MPI_FINALIZE(ierr)
