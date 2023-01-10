@@ -63,6 +63,8 @@ program p_main
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
         call s_check_input_file()
+        
+        print '(" Post-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
 
     ! Broadcasting the user inputs to all of the processors and performing the
@@ -93,6 +95,13 @@ program p_main
 
     ! Time-Marching Loop =======================================================
     do
+        if (proc_rank == 0) then
+            print '(" ["I3"%]  Save "I8" of "I0" @ t_step = "I0"")',            &
+                  int(100*(real(t_step + 1)/(t_step_stop - t_step_start + 1))), &
+                  (t_step      - t_step_start)/t_step_save + 1,                 &
+                  (t_step_stop - t_step_start)/t_step_save + 1,                 &
+                  t_step
+        end if
 
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)

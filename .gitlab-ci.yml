@@ -63,7 +63,7 @@ before_script:
   script:
     - cd "$CI_MFC_DIR/$JOB_MODE" && echo "[CI] Building in $(pwd):"
     - . ./mfc.sh load -c a -m $(if [ "$(echo "$JOB_MODE" | grep -i 'cpu' | wc -c)" -gt 0 ]; then echo "c"; else echo "g"; fi)
-    - ./mfc.sh build -j 8 -m "$JOB_MODE"
+    - ./mfc.sh build -j 8 $FLAGS
   tags:
     - nobatch
 
@@ -72,45 +72,47 @@ before_script:
   script:
     - cd "$CI_MFC_DIR/$JOB_MODE" && echo "[CI] Running in $(pwd):"
     - . ./mfc.sh load -c a -m $(if [ "$(echo "$JOB_MODE" | grep -i 'cpu' | wc -c)" -gt 0 ]; then echo "c"; else echo "g"; fi)
-    - ./mfc.sh test -j 8 -m "$JOB_MODE"
+    - ./mfc.sh test -j 8
   tags:
     - batch
 
 
 clone-cpu:
   variables:
-    JOB_MODE: "release-cpu"
+    JOB_MODE: "cpu"
   extends: .clone
 
 build-cpu:
   variables:
-    JOB_MODE: "release-cpu"
+    FLAGS: ""
+    JOB_MODE: "cpu"
   extends: .build
   needs:
     - clone-cpu
 
 test-cpu:
   variables:
-    JOB_MODE: "release-cpu"
+    JOB_MODE: "cpu"
   extends: .test
   needs:
     - build-cpu
 
 clone-gpu:
   variables:
-    JOB_MODE: "release-gpu"
+    JOB_MODE: "gpu"
   extends: .clone
 
 build-gpu:
   variables:
-    JOB_MODE: "release-gpu"
+    FLAGS: "--gpu"
+    JOB_MODE: "gpu"
   extends: .build
   needs:
     - clone-gpu
 
 test-gpu:
   variables:
-    JOB_MODE: "release-gpu"
+    JOB_MODE: "gpu"
   extends: .test
   needs:
     - build-gpu

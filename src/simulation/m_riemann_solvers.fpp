@@ -37,7 +37,6 @@ module m_riemann_solvers
  s_riemann_solver, &
  s_hll_riemann_solver, &
  s_hllc_riemann_solver, &
- s_convert_species_to_mixture_variables_riemann_acc, &
  s_finalize_riemann_solvers_module
 
     abstract interface ! =======================================================
@@ -2673,69 +2672,6 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
-    subroutine s_convert_species_to_mixture_variables_riemann_acc(rho_K, &
-                                                                  gamma_K, pi_inf_K, &
-                                                                  alpha_K, alpha_rho_K, Re_K, k, l, r)
-!$acc routine seq
-
-        real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
-
-        real(kind(0d0)), dimension(:), intent(INOUT) :: alpha_rho_K, alpha_K !<
-        real(kind(0d0)), dimension(:), intent(OUT) :: Re_K
-            !! Partial densities and volume fractions
-
-        integer, intent(IN) :: k, l, r
-
-        integer :: i, j !< Generic loop iterators
-        real(kind(0d0)) :: alpha_K_sum
-
-        ! Constraining the partial densities and the volume fractions within
-        ! their physical bounds to make sure that any mixture variables that
-        ! are derived from them result within the limits that are set by the
-        ! fluids physical parameters that make up the mixture
-        rho_K = 0d0
-        gamma_K = 0d0
-        pi_inf_K = 0d0
-
-        alpha_K_sum = 0d0
-
-        if (mpp_lim) then
-            do i = 1, num_fluids
-                alpha_rho_K(i) = max(0d0, alpha_rho_K(i))
-                alpha_K(i) = min(max(0d0, alpha_K(i)), 1d0)
-                alpha_K_sum = alpha_K_sum + alpha_K(i)
-            end do
-
-            alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
-
-        end if
-
-        do i = 1, num_fluids
-            rho_K = rho_K + alpha_rho_K(i)
-            gamma_K = gamma_K + alpha_K(i)*gammas(i)
-            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-        end do
-
-        if (any(Re_size > 0)) then
-
-            do i = 1, 2
-                Re_K(i) = dflt_real
-
-                if (Re_size(i) > 0) Re_K(i) = 0d0
-
-                do j = 1, Re_size(i)
-                    Re_K(i) = alpha_K(Re_idx(i, j))/Res(i, j) &
-                              + Re_K(i)
-                end do
-
-                Re_K(i) = 1d0/max(Re_K(i), sgm_eps)
-
-            end do
-        end if
-
-    end subroutine s_convert_species_to_mixture_variables_riemann_acc ! ----------------
-
-        !! @param l  Third coordinate index
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

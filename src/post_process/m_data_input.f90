@@ -221,11 +221,7 @@ contains
 
         integer, intent(IN) :: t_step
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_read_parallel_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 

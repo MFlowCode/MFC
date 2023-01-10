@@ -2,6 +2,8 @@
 !! @file m_variables_conversion.f90
 !! @brief Contains module m_variables_conversion
 
+#:include 'macros.fpp'
+
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
 !!              addition, the module also contains the subroutines used to obtain
@@ -100,18 +102,21 @@ module m_variables_conversion
     !> @}
 
     integer :: ixb, ixe, iyb, iye, izb, ize
+    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
+
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+    !$acc declare create(gammas, pi_infs)
 #endif
-    real(kind(0d0)), allocatable, dimension(:) :: Gs
-    integer, allocatable, dimension(:) :: bubrs
 
+    real(kind(0d0)), allocatable, dimension(:)    :: Gs
+    integer,         allocatable, dimension(:)    :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(ixb, ixe, iyb, iye, izb, ize, momxb, momxe, bubxb, bubxe, contxb, contxe, advxb, advxe, strxb, strxe, gammas, pi_infs, bubrs, Gs, Res)
+    !$acc declare create(bubrs, Gs, Res)
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-!$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
+    !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), target, public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), target, public :: gamma_sf !< Scalar sp. heat ratio function
@@ -609,77 +614,58 @@ contains
 
         iyb = 0; iye = 0; izb = 0; ize = 0; 
         if (n > 0) then
-            iyb = -buff_size
-            iye = n - iyb
-        end if
+            iyb = -buff_size; iye = n - iyb
 
-        if (p > 0) then
-            izb = -buff_size
-            ize = p - izb
-        end if
+            if (p > 0) then
+                izb = -buff_size; ize = p - izb
+            end if
+       end if
 #endif
 
-!$acc update device(ixb, ixe, iyb, iye, izb, ize)
+        !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
-        allocate (gammas(1:num_fluids))
-        allocate (pi_infs(1:num_fluids))
-        allocate (Gs(1:num_fluids))
-
-        allocate (bubrs(1:nb))
+        @:ALLOCATE(gammas (1:num_fluids))
+        @:ALLOCATE(pi_infs(1:num_fluids))
+        @:ALLOCATE(Gs     (1:num_fluids))
 
         do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
+            gammas(i)  = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
-            Gs(i) = fluid_pp(i)%G
+            Gs(i)      = fluid_pp(i)%G
         end do
-!$acc update device(gammas, pi_infs, Gs)
-
-!TODO: this update was in previous version: (no longer needed?)
-!!!$acc update device(small_alf, dflt_real, dflt_int, pi, nnode, sgm_eps)
+        !$acc update device(gammas, pi_infs, Gs)
 
 #ifdef MFC_SIMULATION
 
         if (any(Re_size > 0)) then
-            allocate (Res(1:2, 1:maxval(Re_size)))
-        end if
-
-        if (any(Re_size > 0)) then
+            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-!$acc update device(Res, Re_idx, Re_size)
+            
+            !$acc update device(Res, Re_idx, Re_size)
         end if
 #endif
 
         if (bubbles) then
+            @:ALLOCATE(bubrs(1:nb))
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
             end do
 
+            !$acc update device(bubrs)
         end if
-!$acc update device(bubrs)
 
 !$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
 !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
-!TODO: this was in previous version: (check that not needed)
-!!$acc update device(monopole, num_mono, mono)
-!        do i = 1, num_mono
-!!$acc update device(mono(i)%mag)
-!!$acc update device(mono(i)%length)
-!!$acc update device(mono(i)%npulse)
-!!$acc update device(mono(i)%dir)
-!!$acc update device(mono(i)%delay)
-!!$acc update device(mono(i)%aperture)
-!!$acc update device(mono(i)%foc_length)
-!        end do
-
-        !$acc update device(monopole, num_mono)
+!$acc update device(monopole, num_mono)
 
 #ifdef MFC_POST_PROCESS
         ! Allocating the density, the specific heat ratio function and the
@@ -760,19 +746,14 @@ contains
                                                              gm_alphaK_vf, &
                                                              ix, iy, iz)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: qK_cons_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: qK_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_cons_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_prim_vf
 
         type(scalar_field), &
             allocatable, optional, dimension(:), &
             intent(IN) :: gm_alphaK_vf
 
-        type(int_bounds_info), optional,    intent(IN) :: ix, iy, iz
+        type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -793,12 +774,13 @@ contains
             allocate(nRtmp(0))
         endif
 
-!$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,  dyn_pres_K)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
                     dyn_pres_K = 0d0
-!$acc loop seq
+                    
+                    !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
@@ -832,7 +814,7 @@ contains
 #ifdef MFC_SIMULATION
                     rho_K = max(rho_K, sgm_eps)
 #endif
-!$acc loop seq
+                    !$acc loop seq
                     do i = momxb, momxe
                         if (model_eqns /= 4) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -851,7 +833,7 @@ contains
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
                     if (bubbles) then
-!$acc loop seq
+                        !$acc loop seq
                         do i = 1, nb
                             nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
                         end do
@@ -859,14 +841,15 @@ contains
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
                         call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
-!$acc loop seq
+                        
+                        !$acc loop seq
                         do i = bubxb, bubxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
                         end do
                     end if
 
                     if (hypoelasticity) then
-!$acc loop seq
+                        !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
@@ -887,7 +870,7 @@ contains
                 end do
             end do
         end do
-!$acc end parallel loop
+        !$acc end parallel loop
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
@@ -1172,19 +1155,19 @@ contains
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
 #ifdef MFC_POST_PROCESS
-        deallocate (rho_sf)
-        deallocate (gamma_sf)
-        deallocate (pi_inf_sf)
+        deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
 
-        deallocate (gammas, pi_infs, Gs)
-        deallocate (bubrs)
+        @:DEALLOCATE(gammas, pi_infs, Gs)
+        
+        if (bubbles) then
+            @:DEALLOCATE(bubrs)
+        end if
 
         ! Nullifying the procedure pointer to the subroutine transfering/
         ! computing the mixture/species variables to the mixture variables
         s_convert_to_mixture_variables => null()
 
     end subroutine s_finalize_variables_conversion_module ! ----------------
-
 
 end module m_variables_conversion
