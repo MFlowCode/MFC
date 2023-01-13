@@ -2039,60 +2039,27 @@ contains
             end if
 
             if (num_procs > 1) then
-                tmp = rho
-                call s_mpi_allreduce_sum(tmp, rho)
+                #:for VAR in ['rho','pres','gamma','pi_inf','c','accel']
+                    tmp = ${VAR}$
+                    call s_mpi_allreduce_sum(tmp, ${VAR}$)
+                #:endfor
+
                 do s = 1, num_dims
                     tmp = vel(s)
                     call s_mpi_allreduce_sum(tmp, vel(s))
                 end do
-                tmp = pres
-                call s_mpi_allreduce_sum(tmp, pres)
-                tmp = gamma
-                call s_mpi_allreduce_sum(tmp, gamma)
-                tmp = pi_inf
-                call s_mpi_allreduce_sum(tmp, pi_inf)
-                tmp = c
-                call s_mpi_allreduce_sum(tmp, c)
-                tmp = accel
-                call s_mpi_allreduce_sum(tmp, accel)
 
                 if (bubbles) then
-                    tmp = alf
-                    call s_mpi_allreduce_sum(tmp, alf)
-                    tmp = alfgr
-                    call s_mpi_allreduce_sum(tmp, alfgr)
-                    tmp = nbub
-                    call s_mpi_allreduce_sum(tmp, nbub)
-                    tmp = nR(1)
-                    call s_mpi_allreduce_sum(tmp, nR(1))
-                    tmp = nRdot(1)
-                    call s_mpi_allreduce_sum(tmp, nRdot(1))
-                    tmp = M00
-                    call s_mpi_allreduce_sum(tmp, M00)
-                    tmp = R(1)
-                    call s_mpi_allreduce_sum(tmp, R(1))
-                    tmp = Rdot(1)
-                    call s_mpi_allreduce_sum(tmp, Rdot(1))
-                    tmp = ptilde
-                    call s_mpi_allreduce_sum(tmp, ptilde)
-                    tmp = ptot
-                    call s_mpi_allreduce_sum(tmp, ptot)
+                    #:for VAR in ['alf','alfgr','nbub','nR(1)','nRdot(1)','M00','R(1)','Rdot(1)','ptilde','ptot']
+                        tmp = ${VAR}$
+                        call s_mpi_allreduce_sum(tmp, ${VAR}$)
+                    #:endfor
 
                     if (qbmm) then
-                        tmp = varR
-                        call s_mpi_allreduce_sum(tmp, varR)
-                        tmp = varV
-                        call s_mpi_allreduce_sum(tmp, varV)
-
-                        tmp = M10
-                        call s_mpi_allreduce_sum(tmp, M10)
-                        tmp = M01
-                        call s_mpi_allreduce_sum(tmp, M01)
-                        tmp = M20
-                        call s_mpi_allreduce_sum(tmp, M20)
-                        tmp = M02
-                        call s_mpi_allreduce_sum(tmp, M02)
-
+                        #:for VAR in ['varR','varV','M10','M01','M20','M02']
+                            tmp = ${VAR}$
+                            call s_mpi_allreduce_sum(tmp, ${VAR}$)
+                        #:endfor
                     end if
                 end if
 
