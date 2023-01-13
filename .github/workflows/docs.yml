@@ -39,9 +39,7 @@ jobs:
         git config --global user.name  'MFC Action'
         git config --global user.email '<>'
         git clone "${{ secrets.DOC_PUSH_URL }}" ../www
-        mv ../www/.github ..
         rm -rf ../www/*
-        mv ../.github ../www/
         mv build/install/docs/mfc/* ../www/
         git -C ../www add -A
         git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
