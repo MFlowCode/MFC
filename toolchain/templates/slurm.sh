@@ -28,8 +28,10 @@
 #>
 #SBATCH --job-name="{name}"
 #SBATCH --nodes={nodes}
-#SBATCH --ntasks-per-node={cpus_per_node}
+#SBATCH --ntasks-per-node={tasks_per_node}
 #SBATCH --cpus-per-task=1
+#SBATCH --gpu-bind=verbose,closest
+#SBATCH --gpus=v100-16:{(1 if gpu else 0)*tasks_per_node*nodes}
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
 #SBATCH --output="{name}.out"
@@ -45,8 +47,7 @@
 #>
 #> #SBATCH --mem=...
 #> #SBATCH --constraint="lustre"
-#> #SBATCH --gpus=v100-16:{gpus_per_node*nodes}
-#>
+#> #SBATCH --gpus-per-task={1 if gpu else 0}
 
 
 #>
@@ -68,6 +69,16 @@
 #>       on your system - if at all. {MFC::BIN} refers to
 #>       the path the MFC executable.
 #>
+
+for binpath in {MFC::BINARIES}; do
+
+    echo -e ":) Running $binpath:"
+
+#>
+#> Note: This MPI executable might not be well supported
+#>       on your system - if at all. {MFC::BIN} refers to
+#>       the path the MFC executable.
+#>
 #>srun                                   \
 #>     --nodes={nodes}                   \
 #>     --ntasks-per-node {cpus_per_node} \
@@ -78,13 +89,7 @@
 #>      "{MFC::BIN}"
 #>
 
-for binpath in {MFC::BINARIES}; do
-
-    echo -e ":) Running $binpath:"
-
-    mpirun                        \
-        -np {cpus_per_node*nodes} \
-        "$binpath"
+    mpirun -np {nodes*tasks_per_node} "$binpath"
 
 done
 

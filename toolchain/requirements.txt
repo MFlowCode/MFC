@@ -1,0 +1,7 @@
+rich
+fypp
+wheel
+typing
+PyYAML
+argparse
+dataclasses

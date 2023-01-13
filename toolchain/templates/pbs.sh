@@ -27,7 +27,7 @@
 #>   intended to be modified by users.
 #>
 #PBS -N {name}
-#PBS -l nodes={nodes}:ppn={cpus_per_node}
+#PBS -l nodes={nodes}:ppn={tasks_per_node}
 #PBS -A {account}
 #PBS -l walltime={walltime}
 #PBS -q {partition}
@@ -65,21 +65,21 @@ for binpath in {MFC::BINARIES}; do
 
     echo -e ":) Running $binpath:"
 
-    srun                                  \
-        --nodes={nodes}                   \
-        --ntasks-per-node {cpus_per_node} \
+    srun                                   \
+        --nodes={nodes}                    \
+        --ntasks-per-node {tasks_per_node} \
         "$binpath"
 
-done
+    #>
+    #> srun --mpi=pmix   \
+    #>      "$binpath"
+    #>
+    #> mpirun                            \
+    #>        -np {tasks_per_node*nodes} \
+    #>        "$binpath"
+    #>
 
-#>
-#> srun --mpi=pmix   \
-#>      "{MFC::BIN}"
-#>
-#> mpirun                           \
-#>        -np {cpus_per_node*nodes} \
-#>        "{MFC::BIN}"
-#>
+done
 
 {MFC::EPILOGUE}
 #>

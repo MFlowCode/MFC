@@ -3,6 +3,7 @@
 !! @brief Contains module m_qbmm
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 !> @brief This module is used to compute moment inversion via qbmm
 module m_qbmm
@@ -34,11 +35,11 @@ module m_qbmm
 
     type(int_bounds_info) :: is1, is2, is3
 
-    integer, allocatable, dimension(:) :: bubrs
+    integer, allocatable, dimension(:)    :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
 
 !$acc declare create(momrhs, nterms, is1, is2, is3)
-!$acc declare create( bubrs, bubmoms)
+!$acc declare create(bubrs, bubmoms)
 
 contains
 
@@ -60,7 +61,7 @@ contains
 
         #:endif
 
-        allocate (momrhs(3, 0:2, 0:2, nterms, nb))
+        @:ALLOCATE(momrhs(3, 0:2, 0:2, nterms, nb))
         momrhs = 0d0
 
         ! Assigns the required RHS moments for moment transport equations
@@ -154,11 +155,8 @@ contains
 
         !$acc update device(momrhs)
 
-        allocate (bubrs(1:nb))
-
-        allocate (bubmoms(1:nb, 1:nmom))
-
-
+        @:ALLOCATE(bubrs(1:nb))
+        @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
