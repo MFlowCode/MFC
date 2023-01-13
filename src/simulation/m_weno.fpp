@@ -2,6 +2,8 @@
 !! @file m_weno.f90
 !! @brief Contains module m_weno
 
+#:include 'macros.fpp'
+
 !> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
 !!              that is supplemented with monotonicity preserving bounds (MPWENO)
 !!              and a mapping function that boosts the accuracy of the non-linear
@@ -143,20 +145,20 @@ contains
 
         is3%end = p - is3%beg
 
-        allocate (poly_coef_cbL_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
-        allocate (poly_coef_cbR_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        allocate (d_cbL_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
-        allocate (d_cbR_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
+        @:ALLOCATE(d_cbL_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
+        @:ALLOCATE(d_cbR_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
 
-        allocate (beta_coef_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
                               0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(1, is1)
 
-        allocate (v_rs_ws_x(is1%beg:is1%end, &
+        @:ALLOCATE(v_rs_ws_x(is1%beg:is1%end, &
                                  is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
 
         ! ==================================================================
@@ -175,20 +177,20 @@ contains
 
         is3%end = p - is3%beg
 
-        allocate (poly_coef_cbL_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
-        allocate (poly_coef_cbR_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        allocate (d_cbL_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
-        allocate (d_cbR_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
+        @:ALLOCATE(d_cbL_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
+        @:ALLOCATE(d_cbR_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
 
-        allocate (beta_coef_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
                               0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(2, is2)
 
-        allocate (v_rs_ws_y(is2%beg:is2%end, &
+        @:ALLOCATE(v_rs_ws_y(is2%beg:is2%end, &
                                  is1%beg:is1%end, is3%beg:is3%end, 1:sys_size))
 
         ! ==================================================================
@@ -200,20 +202,20 @@ contains
         is1%beg = -buff_size; is1%end = m - is1%beg
         is3%beg = -buff_size; is3%end = p - is3%beg
 
-        allocate (poly_coef_cbL_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
-        allocate (poly_coef_cbR_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        allocate (d_cbL_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
-        allocate (d_cbR_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
+        @:ALLOCATE(d_cbL_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
+        @:ALLOCATE(d_cbR_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
 
-        allocate (beta_coef_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
                               0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(3, is3)
 
-        allocate (v_rs_ws_z(is3%beg:is3%end, &
+        @:ALLOCATE(v_rs_ws_z(is3%beg:is3%end, &
                                  is2%beg:is2%end, is1%beg:is1%end, 1:sys_size))
 
         ! ==================================================================
@@ -1289,34 +1291,34 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
         !deallocate(vL_rs_vf_x, vR_rs_vf_x)
-        deallocate (v_rs_ws_x)
+        @:DEALLOCATE(v_rs_ws_x)
 
         ! Deallocating WENO coefficients in x-direction ====================
-        deallocate (poly_coef_cbL_x, poly_coef_cbR_x)
-        deallocate (d_cbL_x, d_cbR_x)
-        deallocate (beta_coef_x)
+        @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
+        @:DEALLOCATE(d_cbL_x, d_cbR_x)
+        @:DEALLOCATE(beta_coef_x)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in y-direction ====================
         if (n == 0) return
 
         !deallocate(vL_rs_vf_y, vR_rs_vf_y)
-        deallocate (v_rs_ws_y)
+        @:DEALLOCATE(v_rs_ws_y)
 
-        deallocate (poly_coef_cbL_y, poly_coef_cbR_y)
-        deallocate (d_cbL_y, d_cbR_y)
-        deallocate (beta_coef_y)
+        @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
+        @:DEALLOCATE(d_cbL_y, d_cbR_y)
+        @:DEALLOCATE(beta_coef_y)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in z-direction ====================
         if (p == 0) return
 
         !deallocate(vL_rs_vf_z, vR_rs_vf_z)
-        deallocate (v_rs_ws_z)
+        @:DEALLOCATE(v_rs_ws_z)
 
-        deallocate (poly_coef_cbL_z, poly_coef_cbR_z)
-        deallocate (d_cbL_z, d_cbR_z)
-        deallocate (beta_coef_z)
+        @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)
+        @:DEALLOCATE(d_cbL_z, d_cbR_z)
+        @:DEALLOCATE(beta_coef_z)
         ! ==================================================================
 
     end subroutine s_finalize_weno_module ! --------------------------------

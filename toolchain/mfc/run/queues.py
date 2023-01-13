@@ -1,8 +1,6 @@
-import os
-import typing
-import dataclasses
+import os, typing, dataclasses
 
-from ..util import common
+from .. import common
 
 
 @dataclasses.dataclass
@@ -62,4 +60,3 @@ def get_system() -> QueueSystem:
             return system
 
     raise common.MFCException(f"Failed to detect a queue system.")
-

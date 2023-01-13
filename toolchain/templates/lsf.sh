@@ -30,7 +30,7 @@
 #BSUB -nnodes {nodes}
 #BSUB -N
 #BSUB -P {account}
-#BSUB -W {"walltime"[:-3]}
+#BSUB -W {walltime[:-3]}
 #>
 #> Note: The above expression for the walltime converts
 #>       the expression "hh:mm:ss" to the appropriate
@@ -70,11 +70,12 @@ for binpath in {MFC::BINARIES}; do
     echo -e ":) Running $binpath:"
     echo ""
 
-    jsrun {'--smpiargs="-gpu"' if gpus_per_node > 0 else ''} \
-        --nrs          {cpus_per_node*nodes}               \
-        --cpu_per_rs   1                                   \
-        --gpu_per_rs   {min(gpus_per_node, 1)}             \
-        --tasks_per_rs 1                                   \
+    jsrun                                     \
+        {'--smpiargs="-gpu"' if gpu else ''}  \
+        --nrs          {tasks_per_node*nodes} \
+        --cpu_per_rs   1                      \
+        --gpu_per_rs   {1 if gpu else 0}      \
+        --tasks_per_rs 1                      \
         "$binpath"
 
     echo ""

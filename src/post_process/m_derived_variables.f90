@@ -464,7 +464,7 @@ contains
         integer :: stencil_j_min, stencil_j_max
         integer :: stencil_k_min, stencil_k_max
         integer :: stencil_l_min, stencil_l_max
-        type(bounds_info) :: iz1
+        type(int_bounds_info) :: iz1
 
         if (p > 0) then ! 3D simulation
             allocate (A(10, 10))

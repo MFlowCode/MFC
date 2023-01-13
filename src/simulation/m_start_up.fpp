@@ -97,7 +97,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, DEBUG
+            R0_type
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -217,6 +217,9 @@ contains
             call s_mpi_abort()
         elseif (model_eqns == 2 .and. bubbles .and. bubble_model == 1) then
             print '(A)', 'The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)'
+            call s_mpi_abort()
+        elseif (bubbles .and. nb < 1) then
+            print '(A)', 'The Ensemble-Averaged Bubble Model requires nb >= 1'
             call s_mpi_abort()
         elseif (bubbles .and. bubble_model == 3 .and. (polytropic .neqv. .true.)) then
             print '(A)', 'RP bubbles require polytropic compression'
@@ -728,11 +731,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_start_up] s_read_parallel_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 

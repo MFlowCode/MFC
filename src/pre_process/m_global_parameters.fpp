@@ -206,9 +206,7 @@ contains
         t_step_old = dflt_int
 
         ! Computational domain parameters
-        m = dflt_int
-        n = dflt_int
-        p = dflt_int
+        m = dflt_int; n = 0; p = 0
 
         cyl_coord = .false.
 
@@ -775,11 +773,7 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'

@@ -1,114 +1,69 @@
 #!/usr/bin/env python3
 
-import os
-import signal
-import getpass
-import platform
-import itertools
+import signal, getpass, platform, itertools, dataclasses
 
-from mfc       import args
-from mfc       import build
-from mfc.cfg   import user
-from mfc.cfg   import lock
-from mfc.run   import run
-from mfc.tests import tests
-
-from mfc.util.common  import MFC_LOGO, MFCException, quit
-from mfc.util.common  import delete_directory, format_list_to_string
-from mfc.util.common  import does_command_exist
-from mfc.util.printer import cons
+from mfc         import args, lock, build, bench, state
+from mfc.state   import ARG
+from mfc.run     import run
+from mfc.test    import test
+from mfc.common  import MFC_LOGO, MFCException, quit, format_list_to_string, does_command_exist
+from mfc.printer import cons
 
 
-class MFCState:
-    def __init__(self) -> None:
-        self.user = user.MFCUser()
-        self.lock = lock.MFCLock(self.user)
-        self.test = tests.MFCTest(self)
-        self.args = args.parse(self)
-        self.run  = run.MFCRun(self)
+def __print_greeting():
+    MFC_LOGO_LINES       = MFC_LOGO.splitlines()
+    max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
 
-        self.__handle_mode()
-        self.__print_greeting()
-        self.__checks()
-        self.__run()
+    host_line    = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
+    targets_line = f"[bold]--targets {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in ARG('targets')], 'None')}[/bold]"
 
+    MFC_SIDEBAR_LINES = [
+        "",
+        f"[bold]{host_line}[/bold]",
+        '-' * len(host_line),
+        "",
+        f"[bold]--jobs [magenta]{ARG('jobs')}[/magenta][/bold]"
+    ] + [
+        f"[bold]--{'' if getattr(state.gCFG, field.name) else 'no-'}{field.name}[/bold]" for field in dataclasses.fields(state.gCFG)
+    ] + [
+        targets_line if ARG("command") != "test" else "",
+        "",
+        "[yellow]$ ./mfc.sh \[build, run, test, clean] --help[/yellow]",
+    ]
 
-    def __handle_mode(self):
-        # Handle mode change
-        if self.args["mode"] == self.lock.mode and self.args["mpi"] == self.lock.mpi:
-            return
+    for a, b in itertools.zip_longest(MFC_LOGO_LINES, MFC_SIDEBAR_LINES):
+        lhs = a.ljust(max_logo_line_length)
+        rhs = b if b is not None else ''
+        cons.print(
+            f"[bold blue] {lhs} [/bold blue]  {rhs}",
+            highlight=False
+        )
 
-        cons.print(f"[bold yellow]Switching to [bold magenta]{self.args['mode']}[/bold magenta] mode from [bold magenta]{self.lock.mode}[/bold magenta] mode:[/bold yellow]")
-        
-        self.lock.mode = self.args["mode"]
-        self.lock.mpi  = self.args["mpi"]
-        self.lock.write()
-
-        for target_name in build.get_mfc_target_names():
-            t = build.get_target(target_name)
-            dirpath = build.get_build_dirpath(t)
-            cons.print(f"[bold red] - Removing {os.path.relpath(dirpath)}[/bold red]")
-            delete_directory(dirpath)
-
-
-    def __print_greeting(self):
-        MFC_LOGO_LINES       = MFC_LOGO.splitlines()
-        max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
-
-        host_line = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
-
-        targets_line = \
-            f"[bold]--targets: {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in self.args['targets']], 'None')}[/bold]"
-
-        MFC_SIDEBAR_LINES = [
-            "",
-            f"[bold]{host_line}[/bold]",
-            '-' * len(host_line),
-            "",
-            "",
-            f"[bold]--jobs:    [magenta]{self.args['jobs']}[/magenta][/bold]",
-            f"[bold]--mode:    [magenta]{self.lock.mode}[/magenta][/bold]",
-            targets_line if self.args["command"] != "test" else "",
-            "",
-            "",
-            "[yellow]$ ./mfc.sh \[build, run, test, clean] --help[/yellow]",
-        ]
+    cons.print()
 
 
-        for a, b in itertools.zip_longest(MFC_LOGO_LINES, MFC_SIDEBAR_LINES):
-            lhs = a.ljust(max_logo_line_length)
-            rhs = b if b is not None else ''
-            cons.print(
-                f"[bold blue] {lhs} [/bold blue]  {rhs}",
-                highlight=False
-            )
-
-        cons.print()
+def __checks():
+    if not does_command_exist("cmake"):
+        raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
 
 
-    def __checks(self):
-        if not does_command_exist("cmake"):
-            raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
-
-        if not does_command_exist("mpif90") and self.args["mpi"]:
-            raise MFCException("mpif90 couldn't be located on your system. We therefore assume MPI is not available on your system. It is required to build MFC. Please ensure it is installed and discoverable (e.g in your system's $PATH).")
-
-
-    def __run(self):
-        if self.args["command"] == "test":
-            self.test.execute()
-        elif self.args["command"] == "run":
-            self.run.run()
-        elif self.args["command"] == "build":
-            build.build(self)
-        elif self.args["command"] == "clean":
-            for target in self.args["targets"]:
-                build.clean_target(self, target)
+def __run():    
+    {"test":  test.test,   "run":   run.run,    "build": build.build,
+     "clean": build.clean, "bench": bench.bench
+    }[ARG("command")]()
 
 
 if __name__ == "__main__":
     try:
-        MFCState()
+        lock.init()
+        state.gARG = args.parse(state.gCFG)
+
+        lock.switch(state.MFCConfig.from_dict(state.gARG))
+        
+        __print_greeting()
+        __checks()
+        __run()
+
     except MFCException as exc:
         cons.reset()
         cons.print(f"""\
@@ -129,4 +84,3 @@ if __name__ == "__main__":
 """)
 
         quit(signal.SIGTERM)
-

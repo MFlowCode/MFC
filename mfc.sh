@@ -17,28 +17,236 @@ source "$(pwd)/toolchain/util.sh"
 # Handle upgrading from older MFC build systems
 if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/build/mfc.lock.yaml" ]; then
     error "You are upgrading from an older version of$MAGENTA MFC$COLOR_RESET. Please remove, if applicable, the dependencies/, bootstrap/, and build/ directories before running this command again."
-    
+
     exit 1
 fi
 
 # If the user wishes to run the "load" script
 if [ "$1" == "load" ]; then
     shift;
-    source "$(pwd)/toolchain/scripts/load.sh" "$@"
+
+    # Reset u_computer & u_cg to known values since this script is run with "source"
+    # Therefore, values of variables defined here are kept when the script runs again.
+    u_computer=""; u_cg=""
+
+    # If there are command-line arguments, parse them:
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -c|--computer) u_computer="$2"; shift; shift;    ;;
+            -m|--mode)     u_cg="$2";       shift; shift;    ;;
+            -*|--*)        echo "Unknown option $1"; return; ;;
+        esac
+    done
+
+    # Get computer (if not supplied in command-line)
+    if [ -v $u_computer ]; then
+        log   "Select a system:"
+        log   "$G""ORNL$W:    Ascent     (a), Crusher (c), Summit (s), Wombat (w)"
+        log   "$C""ACCESS$W:  Bridges2   (b), Expanse (e)"
+        log   "$Y""GaTech$W:  Phoenix    (p)"
+        log   "$R""CALTECH$W: Richardson (r)"
+        log_n "($G""a$W/$G""c$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$Y""p$CR/$R""r$CR): "
+        read u_computer
+        log
+    fi
+
+    # Get CPU/GPU (if not supplied in command-line)
+    if [ -v $u_cg ]; then
+        log   "Select configuration:"
+        log   " - CPU (c)"
+        log   " - GPU (g)"
+        log_n "(c/g): "
+        read u_cg
+        log
+    fi
+
+    # User input to lowercase
+    u_computer=$(echo "$u_computer" | tr '[:upper:]' '[:lower:]')
+    u_cg=$(echo "$u_cg" | tr '[:upper:]' '[:lower:]')
+
+    COMPUTER=""; CG=""
+    declare -a MODULES
+
+    if [ "$u_cg" == "c" ]; then # for CPU
+        CG="CPU"
+    elif [ "$u_cg" == "g" ]; then # For GPU
+        CG="GPU"
+    fi
+
+    if [ "$u_computer" == "s" ]; then # For Summit
+        if [ "$u_cg" == "c" ]; then
+            MODULES=("gcc/12.1.0")
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("nvhpc/22.5" "cuda/nvhpc")
+        fi
+
+        MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
+                "hsi/5.0.2.p5" "xalt/1.2.1" "lsf-tools/2.0"
+                "cmake/3.23.1" "ninja/1.10.2" "spectrum-mpi/10.4.0.3-20210112")
+    elif [ "$u_computer" == "b" ]; then # Bridges2
+        if [ "$u_cg" == "c" ]; then
+            MODULES=("allocations/1.0" "gcc/10.2.0" "python/3.8.6"
+                     "openmpi/4.0.5-gcc10.2.0")
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("nvhpc/22.9" "openmpi/4.0.5-nvhpc22.9")
+        fi
+
+        MODULES=("${MODULES[@]}" "python/3.8.6")
+    elif [ "$u_computer" == "a" ]; then # For Ascent
+        if [ "$u_cg" == "c" ]; then
+            MODULES=("gcc/11.1.0" "spectrum-mpi" "cuda")
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("nvhpc/21.11" "spectrum-mpi" "cuda/nvhpc"
+                    "nsight-compute" "nsight-systems")
+        fi
+
+        MODULES=("${MODULES[@]}" "python" "cmake/3.22.2")
+    elif [ "$u_computer" == "r" ]; then # Richardson
+        if [ "$u_cg" == "c" ]; then
+            MODULES=("gcc/9.3.0" "openmpi-2.0/gcc-9.3.0")
+        elif [ "$u_cg" == "g" ]; then
+            error "GPU not supported on Richardson."
+
+            return
+        fi
+
+        MODULES=("${MODULES[@]}" "python/3.7")
+    elif [ "$u_computer" == "w" ]; then # For Wombat
+        if [ "$u_cg" == "c" ]; then
+            MODULES=("gcc/11.1.0" "openmpi/4.0.5_gcc")
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("cuda/11.5.1" "/sw/wombat/Nvidia_HPC_SDK/modulefiles/nvhpc/22.1")
+        fi
+
+        MODULES=("${MODULES[@]}" "cmake/3.22.1" "python/3.9.9")
+    elif [ "$u_computer" == "e" ]; then # Expanse
+        if [ "$u_cg" == "c" ]; then
+            warn "Please set CC=icc, CXX=icx, and FC=ifort."
+            log
+
+            MODULES=("cpu/0.15.4" "gcc/9.2.0" "openmpi/4.1.1" "cmake/3.18.2")
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
+        fi
+
+        MODULES=("${MODULES[@]}" "python/3.8.5")
+    elif [ "$u_computer" == "p" ]; then # Phoenix
+        if [ "$u_cg" == "c" ]; then
+            MODULES=("intel/19.0.5" "mvapich2/2.3.2")
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("cuda/11.2" "nvhpc/22.1")
+        fi
+
+        MODULES=("${MODULES[@]}" "python/3.7.4" "cmake/3.20.3")
+    elif [ "$u_computer" == "c" ]; then # Crusher
+        if [ "$u_cg" == "c" ]; then
+            MODULES=()
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("rocm/5.1.0" "craype-accel-amd-gfx90a")
+        fi
+
+        MODULES=("${MODULES[@]}" "cmake/3.23.2" "cray-fftw/3.3.10.2" "hdf5/1.12.1" "cray-python/3.9.13.1" "ninja/1.10.2" "cray-mpich/8.1.23")
+    else
+        echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
+
+        return
+    fi
+
+    log "Loading modules for $CG mode:"
+
+    # Reset modules to default system configuration
+    if [ "$u_computer" != "p" ]; then
+        module reset > /dev/null 2>&1
+        code="$?"
+
+        # Purge if reset is not available
+        if [ "$code" -ne "0" ]; then
+            module purge > /dev/null 2>&1
+        fi
+    else
+        module purge > /dev/null 2>&1
+    fi
+
+    # Find length of longest module_name in $MODULES for $COMPUTER
+    max_module_length="0"
+    for module_name in ${MODULES[@]}; do
+        module_length="${#module_name}"
+
+        if [ "$module_length" -gt "$max_module_length" ]; then
+            max_module_length="$module_length"
+        fi
+    done
+
+    # Load modules ($MODULES)
+    for module_name in ${MODULES[@]}; do
+        log_n " - Load $CYAN$module_name$COLOR_RESET "
+
+        # Add padding spaces
+        module_length="${#module_name}"
+        delta="$((max_module_length-module_length-2))"
+        if [ "$delta" -ne "-2" ]; then
+            printf "%0.s-" $(seq 0 $delta)
+            echo -n " "
+        fi
+
+        # Load the module
+        module load "$module_name" > /dev/null 2>&1
+
+        # Handle Success / Failure
+        code=$?
+        if [ "$code" == "0" ]; then
+            echo -e "[$G""SUCCESS$W]"
+        else
+            echo -e "[$R""FAILURE$W]"
+
+            # Run load again to show error message
+            module load "$module_name"
+
+            return
+        fi
+    done
+
+    ok "All modules have been loaded."
 
     return
 elif [ "$1" == "format" ]; then
-    "$SHELL" "$(pwd)/toolchain/scripts/format.sh"
+    if ! command -v fprettify > /dev/null 2>&1; then
+        pip3 install --upgrade fprettify
+    fi
+
+    fprettify src --exclude "src/*/autogen" --recursive \
+        --indent 4 --c-relations --enable-replacements --enable-decl \
+        --whitespace-comma 1 --whitespace-multdiv 0 --whitespace-plusminus 1 \
+        --case 1 1 1 1 --strict-indent
+    ret="$?"
+
+    if [ "$ret" != "0" ]; then
+        error "failed to execute fprettify."
+        error "MFC has not been fprettify'ied."
+
+        exit 1
+    fi
+
+    ok "MFC has been fprettify'ied."
+
+    exit 0
+elif [ "$1" == "cloc" ]; then
+    if ! command -v cloc > /dev/null 2>&1; then
+        error "cloc (github.com/AlDanial/cloc) is not installed."
+
+        exit 1
+    fi
+
+    cloc .          --exclude-dir=build,tests,examples,.vscode,.github \
+         --fullpath --not-match-d=src/*/*/autogen
 
     exit $?
-fi
-
-if [ "$1" == "docker" ]; then
+elif [ "$1" == "docker" ]; then
     shift;
 
     if ! command -v docker > /dev/null 2>&1; then
         error "$MAGENTA""Docker$COLOR_RESET is not installed."
-        
+
         exit 1
     fi
 
@@ -46,17 +254,17 @@ if [ "$1" == "docker" ]; then
     log "  - Fetching image..."
     if ! docker pull henryleberre/mfc; then
         error "Failed to fetch$MAGENTA Docker$COLOR_RESET image from$MAGENTA Docker Hub$COLOR_RESET."
-        
+
         exit 1
     fi
 
-    echo "  - Starting container..."
+    log "  - Starting container..."
     docker run --interactive --tty --rm                              \
                --mount type=bind,source="$(pwd)",target=/home/me/MFC \
                henryleberre/mfc
     if (($?)); then
         error "Failed to start Docker container."
-    
+
         exit 1
     fi
 
@@ -81,7 +289,7 @@ if ! command -v cmake > /dev/null 2>&1; then
     # Not installed
     bShouldInstallCMake=true
 
-    warning "$MAGENTA""CMake$COLOR_RESET is not installed."
+    warn "$MAGENTA""CMake$COLOR_RESET is not installed."
 else
     cmake_verstr=$(cmake --version | tr ' ' '\n' | sed -n 3p)
     cmake_major=$(echo $cmake_verstr | tr '.' '\n' | sed -n 1p)
@@ -135,7 +343,7 @@ if [ "$bShouldInstallCMake" = true ]; then
     fi
 
     mkdir -p "$(pwd)/build/cmake"
-    
+
     filename="cmake-$version-linux-$arch.sh"
     repository="https://github.com/Kitware/CMake"
     url="$repository/releases/download/v$version/$filename"
@@ -155,7 +363,7 @@ if [ "$bShouldInstallCMake" = true ]; then
 
     if ! command -v wget > /dev/null 2>&1; then
         error "$MAGENTA""wget$COLOR_RESET is not installed but is necessary to download$MAGENTA CMake$COLOR_RESET."
-    
+
         cmake_fatal_error
     fi
 
@@ -169,7 +377,7 @@ if [ "$bShouldInstallCMake" = true ]; then
 
     if ! $SHELL "$(pwd)/build/cmake/$filename" "--skip-license" "--prefix=$(pwd)/build/cmake"; then
         error "Failed to install a compatible version of CMake."
-        
+
         cmake_fatal_error
     fi
 
@@ -195,25 +403,25 @@ if ! command -v pip3 > /dev/null 2>&1 && [ ! -f "$(pwd)/build/venv/bin/activate"
     # Check whether python3 is in the $PATH / is accessible.
     if ! command -v python3 > /dev/null 2>&1; then
         error "Couldn't find$MAGENTA Python$COLOR_RESET. Please ensure it is discoverable."
-    
+
         exit 1
     fi
 
     # CHeck Python's version for compatibility
     if ! python3 -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"; then
         error "$(python3 --version) is incompatible.$MAGENTA Python$COLOR_RESET v$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR or higher is required."
-    
+
         exit 1
     fi
 
     get_pip_url="https://bootstrap.pypa.io/pip/get-pip.py"
 
-    warning "$MAGENTA""Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET is not installed."
-    log     "Downloading$MAGENTA Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET from $get_pip_url..."
+    warn "$MAGENTA""Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET is not installed."
+    log  "Downloading$MAGENTA Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET from $get_pip_url..."
 
     if ! wget -O "$(pwd)/build/get-pip.py" "$get_pip_url"; then
         error "Couldn't download get-pip.py."
-    
+
         exit 1
     fi
 
@@ -221,7 +429,7 @@ if ! command -v pip3 > /dev/null 2>&1 && [ ! -f "$(pwd)/build/venv/bin/activate"
     export PIP_DISABLE_PIP_VERSION_CHECK=1
     if ! python3 "$(pwd)/build/get-pip.py" --user; then
         error "Couldn't install$MAGENTA pip$COLOR_RESET with get-pip.py"
-    
+
         exit 1
     fi
 
@@ -233,7 +441,7 @@ fi
 if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
     if ! python3 -m venv "$(pwd)/build/venv"; then
         error "Failed to create a$MAGENTA Python$COLOR_RESET virtual environment. Delete the build/venv folder and try again."
-    
+
         exit 1
     fi
 
@@ -268,37 +476,39 @@ fi
 
 # Activate the Python venv
 source "$(pwd)/build/venv/bin/activate"
-ok "Entered the$MAGENTA Python$COLOR_RESET virtual environment (venv)."
+ok "(venv) Entered the$MAGENTA Python$COLOR_RESET virtual environment."
 
 
-# Fetch required Python modules.
-# Some modules which are now in Python's standard library
-#                    are imported as backports to support Python v3.6.
-declare -a REQUIRED_PYTHON_MODULES=("wheel,wheel" "argparse,argparse" "dataclasses,dataclasses" "typing,typing" "yaml,pyyaml" "rich,rich" "fypp,fypp")
+# Install Python dependencies if, either:
+# - This script is running for the first time
+# (or)
+# - The requirements.txt file has changed
+if ! cmp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/requirements.txt" > /dev/null 2>&1; then
+    log "(venv) (Re)Installing mfc.sh's Python dependencies (via Pip)."
 
-for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
-    import_name=$(echo $module | tr ',' '\n' | head -n 1)
-    install_name=$(echo $module | tr ',' '\n' | tail -n 1)
+    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install -r "$(pwd)/toolchain/requirements.txt"; then
+        error "(venv) Installation failed."
 
-    if ! python3 -c "import $import_name" > /dev/null 2>&1; then
-        if ! PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install "$install_name"; then
-            error "Failed to install $import_name/$install_name through Python3's pip."
-        
-            exit 1
-        fi
+        log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+        deactivate
 
-        ok "Installed$MAGENTA Python PIP$COLOR_RESET package $MAGENTA$install_name$COLOR_RESET (into venv)."
+        exit 1
     fi
-done
+
+    ok "(venv) Installation succeeded."
+
+    # Save the new/current requirements.txt
+    cp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/"
+fi
 
 
-# Run the mfc.py bootstrap script
+# Run the main.py bootstrap script
 python3 "$(pwd)/toolchain/mfc.py" "$@"
 code=$?
 
 
 # Deactivate the Python virtualenv in case the user "source"'d this script
-log "Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
 deactivate
 
 

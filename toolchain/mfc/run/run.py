@@ -1,68 +1,62 @@
-import re
+import re, typing
 
-from ..util.printer import cons
+from ..printer import cons
+from ..state   import ARG
 
-from . import engines
-from . import input
-
-from ..util import common
-
-from .. import build
+from .  import engines, input
+from .. import common,  build
 
 
-class MFCRun:
-    def __init__(self, mfc):
-        self.mfc = mfc
+def validate_job_options() -> None:
+    if ARG("nodes") <= 0:
+        raise common.MFCException("RUN: At least one node must be requested.")
 
-    def validate_job_options(self) -> None:
-        if self.mfc.args["cpus_per_node"] != self.mfc.args["gpus_per_node"] \
-            and self.mfc.args["gpus_per_node"] != 0:
-            raise common.MFCException("RUN: Conflicting job execution parameters. If using GPUs, CPUs per node and GPUs per node must match.")
+    if ARG("tasks_per_node") <= 0:
+        raise common.MFCException("RUN: At least one task per node must be requested.")
 
-        if self.mfc.args["nodes"] <= 0:
-            raise common.MFCException("RUN: At least one node must be requested.")
+    if not common.isspace(ARG("email")):
+        # https://stackoverflow.com/questions/8022530/how-to-check-for-valid-email-address
+        if not re.match(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?", ARG("email")):
+            raise common.MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
 
-        if self.mfc.args["cpus_per_node"] <= 0:
-            raise common.MFCException("RUN: At least one CPU per node must be requested.")
 
-        if not common.isspace(self.mfc.args["email"]):
-            # https://stackoverflow.com/questions/8022530/how-to-check-for-valid-email-address
-            if not re.match(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?", self.mfc.args["email"]):
-                raise common.MFCException(f'RUN: {self.mfc.args["email"]} is not a valid e-mail address.')
+def run_targets(targets: typing.List[str]):
+    build.build_targets(targets)
+    
+    cons.print("[bold]Run[/bold]")
+    cons.indent()
 
-        engines.get_engine(self.mfc.args["engine"]).validate_job_options(self.mfc)
+    if len(ARG("targets")) == 0:
+        cons.print(f"> No target selected.")
+        return
 
-    def run(self) -> None:
-        for name in self.mfc.args["targets"]:
-            build.build_target(self.mfc, name)
+    input_file = input.load()
 
-        cons.print("[bold]Run[/bold]")
-        cons.indent()
+    engine = engines.get_engine(ARG("engine"))
+    engine.init(input_file)
 
-        if len(self.mfc.args["targets"]) == 0:
-            cons.print(f"> No target selected.")
-            return
-
-        input_file = input.load(self.mfc.args)
-
-        engine = engines.get_engine(self.mfc.args["engine"])
-        engine.init(self.mfc, input_file)
-
-        cons.print(f"Configuration:")
-        cons.indent()
-        cons.print(f"""\
-Input               {self.mfc.args['input']}
-Job Name      (-#)  {self.mfc.args['name']}
-Engine        (-e)  {self.mfc.args['engine']}
+    cons.print(f"Configuration:")
+    cons.indent()
+    cons.print(f"""\
+Input               {ARG('input')}
+Job Name      (-#)  {ARG('name')}
+Engine        (-e)  {ARG('engine')}
 {engine.get_args()}\
 """)
-        cons.unindent()
+    cons.unindent()
 
-        self.validate_job_options()
+    validate_job_options()
 
-        cons.print("Generating input files...")
-        for name in self.mfc.args["targets"]:
-            input_file.generate(name)
+    cons.print("Generating input files...")
+    for name in ARG("targets"):
+        input_file.generate(name)
 
-        engine.run(self.mfc.args["targets"])
+    engine.run(ARG("targets"))
+    
 
+def run_target(target: str):
+    run_targets([target])
+
+
+def run() -> None:
+    run_targets(ARG("targets"))

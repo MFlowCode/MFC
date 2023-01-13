@@ -56,11 +56,8 @@ program p_main
     use openacc
 #endif
 
-    use nvtx
+    use m_nvtx
 
-#ifdef _OPENACC
-    use openacc
-#endif
     ! ==========================================================================
 
     implicit none
@@ -105,11 +102,8 @@ program p_main
 #endif
 
     devtype = acc_get_device_type()
-    devNum = acc_get_num_devices(devtype)
-    dev = mod(local_rank, devNum)
-
-    ! Note: I0 (Iw, where w=0) is a Fortran 95 feature.
-    print '("Global Rank "I0" (/"I0") - Local Rank "I0" (/"I0") - OpenACC (Local) Device "I0" (/"I0")")', proc_rank, num_procs, local_rank, local_size, dev, devNum
+    devNum  = acc_get_num_devices(devtype)
+    dev     = mod(local_rank, devNum)
 
     call acc_set_device_num(dev, devtype)
 #endif
@@ -122,6 +116,8 @@ program p_main
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
         call s_check_input_file()
+
+        print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
 
     ! Broadcasting the user inputs to all of the processors and performing the
@@ -228,18 +224,26 @@ program p_main
     ! Time-stepping Loop =======================================================
     do
         if (proc_rank == 0) then
-            print *, '------ Time step ', t_step, 'of', t_step_stop, '----'
+            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',       &
+                  int(100*(real(t_step + 1)/(t_step_stop - t_step_start + 1))), &
+                  t_step      - t_step_start + 1,                               &
+                  t_step_stop - t_step_start + 1,                               &
+                  t_step
         end if
+
         mytime = mytime + dt
 
         if (probe_wrt) then
             do i = 1, sys_size
-!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                !$acc update host(q_cons_ts(1)%vf(i)%sf)
             end do
         end if
 
         call s_compute_derived_variables(t_step)
-        if (DEBUG) print *, 'Computed derived vars'
+
+#ifdef DEBUG
+        print *, 'Computed derived vars'
+#endif
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
