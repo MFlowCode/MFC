@@ -32,19 +32,25 @@ include(CheckFortranCompilerFlag)
 
 # === Check Compiler Support & Tools
 # === === Compiler Support
+set(__err_msg "\
+CMake detected the ${CMAKE_Fortran_COMPILER_ID} Fortran compiler \
+v${CMAKE_Fortran_COMPILER_VERSION}. If you intended to use a different \
+compiler (or a different version thereof), please:\n\
+ - Install the compiler or load its module. (e.g. module load gcc/10.1)\n\
+ - Set/Export the C, CXX, and FC environment variables. (e.g. 'export CC=gcc', \
+ 'export CXX=g++', and 'export FC=gfortran'.\n\
+ - If using mfc.sh, delete the build/<code name> directory and try again. (e.g. 'rm -rf build/pre_process')\n")
+
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
-        message(FATAL_ERROR "GNU v5.0 or newer is required to build MFC. "
-                            "[current: ${CMAKE_Fortran_COMPILER_VERSION}]")
+        message(FATAL_ERROR "${__err_msg}ERROR: GNU v5.0 or newer is required to build MFC.")
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
-        message(FATAL_ERROR "NVHPC v21.7 or newer is required to build MFC. "
-                            "[current: ${CMAKE_Fortran_COMPILER_VERSION}]")
+        message(FATAL_ERROR "${__err_msg}ERROR: NVHPC v21.7 or newer is required to build MFC.")
     endif()
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang")
-    message(FATAL_ERROR "MFC does not support the Apple Clang compilers. "
-                        "Please consult the README for more details.")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
+    message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
 endif()
 
 # === === Find Fypp
