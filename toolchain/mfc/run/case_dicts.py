@@ -70,10 +70,9 @@ SIMULATION = COMMON + [
     'riemann_solver', 'wave_speeds', 'avg_state', 'commute_err', 'split_err',
     'alt_crv', 'alt_soundspeed', 'regularization', 'reg_eps', 'null_weights',
     'mixture_err', 'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds',
-    'flux_lim', 'We_riemann_flux', 'We_rhs_flux', 'We_src', 'We_wave_speeds',
-    'lsq_deriv', 'fd_order', 'com_wrt', 'num_probes', 'probe_wrt', 'cb_wrt',
-    'threshold_mf', 'moment_order', 'bubble_model', 'Monopole', 'num_mono',
-    'qbmm', 'R0_type', 'integral_wrt', 'num_integrals', 'cu_mpi'
+    'flux_lim', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
+    'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
+    'num_integrals', 'cu_mpi'
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -81,21 +80,12 @@ for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%end')
 
 for wrt_id in range(1,10+1):
-    SIMULATION.append(f'com_wrt({wrt_id})')
-    SIMULATION.append(f'cb_wrt({wrt_id})')
-
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
 
 for probe_id in range(1,3+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe({probe_id})%{cmp}')
-
-for mf_id in range(1,5+1):
-    SIMULATION.append(f'threshold_mf({mf_id})')
-
-for order_id in range(1,5+1):
-    SIMULATION.append(f'moment_order({order_id})')
 
 for f_id in range(1,10+1):
     for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
