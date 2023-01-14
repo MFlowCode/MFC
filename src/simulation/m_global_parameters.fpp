@@ -225,15 +225,12 @@ module m_global_parameters
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
 
-    logical, dimension(num_fluids_max) :: com_wrt, cb_wrt
     logical :: probe_wrt
     logical :: integral_wrt
     integer :: num_probes
     integer :: num_integrals
     type(probe_parameters), dimension(num_probes_max) :: probe
     type(integral_parameters), dimension(num_probes_max) :: integral
-    real(kind(0d0)), dimension(5) :: threshold_mf
-    integer, dimension(5) :: moment_order
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
@@ -444,8 +441,6 @@ contains
         end do
 
         fd_order = dflt_int
-        com_wrt = .false.
-        cb_wrt = .false.
         probe_wrt = .false.
         integral_wrt = .false.
         num_probes = dflt_int
@@ -464,11 +459,6 @@ contains
             integral(i)%ymax = dflt_real
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
-        end do
-
-        do i = 1, 5
-            threshold_mf(i) = dflt_real
-            moment_order(i) = dflt_int
         end do
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
