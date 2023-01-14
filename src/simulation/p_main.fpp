@@ -52,6 +52,8 @@ program p_main
 
     use m_bubbles
 
+    use ieee_arithmetic
+
 #ifdef _OPENACC
     use openacc
 #endif
@@ -64,7 +66,7 @@ program p_main
 
     integer :: err_code, ierr
 
-    integer :: t_step, i !< Iterator for the time-stepping loop
+    integer :: t_step, i, j, k, l !< Iterator for the time-stepping loop
     real(kind(0d0)) :: time_avg, time_final
     real(kind(0d0)) :: io_time_avg, io_time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
@@ -324,6 +326,16 @@ program p_main
             !  call nvtxStartRange("I/O")
             do i = 1, sys_size
 !$acc update host(q_cons_ts(1)%vf(i)%sf)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                                print *, j, k, l, proc_rank, t_step, m, n, p
+                                STOP "Error"
+                            end if
+                        end do
+                    end do
+                end do
             end do
             call s_write_data_files(q_cons_ts(1)%vf, t_step)
             !  call nvtxEndRange
