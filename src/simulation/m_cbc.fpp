@@ -134,10 +134,12 @@ module m_cbc
 
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
 
+    integer :: cbc_dir, cbc_loc
+
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
 !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,alpha_rho,vel,adv,mf,Re, &
 !$acc                dalpha_rho_ds,dvel_ds,dadv_ds,lambda,L,ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-!$acc                pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj)
+!$acc                pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj, cbc_dir, cbc_loc)
 
 contains
 
@@ -633,7 +635,7 @@ contains
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
     subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, & ! -----------------
-                     cbc_dir, cbc_loc, &
+                     cbc_dir_norm, cbc_loc_norm, &
                      ix, iy, iz)
 
         type(scalar_field), &
@@ -644,7 +646,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: flux_vf, flux_src_vf
 
-        integer, intent(IN) :: cbc_dir, cbc_loc
+        integer, intent(IN) :: cbc_dir_norm, cbc_loc_norm
 
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
@@ -684,6 +686,12 @@ contains
         ! selected CBC coordinate direction
 
         ! Allocating L, see Thompson (1987, 1990)
+
+        cbc_dir = cbc_dir_norm
+        cbc_loc = cbc_loc_norm
+
+        !$acc update device(cbc_dir, cbc_loc)
+
 
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                               cbc_dir, cbc_loc, &
@@ -729,7 +737,6 @@ contains
 
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
             elseif (weno_order == 5) then
-
                 call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                            F_rs${XYZ}$_vf, &
                                                            F_src_rs${XYZ}$_vf, &
@@ -905,19 +912,19 @@ contains
 
                     ! call s_compute_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
 
-                    if ((cbc_loc == -1 .and. bcxb == -5) .or. (cbc_loc == 1 .and. bcxe == -5)) then
+                    if ((cbc_loc == -1 .and. bc${XYZ}$b == -5) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -5)) then
                         call s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcxb == -6) .or. (cbc_loc == 1 .and. bcxe == -6)) then
-call s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcxb == -7) .or. (cbc_loc == 1 .and. bcxe == -7)) then
-call s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcxb == -8) .or. (cbc_loc == 1 .and. bcxe == -8)) then
-call s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcxb == -9) .or. (cbc_loc == 1 .and. bcxe == -9)) then
-call s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcxb == -10) .or. (cbc_loc == 1 .and. bcxe == -10)) then
-call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else if ((cbc_loc == -1 .and. bcxb == -11) .or. (cbc_loc == 1 .and. bcxe == -11)) then
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -6) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -6)) then
+    call s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
+    call s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
+    call s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
+    call s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then
+    call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -11) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -11)) then
      call s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else
     call s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
@@ -942,7 +949,7 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
                         dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
                                               (L(1) - L(advxe))/(2d0*rho*c) + &
                                               (dir_flg(dir_idx(i)) - 1d0)* &
-                                              L(momxb + i)
+                                              L(momxb + i - 1)
                     end do
 
                     vel_dv_dt_sum = 0d0
@@ -984,18 +991,18 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
                     !$acc loop seq
                     do i = 1, contxe
                         flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
-                                                   + ds(0)*dalpha_rho_dt(i)
+                                                   + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*dalpha_rho_dt(i)
                     end do
 
                     !$acc loop seq
                     do i = momxb, momxe
                         flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
-                                                   + ds(0)*(vel(i - contxe)*drho_dt &
+                                                   + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*(vel(i - contxe)*drho_dt &
                                                             + rho*dvel_dt(i - contxe))
                     end do
 
                     flux_rs${XYZ}$_vf(-1, k, r, E_idx) = flux_rs${XYZ}$_vf(0, k, r, E_idx) &
-                                                   + ds(0)*(pres*dgamma_dt &
+                                                   + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*(pres*dgamma_dt &
                                                             + gamma*dpres_dt &
                                                             + dpi_inf_dt &
                                                             + rho*vel_dv_dt_sum &
@@ -1015,21 +1022,20 @@ call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c,
                                 *(flux_rs${XYZ}$_vf(0, k, r, i) &
                                   + vel(dir_idx(1)) &
                                   *flux_src_rs${XYZ}$_vf(0, k, r, i) &
-                                  + ds(0)*dadv_dt(i - E_idx))
+                                  + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*dadv_dt(i - E_idx))
                         end do
 
                     else
 
                         !$acc loop seq
                         do i = advxb, advxe
-                            flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) - &
-                                                       adv(i - E_idx)*flux_src_rs${XYZ}$_vf(0, k, r, i) + &
-                                                       ds(0)*dadv_dt(i - E_idx)
+                            flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) + &
+                                                       sign(1d0, -real(cbc_loc, kind(0d0)))*ds(0)*dadv_dt(i - E_idx)
                         end do
 
                         !$acc loop seq
                         do i = advxb, advxe
-                            flux_src_rs${XYZ}$_vf(-1, k, r, i) = 0d0
+                            flux_src_rs${XYZ}$_vf(-1, k, r, i) = flux_src_rs${XYZ}$_vf(0, k, r, i)
                         end do
 
                     end if
@@ -1157,7 +1163,7 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
 
         integer :: i !> Generic loop iterator
 
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+         L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
         do i = 2, momxb
             L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
@@ -1403,19 +1409,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_src_rsx_vf(j, k, r, advxb) = &
-                            flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)
-                    end do
-                end do
-            end do
-
-            if (riemann_solver == 1) then
+            if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, advxe
+                do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1437,6 +1433,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                     end do
                 end do
             end if
+
+
+
             ! END: Reshaping Inputted Data in x-direction ======================
 
             ! Reshaping Inputted Data in y-direction ===========================
@@ -1488,19 +1487,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_src_rsy_vf(j, k, r, advxb) = &
-                            flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)
-                    end do
-                end do
-            end do
-
-            if (riemann_solver == 1) then
+            if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, advxe
+                do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1521,7 +1510,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                         end do
                     end do
                 end do
-            end if
+            end if                
+
+
             ! END: Reshaping Inputted Data in y-direction ======================
 
             ! Reshaping Inputted Data in z-direction ===========================
@@ -1573,19 +1564,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_src_rsz_vf(j, k, r, advxb) = &
-                            flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)
-                    end do
-                end do
-            end do
-
-            if (riemann_solver == 1) then
+            if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, advxe
+                do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1605,8 +1586,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
-                end do
+                end do                
             end if
+
 
         end if
         ! END: Reshaping Inputted Data in z-direction ======================
@@ -1671,19 +1653,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
-                            flux_src_rsx_vf(j, k, r, advxb)
-                    end do
-                end do
-            end do
-
-            if (riemann_solver == 1) then
+            if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, advxe
+                do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1700,7 +1672,7 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_src_rsx_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, kind(0d0))) 
                         end do
                     end do
                 end do
@@ -1733,19 +1705,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
-                            flux_src_rsy_vf(j, k, r, advxb)
-                    end do
-                end do
-            end do
-
-            if (riemann_solver == 1) then
+            if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, advxe
+                do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1762,11 +1724,12 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_src_rsy_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, kind(0d0))) 
                         end do
                     end do
-                end do
+                end do                
             end if
+
             ! END: Reshaping Outputted Data in y-direction =====================
 
             ! Reshaping Outputted Data in z-direction ==========================
@@ -1795,19 +1758,9 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
-                            flux_src_rsz_vf(j, k, r, advxb)
-                    end do
-                end do
-            end do
-
-            if (riemann_solver == 1) then
+            if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = advxb + 1, advxe
+                do i = 1, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1824,11 +1777,12 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_src_rsz_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, kind(0d0))) 
                         end do
                     end do
                 end do
             end if
+
 
         end if
         ! END: Reshaping Outputted Data in z-direction =====================
