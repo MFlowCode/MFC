@@ -82,9 +82,8 @@ contains
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
-            fluid_pp, com_wrt, cb_wrt, probe_wrt, &
+            fluid_pp, probe_wrt, &
             fd_order, probe, num_probes, t_step_old, &
-            threshold_mf, moment_order, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
@@ -432,22 +431,6 @@ contains
                 (bc_z%end == -1 .and. bc_z%beg /= -1)) then
             print '(A)', 'Unsupported combination of values of '// &
                 'bc_z%beg and bc_z%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((any(threshold_mf /= dflt_real)) &
-                .and. &
-                (all(cb_wrt .neqv. .true.))) then
-            print '(A)', 'Unsupported combination of cb_wrt '// &
-                'and threshold_mf. Exiting ...'
-            call s_mpi_abort()
-        elseif ((any(moment_order /= dflt_int)) &
-                .and. &
-                (all(com_wrt .neqv. .true.))) then
-            print '(A)', 'Unsupported combination of com_wrt '// &
-                'and moment_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (any(cb_wrt) .and. (all(threshold_mf == dflt_real))) then
-            print '(A)', 'Unsupported combination of cb_wrt '// &
-                'and threshold_mf. Exiting ...'
             call s_mpi_abort()
         elseif (model_eqns == 1 .and. alt_soundspeed) then
             print '(A)', 'Unsupported combination of model_eqns '// &
