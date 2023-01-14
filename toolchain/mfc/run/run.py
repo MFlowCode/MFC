@@ -20,9 +20,7 @@ def validate_job_options() -> None:
             raise common.MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
 
 
-def run_targets(targets: typing.List[str]):
-    build.build_targets(targets)
-    
+def run_targets(targets: typing.List[str]):    
     cons.print("[bold]Run[/bold]")
     cons.indent()
 
@@ -50,6 +48,8 @@ Engine        (-e)  {ARG('engine')}
     cons.print("Generating input files...")
     for name in ARG("targets"):
         input_file.generate(name)
+
+    build.build_targets(targets)
 
     engine.run(ARG("targets"))
     
