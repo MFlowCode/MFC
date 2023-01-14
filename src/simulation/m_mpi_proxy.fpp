@@ -202,7 +202,6 @@ contains
             & 'bubble_model', 'thermal', 'R0_type', 'num_mono' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(moment_order(1), 5, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'adv_alphan', 'mpp_lim',   &
             & 'mapped_weno', 'mp_weno', 'cu_mpi', 'weno_flat', 'riemann_flat', &
@@ -211,14 +210,11 @@ contains
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(com_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(cb_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
             & 'Re_inv','poly_sigma' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(threshold_mf(1), 5, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
         #:if not MFC_CASE_OPTIMIZATION
             call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)

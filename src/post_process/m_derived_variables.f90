@@ -21,14 +21,12 @@ module m_derived_variables
 
     private; public :: s_initialize_derived_variables_module, &
  s_compute_finite_difference_coefficients, &
- s_derive_unadvected_volume_fraction, &
  s_derive_specific_heat_ratio, &
  s_derive_liquid_stiffness, &
  s_derive_sound_speed, &
  s_derive_flux_limiter, &
  s_derive_vorticity_component, &
  s_derive_numerical_schlieren_function, &
- s_derive_curvature, &
  s_finalize_derived_variables_module
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: gm_rho_sf !<
@@ -168,43 +166,6 @@ contains
 
     end subroutine s_compute_finite_difference_coefficients ! --------------
 
-    !>  This subroutine is used together with the volume fraction
-        !!      model and when called upon, it computes the values of the
-        !!      unadvected volume fraction from the inputted conservative
-        !!      variables, q_cons_vf. The calculated values are stored in
-        !!      the derived flow quantity storage variable, q_sf.
-        !!  @param q_cons_vf Conservative variables
-        !!  @param q_sf Unadvected volume fraction
-    subroutine s_derive_unadvected_volume_fraction(q_cons_vf, q_sf) ! ------
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_cons_vf
-
-        real(kind(0d0)), &
-            dimension(-offset_x%beg:m + offset_x%end, &
-                      -offset_y%beg:n + offset_y%end, &
-                      -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
-
-        integer :: i, j, k, l !< Generic loop iterators
-
-        ! Computing unadvected volume fraction from conservative variables
-        do l = -offset_z%beg, p + offset_z%end
-            do k = -offset_y%beg, n + offset_y%end
-                do j = -offset_x%beg, m + offset_x%end
-
-                    q_sf(j, k, l) = 1d0
-
-                    do i = adv_idx%beg, adv_idx%end
-                        q_sf(j, k, l) = q_sf(j, k, l) - q_cons_vf(i)%sf(j, k, l)
-                    end do
-
-                end do
-            end do
-        end do
-
-    end subroutine s_derive_unadvected_volume_fraction ! -------------------
 
     !>  This subroutine receives as input the specific heat ratio
         !!      function, gamma_sf, and derives from it the specific heat
@@ -438,146 +399,6 @@ contains
         end do
     end subroutine s_derive_flux_limiter ! ---------------------------------
 
-    !> Computes the local curvatures
-        !!  @param i Fluid indicator
-        !!  @param q_prim_vf Primitive variables
-        !!  @param q_sf Curvature
-    subroutine s_derive_curvature(i, q_prim_vf, q_sf) ! --------------------
-
-        integer, intent(IN) :: i
-
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
-        real(kind(0d0)), dimension(-offset_x%beg:m + offset_x%end, &
-                                   -offset_y%beg:n + offset_y%end, &
-                                   -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
-
-        real(kind(0d0)), allocatable, dimension(:, :, :) :: alpha_unadv_sf
-
-        real(kind(0d0)), allocatable, dimension(:, :) :: A
-        real(kind(0d0)), allocatable, dimension(:) :: sol, b, AA
-        real(kind(0d0)) :: norm
-        real(kind(0d0)) :: xloc, yloc, zloc
-        integer :: ndim
-        integer :: j, k, l, jj, kk, ll, i1, i2
-        integer :: stencil_j_min, stencil_j_max
-        integer :: stencil_k_min, stencil_k_max
-        integer :: stencil_l_min, stencil_l_max
-        type(int_bounds_info) :: iz1
-
-        if (p > 0) then ! 3D simulation
-            allocate (A(10, 10))
-            allocate (sol(10)); allocate (b(10)); allocate (AA(10))
-        else ! 2D simulation
-            allocate (A(6, 6))
-            allocate (sol(6)); allocate (b(6)); allocate (AA(6))
-        end if
-
-        if ((i == num_fluids) .and. (adv_alphan .neqv. .true.)) then
-            allocate (alpha_unadv_sf(-offset_x%beg:m + offset_x%end, &
-                                     -offset_y%beg:n + offset_y%end, &
-                                     -offset_z%beg:p + offset_z%end))
-            call s_derive_unadvected_volume_fraction(q_prim_vf, alpha_unadv_sf)
-        end if
-
-        if (p > 0) then
-            iz1%beg = -offset_z%beg; iz1%end = p + offset_z%end
-        else
-            iz1%beg = -1; iz1%end = 1
-        end if
-
-        ! Parabolic fitting
-        ndim = size(sol, 1)
-
-        do l = iz1%beg + 1, iz1%end - 1
-            do k = -offset_y%beg + 1, n + offset_y%end - 1
-                do j = -offset_x%beg + 1, m + offset_x%end - 1
-                    A(:, :) = 0d0
-                    b(:) = 0d0
-                    sol(:) = 0d0
-                    AA(:) = 0d0
-
-                    stencil_j_min = j - 1; stencil_j_max = j + 1
-                    stencil_k_min = k - 1; stencil_k_max = k + 1
-                    if (p > 0) then
-                        stencil_l_min = l - 1; stencil_l_max = l + 1
-                    else
-                        stencil_l_min = 0; stencil_l_max = 0
-                    end if
-
-                    do ll = stencil_l_min, stencil_l_max
-                        do kk = stencil_k_min, stencil_k_max
-                            do jj = stencil_j_min, stencil_j_max
-
-                                ! Ignore corner points in 3D stencil
-                                if ((p > 0) .and. (abs(jj - j) == 1) .and. (abs(kk - k) == 1) .and. (abs(ll - l) == 1)) cycle
-
-                                ! Find distance between cell centers
-                                xloc = x_cc(jj) - x_cc(j)
-                                yloc = y_cc(kk) - y_cc(k)
-                                if (p > 0) then
-                                    zloc = z_cc(ll) - z_cc(l)
-                                end if
-
-                                ! Compute operator
-                                AA(1) = 1d0
-                                AA(2) = xloc
-                                AA(3) = yloc
-                                AA(4) = 5d-1*xloc**2d0
-                                AA(5) = 5d-1*yloc**2d0
-                                AA(6) = xloc*yloc
-                                if (p > 0) then
-                                    AA(7) = zloc
-                                    AA(8) = 5d-1*zloc**2d0
-                                    AA(9) = yloc*zloc
-                                    AA(10) = zloc*xloc
-                                end if
-
-                                do i1 = 1, ndim
-                                    do i2 = 1, ndim
-                                        A(i1, i2) = A(i1, i2) + AA(i1)*AA(i2)
-                                    end do
-                                end do
-
-                                ! Form RHS vector
-                                do i1 = 1, ndim
-                                    if ((i == num_fluids) .and. (adv_alphan .neqv. .true.)) then
-                                        b(i1) = b(i1) + alpha_unadv_sf(jj, kk, ll)*AA(i1)
-                                    else
-                                        b(i1) = b(i1) + q_prim_vf(E_idx + i)%sf(jj, kk, ll)*AA(i1)
-                                    end if
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    call s_solve_linear_system(A, b, sol, ndim)
-
-                    if (p > 0) then
-                        norm = sqrt(sol(2)**2d0 + sol(3)**2d0 + sol(7)**2d0)
-                    else
-                        norm = sqrt(sol(2)**2d0 + sol(3)**2d0)
-                    end if
-
-                    if (p > 0) then
-                        q_sf(j, k, l) = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(2)**2d0*sol(8) + &
-                                          sol(3)**2d0*sol(8) - 2d0*sol(3)*sol(7)*sol(9) + sol(3)**2d0*sol(4) + &
-                                          sol(7)**2d0*sol(4) - 2d0*sol(7)*sol(2)*sol(10) + sol(7)**2d0*sol(5))/ &
-                                        max(norm, sgm_eps)**3d0
-                    else
-                        q_sf(j, k, l) = -(sol(2)**2d0*sol(5) - 2d0*sol(2)*sol(3)*sol(6) + sol(3)**2d0*sol(4))/ &
-                                        max(norm, sgm_eps)**3d0
-                    end if
-
-                end do
-            end do
-        end do
-
-        deallocate (A, sol, b, AA)
-        if ((i == num_fluids) .and. (adv_alphan .neqv. .true.)) deallocate (alpha_unadv_sf)
-
-    end subroutine s_derive_curvature ! ------------------------------------
 
     !>  Computes the solution to the linear system Ax=b w/ sol = x
         !!  @param A Input matrix
