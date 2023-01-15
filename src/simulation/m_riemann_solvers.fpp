@@ -1879,8 +1879,6 @@ contains
                                         vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
                                     end do
 
-                                elseif (avg_state == 1) then
-                                    call s_mpi_abort()
                                 end if
 
                                 if (mixture_err) then
