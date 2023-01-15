@@ -1,4 +1,5 @@
-from ..util import common
+from ..      import common
+from ..state import ARG
 
 
 COMMON = [
@@ -63,16 +64,15 @@ for p_id in range(1, 10+1):
 
 
 SIMULATION = COMMON + [
-    'run_time_info', 't_step_old', 't_tol', 'debug', 'dt', 't_step_start',
+    'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
     't_step_stop', 't_step_save', 'time_stepper', 'weno_vars', 'weno_eps',
     'char_decomp', 'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
     'riemann_solver', 'wave_speeds', 'avg_state', 'commute_err', 'split_err',
     'alt_crv', 'alt_soundspeed', 'regularization', 'reg_eps', 'null_weights',
     'mixture_err', 'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds',
-    'flux_lim', 'We_riemann_flux', 'We_rhs_flux', 'We_src', 'We_wave_speeds',
-    'lsq_deriv', 'fd_order', 'com_wrt', 'num_probes', 'probe_wrt', 'cb_wrt',
-    'threshold_mf', 'moment_order', 'bubble_model', 'Monopole', 'num_mono',
-    'qbmm', 'R0_type', 'integral_wrt', 'num_integrals', 'cu_mpi'
+    'flux_lim', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
+    'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
+    'num_integrals', 'cu_mpi'
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -80,21 +80,12 @@ for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%end')
 
 for wrt_id in range(1,10+1):
-    SIMULATION.append(f'com_wrt({wrt_id})')
-    SIMULATION.append(f'cb_wrt({wrt_id})')
-
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
 
 for probe_id in range(1,3+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe({probe_id})%{cmp}')
-
-for mf_id in range(1,5+1):
-    SIMULATION.append(f'threshold_mf({mf_id})')
-
-for order_id in range(1,5+1):
-    SIMULATION.append(f'moment_order({order_id})')
 
 for f_id in range(1,10+1):
     for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
@@ -148,7 +139,7 @@ for fl_id in range(1,10+1):
 CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 
 
-def get_input_dict_keys(target_name: str, args: list) -> list:
+def get_input_dict_keys(target_name: str) -> list:
     result = None
     if target_name == "pre_process":  result = PRE_PROCESS.copy()
     if target_name == "simulation":   result = SIMULATION.copy()
@@ -157,7 +148,7 @@ def get_input_dict_keys(target_name: str, args: list) -> list:
     if result == None:
         raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
 
-    if not args["case_optimization"] or target_name != "simulation":
+    if not ARG("case_optimization") or target_name != "simulation":
         return result
     
     return [ x for x in result if x not in CASE_OPTIMIZATION ]

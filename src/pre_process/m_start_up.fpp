@@ -87,8 +87,8 @@ contains
             !! is or is not present in the designated location
 
         ! Namelist for all of the parameters to be inputed by the user
-        namelist /user_inputs/ case_dir, old_grid, old_ic, t_step_old, m, &
-            n, p, x_domain, y_domain, z_domain, &
+        namelist /user_inputs/ case_dir, old_grid, old_ic, &
+            t_step_old, m, n, p, x_domain, y_domain, z_domain, &
             stretch_x, stretch_y, stretch_z, a_x, a_y, &
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, &
@@ -159,6 +159,9 @@ contains
             print '(A)', 'Unsupported combination of values of '// &
                 'bubbles and model_eqns. '// &
                 'Exiting ...'
+            call s_mpi_abort()
+        elseif (bubbles .and. nb < 1) then
+            print '(A)', 'The Ensemble-Averaged Bubble Model requires nb >= 1'
             call s_mpi_abort()
         elseif (bubbles .and. polydisperse .and. (nb == 1)) then
             print '(A)', 'Polydisperse bubble dynamics requires nb > 1 '// &
@@ -799,97 +802,8 @@ contains
             end do
         end if
 
-        ! Constraints on the geometric initial condition patch parameters
-        do i = 1, num_patches
-            if (i <= num_patches) then
-                if (patch_icpp(i)%geometry == 1) then
-                    call s_check_line_segment_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 2) then
-                    call s_check_circle_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 3) then
-                    call s_check_rectangle_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 4) then
-                    call s_check_line_sweep_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 5) then
-                    call s_check_ellipse_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 6) then
-                    call s_check_isentropic_vortex_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_check_2D_analytical_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 8) then
-                    call s_check_sphere_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 9) then
-                    call s_check_cuboid_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 10) then
-                    call s_check_cylinder_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 11) then
-                    call s_check_plane_sweep_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 12) then
-                    call s_check_ellipsoid_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_check_3D_analytical_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 14) then
-                    call s_check_spherical_harmonic_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_check_1d_analytical_patch_geometry(i)
-                elseif (patch_icpp(i)%geometry == 16) then
-                    print *, '1d pressure sinusoid'
-                elseif (patch_icpp(i)%geometry == 17) then
-                    print *, '2d spiral'
-                elseif (patch_icpp(i)%geometry == 18) then
-                    print *, '2d var circle'
-                elseif (patch_icpp(i)%geometry == 19) then
-                    print *, '3d var circle'
-                else
-                    print '(A,I0,A)', 'Unsupported choice of the '// &
-                        'geometry of active patch ', i, &
-                        ' detected. Exiting ...'
-                    call s_mpi_abort()
-                end if
-            else
-                if (patch_icpp(i)%geometry == dflt_int) then
-                    call s_check_inactive_patch_geometry(i)
-                else
-                    print '(A,I0,A)', 'Unsupported choice of the '// &
-                        'geometry of inactive patch ', i, &
-                        ' detected. Exiting ...'
-                    call s_mpi_abort()
-                end if
-            end if
-        end do
-
-        ! Constraints on overwrite rights initial condition patch parameters
-        do i = 1, num_patches
-            if (i <= num_patches) then
-                call s_check_active_patch_alteration_rights(i)
-            else
-                call s_check_inactive_patch_alteration_rights(i)
-            end if
-        end do
-
-        ! Constraints on smoothing initial condition patch parameters
-        do i = 1, num_patches
-            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. &
-                             patch_icpp(i)%geometry == 4 .or. &
-                             patch_icpp(i)%geometry == 5 .or. &
-                             patch_icpp(i)%geometry == 8 .or. &
-                             patch_icpp(i)%geometry == 10 .or. &
-                             patch_icpp(i)%geometry == 11 .or. &
-                             patch_icpp(i)%geometry == 12)) then
-                call s_check_supported_patch_smoothing(i)
-            else
-                call s_check_unsupported_patch_smoothing(i)
-            end if
-        end do
-
-        ! Constraints on flow variables initial condition patch parameters
-        do i = 1, num_patches
-            if (i <= num_patches) then
-                call s_check_active_patch_primitive_variables(i)
-            else
-                call s_check_inactive_patch_primitive_variables(i)
-            end if
-        end do
+        ! check all the patch properties
+        call s_check_patches()
 
         ! Constraints on the stiffened equation of state fluids parameters
         do i = 1, num_fluids
@@ -1217,11 +1131,7 @@ contains
 
         integer, intent(IN) :: dflt_int
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_start_up] s_read_parallel_grid_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
@@ -1332,11 +1242,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_start_up] s_read_parallel_ic_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status

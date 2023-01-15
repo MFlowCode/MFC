@@ -3,6 +3,7 @@
 !! @brief Contains module m_mpi_proxy
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
 !!          available in the MPI implementation's MPI module. Specifically,
@@ -108,11 +109,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_data not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
@@ -141,11 +138,7 @@ contains
     !> Halts all processes until all have reached barrier.
     subroutine s_mpi_barrier() ! -------------------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_barrier not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -159,36 +152,28 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_mpi_proxy_module() ! ---------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_initialize_mpi_proxy_module not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Allocating q_cons_buff_send and q_cons_buff_recv. Please note that
         ! for the sake of simplicity, both variables are provided sufficient
         ! storage to hold the largest buffer in the computational domain.
 
         if (n > 0) then
-
             if (p > 0) then
-                allocate (q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                           (m + 2*buff_size + 1)* &
-                                           (n + 2*buff_size + 1)* &
-                                           (p + 2*buff_size + 1)/ &
-                                           (min(m, n, p) + 2*buff_size + 1)))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                                         & (m + 2*buff_size + 1)* &
+                                         & (n + 2*buff_size + 1)* &
+                                         & (p + 2*buff_size + 1)/ &
+                                         & (min(m, n, p) + 2*buff_size + 1)))
             else
-                allocate (q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                           (max(m, n) + 2*buff_size + 1)))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                                         & (max(m, n) + 2*buff_size + 1)))
             end if
-
         else
-
-            allocate (q_cons_buff_send(0:-1 + buff_size*sys_size))
-
+            @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size))
         end if
 
-        allocate (q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+        @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
 #endif
 
@@ -201,283 +186,68 @@ contains
         !!      remaining processors in the communicator.
     subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_bcast_user_inputs not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: i, j !< Generic loop iterator
 
-        ! Logistics
-        call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(run_time_info, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(t_step_old, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
-        ! Computational domain parameters
-        call MPI_BCAST(m, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(p, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(m_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(n_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(p_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
+            & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
+            & 'num_fluids','time_stepper', 'weno_vars', 'riemann_solver',      & 
+            & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', & 
+            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'bc_x_glb%beg',  & 
+            & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &
+            & 'bc_z_glb%end', 'fd_order', 'num_probes', 'num_integrals',       &
+            & 'bubble_model', 'thermal', 'R0_type', 'num_mono' ]
+            call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
 
-        call MPI_BCAST(cyl_coord, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
+        #:for VAR in [ 'run_time_info','cyl_coord', 'adv_alphan', 'mpp_lim',   &
+            & 'mapped_weno', 'mp_weno', 'cu_mpi', 'weno_flat', 'riemann_flat', &
+            & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
+            & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
+            & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt' ]
+            call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
 
-        call MPI_BCAST(dt, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
+            & 'Re_inv','poly_sigma' ]
+            call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
 
-        call MPI_BCAST(t_step_start, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(t_step_stop, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(t_step_save, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(debug, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-
-        ! Simulation algorithm parameters
-        call MPI_BCAST(model_eqns, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(num_fluids, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(adv_alphan, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mpp_lim, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(time_stepper, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(weno_vars, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
         #:if not MFC_CASE_OPTIMIZATION
-            call MPI_BCAST(weno_order, 1, MPI_INTEGER, &
-                           0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(nb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endif
-        call MPI_BCAST(weno_eps, 1, MPI_DOUBLE_PRECISION, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mapped_weno, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mp_weno, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(cu_mpi, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(weno_flat, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(riemann_flat, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(weno_Re_flux, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(riemann_solver, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(wave_speeds, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(avg_state, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alt_soundspeed, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(null_weights, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mixture_err, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(parallel_io, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(precision, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(hypoelasticity, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
 
-        call MPI_BCAST(bc_x%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_x%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_y%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_y%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_z%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_z%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(bc_x_glb%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_x_glb%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_y_glb%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_y_glb%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_z_glb%beg, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bc_z_glb%end, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        ! Fluids physical parameters
         do i = 1, num_fluids_max
-            call MPI_BCAST(fluid_pp(i)%gamma, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%pi_inf, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%Re(1), 2, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-
-            call MPI_BCAST(fluid_pp(i)%mul0, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%ss, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%pv, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%gamma_v, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%M_v, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%mu_v, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%k_v, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%G, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
+            #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
+                & 'mu_v','k_v','G' ]
+                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            call MPI_BCAST(fluid_pp(i)%Re(1), 2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end do
-
-        !Tait EOS
-        call MPI_BCAST(pref, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(rhoref, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-
-        !Bubble modeling
-        call MPI_BCAST(bubbles, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(bubble_model, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(polytropic, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(thermal, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(R0ref, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        #:if not MFC_CASE_OPTIMIZATION
-            call MPI_BCAST(nb, 1, &
-                           MPI_INTEGER, 0, &
-                           MPI_COMM_WORLD, ierr)
-        #:endif
-        call MPI_BCAST(R0_type, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(Web, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(Ca, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(Re_inv, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(polydisperse, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(poly_sigma, 1, &
-                       MPI_DOUBLE_PRECISION, 0, &
-                       MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(qbmm, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-
-        !Acoustic monopole
-        call MPI_BCAST(monopole, 1, &
-                       MPI_LOGICAL, 0, &
-                       MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(num_mono, 1, &
-                       MPI_INTEGER, 0, &
-                       MPI_COMM_WORLD, ierr)
 
         do j = 1, num_probes_max
-            do i = 1, 3
-                call MPI_BCAST(mono(j)%loc(i), 1, &
-                               MPI_DOUBLE_PRECISION, 0, &
-                               MPI_COMM_WORLD, ierr)
+            do i = 1,3
+                call MPI_BCAST(mono(j)%loc(i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             end do
-            call MPI_BCAST(mono(j)%mag, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%length, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%delay, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%dir, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%npulse, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%pulse, 1, &
-                           MPI_INTEGER, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%support, 1, &
-                           MPI_INTEGER, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%foc_length, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(mono(j)%aperture, 1, &
-                           MPI_DOUBLE_PRECISION, 0, &
-                           MPI_COMM_WORLD, ierr)
+
+            #:for VAR in [ 'mag', 'length', 'delay', 'dir', 'npulse', 'pulse',  &
+                'support', 'foc_length', 'aperture' ]
+                call MPI_BCAST(mono(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'x','y','z' ]
+                call MPI_BCAST(probe(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax' ]
+                call MPI_BCAST(integral(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
         end do
-
-        call MPI_BCAST(com_wrt(1), num_fluids_max, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(cb_wrt(1), num_fluids_max, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(fd_order, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(num_probes, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(probe_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        do i = 1, num_probes_max
-            call MPI_BCAST(probe(i)%x, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(probe(i)%y, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(probe(i)%z, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-        end do
-
-        call MPI_BCAST(integral_wrt, 1, MPI_LOGICAL, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(num_integrals, 1, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-        do i = 1, num_probes_max
-            call MPI_BCAST(integral(i)%xmin, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(integral(i)%xmax, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(integral(i)%ymin, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(integral(i)%ymax, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(integral(i)%zmin, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(integral(i)%zmax, 1, MPI_DOUBLE_PRECISION, &
-                           0, MPI_COMM_WORLD, ierr)
-        end do
-
-        call MPI_BCAST(threshold_mf(1), 5, MPI_DOUBLE_PRECISION, &
-                       0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(moment_order(1), 5, MPI_INTEGER, &
-                       0, MPI_COMM_WORLD, ierr)
-
+        
 #endif
 
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
@@ -487,11 +257,7 @@ contains
         real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] mpi_bcast_time_step_values not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: j
 
@@ -509,11 +275,7 @@ contains
         !!      global parameters.
     subroutine s_mpi_decompose_computational_domain() ! --------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_decompose_computational_domain not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         integer :: num_procs_x, num_procs_y, num_procs_z !<
             !! Optimal number of processors in the x-, y- and z-directions
@@ -901,11 +663,7 @@ contains
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_grid_variables_buffers not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! MPI Communication in x-direction =================================
         if (mpi_dir == 1) then
@@ -1110,11 +868,7 @@ contains
         real(kind(0d0)), intent(OUT) :: ccfl_max_glb
         real(kind(0d0)), intent(OUT) :: Rc_min_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_reduce_stability_criteria_extrema not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
@@ -1147,11 +901,7 @@ contains
         real(kind(0d0)), intent(IN) :: var_loc
         real(kind(0d0)), intent(OUT) :: var_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_allreduce_sum not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
@@ -1173,11 +923,7 @@ contains
         real(kind(0d0)), intent(IN) :: var_loc
         real(kind(0d0)), intent(OUT) :: var_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_allreduce_min not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
@@ -1199,11 +945,7 @@ contains
         real(kind(0d0)), intent(IN) :: var_loc
         real(kind(0d0)), intent(OUT) :: var_glb
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_allreduce_max not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
@@ -1229,11 +971,7 @@ contains
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_sendrecv_conservative_variables_buffers not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         !nCalls_time = nCalls_time + 1
 
@@ -2137,14 +1875,10 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_proxy_module() ! -----------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_finalize_mpi_proxy_module not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Deallocating q_cons_buff_send and q_cons_buff_recv
-        deallocate (q_cons_buff_send, q_cons_buff_recv)
+        @:DEALLOCATE(q_cons_buff_send, q_cons_buff_recv)
 
 #endif
 
@@ -2153,11 +1887,7 @@ contains
     !> The subroutine finalizes the MPI execution environment.
     subroutine s_mpi_finalize() ! ------------------------------------------
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_mpi_proxy] s_mpi_finalize not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Finalizing the MPI environment
         call MPI_FINALIZE(ierr)

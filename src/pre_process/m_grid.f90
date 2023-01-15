@@ -203,11 +203,7 @@ contains
 
         integer, intent(IN) :: dflt_int
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_grid] s_generate_parallel_grid not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)) :: length   !< domain lengths
 

@@ -1,22 +1,9 @@
-import re
-import os
-import time
-import copy
-import queue
-import typing
-import datetime
-import subprocess
-import dataclasses
-import multiprocessing
+import re, os, time, copy, queue, typing, datetime, subprocess, dataclasses, multiprocessing
 
-from ..util.printer import cons
-
-from .. import build
-from ..util import common
-
-from ..run import queues
-from ..run import mpi_bins
-
+from ..state     import ARG, ARGS
+from ..printer   import cons
+from ..          import build, common
+from ..run       import queues, mpi_bins
 from ..run.input import MFCInputFile
 
 
@@ -25,8 +12,7 @@ class Engine:
     name: str
     slug: str
 
-    def init(self, mfc, input: MFCInputFile) -> None:
-        self.mfc   = mfc
+    def init(self, input: MFCInputFile) -> None:
         self.input = input
 
         self._init()
@@ -39,9 +25,6 @@ class Engine:
 
     def run(self, names: typing.List[str]) -> None:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
-
-    def validate_job_options(self) -> None:
-        raise common.MFCException(f"MFCEngine::validate_job_options: not implemented for {self.name}.")
 
     def get_binpath(self, target: str) -> str:
         return os.sep.join([build.get_install_dirpath(), "bin", target])
@@ -56,27 +39,26 @@ class InteractiveEngine(Engine):
         super().__init__("Interactive", "interactive")
 
     def _init(self) -> None:
-        self.mpibin = mpi_bins.get_binary(self.mfc.args)
+        self.mpibin = mpi_bins.get_binary()
         # If using MPI, we don't know yet whether this engine works
-        self.bKnowWorks = not self.mfc.args["mpi"]
+        self.bKnowWorks = not ARG("mpi")
 
     def get_args(self) -> str:
         return f"""\
-Nodes         (-N)  {self.mfc.args['nodes']}
-CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
-GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
+Nodes         (-N)  {ARG('nodes')}
+Tasks (/node) (-n)  {ARG('tasks_per_node')}
 MPI Binary    (-b)  {self.mpibin.bin}\
 """
 
     def get_exec_cmd(self, target_name: str) -> typing.List[str]:
         binpath = self.get_binpath(target_name)
 
-        if not self.mfc.args["mpi"]:
+        if not ARG("mpi"):
             return [binpath]
 
-        flags = self.mfc.args["flags"][:]
+        flags = ARG("flags")[:]
 
-        return [self.mpibin.bin] + self.mpibin.gen_params(self.mfc.args) + flags + [binpath]
+        return [self.mpibin.bin] + self.mpibin.gen_params() + flags + [binpath]
 
 
     def run(self, names: typing.List[str]) -> None:
@@ -84,7 +66,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
 
-            work_timeout = 10
+            work_timeout = 30
 
             cons.print(f"Ensuring the [bold magenta]Interactive Engine[/bold magenta] works ({work_timeout}s timeout):")
 
@@ -95,7 +77,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p = multiprocessing.Process(
                 target=_interactive_working_worker,
                 args=(
-                    [self.mpibin.bin] + self.mpibin.gen_params(self.mfc.args) + test_cmd,
+                    [self.mpibin.bin] + self.mpibin.gen_params() + test_cmd,
                     q,
                 ))
 
@@ -121,7 +103,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             cons.print(f"[bold]Running [magenta]{name}[/magenta][/bold]:")
             cons.indent()
 
-            if not self.mfc.args["dry_run"]:
+            if not ARG("dry_run"):
                 start_time = time.monotonic()
                 common.system(self.get_exec_cmd(name), cwd=self.input.case_dirpath)
                 end_time   = time.monotonic()
@@ -131,10 +113,6 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
             cons.unindent()
 
-    def validate_job_options(self, mfc) -> None:
-        if mfc.args["nodes"] != 1:
-            raise common.MFCException("InteractiveEngine: Only node can be used with the interactive engine.")
-
 
 class BatchEngine(Engine):
     def __init__(self) -> None:
@@ -142,13 +120,12 @@ class BatchEngine(Engine):
 
     def get_args(self) -> str:
         return f"""\
-Nodes         (-N)  {self.mfc.args['nodes']}
-CPUs (/node)  (-n)  {self.mfc.args['cpus_per_node']}
-GPUs (/node)  (-g)  {self.mfc.args["gpus_per_node"]}
-Walltime      (-w)  {self.mfc.args["walltime"]}
-Partition     (-p)  {self.mfc.args["partition"]}
-Account       (-a)  {self.mfc.args["account"]}
-Email         (-@)  {self.mfc.args["email"]}
+Nodes         (-N)  {ARG('nodes')}
+Tasks (/node) (-n)  {ARG('tasks_per_node')}
+Walltime      (-w)  {ARG("walltime")}
+Partition     (-p)  {ARG("partition")}
+Account       (-a)  {ARG("account")}
+Email         (-@)  {ARG("email")}
 """
 
     def run(self, names: typing.List[str]) -> None:
@@ -160,7 +137,7 @@ Email         (-@)  {self.mfc.args["email"]}
 
         self.__create_batch_file(system, names)
 
-        if not self.mfc.args["dry_run"]:
+        if not ARG("dry_run"):
             self.__execute_batch_file(system, names)
 
             cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
@@ -173,7 +150,7 @@ Email         (-@)  {self.mfc.args["email"]}
         return copy.copy(self.input.case_dirpath)
 
     def __get_batch_filename(self, names: typing.List[str]) -> str:
-        return f"{self.mfc.args['name']}.sh"
+        return f"{ARG('name')}.sh"
 
     def __get_batch_filepath(self, names: typing.List[str]):
         return os.path.abspath(os.sep.join([
@@ -199,17 +176,15 @@ TABLE_FOOTER="+-----------------------------------------------------------------
 TABLE_TITLE_FORMAT="| %8s %-96s |\\n"
 TABLE_CONTENT=$(cat <<-END
 $(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                       "Start-date:"    "$(date +%T)")
-$(printf "$TABLE_FORMAT_LINE" "Partition:"     "{self.mfc.args["partition"]}"      "Walltime:"      "{self.mfc.args["walltime"]}")
-$(printf "$TABLE_FORMAT_LINE" "Account:"       "{self.mfc.args["account"]}"        "Nodes:"         "{self.mfc.args["nodes"]}")
-$(printf "$TABLE_FORMAT_LINE" "CPUs (/node):"  "{self.mfc.args["cpus_per_node"]}"  "GPUs (/node):"  "{self.mfc.args["gpus_per_node"]}")
-$(printf "$TABLE_FORMAT_LINE" "Job Name:"      "{self.mfc.args["name"]}"           "Engine"         "{self.mfc.args["engine"]}")
-$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Mode:"          "{self.mfc.args["mode"]}")
-$(printf "$TABLE_FORMAT_LINE" "Email:"         "{self.mfc.args["email"]}"          ""               "")
+$(printf "$TABLE_FORMAT_LINE" "Partition:"     "{ARG("partition")}"      "Walltime:"      "{ARG("walltime")}")
+$(printf "$TABLE_FORMAT_LINE" "Account:"       "{ARG("account")}"        "Nodes:"         "{ARG("nodes")}")
+$(printf "$TABLE_FORMAT_LINE" "Job Name:"      "{ARG("name")}"           "Engine"         "{ARG("engine")}")
+$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Email:"         "{ARG("email")}")
 END
 )
 
 printf "$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Starting" "{self.mfc.args["name"]} from {self.mfc.args["input"]}:"
+printf "$TABLE_TITLE_FORMAT" "Starting" "{ARG("name")} from {ARG("input")}:"
 printf "$TABLE_CONTENT\\n"
 printf "$TABLE_FOOTER\\n"
 
@@ -229,7 +204,7 @@ code=$?
 t_stop="$(date +%s)"
 
 printf "\\n$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Finished" "{self.mfc.args["name"]}:"
+printf "$TABLE_TITLE_FORMAT" "Finished" "{ARG("name")}:"
 printf "$TABLE_FORMAT_LINE" "Total-time:"  "$(expr $t_stop - $t_start)s"  "Exit Code:" "$code"
 printf "$TABLE_FORMAT_LINE" "End-time:"    "$(date +%T)"                  "End-date:"  "$(date +%T)"
 printf "$TABLE_FOOTER"
@@ -237,37 +212,14 @@ printf "$TABLE_FOOTER"
 exit $code
 """
 
-    def __evaluate_variable(self, var: str) -> str:
-        v: str = var.strip()
-        if v in self.mfc.args:
-            return str(self.mfc.args[v])
-
-        return None
-
     def __evaluate_expression(self, expr: str) -> str:
-        expr_original = expr[:]
-
-        evaluated = self.__evaluate_variable(expr)
-        if evaluated is not None:
-            if not common.isspace(evaluated):
-                return evaluated
-            else:
-                # The expression is valid but it is empty
-                return None
-
-        # It may be an expression. Try and parse it
-        for var_candidate in re.split(r"[\*,\ ,\+,\-,\/,\\,\%,\,,\.,\^,\',\",\[,\],\(,\),\=]", expr):
-            evaluated = self.__evaluate_variable(var_candidate)
-
-            if evaluated is not None and not common.isspace(evaluated):
-                expr = expr.replace(var_candidate, evaluated)
-
         # See if it computable
         try:
             # We assume eval is safe because we control the expression.
-            return str(eval(expr))
+            r = str(eval(expr, ARGS()))
+            return r if not common.isspace(r) else None
         except Exception as exc:
-            raise common.MFCException(f"BatchEngine: {expr_original} (interpreted as {expr}) is not a valid expression in the template file. Please check your spelling.")
+            raise common.MFCException(f"BatchEngine: '{expr}' is not a valid expression in the template file. Please check your spelling.")
 
     def __batch_evaluate(self, s: str, system: queues.QueueSystem, names: typing.List[str]):
         replace_list = [
@@ -293,7 +245,7 @@ exit $code
                 # If not specified, then remove the line it appears on
                 s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
 
-                cons.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it figures on will be discarded.")
+                cons.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it appears on will be discarded.")
 
         return s
 
@@ -314,9 +266,6 @@ exit $code
 
         if common.system(cmd, cwd=self.__get_batch_dirpath()) != 0:
             raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
-
-    def validate_job_options(self, mfc) -> None:
-        pass
 
 
 ENGINES = [ InteractiveEngine(), BatchEngine() ]

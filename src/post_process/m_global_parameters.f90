@@ -99,16 +99,16 @@ module m_global_parameters
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    type(bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
-    type(bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
-    integer :: E_idx                     !< Index of energy equation
-    type(bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
-    type(bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
+    type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
+    type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
+    integer :: E_idx                               !< Index of energy equation
+    type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
+    type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
-    integer :: alf_idx                   !< Index of specific heat ratio func. eqn.
-    integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
-    type(bounds_info) :: stress_idx                !< Indices of elastic stresses
+    integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
+    integer :: alf_idx                             !< Index of specific heat ratio func. eqn.
+    integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -236,6 +236,16 @@ module m_global_parameters
     integer, parameter :: nnode = 4 !< Number of QBMM nodes
     !> @}
 
+    !> @name Index variables used for m_variables_conversion
+    !> @{
+    integer :: momxb, momxe
+    integer :: advxb, advxe
+    integer :: contxb, contxe
+    integer :: intxb, intxe
+    integer :: bubxb, bubxe
+    integer :: strxb, strxe
+    !> @}
+
     ! Mathematical and Physical Constants ======================================
     real(kind(0d0)), parameter :: pi = 3.141592653589793d0
     ! ==========================================================================
@@ -253,11 +263,8 @@ contains
         case_dir = ' '
 
         ! Computational domain parameters
-        m = dflt_int
+        m = dflt_int; n = 0; p = 0
         m_root = dflt_int
-        n = dflt_int
-        p = dflt_int
-
         cyl_coord = .false.
 
         t_step_start = dflt_int
@@ -517,6 +524,19 @@ contains
                 end if
             end if
         end if
+
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+        bubxb = bub_idx%beg
+        bubxe = bub_idx%end
+        strxb = stress_idx%beg
+        strxe = stress_idx%end
+        intxb = internalEnergies_idx%beg
+        intxe = internalEnergies_idx%end
         ! ==================================================================
 
 #ifdef MFC_MPI
@@ -761,11 +781,7 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'

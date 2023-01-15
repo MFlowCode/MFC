@@ -5,7 +5,11 @@
 !> @brief This module contains subroutines that are compiler specific
 module m_compile_specific
 
+    ! Dependencies =============================================================
+    use m_mpi_proxy
+
     implicit none
+    ! ==========================================================================
 
 contains
 
@@ -69,16 +73,22 @@ contains
         character(LEN=*), intent(IN)  :: dirpath
         character(LEN=*), intent(OUT) :: basename
 
+        integer           :: iUnit
+        character(len=30) :: tmpfilepath
+
+        write (tmpfilepath, '(A,I0)') 'basename_', proc_rank
+
 #ifdef _WIN32
-        call system('for /F %i in ("'//dirpath//'") do @echo %~ni > basename')
+        call system('for /F %i in ("'//trim(dirpath)//'") do @echo %~ni > '//trim(tmpfilepath))
 #else
-        call system('basename "'//dirpath//'" > basename')
+        call system('basename "'//trim(dirpath)//'" > '//trim(tmpfilepath))
 #endif
 
-        open (100, FILE='basename', FORM='formatted', STATUS='old')
-        read (100, '(A)') basename; close (100)
+        open  (newunit=iUnit, FILE=trim(tmpfilepath), FORM='formatted', STATUS='old')
+        read  (iUnit, '(A)') basename
+        close (iUnit)
 
-        call s_delete_file("basename")
+        call s_delete_file(trim(tmpfilepath))
 
     end subroutine s_get_basename
 

@@ -3,6 +3,7 @@
 !! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 !> @brief The module contains all of the parameters describing the program
 !!              logistics, the computational domain and the simulation algorithm.
@@ -41,7 +42,6 @@ module m_global_parameters
     integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
     character(LEN=path_len) :: case_dir              !< Case folder location
     logical :: run_time_info         !< Run-time output flag
-    logical :: debug                 !< Debug mode print statements
     integer :: t_step_old            !< Existing IC/grid folder
     real(kind(0d0)), parameter :: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
@@ -172,7 +172,7 @@ module m_global_parameters
     integer :: alf_idx               !< Index of void fraction
     integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
-    type(bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     !> @}
 
 !$acc declare create(bub_idx)
@@ -227,15 +227,12 @@ module m_global_parameters
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
 
-    logical, dimension(num_fluids_max) :: com_wrt, cb_wrt
     logical :: probe_wrt
     logical :: integral_wrt
     integer :: num_probes
     integer :: num_integrals
     type(probe_parameters), dimension(num_probes_max) :: probe
     type(integral_parameters), dimension(num_probes_max) :: integral
-    real(kind(0d0)), dimension(5) :: threshold_mf
-    integer, dimension(5) :: moment_order
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
@@ -343,10 +340,8 @@ contains
         run_time_info = .false.
         t_step_old = dflt_int
 
-        debug = .false.
-
         ! Computational domain parameters
-        m = dflt_int; n = dflt_int; p = dflt_int
+        m = dflt_int; n = 0; p = 0
 
         cyl_coord = .false.
 
@@ -415,6 +410,7 @@ contains
             nb = dflt_int
             weno_order = dflt_int
         #:endif
+
         R0_type = dflt_int
 
         ! User inputs for qbmm for simulation code
@@ -447,8 +443,6 @@ contains
         end do
 
         fd_order = dflt_int
-        com_wrt = .false.
-        cb_wrt = .false.
         probe_wrt = .false.
         integral_wrt = .false.
         num_probes = dflt_int
@@ -467,11 +461,6 @@ contains
             integral(i)%ymax = dflt_real
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
-        end do
-
-        do i = 1, 5
-            threshold_mf(i) = dflt_real
-            moment_order(i) = dflt_int
         end do
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
@@ -571,9 +560,9 @@ contains
                     ! print*, 'alf idx', alf_idx
                     ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
-                    allocate (weight(nb), R0(nb), V0(nb))
-                    allocate (bub_idx%rs(nb), bub_idx%vs(nb))
-                    allocate (bub_idx%ps(nb), bub_idx%ms(nb))
+                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
+                    @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
                     if (num_fluids == 1) then
                         gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
@@ -582,7 +571,7 @@ contains
                     end if
 
                     if (qbmm) then
-                        allocate (bub_idx%moms(nb, nmom))
+                        @:ALLOCATE(bub_idx%moms(nb, nmom))
                         do i = 1, nb
                             do j = 1, nmom
                                 bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
@@ -672,9 +661,9 @@ contains
                     end if
                     sys_size = bub_idx%end
 
-                    allocate (bub_idx%rs(nb), bub_idx%vs(nb))
-                    allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                    allocate (weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
+                    @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
+                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -727,7 +716,7 @@ contains
             ! fluids whose interface will support effects of surface tension
             if (any(Re_size > 0)) then
 
-                allocate (Re_idx(1:2, 1:maxval(Re_size)))
+                @:ALLOCATE(Re_idx(1:2, 1:maxval(Re_size)))
 
                 k = 0
                 do i = 1, num_fluids
@@ -772,11 +761,16 @@ contains
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+            if (n > 0) then
+                iy%beg = -buff_size    
+                if (p > 0) then
+                    iz%beg = -buff_size
+                end if
+            end if
+
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-            allocate (ptil(ix%beg:ix%end, &
-                           iy%beg:iy%end, &
-                           iz%beg:iz%end))
+
+            @:ALLOCATE(ptil(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end if
 
         if (probe_wrt) then
@@ -820,29 +814,22 @@ contains
 
 !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
-        allocate (gammas(1:num_fluids), pi_infs(1:num_fluids))
-
-        do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            pi_infs(i) = fluid_pp(i)%pi_inf
-        end do
-!$acc update device(gammas, pi_infs)
-
         ! Allocating grid variables for the x-, y- and z-directions
-        allocate (x_cb(-1 - buff_size:m + buff_size))
-        allocate (x_cc(-buff_size:m + buff_size))
-        allocate (dx(-buff_size:m + buff_size))
+        @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
+        @:ALLOCATE(x_cc(-buff_size:m + buff_size))
+        @:ALLOCATE(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return; allocate (y_cb(-1 - buff_size:n + buff_size))
-        allocate (y_cc(-buff_size:n + buff_size))
-        allocate (dy(-buff_size:n + buff_size))
+        if (n == 0) return;
+        
+        @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
+        @:ALLOCATE(y_cc(-buff_size:n + buff_size))
+        @:ALLOCATE(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return; allocate (z_cb(-1 - buff_size:p + buff_size))
-        allocate (z_cc(-buff_size:p + buff_size))
-        allocate (dz(-buff_size:p + buff_size))
-
-
-
+        if (p == 0) return;
+        
+        @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
+        @:ALLOCATE(z_cc(-buff_size:p + buff_size))
+        @:ALLOCATE(dz(-buff_size:p + buff_size))
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 
@@ -870,9 +857,9 @@ contains
         rhol0 = rhoref
         pl0 = pref
 
-        allocate (pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
-        allocate (k_n(nb), k_v(nb), omegaN(nb))
-        allocate (Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
+        @:ALLOCATE(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
+        @:ALLOCATE(k_n(nb), k_v(nb), omegaN(nb))
+        @:ALLOCATE(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
 
         pb0(:) = dflt_real
         mass_n0(:) = dflt_real
@@ -999,11 +986,7 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
@@ -1031,14 +1014,18 @@ contains
         ! Deallocating the variables bookkeeping the indexes of any viscous
         ! fluids and any pairs of fluids whose interfaces supported effects
         ! of surface tension
-        if (any(Re_size > 0)) deallocate (Re_idx)
+        if (any(Re_size > 0)) then
+            @:DEALLOCATE(Re_idx)
+        end if
 
         ! Deallocating grid variables for the x-, y- and z-directions
-        deallocate (x_cb, x_cc, dx)
+        @:DEALLOCATE(x_cb, x_cc, dx)
+        
+        if (n == 0) return;
+        @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (n == 0) return; deallocate (y_cb, y_cc, dy)
-
-        if (p == 0) return; deallocate (z_cb, z_cc, dz)
+        if (p == 0) return;
+        @:DEALLOCATE(z_cb, z_cc, dz)
 
         deallocate (proc_coords)
         if (parallel_io) then
