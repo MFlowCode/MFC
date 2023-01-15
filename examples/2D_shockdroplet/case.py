@@ -20,7 +20,7 @@ Nx =5000.
 dx = 0.25/Nx #8.3e-6
 
 time_end = 0.0002#50us
-cfl = 0.45
+cfl = 0.1
 
 dt = cfl * dx/c_l #5.3E-9
 Nt = int(time_end/dt)#10000
@@ -35,14 +35,14 @@ print(json.dumps({
                     'x_domain%beg'                 :  0,                   \
                     'x_domain%end'                 :  0.25,                   \
                     'y_domain%beg'                 :  0,                  \
-                    'y_domain%end'                 :  0.37,          
+                    'y_domain%end'                 :  0.037,          
                     'm'                            : int(Nx),                      \
                     'n'                            : int(Ny),                        \
                     'p'                            : 0,                        \
                     'dt'                           : dt,                   \
                     't_step_start'                 : 0,                        \
-                    't_step_stop'                  : 12000,                     \
-                    't_step_save'                  :300,#(Nt/1000),                     \
+                    't_step_stop'                  : 50000,                     \
+                    't_step_save'                  : 1000,#(Nt/1000),                     \
 		    # ==========================================================
                                                                                \
                     # Simulation Algorithm Parameters ==========================
@@ -64,10 +64,10 @@ print(json.dumps({
 		    'riemann_solver'               : 2,                        \
                     'wave_speeds'                  : 1,                        \
                     'avg_state'                    : 2,                        \
-                    'bc_x%beg'                     : -11,#11,                       \
-                    'bc_x%end'                     : -8,#12                       \
+                    'bc_x%beg'                     : -6,#11,                       \
+                    'bc_x%end'                     : -6,#12                       \
                     'bc_y%beg'                     : -2,                      \
-                    'bc_y%end'                     : -3,                      \
+                    'bc_y%end'                     : -6,                      \
                     # ==========================================================
                                                                                \
                     # Formatted Database Files Structure Parameters ============
@@ -85,9 +85,9 @@ print(json.dumps({
 		    # Patch 1: Background  ============================
                     'patch_icpp(1)%geometry'       : 3,                        \
                     'patch_icpp(1)%x_centroid'     : 0.25/2,                  \
-                    'patch_icpp(1)%y_centroid'     : 0.37/2,          \
+                    'patch_icpp(1)%y_centroid'     : 0.037/2,          \
                     'patch_icpp(1)%length_x'       : 0.25,                   \
-                    'patch_icpp(1)%length_y'       : 0.37,         \
+                    'patch_icpp(1)%length_y'       : 0.037,         \
                     'patch_icpp(1)%vel(1)'         : 0.,                   \
                     'patch_icpp(1)%vel(2)'         : 0.E+00,                  \
                     'patch_icpp(1)%pres'           : 101325.,                   \
@@ -101,9 +101,9 @@ print(json.dumps({
                     'patch_icpp(2)%geometry'       : 3,                        \
                     'patch_icpp(2)%alter_patch(1)' : 'T',                      \
                     'patch_icpp(2)%x_centroid'     : 0.,                  \
-                    'patch_icpp(2)%y_centroid'     : 0.37/2,          \
+                    'patch_icpp(2)%y_centroid'     : 0.037/2,          \
                     'patch_icpp(2)%length_x'       : 0.25-D,                   \
-                    'patch_icpp(2)%length_y'       : 0.37,         \
+                    'patch_icpp(2)%length_y'       : 0.037,         \
                     'patch_icpp(2)%vel(1)'         : vel,                   \
                     'patch_icpp(2)%vel(2)'         : 0.E+00,                  \
                     'patch_icpp(2)%pres'           : ps,                   \
