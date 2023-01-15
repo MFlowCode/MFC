@@ -1614,25 +1614,6 @@ contains
                                     end do
                                 end if
 
-                                !else
-                                !    !$acc loop seq
-                                !    do i = 1, num_dims
-                                !        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                !            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                !                         vel_L(dir_idx(i)) + &
-                                !                         s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                !                                    (1d0 - dir_flg(dir_idx(i)))* &
-                                !                                    vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                !                  dir_flg(dir_idx(i))*(pres_L)) &
-                                !            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                !                           vel_R(dir_idx(i)) + &
-                                !                           s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                !                                      (1d0 - dir_flg(dir_idx(i)))* &
-                                !                                      vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                !                    dir_flg(dir_idx(i))*(pres_R))
-                                !    end do
-                                !end if
-
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0.d0
 
                                 !$acc loop seq
