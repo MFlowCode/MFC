@@ -160,7 +160,6 @@ contains
         call s_compute_weno_coefficients(1, is1)
 
         @:ALLOCATE(v_rs_ws_x(is1%beg:is1%end, &
-
                                  is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
 
         ! ==================================================================

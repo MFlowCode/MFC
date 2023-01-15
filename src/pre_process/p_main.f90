@@ -164,7 +164,6 @@ program p_main
     s_write_data_files => null()
 
     ! Deallocation procedures for the modules
-    call s_finalize_assign_patches_module()
     call s_finalize_grid_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()
