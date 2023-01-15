@@ -17,6 +17,8 @@
 !!                  1) Harten-Lax-van Leer (HLL)
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
+#:include 'inline_riemann.fpp'
+
 module m_riemann_solvers
 
     ! Dependencies =============================================================
@@ -34,10 +36,10 @@ module m_riemann_solvers
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, &
- s_riemann_solver, &
- s_hll_riemann_solver, &
- s_hllc_riemann_solver, &
- s_finalize_riemann_solvers_module
+                        s_riemann_solver, &
+                        s_hll_riemann_solver, &
+                        s_hllc_riemann_solver, &
+                        s_finalize_riemann_solvers_module
 
     abstract interface ! =======================================================
 
@@ -600,40 +602,9 @@ contains
                                     end if
                                 end do
                             end if
-
-                            if (avg_state == 2) then
-                                rho_avg = 5d-1*(rho_L + rho_R)
-
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg(i) = 5d-1*(vel_L(i) + vel_R(i))
-                                end do
-
-                                H_avg = 5d-1*(H_L + H_R)
-
-                                gamma_avg = 5d-1*(gamma_L + gamma_R)
-                            elseif (avg_state == 1) then
-                                rho_avg = sqrt(rho_L*rho_R)
-
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg(i) = (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))/ &
-                                                 (sqrt(rho_L) + sqrt(rho_R))
-                                end do
-
-                                H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                        (sqrt(rho_L) + sqrt(rho_R))
-
-                                gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-                            end if
-
-                            vel_avg_rms = 0d0
-
-                            !$acc loop seq
-                            do i = 1, num_dims
-                                vel_avg_rms = vel_avg_rms + vel_avg(i)**2d0
-                            end do
+                            
+                            ! compute avg state goes here
+                            @:compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
 
                             if (mixture_err) then
                                 if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1210,35 +1181,8 @@ contains
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                                if (avg_state == 2) then
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    vel_avg_rms = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
-                                    end do
-
-                                    H_avg = 5d-1*(H_L + H_R)
-
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
-
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-                                    vel_avg_rms = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end do
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
-                                end if
+                                @:compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1545,39 +1489,8 @@ contains
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                                if (avg_state == 2) then
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg(i) = 5d-1*(vel_L(i) + vel_R(i))
-                                    end do
-
-                                    H_avg = 5d-1*(H_L + H_R)
-
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
-
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg(i) = (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))/ &
-                                                     (sqrt(rho_L) + sqrt(rho_R))
-                                    end do
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
-                                end if
-
-                                vel_avg_rms = 0d0
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg_rms = vel_avg_rms + vel_avg(i)**2d0
-                                end do
+                                @:compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1906,9 +1819,6 @@ contains
                                         end if
                                     end do
 
-                                    !call s_comp_n_from_prim(qL_prim_rs${XYZ}$_vf(j, k, l,  E_idx + num_fluids), R0_L, nbub_L)
-                                    !call s_comp_n_from_prim(qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + num_fluids), R0_R, nbub_R)
-
                                     nbub_L_denom = 0d0
                                     nbub_R_denom = 0d0
 
@@ -2001,21 +1911,7 @@ contains
                                     end do
 
                                 elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-
-                                    vel_avg_rms = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end do
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
+                                    call s_mpi_abort()
                                 end if
 
                                 if (mixture_err) then
@@ -2394,6 +2290,7 @@ contains
                                         vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(2) + sqrt(rho_R)*vel_R(2))**2d0/ &
                                                       (sqrt(rho_L) + sqrt(rho_R))**2d0
                                     end if
+
                                     if (num_dims == 3) then
                                         vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(3) + sqrt(rho_R)*vel_R(3))**2d0/ &
                                                       (sqrt(rho_L) + sqrt(rho_R))**2d0
