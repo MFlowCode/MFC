@@ -82,9 +82,8 @@ contains
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
-            fluid_pp, com_wrt, cb_wrt, probe_wrt, &
+            fluid_pp, probe_wrt, &
             fd_order, probe, num_probes, t_step_old, &
-            threshold_mf, moment_order, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
@@ -97,7 +96,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, DEBUG
+            R0_type
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -217,6 +216,9 @@ contains
             call s_mpi_abort()
         elseif (model_eqns == 2 .and. bubbles .and. bubble_model == 1) then
             print '(A)', 'The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)'
+            call s_mpi_abort()
+        elseif (bubbles .and. nb < 1) then
+            print '(A)', 'The Ensemble-Averaged Bubble Model requires nb >= 1'
             call s_mpi_abort()
         elseif (bubbles .and. bubble_model == 3 .and. (polytropic .neqv. .true.)) then
             print '(A)', 'RP bubbles require polytropic compression'
@@ -429,22 +431,6 @@ contains
                 (bc_z%end == -1 .and. bc_z%beg /= -1)) then
             print '(A)', 'Unsupported combination of values of '// &
                 'bc_z%beg and bc_z%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((any(threshold_mf /= dflt_real)) &
-                .and. &
-                (all(cb_wrt .neqv. .true.))) then
-            print '(A)', 'Unsupported combination of cb_wrt '// &
-                'and threshold_mf. Exiting ...'
-            call s_mpi_abort()
-        elseif ((any(moment_order /= dflt_int)) &
-                .and. &
-                (all(com_wrt .neqv. .true.))) then
-            print '(A)', 'Unsupported combination of com_wrt '// &
-                'and moment_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (any(cb_wrt) .and. (all(threshold_mf == dflt_real))) then
-            print '(A)', 'Unsupported combination of cb_wrt '// &
-                'and threshold_mf. Exiting ...'
             call s_mpi_abort()
         elseif (model_eqns == 1 .and. alt_soundspeed) then
             print '(A)', 'Unsupported combination of model_eqns '// &
@@ -728,11 +714,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_start_up] s_read_parallel_data_files not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
@@ -1118,7 +1100,7 @@ contains
             do k = 0, n
                 do l = 0, p
 
-                    call s_convert_to_mixture_variables(v_vf, rho, gamma, pi_inf, Re, j, k, l)
+                    call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, Re)
 
                     dyn_pres = 0d0
                     do i = mom_idx%beg, mom_idx%end

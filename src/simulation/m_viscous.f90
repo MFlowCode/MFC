@@ -1,6 +1,7 @@
 !>
 !! @file m_viscous.f90
 !! @brief Contains module m_viscous
+#:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to compute viscous terms.
 module m_viscous
@@ -36,7 +37,7 @@ module m_viscous
 
         
 
-        allocate (Res(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE (Res(1:2, 1:maxval(Re_size)))
 
         do i = 1, 2
             do j = 1, Re_size(i)
@@ -1158,7 +1159,7 @@ module m_viscous
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
 
     subroutine s_finalize_viscous_module()
-        deallocate (Res)
+        @:DEALLOCATE (Res)
     end subroutine s_finalize_viscous_module
 
 end module m_viscous
