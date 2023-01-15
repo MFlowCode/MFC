@@ -584,8 +584,7 @@ contains
                                 end do
                             end if
                             
-                            ! compute avg state goes here
-                            @:compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+                            @:compute_average_state()
 
                             if (mixture_err) then
                                 if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1163,7 +1162,7 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
 
-                                @:compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+                                @:compute_average_state()
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1471,7 +1470,7 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
 
-                                @:compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+                                @:compute_average_state()
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -2346,6 +2345,7 @@ contains
                                            (s_R - vel_R(idx1))) &
                                           /(rho_L*(s_L - vel_L(idx1)) - &
                                             rho_R*(s_R - vel_R(idx1)))
+
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(idx1) - &
