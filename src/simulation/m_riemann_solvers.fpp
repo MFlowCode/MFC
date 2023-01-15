@@ -1560,6 +1560,7 @@ contains
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
+
                                 ! follows Einfeldt et al.
                                 ! s_M/P = min/max(0.,s_L/R)
                                 s_M = min(0d0, s_L); s_P = max(0d0, s_R)
@@ -2245,43 +2246,8 @@ contains
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                                if (avg_state == 2) then
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    vel_avg_rms = (5d-1*(vel_L(1) + vel_R(1)))**2d0
-                                    if (num_dims >= 2) then
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(2) + vel_R(2)))**2d0
-                                    end if
-                                    if (num_dims == 3) then
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(3) + vel_R(3)))**2d0
-                                    end if
-
-                                    H_avg = 5d-1*(H_L + H_R)
-
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
-
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-                                    vel_avg_rms = (sqrt(rho_L)*vel_L(1) + sqrt(rho_R)*vel_R(1))**2d0/ &
-                                                  (sqrt(rho_L) + sqrt(rho_R))**2d0
-
-                                    if (num_dims >= 2) then
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(2) + sqrt(rho_R)*vel_R(2))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end if
-
-                                    if (num_dims == 3) then
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(3) + sqrt(rho_R)*vel_R(3))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end if
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
-                                end if
+                                @:compute_average_state()
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
