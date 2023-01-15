@@ -466,7 +466,7 @@ contains
 
     end subroutine s_compute_weno_coefficients ! ---------------------------
 
-subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
+    subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
                           norm_dir, weno_dir, &
                           is1_d, is2_d, is3_d)
 
@@ -487,16 +487,6 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
 
         integer :: t1, t2, c_rate, c_max
 
-        ! For MP_WENO
-        real(kind(0d0)), dimension(-1:1) :: d
-        real(kind(0d0)) :: d_MD, d_LC
-        real(kind(0d0)) :: vL_UL, vR_UL
-        real(kind(0d0)) :: vL_MD, vR_MD
-        real(kind(0d0)) :: vL_LC, vR_LC
-        real(kind(0d0)) :: vL_min, vR_min
-        real(kind(0d0)) :: vL_max, vR_max
-        real(kind(0d0)) :: alpha_mp = 2d0
-        real(kind(0d0)) :: beta_mp = 4d0/3d0
 
         integer :: is1b, is2b, is3b, is1e, is2e, is3e
 
@@ -511,7 +501,7 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
                                    norm_dir, weno_dir)
         end if
 
-
+        call cpu_time(start)
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
@@ -558,7 +548,6 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-                if (mapped_weno) then
 !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -585,62 +574,14 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
 
                                     omega = alpha/sum(alpha)
 
-                                    alpha = (d_cbL_${XYZ}$(:, j)*(1d0 + d_cbL_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
-                                            *(omega/(d_cbL_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$(:, j))))
+                                    if(mapped_weno) then
 
-                                    omega = alpha/sum(alpha)
+                                        alpha = (d_cbL_${XYZ}$(:, j)*(1d0 + d_cbL_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
+                                                *(omega/(d_cbL_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$(:, j))))
 
-                                    vL_rs_vf_${XYZ}$(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
+                                        omega = alpha/sum(alpha)
 
-                                    ! reconstruct from right side
-
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(-1)
-
-                                    alpha = d_cbR_${XYZ}$(:, j)/(beta*beta)
-
-                                    omega = alpha/sum(alpha)
-
-                                    alpha = (d_cbR_${XYZ}$(:, j)*(1d0 + d_cbR_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
-                                            *(omega/(d_cbR_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$(:, j))))
-
-                                    omega = alpha/sum(alpha)
-
-                                    vR_rs_vf_${XYZ}$(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
-
-                                end do
-                            end do
-                        end do
-                    end do
-!$acc end parallel loop
-                else
-!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                do i = 1, v_size
-                                    ! reconstruct from left side
-
-                                    dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                             - v_rs_ws_${XYZ}$(j, k, l, i)
-                                    dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              - v_rs_ws_${XYZ}$(j - 1, k, l, i)
-
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(-1)
-
-                                    beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(0)*dvd(0) &
-                                              + weno_eps
-                                    beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(-1)*dvd(-1) &
-                                              + weno_eps
-
-                                    alpha = d_cbL_${XYZ}$(:, j)/(beta*beta)
-
-                                    omega = alpha/sum(alpha)
+                                    end if
 
                                     vL_rs_vf_${XYZ}$(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -655,6 +596,15 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
 
                                     omega = alpha/sum(alpha)
 
+                                    if(mapped_weno) then
+
+                                        alpha = (d_cbR_${XYZ}$(:, j)*(1d0 + d_cbR_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
+                                                *(omega/(d_cbR_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$(:, j))))
+
+                                        omega = alpha/sum(alpha)
+
+                                    end if
+
                                     vR_rs_vf_${XYZ}$(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
                                 end do
@@ -662,294 +612,106 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
                         end do
                     end do
 !$acc end parallel loop
-                end if
             end if
             #:endfor
         else
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-                if (mapped_weno) then
 !$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
 !$acc loop seq
-                                do i = 1, v_size
+                            do i = 1, v_size
 
-                                    dvd(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
-                                             - v_rs_ws_${XYZ}$(j + 1, k, l, i)
-                                    dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                             - v_rs_ws_${XYZ}$(j, k, l, i)
-                                    dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              - v_rs_ws_${XYZ}$(j - 1, k, l, i)
-                                    dvd(-2) = v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                              - v_rs_ws_${XYZ}$(j - 2, k, l, i)
+                                dvd(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
+                                         - v_rs_ws_${XYZ}$(j + 1, k, l, i)
+                                dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
+                                         - v_rs_ws_${XYZ}$(j, k, l, i)
+                                dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          - v_rs_ws_${XYZ}$(j - 1, k, l, i)
+                                dvd(-2) = v_rs_ws_${XYZ}$(j - 1, k, l, i) &
+                                          - v_rs_ws_${XYZ}$(j - 2, k, l, i)
 
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(1) &
-                                              + poly_coef_cbL_${XYZ}$(j, 0, 1)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(0) &
-                                              + poly_coef_cbL_${XYZ}$(j, 1, 1)*dvd(-1)
-                                    poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 2, 0)*dvd(-1) &
-                                              + poly_coef_cbL_${XYZ}$(j, 2, 1)*dvd(-2)
+                                poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(1) &
+                                          + poly_coef_cbL_${XYZ}$(j, 0, 1)*dvd(0)
+                                poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(0) &
+                                          + poly_coef_cbL_${XYZ}$(j, 1, 1)*dvd(-1)
+                                poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          + poly_coef_cbL_${XYZ}$(j, 2, 0)*dvd(-1) &
+                                          + poly_coef_cbL_${XYZ}$(j, 2, 1)*dvd(-2)
 
-                                    beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(1)*dvd(1) &
-                                              + beta_coef_${XYZ}$(j, 0, 1)*dvd(1)*dvd(0) &
-                                              + beta_coef_${XYZ}$(j, 0, 2)*dvd(0)*dvd(0) &
-                                              + weno_eps
-                                    beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(0)*dvd(0) &
-                                              + beta_coef_${XYZ}$(j, 1, 1)*dvd(0)*dvd(-1) &
-                                              + beta_coef_${XYZ}$(j, 1, 2)*dvd(-1)*dvd(-1) &
-                                              + weno_eps
-                                    beta(2) = beta_coef_${XYZ}$(j, 2, 0)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_${XYZ}$(j, 2, 1)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_${XYZ}$(j, 2, 2)*dvd(-2)*dvd(-2) &
-                                              + weno_eps
+                                beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(1)*dvd(1) &
+                                          + beta_coef_${XYZ}$(j, 0, 1)*dvd(1)*dvd(0) &
+                                          + beta_coef_${XYZ}$(j, 0, 2)*dvd(0)*dvd(0) &
+                                          + weno_eps
+                                beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(0)*dvd(0) &
+                                          + beta_coef_${XYZ}$(j, 1, 1)*dvd(0)*dvd(-1) &
+                                          + beta_coef_${XYZ}$(j, 1, 2)*dvd(-1)*dvd(-1) &
+                                          + weno_eps
+                                beta(2) = beta_coef_${XYZ}$(j, 2, 0)*dvd(-1)*dvd(-1) &
+                                          + beta_coef_${XYZ}$(j, 2, 1)*dvd(-1)*dvd(-2) &
+                                          + beta_coef_${XYZ}$(j, 2, 2)*dvd(-2)*dvd(-2) &
+                                          + weno_eps
 
-                                    alpha = d_cbL_${XYZ}$(:, j)/(beta*beta)
+                                alpha = d_cbL_${XYZ}$(:, j)/(beta*beta)
 
-                                    omega = alpha/sum(alpha)
+                                omega = alpha/sum(alpha)
 
-                                   
+                                if(mapped_weno) then                                   
 
                                     alpha = (d_cbL_${XYZ}$(:, j)*(1d0 + d_cbL_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
                                             *(omega/(d_cbL_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$(:, j))))
 
                                     omega = alpha/sum(alpha)
- 
 
-                                    vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+                                end if
 
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
-                                              + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(0) &
-                                              + poly_coef_cbR_${XYZ}$(j, 1, 1)*dvd(-1)
-                                    poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 2, 0)*dvd(-1) &
-                                              + poly_coef_cbR_${XYZ}$(j, 2, 1)*dvd(-2)
 
-                                    alpha = d_cbR_${XYZ}$(:, j)/(beta*beta)
+                                vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
 
-                                    omega = alpha/sum(alpha)
+                                poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
+                                          + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
+                                poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(0) &
+                                          + poly_coef_cbR_${XYZ}$(j, 1, 1)*dvd(-1)
+                                poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                          + poly_coef_cbR_${XYZ}$(j, 2, 0)*dvd(-1) &
+                                          + poly_coef_cbR_${XYZ}$(j, 2, 1)*dvd(-2)
+
+                                alpha = d_cbR_${XYZ}$(:, j)/(beta*beta)
+
+                                omega = alpha/sum(alpha)
+
+                                if(mapped_weno) then
 
                                     alpha = (d_cbR_${XYZ}$(:, j)*(1d0 + d_cbR_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
                                             *(omega/(d_cbR_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$(:, j))))
 
                                     omega = alpha/sum(alpha)
 
-                                    vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+                                end if
 
-                                end do
+                                vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+
                             end do
                         end do
                     end do
+                end do
 !$acc end parallel loop
-                else
-!$acc parallel loop gang vector collapse (4)  default(present) private(dvd, poly, beta, alpha, omega)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                do i = 1, v_size
-
-                                    dvd(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
-                                             - v_rs_ws_${XYZ}$(j + 1, k, l, i)
-                                    dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                             - v_rs_ws_${XYZ}$(j, k, l, i)
-                                    dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              - v_rs_ws_${XYZ}$(j - 1, k, l, i)
-                                    dvd(-2) = v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                              - v_rs_ws_${XYZ}$(j - 2, k, l, i)
-
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(1) &
-                                              + poly_coef_cbL_${XYZ}$(j, 0, 1)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(0) &
-                                              + poly_coef_cbL_${XYZ}$(j, 1, 1)*dvd(-1)
-                                    poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 2, 0)*dvd(-1) &
-                                              + poly_coef_cbL_${XYZ}$(j, 2, 1)*dvd(-2)
-
-                                    beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(1)*dvd(1) &
-                                              + beta_coef_${XYZ}$(j, 0, 1)*dvd(1)*dvd(0) &
-                                              + beta_coef_${XYZ}$(j, 0, 2)*dvd(0)*dvd(0) &
-                                              + weno_eps
-                                    beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(0)*dvd(0) &
-                                              + beta_coef_${XYZ}$(j, 1, 1)*dvd(0)*dvd(-1) &
-                                              + beta_coef_${XYZ}$(j, 1, 2)*dvd(-1)*dvd(-1) &
-                                              + weno_eps
-                                    beta(2) = beta_coef_${XYZ}$(j, 2, 0)*dvd(-1)*dvd(-1) &
-                                              + beta_coef_${XYZ}$(j, 2, 1)*dvd(-1)*dvd(-2) &
-                                              + beta_coef_${XYZ}$(j, 2, 2)*dvd(-2)*dvd(-2) &
-                                              + weno_eps
-
-                                    alpha = d_cbL_${XYZ}$(:, j)/(beta*beta)
-
-                                    omega = alpha/sum(alpha)
-
-                                    vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
-                                              + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(0) &
-                                              + poly_coef_cbR_${XYZ}$(j, 1, 1)*dvd(-1)
-                                    poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 2, 0)*dvd(-1) &
-                                              + poly_coef_cbR_${XYZ}$(j, 2, 1)*dvd(-2)
-
-                                    alpha = d_cbR_${XYZ}$(:, j)/(beta*beta)
-
-                                    omega = alpha/sum(alpha)
-
-                                    vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-
-                                end do
-                            end do
-                        end do
-                    end do
-!$acc end parallel loop
-                end if
 
                 if (mp_weno) then
-!$acc parallel loop gang vector collapse (4)  default(present) private(d)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                do i = 1, v_size
-                                    alpha_mp = 2d0
-                                    beta_mp = 4d0/3d0
-
-                                    d(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                            + v_rs_ws_${XYZ}$(j - 2, k, l, i) &
-                                            - v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                            *2d0
-                                    d(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                           + v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                           - v_rs_ws_${XYZ}$(j, k, l, i) &
-                                           *2d0
-                                    d(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
-                                           + v_rs_ws_${XYZ}$(j, k, l, i) &
-                                           - v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                           *2d0
-
-                                    d_MD = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
-                                           *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
-                                                *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
-                                           *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
-                                                abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
-
-                                    d_LC = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
-                                           *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
-                                                *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
-                                           *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
-                                                abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
-
-                                    vL_UL = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                            - (v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                               - v_rs_ws_${XYZ}$(j, k, l, i))*alpha_mp
-
-                                    vL_MD = (v_rs_ws_${XYZ}$(j, k, l, i) &
-                                             + v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                             - d_MD)*5d-1
-
-                                    vL_LC = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                            - (v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                               - v_rs_ws_${XYZ}$(j, k, l, i))*5d-1 + beta_mp*d_LC
-
-                                    vL_min = max(min(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     v_rs_ws_${XYZ}$(j - 1, k, l, i), &
-                                                     vL_MD), &
-                                                 min(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     vL_UL, &
-                                                     vL_LC))
-
-                                    vL_max = min(max(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     v_rs_ws_${XYZ}$(j - 1, k, l, i), &
-                                                     vL_MD), &
-                                                 max(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     vL_UL, &
-                                                     vL_LC))
-
-                                    vL_rs_vf_${XYZ}$(j, k, l, i) = vL_rs_vf_${XYZ}$(j, k, l, i) &
-                                                                  + (sign(5d-1, vL_min - vL_rs_vf_${XYZ}$(j, k, l, i)) &
-                                                                     + sign(5d-1, vL_max - vL_rs_vf_${XYZ}$(j, k, l, i))) &
-                                                                  *min(abs(vL_min - vL_rs_vf_${XYZ}$(j, k, l, i)), &
-                                                                       abs(vL_max - vL_rs_vf_${XYZ}$(j, k, l, i)))
-                                    ! END: Left Monotonicity Preserving Bound ==========================
-
-                                    ! Right Monotonicity Preserving Bound ==============================
-                                    d(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                            + v_rs_ws_${XYZ}$(j - 2, k, l, i) &
-                                            - v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                            *2d0
-                                    d(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                           + v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                           - v_rs_ws_${XYZ}$(j, k, l, i) &
-                                           *2d0
-                                    d(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
-                                           + v_rs_ws_${XYZ}$(j, k, l, i) &
-                                           - v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                           *2d0
-
-                                    d_MD = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
-                                           *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
-                                                *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
-                                           *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
-                                                abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
-
-                                    d_LC = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
-                                           *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
-                                                *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
-                                           *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
-                                                abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
-
-                                    vR_UL = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                            + (v_rs_ws_${XYZ}$(j, k, l, i) &
-                                               - v_rs_ws_${XYZ}$(j - 1, k, l, i))*alpha_mp
-
-                                    vR_MD = (v_rs_ws_${XYZ}$(j, k, l, i) &
-                                             + v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                             - d_MD)*5d-1
-
-                                    vR_LC = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                            + (v_rs_ws_${XYZ}$(j, k, l, i) &
-                                               - v_rs_ws_${XYZ}$(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
-
-                                    vR_min = max(min(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     v_rs_ws_${XYZ}$(j + 1, k, l, i), &
-                                                     vR_MD), &
-                                                 min(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     vR_UL, &
-                                                     vR_LC))
-
-                                    vR_max = min(max(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     v_rs_ws_${XYZ}$(j + 1, k, l, i), &
-                                                     vR_MD), &
-                                                 max(v_rs_ws_${XYZ}$(j, k, l, i), &
-                                                     vR_UL, &
-                                                     vR_LC))
-
-                                    vR_rs_vf_${XYZ}$(j, k, l, i) = vR_rs_vf_${XYZ}$(j, k, l, i) &
-                                                                  + (sign(5d-1, vR_min - vR_rs_vf_${XYZ}$(j, k, l, i)) &
-                                                                     + sign(5d-1, vR_max - vR_rs_vf_${XYZ}$(j, k, l, i))) &
-                                                                  *min(abs(vR_min - vR_rs_vf_${XYZ}$(j, k, l, i)), &
-                                                                       abs(vR_max - vR_rs_vf_${XYZ}$(j, k, l, i)))
-                                    ! END: Right Monotonicity Preserving Bound =========================
-                                end do
-                            end do
-                        end do
-                    end do
-!$acc end parallel loop
+                    call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
+                     vR_rs_vf_${XYZ}$)                   
                 end if
+
             end if
             #:endfor
         end if
+
         
 
     end subroutine s_weno
@@ -1078,49 +840,7 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
 
     end subroutine s_initialize_weno ! -------------------------------------
 
-    !>  The goal of this procedure is to map the nonlinear WENO
-        !!      weights to the more accurate nonlinear WENOM weights in
-        !!      order to reinstate the optimal order of accuracy of the
-        !!      reconstruction in the proximity of critical points, see
-        !!      Henrick et al. (2005).
-        !!  @param d_K Cell boundary pointer
-        !!  @param alpha_K ideal weights
-        !!  @param omega_K nonlinear weights
-    subroutine s_map_nonlinear_weights(d_K, alpha_K, omega_K) ! ------------
-        !$acc routine seq
 
-        ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(0:), intent(IN) :: d_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: omega_K
-
-        ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
-        if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
-
-        alpha_K = (d_K*(1d0 + d_K - 3d0*omega_K) + omega_K**2d0) &
-                  *(omega_K/(d_K**2d0 + omega_K*(1d0 - 2d0*d_K)))
-
-        omega_K = alpha_K/sum(alpha_K)
-
-    end subroutine s_map_nonlinear_weights ! -------------------------------
-
-    subroutine s_map_nonlinear_weights_weno3(d_K, alpha_K, omega_K) ! ------------
-        !$acc routine seq
-
-        ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(0:), intent(IN) :: d_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: omega_K
-
-        ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
-        if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
-
-        alpha_K = (d_K*(1d0 + d_K - 3d0*omega_K) + omega_K**2d0) &
-                  *(omega_K/(d_K**2d0 + omega_K*(1d0 - 2d0*d_K)))
-
-        omega_K = alpha_K/sum(alpha_K)
-
-    end subroutine s_map_nonlinear_weights_weno3 ! -------------------------------
 
     !>  The goal of this subroutine is to ensure that the WENO
         !!      reconstruction is monotonic. The latter is achieved by
@@ -1133,13 +853,13 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
         !!  @param j First-coordinate cell index
         !!  @param k Second-coordinate cell index
         !!  @param l Third-coordinate cell index
-    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf, i, j, k, l) ! --------------------------
-        !$acc routine seq
+    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf) ! --------------------------
 
-        type(vector_field), dimension(:), intent(IN) :: v_rs_ws
-        type(scalar_field), dimension(:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
-        integer, intent(IN) :: i, j, k, l
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
 
+        integer :: i, j, k, l
+        
         real(kind(0d0)), dimension(-1:1) :: d !< Curvature measures at the zone centers
 
         real(kind(0d0)) :: d_MD, d_LC !<
@@ -1164,120 +884,135 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
 
-        ! Left Monotonicity Preserving Bound ===============================
-        d(-1) = v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                + v_rs_ws(-2)%vf(i)%sf(j, k, l) &
-                - v_rs_ws(-1)%vf(i)%sf(j, k, l) &
-                *2d0
-        d(0) = v_rs_ws(1)%vf(i)%sf(j, k, l) &
-               + v_rs_ws(-1)%vf(i)%sf(j, k, l) &
-               - v_rs_ws(0)%vf(i)%sf(j, k, l) &
-               *2d0
-        d(1) = v_rs_ws(2)%vf(i)%sf(j, k, l) &
-               + v_rs_ws(0)%vf(i)%sf(j, k, l) &
-               - v_rs_ws(1)%vf(i)%sf(j, k, l) &
-               *2d0
+ !$acc parallel loop gang vector collapse (4)  default(present) private(d)
+        do l = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = is1%beg, is1%end
+                    do i = 1, v_size
+                        alpha_mp = 2d0
+                        beta_mp = 4d0/3d0
 
-        d_MD = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
-               *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
-                    *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
-               *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
-                    abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
+                        d(-1) = v_rs_ws(j, k, l, i) &
+                                + v_rs_ws(j - 2, k, l, i) &
+                                - v_rs_ws(j - 1, k, l, i) &
+                                *2d0
+                        d(0) = v_rs_ws(j + 1, k, l, i) &
+                               + v_rs_ws(j - 1, k, l, i) &
+                               - v_rs_ws(j, k, l, i) &
+                               *2d0
+                        d(1) = v_rs_ws(j + 2, k, l, i) &
+                               + v_rs_ws(j, k, l, i) &
+                               - v_rs_ws(j + 1, k, l, i) &
+                               *2d0
 
-        d_LC = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
-               *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
-                    *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
-               *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
-                    abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
+                        d_MD = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
+                               *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
+                                    *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
+                               *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
+                                    abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
 
-        vL_UL = v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                - (v_rs_ws(1)%vf(i)%sf(j, k, l) &
-                   - v_rs_ws(0)%vf(i)%sf(j, k, l))*alpha
+                        d_LC = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
+                               *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
+                                    *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
+                               *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
+                                    abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
 
-        vL_MD = (v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                 + v_rs_ws(-1)%vf(i)%sf(j, k, l) &
-                 - d_MD)*5d-1
+                        vL_UL = v_rs_ws(j, k, l, i) &
+                                - (v_rs_ws(j + 1, k, l, i) &
+                                   - v_rs_ws(j, k, l, i))*alpha_mp
 
-        vL_LC = v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                - (v_rs_ws(1)%vf(i)%sf(j, k, l) &
-                   - v_rs_ws(0)%vf(i)%sf(j, k, l))*5d-1 + beta*d_LC
+                        vL_MD = (v_rs_ws(j, k, l, i) &
+                                 + v_rs_ws(j - 1, k, l, i) &
+                                 - d_MD)*5d-1
 
-        vL_min = max(min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         v_rs_ws(-1)%vf(i)%sf(j, k, l), &
-                         vL_MD), &
-                     min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         vL_UL, &
-                         vL_LC))
+                        vL_LC = v_rs_ws(j, k, l, i) &
+                                - (v_rs_ws(j + 1, k, l, i) &
+                                   - v_rs_ws(j, k, l, i))*5d-1 + beta_mp*d_LC
 
-        vL_max = min(max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         v_rs_ws(-1)%vf(i)%sf(j, k, l), &
-                         vL_MD), &
-                     max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         vL_UL, &
-                         vL_LC))
+                        vL_min = max(min(v_rs_ws(j, k, l, i), &
+                                         v_rs_ws(j - 1, k, l, i), &
+                                         vL_MD), &
+                                     min(v_rs_ws(j, k, l, i), &
+                                         vL_UL, &
+                                         vL_LC))
 
-        vL_rs_vf(i)%sf(j, k, l) = vL_rs_vf(i)%sf(j, k, l) &
-                                  + (sign(5d-1, vL_min - vL_rs_vf(i)%sf(j, k, l)) &
-                                     + sign(5d-1, vL_max - vL_rs_vf(i)%sf(j, k, l))) &
-                                  *min(abs(vL_min - vL_rs_vf(i)%sf(j, k, l)), &
-                                       abs(vL_max - vL_rs_vf(i)%sf(j, k, l)))
-        ! END: Left Monotonicity Preserving Bound ==========================
+                        vL_max = min(max(v_rs_ws(j, k, l, i), &
+                                         v_rs_ws(j - 1, k, l, i), &
+                                         vL_MD), &
+                                     max(v_rs_ws(j, k, l, i), &
+                                         vL_UL, &
+                                         vL_LC))
 
-        ! Right Monotonicity Preserving Bound ==============================
-        d(-1) = v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                + v_rs_ws(-2)%vf(i)%sf(j, k, l) &
-                - v_rs_ws(-1)%vf(i)%sf(j, k, l)*2d0
-        d(0) = v_rs_ws(1)%vf(i)%sf(j, k, l) &
-               + v_rs_ws(-1)%vf(i)%sf(j, k, l) &
-               - v_rs_ws(0)%vf(i)%sf(j, k, l)*2d0
-        d(1) = v_rs_ws(2)%vf(i)%sf(j, k, l) &
-               + v_rs_ws(0)%vf(i)%sf(j, k, l) &
-               - v_rs_ws(1)%vf(i)%sf(j, k, l)*2d0
+                        vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) &
+                                                      + (sign(5d-1, vL_min - vL_rs_vf(j, k, l, i)) &
+                                                         + sign(5d-1, vL_max - vL_rs_vf(j, k, l, i))) &
+                                                      *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
+                                                           abs(vL_max - vL_rs_vf(j, k, l, i)))
+                        ! END: Left Monotonicity Preserving Bound ==========================
 
-        d_MD = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
-               *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
-                    *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
-               *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
-                    abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
+                        ! Right Monotonicity Preserving Bound ==============================
+                        d(-1) = v_rs_ws(j, k, l, i) &
+                                + v_rs_ws(j - 2, k, l, i) &
+                                - v_rs_ws(j - 1, k, l, i) &
+                                *2d0
+                        d(0) = v_rs_ws(j + 1, k, l, i) &
+                               + v_rs_ws(j - 1, k, l, i) &
+                               - v_rs_ws(j, k, l, i) &
+                               *2d0
+                        d(1) = v_rs_ws(j + 2, k, l, i) &
+                               + v_rs_ws(j, k, l, i) &
+                               - v_rs_ws(j + 1, k, l, i) &
+                               *2d0
 
-        d_LC = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
-               *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
-                    *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
-               *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
-                    abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
+                        d_MD = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
+                               *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
+                                    *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
+                               *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
+                                    abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
 
-        vR_UL = v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                + (v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                   - v_rs_ws(-1)%vf(i)%sf(j, k, l))*alpha
+                        d_LC = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
+                               *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
+                                    *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
+                               *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
+                                    abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
 
-        vR_MD = (v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                 + v_rs_ws(1)%vf(i)%sf(j, k, l) &
-                 - d_MD)*5d-1
+                        vR_UL = v_rs_ws(j, k, l, i) &
+                                + (v_rs_ws(j, k, l, i) &
+                                   - v_rs_ws(j - 1, k, l, i))*alpha_mp
 
-        vR_LC = v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                + (v_rs_ws(0)%vf(i)%sf(j, k, l) &
-                   - v_rs_ws(-1)%vf(i)%sf(j, k, l))*5d-1 + beta*d_LC
+                        vR_MD = (v_rs_ws(j, k, l, i) &
+                                 + v_rs_ws(j + 1, k, l, i) &
+                                 - d_MD)*5d-1
 
-        vR_min = max(min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         v_rs_ws(1)%vf(i)%sf(j, k, l), &
-                         vR_MD), &
-                     min(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         vR_UL, &
-                         vR_LC))
+                        vR_LC = v_rs_ws(j, k, l, i) &
+                                + (v_rs_ws(j, k, l, i) &
+                                   - v_rs_ws(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
 
-        vR_max = min(max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         v_rs_ws(1)%vf(i)%sf(j, k, l), &
-                         vR_MD), &
-                     max(v_rs_ws(0)%vf(i)%sf(j, k, l), &
-                         vR_UL, &
-                         vR_LC))
+                        vR_min = max(min(v_rs_ws(j, k, l, i), &
+                                         v_rs_ws(j + 1, k, l, i), &
+                                         vR_MD), &
+                                     min(v_rs_ws(j, k, l, i), &
+                                         vR_UL, &
+                                         vR_LC))
 
-        vR_rs_vf(i)%sf(j, k, l) = vR_rs_vf(i)%sf(j, k, l) &
-                                  + (sign(5d-1, vR_min - vR_rs_vf(i)%sf(j, k, l)) &
-                                     + sign(5d-1, vR_max - vR_rs_vf(i)%sf(j, k, l))) &
-                                  *min(abs(vR_min - vR_rs_vf(i)%sf(j, k, l)), &
-                                       abs(vR_max - vR_rs_vf(i)%sf(j, k, l)))
-        ! END: Right Monotonicity Preserving Bound =========================
+                        vR_max = min(max(v_rs_ws(j, k, l, i), &
+                                         v_rs_ws(j + 1, k, l, i), &
+                                         vR_MD), &
+                                     max(v_rs_ws(j, k, l, i), &
+                                         vR_UL, &
+                                         vR_LC))
+
+                        vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
+                                                      + (sign(5d-1, vR_min - vR_rs_vf(j, k, l, i)) &
+                                                         + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
+                                                      *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
+                                                           abs(vR_max - vR_rs_vf(j, k, l, i)))
+                        ! END: Right Monotonicity Preserving Bound =========================
+                    end do
+                end do
+            end do
+        end do
+!$acc end parallel loop
 
     end subroutine s_preserve_monotonicity ! -------------------------------
 
