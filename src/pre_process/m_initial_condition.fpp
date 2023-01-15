@@ -26,9 +26,7 @@ module m_initial_condition
 
     use m_patches
 
-    use m_create_patches
-
-    use m_assign_patches
+    use m_assign_variables
     ! ==========================================================================
     ! ==========================================================================
 
