@@ -110,20 +110,6 @@ module m_riemann_solvers
 
         end subroutine s_abstract_riemann_solver
 
-        !>  The abstract interface to the subroutines that are used to calculate
-        !!  the Roe and arithmetic average states. For more information refer to:
-        !!      1) s_compute_roe_average_state
-        !!      2) s_compute_arithmetic_average_state
-        !!  @param i First coordinate location index
-        !!  @param j Second coordinate location index
-        !!  @param k Third coordinate location index
-        subroutine s_compute_abstract_average_state(qL_prim_rs_vf, qR_prim_rs_vf, i, j, k)
-            import :: scalar_field, int_bounds_info, sys_size
-            integer, intent(IN) :: i, j, k
-            type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
-
-        end subroutine s_compute_abstract_average_state
-
         !> The abstract interface to the subroutines that are utilized to compute
         !! the wave speeds of the Riemann problem either directly or by the means
         !! of pressure-velocity estimates. For more information please refer to:
@@ -329,11 +315,6 @@ module m_riemann_solvers
         pointer :: s_riemann_solver => null() !<
     !! Pointer to the procedure that is utilized to calculate either the HLL,
     !! HLLC or exact intercell fluxes, based on the choice of Riemann solver
-
-    procedure(s_compute_abstract_average_state), &
-        pointer :: s_compute_average_state => null() !<
-    !! Pointer to the subroutine utilized to calculate either the Roe or the
-    !! arithmetic average state variables, based on the chosen average state
 
     procedure(s_compute_abstract_wave_speeds), &
         pointer :: s_compute_wave_speeds => null() !<
@@ -4499,7 +4480,7 @@ contains
 
         ! Disassociating the procedural pointers to the procedures that were
         ! utilized to compute the average state and estimate the wave speeds
-        s_compute_average_state => null(); s_compute_wave_speeds => null()
+        s_compute_wave_speeds => null()
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the viscous source flux
