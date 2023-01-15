@@ -1,6 +1,11 @@
 tags
 src/*/tags
 
+*.swo
+*.swp
+
+*:Zone.Identifier
+
 .vscode/
 .nfs*
 defaults.yaml

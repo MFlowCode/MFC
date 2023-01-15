@@ -1,4 +1,3 @@
-
 module m_nvtx
 
     use iso_c_binding
@@ -80,4 +79,4 @@ contains
 #endif
     end subroutine
 
-end module nvtx
+end module m_nvtx

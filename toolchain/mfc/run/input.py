@@ -1,22 +1,18 @@
+import os, json, dataclasses
 
-import os
-import json
-import dataclasses
-
-from ..util.printer import cons
-from ..util         import common
-from .              import case_dicts
+from ..printer import cons
+from ..        import common
+from ..state   import ARG
+from .         import case_dicts
 
 @dataclasses.dataclass
 class MFCInputFile:
     filename:     str
     case_dirpath: str
     case_dict:    dict
-    args:         dict
-
 
     def __generate_inp(self, target_name: str) -> None:
-        MASTER_KEYS: list = case_dicts.get_input_dict_keys(target_name, self.args)
+        MASTER_KEYS: list = case_dicts.get_input_dict_keys(target_name)
 
         # Create Fortran-style input file content string
         dict_str = ""
@@ -38,7 +34,7 @@ class MFCInputFile:
 
     def __generate_fpp(self, target_name: str) -> None:
         # === case.fpp ===
-        use_case_optimization = self.args["case_optimization"] and target_name == "simulation"
+        use_case_optimization = ARG("case_optimization") and target_name == "simulation"
 
         filepath = os.path.join(os.getcwd(), "src", target_name, "case.fpp")
         content  = f"""\
@@ -89,8 +85,8 @@ class MFCInputFile:
 
 
 # Load the input file
-def load(args: dict) -> MFCInputFile:
-    filename: str = args["input"].strip()
+def load() -> MFCInputFile:
+    filename: str = ARG("input").strip()
 
     cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
 
@@ -115,5 +111,4 @@ def load(args: dict) -> MFCInputFile:
     except Exception as exc:
         raise common.MFCException(f"Input file {filename} did not produce valid JSON. It should only print the case dictionary.\n\n{exc}\n")
 
-    return MFCInputFile(filename, dirpath, dictionary, args)
-
+    return MFCInputFile(filename, dirpath, dictionary)

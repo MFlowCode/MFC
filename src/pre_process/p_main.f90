@@ -53,6 +53,8 @@ program p_main
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
         call s_check_input_file()
+    
+        print '(" Pre-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
 
     ! Broadcasting the user inputs to all of the processors and performing the
@@ -162,7 +164,7 @@ program p_main
     s_write_data_files => null()
 
     ! Deallocation procedures for the modules
-    call s_finalize_initial_condition_module()
+    call s_finalize_assign_patches_module()
     call s_finalize_grid_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()

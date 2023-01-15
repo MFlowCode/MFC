@@ -229,17 +229,19 @@ program p_main
                   t_step_stop - t_step_start + 1,                               &
                   t_step
         end if
-        
         mytime = mytime + dt
 
         if (probe_wrt) then
             do i = 1, sys_size
-!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                !$acc update host(q_cons_ts(1)%vf(i)%sf)
             end do
         end if
 
         call s_compute_derived_variables(t_step)
-        if (DEBUG) print *, 'Computed derived vars'
+
+#ifdef DEBUG
+        print *, 'Computed derived vars'
+#endif
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then

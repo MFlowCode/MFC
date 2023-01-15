@@ -181,6 +181,16 @@ module m_global_parameters
     integer :: R0_type   !1 = simpson
     !> @}
 
+    !> @name Index variables used for m_variables_conversion
+    !> @{
+    integer :: momxb, momxe
+    integer :: advxb, advxe
+    integer :: contxb, contxe
+    integer :: intxb, intxe
+    integer :: bubxb, bubxe
+    integer :: strxb, strxe
+    !> @}
+
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
     ! Mathematical and Physical Constants ======================================
@@ -203,9 +213,7 @@ contains
         t_step_old = dflt_int
 
         ! Computational domain parameters
-        m = dflt_int
-        n = dflt_int
-        p = dflt_int
+        m = dflt_int; n = 0; p = 0
 
         cyl_coord = .false.
 
@@ -567,6 +575,20 @@ contains
                 end if
             end if
         end if
+
+        momxb = mom_idx%beg
+        momxe = mom_idx%end
+        advxb = adv_idx%beg
+        advxe = adv_idx%end
+        contxb = cont_idx%beg
+        contxe = cont_idx%end
+        bubxb = bub_idx%beg
+        bubxe = bub_idx%end
+        strxb = stress_idx%beg
+        strxe = stress_idx%end
+        intxb = internalEnergies_idx%beg
+        intxe = internalEnergies_idx%end
+
         ! ==================================================================
 
 #ifdef MFC_MPI
@@ -758,11 +780,7 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
-#ifndef MFC_MPI
-
-        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
-
-#else
+#ifdef MFC_MPI
 
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
@@ -812,7 +830,7 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! ----------------------
-
+    
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
