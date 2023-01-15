@@ -1,4 +1,4 @@
-#:def arithmetic_avg(rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+#:def arithmetic_avg()
     rho_avg = 5d-1*(rho_L + rho_R)
     vel_avg_rms = 0d0
     !$acc loop seq
@@ -10,7 +10,7 @@
     gamma_avg = 5d-1*(gamma_L + gamma_R)
 #:enddef arithmetic_avg
 
-#:def roe_avg(rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+#:def roe_avg()
     rho_avg = sqrt(rho_L*rho_R)
     vel_avg_rms = 0d0
     !$acc loop seq
@@ -26,14 +26,20 @@
                 (sqrt(rho_L) + sqrt(rho_R))
 #:enddef roe_avg
 
-#:def compute_average_state(avg_state,rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+#:def compute_average_state()
 
 if (avg_state == 1) then
-    @:roe_avg(rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+    @:roe_avg()
 end if
 
 if (avg_state == 2) then
-    @:arithmetic_avg(rho_avg,rho_L,rho_R,vel_L,vel_R,vel_avg_rms,H_L,H_R,H_avg,gamma_L,gamma_R,gamma_avg)
+    @:arithmetic_avg()
 end if
 
 #:enddef compute_average_state
+
+! #:def compute_wave_speeds()
+
+! #:enddef compute_wave_speeds
+
+
