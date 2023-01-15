@@ -269,6 +269,11 @@ contains
                 'model_eqns (6-eq) and Roe average (please use avg_state = 2). '// &
                 'Exiting ...'
             call s_mpi_abort()
+       elseif (bubbles .and. avg_state == 1) then
+            print '(A)', 'Unsupported combination of values of '// &
+                'bubbles and Roe average (please use avg_state = 2). '// &
+                'Exiting ...'
+            call s_mpi_abort()
         elseif (model_eqns == 3 .and. wave_speeds == 2) then
             print '(A)', 'Unsupported combination of values of '// &
                 'model_eqns (6-eq) and wave_speeds (please use wave_speeds = 1). '// &
