@@ -1586,45 +1586,52 @@ contains
 
                                 ! Momentum flux.
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                if (bubbles .neqv. .true.) then
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                         vel_L(dir_idx(i)) + &
-                                                         s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                                                    (1d0 - dir_flg(dir_idx(i)))* &
-                                                                    vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                                  dir_flg(dir_idx(i))*(pres_L)) &
-                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                           vel_R(dir_idx(i)) + &
-                                                           s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                                                      (1d0 - dir_flg(dir_idx(i)))* &
-                                                                      vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                    dir_flg(dir_idx(i))*(pres_R))
-                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
-                                    end do
-                                else
-                                    ! Include p_tilde
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                         vel_L(dir_idx(i)) + &
-                                                         s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                                                    (1d0 - dir_flg(dir_idx(i)))* &
-                                                                    vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                                  dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
-                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                           vel_R(dir_idx(i)) + &
-                                                           s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                                                      (1d0 - dir_flg(dir_idx(i)))* &
-                                                                      vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                    dir_flg(dir_idx(i))*(pres_R - ptilde_R))
-                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
-                                    end do
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                     vel_L(dir_idx(i)) + &
+                                                     s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                                                (1d0 - dir_flg(dir_idx(i)))* &
+                                                                vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                              dir_flg(dir_idx(i))*pres_L) &
+                                        + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                       vel_R(dir_idx(i)) + &
+                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                                                  (1d0 - dir_flg(dir_idx(i)))* &
+                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                                dir_flg(dir_idx(i))*pres_R)
+                                end do
 
+                                if (bubbles) then
+                                    ! Put p_tilde in
+                                    !$acc loop seq
+                                    do i = 1, num_dims
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) =     &
+                                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) + &
+                                              xi_M*(dir_flg(dir_idx(i))*(-1d0*ptilde_L))      &
+                                            + xi_P*(dir_flg(dir_idx(i))*(-1d0*ptilde_R))
+                                    end do
                                 end if
+
+                                !else
+                                !    !$acc loop seq
+                                !    do i = 1, num_dims
+                                !        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                !            xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                !                         vel_L(dir_idx(i)) + &
+                                !                         s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                !                                    (1d0 - dir_flg(dir_idx(i)))* &
+                                !                                    vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                !                  dir_flg(dir_idx(i))*(pres_L)) &
+                                !            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                !                           vel_R(dir_idx(i)) + &
+                                !                           s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                !                                      (1d0 - dir_flg(dir_idx(i)))* &
+                                !                                      vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                !                    dir_flg(dir_idx(i))*(pres_R))
+                                !    end do
+                                !end if
 
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0.d0
 
