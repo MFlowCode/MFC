@@ -17,6 +17,8 @@
 !!                  1) Harten-Lax-van Leer (HLL)
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
+#:include 'inline_riemann.fpp'
+
 module m_riemann_solvers
 
     ! Dependencies =============================================================
@@ -34,10 +36,10 @@ module m_riemann_solvers
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, &
- s_riemann_solver, &
- s_hll_riemann_solver, &
- s_hllc_riemann_solver, &
- s_finalize_riemann_solvers_module
+                        s_riemann_solver, &
+                        s_hll_riemann_solver, &
+                        s_hllc_riemann_solver, &
+                        s_finalize_riemann_solvers_module
 
     abstract interface ! =======================================================
 
@@ -107,20 +109,6 @@ module m_riemann_solvers
             type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         end subroutine s_abstract_riemann_solver
-
-        !>  The abstract interface to the subroutines that are used to calculate
-        !!  the Roe and arithmetic average states. For more information refer to:
-        !!      1) s_compute_roe_average_state
-        !!      2) s_compute_arithmetic_average_state
-        !!  @param i First coordinate location index
-        !!  @param j Second coordinate location index
-        !!  @param k Third coordinate location index
-        subroutine s_compute_abstract_average_state(qL_prim_rs_vf, qR_prim_rs_vf, i, j, k)
-            import :: scalar_field, int_bounds_info, sys_size
-            integer, intent(IN) :: i, j, k
-            type(scalar_field), dimension(sys_size), intent(IN) :: qL_prim_rs_vf, qR_prim_rs_vf
-
-        end subroutine s_compute_abstract_average_state
 
         !> The abstract interface to the subroutines that are utilized to compute
         !! the wave speeds of the Riemann problem either directly or by the means
@@ -327,11 +315,6 @@ module m_riemann_solvers
         pointer :: s_riemann_solver => null() !<
     !! Pointer to the procedure that is utilized to calculate either the HLL,
     !! HLLC or exact intercell fluxes, based on the choice of Riemann solver
-
-    procedure(s_compute_abstract_average_state), &
-        pointer :: s_compute_average_state => null() !<
-    !! Pointer to the subroutine utilized to calculate either the Roe or the
-    !! arithmetic average state variables, based on the chosen average state
 
     procedure(s_compute_abstract_wave_speeds), &
         pointer :: s_compute_wave_speeds => null() !<
@@ -600,40 +583,8 @@ contains
                                     end if
                                 end do
                             end if
-
-                            if (avg_state == 2) then
-                                rho_avg = 5d-1*(rho_L + rho_R)
-
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg(i) = 5d-1*(vel_L(i) + vel_R(i))
-                                end do
-
-                                H_avg = 5d-1*(H_L + H_R)
-
-                                gamma_avg = 5d-1*(gamma_L + gamma_R)
-                            elseif (avg_state == 1) then
-                                rho_avg = sqrt(rho_L*rho_R)
-
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg(i) = (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))/ &
-                                                 (sqrt(rho_L) + sqrt(rho_R))
-                                end do
-
-                                H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                        (sqrt(rho_L) + sqrt(rho_R))
-
-                                gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-                            end if
-
-                            vel_avg_rms = 0d0
-
-                            !$acc loop seq
-                            do i = 1, num_dims
-                                vel_avg_rms = vel_avg_rms + vel_avg(i)**2d0
-                            end do
+                            
+                            @:compute_average_state()
 
                             if (mixture_err) then
                                 if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1210,35 +1161,8 @@ contains
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                                if (avg_state == 2) then
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    vel_avg_rms = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
-                                    end do
-
-                                    H_avg = 5d-1*(H_L + H_R)
-
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
-
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-                                    vel_avg_rms = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end do
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
-                                end if
+                                @:compute_average_state()
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1545,39 +1469,8 @@ contains
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                                if (avg_state == 2) then
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg(i) = 5d-1*(vel_L(i) + vel_R(i))
-                                    end do
-
-                                    H_avg = 5d-1*(H_L + H_R)
-
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
-
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg(i) = (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))/ &
-                                                     (sqrt(rho_L) + sqrt(rho_R))
-                                    end do
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
-                                end if
-
-                                vel_avg_rms = 0d0
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_avg_rms = vel_avg_rms + vel_avg(i)**2d0
-                                end do
+                                @:compute_average_state()
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -1667,6 +1560,7 @@ contains
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
+
                                 ! follows Einfeldt et al.
                                 ! s_M/P = min/max(0.,s_L/R)
                                 s_M = min(0d0, s_L); s_P = max(0d0, s_R)
@@ -1692,44 +1586,32 @@ contains
 
                                 ! Momentum flux.
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                if (bubbles .neqv. .true.) then
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                         vel_L(dir_idx(i)) + &
-                                                         s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                                                    (1d0 - dir_flg(dir_idx(i)))* &
-                                                                    vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                                  dir_flg(dir_idx(i))*(pres_L)) &
-                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                           vel_R(dir_idx(i)) + &
-                                                           s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                                                      (1d0 - dir_flg(dir_idx(i)))* &
-                                                                      vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                    dir_flg(dir_idx(i))*(pres_R))
-                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
-                                    end do
-                                else
-                                    ! Include p_tilde
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                         vel_L(dir_idx(i)) + &
-                                                         s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-                                                                    (1d0 - dir_flg(dir_idx(i)))* &
-                                                                    vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
-                                                  dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
-                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                           vel_R(dir_idx(i)) + &
-                                                           s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-                                                                      (1d0 - dir_flg(dir_idx(i)))* &
-                                                                      vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                    dir_flg(dir_idx(i))*(pres_R - ptilde_R))
-                                        ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
-                                    end do
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                     vel_L(dir_idx(i)) + &
+                                                     s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                                                (1d0 - dir_flg(dir_idx(i)))* &
+                                                                vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                              dir_flg(dir_idx(i))*pres_L) &
+                                        + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                       vel_R(dir_idx(i)) + &
+                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                                                  (1d0 - dir_flg(dir_idx(i)))* &
+                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                                dir_flg(dir_idx(i))*pres_R)
+                                end do
 
+                                if (bubbles) then
+                                    ! Put p_tilde in
+                                    !$acc loop seq
+                                    do i = 1, num_dims
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) =     &
+                                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) + &
+                                              xi_M*(dir_flg(dir_idx(i))*(-1d0*ptilde_L))      &
+                                            + xi_P*(dir_flg(dir_idx(i))*(-1d0*ptilde_R))
+                                    end do
                                 end if
 
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0.d0
@@ -1906,9 +1788,6 @@ contains
                                         end if
                                     end do
 
-                                    !call s_comp_n_from_prim(qL_prim_rs${XYZ}$_vf(j, k, l,  E_idx + num_fluids), R0_L, nbub_L)
-                                    !call s_comp_n_from_prim(qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + num_fluids), R0_R, nbub_R)
-
                                     nbub_L_denom = 0d0
                                     nbub_R_denom = 0d0
 
@@ -2000,22 +1879,6 @@ contains
                                         vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
                                     end do
 
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-
-                                    vel_avg_rms = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end do
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
                                 end if
 
                                 if (mixture_err) then
@@ -2369,42 +2232,8 @@ contains
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                                if (avg_state == 2) then
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    vel_avg_rms = (5d-1*(vel_L(1) + vel_R(1)))**2d0
-                                    if (num_dims >= 2) then
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(2) + vel_R(2)))**2d0
-                                    end if
-                                    if (num_dims == 3) then
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(3) + vel_R(3)))**2d0
-                                    end if
-
-                                    H_avg = 5d-1*(H_L + H_R)
-
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
-
-                                elseif (avg_state == 1) then
-
-                                    rho_avg = sqrt(rho_L*rho_R)
-                                    vel_avg_rms = (sqrt(rho_L)*vel_L(1) + sqrt(rho_R)*vel_R(1))**2d0/ &
-                                                  (sqrt(rho_L) + sqrt(rho_R))**2d0
-
-                                    if (num_dims >= 2) then
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(2) + sqrt(rho_R)*vel_R(2))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end if
-                                    if (num_dims == 3) then
-                                        vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(3) + sqrt(rho_R)*vel_R(3))**2d0/ &
-                                                      (sqrt(rho_L) + sqrt(rho_R))**2d0
-                                    end if
-
-                                    H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/ &
-                                            (sqrt(rho_L) + sqrt(rho_R))
-
-                                    gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/ &
-                                                (sqrt(rho_L) + sqrt(rho_R))
-                                end if
+                                @:compute_average_state()
 
                                 if (mixture_err) then
                                     if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
@@ -2468,6 +2297,7 @@ contains
                                            (s_R - vel_R(idx1))) &
                                           /(rho_L*(s_L - vel_L(idx1)) - &
                                             rho_R*(s_R - vel_R(idx1)))
+
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(idx1) - &
@@ -4602,7 +4432,7 @@ contains
 
         ! Disassociating the procedural pointers to the procedures that were
         ! utilized to compute the average state and estimate the wave speeds
-        s_compute_average_state => null(); s_compute_wave_speeds => null()
+        s_compute_wave_speeds => null()
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the viscous source flux
