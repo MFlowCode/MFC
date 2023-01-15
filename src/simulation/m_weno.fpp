@@ -1078,49 +1078,7 @@ subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf
 
     end subroutine s_initialize_weno ! -------------------------------------
 
-    !>  The goal of this procedure is to map the nonlinear WENO
-        !!      weights to the more accurate nonlinear WENOM weights in
-        !!      order to reinstate the optimal order of accuracy of the
-        !!      reconstruction in the proximity of critical points, see
-        !!      Henrick et al. (2005).
-        !!  @param d_K Cell boundary pointer
-        !!  @param alpha_K ideal weights
-        !!  @param omega_K nonlinear weights
-    subroutine s_map_nonlinear_weights(d_K, alpha_K, omega_K) ! ------------
-        !$acc routine seq
 
-        ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(0:), intent(IN) :: d_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: omega_K
-
-        ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
-        if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
-
-        alpha_K = (d_K*(1d0 + d_K - 3d0*omega_K) + omega_K**2d0) &
-                  *(omega_K/(d_K**2d0 + omega_K*(1d0 - 2d0*d_K)))
-
-        omega_K = alpha_K/sum(alpha_K)
-
-    end subroutine s_map_nonlinear_weights ! -------------------------------
-
-    subroutine s_map_nonlinear_weights_weno3(d_K, alpha_K, omega_K) ! ------------
-        !$acc routine seq
-
-        ! Ideal and nonlinear weights
-        real(kind(0d0)), dimension(0:), intent(IN) :: d_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: alpha_K
-        real(kind(0d0)), dimension(0:), intent(INOUT) :: omega_K
-
-        ! Mapping the WENO nonlinear weights to the WENOM nonlinear weights
-        if (minval(d_K) == 0d0 .or. maxval(d_K) == 1d0) return
-
-        alpha_K = (d_K*(1d0 + d_K - 3d0*omega_K) + omega_K**2d0) &
-                  *(omega_K/(d_K**2d0 + omega_K*(1d0 - 2d0*d_K)))
-
-        omega_K = alpha_K/sum(alpha_K)
-
-    end subroutine s_map_nonlinear_weights_weno3 ! -------------------------------
 
     !>  The goal of this subroutine is to ensure that the WENO
         !!      reconstruction is monotonic. The latter is achieved by

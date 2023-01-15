@@ -694,7 +694,6 @@ contains
 
 
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
-                              cbc_dir, cbc_loc, &
                               ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
@@ -991,18 +990,18 @@ contains
                     !$acc loop seq
                     do i = 1, contxe
                         flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
-                                                   + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*dalpha_rho_dt(i)
+                                                   + ds(0)*dalpha_rho_dt(i)
                     end do
 
                     !$acc loop seq
                     do i = momxb, momxe
                         flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
-                                                   + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*(vel(i - contxe)*drho_dt &
+                                                   + ds(0)*(vel(i - contxe)*drho_dt &
                                                             + rho*dvel_dt(i - contxe))
                     end do
 
                     flux_rs${XYZ}$_vf(-1, k, r, E_idx) = flux_rs${XYZ}$_vf(0, k, r, E_idx) &
-                                                   + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*(pres*dgamma_dt &
+                                                   + ds(0)*(pres*dgamma_dt &
                                                             + gamma*dpres_dt &
                                                             + dpi_inf_dt &
                                                             + rho*vel_dv_dt_sum &
@@ -1022,7 +1021,7 @@ contains
                                 *(flux_rs${XYZ}$_vf(0, k, r, i) &
                                   + vel(dir_idx(1)) &
                                   *flux_src_rs${XYZ}$_vf(0, k, r, i) &
-                                  + ds(0)*sign(1d0, -real(cbc_loc, kind(0d0)))*dadv_dt(i - E_idx))
+                                  + ds(0)*dadv_dt(i - E_idx))
                         end do
 
                     else
@@ -1030,7 +1029,7 @@ contains
                         !$acc loop seq
                         do i = advxb, advxe
                             flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) + &
-                                                       sign(1d0, -real(cbc_loc, kind(0d0)))*ds(0)*dadv_dt(i - E_idx)
+                                                       ds(0)*dadv_dt(i - E_idx)
                         end do
 
                         !$acc loop seq
@@ -1053,7 +1052,6 @@ contains
         ! CBC coordinate direction.
 
         call s_finalize_cbc(flux_vf, flux_src_vf, &
-                            cbc_dir, cbc_loc, &
                             ix, iy, iz)
 
     end subroutine s_cbc ! -------------------------------------------------
@@ -1323,7 +1321,6 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
     subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, & ! ------
-                                cbc_dir, cbc_loc, &
                                 ix, iy, iz)
 
         type(scalar_field), &
@@ -1334,7 +1331,6 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
             dimension(sys_size), &
             intent(IN) :: flux_vf, flux_src_vf
 
-        integer, intent(IN) :: cbc_dir, cbc_loc
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
@@ -1612,14 +1608,12 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
     subroutine s_finalize_cbc(flux_vf, flux_src_vf, & ! -------------------
-                              cbc_dir, cbc_loc, &
                               ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_vf, flux_src_vf
 
-        integer, intent(IN) :: cbc_dir, cbc_loc
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
