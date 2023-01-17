@@ -101,7 +101,7 @@ module m_variables_conversion
     real(kind(0d0)) :: pres_avg  !< averaging for bubble mixture speed of sound
     !> @}
 
-    integer :: ixb, ixe, iyb, iye, izb, ize
+    integer, public :: ixb, ixe, iyb, iye, izb, ize
     !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
 
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
@@ -134,76 +134,7 @@ module m_variables_conversion
 
 contains
 
-    !>  This procedure calculates the pressure based on energy when
-        !!      there are no bubbles present and model_eqns != 4
-        !! @param energy Energy
-        !! @param alf Void Fraction
-        !! @param dyn_p Dynamic Pressure
-        !! @param pi_inf Liquid Stiffness
-        !! @param gamma Specific Heat Ratio
-        !! @param pres Pressure to calculate
-    subroutine s_compute_pressure_from_energy(energy, alf, dyn_p, pi_inf, gamma, pres)
-!$acc routine seq
-
-        real(kind(0d0)) :: energy, alf
-
-        real(kind(0d0)), intent(IN) :: dyn_p
-        real(kind(0d0)), intent(OUT) :: pres
-
-        real(kind(0d0)) :: pi_inf, gamma
-
-        pres = (energy - dyn_p - pi_inf)/gamma
-
-    end subroutine s_compute_pressure_from_energy
-
-    !>  This procedure calculates the pressure when there
-        !!      are bubbles present and model_eqns != 4
-        !! @param energy Energy
-        !! @param alf Void Fraction
-        !! @param dyn_p Dynamic Pressure
-        !! @param pi_inf Liquid Stiffness
-        !! @param gamma Specific Heat Ratio
-        !! @param pres Pressure to calculate
-    subroutine s_compute_pressure_from_bubbles(energy, alf, dyn_p, pi_inf, gamma, pres)
-!$acc routine seq
-
-        real(kind(0d0)) :: energy, alf
-
-        real(kind(0d0)), intent(IN) :: dyn_p
-        real(kind(0d0)), intent(OUT) :: pres
-
-        real(kind(0d0)) :: pi_inf, gamma
-
-        pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf)/gamma
-
-    end subroutine s_compute_pressure_from_bubbles
-
-    !>  This procedure calculates the pressure when model_eqns = 4
-        !! @param energy Energy
-        !! @param alf Void Fraction
-        !! @param dyn_p Dynamic Pressure
-        !! @param pi_inf Liquid Stiffness
-        !! @param gamma Specific Heat Ratio
-        !! @param pres Pressure to calculate
-    subroutine s_compute_pressure_4eqns(energy, alf, dyn_p, pi_inf, gamma, pres)      
-!$acc routine seq
-
-        real(kind(0d0)) :: energy, alf
-
-        real(kind(0d0)), intent(IN) :: dyn_p
-        real(kind(0d0)), intent(OUT) :: pres
-
-        real(kind(0d0)) :: pi_inf, gamma
-
-        pres = (pref + pi_inf)* &
-            (energy/ &
-            (rhoref*(1 - alf)) &
-            )**(1/gamma + 1) - pi_inf
-
-    end subroutine s_compute_pressure_4eqns
-
-    !>  This procedure conditionally calls the appropriate pressure-computing
-        !!      subroutine.
+    !>  This procedure conditionally calculates the appropriate pressure
         !! @param energy Energy
         !! @param alf Void Fraction
         !! @param dyn_p Dynamic Pressure
@@ -224,11 +155,14 @@ contains
         ! for computing pressure is targeted by the procedure pointer
 
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then   
-            call s_compute_pressure_from_energy(energy, alf, dyn_p, pi_inf, gamma, pres)
+            pres = (energy - dyn_p - pi_inf)/gamma
         else if ((model_eqns /= 4) .and. bubbles) then
-            call s_compute_pressure_from_bubbles(energy, alf, dyn_p, pi_inf, gamma, pres)
+            pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf)/gamma
         else
-            call s_compute_pressure_4eqns(energy, alf, dyn_p, pi_inf, gamma, pres)
+            pres = (pref + pi_inf)* &
+                (energy/ &
+                (rhoref*(1 - alf)) &
+                )**(1/gamma + 1) - pi_inf
         end if
 
     end subroutine s_compute_pressure
@@ -264,9 +198,10 @@ contains
         real(kind(0d0)), pointer :: rho_K, gamma_K, pi_inf_K
 
         !> Post process requires rho_sf/gamma_sf/pi_inf_sf to be 
-            !! updated instead of rho/gamma/pi_inf. Therefore, the
+            !! updated alongside of rho/gamma/pi_inf. Therefore, the
             !! versions of these variables appended with '_K' represent
-            !! pointers that target the correct variable.
+            !! pointers that target the correct variable. At the end, 
+            !! rho/gamma/pi_inf are updated for post process.
 #ifdef MFC_POST_PROCESS
         rho_K => rho_sf(i, j, k)
         gamma_K =>  gamma_sf(i, j, k)
@@ -282,6 +217,12 @@ contains
         rho_K = q_vf(1)%sf(i, j, k)
         gamma_K = q_vf(gamma_idx)%sf(i, j, k)
         pi_inf_K = q_vf(pi_inf_idx)%sf(i, j, k)
+
+#ifdef MFC_POST_PROCESS
+        rho = rho_K
+        gamma = gamma_K
+        pi_inf = pi_inf_K
+#endif
 
     end subroutine s_convert_mixture_to_mixture_variables ! ----------------
 
@@ -319,9 +260,10 @@ contains
         real(kind(0d0)), pointer :: rho_K, gamma_K, pi_inf_K
 
         !> Post process requires rho_sf/gamma_sf/pi_inf_sf to be 
-            !! updated instead of rho/gamma/pi_inf. Therefore, the
+            !! updated alongside of rho/gamma/pi_inf. Therefore, the
             !! versions of these variables appended with '_K' represent
-            !! pointers that target the correct variable.
+            !! pointers that target the correct variable. At the end, 
+            !! rho/gamma/pi_inf are updated for post process.
 #ifdef MFC_POST_PROCESS
         rho_K => rho_sf(j, k, l)
         gamma_K =>  gamma_sf(j, k, l)
@@ -376,6 +318,12 @@ contains
             end if
         end if
 
+#ifdef MFC_POST_PROCESS
+        rho = rho_K
+        gamma = gamma_K
+        pi_inf = pi_inf_K
+#endif
+
     end subroutine s_convert_species_to_mixture_variables_bubbles ! ----------------
 
     !>  This subroutine is designed for the volume fraction model
@@ -414,9 +362,10 @@ contains
         real(kind(0d0)), pointer :: rho_K, gamma_K, pi_inf_K
 
         !> Post process requires rho_sf/gamma_sf/pi_inf_sf to be 
-            !! updated instead of rho/gamma/pi_inf. Therefore, the
+            !! updated alongside of rho/gamma/pi_inf. Therefore, the
             !! versions of these variables appended with '_K' represent
-            !! pointers that target the correct variable.
+            !! pointers that target the correct variable. At the end, 
+            !! rho/gamma/pi_inf are updated for post process.
 #ifdef MFC_POST_PROCESS
         rho_K => rho_sf(k, l, r)
         gamma_K =>  gamma_sf(k, l, r)
@@ -479,6 +428,12 @@ contains
             end do
             G_K = max(0d0, G_K)
         end if
+
+#ifdef MFC_POST_PROCESS
+        rho = rho_K
+        gamma = gamma_K
+        pi_inf = pi_inf_K
+#endif
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------
 
@@ -746,7 +701,7 @@ contains
                                                              gm_alphaK_vf, &
                                                              ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_cons_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_prim_vf
 
         type(scalar_field), &
@@ -786,6 +741,10 @@ contains
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
 
+                    do i = 1, contxe
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                    end do
+
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
@@ -814,6 +773,7 @@ contains
 #ifdef MFC_SIMULATION
                     rho_K = max(rho_K, sgm_eps)
 #endif
+
                     !$acc loop seq
                     do i = momxb, momxe
                         if (model_eqns /= 4) then
@@ -826,10 +786,10 @@ contains
                                                         /qK_cons_vf(1)%sf(j, k, l)
                         end if
                     end do
-
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, pres)
+
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
                     if (bubbles) then
@@ -867,6 +827,10 @@ contains
                             end if
                         end do
                     end if
+
+                    do i = advxb, advxe
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                    end do
                 end do
             end do
         end do
@@ -919,7 +883,7 @@ contains
                                                         rho, gamma, pi_inf)
 
                     ! Transferring the continuity equation(s) variable(s)
-                    do i = 1, cont_idx%end
+                    do i = 1, contxe
                         q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                     end do
 
@@ -928,7 +892,7 @@ contains
                     dyn_pres = 0d0
 
                     ! Computing momenta and dynamic pressure from velocity
-                    do i = mom_idx%beg, mom_idx%end
+                    do i = momxb, momxe
                         q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         dyn_pres = dyn_pres + q_cons_vf(i)%sf(j, k, l)* &
                                    q_prim_vf(i)%sf(j, k, l)/2d0
