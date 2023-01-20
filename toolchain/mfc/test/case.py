@@ -36,7 +36,7 @@ BASE_CFG = {
     'avg_state'                    : 2,
     'format'                       : 1,
     'precision'                    : 2,
-    'prim_vars_wrt'                :'T',
+    'prim_vars_wrt'                :'F',
     'parallel_io'                  :'F',
 
     'patch_icpp(1)%pres'           : 1.0,
