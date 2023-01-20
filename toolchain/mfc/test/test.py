@@ -80,7 +80,8 @@ def test():
 
         return
 
-    build_targets(["pre_process", "simulation"])
+    if not ARG("case_optimization"):
+        build_targets(["pre_process", "simulation"])
 
     range_str = f"from [bold magenta]{ARG('from')}[/bold magenta] to [bold magenta]{ARG('to')}[/bold magenta]"
 

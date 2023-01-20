@@ -1,7 +1,3 @@
-
-
-#:include 'case.fpp'
-
 !> @brief This module contains subroutines that read, and check consistency
 !!              of, the user provided inputs and data.
 module m_check_patches
