@@ -137,7 +137,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
@@ -151,7 +151,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     if (monopole) then
         call s_initialize_monopole_module()
@@ -163,7 +163,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     if (hypoelasticity) call s_initialize_hypoelastic_module()
     call s_initialize_data_output_module()
@@ -172,7 +172,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -198,7 +198,7 @@ program p_main
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     print *, "[MEM-INST] After: s_initialize_weno_module"
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     call s_initialize_cbc_module()
 
