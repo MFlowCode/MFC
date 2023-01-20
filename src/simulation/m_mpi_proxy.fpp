@@ -207,7 +207,8 @@ contains
             & 'mapped_weno', 'mp_weno', 'cu_mpi', 'weno_flat', 'riemann_flat', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
-            & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt' ]
+            & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
+            & 'prim_vars_wrt']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
