@@ -2,8 +2,6 @@
 !! @file m_start_up.f90
 !! @brief Contains module m_start_up
 
-#:include 'case.fpp'
-
 !> @brief This module contains subroutines that read, and check consistency
 !!              of, the user provided inputs and data.
 module m_start_up
