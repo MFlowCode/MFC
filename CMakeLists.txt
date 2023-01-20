@@ -159,23 +159,27 @@ macro(HANDLE_SOURCES target)
     file(GLOB    common_F90s CONFIGURE_DEPENDS    "${common_DIR}/*.f90")
     set(${target}_SRCs ${${target}_F90s} ${common_F90s})
 
-    # src/[<DIR>,common]/FPP.fpp -> src/<DIR>/autogen/F90.f90
+    # src/[<DIR>,common]/*.fpp -> src/<DIR>/autogen/*.f90
     file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp")
     file(GLOB    common_FPPs CONFIGURE_DEPENDS    "${common_DIR}/*.fpp")
+
+    # Locate src/[<DIR>,common]/include/*.fpp
+    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
+    file(GLOB    common_incs CONFIGURE_DEPENDS    "${common_DIR}/include/*.fpp")
 
     file(MAKE_DIRECTORY "${${target}_DIR}/autogen")
     foreach(fpp ${${target}_FPPs} ${common_FPPs})
         cmake_path(GET fpp FILENAME fpp_filename)
         set(f90 "${${target}_DIR}/autogen/${fpp_filename}.f90")
-        set(dep "${fpp}")
-        if (EXISTS "${${target}_DIR}/case.fpp")
-            list(APPEND dep "${${target}_DIR}/case.fpp")
-        endif()
 
         add_custom_command(
             OUTPUT   ${f90}
-            COMMAND  ${FYPP_EXE} -I ${common_DIR} ${fpp} ${f90}
-            DEPENDS  ${dep}
+            COMMAND  ${FYPP_EXE} -I "${common_DIR}"
+                                 -I "${common_DIR}/include"
+                                 -I "${${target}_DIR}/include"
+                                 --line-numbering
+                                 "${fpp}" "${f90}"
+            DEPENDS  "${fpp};${${target}_incs};${common_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
             VERBATIM
         )
