@@ -1015,7 +1015,7 @@ contains
 !$acc end host_data
 !$acc wait
                     else
-#endif // #if defined(_OPENACC) && defined(__PGI)
+#endif
                         !call cpu_time(s_time)
 !$acc update host(q_cons_buff_send)
                         !call cpu_time(e_time)
