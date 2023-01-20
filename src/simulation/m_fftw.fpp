@@ -70,7 +70,7 @@ contains
         print *, "The FFTW module is not supported when using OpenACC with a compiler other than NVHPC/PGI."
         stop 1
 
-#endif // defined(_OPENACC) && !defined(__PGI)
+#endif
 
         ! Size of input array going into DFT
         real_size = p + 1
