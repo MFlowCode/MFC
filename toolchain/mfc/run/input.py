@@ -58,7 +58,7 @@ class MFCInputFile:
             content = content + f"""
 #:set weno_order = {int(self.case_dict["weno_order"])}
 #:set weno_polyn = {int((self.case_dict["weno_order"] - 1) / 2)}
-#:set nb         = {int(self.case_dict.get("nb", -100))}
+#:set nb         = {int(self.case_dict.get("nb", 1))}
 #:set num_dims   = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
 #:set nterms     = {nterms}
 """
