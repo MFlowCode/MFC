@@ -46,3 +46,4 @@ if (avg_state == 2) then
 end if
 
 #:enddef compute_average_state
+
