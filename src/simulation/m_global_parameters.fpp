@@ -104,6 +104,7 @@ module m_global_parameters
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
     integer :: weno_vars      !< WENO-reconstructed state variables type
+    logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
@@ -537,7 +538,7 @@ contains
                 if (bubbles) then
                     alf_idx = adv_idx%end
                 else
-                    alf_idx = 0
+                    alf_idx = 1
                 end if
 
                 if (bubbles) then
@@ -639,6 +640,7 @@ contains
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
+                alf_idx = adv_idx%end
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
@@ -651,7 +653,7 @@ contains
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = adv_idx%beg !one volume advection equation
                 alf_idx = adv_idx%end
-                sys_size = alf_idx !adv_idx%end
+                sys_size = adv_idx%end
 
                 if (bubbles) then
                     bub_idx%beg = sys_size + 1
