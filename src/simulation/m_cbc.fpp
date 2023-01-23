@@ -17,6 +17,9 @@
 !!                           7) Supersonic Inflow
 !!                           8) Supersonic Outflow
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
+
+#:include 'inline_conversions.fpp'
+
 module m_cbc
 
     ! Dependencies =============================================================
@@ -64,7 +67,7 @@ module m_cbc
     real(kind(0d0)) :: H           !< Cell averaged enthalpy
     real(kind(0d0)), allocatable, dimension(:) :: adv         !< Cell averaged advected variables
     real(kind(0d0)), allocatable, dimension(:) :: mf          !< Cell averaged mass fraction
-    real(kind(0d0)) :: gamma       !< Cell averaged specific heat ratio
+    real(kind(0d0)) :: gamma        !< Cell averaged specific heat ratio
     real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
     real(kind(0d0)) :: c           !< Cell averaged speed of sound
     real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
@@ -655,7 +658,7 @@ contains
 
         real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
 
-        integer :: i, j, k, r !< Generic loop iterators
+        integer :: i, j, k, r, q !< Generic loop iterators
 
         real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
 
@@ -798,41 +801,18 @@ contains
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
-                    E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
-
-                    H = (E + pres)/rho
-
                     !$acc loop seq
                     do i = 1, contxe
                         mf(i) = alpha_rho(i)/rho
                     end do
 
+                    E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
+
+                    H = (E + pres)/rho
+
                     ! Compute mixture sound speed
-                    if (alt_soundspeed) then
-                        blkmod1 = ((gammas(1) + 1d0)*pres + &
-                                   pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1d0)*pres + &
-                                   pi_infs(2))/gammas(2)
-                        c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-                    elseif (model_eqns == 3) then
-                        c = 0d0
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            c = c + q_prim_rs${XYZ}$_vf(0, k, r, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
-                                (pres + pi_infs(i)/(gammas(i) + 1d0))
-                        end do
-                        c = c/rho
-                    else
-                        c = ((H - 5d-1*vel_K_sum)/gamma)
-                    end if
-
-                    c = sqrt(c)
-
-                    !                  IF (mixture_err .AND. c < 0d0) THEN
-                    !                    c = sgm_eps
-                    !                  ELSE
-                    !                    c = SQRT(c)
-                    !                  END IF
+                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, &
+                                    q_prim_rs${XYZ}$_vf, 0, k, r, 2, c)
 
                     ! ============================================================
 

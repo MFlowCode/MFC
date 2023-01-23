@@ -82,7 +82,7 @@ contains
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
-            fluid_pp, probe_wrt, &
+            fluid_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
