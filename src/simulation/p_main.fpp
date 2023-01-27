@@ -337,7 +337,7 @@ program p_main
                     end do
                 end do
             end do
-            call s_write_data_files(q_cons_ts(1)%vf, t_step)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
             nt = int((t_step - t_step_start)/(t_step_save))
