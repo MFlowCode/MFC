@@ -45,13 +45,17 @@ module m_data_output
         !> Write data files
         !! @param q_cons_vf Conservative variables
         !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, t_step)
+        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
             import :: scalar_field, sys_size
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(IN) :: q_cons_vf
+
+            type(scalar_field), &
+                dimension(sys_size), &
+                intent(INOUT) :: q_prim_vf
 
             integer, intent(IN) :: t_step
 
@@ -439,11 +443,10 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, t_step) ! ---------------------
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         integer, intent(IN) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -540,10 +543,10 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            do i = 1, sys_size
-                allocate(q_prim_vf(i)%sf(ixb:ixe, iyb:iye, izb:ize))
-            end do
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+            do i = 1, sys_size
+                !$acc update host(q_prim_vf(i)%sf(:,:,:))
+            end do
         end if
 
         !1D
@@ -679,11 +682,15 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, t_step) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step) ! --
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(INOUT) :: q_prim_vf
 
         integer, intent(IN) :: t_step
 
