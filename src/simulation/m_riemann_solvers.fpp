@@ -18,7 +18,6 @@
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
 #:include 'inline_riemann.fpp'
-#:include 'inline_conversions.fpp'
 
 module m_riemann_solvers
 
@@ -310,8 +309,6 @@ module m_riemann_solvers
     !> @}
     real(kind(0d0)) :: xi_L, xi_R
 
-    real(kind(0d0)) :: start, finish
-
 !$acc declare create(s_L, s_R, s_S, rho_Star, E_Star, p_Star, p_K_Star, s_M, s_P, xi_M, xi_P, xi_L, xi_R)
 
     procedure(s_abstract_riemann_solver), &
@@ -589,20 +586,82 @@ contains
                             
                             @:compute_average_state()
 
-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                            if (mixture_err) then
+                                if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
+                                    c_avg = sgm_eps
+                                else
+                                    c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                end if
+                            else
+                                c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                            end if
 
-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                            if (alt_soundspeed) then
+                                blkmod1 = ((gammas(1) + 1d0)*pres_L + &
+                                           pi_infs(1))/gammas(1)
 
-                            @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
+                                blkmod2 = ((gammas(2) + 1d0)*pres_L + &
+                                           pi_infs(2))/gammas(2)
 
-                            !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                c_L = 1d0/(rho_L*(alpha_L(1)/blkmod1 + alpha_L(2)/blkmod2))
 
-                            @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                blkmod1 = ((gammas(1) + 1d0)*pres_R + &
+                                           pi_infs(1))/gammas(1)
+
+                                blkmod2 = ((gammas(2) + 1d0)*pres_R + &
+                                           pi_infs(2))/gammas(2)
+
+                                c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
+                            elseif (model_eqns == 3) then
+                                c_L = 0d0
+                                c_R = 0d0
+
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    c_L = c_L + qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                          (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+
+                                    c_R = c_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                          (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                end do
+
+                                c_L = c_L/rho_L
+                                c_R = c_R/rho_R
+                            elseif ((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles)) then
+                                ! Sound speed for bubble mmixture to order O(\alpha)
+
+                                if (mpp_lim .and. (num_fluids > 1)) then
+                                    c_L = (1d0/gamma_L + 1d0)* &
+                                          (pres_L + pi_inf_L)/rho_L
+                                    c_R = (1d0/gamma_R + 1d0)* &
+                                          (pres_R + pi_inf_R)/rho_R
+                                else
+                                    c_L = &
+                                        (1d0/gamma_L + 1d0)* &
+                                        (pres_L + pi_inf_L)/ &
+                                        (rho_L*(1d0 - alpha_L(num_fluids)))
+                                    c_R = &
+                                        (1d0/gamma_R + 1d0)* &
+                                        (pres_R + pi_inf_R)/ &
+                                        (rho_R*(1d0 - alpha_R(num_fluids)))
+                                end if
+                            else
+                                c_L = ((H_L - 5d-1*vel_L_rms)/gamma_L)
+
+                                c_R = ((H_R - 5d-1*vel_R_rms)/gamma_R)
+                            end if
+
+                            if (mixture_err .and. c_L < 0d0) then
+                                c_L = 100.d0*sgm_eps
+                            else
+                                c_L = sqrt(c_L)
+                            end if
+
+                            if (mixture_err .and. c_R < 0d0) then
+                                c_R = 100.d0*sgm_eps
+                            else
+                                c_R = sqrt(c_R)
+                            end if
 
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
@@ -989,7 +1048,6 @@ contains
             flux_vf, flux_src_vf, &
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
-
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
@@ -1106,17 +1164,58 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                                if (mixture_err) then
+                                    if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
+                                        c_avg = sgm_eps
+                                    else
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
+                                        c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                    end if
+                                else
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                    c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                end if
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                if (alt_soundspeed) then
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_L + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_L + &
+                                               pi_infs(2))/gammas(2)
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 &
+                                                      + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_R + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_R + &
+                                               pi_infs(2))/gammas(2)
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + 1)/blkmod1 &
+                                                      + qR_prim_rs${XYZ}$_vf(j + 1, k, l, e_idx + 2)/blkmod2))
+
+                                else
+                                    c_L = 0d0
+                                    c_R = 0d0
+                                    !$acc loop seq
+                                    do i = 1, num_fluids
+                                        c_L = c_L + qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                              (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                        c_R = c_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*(1d0/gammas(i) + 1d0)* &
+                                              (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx) + pi_infs(i)/(gammas(i) + 1d0))
+                                    end do
+                                    c_L = c_L/rho_L
+                                    c_R = c_R/rho_R
+                                end if
+
+                                if (mixture_err .and. c_L < 0d0) then
+                                    c_L = 100.d0*sgm_eps
+                                else
+                                    c_L = sqrt(c_L)
+                                end if
+                                if (mixture_err .and. c_R < 0d0) then
+                                    c_R = 100.d0*sgm_eps
+                                else
+                                    c_R = sqrt(c_R)
+                                end if
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1373,17 +1472,62 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
+                                if (mixture_err) then
+                                    if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
+                                        c_avg = sgm_eps
+                                    else
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
+                                        c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                    end if
+                                else
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                    c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                end if
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                if (alt_soundspeed) then
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_L + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_L + &
+                                               pi_infs(2))/gammas(2)
+                                    c_L = 1d0/(rho_L*(alpha_L(1)/blkmod1 + alpha_L(2)/blkmod2))
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_R + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_R + &
+                                               pi_infs(2))/gammas(2)
+                                    c_R = 1d0/(rho_R*(alpha_R(1)/blkmod1 + alpha_R(2)/blkmod2))
+
+                                else
+                                    ! Sound speed for bubble mmixture to order O(\alpha)
+
+                                    if (mpp_lim .and. (num_fluids > 1)) then
+                                        c_L = (1d0/gamma_L + 1d0)* &
+                                              (pres_L + pi_inf_L)/rho_L
+                                        c_R = (1d0/gamma_R + 1d0)* &
+                                              (pres_R + pi_inf_R)/rho_R
+                                    else
+                                        c_L = &
+                                            (1d0/gamma_L + 1d0)* &
+                                            (pres_L + pi_inf_L)/ &
+                                            (rho_L*(1d0 - alpha_L(num_fluids)))
+                                        c_R = &
+                                            (1d0/gamma_R + 1d0)* &
+                                            (pres_R + pi_inf_R)/ &
+                                            (rho_R*(1d0 - alpha_R(num_fluids)))
+                                    end if
+                                end if
+
+                                if (mixture_err .and. c_L < 0d0) then
+                                    c_L = 100.d0*sgm_eps
+                                else
+                                    c_L = sqrt(c_L)
+                                end if
+                                if (mixture_err .and. c_R < 0d0) then
+                                    c_R = 100.d0*sgm_eps
+                                else
+                                    c_R = sqrt(c_R)
+                                end if
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1557,16 +1701,10 @@ contains
                 
                 elseif (model_eqns == 2 .and. bubbles) then
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, & 
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms)
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
-                                end do
 
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
 
@@ -1743,17 +1881,62 @@ contains
 
                                 end if
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
+                                if (mixture_err) then
+                                    if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
+                                        c_avg = sgm_eps
+                                    else
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
+                                        c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                    end if
+                                else
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                    c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                end if
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                if (alt_soundspeed) then
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_L + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_L + &
+                                               pi_infs(2))/gammas(2)
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_R + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_R + &
+                                               pi_infs(2))/gammas(2)
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + 1)/blkmod1 + qR_prim_rs${XYZ}$_vf(j + 1, k, l,  E_idx + 2)/blkmod2))
+
+                                else
+                                    ! Sound speed for bubble mmixture to order O(\alpha)
+
+                                    if (mpp_lim .and. (num_fluids > 1)) then
+                                        c_L = (1d0/gamma_L + 1d0)* &
+                                              (pres_L + pi_inf_L)/rho_L
+                                        c_R = (1d0/gamma_R + 1d0)* &
+                                              (pres_R + pi_inf_R)/rho_R
+                                    else
+                                        c_L = &
+                                            (1d0/gamma_L + 1d0)* &
+                                            (pres_L + pi_inf_L)/ &
+                                            (rho_L*(1d0 - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)))
+                                        c_R = &
+                                            (1d0/gamma_R + 1d0)* &
+                                            (pres_R + pi_inf_R)/ &
+                                            (rho_R*(1d0 - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)))
+                                    end if
+                                end if
+
+                                if (mixture_err .and. c_L < 0d0) then
+                                    c_L = 100.d0*sgm_eps
+                                else
+                                    c_L = sqrt(c_L)
+                                end if
+                                if (mixture_err .and. c_R < 0d0) then
+                                    c_R = 100.d0*sgm_eps
+                                else
+                                    c_R = sqrt(c_R)
+                                end if
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1944,17 +2127,11 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms)
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
-
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
-                                end do
 
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
                                 !$acc loop seq
@@ -2058,17 +2235,50 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 0, c_L)
+                                if (mixture_err) then
+                                    if ((H_avg - 5d-1*vel_avg_rms) < 0d0) then
+                                        c_avg = sgm_eps
+                                    else
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 0, c_R)
+                                        c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                    end if
+                                else
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                    c_avg = sqrt((H_avg - 5d-1*vel_avg_rms)/gamma_avg)
+                                end if
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                if (alt_soundspeed) then
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_L + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_L + &
+                                               pi_infs(2))/gammas(2)
+                                    c_L = 1d0/(rho_L*(qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 1)/blkmod1 &
+                                                      + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + 2)/blkmod2))
+
+                                    blkmod1 = ((gammas(1) + 1d0)*pres_R + &
+                                               pi_infs(1))/gammas(1)
+                                    blkmod2 = ((gammas(2) + 1d0)*pres_R + &
+                                               pi_infs(2))/gammas(2)
+                                    c_R = 1d0/(rho_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + 1)/blkmod1 &
+                                                      + qR_prim_rs${XYZ}$_vf(j + 1, k, l, e_idx + 2)/blkmod2))
+
+                                else
+                                    c_L = ((H_L - 5d-1*vel_L_rms)/gamma_L)
+
+                                    c_R = ((H_R - 5d-1*vel_R_rms)/gamma_R)
+                                end if
+
+                                if (mixture_err .and. c_L < 0d0) then
+                                    c_L = 100.d0*sgm_eps
+                                else
+                                    c_L = sqrt(c_L)
+                                end if
+                                if (mixture_err .and. c_R < 0d0) then
+                                    c_R = 100.d0*sgm_eps
+                                else
+                                    c_R = sqrt(c_R)
+                                end if
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq

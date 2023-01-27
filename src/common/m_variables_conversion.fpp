@@ -70,7 +70,36 @@ module m_variables_conversion
 
         end subroutine s_convert_xxxxx_to_mixture_variables
 
+        !> The abstract interface to the procedures that are used to compute the
+        !! Roe and the arithmetic average states. For additional information see:
+        !!                 1) s_compute_roe_average_state
+        !!                 2) s_compute_arithmetic_average_state
+        !! @param i Cell location first index
+        !! @param j Cell location second index
+        !! @param k Cell location third index
+        subroutine s_compute_abstract_average_state(i, j, k)
+
+            integer, intent(IN) :: i, j, k
+
+        end subroutine s_compute_abstract_average_state
+
     end interface ! ============================================================
+
+    !> @name  Left/right states
+    !> @{
+
+    !> @name Averaged states
+    !> @{
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_avg_sf !< averaged (Roe/arithmetic) density
+    real(kind(0d0)), allocatable, dimension(:) :: vel_avg    !< averaged (Roe/arithmetic) velocity
+    real(kind(0d0)) :: H_avg      !< averaged (Roe/arithmetic) enthalpy
+    type(scalar_field), allocatable, dimension(:) :: mf_avg_vf  !< averaged (Roe/arithmetic) mass fraction
+    real(kind(0d0)) :: gamma_avg  !< averaged (Roe/arithmetic) specific heat ratio
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: c_avg_sf   !< averaged (Roe/arithmetic) speed of sound
+
+    real(kind(0d0)) :: alpha_avg !< averaging for bubbly mixture speed of sound
+    real(kind(0d0)) :: pres_avg  !< averaging for bubble mixture speed of sound
+    !> @}
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
     !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
@@ -89,14 +118,19 @@ module m_variables_conversion
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function   
+    real(kind(0d0)), allocatable, dimension(:, :, :), target, public :: rho_sf !< Scalar density function
+    real(kind(0d0)), allocatable, dimension(:, :, :), target, public :: gamma_sf !< Scalar sp. heat ratio function
+    real(kind(0d0)), allocatable, dimension(:, :, :), target, public :: pi_inf_sf !< Scalar liquid stiffness function   
 
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
     !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
     !! or s_convert_species_to_mixture_variables, based on model equations choice 
+
+    procedure(s_compute_abstract_average_state), &
+        pointer :: s_compute_average_state => null() !<
+    !! Pointer to the subroutine utilized to calculate either the Roe or the
+    !! arithmetic average state variables, based on the chosen average state
 
 contains
 
@@ -110,12 +144,12 @@ contains
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, pres)      
 !$acc routine seq
 
-        real(kind(0d0)), intent(IN) :: energy, alf
+        real(kind(0d0)) :: energy, alf
 
         real(kind(0d0)), intent(IN) :: dyn_p
         real(kind(0d0)), intent(OUT) :: pres
 
-        real(kind(0d0)), intent(IN) :: pi_inf, gamma
+        real(kind(0d0)) :: pi_inf, gamma
 
         ! Depending on model_eqns and bubbles, the appropriate procedure
         ! for computing pressure is targeted by the procedure pointer
@@ -161,18 +195,33 @@ contains
         real(kind(0d0)), optional, intent(OUT) :: G_K
         real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
+        real(kind(0d0)), pointer :: rho_K, gamma_K, pi_inf_K
+
+        !> Post process requires rho_sf/gamma_sf/pi_inf_sf to be 
+            !! updated alongside of rho/gamma/pi_inf. Therefore, the
+            !! versions of these variables appended with '_K' represent
+            !! pointers that target the correct variable. At the end, 
+            !! rho/gamma/pi_inf are updated for post process.
+#ifdef MFC_POST_PROCESS
+        rho_K => rho_sf(i, j, k)
+        gamma_K =>  gamma_sf(i, j, k)
+        pi_inf_K => pi_inf_sf(i, j, k)
+#else
+        rho_K  => rho
+        gamma_K => gamma
+        pi_inf_K => pi_inf
+#endif
+
         ! Transfering the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
-        rho = q_vf(1)%sf(i, j, k)
-        gamma = q_vf(gamma_idx)%sf(i, j, k)
-        pi_inf = q_vf(pi_inf_idx)%sf(i, j, k)
+        rho_K = q_vf(1)%sf(i, j, k)
+        gamma_K = q_vf(gamma_idx)%sf(i, j, k)
+        pi_inf_K = q_vf(pi_inf_idx)%sf(i, j, k)
 
-
-        ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
-        pi_inf_sf(i, j, k) = pi_inf
+        rho = rho_K
+        gamma = gamma_K
+        pi_inf = pi_inf_K
 #endif
 
     end subroutine s_convert_mixture_to_mixture_variables ! ----------------
@@ -208,6 +257,23 @@ contains
 
         integer :: i
 
+        real(kind(0d0)), pointer :: rho_K, gamma_K, pi_inf_K
+
+        !> Post process requires rho_sf/gamma_sf/pi_inf_sf to be 
+            !! updated alongside of rho/gamma/pi_inf. Therefore, the
+            !! versions of these variables appended with '_K' represent
+            !! pointers that target the correct variable. At the end, 
+            !! rho/gamma/pi_inf are updated for post process.
+#ifdef MFC_POST_PROCESS
+        rho_K => rho_sf(j, k, l)
+        gamma_K =>  gamma_sf(j, k, l)
+        pi_inf_K => pi_inf_sf(j, k, l)
+#else
+        rho_K  => rho
+        gamma_K => gamma
+        pi_inf_K => pi_inf
+#endif
+
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
         ! are derived from them result within the limits that are set by the
@@ -219,44 +285,43 @@ contains
         ! function as well as the liquid stiffness function, respectively
 
         if (model_eqns == 4) then
-            rho = q_vf(1)%sf(j, k, l)
-            gamma = fluid_pp(1)%gamma    !qK_vf(gamma_idx)%sf(i,j,k)
-            pi_inf = fluid_pp(1)%pi_inf   !qK_vf(pi_inf_idx)%sf(i,j,k)
+            rho_K = q_vf(1)%sf(j, k, l)
+            gamma_K = fluid_pp(1)%gamma    !qK_vf(gamma_idx)%sf(i,j,k)
+            pi_inf_K = fluid_pp(1)%pi_inf   !qK_vf(pi_inf_idx)%sf(i,j,k)
         else if ((model_eqns == 2) .and. bubbles) then
-            rho = 0d0; gamma = 0d0; pi_inf = 0d0
+            rho_K = 0d0; gamma_K = 0d0; pi_inf_K = 0d0
 
             if (mpp_lim .and. (num_fluids > 2)) then
                 do i = 1, num_fluids
-                    rho = rho + q_vf(i)%sf(j, k, l)
-                    gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
-                    pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
+                    rho_K = rho_K + q_vf(i)%sf(j, k, l)
+                    gamma_K = gamma_K + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
+                    pi_inf_K = pi_inf_K + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
                 end do
             else if (num_fluids == 2) then
-                rho = q_vf(1)%sf(j, k, l)
-                gamma = fluid_pp(1)%gamma
-                pi_inf = fluid_pp(1)%pi_inf
+                rho_K = q_vf(1)%sf(j, k, l)
+                gamma_K = fluid_pp(1)%gamma
+                pi_inf_K = fluid_pp(1)%pi_inf
             else if (num_fluids > 2) then
                 !TODO: This may need fixing for hypo + bubbles
                 do i = 1, num_fluids - 1 !leave out bubble part of mixture
-                    rho = rho + q_vf(i)%sf(j, k, l)
-                    gamma = gamma + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
-                    pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
+                    rho_K = rho_K + q_vf(i)%sf(j, k, l)
+                    gamma_K = gamma_K + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%gamma
+                    pi_inf_K = pi_inf_K + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
                 end do
-                !rho    = qK_vf(1)%sf(j,k,l)
+                !rho_K    = qK_vf(1)%sf(j,k,l)
                 !gamma_K  = fluid_pp(1)%gamma
                 !pi_inf_K = fluid_pp(1)%pi_inf
             else
-                rho = q_vf(1)%sf(j, k, l)
-                gamma = fluid_pp(1)%gamma
-                pi_inf = fluid_pp(1)%pi_inf
+                rho_K = q_vf(1)%sf(j, k, l)
+                gamma_K = fluid_pp(1)%gamma
+                pi_inf_K = fluid_pp(1)%pi_inf
             end if
         end if
 
-        ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
-        pi_inf_sf(i, j, k) = pi_inf
+        rho = rho_K
+        gamma = gamma_K
+        pi_inf = pi_inf_K
 #endif
 
     end subroutine s_convert_species_to_mixture_variables_bubbles ! ----------------
@@ -294,6 +359,23 @@ contains
 
         integer :: i, j !< Generic loop iterator
 
+        real(kind(0d0)), pointer :: rho_K, gamma_K, pi_inf_K
+
+        !> Post process requires rho_sf/gamma_sf/pi_inf_sf to be 
+            !! updated alongside of rho/gamma/pi_inf. Therefore, the
+            !! versions of these variables appended with '_K' represent
+            !! pointers that target the correct variable. At the end, 
+            !! rho/gamma/pi_inf are updated for post process.
+#ifdef MFC_POST_PROCESS
+        rho_K => rho_sf(k, l, r)
+        gamma_K =>  gamma_sf(k, l, r)
+        pi_inf_K => pi_inf_sf(k, l, r)
+#else
+        rho_K  => rho
+        gamma_K => gamma
+        pi_inf_K => pi_inf
+#endif
+
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
 
@@ -315,12 +397,12 @@ contains
 
         ! Calculating the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively, from the species analogs
-        rho = 0d0; gamma = 0d0; pi_inf = 0d0
+        rho_K = 0d0; gamma_K = 0d0; pi_inf_K = 0d0
 
         do i = 1, num_fluids
-            rho = rho + alpha_rho_K(i)
-            gamma = gamma + alpha_K(i)*gammas(i)
-            pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
+            rho_K = rho_K + alpha_rho_K(i)
+            gamma_K = gamma_K + alpha_K(i)*gammas(i)
+            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
         end do
 
 #ifdef MFC_SIMULATION
@@ -347,11 +429,10 @@ contains
             G_K = max(0d0, G_K)
         end if
 
-        ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
-        pi_inf_sf(i, j, k) = pi_inf
+        rho = rho_K
+        gamma = gamma_K
+        pi_inf = pi_inf_K
 #endif
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------

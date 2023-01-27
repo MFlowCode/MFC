@@ -79,7 +79,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -fcheck=all     -fbacktrace
-            -fimplicit-none
+            -fimplicit-none -ffpe-trap=invalid,zero,overflow,underflow
         )
     endif()
 

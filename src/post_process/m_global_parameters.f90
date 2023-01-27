@@ -389,7 +389,7 @@ contains
             if (bubbles) then
                 alf_idx = adv_idx%end
             else
-                alf_idx = 1
+                alf_idx = 0
             end if
 
             if (bubbles) then

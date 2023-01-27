@@ -3,7 +3,6 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -442,8 +441,6 @@ contains
     subroutine s_write_serial_data_files(q_cons_vf, t_step) ! ---------------------
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-
         integer, intent(IN) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -539,13 +536,6 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
-        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            do i = 1, sys_size
-                allocate(q_prim_vf(i)%sf(ixb:ixe, iyb:iye, izb:ize))
-            end do
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
-        end if
-
         !1D
         if (n == 0 .and. p == 0) then
 
@@ -555,13 +545,87 @@ contains
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
+                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, Re, &
+                                                            G, fluid_pp(:)%G)
+                        lit_gamma = 1d0/gamma + 1d0
+
                         if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                             .or. &
                             ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
                             ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else
-                            write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
+                        else if (i == mom_idx%beg) then !u
+                            write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
+                        else if (i == stress_idx%beg) then !tau_e
+                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
+                        else if (i == E_idx) then !p
+                            if (model_eqns == 4) then
+                                !Tait pressure from density
+                                write (2, FMT) x_cb(j), &
+                                    (pref + pi_inf)*( &
+                                    (q_cons_vf(1)%sf(j, 0, 0)/ &
+                                     (rhoref*(1.d0 - q_cons_vf(4)%sf(j, 0, 0))) &
+                                     )**lit_gamma) &
+                                    - pi_inf
+                            else if (hypoelasticity) then
+                                ! elastic contribution to energy
+                                E_e = 0d0
+                                do k = stress_idx%beg, stress_idx%end
+                                    if (G > 1000) then
+                                        E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho)**2d0) &
+                                              /(4d0*G)
+                                        ! Additional terms in 2D and 3D
+                                        if ((k == stress_idx%beg + 1) .or. &
+                                            (k == stress_idx%beg + 3) .or. &
+                                            (k == stress_idx%beg + 4)) then
+                                            E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho)**2d0) &
+                                                  /(4d0*G)
+                                        end if
+                                    end if
+                                end do
+
+                                write (2, FMT) x_cb(j), &
+                                    ( &
+                                    q_cons_vf(E_idx)%sf(j, 0, 0) - &
+                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho - &
+                                    pi_inf - E_e &
+                                    )/gamma
+                            else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
+                                !Stiffened gas pressure from energy
+                                write (2, FMT) x_cb(j), &
+                                    ( &
+                                    q_cons_vf(E_idx)%sf(j, 0, 0) - &
+                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho - &
+                                    pi_inf &
+                                    )/gamma
+                            else
+                                !Stiffened gas pressure from energy with bubbles
+                                write (2, FMT) x_cb(j), &
+                                    ( &
+                                    (q_cons_vf(E_idx)%sf(j, 0, 0) - &
+                                     0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho)/ &
+                                    (1.d0 - q_cons_vf(alf_idx)%sf(j, 0, 0)) - &
+                                    pi_inf &
+                                    )/gamma
+                            end if
+                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
+                            do k = 1, nb
+                                nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
+                            end do
+
+                            !call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+
+                            vftmp = q_cons_vf(alf_idx)%sf(j, 0, 0)
+
+                            nR3 = 0d0
+
+                            do k = 1, nb
+                                nR3 = nR3 + weight(k)*(nRtmp(k)**3d0)
+                            end do
+
+                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if
                     end do
                     close (2)
@@ -598,29 +662,6 @@ contains
                 end do
                 close (2)
             end do
-
-            if (prim_vars_wrt) then
-                do i = 1, sys_size
-                    write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
-
-                    open (2, FILE=trim(file_path))
-
-                    do j = 0, m
-                        do k = 0, n
-                            if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                                .or. &
-                                ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                ) then
-                                write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
-                            else
-                                write (2, FMT) x_cb(j), y_cb(k), q_prim_vf(i)%sf(j, k, 0)
-                            end if
-                        end do
-                        write (2, *)
-                    end do
-                    close (2)
-                end do
-            end if
         end if
 
         if (precision == 1) then
@@ -645,32 +686,6 @@ contains
                 end do
                 close (2)
             end do
-
-            if (prim_vars_wrt) then
-                do i = 1, sys_size
-                    write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
-
-                    open (2, FILE=trim(file_path))
-
-                    do j = 0, m
-                        do k = 0, n
-                            do l = 0, p
-                                if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                                    .or. &
-                                    ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                    ) then
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
-                                else
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)  
-                                end if
-                            end do
-                            write (2, *)
-                        end do
-                        write (2, *)
-                    end do
-                    close (2)
-                end do
-            end if
         end if
 
     end subroutine s_write_serial_data_files ! ------------------------------------
@@ -800,9 +815,8 @@ contains
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
-        real(kind(0d0)), dimension(1:1, 1:1, 1:1, 1:1) :: q_prim_redundant
 
-        integer :: i, j, k, l, s, q !< Generic loop iterator
+        integer :: i, j, k, l, s !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
@@ -874,14 +888,15 @@ contains
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), &
-                        q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k, l), &
-                        pi_inf, gamma, pres)
-
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
 
+                        !Tait pressure from density
+                        pres = (pref + pi_inf)*( &
+                               (q_cons_vf(1)%sf(j - 2, k, l)/ &
+                                (rhoref*(1.d0 - q_cons_vf(4)%sf(j - 2, k, l))) &
+                                )**lit_gamma) &
+                               - pi_inf
                     else if (hypoelasticity) then
                         ! calculate elastic contribution to Energy
                         E_e = 0d0
@@ -904,6 +919,22 @@ contains
                                q_cons_vf(E_idx)%sf(j - 2, k, l) - &
                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k, l)**2.d0)/rho - &
                                pi_inf - E_e &
+                               )/gamma
+
+                    else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
+                        !Stiffened gas pressure from energy
+                        pres = ( &
+                               q_cons_vf(E_idx)%sf(j - 2, k, l) - &
+                               0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k, l) - &
+                               pi_inf &
+                               )/gamma
+                    else
+                        !Stiffened gas pressure from energy with bubbles
+                        pres = ( &
+                               (q_cons_vf(E_idx)%sf(j - 2, k, l) - &
+                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k, l)**2.d0)/rho)/ &
+                               (1.d0 - q_cons_vf(alf_idx)%sf(j - 2, k, l)) - &
+                               pi_inf &
                                )/gamma
                     end if
 
@@ -953,10 +984,25 @@ contains
                         ptot = pres - ptilde
                     end if
 
-                    ! Compute mixture sound Speed
-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
-                    j - 2, k, l, 0, c)
+                    ! Compute mixture sound speed
+                    if (alt_soundspeed) then
+                        do s = 1, num_fluids
+                            alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k, l)
+                        end do
+                        blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
+                                   fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
+                        blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
+                                   fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+                        c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
+                    else
+                        c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
+                    end if
+
+                    if (mixture_err .and. c < 0d0) then
+                        c = sgm_eps
+                    else
+                        c = sqrt(c)
+                    end if
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -985,13 +1031,15 @@ contains
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                            q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                            pi_inf, gamma, pres)
-
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+
+                            !Tait pressure from density
+                            pres = (pref + pi_inf)*( &
+                                   (q_cons_vf(1)%sf(j - 2, k - 2, l)/ &
+                                    (rhoref*(1.d0 - q_cons_vf(4)%sf(j - 2, k - 2, l))) &
+                                    )**lit_gamma) &
+                                   - pi_inf
                         else if (hypoelasticity) then
                             ! calculate elastic contribution to Energy
                             E_e = 0d0
@@ -1018,6 +1066,24 @@ contains
                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l)**2.d0)/rho - &
                                    pi_inf - E_e &
                                    )/gamma
+
+                        else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
+                            !Stiffened gas pressure from energy
+                            pres = ( &
+                                   q_cons_vf(E_idx)%sf(j - 2, k - 2, l) - &
+                                   0.5d0*((q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0 + &
+                                           q_cons_vf(3)%sf(j - 2, k - 2, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k - 2, l)) - &
+                                   pi_inf &
+                                   )/gamma
+                        else
+                            !Stiffened gas pressure from energy with bubbles
+                            pres = ( &
+                                   (q_cons_vf(E_idx)%sf(j - 2, k - 2, l) - &
+                                    0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0 + q_cons_vf(3)%sf(j - 2, k - 2, l)**2.d0) &
+                                    /q_cons_vf(1)%sf(j - 2, k - 2, l))/ &
+                                   (1.d0 - q_cons_vf(alf_idx)%sf(j - 2, k - 2, l)) - &
+                                   pi_inf &
+                                   )/gamma
                         end if
 
                         if (bubbles) then
@@ -1040,9 +1106,24 @@ contains
                         end if
 
                         ! Compute mixture sound speed
-                        @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
-                        j - 2, k - 2, l, 0, c)
+                        if (alt_soundspeed) then
+                            do s = 1, num_fluids
+                                alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k - 2, l)
+                            end do
+                            blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
+                                       fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
+                            blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
+                                       fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+                            c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
+                        else
+                            c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
+                        end if
+
+                        if (mixture_err .and. c < 0d0) then
+                            c = sgm_eps
+                        else
+                            c = sqrt(c)
+                        end if
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -1081,9 +1162,24 @@ contains
                             pres = (q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2) - 0.5d0*rho*dot_product(vel, vel) - pi_inf)/gamma
 
                             ! Compute mixture sound speed
-                            @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                            ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
-                            j - 2, k - 2, l - 2, 0, c)
+                            if (alt_soundspeed) then
+                                do s = 1, num_fluids
+                                    alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k - 2, l - 2)
+                                end do
+                                blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
+                                           fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
+                                blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
+                                           fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+                                c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
+                            else
+                                c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
+                            end if
+
+                            if (mixture_err .and. c < 0d0) then
+                                c = sgm_eps
+                            else
+                                c = sqrt(c)
+                            end if
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
