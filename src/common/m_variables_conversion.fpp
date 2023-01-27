@@ -3,6 +3,7 @@
 !! @brief Contains module m_variables_conversion
 
 #:include 'macros.fpp'
+#:include 'inline_conversions.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -707,7 +708,7 @@ contains
                                                         /qK_cons_vf(1)%sf(j, k, l)
                         end if
                     end do
-                    call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
+                    s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, pres)
 
@@ -721,7 +722,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                        @:s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
                         
                         !$acc loop seq
                         do i = bubxb, bubxe
