@@ -997,7 +997,7 @@ contains
                     !ME3
 
 !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms)
+!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
