@@ -335,7 +335,7 @@ contains
         integer :: i, j !< Generic loop iterator
 
         ! Logistics
-        case_dir = dflt_char
+        case_dir = '.'
         run_time_info = .false.
         t_step_old = dflt_int
 
