@@ -325,7 +325,7 @@ program p_main
             call cpu_time(start)
             !  call nvtxStartRange("I/O")
             do i = 1, sys_size
-!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                !$acc update host(q_cons_ts(1)%vf(i)%sf)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m

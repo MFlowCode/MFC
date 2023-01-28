@@ -501,8 +501,6 @@ contains
                                    norm_dir, weno_dir)
         end if
 
-        call cpu_time(start)
-
         if (weno_order == 1) then
             if (weno_dir == 1) then
 !$acc parallel loop collapse(4) default(present)
@@ -879,19 +877,20 @@ contains
             !! may be utilized with the scheme. In theory, for stability, a CFL
             !! number less than 1/(1+alpha) is necessary. The default value for
             !! alpha is 2.
+        
 
         real(kind(0d0)), parameter :: beta = 4d0/3d0 !<
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
+
+        real(kind(0d0)), parameter :: alpha_mp = 2d0
+        real(kind(0d0)), parameter :: beta_mp  = 4d0/3d0
 
  !$acc parallel loop gang vector collapse (4)  default(present) private(d)
         do l = is3%beg, is3%end
             do k = is2%beg, is2%end
                 do j = is1%beg, is1%end
                     do i = 1, v_size
-                        alpha_mp = 2d0
-                        beta_mp = 4d0/3d0
-
                         d(-1) = v_rs_ws(j, k, l, i) &
                                 + v_rs_ws(j - 2, k, l, i) &
                                 - v_rs_ws(j - 1, k, l, i) &

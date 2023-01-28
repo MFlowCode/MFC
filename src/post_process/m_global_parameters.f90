@@ -259,7 +259,7 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Logistics
-        case_dir = ' '
+        case_dir = '.'
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
