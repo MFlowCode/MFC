@@ -24,7 +24,6 @@ module m_helper
         s_compute_finite_difference_coefficients, &
         s_apply_scalar_divergence_theorem, &
         s_compute_fd_gradient, &
-        s_comp_n_from_cons, &
         s_comp_n_from_prim, &
         s_quad
 
@@ -433,24 +432,6 @@ contains
         end if
 
     end subroutine s_compute_finite_difference_coefficients ! --------------
-
-    !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weight)
-    !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-        real(kind(0.d0)), dimension(nb) :: weight
-
-        call s_quad(nRtmp**3.d0, nR3, weight)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_cons
 
     !> Computes the bubble number density n from the primitive variables
         !! @param vftmp is the void fraction

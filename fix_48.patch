@@ -583,7 +583,7 @@ index 18dfa8d..e77782d 100644
 -                                nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
 -                            end do
 -
--                            !call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+-                            !call comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
 -
 -                            vftmp = q_cons_vf(alf_idx)%sf(j, 0, 0)
 -
