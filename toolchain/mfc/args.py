@@ -1,4 +1,4 @@
-import argparse
+import argparse, dataclasses
 
 from .build     import get_mfc_target_names, get_target_names, get_dependencies_names
 from .common    import format_list_to_string
@@ -36,15 +36,12 @@ started, run ./mfc.sh build -h.""",
                            default=get_mfc_target_names(), help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string(get_target_names())}.")
 
         if "m" not in mask:
-            p.add_argument(     "--mpi", action="store_true",                help=f"Build with    MPI.")
-            p.add_argument(  "--no-mpi", action="store_false", dest="mpi",   help=f"Build without MPI.")
-            p.add_argument(     "--gpu", action="store_true",                help=f"Build with    GPU Acceleration.")
-            p.add_argument(  "--no-gpu", action="store_false", dest="gpu",   help=f"Build without GPU Acceleration.")
-            p.add_argument(   "--debug", action="store_true",                help=f"Build in      Debug mode.")
-            p.add_argument("--no-debug", action="store_false", dest="debug", help=f"Build in      Release mode.")
+            for f in dataclasses.fields(config):
+                p.add_argument(   f"--{f.name}", action="store_true",               help=f"Turn the {f.name} option ON.")
+                p.add_argument(f"--no-{f.name}", action="store_false", dest=f.name, help=f"Turn the {f.name} option OFF.")
 
-            p.set_defaults(mpi=config.mpi, gpu=config.gpu, debug=config.debug)
-
+            p.set_defaults(**{ f.name: getattr(config, f.name) for f in dataclasses.fields(config) })
+            
         if "j" not in mask:
             p.add_argument("-j", "--jobs", metavar="JOBS", type=int, default=1, help="Allows for JOBS concurrent jobs.")
 
