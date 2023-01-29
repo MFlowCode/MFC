@@ -48,7 +48,7 @@ jobs:
 
       - name: Setup
         if:   matrix.os == 'self-hosted'
-        run:  
+        run:  echo 'test'
         
       - name: Build
         run:  /bin/bash mfc.sh build -j $(nproc)
