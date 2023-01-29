@@ -17,6 +17,8 @@ module m_mpi_proxy
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
+
+    use m_mpi_common
     ! ==========================================================================
 
     implicit none
@@ -26,105 +28,6 @@ module m_mpi_proxy
 
 contains
 
-    !>  The subroutine intializes the MPI environment and queries
-        !!      both the number of processors that will be available for
-        !!      the job as well as the local processor rank.
-    subroutine s_mpi_initialize() ! ----------------------------
-
-#ifndef MFC_MPI
-
-        ! Serial run only has 1 processor
-        num_procs = 1
-        ! Local processor rank is 0
-        proc_rank = 0
-
-#else
-
-        ! Establishing the MPI environment
-        call MPI_INIT(ierr)
-
-        ! Checking whether the MPI environment has been properly intialized
-        if (ierr /= MPI_SUCCESS) then
-            print '(A)', 'Unable to initialize MPI environment. Exiting ...'
-            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-        end if
-
-        ! Querying number of processors available for the job
-        call MPI_COMM_SIZE(MPI_COMM_WORLD, num_procs, ierr)
-
-        ! Identifying the rank of the local processor
-        call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
-
-#endif
-
-    end subroutine s_mpi_initialize ! --------------------------
-
-    !> The subroutine terminates the MPI execution environment.
-    subroutine s_mpi_abort() ! ---------------------------------------------
-
-#ifndef MFC_MPI
-
-        stop 1
-
-#else
-
-        ! Terminating the MPI environment
-        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-
-#endif
-
-    end subroutine s_mpi_abort ! -------------------------------------------
-
-        !! @param q_cons_vf Conservative variables
-    subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_cons_vf
-
-#ifdef MFC_MPI
-
-        integer, dimension(num_dims) :: sizes_glb, sizes_loc
-        integer :: ierr
-
-        ! Generic loop iterator
-        integer :: i
-
-        do i = 1, sys_size
-            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf
-        end do
-
-        ! Define global(g) and local(l) sizes for flow variables
-        sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
-        if (n > 0) then
-            sizes_glb(2) = n_glb + 1; sizes_loc(2) = n + 1
-            if (p > 0) then
-                sizes_glb(3) = p_glb + 1; sizes_loc(3) = p + 1
-            end if
-        end if
-
-        ! Define the view for each variable
-        do i = 1, sys_size
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
-        end do
-
-#endif
-
-    end subroutine s_initialize_mpi_data ! ---------------------------------
-
-    !> Halts all processes until all have reached barrier.
-    subroutine s_mpi_barrier() ! -------------------------------------------
-
-#ifdef MFC_MPI
-
-        ! Calling MPI_BARRIER
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
-#endif
-
-    end subroutine s_mpi_barrier ! -----------------------------------------
 
     !> Since only processor with rank 0 is in charge of reading
         !!       and checking the consistency of the user provided inputs,
@@ -199,20 +102,6 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
 
-    subroutine mpi_bcast_time_step_values(proc_time, time_avg)
-
-        real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
-        real(kind(0d0)), intent(INOUT) :: time_avg
-
-#ifdef MFC_MPI
-
-        integer :: j
-
-        call MPI_GATHER(time_avg, 1, MPI_DOUBLE_PRECISION, proc_time(0), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-#endif
-
-    end subroutine mpi_bcast_time_step_values
 
     !> Description: This subroutine takes care of efficiently distributing
         !!              the computational domain among the available processors
@@ -630,46 +519,5 @@ contains
 #endif
 
     end subroutine s_mpi_decompose_computational_domain ! ------------------
-
-    !>  The following subroutine takes the inputted variable and
-        !!      determines its minimum value on the entire computational
-        !!      domain. The result is stored back into inputted variable.
-        !!  @param var_loc holds the local value to be reduced among
-        !!      all the processors in communicator. On output, the variable holds
-        !!      the minimum value, reduced amongst all of the local values.
-    subroutine s_mpi_reduce_min(var_loc) ! ---------------------------------
-
-        real(kind(0d0)), intent(INOUT) :: var_loc
-
-#ifdef MFC_MPI
-
-        ! Temporary storage variable that holds the reduced minimum value
-        real(kind(0d0)) :: var_glb
-
-        ! Performing reduction procedure and eventually storing its result
-        ! into the variable that was initially inputted into the subroutine
-        call MPI_REDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
-                        MPI_MIN, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(var_glb, 1, MPI_DOUBLE_PRECISION, &
-                       0, MPI_COMM_WORLD, ierr)
-
-        var_loc = var_glb
-
-#endif
-
-    end subroutine s_mpi_reduce_min ! --------------------------------------
-
-    !> Finalization of all MPI related processes
-    subroutine s_mpi_finalize() ! ------------------------------
-
-#ifdef MFC_MPI
-
-        ! Terminating the MPI environment
-        call MPI_FINALIZE(ierr)
-
-#endif
-
-    end subroutine s_mpi_finalize ! ----------------------------
 
 end module m_mpi_proxy
