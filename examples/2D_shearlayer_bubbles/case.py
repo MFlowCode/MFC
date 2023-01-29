@@ -7,7 +7,6 @@ myv = 0.1
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================
-    'case_dir'                     : '\'.\'',
     'run_time_info'                : 'T',
     # ==========================================================
 
