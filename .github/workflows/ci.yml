@@ -23,8 +23,8 @@ jobs:
         include:
           - os:  ubuntu-latest
           - os:  macos-latest
-          - os:  self-hosted
             gcc: 11
+          - os:  self-hosted
     runs-on: ${{ matrix.os }}
     steps:
       - name: Clone
@@ -56,15 +56,25 @@ jobs:
         run:  /bin/bash mfc.sh build -j $(nproc)
         
       - name: Build
-        if:   matrix.os == 'ubuntu-latest'
+        if:   matrix.os == 'ubuntu-latest' 
         run:  /bin/bash mfc.sh build -j $(nproc)
         
       - name: Build
         if:   matrix.os == 'self-hosted'
         run:  |
           export PATH=$PATH:/usr/lib64/openmpi/bin/
-          which mpif90
           /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
+        if:   matrix.os == 'self-hosted'
+        run:  |
+          export PATH=$PATH:/usr/lib64/openmpi/bin/
+          /bin/bash mfc.sh test -j $(nproc)
+
+      - name: Test Suite
+        if:   matrix.os == 'ubuntu-latest' 
+        run:  /bin/bash mfc.sh test  -j $(nproc)
+
+      - name: Test Suite
+        if:   matrix.os == 'macos-latest' 
         run:  /bin/bash mfc.sh test  -j $(nproc)
