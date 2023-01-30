@@ -52,7 +52,9 @@ jobs:
           echo "export PATH=$PATH:/usr/lib64/openmpi/bin/" >> $GITHUB_ENV
         
       - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc)
+        run:  |
+          which mpif90
+          /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
         run:  /bin/bash mfc.sh test  -j $(nproc)
