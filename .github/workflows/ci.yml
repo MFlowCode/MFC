@@ -69,7 +69,7 @@ jobs:
         if:   matrix.os == 'self-hosted'
         run:  |
           export PATH=$PATH:/usr/lib64/openmpi/bin/
-          /bin/bash mfc.sh test -j $(nproc)
+          /bin/bash mfc.sh test -j $(nproc) -b mpirun
 
       - name: Test Suite
         if:   matrix.os == 'ubuntu-latest' 
