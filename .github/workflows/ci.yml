@@ -48,7 +48,7 @@ jobs:
 
       - name: Setup
         if:   matrix.os == 'self-hosted'
-        run:  echo 'test'
+        run:  "export PATH=$PATH:/usr/lib64/openmpi/bin/"  
         
       - name: Build
         run:  /bin/bash mfc.sh build -j $(nproc)
