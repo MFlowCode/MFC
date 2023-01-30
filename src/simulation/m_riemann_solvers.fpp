@@ -592,9 +592,6 @@ contains
                             @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
                                     vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
 
-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
-
                             @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
                                     vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
 
