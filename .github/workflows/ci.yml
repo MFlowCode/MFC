@@ -25,6 +25,7 @@ jobs:
           - os:  macos-latest
             gcc: 11
           - os:  instinct
+          - os:  wingtip-gpu3
     runs-on: ${{ matrix.os }}
     steps:
       - name: Clone
@@ -50,6 +51,12 @@ jobs:
         if:   matrix.os == 'instinct'
         run:  |
           echo "export PATH=$PATH:/usr/lib64/openmpi/bin/" >> $GITHUB_ENV
+          
+      - name: Setup
+        if:   matrix.os == 'wingtip-gpu3'
+        run:  |
+          module use /opt/nvidia/hpc_sdk/modulefiles/
+          module load nvhpc/22.11
         
       - name: Build
         if:   matrix.os == 'macos-latest'
@@ -58,7 +65,11 @@ jobs:
       - name: Build
         if:   matrix.os == 'ubuntu-latest' 
         run:  /bin/bash mfc.sh build -j $(nproc)
-        
+
+      - name: Build
+        if:   matrix.os == 'wingtip-gpu3' 
+        run:  /bin/bash mfc.sh build -j $(nproc)
+
       - name: Build
         if:   matrix.os == 'instinct'
         run:  |
@@ -78,3 +89,7 @@ jobs:
       - name: Test Suite
         if:   matrix.os == 'macos-latest' 
         run:  /bin/bash mfc.sh test  -j $(nproc)
+        
+      - name: Test Suite
+        if:   matrix.os == 'wingtip-gpu3' 
+        run:  /bin/bash mfc.sh test  -j $(nproc) -b mpirun
