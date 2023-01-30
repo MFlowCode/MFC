@@ -48,7 +48,8 @@ jobs:
 
       - name: Setup
         if:   matrix.os == 'self-hosted'
-        run:  "export PATH=$PATH:/usr/lib64/openmpi/bin/"  
+        run:  |
+          echo "export PATH=$PATH:/usr/lib64/openmpi/bin/" >> $GITHUB_ENV
         
       - name: Build
         run:  /bin/bash mfc.sh build -j $(nproc)
