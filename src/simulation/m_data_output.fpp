@@ -3,6 +3,7 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
+#:include 'inline_conversions.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -29,19 +30,13 @@ module m_data_output
 
     private; public :: s_initialize_data_output_module, &
  s_open_run_time_information_file, &
- s_open_com_files, &
- s_open_cb_files, &
  s_open_probe_files, &
  s_write_run_time_information, &
  s_write_data_files, &
  s_write_serial_data_files, &
  s_write_parallel_data_files, &
- s_write_com_files, &
- s_write_cb_files, &
  s_write_probe_files, &
  s_close_run_time_information_file, &
- s_close_com_files, &
- s_close_cb_files, &
  s_close_probe_files, &
  s_finalize_data_output_module
 
@@ -50,13 +45,17 @@ module m_data_output
         !> Write data files
         !! @param q_cons_vf Conservative variables
         !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, t_step)
+        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
             import :: scalar_field, sys_size
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(IN) :: q_cons_vf
+
+            type(scalar_field), &
+                dimension(sys_size), &
+                intent(INOUT) :: q_prim_vf
 
             integer, intent(IN) :: t_step
 
@@ -85,19 +84,11 @@ module m_data_output
     real(kind(0d0)) :: Rc_min !< Rc criterion maximum
     !> @}
 
-    ! @name Generic storage for flow variable(s) that are to be written to CoM data file
+    ! @name Variables for computing acceleration
     !> @{
     real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
-    real(kind(0d0)), public, allocatable, dimension(:, :) :: q_com
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: moments
-    real(kind(0d0)), public, allocatable, dimension(:, :) :: cb_mass
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: bounds
-    real(kind(0d0)), public, allocatable, dimension(:, :) :: cntrline
     real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
-    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: energy
-
-
+    !> @}
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
@@ -168,131 +159,6 @@ contains
         end if
 
     end subroutine s_open_run_time_information_file ! ----------------------
-
-    !>  This opens a formatted data file where the root processor
-        !!      can write out the CoM information
-    subroutine s_open_com_files() ! ----------------------------------------
-
-        character(LEN=path_len + 3*name_len) :: file_path !<
-            !! Relative path to the CoM file in the case directory
-
-        integer :: i !< Generic loop iterator
-
-        do i = 1, num_fluids
-            if (com_wrt(i)) then
-
-                ! Generating the relative path to the CoM data file
-                write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
-                file_path = trim(case_dir)//trim(file_path)
-
-                ! Creating the formatted data file and setting up its
-                ! structure
-                open (i + 10, FILE=trim(file_path), &
-                      FORM='formatted', &
-                      POSITION='append', &
-                      STATUS='unknown')
-
-                if (n == 0) then
-                    if (any(moment_order /= dflt_int)) then
-                        write (i + 10, '(A)') '=== Non-Dimensional Time '// &
-                            '=== Total Mass '// &
-                            '=== x-loc '// &
-                            '=== x-vel '// &
-                            '=== x-accel '// &
-                            '=== Higher Moments ==='
-                    else
-                        write (i + 10, '(A)') '=== Non-Dimensional Time '// &
-                            '=== Total Mass '// &
-                            '=== x-loc '// &
-                            '=== x-vel '// &
-                            '=== x-accel ==='
-                    end if
-                elseif (p == 0) then
-                    if (any(moment_order /= dflt_int)) then
-                        write (i + 10, '(A)') '=== Non-Dimensional Time '// &
-                            '=== Total Mass '// &
-                            '=== x-loc '// &
-                            '=== y-loc '// &
-                            '=== x-vel '// &
-                            '=== y-vel '// &
-                            '=== x-accel '// &
-                            '=== y-accel '// &
-                            '=== Higher Moments ==='
-                    else
-                        write (i + 10, '(A)') '=== Non-Dimensional Time '// &
-                            '=== Total Mass '// &
-                            '=== x-loc '// &
-                            '=== y-loc '// &
-                            '=== x-vel '// &
-                            '=== y-vel '// &
-                            '=== x-accel '// &
-                            '=== y-accel ==='
-                    end if
-                else
-                    if (any(moment_order /= dflt_int)) then
-                        write (i + 10, '(A)') '=== Non-Dimensional Time '// &
-                            '=== Total Mass '// &
-                            '=== x-loc '// &
-                            '=== y-loc '// &
-                            '=== z-loc '// &
-                            '=== x-vel '// &
-                            '=== y-vel '// &
-                            '=== z-vel '// &
-                            '=== x-accel '// &
-                            '=== y-accel '// &
-                            '=== z-accel '// &
-                            '=== Higher Moments ==='
-                    else
-                        write (i + 10, '(A)') '=== Non-Dimensional Time '// &
-                            '=== Total Mass '// &
-                            '=== x-loc '// &
-                            '=== y-loc '// &
-                            '=== z-loc '// &
-                            '=== x-vel '// &
-                            '=== y-vel '// &
-                            '=== z-vel '// &
-                            '=== x-accel '// &
-                            '=== y-accel '// &
-                            '=== z-accel ==='
-                    end if
-                end if
-            end if
-        end do
-
-    end subroutine s_open_com_files ! --------------------------------------
-
-    !>  This opens a formatted data file where the root processor
-        !!      can write out the coherent body (cb) information
-    subroutine s_open_cb_files() ! ----------------------------------------
-
-        character(LEN=path_len + 3*name_len) :: file_path !<
-            !! Relative path to the cb file in the case directory
-
-        integer :: i  !< Generic loop iterator
-
-        do i = 1, num_fluids
-            if (cb_wrt(i)) then
-
-                ! Generating the relative path to the cb data file
-                write (file_path, '(A,I0,A)') '/fluid', i, '_cb.dat'
-                file_path = trim(case_dir)//trim(file_path)
-
-                ! Creating the formatted data file and setting up its
-                ! structure
-                open (i + 20, FILE=trim(file_path), &
-                      FORM='formatted', &
-                      POSITION='append', &
-                      STATUS='unknown')
-
-                write (i + 20, '(A)') '=== Non-Dimensional Time '// &
-                    '=== Coherent Body Mass '// &
-                    '=== Coherent Body Area '// &
-                    '=== Bounds '// &
-                    '=== Centerline ==='
-            end if
-        end do
-
-    end subroutine s_open_cb_files ! --------------------------------------
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -577,9 +443,10 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, t_step) ! ---------------------
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         integer, intent(IN) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -675,6 +542,13 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
+        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+            do i = 1, sys_size
+                !$acc update host(q_prim_vf(i)%sf(:,:,:))
+            end do
+        end if
+
         !1D
         if (n == 0 .and. p == 0) then
 
@@ -684,87 +558,13 @@ contains
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
-                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, Re, &
-                                                            G, fluid_pp(:)%G)
-                        lit_gamma = 1d0/gamma + 1d0
-
                         if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                             .or. &
                             ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
                             ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == mom_idx%beg) then !u
-                            write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == stress_idx%beg) then !tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == E_idx) then !p
-                            if (model_eqns == 4) then
-                                !Tait pressure from density
-                                write (2, FMT) x_cb(j), &
-                                    (pref + pi_inf)*( &
-                                    (q_cons_vf(1)%sf(j, 0, 0)/ &
-                                     (rhoref*(1.d0 - q_cons_vf(4)%sf(j, 0, 0))) &
-                                     )**lit_gamma) &
-                                    - pi_inf
-                            else if (hypoelasticity) then
-                                ! elastic contribution to energy
-                                E_e = 0d0
-                                do k = stress_idx%beg, stress_idx%end
-                                    if (G > 1000) then
-                                        E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho)**2d0) &
-                                              /(4d0*G)
-                                        ! Additional terms in 2D and 3D
-                                        if ((k == stress_idx%beg + 1) .or. &
-                                            (k == stress_idx%beg + 3) .or. &
-                                            (k == stress_idx%beg + 4)) then
-                                            E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho)**2d0) &
-                                                  /(4d0*G)
-                                        end if
-                                    end if
-                                end do
-
-                                write (2, FMT) x_cb(j), &
-                                    ( &
-                                    q_cons_vf(E_idx)%sf(j, 0, 0) - &
-                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho - &
-                                    pi_inf - E_e &
-                                    )/gamma
-                            else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
-                                !Stiffened gas pressure from energy
-                                write (2, FMT) x_cb(j), &
-                                    ( &
-                                    q_cons_vf(E_idx)%sf(j, 0, 0) - &
-                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho - &
-                                    pi_inf &
-                                    )/gamma
-                            else
-                                !Stiffened gas pressure from energy with bubbles
-                                write (2, FMT) x_cb(j), &
-                                    ( &
-                                    (q_cons_vf(E_idx)%sf(j, 0, 0) - &
-                                     0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho)/ &
-                                    (1.d0 - q_cons_vf(alf_idx)%sf(j, 0, 0)) - &
-                                    pi_inf &
-                                    )/gamma
-                            end if
-                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
-                            do k = 1, nb
-                                nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
-                            end do
-
-                            !call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
-
-                            vftmp = q_cons_vf(alf_idx)%sf(j, 0, 0)
-
-                            nR3 = 0d0
-
-                            do k = 1, nb
-                                nR3 = nR3 + weight(k)*(nRtmp(k)**3d0)
-                            end do
-
-                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
+                        else
+                            write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
@@ -801,6 +601,29 @@ contains
                 end do
                 close (2)
             end do
+
+            if (prim_vars_wrt) then
+                do i = 1, sys_size
+                    write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
+
+                    open (2, FILE=trim(file_path))
+
+                    do j = 0, m
+                        do k = 0, n
+                            if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
+                                .or. &
+                                ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                ) then
+                                write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                            else
+                                write (2, FMT) x_cb(j), y_cb(k), q_prim_vf(i)%sf(j, k, 0)
+                            end if
+                        end do
+                        write (2, *)
+                    end do
+                    close (2)
+                end do
+            end if
         end if
 
         if (precision == 1) then
@@ -825,6 +648,32 @@ contains
                 end do
                 close (2)
             end do
+
+            if (prim_vars_wrt) then
+                do i = 1, sys_size
+                    write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
+
+                    open (2, FILE=trim(file_path))
+
+                    do j = 0, m
+                        do k = 0, n
+                            do l = 0, p
+                                if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
+                                    .or. &
+                                    ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                    ) then
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                                else
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)  
+                                end if
+                            end do
+                            write (2, *)
+                        end do
+                        write (2, *)
+                    end do
+                    close (2)
+                end do
+            end if
         end if
 
     end subroutine s_write_serial_data_files ! ------------------------------------
@@ -833,11 +682,15 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, t_step) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step) ! --
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(INOUT) :: q_prim_vf
 
         integer, intent(IN) :: t_step
 
@@ -914,718 +767,6 @@ contains
 
     end subroutine s_write_parallel_data_files ! ---------------------------
 
-    !>  This writes a formatted data file where the root processor
-        !!      can write out the CoM information
-        !!  @param t_step Current time-step
-        !!  @param q_com Center of mass information
-        !!  @param moments Higher moment information
-    subroutine s_write_com_files(t_step, q_com, moments) ! -------------------
-
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), dimension(num_fluids, 10), intent(IN) :: q_com
-        real(kind(0d0)), dimension(num_fluids, 2, 5), intent(IN) :: moments
-
-        integer :: i !< Generic loop iterator
-        real(kind(0d0)) :: nondim_time !< Non-dimensional time
-
-        ! Non-dimensional time calculation
-        if (t_step_old /= dflt_int) then
-            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
-        else
-            nondim_time = real(t_step, kind(0d0))*dt
-        end if
-
-        if (n == 0) then ! 1D simulation
-            do i = 1, num_fluids ! Loop through fluids
-                if (com_wrt(i)) then ! Writing out CoM data
-                    if (proc_rank == 0) then
-                        write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') &
-                            nondim_time, &
-                            q_com(i, 1), &
-                            q_com(i, 2), &
-                            q_com(i, 5), &
-                            q_com(i, 8)
-
-                    end if
-                end if
-            end do
-        elseif (p == 0) then ! 2D simulation
-            do i = 1, num_fluids ! Loop through fluids
-                if (com_wrt(i)) then ! Writing out CoM data
-                    if (proc_rank == 0) then
-                        if (moment_order(1) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 8), &
-                                q_com(i, 9)
-                        elseif (moment_order(2) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,E24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                moments(i, 1, 1)
-                        elseif (moment_order(3) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,E24.8,'// &
-                                   'E24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2)
-                        elseif (moment_order(4) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,E24.8,'// &
-                                   'E24.8,E24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 1, 3)
-                        elseif (moment_order(5) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,E24.8,'// &
-                                   'E24.8,E24.8,E24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 1, 3), &
-                                moments(i, 1, 4)
-                        else
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,E24.8,'// &
-                                   'E24.8,E24.8,E24.8,E24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 1, 3), &
-                                moments(i, 1, 4), &
-                                moments(i, 1, 5)
-                        end if
-                    end if
-                end if
-            end do
-        else ! 3D simulation
-            do i = 1, num_fluids ! Loop through fluids
-                if (com_wrt(i)) then ! Writing out CoM data
-                    if (proc_rank == 0) then
-                        if (moment_order(1) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 4), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 7), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                q_com(i, 10)
-                        elseif (moment_order(2) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 4), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 7), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                q_com(i, 10), &
-                                moments(i, 1, 1), &
-                                moments(i, 2, 1)
-                        elseif (moment_order(3) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 4), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 7), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                q_com(i, 10), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 2, 1), &
-                                moments(i, 2, 2)
-                        elseif (moment_order(4) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 4), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 7), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                q_com(i, 10), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 1, 3), &
-                                moments(i, 2, 1), &
-                                moments(i, 2, 2), &
-                                moments(i, 2, 3)
-                        elseif (moment_order(5) == dflt_int) then
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 4), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 7), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                q_com(i, 10), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 1, 3), &
-                                moments(i, 1, 4), &
-                                moments(i, 2, 1), &
-                                moments(i, 2, 2), &
-                                moments(i, 2, 3), &
-                                moments(i, 2, 4)
-                        else
-                            write (i + 10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i, 1), &
-                                q_com(i, 2), &
-                                q_com(i, 3), &
-                                q_com(i, 4), &
-                                q_com(i, 5), &
-                                q_com(i, 6), &
-                                q_com(i, 7), &
-                                q_com(i, 8), &
-                                q_com(i, 9), &
-                                q_com(i, 10), &
-                                moments(i, 1, 1), &
-                                moments(i, 1, 2), &
-                                moments(i, 1, 3), &
-                                moments(i, 1, 4), &
-                                moments(i, 1, 5), &
-                                moments(i, 2, 1), &
-                                moments(i, 2, 2), &
-                                moments(i, 2, 3), &
-                                moments(i, 2, 4), &
-                                moments(i, 2, 5)
-                        end if
-                    end if
-                end if
-            end do
-        end if
-
-    end subroutine s_write_com_files ! -------------------------------------
-
-    !>  The goal of this subroutine is to output coherent body information.
-        !!  @param t_step Current time-step
-        !!  @param cb_mass Coherent body mass
-        !!  @param bounds Coherent body boundary
-        !!  @param cntrline Coherent body center line
-    subroutine s_write_cb_files(t_step, cb_mass, bounds, cntrline) ! ----------
-
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), dimension(num_fluids, 10), intent(IN) :: cb_mass
-        real(kind(0d0)), dimension(num_fluids, 5, 6), intent(IN) :: bounds
-        real(kind(0d0)), dimension(num_fluids, 5), intent(IN) :: cntrline
-
-        integer :: i !< Generic loop iterator
-        real(kind(0d0)) :: nondim_time !< Non-dimensional time
-
-        ! Non-dimensional time calculation
-        if (t_step_old /= dflt_int) then
-            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
-        else
-            nondim_time = real(t_step, kind(0d0))*dt
-        end if
-
-        do i = 1, num_fluids ! Loop through fluids
-            if (cb_wrt(i)) then ! Writing out CoM data
-                if (proc_rank == 0) then
-                    if (n == 0) then ! 1D simulation
-                        if (threshold_mf(2) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 6), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 1, 2)
-                        elseif (threshold_mf(3) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2)
-                        elseif (threshold_mf(4) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2)
-                        elseif (threshold_mf(5) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 4), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                cb_mass(i, 9), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 4, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 4, 2)
-                        else
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 4), &
-                                cb_mass(i, 5), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                cb_mass(i, 9), &
-                                cb_mass(i, 10), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 4, 1), &
-                                bounds(i, 5, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 4, 2), &
-                                bounds(i, 5, 2)
-                        end if
-                    elseif (p == 0) then ! 2D simulation
-                        if (threshold_mf(2) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 6), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 1, 4), &
-                                cntrline(i, 1)
-                        elseif (threshold_mf(3) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2)
-                        elseif (threshold_mf(4) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 3, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 3, 4), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2), &
-                                cntrline(i, 3)
-                        elseif (threshold_mf(5) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 4), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                cb_mass(i, 9), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 4, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 4, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 3, 3), &
-                                bounds(i, 4, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 3, 4), &
-                                bounds(i, 4, 4), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2), &
-                                cntrline(i, 3), &
-                                cntrline(i, 4)
-                        else
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 4), &
-                                cb_mass(i, 5), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                cb_mass(i, 9), &
-                                cb_mass(i, 10), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 4, 1), &
-                                bounds(i, 5, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 4, 2), &
-                                bounds(i, 5, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 3, 3), &
-                                bounds(i, 4, 3), &
-                                bounds(i, 5, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 3, 4), &
-                                bounds(i, 4, 4), &
-                                bounds(i, 5, 4), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2), &
-                                cntrline(i, 3), &
-                                cntrline(i, 4), &
-                                cntrline(i, 5)
-                        end if
-                    else ! 3D simulation
-                        if (threshold_mf(2) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 6), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 1, 5), &
-                                bounds(i, 1, 6), &
-                                cntrline(i, 1)
-                        elseif (threshold_mf(3) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 1, 5), &
-                                bounds(i, 2, 5), &
-                                bounds(i, 1, 6), &
-                                bounds(i, 2, 6), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2)
-                        elseif (threshold_mf(4) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 3, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 3, 4), &
-                                bounds(i, 1, 5), &
-                                bounds(i, 2, 5), &
-                                bounds(i, 3, 5), &
-                                bounds(i, 1, 6), &
-                                bounds(i, 2, 6), &
-                                bounds(i, 3, 6), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2), &
-                                cntrline(i, 3)
-                        elseif (threshold_mf(5) == dflt_real) then
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 4), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                cb_mass(i, 9), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 4, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 4, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 3, 3), &
-                                bounds(i, 4, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 3, 4), &
-                                bounds(i, 4, 4), &
-                                bounds(i, 1, 5), &
-                                bounds(i, 2, 5), &
-                                bounds(i, 3, 5), &
-                                bounds(i, 4, 5), &
-                                bounds(i, 1, 6), &
-                                bounds(i, 2, 6), &
-                                bounds(i, 3, 6), &
-                                bounds(i, 4, 6), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2), &
-                                cntrline(i, 3), &
-                                cntrline(i, 4)
-                        else
-                            write (i + 20, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8,F24.8,F24.8,F24.8,'// &
-                                   'F24.8)') &
-                                nondim_time, &
-                                cb_mass(i, 1), &
-                                cb_mass(i, 2), &
-                                cb_mass(i, 3), &
-                                cb_mass(i, 4), &
-                                cb_mass(i, 5), &
-                                cb_mass(i, 6), &
-                                cb_mass(i, 7), &
-                                cb_mass(i, 8), &
-                                cb_mass(i, 9), &
-                                cb_mass(i, 10), &
-                                bounds(i, 1, 1), &
-                                bounds(i, 2, 1), &
-                                bounds(i, 3, 1), &
-                                bounds(i, 4, 1), &
-                                bounds(i, 5, 1), &
-                                bounds(i, 1, 2), &
-                                bounds(i, 2, 2), &
-                                bounds(i, 3, 2), &
-                                bounds(i, 4, 2), &
-                                bounds(i, 5, 2), &
-                                bounds(i, 1, 3), &
-                                bounds(i, 2, 3), &
-                                bounds(i, 3, 3), &
-                                bounds(i, 4, 3), &
-                                bounds(i, 5, 3), &
-                                bounds(i, 1, 4), &
-                                bounds(i, 2, 4), &
-                                bounds(i, 3, 4), &
-                                bounds(i, 4, 4), &
-                                bounds(i, 5, 4), &
-                                bounds(i, 1, 5), &
-                                bounds(i, 2, 5), &
-                                bounds(i, 3, 5), &
-                                bounds(i, 4, 5), &
-                                bounds(i, 5, 5), &
-                                bounds(i, 1, 6), &
-                                bounds(i, 2, 6), &
-                                bounds(i, 3, 6), &
-                                bounds(i, 4, 6), &
-                                bounds(i, 5, 6), &
-                                cntrline(i, 1), &
-                                cntrline(i, 2), &
-                                cntrline(i, 3), &
-                                cntrline(i, 4), &
-                                cntrline(i, 5)
-                        end if
-                    end if
-                end if
-            end if
-        end do
-
-    end subroutine s_write_cb_files ! -------------------------------------
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
@@ -1666,8 +807,9 @@ contains
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
+        real(kind(0d0)), dimension(1:1, 1:1, 1:1, 1:1) :: q_prim_redundant
 
-        integer :: i, j, k, l, s !< Generic loop iterator
+        integer :: i, j, k, l, s, q !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
@@ -1739,15 +881,14 @@ contains
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
+                    call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), &
+                        q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k, l), &
+                        pi_inf, gamma, pres)
+
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
 
-                        !Tait pressure from density
-                        pres = (pref + pi_inf)*( &
-                               (q_cons_vf(1)%sf(j - 2, k, l)/ &
-                                (rhoref*(1.d0 - q_cons_vf(4)%sf(j - 2, k, l))) &
-                                )**lit_gamma) &
-                               - pi_inf
                     else if (hypoelasticity) then
                         ! calculate elastic contribution to Energy
                         E_e = 0d0
@@ -1770,22 +911,6 @@ contains
                                q_cons_vf(E_idx)%sf(j - 2, k, l) - &
                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k, l)**2.d0)/rho - &
                                pi_inf - E_e &
-                               )/gamma
-
-                    else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
-                        !Stiffened gas pressure from energy
-                        pres = ( &
-                               q_cons_vf(E_idx)%sf(j - 2, k, l) - &
-                               0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k, l) - &
-                               pi_inf &
-                               )/gamma
-                    else
-                        !Stiffened gas pressure from energy with bubbles
-                        pres = ( &
-                               (q_cons_vf(E_idx)%sf(j - 2, k, l) - &
-                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k, l)**2.d0)/rho)/ &
-                               (1.d0 - q_cons_vf(alf_idx)%sf(j - 2, k, l)) - &
-                               pi_inf &
                                )/gamma
                     end if
 
@@ -1835,25 +960,10 @@ contains
                         ptot = pres - ptilde
                     end if
 
-                    ! Compute mixture sound speed
-                    if (alt_soundspeed) then
-                        do s = 1, num_fluids
-                            alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k, l)
-                        end do
-                        blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
-                                   fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                        blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
-                                   fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                        c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
-                    else
-                        c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
-                    end if
-
-                    if (mixture_err .and. c < 0d0) then
-                        c = sgm_eps
-                    else
-                        c = sqrt(c)
-                    end if
+                    ! Compute mixture sound Speed
+                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
+                    j - 2, k, l, 0, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1882,15 +992,13 @@ contains
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
+                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                            q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                            pi_inf, gamma, pres)
+
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-
-                            !Tait pressure from density
-                            pres = (pref + pi_inf)*( &
-                                   (q_cons_vf(1)%sf(j - 2, k - 2, l)/ &
-                                    (rhoref*(1.d0 - q_cons_vf(4)%sf(j - 2, k - 2, l))) &
-                                    )**lit_gamma) &
-                                   - pi_inf
                         else if (hypoelasticity) then
                             ! calculate elastic contribution to Energy
                             E_e = 0d0
@@ -1917,24 +1025,6 @@ contains
                                    0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l)**2.d0)/rho - &
                                    pi_inf - E_e &
                                    )/gamma
-
-                        else if (model_eqns == 2 .and. (bubbles .neqv. .true.)) then
-                            !Stiffened gas pressure from energy
-                            pres = ( &
-                                   q_cons_vf(E_idx)%sf(j - 2, k - 2, l) - &
-                                   0.5d0*((q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0 + &
-                                           q_cons_vf(3)%sf(j - 2, k - 2, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k - 2, l)) - &
-                                   pi_inf &
-                                   )/gamma
-                        else
-                            !Stiffened gas pressure from energy with bubbles
-                            pres = ( &
-                                   (q_cons_vf(E_idx)%sf(j - 2, k - 2, l) - &
-                                    0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0 + q_cons_vf(3)%sf(j - 2, k - 2, l)**2.d0) &
-                                    /q_cons_vf(1)%sf(j - 2, k - 2, l))/ &
-                                   (1.d0 - q_cons_vf(alf_idx)%sf(j - 2, k - 2, l)) - &
-                                   pi_inf &
-                                   )/gamma
                         end if
 
                         if (bubbles) then
@@ -1957,24 +1047,9 @@ contains
                         end if
 
                         ! Compute mixture sound speed
-                        if (alt_soundspeed) then
-                            do s = 1, num_fluids
-                                alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k - 2, l)
-                            end do
-                            blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
-                                       fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                            blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
-                                       fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                            c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
-                        else
-                            c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
-                        end if
-
-                        if (mixture_err .and. c < 0d0) then
-                            c = sgm_eps
-                        else
-                            c = sqrt(c)
-                        end if
+                        @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
+                        j - 2, k - 2, l, 0, c)
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -2013,24 +1088,9 @@ contains
                             pres = (q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2) - 0.5d0*rho*dot_product(vel, vel) - pi_inf)/gamma
 
                             ! Compute mixture sound speed
-                            if (alt_soundspeed) then
-                                do s = 1, num_fluids
-                                    alpha(s) = q_cons_vf(E_idx + s)%sf(j - 2, k - 2, l - 2)
-                                end do
-                                blkmod1 = ((fluid_pp(1)%gamma + 1d0)*pres + &
-                                           fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                                blkmod2 = ((fluid_pp(2)%gamma + 1d0)*pres + &
-                                           fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                                c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
-                            else
-                                c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
-                            end if
-
-                            if (mixture_err .and. c < 0d0) then
-                                c = sgm_eps
-                            else
-                                c = sqrt(c)
-                            end if
+                            @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+                            ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
+                            j - 2, k - 2, l - 2, 0, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -2357,32 +1417,6 @@ contains
 
     end subroutine s_close_run_time_information_file ! ---------------------
 
-    !> Closes communication files
-    subroutine s_close_com_files() ! ---------------------------------------
-
-        integer :: i !< Generic loop iterator
-
-        do i = 1, num_fluids
-            if (com_wrt(i)) then
-                close (i + 10)
-            end if
-        end do
-
-    end subroutine s_close_com_files ! -------------------------------------
-
-    !> Closes coherent body files
-    subroutine s_close_cb_files() ! ---------------------------------------
-
-        integer :: i !< Generic loop iterator
-
-        do i = 1, num_fluids
-            if (cb_wrt(i)) then
-                close (i + 20)
-            end if
-        end do
-
-    end subroutine s_close_cb_files ! -------------------------------------
-
     !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------
 
@@ -2430,24 +1464,6 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-        ! Allocating the generic storage for the flow variable(s) that are
-        ! going to be written to the CoM data files
-        if (any(com_wrt)) then
-            ! num_fluids, mass, x-loc, y-loc, z-loc, x-vel, y-vel, z-vel, x-acc, y-acc, z-acc
-            allocate (q_com(num_fluids, 10))
-            ! num_fluids, 2 lateral directions, 5 higher moment orders
-            allocate (moments(num_fluids, 2, 5))
-        end if
-
-        if (any(cb_wrt)) then
-            ! num_fluids, mass for 5 threshold mass fractions, area for 5 threshold mass fractions
-            allocate (cb_mass(num_fluids, 10))
-            ! num_fluids, 5 threshold mass fractions, xmin, xmax, ymin, ymax, zmin, zmax
-            allocate (bounds(num_fluids, 5, 6))
-            ! num_fluids, centerline dimension for 5 threshold mass fractions
-            allocate (cntrline(num_fluids, 5))
-        end if
-
         if (probe_wrt) then
             allocate (accel_mag(0:m, 0:n, 0:p))
             allocate (x_accel(0:m, 0:n, 0:p))
@@ -2476,16 +1492,6 @@ contains
         @:DEALLOCATE(icfl_sf)
         if (any(Re_size > 0)) then
             @:DEALLOCATE(vcfl_sf, Rc_sf)
-        end if
-
-        ! Deallocating the storage employed for the flow variables that
-        ! were written to CoM and probe files
-        if (any(com_wrt)) then
-            deallocate(q_com, moments)
-        end if
-
-        if (any(cb_wrt)) then
-            deallocate(cb_mass, bounds, cntrline)
         end if
 
         if (probe_wrt) then

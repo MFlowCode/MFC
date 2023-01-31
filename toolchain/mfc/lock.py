@@ -69,7 +69,7 @@ def switch(to: MFCConfig):
     state.gCFG  = to
     write()
 
-    for target_name in build.get_target_names():
+    for target_name in build.get_mfc_target_names():
         dirpath = build.get_build_dirpath(build.get_target(target_name))
         cons.print(f"[bold red]Removing {os.path.relpath(dirpath)}[/bold red]")
         common.delete_directory(dirpath)

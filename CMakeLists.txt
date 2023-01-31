@@ -32,19 +32,25 @@ include(CheckFortranCompilerFlag)
 
 # === Check Compiler Support & Tools
 # === === Compiler Support
+set(__err_msg "\
+CMake detected the ${CMAKE_Fortran_COMPILER_ID} Fortran compiler \
+v${CMAKE_Fortran_COMPILER_VERSION}. If you intended to use a different \
+compiler (or a different version thereof), please:\n\
+ - Install the compiler or load its module. (e.g. module load gcc/10.1)\n\
+ - Set/Export the C, CXX, and FC environment variables. (e.g. 'export CC=gcc', \
+ 'export CXX=g++', and 'export FC=gfortran'.\n\
+ - If using mfc.sh, delete the build/<code name> directory and try again. (e.g. 'rm -rf build/pre_process')\n")
+
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
-        message(FATAL_ERROR "GNU v5.0 or newer is required to build MFC. "
-                            "[current: ${CMAKE_Fortran_COMPILER_VERSION}]")
+        message(FATAL_ERROR "${__err_msg}ERROR: GNU v5.0 or newer is required to build MFC.")
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
-        message(FATAL_ERROR "NVHPC v21.7 or newer is required to build MFC. "
-                            "[current: ${CMAKE_Fortran_COMPILER_VERSION}]")
+        message(FATAL_ERROR "${__err_msg}ERROR: NVHPC v21.7 or newer is required to build MFC.")
     endif()
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang")
-    message(FATAL_ERROR "MFC does not support the Apple Clang compilers. "
-                        "Please consult the README for more details.")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
+    message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
 endif()
 
 # === === Find Fypp
@@ -73,14 +79,14 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -fcheck=all     -fbacktrace
-            -fimplicit-none -ffpe-trap=invalid,zero,overflow,underflow
+            -fimplicit-none
         )
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
-            -fallow-argument-mismatch
+            $<$<COMPILE_LANGUAGE:Fortran>:-fallow-argument-mismatch>
         )
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -153,23 +159,27 @@ macro(HANDLE_SOURCES target)
     file(GLOB    common_F90s CONFIGURE_DEPENDS    "${common_DIR}/*.f90")
     set(${target}_SRCs ${${target}_F90s} ${common_F90s})
 
-    # src/[<DIR>,common]/FPP.fpp -> src/<DIR>/autogen/F90.f90
+    # src/[<DIR>,common]/*.fpp -> src/<DIR>/autogen/*.f90
     file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp")
     file(GLOB    common_FPPs CONFIGURE_DEPENDS    "${common_DIR}/*.fpp")
+
+    # Locate src/[<DIR>,common]/include/*.fpp
+    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
+    file(GLOB    common_incs CONFIGURE_DEPENDS    "${common_DIR}/include/*.fpp")
 
     file(MAKE_DIRECTORY "${${target}_DIR}/autogen")
     foreach(fpp ${${target}_FPPs} ${common_FPPs})
         cmake_path(GET fpp FILENAME fpp_filename)
         set(f90 "${${target}_DIR}/autogen/${fpp_filename}.f90")
-        set(dep "${fpp}")
-        if (EXISTS "${${target}_DIR}/case.fpp")
-            list(APPEND dep "${${target}_DIR}/case.fpp")
-        endif()
 
         add_custom_command(
             OUTPUT   ${f90}
-            COMMAND  ${FYPP_EXE} -I ${common_DIR} ${fpp} ${f90}
-            DEPENDS  ${dep}
+            COMMAND  ${FYPP_EXE} -I "${common_DIR}"
+                                 -I "${common_DIR}/include"
+                                 -I "${${target}_DIR}/include"
+                                 --line-numbering
+                                 "${fpp}" "${f90}"
+            DEPENDS  "${fpp};${${target}_incs};${common_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
             VERBATIM
         )

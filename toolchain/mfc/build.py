@@ -187,10 +187,10 @@ def build_target(name: str, history: typing.List[str] = None):
         common.create_directory(build_dirpath)
 
         if common.system(configure, no_exception=True) != 0:
-            raise common.MFCException("Failed to configure the [bold magenta]{name}[/bold magenta] target.")
+            raise common.MFCException(f"Failed to configure the [bold magenta]{name}[/bold magenta] target.")
 
-    common.system(build,   exception_text="Failed to build the [bold magenta]{name}[/bold magenta] target.")
-    common.system(install, exception_text="Failed to install the [bold magenta]{name}[/bold magenta] target.")
+    common.system(build,   exception_text=f"Failed to build the [bold magenta]{name}[/bold magenta] target.")
+    common.system(install, exception_text=f"Failed to install the [bold magenta]{name}[/bold magenta] target.")
     
     cons.print(no_indent=True)
     cons.unindent()
