@@ -102,6 +102,7 @@ module m_global_parameters
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
     integer :: weno_vars      !< WENO-reconstructed state variables type
+    logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
@@ -225,15 +226,12 @@ module m_global_parameters
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
 
-    logical, dimension(num_fluids_max) :: com_wrt, cb_wrt
     logical :: probe_wrt
     logical :: integral_wrt
     integer :: num_probes
     integer :: num_integrals
     type(probe_parameters), dimension(num_probes_max) :: probe
     type(integral_parameters), dimension(num_probes_max) :: integral
-    real(kind(0d0)), dimension(5) :: threshold_mf
-    integer, dimension(5) :: moment_order
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
@@ -337,7 +335,7 @@ contains
         integer :: i, j !< Generic loop iterator
 
         ! Logistics
-        case_dir = dflt_char
+        case_dir = '.'
         run_time_info = .false.
         t_step_old = dflt_int
 
@@ -444,8 +442,6 @@ contains
         end do
 
         fd_order = dflt_int
-        com_wrt = .false.
-        cb_wrt = .false.
         probe_wrt = .false.
         integral_wrt = .false.
         num_probes = dflt_int
@@ -464,11 +460,6 @@ contains
             integral(i)%ymax = dflt_real
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
-        end do
-
-        do i = 1, 5
-            threshold_mf(i) = dflt_real
-            moment_order(i) = dflt_int
         end do
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
@@ -545,7 +536,7 @@ contains
                 if (bubbles) then
                     alf_idx = adv_idx%end
                 else
-                    alf_idx = 0
+                    alf_idx = 1
                 end if
 
                 if (bubbles) then
@@ -647,6 +638,7 @@ contains
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
+                alf_idx = adv_idx%end
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
@@ -659,7 +651,7 @@ contains
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = adv_idx%beg !one volume advection equation
                 alf_idx = adv_idx%end
-                sys_size = alf_idx !adv_idx%end
+                sys_size = adv_idx%end
 
                 if (bubbles) then
                     bub_idx%beg = sys_size + 1

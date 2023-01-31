@@ -25,6 +25,7 @@ module m_global_parameters
     integer, parameter :: name_len = 50   !< Maximum name length
     real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
     integer, parameter :: dflt_int = -100 !< Default integer value
+    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic               !< Use existing IC data
@@ -200,7 +201,7 @@ contains
         integer :: i !< Generic loop operator
 
         ! Logistics
-        case_dir = ' '
+        case_dir = '.'
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
@@ -394,7 +395,7 @@ contains
             if (bubbles) then
                 alf_idx = adv_idx%end
             else
-                alf_idx = 0
+                alf_idx = 1
             end if
 
             if (bubbles) then

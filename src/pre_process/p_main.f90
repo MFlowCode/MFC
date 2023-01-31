@@ -27,6 +27,10 @@ program p_main
                                 !! conservative variables to files
 
     use m_compile_specific      !< Compile-specific procedures
+
+    use m_assign_patches
+
+    use m_check_patches
     ! ==========================================================================
 
     implicit none
@@ -67,7 +71,7 @@ program p_main
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
     call s_initialize_grid_module()
-    call s_initialize_initial_condition_module()
+    call s_initialize_assign_patches_module()
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -159,7 +163,7 @@ program p_main
     s_write_data_files => null()
 
     ! Deallocation procedures for the modules
-    call s_finalize_initial_condition_module()
+    call s_finalize_assign_patches_module()
     call s_finalize_grid_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()

@@ -35,7 +35,7 @@ module m_time_steppers
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
-    type(scalar_field), private, allocatable, dimension(:) :: q_prim_vf !<
+    type(scalar_field), allocatable, dimension(:) :: q_prim_vf !<
     !! Cell-average primitive variables at the current time-stage
 
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
@@ -104,7 +104,7 @@ contains
         end do
 
         ! Allocating the cell-average primitive ts variables
-        if (any(com_wrt) .or. any(cb_wrt) .or. probe_wrt) then
+        if (probe_wrt) then
             @:ALLOCATE(q_prim_ts(0:3))
 
             do i = 0, 3
@@ -198,7 +198,7 @@ contains
         print *, 'wrote runtime info'
 #endif
 
-        if (any(com_wrt) .or. any(cb_wrt) .or. probe_wrt) then
+        if (probe_wrt) then
             call s_time_step_cycling(t_step)
         end if
 
@@ -262,7 +262,7 @@ contains
             call s_write_run_time_information(q_prim_vf, t_step)
         end if
 
-        if (any(com_wrt) .or. any(cb_wrt) .or. probe_wrt) then
+        if (probe_wrt) then
             call s_time_step_cycling(t_step)
         end if
 
@@ -345,7 +345,7 @@ contains
             call s_write_run_time_information(q_prim_vf, t_step)
         end if
 
-        if (any(com_wrt) .or. any(cb_wrt) .or. probe_wrt) then
+        if (probe_wrt) then
             call s_time_step_cycling(t_step)
         end if
 
@@ -490,7 +490,7 @@ contains
         @:DEALLOCATE(q_cons_ts)
 
         ! Deallocating the cell-average primitive ts variables
-        if (any(com_wrt) .or. any(cb_wrt) .or. probe_wrt) then
+        if (probe_wrt) then
             do i = 0, 3
                 do j = 1, sys_size
                     @:DEALLOCATE(q_prim_ts(i)%vf(j)%sf)

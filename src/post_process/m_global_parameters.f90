@@ -260,7 +260,7 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Logistics
-        case_dir = ' '
+        case_dir = '.'
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
@@ -391,7 +391,7 @@ contains
             if (bubbles) then
                 alf_idx = adv_idx%end
             else
-                alf_idx = 0
+                alf_idx = 1
             end if
 
             if (bubbles) then

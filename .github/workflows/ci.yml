@@ -24,6 +24,8 @@ jobs:
           - os:  ubuntu-latest
           - os:  macos-latest
             gcc: 11
+          - os:  self-hosted
+          
     runs-on: ${{ matrix.os }}
     steps:
       - name: Clone
@@ -44,9 +46,16 @@ jobs:
       - name: Setup
         if:   matrix.os == 'ubuntu-latest'
         run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-
+          
+      - name: Setup
+        if:   matrix.os == 'self-hosted'
+        run:  |
+          module use /opt/nvidia/hpc_sdk/modulefiles/
+          module load nvhpc/22.11
+        
       - name: Build
         run:  /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
         run:  /bin/bash mfc.sh test  -j $(nproc)
+

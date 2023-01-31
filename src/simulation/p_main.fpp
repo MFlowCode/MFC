@@ -52,6 +52,8 @@ program p_main
 
     use m_bubbles
 
+    use ieee_arithmetic
+
 #ifdef _OPENACC
     use openacc
 #endif
@@ -64,7 +66,7 @@ program p_main
 
     integer :: err_code, ierr
 
-    integer :: t_step, i !< Iterator for the time-stepping loop
+    integer :: t_step, i, j, k, l !< Iterator for the time-stepping loop
     real(kind(0d0)) :: time_avg, time_final
     real(kind(0d0)) :: io_time_avg, io_time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
@@ -135,7 +137,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
@@ -149,7 +151,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     if (monopole) then
         call s_initialize_monopole_module()
@@ -161,7 +163,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     if (hypoelasticity) call s_initialize_hypoelastic_module()
     call s_initialize_data_output_module()
@@ -170,7 +172,7 @@ program p_main
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -196,7 +198,7 @@ program p_main
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     print *, "[MEM-INST] After: s_initialize_weno_module"
     call acc_present_dump()
-#endif // defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#endif
 
     call s_initialize_cbc_module()
 
@@ -323,9 +325,19 @@ program p_main
             call cpu_time(start)
             !  call nvtxStartRange("I/O")
             do i = 1, sys_size
-!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                !$acc update host(q_cons_ts(1)%vf(i)%sf)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                                print *, j, k, l, proc_rank, t_step, m, n, p
+                                STOP "Error"
+                            end if
+                        end do
+                    end do
+                end do
             end do
-            call s_write_data_files(q_cons_ts(1)%vf, t_step)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
             nt = int((t_step - t_step_start)/(t_step_save))

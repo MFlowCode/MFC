@@ -1,57 +1,25 @@
-tags
-src/*/tags
+/build/
+.vscode/
+src/*/case.fpp
+src/*/autogen/
 
 *.swo
 *.swp
 
 *:Zone.Identifier
 
-.vscode/
 .nfs*
-defaults.yaml
 
 __pycache__
 
-CMakeFiles/
-CMakeCache.txt
-Makefile
-cmake_install.cmake
-
 *.egg-info
 
-/build/
-toolchain/build/
-
-src/*/*.mod
-src/*/*.o
-src/*/autogen/
-src/common/case.fpp
-src/pre_process/pre_process
-src/simulation/simulation
-src/post_process/post_process
-src/master_scripts/*.pyc
-src/*/.build
-src/*/case.*
-src/master_scripts/__*
-make_doc.sh
-cases/
 .DS_Store
 
-tests/**/*.log
-tests/*.txt
-tests/*/**
-!**/golden.txt
-
-tests_hypoelastic/*/D/*
-tests_hypoelastic/*/p*
-tests_hypoelastic/*/D_*
-tests_hypoelastic/*/*.inp
-tests_hypoelastic/*/*.inf
-tests_hypoelastic/*/*.dat
-tests_hypoelastic/*/silo*
-tests_hypoelastic/*/restart*
-tests_hypoelastic/*/*.out
-tests_hypoelastic/*/binary
+/tests/**/*.log
+/tests/*.txt
+/tests/*/**
+!/tests/golden.txt
 
 examples/*batch/*/
 examples/*/D/*
@@ -69,15 +37,3 @@ examples/*/fort.1
 examples/*/pre_process.sh
 examples/*/simulation.sh
 examples/*/post_process.sh
-
-doc/*/MFC_user_guide.bbl
-doc/*/MFC_user_guide.blg
-doc/*/MFC_user_guide.aux
-doc/*/MFC_user_guide.toc
-doc/*/MFC_user_guide.fls
-doc/*/MFC_user_guide.synctex.gz
-doc/*/MFC_user_guide.log
-doc/*/MFC_user_guide.fdb_latexmk
-
-doc/Doxygen/*/html
-doc/Doxygen/*icon*
