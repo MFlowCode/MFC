@@ -124,19 +124,19 @@ program p_main
         call s_write_grid_to_formatted_database_file(t_step)
 
         ! Computing centered finite-difference coefficients in x-direction
-        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt) then
+        if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
             call s_compute_finite_difference_coefficients(m, offset_x, x_cc, &
                                                           fd_coeff_x)
         end if
 
         ! Computing centered finite-difference coefficients in y-direction
-        if (omega_wrt(1) .or. omega_wrt(3) .or. (n > 0 .and. schlieren_wrt)) then
+        if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. (n > 0 .and. schlieren_wrt)) then
             call s_compute_finite_difference_coefficients(n, offset_y, y_cc, &
                                                           fd_coeff_y)
         end if
 
         ! Computing centered finite-difference coefficients in z-direction
-        if (omega_wrt(1) .or. omega_wrt(2) .or. (p > 0 .and. schlieren_wrt)) then
+        if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. (p > 0 .and. schlieren_wrt)) then
             call s_compute_finite_difference_coefficients(p, offset_z, z_cc, &
                                                           fd_coeff_z)
         end if
@@ -429,6 +429,17 @@ program p_main
                 end if
             end do
         end if
+        ! ----------------------------------------------------------------------
+
+        ! Adding Q_M to the formatted database file ------------------
+		if (p > 0 .and. qm_wrt) then
+			call s_derive_qm(q_prim_vf, q_sf)
+
+			write (varname, '(A)') 'qm'
+			call s_write_variable_to_formatted_database_file(varname, t_step)
+
+			varname(:) = ' '
+		end if
         ! ----------------------------------------------------------------------
 
         ! Adding numerical Schlieren function to formatted database file -------
