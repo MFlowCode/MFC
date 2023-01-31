@@ -26,6 +26,7 @@ module m_derived_variables
  s_derive_sound_speed, &
  s_derive_flux_limiter, &
  s_derive_vorticity_component, &
+ s_derive_qm, &
  s_derive_numerical_schlieren_function, &
  s_finalize_derived_variables_module
 
@@ -568,6 +569,92 @@ contains
         end if
 
     end subroutine s_derive_vorticity_component ! --------------------------
+
+	!> This subroutine gets as inputs the primitive variables. From those
+		!!		inputs, it proceeds to calculate the value of the Q_M 
+		!!		function, which are subsequently stored in the derived flow
+		!!		quantity storage variable, q_sf.
+		!!	@param q_prim_vf Primitive variables
+		!!	@param q_sf Q_M
+	subroutine s_derive_qm(q_prim_vf,q_sf)
+		type(scalar_field), &
+            dimension(sys_size), &
+            intent(IN) :: q_prim_vf
+
+        real(kind(0d0)), &
+            dimension(-offset_x%beg:m + offset_x%end, &
+                      -offset_y%beg:n + offset_y%end, &
+                      -offset_z%beg:p + offset_z%end), &
+            intent(INOUT) :: q_sf
+
+        real(kind(0d0)), &
+            dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
+
+		real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
+        integer :: j, k, l, r, jj, kk !< Generic loop iterators
+
+        do l = -offset_z%beg, p + offset_z%end
+            do k = -offset_y%beg, n + offset_y%end
+                do j = -offset_x%beg, m + offset_x%end
+
+					! Get velocity gradient tensor
+                    q_jacobian_sf(:, :) = 0d0
+					
+                    do r = -fd_number, fd_number
+						do jj = 1, 3
+							! d()/dx
+							q_jacobian_sf(jj, 1) = &
+								q_jacobian_sf(jj, 1)+ &
+								fd_coeff_x(r, j)* &
+								q_prim_vf(mom_idx%beg+jj-1)%sf(r + j, k, l)
+							! d()/dy
+							q_jacobian_sf(jj, 2) = &
+								q_jacobian_sf(jj, 2)+ &
+								fd_coeff_y(r, k)* &
+								q_prim_vf(mom_idx%beg+jj-1)%sf(j, r + k, l)
+							! d()/dz
+							q_jacobian_sf(jj, 3) = &
+								q_jacobian_sf(jj, 3)+ &
+								fd_coeff_z(r, l)* &
+								q_prim_vf(mom_idx%beg+jj-1)%sf(j, k, r + l)
+						end do
+					end do
+					
+					! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
+					do jj = 1, 3
+						do kk = 1, 3
+							S(jj, kk) = 0.5D0* &
+							(q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
+							O(jj, kk) = 0.5D0* &
+							(q_jacobian_sf(jj, kk) - q_jacobian_sf(kk, jj))
+						end do
+					end do
+					
+					! Compute S2 = S*S'
+					do jj = 1, 3
+						do kk = 1, 3
+							O2(jj, kk) = O(jj,1)*O(kk,1)+ &
+										 O(jj,2)*O(kk,2)+ &
+										 O(jj,3)*O(kk,3)
+							S2(jj, kk) = S(jj,1)*S(kk,1)+ &
+										 S(jj,2)*S(kk,2)+ &
+										 S(jj,3)*S(kk,3)
+						end do
+					end do
+					
+					! Compute Q
+					Q = 0.5*((O2(1,1)+O2(2,2)+O2(3,3))- &
+							 (S2(1,1)+S2(2,2)+S2(3,3)))
+					trS = S(1,1)+S(2,2)+S(3,3)
+					IIS = 0.5*((S(1,1)+S(2,2)+S(3,3))**2- &
+							   (S2(1,1)+S2(2,2)+S2(3,3)))
+					q_sf(j, k, l) = Q+IIS
+
+                end do
+            end do
+        end do		
+
+	end subroutine s_derive_qm
 
     !>  This subroutine gets as inputs the conservative variables
         !!      and density. From those inputs, it proceeds to calculate
