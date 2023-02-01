@@ -41,11 +41,11 @@ If you use MFC, consider citing it:
 
 ```bibtex
 @article{Bryngelson_2021,
-  title = {MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
+  title = {{MFC: A}n open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
   author = {Spencer H. Bryngelson and Kevin Schmidmayer and Vedran Coralic and Jomela C. Meng and Kazuki Maeda and Tim Colonius},
   journal = {Computer Physics Communications},
   doi = {10.1016/j.cpc.2020.107396},
-  year = 2021,
+  year = {2021},
   pages = {107396},
 }
 ```
@@ -59,5 +59,5 @@ MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
  
 <p align="justify">
   MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
-  MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE, now ACCESS), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit under allocation CFD154 (PI Bryngelson).
+  MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE, now ACCESS), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit, Crusher, and Wombat under allocation CFD154 (PI Bryngelson).
 </p>
