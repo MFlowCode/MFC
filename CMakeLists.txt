@@ -148,6 +148,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 ## === HANDLE_SOURCES
+# Gather F90 source files for a given target, including common/, and preprocessing .fpp -> .f90.
 # Outputs:
 #  - <target>_SRCs: List of F90 source filepaths for src/[<target>,common]/ (including .fpp -> .f90)
 macro(HANDLE_SOURCES target)
@@ -188,55 +189,30 @@ macro(HANDLE_SOURCES target)
     endforeach()
 endmacro()
 
-
 HANDLE_SOURCES(pre_process)
 HANDLE_SOURCES(simulation)
 HANDLE_SOURCES(post_process)
 
-# === === src/pre_process
-if (MFC_PRE_PROCESS)
-    add_executable(pre_process ${pre_process_SRCs})
 
-    if (MFC_MPI)
+## === MFC_SETUP_TARGET
+# Setup a target with the following options:
+#  - TARGET:  Target name
+#  - SOURCES: List of source files
+#  - OpenACC: Can be compiled with OpenACC
+#  - MPI:     Can be compiled with MPI
+function(MFC_SETUP_TARGET)
+    cmake_parse_arguments(ARGS "OpenACC;MPI" "TARGET" "SOURCES" ${ARGN})
+
+    add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+
+    if (MFC_MPI AND ARGS_MPI)
         find_package(MPI COMPONENTS Fortran REQUIRED)
 
-        target_compile_definitions(pre_process PRIVATE MFC_MPI)
-        target_link_libraries     (pre_process PRIVATE MPI::MPI_Fortran)
+        target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_MPI)
+        target_link_libraries     (${ARGS_TARGET} PRIVATE MPI::MPI_Fortran)
     endif()
 
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-        target_compile_options(pre_process PRIVATE -h noacc -x acc)
-    endif()
-
-    target_compile_definitions(pre_process PRIVATE MFC_PRE_PROCESS)
-
-    install(TARGETS pre_process RUNTIME DESTINATION bin)
-endif()
-
-
-# === === src/simulation
-if (MFC_SIMULATION)
-    add_executable(simulation ${simulation_SRCs})
-
-    if (MFC_MPI)
-        find_package(MPI COMPONENTS Fortran REQUIRED)
-
-        target_compile_definitions(simulation PRIVATE MFC_MPI)
-        target_link_libraries     (simulation PRIVATE MPI::MPI_Fortran)
-    endif()
-
-    # === === === FFTW
-    if (MFC_OpenACC AND (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
-        find_package(CUDAToolkit REQUIRED)
-
-        target_link_libraries(simulation PRIVATE CUDA::cudart CUDA::cufft)
-    else()
-        find_package(FFTW REQUIRED)
-
-        target_link_libraries(simulation PRIVATE FFTW::FFTW)
-    endif()
-
-    if (MFC_OpenACC)
+    if (MFC_OpenACC AND ARGS_OpenACC)
         find_package(OpenACC)
 
         # This should be equivalent to if (NOT OpenACC_FC_FOUND)
@@ -244,10 +220,10 @@ if (MFC_SIMULATION)
             message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
         endif()
 
-        target_link_libraries(simulation PRIVATE OpenACC::OpenACC_Fortran)
+        target_link_libraries(${ARGS_TARGET} PRIVATE OpenACC::OpenACC_Fortran)
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-            target_compile_options(simulation PRIVATE
+            target_compile_options(${ARGS_TARGET} PRIVATE
                 "-foffload=amdgcn-amdhsa='-march=gfx90a'"
                 "-foffload-options=-lgfortran\ -lm"
                 "-fno-exceptions")
@@ -259,38 +235,71 @@ if (MFC_SIMULATION)
                     "built without support for it, disallowing the use of "
                     "cu_tensor=T. This can result in degraded performance.")
             else()
-                target_link_libraries     (simulation PRIVATE cuTENSOR::cuTENSOR)
-                target_compile_definitions(simulation PRIVATE MFC_cuTENSOR)
+                target_link_libraries     (${ARGS_TARGET} PRIVATE cuTENSOR::cuTENSOR)
+                target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_cuTENSOR)
             endif()
 
             if     (CMAKE_BUILD_TYPE STREQUAL "Release")
-                target_compile_options(simulation
+                target_compile_options(${ARGS_TARGET}
                     PRIVATE -gpu=keep,ptxinfo,lineinfo
                 )
             elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
-                target_compile_options(simulation
+                target_compile_options(${ARGS_TARGET}
                     PRIVATE -gpu=keep,ptxinfo,lineinfo,autocompare,debug
                 )
             endif()
         endif()
     elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-        target_compile_options(simulation PRIVATE -h noacc -x acc)
+        target_compile_options(${ARGS_TARGET} PRIVATE -h noacc -x acc)
+    endif()
+
+    string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
+
+    target_compile_definitions(${ARGS_TARGET} PRIVATE "MFC_${ARGS_TARGET_UPPER}")
+
+    install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
+endfunction()
+
+
+if (MFC_PRE_PROCESS)
+    MFC_SETUP_TARGET(
+        TARGET  pre_process
+        SOURCES "${pre_process_SRCs}"
+        MPI
+    )
+endif()
+
+
+if (MFC_SIMULATION)
+    MFC_SETUP_TARGET(
+        TARGET simulation
+        SOURCES "${simulation_SRCs}"
+        MPI OpenACC
+    )
+
+    if (MFC_OpenACC AND (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
+        find_package(CUDAToolkit REQUIRED)
+
+        target_link_libraries(simulation PRIVATE CUDA::cudart CUDA::cufft)
+    else()
+        find_package(FFTW REQUIRED)
+
+        target_link_libraries(simulation PRIVATE FFTW::FFTW)
     endif()
 
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
         find_package(CUDAToolkit REQUIRED)
         target_link_libraries(simulation PRIVATE CUDA::nvToolsExt)
     endif()
-
-    target_compile_definitions(simulation PRIVATE MFC_SIMULATION)
-
-    install(TARGETS simulation RUNTIME DESTINATION bin)
 endif()
 
 
-# === === src/post_process
 if (MFC_POST_PROCESS)
-    add_executable(post_process ${post_process_SRCs})
+    MFC_SETUP_TARGET(
+        TARGET  post_process
+        SOURCES "${post_process_SRCs}"
+        MPI
+    )
 
     find_package(FFTW REQUIRED)
     find_package(SILO REQUIRED)
@@ -298,23 +307,8 @@ if (MFC_POST_PROCESS)
 
     target_link_libraries(post_process PRIVATE SILO::SILO HDF5::HDF5 FFTW::FFTW)
 
-    if (MFC_MPI)
-        find_package(MPI COMPONENTS Fortran REQUIRED)
-
-        target_compile_definitions(post_process PRIVATE MFC_MPI)
-        target_link_libraries     (post_process PRIVATE MPI::MPI_Fortran)
-    endif()
-
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-        target_compile_options(post_process PRIVATE -h noacc -x acc)
-    endif()
-
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
-    target_compile_definitions(post_process PRIVATE MFC_POST_PROCESS)
-    target_compile_options    (post_process PRIVATE -O0)
-
-
-    install(TARGETS post_process RUNTIME DESTINATION bin)
+    target_compile_options(post_process PRIVATE -O0)
 endif()
 
 
@@ -345,7 +339,7 @@ macro(GEN_DOCS target name)
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/Doxyfile"
-                "${${target}_srcs}"
+                "${${target}_SRCs}"
         COMMAND "${DOXYGEN_EXECUTABLE}"
                 "Doxyfile"
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}"
@@ -404,4 +398,3 @@ if (MFC_DOCUMENTATION)
     # === === Generate Landing Page
     GEN_DOCS(documentation "MFC")
 endif()
-
