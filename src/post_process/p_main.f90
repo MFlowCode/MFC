@@ -34,7 +34,7 @@ program p_main
     use m_derived_variables     !< Procedures used to compute quantites derived
                                 !! from the conservative and primitive variables
 
-    use m_helper
+    !use m_helper
     ! ==========================================================================
 
     implicit none
