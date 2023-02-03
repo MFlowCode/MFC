@@ -126,24 +126,21 @@ program p_main
         call s_write_grid_to_formatted_database_file(t_step)
 
         ! Computing centered finite-difference coefficients in x-direction
-        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt) then
-            call s_compute_finite_difference_coefficients(m, x_cc, &
-                                                          fd_coeff_x, buff_size, &
-                                                           fd_number, fd_order)
+        if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
+            call s_compute_finite_difference_coefficients(m, offset_x, x_cc, &
+                                                          fd_coeff_x)
         end if
 
         ! Computing centered finite-difference coefficients in y-direction
-        if (omega_wrt(1) .or. omega_wrt(3) .or. (n > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(n, y_cc, &
-                                                          fd_coeff_y, buff_size, &
-                                                           fd_number, fd_order)
+        if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. (n > 0 .and. schlieren_wrt)) then
+            call s_compute_finite_difference_coefficients(n, offset_y, y_cc, &
+                                                          fd_coeff_y)
         end if
 
         ! Computing centered finite-difference coefficients in z-direction
-        if (omega_wrt(1) .or. omega_wrt(2) .or. (p > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(p, z_cc, &
-                                                          fd_coeff_z, buff_size, &
-                                                          fd_number, fd_order)
+        if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. (p > 0 .and. schlieren_wrt)) then
+            call s_compute_finite_difference_coefficients(p, offset_z, z_cc, &
+                                                          fd_coeff_z)
         end if
 
         ! Adding the partial densities to the formatted database file ----------
@@ -260,17 +257,6 @@ program p_main
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
 
-!                    if (fourier_decomp) then
-!                        dft_q_sf(:,:,:) = q_sf(:,:,:)
-!                        do j = fourier_modes%beg, fourier_modes%end
-!                            IF (ANY(j == (/1,2,3,5,7,9/))) THEN
-!                            q_sf(:,:,:) = dft_q_sf(:,:,:)
-!                            CALL s_apply_fourier_decomposition(q_sf,j)
-!                            WRITE(varname, '(A,I0,A,I0)') 'tau', i, '_', j
-!                            CALL s_write_variable_to_formatted_database_file(varname,t_step)
-!                           END IF
-!                        end do
-!                    else
                     write (varname, '(A,I0)') 'tau', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
@@ -434,6 +420,17 @@ program p_main
                 end if
             end do
         end if
+        ! ----------------------------------------------------------------------
+
+        ! Adding Q_M to the formatted database file ------------------
+		if (p > 0 .and. qm_wrt) then
+			call s_derive_qm(q_prim_vf, q_sf)
+
+			write (varname, '(A)') 'qm'
+			call s_write_variable_to_formatted_database_file(varname, t_step)
+
+			varname(:) = ' '
+		end if
         ! ----------------------------------------------------------------------
 
         ! Adding numerical Schlieren function to formatted database file -------

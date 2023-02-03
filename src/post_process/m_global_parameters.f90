@@ -187,6 +187,7 @@ module m_global_parameters
     logical :: cons_vars_wrt
     logical :: c_wrt
     logical, dimension(3) :: omega_wrt
+    logical :: qm_wrt
     logical :: schlieren_wrt
     !> @}
 
@@ -260,7 +261,7 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Logistics
-        case_dir = ' '
+        case_dir = '.'
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
@@ -319,6 +320,7 @@ contains
         cons_vars_wrt = .false.
         c_wrt = .false.
         omega_wrt = .false.
+		qm_wrt = .false.
         schlieren_wrt = .false.
 
         schlieren_alpha = dflt_real
@@ -581,7 +583,7 @@ contains
         buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
                         offset_y%end, offset_z%beg, offset_z%end)
 
-        if (any(omega_wrt) .or. schlieren_wrt) then
+        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if

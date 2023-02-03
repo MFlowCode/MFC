@@ -323,7 +323,7 @@ program p_main
             call cpu_time(start)
             !  call nvtxStartRange("I/O")
             do i = 1, sys_size
-!$acc update host(q_cons_ts(1)%vf(i)%sf)
+                !$acc update host(q_cons_ts(1)%vf(i)%sf)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -335,7 +335,7 @@ program p_main
                     end do
                 end do
             end do
-            call s_write_data_files(q_cons_ts(1)%vf, t_step)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
             nt = int((t_step - t_step_start)/(t_step_save))

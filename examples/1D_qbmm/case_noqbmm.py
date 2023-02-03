@@ -78,7 +78,6 @@ Nt     = int(Nout*Nfiles)
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================
-    'case_dir'                     : '\'.\'',
     'run_time_info'                : 'F',
     # ==========================================================
 

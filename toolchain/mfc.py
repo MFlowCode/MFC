@@ -16,19 +16,19 @@ def __print_greeting():
 
     host_line    = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
     targets_line = f"[bold]--targets {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in ARG('targets')], 'None')}[/bold]"
+    help_line    = "$ ./mfc.sh \[build, run, test, clean] --help"
 
     MFC_SIDEBAR_LINES = [
         "",
         f"[bold]{host_line}[/bold]",
         '-' * len(host_line),
-        "",
         f"[bold]--jobs [magenta]{ARG('jobs')}[/magenta][/bold]"
     ] + [
         f"[bold]--{'' if getattr(state.gCFG, field.name) else 'no-'}{field.name}[/bold]" for field in dataclasses.fields(state.gCFG)
     ] + [
         targets_line if ARG("command") != "test" else "",
-        "",
-        "[yellow]$ ./mfc.sh \[build, run, test, clean] --help[/yellow]",
+        '-' * len(help_line),
+        f"[yellow]{help_line}[/yellow]",
     ]
 
     for a, b in itertools.zip_longest(MFC_LOGO_LINES, MFC_SIDEBAR_LINES):
