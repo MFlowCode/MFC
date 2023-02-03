@@ -35,7 +35,7 @@ module m_time_steppers
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
-    type(scalar_field), private, allocatable, dimension(:) :: q_prim_vf !<
+    type(scalar_field), allocatable, dimension(:) :: q_prim_vf !<
     !! Cell-average primitive variables at the current time-stage
 
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<

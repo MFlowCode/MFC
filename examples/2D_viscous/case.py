@@ -15,7 +15,6 @@ c_l,     c_g = math.sqrt( ( p_l+4.E8)/rho_l ), math.sqrt( 1.4*p_g/rho_g )
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
-    'case_dir'                     : '\'.\'',
     'run_time_info'                : 'T',
     # ==========================================================================
 

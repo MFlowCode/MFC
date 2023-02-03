@@ -17,6 +17,8 @@ module m_mpi_proxy
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
+
+    use m_mpi_common
     ! ==========================================================================
 
     implicit none
@@ -44,105 +46,6 @@ module m_mpi_proxy
 
 contains
 
-    !>  The subroutine intializes the MPI environment and queries
-        !!      both the number of processors that will be available for
-        !!      the job as well as the local processor rank.
-    subroutine s_mpi_initialize() ! ----------------------------
-
-#ifndef MFC_MPI
-
-        ! Serial run only has 1 processor
-        num_procs = 1
-        ! Local processor rank is 0
-        proc_rank = 0
-
-#else
-
-        ! Establishing the MPI environment
-        call MPI_INIT(ierr)
-
-        ! Checking whether the MPI environment has been properly intialized
-        if (ierr /= MPI_SUCCESS) then
-            print '(A)', 'Unable to initialize MPI environment. Exiting ...'
-            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-        end if
-
-        ! Querying number of processors available for the job
-        call MPI_COMM_SIZE(MPI_COMM_WORLD, num_procs, ierr)
-
-        ! Identifying the rank of the local processor
-        call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
-
-#endif
-
-    end subroutine s_mpi_initialize ! --------------------------
-
-    !> The subroutine terminates the MPI execution environment.
-    subroutine s_mpi_abort() ! ---------------------------------------------
-
-#ifndef MFC_MPI
-
-        stop 1
-
-#else
-
-        ! Terminating the MPI environment
-        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-
-#endif
-
-    end subroutine s_mpi_abort ! -------------------------------------------
-
-    !> This subroutine defines local and global sizes for the data
-    !> @name q_cons_vf Conservative variables
-    subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_cons_vf
-
-#ifdef MFC_MPI
-
-        integer, dimension(num_dims) :: sizes_glb, sizes_loc
-        integer :: ierr
-
-        integer :: i !< Generic loop iterator
-
-        do i = 1, sys_size
-            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
-        end do
-
-        ! Define global(g) and local(l) sizes for flow variables
-        sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
-        if (n > 0) then
-            sizes_glb(2) = n_glb + 1; sizes_loc(2) = n + 1
-            if (p > 0) then
-                sizes_glb(3) = p_glb + 1; sizes_loc(3) = p + 1
-            end if
-        end if
-
-        ! Define the view for each variable
-        do i = 1, sys_size
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
-        end do
-
-#endif
-
-    end subroutine s_initialize_mpi_data ! ---------------------------------
-
-    !>Halts all processes until all have reached barrier.
-    subroutine s_mpi_barrier() ! -------------------------------------------
-
-#ifdef MFC_MPI
-
-        ! Calling MPI_BARRIER
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
-#endif
-
-    end subroutine s_mpi_barrier ! -----------------------------------------
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
@@ -262,7 +165,7 @@ contains
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
             & 'coarsen_silo', 'E_wrt', 'pres_wrt', 'gamma_wrt',                & 
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', & 
-            & 'prim_vars_wrt', 'c_wrt', 'schlieren_wrt', 'bubbles',            &
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles',   &
             & 'polytropic', 'fourier_decomp', 'polydisperse' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -1461,41 +1364,6 @@ contains
 
     end subroutine s_mpi_sendrecv_cons_vars_buffer_regions ! ---------------
 
-    !>  The following subroutine takes the first element of the
-        !!      2-element inputted variable and determines its maximum
-        !!      value on the entire computational domain. The result is
-        !!      stored back into the first element of the variable while
-        !!      the rank of the processor that is in charge of the sub-
-        !!      domain containing the maximum is stored into the second
-        !!      element of the variable.
-        !!  @param var_loc On input, this variable holds the local value and processor rank,
-        !!  which are to be reduced among all the processors in communicator.
-        !!  On output, this variable holds the maximum value, reduced amongst
-        !!  all of the local values, and the process rank to which the value
-        !!  belongs.
-    subroutine s_mpi_reduce_maxloc(var_loc) ! ------------------------------
-
-        real(kind(0d0)), dimension(2), intent(INOUT) :: var_loc
-
-#ifdef MFC_MPI
-
-        real(kind(0d0)), dimension(2) :: var_glb  !<
-            !! Temporary storage variable that holds the reduced maximum value
-            !! and the rank of the processor with which the value is associated
-
-        ! Performing reduction procedure and eventually storing its result
-        ! into the variable that was initially inputted into the subroutine
-        call MPI_REDUCE(var_loc, var_glb, 1, MPI_2DOUBLE_PRECISION, &
-                        MPI_MAXLOC, 0, MPI_COMM_WORLD, ierr)
-
-        call MPI_BCAST(var_glb, 1, MPI_2DOUBLE_PRECISION, &
-                       0, MPI_COMM_WORLD, ierr)
-
-        var_loc = var_glb
-
-#endif
-
-    end subroutine s_mpi_reduce_maxloc ! -----------------------------------
 
     !>  This subroutine gathers the Silo database metadata for
         !!      the spatial extents in order to boost the performance of
@@ -1733,16 +1601,5 @@ contains
 
     end subroutine s_finalize_mpi_proxy_module ! -------------------------
 
-    !> Finalization of all MPI related processes
-    subroutine s_mpi_finalize() ! ------------------------------
-
-#ifdef MFC_MPI
-
-        ! Terminating the MPI environment
-        call MPI_FINALIZE(ierr)
-
-#endif
-
-    end subroutine s_mpi_finalize ! ----------------------------
 
 end module m_mpi_proxy

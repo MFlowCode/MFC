@@ -32,6 +32,9 @@ contains
             !! Generic logical used for the purpose of asserting whether a file
             !! is or is not present in the designated location
 
+        integer :: iostatus
+            !! Integer to check iostat of file read
+
         ! Namelist for all of the parameters to be inputed by the user
         namelist /user_inputs/ case_dir, m, n, p, t_step_start, &
             t_step_stop, t_step_save, model_eqns, &
@@ -43,7 +46,7 @@ contains
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
             cons_vars_wrt, prim_vars_wrt, c_wrt, &
-            omega_wrt, schlieren_wrt, schlieren_alpha, &
+            omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, coarsen_silo, fourier_decomp, &
@@ -60,7 +63,14 @@ contains
         if (file_check) then
             open (1, FILE=trim(file_loc), FORM='formatted', &
                   STATUS='old', ACTION='read')
-            read (1, NML=user_inputs)
+            read (1, NML=user_inputs, iostat=iostatus)
+
+            if (iostatus /= 0) then
+                print '(A)', 'Invalid line in post_process.inp. It is '// &
+                'likely due to a datatype mismatch. Exiting ...'
+                call s_mpi_abort()
+            end if
+
             close (1)
             ! Store m,n,p into global m,n,p
             m_glb = m

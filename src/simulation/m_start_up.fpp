@@ -72,6 +72,9 @@ contains
         logical :: file_exist !<
             !! Logical used to check the existence of the input file
 
+        integer :: iostatus
+            !! Integer to check iostat of file read
+
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
@@ -107,7 +110,15 @@ contains
                   FORM='formatted', &
                   ACTION='read', &
                   STATUS='old')
-            read (1, NML=user_inputs); close (1)
+            read (1, NML=user_inputs, iostat=iostatus)
+
+            if (iostatus /= 0) then
+                print '(A)', 'Invalid line in simulation.inp. It is '// &
+                'likely due to a datatype mismatch. Exiting ...'
+                call s_mpi_abort()
+            end if
+
+            close (1)
 
             ! Store BC information into global BC
             bc_x_glb%beg = bc_x%beg

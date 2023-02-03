@@ -43,7 +43,7 @@ contains
 #ifdef _WIN32
         call system('rmdir "'//dir_name//'" /s /q')
 #else
-        call system('rm -rf "'//dir_name//'"')
+        call system('rm -r "'//dir_name//'"')
 #endif
 
     end subroutine s_delete_directory

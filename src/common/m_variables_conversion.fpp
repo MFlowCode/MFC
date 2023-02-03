@@ -173,8 +173,8 @@ contains
 
         ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
+        rho_sf   (i, j, k) = rho
+        gamma_sf (i, j, k) = gamma
         pi_inf_sf(i, j, k) = pi_inf
 #endif
 
@@ -257,9 +257,9 @@ contains
 
         ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
-        pi_inf_sf(i, j, k) = pi_inf
+        rho_sf   (j, k, l) = rho
+        gamma_sf (j, k, l) = gamma
+        pi_inf_sf(j, k, l) = pi_inf
 #endif
 
     end subroutine s_convert_species_to_mixture_variables_bubbles ! ----------------
@@ -352,9 +352,9 @@ contains
 
         ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
-        pi_inf_sf(i, j, k) = pi_inf
+        rho_sf   (k, l, r) = rho
+        gamma_sf (k, l, r) = gamma
+        pi_inf_sf(k, l, r) = pi_inf
 #endif
 
     end subroutine s_convert_species_to_mixture_variables ! ----------------

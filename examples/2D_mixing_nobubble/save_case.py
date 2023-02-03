@@ -50,7 +50,6 @@ vf0  = 1.E-12
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================
-    'case_dir'                     : '\'.\'',
     'run_time_info'                : 'T',
     # ==========================================================
 

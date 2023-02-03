@@ -116,7 +116,7 @@ POST_PROCESS = COMMON + [
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
-    'schlieren_wrt', 'schlieren_alpha', 'fd_order'
+    'qm_wrt', 'schlieren_wrt', 'schlieren_alpha', 'fd_order'
 ]
 
 for cmp_id in range(1,3+1):

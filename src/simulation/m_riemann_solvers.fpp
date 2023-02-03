@@ -592,9 +592,6 @@ contains
                             @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
                                     vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
 
-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
-
                             @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
                                     vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
 
@@ -997,7 +994,7 @@ contains
                     !ME3
 
 !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms)
+!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end

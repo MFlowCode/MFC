@@ -16,8 +16,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  tests:
-    name: Test Suite
+  github:
+    name: (GitHub) Test Suite
     strategy:
       matrix:
         include:
@@ -44,9 +44,34 @@ jobs:
       - name: Setup
         if:   matrix.os == 'ubuntu-latest'
         run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-
+       
       - name: Build
         run:  /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
         run:  /bin/bash mfc.sh test  -j $(nproc)
+
+  self:
+    name: (Self) Test Suite
+    strategy:
+      matrix:
+        include:
+          - os: self-hosted
+    runs-on: ${{ matrix.os }}
+    if: github.repository == 'MFlowCode/MFC'
+    steps:
+      - name: Clone
+        uses: actions/checkout@v3
+          
+      - name: Setup
+        if:
+        run:  |
+          module use /opt/nvidia/hpc_sdk/modulefiles/
+          module load nvhpc/22.11
+        
+      - name: Build
+        run:  /bin/bash mfc.sh build -j $(nproc)
+
+      - name: Test Suite
+        run:  /bin/bash mfc.sh test  -j $(nproc)
+

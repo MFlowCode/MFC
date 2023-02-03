@@ -8,7 +8,6 @@ Nt   = 50
 mydt = 0.0005
 
 BASE_CFG = {
-    'case_dir'                     : '\'.\'',
     'run_time_info'                : 'T',
     'm'                            : 0,
     'n'                            : 0,

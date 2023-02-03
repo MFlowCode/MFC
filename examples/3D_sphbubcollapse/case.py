@@ -5,7 +5,6 @@ import json
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
-    'case_dir'                     : '\'.\'',
     'run_time_info'                : 'T',
     # ==========================================================================
 

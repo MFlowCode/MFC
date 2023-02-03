@@ -208,7 +208,7 @@ contains
         integer :: i !< Generic loop operator
 
         ! Logistics
-        case_dir = ' '
+        case_dir = '.'
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int

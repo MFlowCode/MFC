@@ -84,6 +84,9 @@ contains
             !! Generic logical used for the purpose of asserting whether a file
             !! is or is not present in the designated location
 
+        integer :: iostatus
+            !! Integer to check iostat of file read
+
         ! Namelist for all of the parameters to be inputed by the user
         namelist /user_inputs/ case_dir, old_grid, old_ic, &
             t_step_old, m, n, p, x_domain, y_domain, z_domain, &
@@ -111,7 +114,12 @@ contains
         if (file_check) then
             open (1, FILE=trim(file_loc), FORM='formatted', &
                   STATUS='old', ACTION='read')
-            read (1, NML=user_inputs)
+            read (1, NML=user_inputs, iostat=iostatus)
+            if (iostatus /= 0) then
+                print '(A)', 'Invalid line in pre_process.inp. It is '// &
+                'likely due to a datatype mismatch. Exiting ...'
+                call s_mpi_abort()
+            end if
             close (1)
             ! Store m,n,p into global m,n,p
             m_glb = m
