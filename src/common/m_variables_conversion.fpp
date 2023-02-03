@@ -4,6 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'inline_conversions.fpp'
+#:include 'inline_computation.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -724,7 +725,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                        @:comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
                         
                         !$acc loop seq
                         do i = bubxb, bubxe
