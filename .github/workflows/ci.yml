@@ -64,14 +64,19 @@ jobs:
         uses: actions/checkout@v3
           
       - name: Setup
-        if:
+        run:  echo "test"
+        
+      - name: Build
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc/22.11
-        
-      - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc)
+          export PATH=$PATH:"/opt/nvidia/hpc_sdk/Linux_x86_64/22.5/compilers/bin"
+          /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
-        run:  /bin/bash mfc.sh test  -j $(nproc)
+        run:  |
+          module use /opt/nvidia/hpc_sdk/modulefiles/
+          module load nvhpc/22.11
+          export PATH=$PATH:"/opt/nvidia/hpc_sdk/Linux_x86_64/22.5/compilers/bin"
+          /bin/bash mfc.sh test  -j $(nproc)
 
