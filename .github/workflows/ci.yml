@@ -51,8 +51,8 @@ jobs:
       - name: Test Suite
         run:  /bin/bash mfc.sh test  -j $(nproc)
 
-  self:
-    name: (Self) Test Suite
+  self-cpu:
+    name: (Self) Test Suite - CPU
     strategy:
       matrix:
         include:
@@ -77,4 +77,31 @@ jobs:
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc/22.11
           /bin/bash mfc.sh test  -j 4
+
+  self-gpu:
+    name: (Self) Test Suite - GPU
+    strategy:
+      matrix:
+        include:
+          - os: self-hosted
+    runs-on: ${{ matrix.os }}
+    if: github.repository == 'MFlowCode/MFC'
+    steps:
+      - name: Clone
+        uses: actions/checkout@v3
+          
+      - name: Setup
+        run:  echo "test"
+        
+      - name: Build
+        run:  |
+          module use /opt/nvidia/hpc_sdk/modulefiles/
+          module load nvhpc/22.11
+          /bin/bash mfc.sh build -j 4 --gpu
+
+      - name: Test Suite
+        run:  |
+          module use /opt/nvidia/hpc_sdk/modulefiles/
+          module load nvhpc/22.11
+          /bin/bash mfc.sh test  -b mpirun --gpu
 
