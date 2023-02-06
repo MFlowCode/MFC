@@ -70,13 +70,11 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc/22.11
-          export PATH=$PATH:"/opt/nvidia/hpc_sdk/Linux_x86_64/22.5/compilers/bin"
           /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc/22.11
-          export PATH=$PATH:"/opt/nvidia/hpc_sdk/Linux_x86_64/22.5/compilers/bin"
           /bin/bash mfc.sh test  -j $(nproc)
 
