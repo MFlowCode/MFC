@@ -64,6 +64,8 @@ module m_data_output
 
 contains
 
+        @:comp_n_from_cons()
+
     !>  Writes grid and initial condition data files to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf The conservative variables
@@ -185,7 +187,7 @@ contains
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
                             
-                            @:comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
+                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
 
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if

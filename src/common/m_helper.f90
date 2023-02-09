@@ -30,7 +30,7 @@ module m_helper
 contains
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
-
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
@@ -39,7 +39,7 @@ contains
     end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
 
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: cyl_x, cyl_y
 
         sph_phi = atan(cyl_y/cyl_x)
@@ -51,6 +51,7 @@ contains
         !! @param offset Thickness
         !! @param a Starting position
     function f_r(myth, offset, a)
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: myth, offset, a
         real(kind(0d0)) :: b
         real(kind(0d0)) :: f_r
@@ -438,7 +439,7 @@ contains
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weight)
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
@@ -455,7 +456,7 @@ contains
         !! @param func is the bubble dynamic variables for each bin
         !! @param mom is the computed moment
     subroutine s_quad(func, mom, weight)
-
+        !$acc routine seq
         real(kind(0.d0)), dimension(nb), intent(IN) :: func
         real(kind(0.d0)), intent(OUT) :: mom
         real(kind(0.d0)), dimension(nb) :: weight

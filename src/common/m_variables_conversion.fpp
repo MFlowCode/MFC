@@ -104,6 +104,8 @@ module m_variables_conversion
 
 contains
 
+    @:comp_n_from_cons()
+
     !>  This procedure conditionally calculates the appropriate pressure
         !! @param energy Energy
         !! @param alf Void Fraction
@@ -725,7 +727,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        @:comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
                         
                         !$acc loop seq
                         do i = bubxb, bubxe
