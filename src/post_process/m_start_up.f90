@@ -212,11 +212,11 @@ contains
             call s_mpi_abort()
 
             ! Constraints on the boundary conditions in the x-direction
-        elseif (bc_x%beg < -12 .or. bc_x%beg > -1) then
+        elseif (bc_x%beg < -14 .or. bc_x%beg > -1) then
             print '(A)', 'Unsupported choice for the value of '// &
                 'bc_x%beg. Exiting ...'
             call s_mpi_abort()
-        elseif (bc_x%end < -12 .or. bc_x%end > -1) then
+        elseif (bc_x%end < -14 .or. bc_x%end > -1) then
             print '(A)', 'Unsupported choice for the value of '// &
                 'bc_x%end. Exiting ...'
             call s_mpi_abort()
@@ -235,7 +235,7 @@ contains
                    .or. &
                    (cyl_coord .and. p == 0)) &
                   .and. &
-                  (bc_y%beg < -12 .or. bc_y%beg > -1)) &
+                  (bc_y%beg < -14 .or. bc_y%beg > -1)) &
                  .or. &
                  (cyl_coord .and. p > 0 &
                   .and. &
@@ -245,7 +245,7 @@ contains
             call s_mpi_abort()
         elseif (bc_y%end /= dflt_int &
                 .and. &
-                (bc_y%end < -12 .or. bc_y%end > -1)) then
+                (bc_y%end < -14 .or. bc_y%end > -1)) then
             print '(A)', 'Unsupported choice for the value of '// &
                 'bc_y%end. Exiting ...'
             call s_mpi_abort()
@@ -274,13 +274,13 @@ contains
             ! Constraints on the boundary conditions in the z-direction
         elseif (bc_z%beg /= dflt_int &
                 .and. &
-                (bc_z%beg < -12 .or. bc_z%beg > -1)) then
+                (bc_z%beg < -14 .or. bc_z%beg > -1)) then
             print '(A)', 'Unsupported choice for the value of '// &
                 'bc_z%beg. Exiting ...'
             call s_mpi_abort()
         elseif (bc_z%end /= dflt_int &
                 .and. &
-                (bc_z%end < -12 .or. bc_z%end > -1)) then
+                (bc_z%end < -14 .or. bc_z%end > -1)) then
             print '(A)', 'Unsupported choice for the value of '// &
                 'bc_z%end. Exiting ...'
             call s_mpi_abort()

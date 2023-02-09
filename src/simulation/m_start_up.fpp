@@ -376,10 +376,10 @@ contains
                 'riemann_solver and avg_state. '// &
                 'Exiting ...'
             call s_mpi_abort()
-        elseif (bc_x%beg < -12 .or. bc_x%beg > -1) then
+        elseif (bc_x%beg < -14 .or. bc_x%beg > -1) then
             print '(A)', 'Unsupported value of bc_x%beg. Exiting ...'
             call s_mpi_abort()
-        elseif (bc_x%end < -12 .or. bc_x%end > -1) then
+        elseif (bc_x%end < -14 .or. bc_x%end > -1) then
             print '(A)', 'Unsupported value of bc_x%end. Exiting ...'
             call s_mpi_abort()
         elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
@@ -390,7 +390,7 @@ contains
             call s_mpi_abort()
         elseif (bc_y%beg /= dflt_int &
                 .and. &
-                (((cyl_coord .neqv. .true.) .and. (bc_y%beg < -12 .or. bc_y%beg > -1)) &
+                (((cyl_coord .neqv. .true.) .and. (bc_y%beg < -14 .or. bc_y%beg > -1)) &
                  .or. &
                  (cyl_coord .and. p == 0 .and. bc_y%beg /= -2) &
                  .or. &
@@ -399,7 +399,7 @@ contains
             call s_mpi_abort()
         elseif (bc_y%end /= dflt_int &
                 .and. &
-                (bc_y%end < -12 .or. bc_y%end > -1)) then
+                (bc_y%end < -14 .or. bc_y%end > -1)) then
             print '(A)', 'Unsupported value of bc_y%end. Exiting ...'
             call s_mpi_abort()
         elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
@@ -422,12 +422,12 @@ contains
             call s_mpi_abort()
         elseif (bc_z%beg /= dflt_int &
                 .and. &
-                (bc_z%beg < -12 .or. bc_z%beg > -1)) then
+                (bc_z%beg < -14 .or. bc_z%beg > -1)) then
             print '(A)', 'Unsupported value of bc_z%beg. Exiting ...'
             call s_mpi_abort()
         elseif (bc_z%end /= dflt_int &
                 .and. &
-                (bc_z%end < -12 .or. bc_z%end > -1)) then
+                (bc_z%end < -14 .or. bc_z%end > -1)) then
             print '(A)', 'Unsupported value of bc_z%end. Exiting ...'
             call s_mpi_abort()
         elseif ((p == 0 .and. bc_z%beg /= dflt_int) &

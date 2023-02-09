@@ -9,6 +9,7 @@
 !!              stiffened equation of state and mixture relations. At this time,
 !!              the following CBC are available:
 !!                           1) Slip Wall
+!!                           *) NoSlip Wall
 !!                           2) Nonreflecting Subsonic Buffer
 !!                           3) Nonreflecting Subsonic Inflow
 !!                           4) Nonreflecting Subsonic Outflow
@@ -39,6 +40,7 @@ module m_cbc
         !> Abstract interface to the procedures that are utilized to calculate
         !! the L variables. For additional information refer to the following:
         !!            1) s_compute_slip_wall_L
+        !!            *) s_compute_noslip_wall_L
         !!            2) s_compute_nonreflecting_subsonic_buffer_L
         !!            3) s_compute_nonreflecting_subsonic_inflow_L
         !!            4) s_compute_nonreflecting_subsonic_outflow_L
@@ -97,6 +99,8 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:) :: dalpha_rho_ds !< Spatial derivatives in s-dir of partial density
     real(kind(0d0)), allocatable, dimension(:) :: dvel_ds !< Spatial derivatives in s-dir of velocity
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
+    real(kind(0d0)) :: dpres_dtrv1 !< Spatial derivatives in s-dir of pressure
+    real(kind(0d0)) :: dpres_dtrv2 !< Spatial derivatives in s-dir of pressure
     real(kind(0d0)), allocatable, dimension(:) :: dadv_ds !< Spatial derivatives in s-dir of advection variables
 
     !! Note that these are only obtained in those cells on the domain boundary along which the
@@ -108,9 +112,9 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
     ! CBC Coefficients =========================================================
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: fd_coef_x !< Finite diff. coefficients x-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: fd_coef_y !< Finite diff. coefficients y-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: fd_coef_z !< Finite diff. coefficients z-dir
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
@@ -319,7 +323,7 @@ contains
         ! Allocating/Computing CBC Coefficients in x-direction =============
         if (all((/bc_x%beg, bc_x%end/) <= -5)) then
 
-            allocate (fd_coef_x(0:buff_size, -1:1))
+            allocate (fd_coef_x(0:buff_size, 1:3, -1:1))
 
             if (weno_order > 1) then
                 allocate (pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
@@ -330,7 +334,7 @@ contains
 
         elseif (bc_x%beg <= -5) then
 
-            allocate (fd_coef_x(0:buff_size, -1:-1))
+            allocate (fd_coef_x(0:buff_size, 1:3, -1:-1))
 
             if (weno_order > 1) then
                 allocate (pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
@@ -340,7 +344,7 @@ contains
 
         elseif (bc_x%end <= -5) then
 
-            allocate (fd_coef_x(0:buff_size, 1:1))
+            allocate (fd_coef_x(0:buff_size, 1:3, 1:1))
 
             if (weno_order > 1) then
                 allocate (pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
@@ -356,7 +360,7 @@ contains
 
             if (all((/bc_y%beg, bc_y%end/) <= -5)) then
 
-                allocate (fd_coef_y(0:buff_size, -1:1))
+                allocate (fd_coef_y(0:buff_size, 1:3, -1:1))
 
                 if (weno_order > 1) then
                     allocate (pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
@@ -367,7 +371,7 @@ contains
 
             elseif (bc_y%beg <= -5) then
 
-                allocate (fd_coef_y(0:buff_size, -1:-1))
+                allocate (fd_coef_y(0:buff_size, 1:3, -1:-1))
 
                 if (weno_order > 1) then
                     allocate (pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
@@ -377,7 +381,7 @@ contains
 
             elseif (bc_y%end <= -5) then
 
-                allocate (fd_coef_y(0:buff_size, 1:1))
+                allocate (fd_coef_y(0:buff_size, 1:3, 1:1))
 
                 if (weno_order > 1) then
                     allocate (pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
@@ -395,7 +399,7 @@ contains
 
             if (all((/bc_z%beg, bc_z%end/) <= -5)) then
 
-                allocate (fd_coef_z(0:buff_size, -1:1))
+                allocate (fd_coef_z(0:buff_size, 1:3, -1:1))
 
                 if (weno_order > 1) then
                     allocate (pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
@@ -406,7 +410,7 @@ contains
 
             elseif (bc_z%beg <= -5) then
 
-                allocate (fd_coef_z(0:buff_size, -1:-1))
+                allocate (fd_coef_z(0:buff_size, 1:3, -1:-1))
 
                 if (weno_order > 1) then
                     allocate (pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
@@ -416,7 +420,7 @@ contains
 
             elseif (bc_z%end <= -5) then
 
-                allocate (fd_coef_z(0:buff_size, 1:1))
+                allocate (fd_coef_z(0:buff_size, 1:3, 1:1))
 
                 if (weno_order > 1) then
                     allocate (pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
@@ -484,19 +488,47 @@ contains
         if (cbc_dir == ${CBC_DIR}$) then
             if (weno_order == 1) then
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -2d0/(ds(0) + ds(1))
-                fd_coef_${XYZ}$(1, cbc_loc) = -fd_coef_${XYZ}$(0, cbc_loc)
+                fd_coef_${XYZ}$(:, 1 ,cbc_loc) = 0d0
+                fd_coef_${XYZ}$(0, 1 ,cbc_loc) = -2d0/(ds(0) + ds(1))
+                fd_coef_${XYZ}$(1, 1 ,cbc_loc) = -fd_coef_${XYZ}$(0, 1, cbc_loc)
+
+                ! Finite difference coefficient for transverse directions
+                if (cbc_dir == 1) then
+                    ! Trv1
+                    fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                    fd_coef_${XYZ}$(0, 2, cbc_loc) = -2d0/(dy(0) + dy(1))
+                    fd_coef_${XYZ}$(1, 2, cbc_loc) = -fd_coef_${XYZ}$(0, 2, cbc_loc)
+
+                    if (p > 0) then
+                    ! Trv2
+                        fd_coef_${XYZ}$(:, 3, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 3, cbc_loc) = -2d0/(dz(0) + dz(1))
+                        fd_coef_${XYZ}$(1, 3, cbc_loc) = -fd_coef_${XYZ}$(0, 3, cbc_loc)
+                    end if
+
+                elseif (cbc_dir == 2) then
+                    ! Trv1
+                    fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                    fd_coef_${XYZ}$(0, 2, cbc_loc) = -2d0/(dx(0) + dx(1))
+                    fd_coef_${XYZ}$(1, 2, cbc_loc) = -fd_coef_${XYZ}$(0, 2, cbc_loc)
+
+                    if (p > 0) then
+                    ! Trv2
+                        fd_coef_${XYZ}$(:, 3, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 3, cbc_loc) = -2d0/(dz(0) + dz(1))
+                        fd_coef_${XYZ}$(1, 3, cbc_loc) = -fd_coef_${XYZ}$(0, 3, cbc_loc)
+                    end if
+                end if
 
                 ! ==================================================================
 
                 ! Computing CBC2 Coefficients ======================================
             elseif (weno_order == 3) then
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                fd_coef_${XYZ}$(1, cbc_loc) = -4d0*fd_coef_${XYZ}$(0, cbc_loc)/3d0
-                fd_coef_${XYZ}$(2, cbc_loc) = fd_coef_${XYZ}$(0, cbc_loc)/3d0
+                fd_coef_${XYZ}$(:, 1, cbc_loc) = 0d0
+                fd_coef_${XYZ}$(0, 1, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
+                fd_coef_${XYZ}$(1, 1, cbc_loc) = -4d0*fd_coef_${XYZ}$(0, 1, cbc_loc)/3d0
+                fd_coef_${XYZ}$(2, 1, cbc_loc) = fd_coef_${XYZ}$(0, 1, cbc_loc)/3d0
 
                 pi_coef_${XYZ}$(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
@@ -505,14 +537,109 @@ contains
                 ! Computing CBC4 Coefficients ======================================
             else
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
+                fd_coef_${XYZ}$(:, 1, cbc_loc) = 0d0
+                fd_coef_${XYZ}$(0, 1, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
                                                - 1d1*ds(2) + 1d1*ds(3) &
                                                - 3d0*ds(4))
-                fd_coef_${XYZ}$(1, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(4, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(1, 1, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 1, cbc_loc)/25d0
+                fd_coef_${XYZ}$(2, 1, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 1, cbc_loc)/25d0
+                fd_coef_${XYZ}$(3, 1, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 1, cbc_loc)/25d0
+                fd_coef_${XYZ}$(4, 1, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 1, cbc_loc)/25d0
+
+                ! Finite difference coefficient for transverse directions
+
+                if (cbc_dir == 1) then
+                    ! Trv1
+                    fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                    fd_coef_${XYZ}$(0, 2, cbc_loc) = -50d0/(25d0*dy(0) + 2d0*dy(1) &
+                                                   - 1d1*dy(2) + 1d1*dy(3) &
+                                                   - 3d0*dy(4))
+                    fd_coef_${XYZ}$(1, 2, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                    fd_coef_${XYZ}$(2, 2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                    fd_coef_${XYZ}$(3, 2, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                    fd_coef_${XYZ}$(4, 2, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+
+                    if (p > 0) then
+                    ! Trv2
+                        fd_coef_${XYZ}$(:, 3, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 3, cbc_loc) = -50d0/(25d0*dz(0) + 2d0*dz(1) &
+                                                       - 1d1*dz(2) + 1d1*dz(3) &
+                                                       - 3d0*dz(4))
+                        fd_coef_${XYZ}$(1, 3, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(2, 3, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(3, 3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(4, 3, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                    end if
+
+                elseif (cbc_dir == 2) then
+                    ! Trv1
+                    fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                    fd_coef_${XYZ}$(0, 2, cbc_loc) = -50d0/(25d0*dx(0) + 2d0*dx(1) &
+                                                   - 1d1*dx(2) + 1d1*dx(3) &
+                                                   - 3d0*dx(4))
+                    fd_coef_${XYZ}$(1, 2, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                    fd_coef_${XYZ}$(2, 2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                    fd_coef_${XYZ}$(3, 2, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                    fd_coef_${XYZ}$(4, 2, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+
+                    if (p > 0) then
+                    ! Trv2
+                        fd_coef_${XYZ}$(:, 3, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 3, cbc_loc) = -50d0/(25d0*dz(0) + 2d0*dz(1) &
+                                                       - 1d1*dz(2) + 1d1*dz(3) &
+                                                       - 3d0*dz(4))
+                        fd_coef_${XYZ}$(1, 3, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(2, 3, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(3, 3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(4, 3, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                    end if
+
+                elseif (cbc_dir == 3) then
+
+                    if (all((/m, n/) > 0)) then
+                        ! Trv1
+                        fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 2, cbc_loc) = -50d0/(25d0*dy(0) + 2d0*dy(1) &
+                                                       - 1d1*dy(2) + 1d1*dy(3) &
+                                                       - 3d0*dy(4))
+                        fd_coef_${XYZ}$(1, 2, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(2, 2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(3, 2, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(4, 2, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        ! Trv2
+                        fd_coef_${XYZ}$(:, 3, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 3, cbc_loc) = -50d0/(25d0*dx(0) + 2d0*dx(1) &
+                                                       - 1d1*dx(2) + 1d1*dx(3) &
+                                                       - 3d0*dx(4))
+                        fd_coef_${XYZ}$(1, 3, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(2, 3, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(3, 3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(4, 3, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 3, cbc_loc)/25d0
+
+                    else if (n == 0) then
+                        ! Only one transverse Direction
+                        fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 2, cbc_loc) = -50d0/(25d0*dx(0) + 2d0*dx(1) &
+                                                       - 1d1*dx(2) + 1d1*dx(3) &
+                                                       - 3d0*dx(4))
+                        fd_coef_${XYZ}$(1, 2, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(2, 2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(3, 2, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(4, 2, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+
+                    else if (m == 0) then
+                        ! Only one transverse Direction
+                        fd_coef_${XYZ}$(:, 2, cbc_loc) = 0d0
+                        fd_coef_${XYZ}$(0, 2, cbc_loc) = -50d0/(25d0*dy(0) + 2d0*dy(1) &
+                                                       - 1d1*dy(2) + 1d1*dy(3) &
+                                                       - 3d0*dy(4))
+                        fd_coef_${XYZ}$(1, 2, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(2, 2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(3, 2, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+                        fd_coef_${XYZ}$(4, 2, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, 2, cbc_loc)/25d0
+
+                    end if
+                end if
 
                 pi_coef_${XYZ}$(0, 0, cbc_loc) = &
                     ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
@@ -680,7 +807,7 @@ contains
 
         real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
 
-        integer :: i, j, k, r, q !< Generic loop iterators
+        integer :: i, j, k, r, q, kk, rr !< Generic loop iterators
 
         real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
 
@@ -700,6 +827,9 @@ contains
                               ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
+        !Print*, 'Trv1', dpres_dtrv1, 'is2%end:', is2%end
+
+
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
         if (cbc_dir == ${CBC_DIR}$) then
@@ -862,27 +992,93 @@ contains
                         !$acc loop seq
                         do i = 1, contxe
                             dalpha_rho_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, i)* &
-                                               fd_coef_${XYZ}$(j, cbc_loc) + &
+                                               fd_coef_${XYZ}$(j, 1, cbc_loc) + &
                                                dalpha_rho_ds(i)
                         end do
                         !$acc loop seq
                         do i = 1, num_dims
                             dvel_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, contxe + i)* &
-                                         fd_coef_${XYZ}$(j, cbc_loc) + &
+                                         fd_coef_${XYZ}$(j, 1, cbc_loc) + &
                                          dvel_ds(i)
                         end do
 
                         dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, E_idx)* &
-                                   fd_coef_${XYZ}$(j, cbc_loc) + &
+                                   fd_coef_${XYZ}$(j, 1, cbc_loc) + &
                                    dpres_ds
                         !$acc loop seq
                         do i = 1, advxe - E_idx
                             dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, E_idx + i)* &
-                                         fd_coef_${XYZ}$(j, cbc_loc) + &
+                                         fd_coef_${XYZ}$(j, 1, cbc_loc) + &
                                          dadv_ds(i)
                         end do
                     end do
                     ! ============================================================
+                    ! Compute Transverse Pressure Gradient
+
+                    !Print*, 'Trv1', dpres_dtrv1
+                    !Print*, 'coef:', q_prim_rs${XYZ}$_vf(0, 0:99, r, E_idx)
+                    dpres_dtrv1 = 0d0
+                    dpres_dtrv2 = 0d0
+                    !Print*, 'y:', is2%end, 'value:', q_prim_rs${XYZ}$_vf(0, is2%end-1, r, E_idx)
+
+                    if (weno_order == 5) then
+                        if (k == 1) then
+                               dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, 0, r, E_idx)* (-2d0/(dy(0) + dy(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, 1, r, E_idx)* (2d0/(dy(0) + dy(1)))
+                        elseif (r == 1 .AND. P > 0) then
+                               dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, 0, E_idx)* (-2d0/(dz(0) + dz(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, k, 1, E_idx)* (2d0/(dz(0) + dz(1)))
+                        elseif (k == 2) then
+                               dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, 0, r, E_idx)* (-3d0/(dy(0) + dy(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, 1, r, E_idx)* (4d0/(dy(0) + dy(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, 2, r, E_idx)* (-1d0/(dy(0) + dy(1)))
+                        elseif (r == 2 .AND. P > 0 ) then
+                               dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, 0, E_idx)* (-3d0/(dz(0) + dz(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, k, 1, E_idx)* (4d0/(dz(0) + dz(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, k, 2, E_idx)* (-1d0/(dz(0) + dz(1)))
+
+                              !dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, 0, E_idx)* (-6d0/(3d0*dz(0) + 2d0*dz(1) - dz(2))) + &
+                                             !q_prim_rs${XYZ}$_vf(0, k, 1, E_idx)* (-4d0*(-6d0/(3d0*dz(0) + 2d0*dz(1) - dz(2)))/3d0) + &
+                                             !q_prim_rs${XYZ}$_vf(0, k, 2, E_idx)* ((-6d0/(3d0*dz(0) + 2d0*dz(1) - dz(2)))/3d0)
+                        elseif (k == is2%end-1) then
+                               dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, is2%end - 1, r, E_idx)* (-2d0/(dy(0) + dy(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, is2%end, r, E_idx)* (2d0/(dy(0) + dy(1)))
+                        elseif (r == is3%end-1 .AND. P > 0) then
+                               dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, is3%end - 1, E_idx)* (-2d0/(dz(0) + dz(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, k, is3%end, E_idx)* (2d0/(dz(0) + dz(1)))
+                        elseif (k == is2%end-2) then
+                               dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, is2%end - 2, r, E_idx)* (-3d0/(dy(0) + dy(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, is2%end - 1, r, E_idx)* (4d0/(dy(0) + dy(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, is2%end, r, E_idx)* (-1d0/(dy(0) + dy(1)))
+                        elseif (r == is3%end-2 .AND. P > 0 ) then
+                               dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, is3%end - 2, E_idx)* (-3d0/(dz(0) + dz(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, k, is3%end - 1, E_idx)* (4d0/(dz(0) + dz(1))) + &
+                                             q_prim_rs${XYZ}$_vf(0, k, is3%end, E_idx)* (-1d0/(dz(0) + dz(1)))
+
+                        end if
+                    end if
+
+
+                    if (k > buff_size/2 - 1 .AND. k < is2%end - buff_size/2 + 1) then
+                        ! Trv1
+                        !$acc loop seq
+                        do kk = k - buff_size/2, k + buff_size/2
+                           dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, kk, r, E_idx)* &
+                                    fd_coef_${XYZ}$(kk-k + buff_size/2, 2, cbc_loc) + &
+                                    dpres_dtrv1
+                        end do
+                    end if
+
+                    if (r > buff_size/2 - 1 .AND. r < is3%end - buff_size/2 + 1) then
+                        ! Trv2
+                        !$acc loop seq
+                        do rr = r - buff_size/2, r + buff_size/2
+                           dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, rr, E_idx)* &
+                                    fd_coef_${XYZ}$(rr-r + buff_size/2, 3, cbc_loc) + &
+                                    dpres_dtrv2
+                        end do
+                    end if
+
 
                     ! First-Order Temporal Derivatives of Primitive Variables ====
                     lambda(1) = vel(dir_idx(1)) - c
@@ -904,8 +1100,10 @@ contains
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then
     call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -11) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -11)) then
-     call s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-                    else
+    call s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -14) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -14)) then
+    call s_compute_noslip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dpres_dtrv1, dpres_dtrv2, dvel_ds, dadv_ds) ! --------------
+                    else if ((cbc_loc == -1 .and. bc${XYZ}$b == -12) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -12)) then
     call s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     end if
 
@@ -1061,6 +1259,34 @@ contains
         L(advxe) = L(1)
 
     end subroutine s_compute_slip_wall_L ! ---------------------------------
+
+    !>  The L variables for the slip wall CBC, see pg. 451 of
+        !!      Thompson (1990). At the slip wall (frictionless wall),
+        !!      the normal component of velocity is zero at all times,
+        !!      while the transverse velocities may be nonzero.
+        !!  @param dflt_int Default null integer
+    subroutine s_compute_noslip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dpres_dtrv1, dpres_dtrv2, dvel_ds, dadv_ds) ! --------------
+!$acc routine seq
+        integer, intent(IN) :: dflt_int
+        real(kind(0d0)), dimension(3), intent(IN) :: lambda
+        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
+        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds, dpres_dtrv1, dpres_dtrv2
+        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+
+        integer :: i
+
+        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+
+        L(2) = 0d0
+
+        L(3) = -(dpres_dtrv1/rho)
+
+        L(4) = -(dpres_dtrv2/rho)
+
+        L(adv_idx%end) = L(1)
+
+    end subroutine s_compute_noslip_wall_L ! ---------------------------------
 
     !>  The L variables for the nonreflecting subsonic buffer CBC
         !!      see pg. 13 of Thompson (1987). The nonreflecting subsonic
