@@ -400,10 +400,11 @@ Implementation of the parameterse into the model follow [Ando (2010)](references
 |  -10 | Characteristic | Constant pressure subsonic outflow |
 |  -11 | Characteristic | Supersonic inflow |
 |  -12 | Characteristic | Supersonic outflow |
+|  -14 | Normal         | NoSlip wall |
 	
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions). Their number (`#`)
 corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
-The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90).
+The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90). Please note the boundary condition #-13 is taken for treating the beginning boundary of the radial direction in cylindrical coordinate systems.
 
 ### Patch types
 
