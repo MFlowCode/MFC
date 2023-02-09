@@ -25,6 +25,7 @@ module m_helper
         s_apply_scalar_divergence_theorem, &
         s_compute_fd_gradient, &
         s_comp_n_from_prim, &
+        s_comp_n_from_cons, &
         s_quad
 
 contains
@@ -438,19 +439,39 @@ contains
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weight)
+    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
         !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
         real(kind(0.d0)) :: R3
-        real(kind(0.d0)), dimension(nb) :: weight
+        integer :: i
 
-        call s_quad(Rtmp**3.d0, R3, weight)  !returns itself if NR0 = 1
+        R3 = 0d0
+        do i = 1, nb
+            R3 = R3 + weight(i)*(Rtmp(i)**3d0)
+        end do
+
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-        ! ntmp = 1d0
-
     end subroutine s_comp_n_from_prim
+
+    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
+        !$acc routine seq
+        real(kind(0.d0)), intent(IN) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
+        real(kind(0.d0)), intent(OUT) :: ntmp
+    
+        real(kind(0.d0)) :: nR3
+        integer :: i
+
+        nR3 = 0d0
+        do i = 1, nb
+            nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
+        end do
+
+        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+
+    end subroutine s_comp_n_from_cons
 
     !> Computes the quadrature for polydisperse bubble populations
         !! @param func is the bubble dynamic variables for each bin

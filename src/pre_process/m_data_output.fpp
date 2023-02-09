@@ -3,7 +3,7 @@
 !! @brief Contains module m_data_output
 
 #:include 'inline_conversions.fpp'
-#:include 'inline_computation.fpp'
+!#:include 'inline_computation.fpp'
 
 !> @brief This module takes care of writing the grid and initial condition
 !!              data files into the "0" time-step directory located in the folder
@@ -28,6 +28,8 @@ module m_data_output
     use m_compile_specific
 
     use m_variables_conversion
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -63,8 +65,6 @@ module m_data_output
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
-
-        @:comp_n_from_cons()
 
     !>  Writes grid and initial condition data files to the "0"
         !!  time-step directory in the local processor rank folder

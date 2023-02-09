@@ -11,8 +11,13 @@
         real(kind(0.d0)), intent(OUT) :: ntmp
     
         real(kind(0.d0)) :: nR3
-    
-        call s_quad(nRtmp**3.d0, nR3, weight)  !returns itself if NR0 = 1
+        integer :: i
+
+        nR3 = 0d0
+        do i = 1, nb
+            nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
+        end do
+
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons

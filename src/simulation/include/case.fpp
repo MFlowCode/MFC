@@ -8,4 +8,4 @@
 #:set weno_polyn = 2
 #:set nb         = 1
 #:set num_dims   = 3
-#:set nterms     = 12
+#:set nterms     = 6
