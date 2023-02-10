@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # Note: If C is not included as a language,
 # FIND_LIBRARY_USE_LIB64_PATHS is ignored.

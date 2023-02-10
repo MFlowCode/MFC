@@ -14,9 +14,6 @@
   <a href="https://lbesson.mit-license.org/">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
   </a>
-  <a href="https://zenodo.org/badge/latestdoi/198475661">
-    <img src="https://zenodo.org/badge/198475661.svg" alt="DOI">
-  </a>
 </p>
 
 <p align="justify">
