@@ -3,7 +3,6 @@
 !! @brief Contains module m_data_output
 
 #:include 'inline_conversions.fpp'
-!#:include 'inline_computation.fpp'
 
 !> @brief This module takes care of writing the grid and initial condition
 !!              data files into the "0" time-step directory located in the folder

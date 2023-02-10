@@ -4,7 +4,6 @@
 
 #:include 'macros.fpp'
 #:include 'inline_conversions.fpp'
-!#:include 'inline_computation.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
