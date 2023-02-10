@@ -312,7 +312,7 @@ else
 fi
 
 if [ "$bShouldInstallCMake" = true ]; then
-    version="3.24.2"
+    version="3.25.2"
     arch="$(uname -m)"
 
     bErrorDoSelfDownload=false
