@@ -31,7 +31,6 @@
         
 # 57 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/include/inline_conversions.fpp"
 # 7 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp" 2
-!#:include 'inline_computation.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -530,85 +529,85 @@ contains
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
 
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 allocate(gammas (1:num_fluids))
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc enter data create(gammas (1:num_fluids))
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+! ================================================
+# 504 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+
+
 # 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
 # 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
-
-
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
-! ================================================
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 allocate(pi_infs(1:num_fluids))
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc enter data create(pi_infs(1:num_fluids))
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+! ================================================
+# 505 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+
+
 # 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
 # 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
-
-
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
-! ================================================
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 allocate(Gs     (1:num_fluids))
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc enter data create(Gs     (1:num_fluids))
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  ALLOCATE (src/common/macros.fpp) ====
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 507 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 506 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
 
         do i = 1, num_fluids
@@ -622,31 +621,31 @@ allocate(Gs     (1:num_fluids))
 
         if (any(Re_size > 0)) then
 
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 allocate(Res(1:2, 1:maxval(Re_size)))
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc enter data create(Res(1:2, 1:maxval(Re_size)))
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  ALLOCATE (src/common/macros.fpp) ====
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 519 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 518 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
             
             do i = 1, 2
@@ -661,31 +660,31 @@ allocate(Res(1:2, 1:maxval(Re_size)))
 
         if (bubbles) then
 
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 allocate(bubrs(1:nb))
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc enter data create(bubrs(1:nb))
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  ALLOCATE (src/common/macros.fpp) ====
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ================================================
-# 532 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 531 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
 
             do i = 1, nb
@@ -1206,60 +1205,60 @@ allocate(bubrs(1:nb))
 #endif
 
 
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN DEALLOCATE (src/common/macros.fpp) ====
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 deallocate(gammas, pi_infs, Gs)
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc exit data delete(gammas, pi_infs, Gs)
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  DEALLOCATE (src/common/macros.fpp) ====
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1051 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1050 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
         
         if (bubbles) then
 
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==== BEGIN DEALLOCATE (src/common/macros.fpp) ====
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 deallocate(bubrs)
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 !$acc exit data delete(bubrs)
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ====  END  DEALLOCATE (src/common/macros.fpp) ====
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 ! ==================================================
-# 1054 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
+# 1053 "/Users/benwilfong/Documents/software/MFC-Wilfong/src/common/m_variables_conversion.fpp"
 
         end if
 
