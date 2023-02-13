@@ -82,14 +82,16 @@ for binpath in {MFC::BINARIES}; do
 #>srun                                   \
 #>     --nodes={nodes}                   \
 #>     --ntasks-per-node {cpus_per_node} \
-#>     --mpi=pmi2		       \
-#>     "{MFC::BIN}"
+#>     --mpi=pmi2		                 \
+#>     {MFC::PROFILER} "{MFC::BIN}"
 #>
-#> srun --mpi=pmix   \
-#>      "{MFC::BIN}"
+#> srun --mpi=pmix                   \
+#>      {MFC::PROFILER} "{MFC::BIN}"
 #>
 
-    mpirun -np {nodes*tasks_per_node} "$binpath"
+    mpirun                         \
+        -np {nodes*tasks_per_node} \
+        {MFC::PROFILER} $binpath"
 
 done
 
