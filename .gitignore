@@ -21,6 +21,10 @@ __pycache__
 /tests/*/**
 !/tests/golden.txt
 
+# NVIDIA Nsight Compute
+*.nsys-rep
+*.sqlite
+
 examples/*batch/*/
 examples/*/D/*
 examples/*/p*
