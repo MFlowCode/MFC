@@ -132,12 +132,12 @@ if [ "$1" == "load" ]; then
         MODULES=("${MODULES[@]}" "python/3.8.5")
     elif [ "$u_computer" == "p" ]; then # Phoenix
         if [ "$u_cg" == "c" ]; then
-            MODULES=("intel/19.0.5" "mvapich2/2.3.2")
+            MODULES=("gcc/10.3.0-o57x6h" "mvapich2/2.3.6-ouywal")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("cuda/11.2" "nvhpc/22.1")
+            MODULES=("cuda/11.7.0-7sdye3" "nvhpc/22.11")
         fi
 
-        MODULES=("${MODULES[@]}" "python/3.7.4" "cmake/3.20.3")
+        MODULES=("${MODULES[@]}" "python/3.9.12-rkxvr6" "cmake/3.23.1-327dbl")
     elif [ "$u_computer" == "c" ]; then # Crusher
         if [ "$u_cg" == "c" ]; then
             MODULES=()
