@@ -422,6 +422,12 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 11   | Sweep plane 	  | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		  | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 3D analytical 	| 3     | N      | Assigns the primitive variables as analytical functions |
+| 14   | Spherical Harmonic | 3 |  N     | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |   
+| 15   | 1D analytical  | 1     |  N     | Assigns the primitive variables as analytical functions  |
+| 16   | 1D bubble pulse | 1    |  N     | Requires `x_centroid`, `length_x` |
+| 17   | Spiral          | 2    |  N     | Requires `[x,y]_centroid` |
+| 18   | 2D Varcircle    | 2    |  Y     | Requires `[x,y]_centroid`, `radius`, and `thickness` |
+| 19   | 3D Varcircle    | 3    |  Y     | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types). This includes
 types exclusive to one-, two-, and three-dimensional problems. The patch type number (`#`)
@@ -446,7 +452,7 @@ The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux
 ### Monopole supports
 
 | #    | Description |
-| ---: | :----       |
+| --- | ----       |
 |    1 | 1D normal to x-axis      |
 |    2 | 2D semi-infinite source plane         |
 |    3 | 3D semi-infinite source plane along some lines       |
@@ -457,6 +463,44 @@ The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux
 The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
 types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
 $i$ is the monopole source index.
+
+### Conservative Variables Ordering
+
+| 5-eqn | 6-eqn |
+| ----  |  ---- |
+| num_fluids continuity variables | num_fluids continuity variables        |
+| num_dims momentum variables   | num_dims momentum variables          |
+| 1 energy variable                     | 1 energy variable                            |
+| num_fluids advection variables       | num_fluids advection variables              |
+| N/A                                             | num_fluids internal energy variables |
+
+The above variables are used for all simulations:
+
+| 5-eqn | 6-eqn |
+| ----  |  ---- |
+| sub-grid bubble variables | N/A |
+| hypoelastic variables     | N/A |
+
+The above variables correspond to optional physics:
+
+### Primitive Variables Ordering
+
+| 5-eqn | 6-eqn |
+| ---- | ---- |
+| num_fluids densities          | num_fluids densities          |
+| num_dims velocities           | num_dims velocities           |
+| 1 pressure                    | 1 pressure                    |
+| num_fluids volume fractions   | num_fluids volume fractions   |
+| N/A                           | num_fluids partial pressures  |
+
+The above variables are used for all simualtions:
+
+| 5-eqn | 6-eqn |
+| ----  |  ---- |
+| sub-grid bubble variables | N/A |
+| hypoelastic variables     | N/A |
+
+The above variables correspond to optional physics:
 
 ## Running
 
