@@ -468,11 +468,11 @@ $i$ is the monopole source index.
 
 | 5-eqn | 6-eqn |
 | ----  |  ---- |
-| num_fluids continuity variables (\alpha_i\rho_i)| num_fluids continuity variables (\alpha_i\rho_i)         |
-| num_dims momentum variables (\alpha_i\rho_i v)  | num_dims momentum variables (\alpha_i\rho_i v)           |
-| 1 energy variable (\rho E)                      | 1 energy variable (\rho E)                               |
-| num_fluids advection variables (\alpha_i)       | num_fluids advection variables (\alpha_i)                |
-| N/A                                             | num_fluids internal energy variables (\alpha_i\rho_ie_i) |
+| num_fluids continuity variables | num_fluids continuity variables        |
+| num_dims momentum variables   | num_dims momentum variables          |
+| 1 energy variable                     | 1 energy variable                            |
+| num_fluids advection variables       | num_fluids advection variables              |
+| N/A                                             | num_fluids internal energy variables |
 
 The above variables are used for all simulations:
 
