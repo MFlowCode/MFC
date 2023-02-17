@@ -452,7 +452,7 @@ The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux
 ### Monopole supports
 
 | #    | Description |
-| ---: | :----       |
+| --- | ----       |
 |    1 | 1D normal to x-axis      |
 |    2 | 2D semi-infinite source plane         |
 |    3 | 3D semi-infinite source plane along some lines       |
@@ -467,7 +467,7 @@ $i$ is the monopole source index.
 ### Conservative Variables Ordering
 
 | 5-eqn | 6-eqn |
-| ---:  | : --- |
+| ----  |  ---- |
 | num_fluids continuity variables (\alpha_i\rho_i)| num_fluids continuity variables (\alpha_i\rho_i)         |
 | num_dims momentum variables (\alpha_i\rho_i v)  | num_dims momentum variables (\alpha_i\rho_i v)           |
 | 1 energy variable (\rho E)                      | 1 energy variable (\rho E)                               |
@@ -477,7 +477,7 @@ $i$ is the monopole source index.
 The above variables are used for all simulations:
 
 | 5-eqn | 6-eqn |
-| ---:  | : --- |
+| ----  |  ---- |
 | sub-grid bubble variables | N/A |
 | hypoelastic variables     | N/A |
 
@@ -486,6 +486,7 @@ The above variables correspond to optional physics:
 ### Primitive Variables Ordering
 
 | 5-eqn | 6-eqn |
+| ---- | ---- |
 | num_fluids densities          | num_fluids densities          |
 | num_dims velocities           | num_dims velocities           |
 | 1 pressure                    | 1 pressure                    |
@@ -495,7 +496,7 @@ The above variables correspond to optional physics:
 The above variables are used for all simualtions:
 
 | 5-eqn | 6-eqn |
-| ---:  | : --- |
+| ----  |  ---- |
 | sub-grid bubble variables | N/A |
 | hypoelastic variables     | N/A |
 
