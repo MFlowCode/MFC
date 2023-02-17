@@ -458,6 +458,42 @@ The monopole support types available in MFC are listed in table [Monopole suppor
 types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
 $i$ is the monopole source index.
 
+### Conservative Variables Ordering
+
+The following variables are used for all simulations:
+
+| 5-eqn | 6-eqn |
+| ---:  | : --- |
+| num_fluids continuity variables (\alpha_i\rho_i)| num_fluids continuity variables (\alpha_i\rho_i)         |
+| num_dims momentum variables (\alpha_i\rho_i v)  | num_dims momentum variables (\alpha_i\rho_i v)           |
+| 1 energy variable (\rho E)                      | 1 energy variable (\rho E)                               |
+| num_fluids advection variables (\alpha_i)       | num_fluids advection variables (\alpha_i)                |
+| N/A                                             | num_fluids internal energy variables (\alpha_i\rho_ie_i) |
+
+The following variables correspond to optional physics:
+| 5-eqn | 6-eqn |
+| ---:  | : --- |
+| sub-grid bubble variables | N/A |
+| hypoelastic variables     | N/A |
+
+### Primitive Variables Ordering
+
+The following variables are used for all simualtions:
+
+| 5-eqn | 6-eqn |
+| num_fluids densities          | num_fluids densities          |
+| num_dims velocities           | num_dims velocities           |
+| 1 pressure                    | 1 pressure                    |
+| num_fluids volume fractions   | num_fluids volume fractions   |
+| N/A                           | num_fluids partial pressures  |
+
+The following variables correspond to optional physics:
+
+| 5-eqn | 6-eqn |
+| ---:  | : --- |
+| sub-grid bubble variables | N/A |
+| hypoelastic variables     | N/A |
+
 ## Running
 
 MFC can be run using `mfc.sh`'s `run` command. It supports both interactive and
