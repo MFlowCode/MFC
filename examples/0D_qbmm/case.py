@@ -4,12 +4,12 @@ import math, json
 
 x0      = 10.E-06
 p0      = 101325.
-rho0    = 1.E+03
+rho0    = 1000.
 c0      = math.sqrt( p0/rho0 )
 
 # water props ==================================================================
 n_tait  = 7.1
-B_tait  = 306.E+06 / p0
+B_tait  = 306.E+06 
 mul0    = -10.002E-03
 
 #air props
@@ -38,9 +38,9 @@ myr0    = R0ref
 cfl     = 0.1
 Nx      = 30
 Ldomain = 20.E-03
-L       = Ldomain/x0
+L       = Ldomain
 dx      = L/float(Nx)
-dt      = cfl*dx*c0/cact
+dt      = cfl*dx/cact
 Lpulse  = 0.3*Ldomain
 Tpulse  = Lpulse/cact
 Tfinal  = 0.25*10.*Tpulse*c0/x0
@@ -61,14 +61,14 @@ print(json.dumps({
     # ===========================================================================
     
     # Computational Domain Parameters ===========================================
-    'x_domain%beg'                 : -10.E-03/x0,
-    'x_domain%end'                 :  10.E-03/x0,
+    'x_domain%beg'                 : -10.E-03,
+    'x_domain%end'                 :  10.E-03,
     'stretch_x'                    : 'F',
     'cyl_coord'                    : 'F',
     'm'                            : Nx,
     'n'                            : 0,
     'p'                            : 0,
-    'dt'                           : 0.001,
+    'dt'                           : dt,
     't_step_start'                 : 0,
     't_step_stop'                  : 30000,
     't_step_save'                  : 1000,
@@ -110,10 +110,10 @@ print(json.dumps({
     
     'patch_icpp(1)%geometry'       : 1,
     'patch_icpp(1)%x_centroid'     : 0.,
-    'patch_icpp(1)%length_x'       : 20.E-03/x0,
+    'patch_icpp(1)%length_x'       : 20.E-03,
     'patch_icpp(1)%vel(1)'         : 0.0,
-    'patch_icpp(1)%pres'           : 1.0,
-    'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,
+    'patch_icpp(1)%pres'           : p0,
+    'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*rho0,
     'patch_icpp(1)%alpha(1)'       : vf0,
     'patch_icpp(1)%r0'             : 1.,
     'patch_icpp(1)%v0'             : 0.,
