@@ -422,6 +422,12 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 11   | Sweep plane 	  | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		  | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 3D analytical 	| 3     | N      | Assigns the primitive variables as analytical functions |
+| 14   | Spherical Harmonic | 3 |  N     | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |   
+| 15   | 1D analytical  | 1     |  N     | Assigns the primitive variables as analytical functions  |
+| 16   | 1D bubble pulse | 1    |  N     | Requires `x_centroid`, `length_x` |
+| 17   | Spiral          | 2    |  N     | Requires `[x,y]_centroid` |
+| 18   | 2D Varcircle    | 2    |  Y     | Requires `[x,y]_centroid`, `radius`, and `thickness` |
+| 19   | 3D Varcircle    | 3    |  Y     | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types). This includes
 types exclusive to one-, two-, and three-dimensional problems. The patch type number (`#`)
