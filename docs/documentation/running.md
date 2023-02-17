@@ -466,8 +466,6 @@ $i$ is the monopole source index.
 
 ### Conservative Variables Ordering
 
-The following variables are used for all simulations:
-
 | 5-eqn | 6-eqn |
 | ---:  | : --- |
 | num_fluids continuity variables (\alpha_i\rho_i)| num_fluids continuity variables (\alpha_i\rho_i)         |
@@ -476,15 +474,16 @@ The following variables are used for all simulations:
 | num_fluids advection variables (\alpha_i)       | num_fluids advection variables (\alpha_i)                |
 | N/A                                             | num_fluids internal energy variables (\alpha_i\rho_ie_i) |
 
-The following variables correspond to optional physics:
+The above variables are used for all simulations:
+
 | 5-eqn | 6-eqn |
 | ---:  | : --- |
 | sub-grid bubble variables | N/A |
 | hypoelastic variables     | N/A |
 
-### Primitive Variables Ordering
+The above variables correspond to optional physics:
 
-The following variables are used for all simualtions:
+### Primitive Variables Ordering
 
 | 5-eqn | 6-eqn |
 | num_fluids densities          | num_fluids densities          |
@@ -493,12 +492,14 @@ The following variables are used for all simualtions:
 | num_fluids volume fractions   | num_fluids volume fractions   |
 | N/A                           | num_fluids partial pressures  |
 
-The following variables correspond to optional physics:
+The above variables are used for all simualtions:
 
 | 5-eqn | 6-eqn |
 | ---:  | : --- |
 | sub-grid bubble variables | N/A |
 | hypoelastic variables     | N/A |
+
+The above variables correspond to optional physics:
 
 ## Running
 
