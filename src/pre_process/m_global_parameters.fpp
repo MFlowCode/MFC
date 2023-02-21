@@ -20,12 +20,6 @@ module m_global_parameters
 
     ! Logistics ================================================================
     integer :: num_procs            !< Number of processors
-    integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
-    integer, parameter :: path_len = 400  !< Maximum path length
-    integer, parameter :: name_len = 50   !< Maximum name length
-    real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
-    integer, parameter :: dflt_int = -100 !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic               !< Use existing IC data
@@ -158,7 +152,6 @@ module m_global_parameters
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
-    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
@@ -187,9 +180,6 @@ module m_global_parameters
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
-    ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
-    ! ==========================================================================
 
 contains
 
