@@ -69,6 +69,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-o", "--only",        nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
     test.add_argument("-b", "--binary",      choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
+    test.add_argument("-a", "--test-all",  action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
 
     # === RUN ===
