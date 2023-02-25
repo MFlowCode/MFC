@@ -1,4 +1,4 @@
-import argparse, dataclasses
+import re, argparse, dataclasses
 
 from .build     import get_mfc_target_names, get_target_names, get_dependencies_names
 from .common    import format_list_to_string
@@ -115,5 +115,8 @@ started, run ./mfc.sh build -h.""",
     if args["command"] is None:
         parser.print_help()
         exit(-1)
+
+    # "Slugify" the name of the job
+    args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
     return args

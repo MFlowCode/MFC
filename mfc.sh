@@ -115,10 +115,10 @@ if [ "$1" == "load" ]; then
         if [ "$u_cg" == "c" ]; then
             MODULES=("gcc/11.1.0" "openmpi/4.0.5_gcc")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("cuda/11.5.1" "/sw/wombat/Nvidia_HPC_SDK/modulefiles/nvhpc/22.1")
+            MODULES=("nvhpc/22.11")
         fi
 
-        MODULES=("${MODULES[@]}" "cmake/3.22.1" "python/3.9.9")
+        MODULES=("${MODULES[@]}" "cmake/3.25.1" "python/3.10.8")
     elif [ "$u_computer" == "e" ]; then # Expanse
         if [ "$u_cg" == "c" ]; then
             warn "Please set CC=icc, CXX=icx, and FC=ifort."

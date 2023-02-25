@@ -204,5 +204,7 @@ def get_loaded_modules() -> typing.List[str]:
     Returns a list of loaded modules.
     """
 
-    return subprocess.getoutput("module -t list").splitlines()
+    return [ l for l in subprocess.getoutput("module -t list").splitlines() if ' ' not in l ]
+
+
 

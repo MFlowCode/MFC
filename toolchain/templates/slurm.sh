@@ -91,7 +91,7 @@ for binpath in {MFC::BINARIES}; do
 
     mpirun                         \
         -np {nodes*tasks_per_node} \
-        {MFC::PROFILER} $binpath"
+        {MFC::PROFILER} "$binpath"
 
 done
 

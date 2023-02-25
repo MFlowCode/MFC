@@ -38,8 +38,5 @@ examples/*/restart*
 examples/*/*.out
 examples/*/binary
 examples/*/fort.1
-examples/*/pre_process.sh
-examples/*/simulation.sh
-examples/*/post_process.sh
-examples/*/fort.1
 examples/*/*.sh
+examples/*/*.err
