@@ -11,6 +11,8 @@ from ..build   import build_targets
 from .         import pack as packer
 
 import rich, rich.table
+import h5py
+import numpy as np
 
 
 CASES = generate_cases()
@@ -81,7 +83,7 @@ def test():
         return
 
     if not ARG("case_optimization"):
-        build_targets(["pre_process", "simulation"])
+        build_targets(["pre_process", "simulation", "post_process"])
 
     range_str = f"from [bold magenta]{ARG('from')}[/bold magenta] to [bold magenta]{ARG('to')}[/bold magenta]"
 
@@ -110,16 +112,33 @@ def test():
         sched.Task(ppn=case.ppn, func=handle_case, args=[ case ]) for case in CASES
     ]
     sched.sched(tasks, nThreads)
-    
+
     cons.print()
     if nFAIL == 0:
-        cons.print(f"Tested [bold green]✓[/bold green]")
-        cons.unindent()
+        cons.print(f"Tested Simulation [bold green]✓[/bold green]")
     else:
         if nFAIL == 1:
             raise MFCException(f"Testing: There was [bold red]1[/bold red] failure.")
         else:
             raise MFCException(f"Testing: There were [bold red]{nFAIL}[/bold red] failures.")
+
+    if ARG("test_all"):
+        cons.print(f"Now testing post process...")
+        cons.print()
+        nFAIL = 0
+        tasks = [
+            sched.Task(ppn=case.ppn, func=handle_case_post_process, args=[ case ]) for case in CASES
+        ]
+        sched.sched(tasks, nThreads)
+        cons.print()
+        if nFAIL == 0:
+            cons.print(f"Tested Post Process [bold green]✓[/bold green]")
+        else:
+            if nFAIL == 1:
+                raise MFCException(f"Testing: There was [bold red]1[/bold red] failure.")
+            else:
+                raise MFCException(f"Testing: There were [bold red]{nFAIL}[/bold red] failures.")
+    cons.unindent()
 
 
 def handle_case(test: TestCase):
@@ -137,7 +156,7 @@ def handle_case(test: TestCase):
         else:
             tol = 1e-12
 
-        cmd = test.run()
+        cmd = test.run(False)
 
         out_filepath = os.path.join(test.get_dirpath(), "out.txt")
 
@@ -161,6 +180,7 @@ def handle_case(test: TestCase):
             packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
 
         cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+
     except Exception as exc:
         nFAIL = nFAIL + 1
 
@@ -169,3 +189,74 @@ def handle_case(test: TestCase):
 
         cons.print(f"[bold red]Failed test {test}.[/bold red]")
         cons.print(f"{exc}")
+
+def handle_case_post_process(test: TestCase):
+    global nFAIL
+
+    if 'hypoelasticity' in test.params and test.params['hypoelasticity'] == 'T':
+        return
+    
+    try:
+        test.params.update({
+            'parallel_io'       : 'T',
+            'cons_vars_wrt'     : 'T',
+            'prim_vars_wrt'     : 'T',
+            'alpha_rho_wrt(1)'  : 'T',
+            'rho_wrt'           : 'T',
+            'mom_wrt(1)'        : 'T',
+            'vel_wrt(1)'        : 'T',
+            'E_wrt'             : 'T',
+            'pres_wrt'          : 'T',
+            'alpha_wrt(1)'      : 'T',
+            'gamma_wrt'         : 'T',
+            'heat_ratio_wrt'    : 'T',
+            'pi_inf_wrt'        : 'T',
+            'pres_inf_wrt'      : 'T',
+            'c_wrt'             : 'T',
+        })
+
+        if test.params['p'] != 0:
+            test.params['omega_wrt'] = 'T'
+            test.params['fd_order'] = 1
+
+        test.create_directory()
+
+        cmd = test.run(True)
+
+        out_filepath = os.path.join(test.get_dirpath(), "out_pp.txt")
+
+        common.file_write(out_filepath, cmd.stdout)
+
+        if cmd.returncode != 0:
+            cons.print(cmd.stdout)
+            raise MFCException(f"""Test {test}: Failed to execute MFC. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+
+        silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p0', '50.silo')
+        f = h5py.File(silo_filepath, 'r')
+        silo = f['.silo']
+        for key in silo.keys():
+            dataset = silo[key]
+            for data in dataset:
+                check_data(data)
+        
+        cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+
+    except Exception as exc:
+        nFAIL = nFAIL + 1
+
+        if not ARG("relentless"):
+            raise exc
+
+        cons.print(f"[bold red]Failed test {test}.[/bold red]")
+        cons.print(f"{exc}")
+
+def check_data(data):
+    if isinstance(data, np.ndarray):
+        for subdata in data:
+            check_data(subdata)
+    else:
+        if np.isnan(data):
+            raise MFCException(f"""Test {test}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+        if np.isinf(data):
+            raise MFCException(f"""Test {test}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+

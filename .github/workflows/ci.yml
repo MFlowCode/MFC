@@ -49,7 +49,7 @@ jobs:
         run:  /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
-        run:  /bin/bash mfc.sh test  -j $(nproc)
+        run:  /bin/bash mfc.sh test  -j $(nproc) -a
 
   self-cpu:
     name: (Self) Test Suite - CPU
@@ -76,7 +76,7 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc/22.11
-          /bin/bash mfc.sh test  -j 4
+          /bin/bash mfc.sh test  -j 4 -a
 
   self-gpu:
     name: (Self) Test Suite - GPU
@@ -103,5 +103,5 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc/22.11
-          /bin/bash mfc.sh test  -b mpirun --gpu
+          /bin/bash mfc.sh test  -b mpirun --gpu -a
 

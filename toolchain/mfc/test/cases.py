@@ -262,7 +262,6 @@ def generate_cases() -> typing.List[TestCase]:
             if len(dimInfo[0]) >= 3:
                 stack.pop()
 
-
     def alter_hypoelasticity(dimInfo, dimParams):
         # Hypoelasticity checks
         for num_fluids in [1,2]:
