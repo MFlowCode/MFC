@@ -114,19 +114,19 @@ vel = c_a/gama * (psOp0a - 1.) * p0a / ( p0a + pia ) / Ms
 ## Domain boundaries - m
 
 # x direction
-xb = -8.4707/2 * D0
-xe =  9.6226/2 * D0
+xb = -8.4707 * D0
+xe =  9.6226 * D0
 
 #xb = -10 * D0
 #xe = 10 * D0
 
 # y direction
 yb =  0 * D0
-ye =  10/2 * D0
+ye =  10 * D0
 
 # y direction
 zb =  0 * D0
-ze =  10/2 * D0
+ze =  10 * D0
 
 # Stretching factor, to make sure the domaing is sufficiently large after the mesh strecth
 StF = 4.0
