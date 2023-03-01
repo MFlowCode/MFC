@@ -69,13 +69,13 @@ jobs:
       - name: Build
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
+          module load nvhpc
           /bin/bash mfc.sh build -j 4
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
+          module load nvhpc
           /bin/bash mfc.sh test  -j 4 -a
 
   self-gpu:
@@ -96,12 +96,12 @@ jobs:
       - name: Build
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
+          module load nvhpc
           /bin/bash mfc.sh build -j 4 --gpu
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
+          module load nvhpc
           /bin/bash mfc.sh test  -b mpirun --gpu -a
 
