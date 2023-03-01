@@ -101,7 +101,7 @@ class TestCase(case.Case):
         self.ppn   = ppn if ppn is not None else 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self) -> subprocess.CompletedProcess:
+    def run(self, post_process_toggle) -> subprocess.CompletedProcess:
         filepath          = f'"{self.get_dirpath()}/case.py"'
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
@@ -110,10 +110,16 @@ class TestCase(case.Case):
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
                 
-        command: str = f'''\
-{mfc_script} run {filepath} {tasks} {binary_option} {case_optimization} \
-{jobs} -t pre_process simulation 2>&1\
-'''
+        if post_process_toggle:
+            command: str = f'''\
+                {mfc_script} run {filepath} {tasks} {binary_option} {case_optimization} \
+                {jobs} 2>&1\
+                '''
+        else:
+            command: str = f'''\
+                {mfc_script} run {filepath} {tasks} {binary_option} {case_optimization} \
+                {jobs} -t pre_process simulation 2>&1\
+                '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, universal_newlines=True,

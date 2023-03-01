@@ -681,7 +681,7 @@ contains
                     ! If pre-processing, use non acc mixture subroutines
                         if (hypoelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                                                                rho_K, gamma_K, pi_inf_K, Re_K, G_K)
+                                                                rho_K, gamma_K, pi_inf_K, Re_K, G_K, fluid_pp(:)%G)
                         else
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K)
