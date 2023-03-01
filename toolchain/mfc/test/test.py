@@ -192,9 +192,6 @@ def handle_case(test: TestCase):
 
 def handle_case_post_process(test: TestCase):
     global nFAIL
-
-    if 'hypoelasticity' in test.params and test.params['hypoelasticity'] == 'T':
-        return
     
     try:
         test.params.update({
