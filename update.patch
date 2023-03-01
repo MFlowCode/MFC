@@ -1,0 +1,957 @@
+diff --git a/examples/2D_shockbubble/case.py b/examples/2D_shockbubble/case.py
+index 20997d2..09b66fb 100644
+--- a/examples/2D_shockbubble/case.py
++++ b/examples/2D_shockbubble/case.py
+@@ -63,7 +63,7 @@ print(json.dumps({
+     'bc_x%end'                     : -6,
+     'bc_y%beg'                     : -6,
+     'bc_y%end'                     : -6,
+-    # ===================================================   =======================
++    # ==========================================================================
+ 
+     # Formatted Database Files Structure Parameters ============================
+     'format'                       : 1,
+diff --git a/src/common/inline_conversions.fpp b/src/common/inline_conversions.fpp
+index f5cb631..bce61b7 100644
+--- a/src/common/inline_conversions.fpp
++++ b/src/common/inline_conversions.fpp
+@@ -1,56 +1,53 @@
+-!>  This procedure calculates the speed of sound
+-        !! @param pres Pressure
+-        !! @param rho Cell averaged density
+-        !! @param pi_inf Cell averaged liquid stiffness
+-        !! @param gamma Cell averaged specific heat ratio
+-        !! @param H Cell averaged enthalpy
+-        !! @param adv Advection Variables
+-        !! @param vel_sum Sum of all velocities
+-        !! @param q_prim_vf Primitive vars in 1 direction
+-        !! @param flg Helps determine which conditionals to be called.
+-            ! flg >= 2: Check all conditionals
+-            ! flg =  1: Check for alt_soundspeed, otherwise run the 3rd conditional block
+-            ! flg = 0: Check for alt_soundspeed, otherwise use enthalpy
+-        !! @param c Speed of sound
+-        
+-#:def compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, q_prim_vf, j, k, l, flg, c)
+-
+-    if (alt_soundspeed .and. ${flg}$ >= 0) then 
+-        blkmod1 = ((gammas(1) + 1d0)*${pres}$ + & 
+-                    pi_infs(1))/gammas(1) 
+-        blkmod2 = ((gammas(2) + 1d0)*${pres}$ + & 
+-                    pi_infs(2))/gammas(2) 
+-        ${c}$ = (1d0/(${rho}$*(${adv}$(1)/blkmod1 + ${adv}$(2)/blkmod2))) 
+-    elseif (model_eqns == 3 .and. ${flg}$ >= 2) then 
+-        ${c}$ = 0d0 
++#:def s_compute_speed_of_sound()
++    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
++
++        real(kind(0d0)), intent(IN) :: pres
++        real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf
++        real(kind(0d0)), intent(IN) :: H
++        real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
++        real(kind(0d0)), intent(IN) :: vel_sum
++        real(kind(0d0)), intent(OUT) :: c
++
++        real(kind(0d0)) :: blkmod1, blkmod2
++
++        integer :: q
++
++        if (alt_soundspeed) then 
++            blkmod1 = ((gammas(1) + 1d0)*pres + & 
++                        pi_infs(1))/gammas(1)
++            blkmod2 = ((gammas(2) + 1d0)*pres + & 
++                        pi_infs(2))/gammas(2) 
++            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2))) 
++        elseif (model_eqns == 3) then 
++            c = 0d0 
+ !$acc loop seq 
+-        do q = 1, num_fluids 
+-            ${c}$ = ${c}$ + ${q_prim_vf}$(${j}$, ${k}$, ${l}$, q + advxb - 1)*(1d0/gammas(q) + 1d0)* & 
+-                (${q_prim_vf}$(${j}$, ${k}$, ${l}$, E_idx) + pi_infs(q)/(gammas(q) + 1d0)) 
+-        end do 
+-        ${c}$ = ${c}$/${rho}$
+-
+-    elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles) .or. ${flg}$ == 1) &
+-            .and. ${flg}$ >= 1) then
+-        ! Sound speed for bubble mmixture to order O(\alpha)
+-
+-        if (mpp_lim .and. (num_fluids > 1)) then
+-            ${c}$ = (1d0/${gamma}$ + 1d0)* &
+-                  (${pres}$ + ${pi_inf}$)/${rho}$
++            do q = 1, num_fluids 
++                c = c + adv(q)*(1d0/gammas(q) + 1d0)* & 
++                    (pres + pi_infs(q)/(gammas(q) + 1d0)) 
++            end do 
++            c = c/rho
++
++        elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles))) then
++            ! Sound speed for bubble mmixture to order O(\alpha)
++
++            if (mpp_lim .and. (num_fluids > 1)) then
++                c = (1d0/gamma + 1d0)* &
++                      (pres + pi_inf)/rho
++            else
++                c = &
++                    (1d0/gamma + 1d0)* &    
++                    (pres + pi_inf)/ &
++                    (rho*(1d0 - adv(num_fluids)))
++            end if
++        else 
++            c = ((H - 5d-1*vel_sum)/gamma) 
++        end if 
++
++        if (mixture_err .and. c < 0d0) then
++            c = 100.d0*sgm_eps
+         else
+-            ${c}$ = &
+-                (1d0/${gamma}$ + 1d0)* &    
+-                (${pres}$ + ${pi_inf}$)/ &
+-                (${rho}$*(1d0 - ${adv}$(num_fluids)))
++            c = sqrt(c)
+         end if
+-    else 
+-        ${c}$ = ((${H}$ - 5d-1*${vel_sum}$)/${gamma}$) 
+-    end if 
+-
+-    if (mixture_err .and. ${c}$ < 0d0) then
+-        ${c}$ = 100.d0*sgm_eps
+-    else
+-        ${c}$ = sqrt(${c}$)
+-    end if
+-        
+-#:enddef compute_speed_of_sound
++    end subroutine s_compute_speed_of_sound
++#:enddef
++
+diff --git a/src/common/m_variables_conversion.fpp b/src/common/m_variables_conversion.fpp
+index 3089673..b1f8791 100644
+--- a/src/common/m_variables_conversion.fpp
++++ b/src/common/m_variables_conversion.fpp
+@@ -77,7 +77,7 @@ module m_variables_conversion
+ 
+     !! In simulation, gammas and pi_infs is already declared in m_global_variables
+ #ifndef MFC_SIMULATION
+-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
++    real(kind(0d0)), allocatable, public, dimension(:) :: gammas, pi_infs
+     !$acc declare create(gammas, pi_infs)
+ #endif
+ 
+@@ -103,19 +103,26 @@ contains
+     !>  This procedure conditionally calculates the appropriate pressure
+         !! @param energy Energy
+         !! @param alf Void Fraction
++        !! @param stress Shear Stress
++        !! @param mom Momentum
+         !! @param dyn_p Dynamic Pressure
+         !! @param pi_inf Liquid Stiffness
+         !! @param gamma Specific Heat Ratio
+         !! @param pres Pressure to calculate
+-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, pres)      
++    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, pres, stress, mom, G)      
+ !$acc routine seq
+ 
+-        real(kind(0d0)), intent(IN) :: energy, alf
++        real(kind(0d0)), intent(IN) :: energy, alf 
++        real(kind(0d0)), intent(IN), optional :: stress, mom, G
+ 
+         real(kind(0d0)), intent(IN) :: dyn_p
+         real(kind(0d0)), intent(OUT) :: pres
+ 
+-        real(kind(0d0)), intent(IN) :: pi_inf, gamma
++        real(kind(0d0)), intent(IN) :: pi_inf, gamma, rho
++
++        real(kind(0d0)) :: E_e
++
++        integer :: s !< Generic loop iterator
+ 
+         ! Depending on model_eqns and bubbles, the appropriate procedure
+         ! for computing pressure is targeted by the procedure pointer
+@@ -131,6 +138,28 @@ contains
+                 )**(1/gamma + 1) - pi_inf
+         end if
+ 
++        if (hypoelasticity .and. present(G)) then
++            ! calculate elastic contribution to Energy
++            E_e = 0d0
++            do s = stress_idx%beg, stress_idx%end
++                if (G > 0) then
++                    E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
++                    ! Additional terms in 2D and 3D
++                    if ((s == stress_idx%beg + 1) .or. &
++                        (s == stress_idx%beg + 3) .or. &
++                        (s == stress_idx%beg + 4)) then
++                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
++                    end if
++                end if
++            end do
++
++            pres = ( &
++                   energy - &
++                   0.5d0*(mom**2.d0)/rho - &
++                   pi_inf - E_e &
++                   )/gamma
++        end if
++
+     end subroutine s_compute_pressure
+ 
+     !>  This subroutine is designed for the gamma/pi_inf model
+@@ -707,7 +736,7 @@ contains
+                     end do
+                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
+                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
+-                                            dyn_pres_K, pi_inf_K, gamma_K, pres)
++                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
+ 
+                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
+ 
+diff --git a/src/post_process/m_derived_variables.f90 b/src/post_process/m_derived_variables.fpp
+similarity index 91%
+rename from src/post_process/m_derived_variables.f90
+rename to src/post_process/m_derived_variables.fpp
+index df0feca..2cdad7c 100644
+--- a/src/post_process/m_derived_variables.f90
++++ b/src/post_process/m_derived_variables.fpp
+@@ -7,6 +7,9 @@
+ !!      Currently, the available derived variables include the unadvected
+ !!      volume fraction, specific heat ratio, liquid stiffness, speed of
+ !!      sound, vorticity and the numerical Schlieren function.
++
++#:include 'inline_conversions.fpp'
++
+ module m_derived_variables
+ 
+     ! Dependencies =============================================================
+@@ -15,6 +18,8 @@ module m_derived_variables
+     use m_global_parameters     !< Global parameters for the code
+ 
+     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
++
++    use m_variables_conversion
+     ! ==========================================================================
+ 
+     implicit none
+@@ -28,7 +33,8 @@ module m_derived_variables
+  s_derive_vorticity_component, &
+  s_derive_qm, &
+  s_derive_numerical_schlieren_function, &
+- s_finalize_derived_variables_module
++ s_finalize_derived_variables_module, &
++ s_compute_speed_of_sound
+ 
+     real(kind(0d0)), allocatable, dimension(:, :, :) :: gm_rho_sf !<
+     !! Gradient magnitude (gm) of the density for each cell of the computational
+@@ -570,14 +576,14 @@ contains
+ 
+     end subroutine s_derive_vorticity_component ! --------------------------
+ 
+-	!> This subroutine gets as inputs the primitive variables. From those
+-		!!		inputs, it proceeds to calculate the value of the Q_M 
+-		!!		function, which are subsequently stored in the derived flow
+-		!!		quantity storage variable, q_sf.
+-		!!	@param q_prim_vf Primitive variables
+-		!!	@param q_sf Q_M
+-	subroutine s_derive_qm(q_prim_vf,q_sf)
+-		type(scalar_field), &
++    !> This subroutine gets as inputs the primitive variables. From those
++        !!      inputs, it proceeds to calculate the value of the Q_M 
++        !!      function, which are subsequently stored in the derived flow
++        !!      quantity storage variable, q_sf.
++        !!  @param q_prim_vf Primitive variables
++        !!  @param q_sf Q_M
++    subroutine s_derive_qm(q_prim_vf,q_sf)
++        type(scalar_field), &
+             dimension(sys_size), &
+             intent(IN) :: q_prim_vf
+ 
+@@ -590,71 +596,73 @@ contains
+         real(kind(0d0)), &
+             dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
+ 
+-		real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
++        real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
+         integer :: j, k, l, r, jj, kk !< Generic loop iterators
+ 
+         do l = -offset_z%beg, p + offset_z%end
+             do k = -offset_y%beg, n + offset_y%end
+                 do j = -offset_x%beg, m + offset_x%end
+ 
+-					! Get velocity gradient tensor
++                    ! Get velocity gradient tensor
+                     q_jacobian_sf(:, :) = 0d0
+-					
++                    
+                     do r = -fd_number, fd_number
+-						do jj = 1, 3
+-							! d()/dx
+-							q_jacobian_sf(jj, 1) = &
+-								q_jacobian_sf(jj, 1)+ &
+-								fd_coeff_x(r, j)* &
+-								q_prim_vf(mom_idx%beg+jj-1)%sf(r + j, k, l)
+-							! d()/dy
+-							q_jacobian_sf(jj, 2) = &
+-								q_jacobian_sf(jj, 2)+ &
+-								fd_coeff_y(r, k)* &
+-								q_prim_vf(mom_idx%beg+jj-1)%sf(j, r + k, l)
+-							! d()/dz
+-							q_jacobian_sf(jj, 3) = &
+-								q_jacobian_sf(jj, 3)+ &
+-								fd_coeff_z(r, l)* &
+-								q_prim_vf(mom_idx%beg+jj-1)%sf(j, k, r + l)
+-						end do
+-					end do
+-					
+-					! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
+-					do jj = 1, 3
+-						do kk = 1, 3
+-							S(jj, kk) = 0.5D0* &
+-							(q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
+-							O(jj, kk) = 0.5D0* &
+-							(q_jacobian_sf(jj, kk) - q_jacobian_sf(kk, jj))
+-						end do
+-					end do
+-					
+-					! Compute S2 = S*S'
+-					do jj = 1, 3
+-						do kk = 1, 3
+-							O2(jj, kk) = O(jj,1)*O(kk,1)+ &
+-										 O(jj,2)*O(kk,2)+ &
+-										 O(jj,3)*O(kk,3)
+-							S2(jj, kk) = S(jj,1)*S(kk,1)+ &
+-										 S(jj,2)*S(kk,2)+ &
+-										 S(jj,3)*S(kk,3)
+-						end do
+-					end do
+-					
+-					! Compute Q
+-					Q = 0.5*((O2(1,1)+O2(2,2)+O2(3,3))- &
+-							 (S2(1,1)+S2(2,2)+S2(3,3)))
+-					trS = S(1,1)+S(2,2)+S(3,3)
+-					IIS = 0.5*((S(1,1)+S(2,2)+S(3,3))**2- &
+-							   (S2(1,1)+S2(2,2)+S2(3,3)))
+-					q_sf(j, k, l) = Q+IIS
++                        do jj = 1, 3
++                            ! d()/dx
++                            q_jacobian_sf(jj, 1) = &
++                                q_jacobian_sf(jj, 1)+ &
++                                fd_coeff_x(r, j)* &
++                                q_prim_vf(mom_idx%beg+jj-1)%sf(r + j, k, l)
++                            ! d()/dy
++                            q_jacobian_sf(jj, 2) = &
++                                q_jacobian_sf(jj, 2)+ &
++                                fd_coeff_y(r, k)* &
++                                q_prim_vf(mom_idx%beg+jj-1)%sf(j, r + k, l)
++                            ! d()/dz
++                            q_jacobian_sf(jj, 3) = &
++                                q_jacobian_sf(jj, 3)+ &
++                                fd_coeff_z(r, l)* &
++                                q_prim_vf(mom_idx%beg+jj-1)%sf(j, k, r + l)
++                        end do
++                    end do
++                    
++                    ! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
++                    do jj = 1, 3
++                        do kk = 1, 3
++                            S(jj, kk) = 0.5D0* &
++                            (q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
++                            O(jj, kk) = 0.5D0* &
++                            (q_jacobian_sf(jj, kk) - q_jacobian_sf(kk, jj))
++                        end do
++                    end do
++                    
++                    ! Compute S2 = S*S'
++                    do jj = 1, 3
++                        do kk = 1, 3
++                            O2(jj, kk) = O(jj,1)*O(kk,1)+ &
++                                         O(jj,2)*O(kk,2)+ &
++                                         O(jj,3)*O(kk,3)
++                            S2(jj, kk) = S(jj,1)*S(kk,1)+ &
++                                         S(jj,2)*S(kk,2)+ &
++                                         S(jj,3)*S(kk,3)
++                        end do
++                    end do
++                    
++                    ! Compute Q
++                    Q = 0.5*((O2(1,1)+O2(2,2)+O2(3,3))- &
++                             (S2(1,1)+S2(2,2)+S2(3,3)))
++                    trS = S(1,1)+S(2,2)+S(3,3)
++                    IIS = 0.5*((S(1,1)+S(2,2)+S(3,3))**2- &
++                               (S2(1,1)+S2(2,2)+S2(3,3)))
++                    q_sf(j, k, l) = Q+IIS
+ 
+                 end do
+             end do
+-        end do		
++        end do      
++
++    end subroutine s_derive_qm
+ 
+-	end subroutine s_derive_qm
++    @:s_compute_speed_of_sound()
+ 
+     !>  This subroutine gets as inputs the conservative variables
+         !!      and density. From those inputs, it proceeds to calculate
+@@ -833,4 +841,4 @@ contains
+ 
+     end subroutine s_finalize_derived_variables_module ! -----------------
+ 
+-end module m_derived_variables
++end module m_derived_variables
+\ No newline at end of file
+diff --git a/src/post_process/m_global_parameters.f90 b/src/post_process/m_global_parameters.f90
+index ebda428..8d73c9b 100644
+--- a/src/post_process/m_global_parameters.f90
++++ b/src/post_process/m_global_parameters.f90
+@@ -146,6 +146,8 @@ module m_global_parameters
+ 
+     ! ==========================================================================
+ 
++    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
++
+     ! Formatted Database File(s) Structure Parameters ==========================
+ 
+     integer :: format !< Format of the database file(s)
+@@ -622,6 +624,8 @@ contains
+             end if
+         end if
+ 
++        allocate (adv(num_fluids))
++
+         if (cyl_coord .neqv. .true.) then ! Cartesian grid
+             grid_geometry = 1
+         elseif (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
+@@ -834,6 +838,8 @@ contains
+ 
+         deallocate (proc_coords)
+ 
++        deallocate (adv)
++
+ #ifdef MFC_MPI
+ 
+         if (parallel_io) then
+diff --git a/src/post_process/p_main.f90 b/src/post_process/p_main.fpp
+similarity index 94%
+rename from src/post_process/p_main.f90
+rename to src/post_process/p_main.fpp
+index 7101b4a..af78800 100644
+--- a/src/post_process/p_main.f90
++++ b/src/post_process/p_main.fpp
+@@ -45,13 +45,17 @@ program p_main
+ 
+     !> @name Generic loop iterator
+     !> @{
+-    integer :: i, j, k
++    integer :: i, j, k, l
+     !> @}
+ 
+     real(kind(0d0)) :: total_volume !<
+     !! Variable for the total volume of the second volume fraction
+     !! to later on track the evolution of the radius of a bubble over time
+ 
++    real(kind(0d0)) :: pres
++    real(kind(0d0)) :: c
++    real(kind(0d0)) :: H 
++
+     ! Initialization of the MPI environment
+     call s_mpi_initialize()
+ 
+@@ -380,9 +384,26 @@ program p_main
+ 
+         ! Adding the sound speed to the formatted database file ----------------
+         if (c_wrt) then
++            do k = -offset_z%beg, p + offset_z%end
++                do j = -offset_y%beg, n + offset_y%end
++                    do i = -offset_x%beg, m + offset_x%end
++                        do l = 1, adv_idx%end - E_idx
++                            adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
++                        end do
++
++                        pres = q_prim_vf(E_idx)%sf(i, j, k)
++
++                        H = ((gamma_sf(i, j, k) + 1d0)*pres + &
++                        pi_inf_sf(i, j, k))/rho_sf(i, j, k)
+ 
+-            call s_derive_sound_speed(q_prim_vf, rho_sf, gamma_sf, &
+-                                      pi_inf_sf, q_sf)
++                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
++                            gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
++                            H, adv, 0d0, c)
++
++                        q_sf(i, j, k) = c
++                    end do
++                end do
++            end do
+ 
+             write (varname, '(A)') 'c'
+             call s_write_variable_to_formatted_database_file(varname, t_step)
+@@ -421,14 +442,14 @@ program p_main
+         ! ----------------------------------------------------------------------
+ 
+         ! Adding Q_M to the formatted database file ------------------
+-		if (p > 0 .and. qm_wrt) then
+-			call s_derive_qm(q_prim_vf, q_sf)
++        if (p > 0 .and. qm_wrt) then
++            call s_derive_qm(q_prim_vf, q_sf)
+ 
+-			write (varname, '(A)') 'qm'
+-			call s_write_variable_to_formatted_database_file(varname, t_step)
++            write (varname, '(A)') 'qm'
++            call s_write_variable_to_formatted_database_file(varname, t_step)
+ 
+-			varname(:) = ' '
+-		end if
++            varname(:) = ' '
++        end if
+         ! ----------------------------------------------------------------------
+ 
+         ! Adding numerical Schlieren function to formatted database file -------
+@@ -542,4 +563,4 @@ program p_main
+     ! Finalizing the MPI environment
+     call s_mpi_finalize()
+ 
+-end program p_main
++end program p_main
+\ No newline at end of file
+diff --git a/src/pre_process/m_data_output.f90 b/src/pre_process/m_data_output.f90
+index a4d4c08..721ab0f 100644
+--- a/src/pre_process/m_data_output.f90
++++ b/src/pre_process/m_data_output.f90
+@@ -169,8 +169,11 @@ contains
+                         else if (i == stress_idx%beg) then !tau_e
+                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
+                         else if (i == E_idx) then !p
+-                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j, 0, 0), q_cons_vf(alf_idx)%sf(j, 0, 0), &
+-                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, pi_inf, gamma, pres)
++                            call s_compute_pressure( &
++                                q_cons_vf(E_idx)%sf(j, 0, 0), &
++                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
++                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
++                                pi_inf, gamma, rho, pres)
+                             write (2, FMT) x_cb(j), pres
+                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
+                             do k = 1, nb
+diff --git a/src/simulation/m_cbc.fpp b/src/simulation/m_cbc.fpp
+index 2ec7ffd..e423e20 100644
+--- a/src/simulation/m_cbc.fpp
++++ b/src/simulation/m_cbc.fpp
+@@ -833,8 +833,7 @@ contains
+                     H = (E + pres)/rho
+ 
+                     ! Compute mixture sound speed
+-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, &
+-                                    q_prim_rs${XYZ}$_vf, 0, k, r, 2, c)
++                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
+ 
+                     ! ============================================================
+ 
+@@ -1288,6 +1287,8 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho,
+ 
+     end subroutine s_compute_supersonic_outflow_L ! ------------------------
+ 
++    @:s_compute_speed_of_sound()
++
+     !>  The computation of parameters, the allocation of memory,
+         !!      the association of pointers and/or the execution of any
+         !!      other procedures that are required for the setup of the
+diff --git a/src/simulation/m_data_output.fpp b/src/simulation/m_data_output.fpp
+index 433c199..5353f23 100644
+--- a/src/simulation/m_data_output.fpp
++++ b/src/simulation/m_data_output.fpp
+@@ -224,11 +224,14 @@ contains
+         real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
+         real(kind(0d0)) :: rho        !< Cell-avg. density
+         real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
++        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
+         real(kind(0d0)) :: pres       !< Cell-avg. pressure
+         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
+         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
+         real(kind(0d0)) :: c          !< Cell-avg. sound speed
++        real(kind(0d0)) :: E          !< Cell-avg. energy
++        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
+         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+ 
+         ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
+@@ -238,7 +241,7 @@ contains
+         real(kind(0d0)) :: blkmod1, blkmod2 !<
+             !! Fluid bulk modulus for Woods mixture sound speed
+ 
+-        integer :: i, j, k, l !< Generic loop iterators
++        integer :: i, j, k, l, q !< Generic loop iterators
+ 
+         integer :: Nfq
+         real(kind(0d0)) :: fltr_dtheta   !<
+@@ -265,33 +268,19 @@ contains
+                         vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+                     end do
+ 
++                    vel_sum = 0d0
++                    do i = 1, num_dims
++                        vel_sum = vel_sum + vel(i)**2d0
++                    end do
++
+                     pres = q_prim_vf(E_idx)%sf(j, k, l)
+ 
+-                    ! Compute mixture sound speed
+-                    if (alt_soundspeed) then
+-                        do i = 1, num_fluids
+-                            alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+-                        end do
+-                        blkmod1 = ((gammas(1) + 1d0)*pres + &
+-                                   pi_infs(1))/gammas(1)
+-                        blkmod2 = ((gammas(2) + 1d0)*pres + &
+-                                   pi_infs(2))/gammas(2)
+-                        c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
+-                    elseif (model_eqns == 3) then
+-                        c = 0d0
+-                        do i = 1, num_fluids
+-                            c = c + q_prim_vf(i + advxb - 1)%sf(j, k, l)*(1d0/gammas(i) + 1d0)* &
+-                                (pres + pi_infs(i)/(gammas(i) + 1d0))
+-                        end do
+-                    else
+-                        c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
+-                    end if
++                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum
+ 
+-                    if (mixture_err .and. c < 0d0) then
+-                        c = sgm_eps
+-                    else
+-                        c = sqrt(c)
+-                    end if
++                    H = (E + pres)/rho
++
++                    ! Compute mixture sound speed
++                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+ 
+                     if (grid_geometry == 3) then
+                         if (k == 0) then
+@@ -807,7 +796,6 @@ contains
+         real(kind(0d0)), dimension(2) :: Re
+         real(kind(0d0)) :: E_e
+         real(kind(0d0)), dimension(6) :: tau_e
+-        real(kind(0d0)), dimension(1:1, 1:1, 1:1, 1:1) :: q_prim_redundant
+ 
+         integer :: i, j, k, l, s, q !< Generic loop iterator
+ 
+@@ -881,37 +869,19 @@ contains
+                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
+                     end do
+ 
+-                    call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), &
++                    call s_compute_pressure( &
++                        q_cons_vf(1)%sf(j - 2, k, l), &
+                         q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+-                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k, l), &
+-                        pi_inf, gamma, pres)
++                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
++                        q_cons_vf(1)%sf(j - 2, k, l), &
++                        pi_inf, gamma, pres, rho, &
++                        q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
++                        q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+ 
+                     if (model_eqns == 4) then
+                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+-
+                     else if (hypoelasticity) then
+-                        ! calculate elastic contribution to Energy
+-                        E_e = 0d0
+-                        do s = stress_idx%beg, stress_idx%end
+-                            if (G > 0) then
+-                                E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k, l)/rho)**2d0) &
+-                                      /(4d0*G)
+-                                ! Additional terms in 2D and 3D
+-                                if ((s == stress_idx%beg + 1) .or. &
+-                                    (s == stress_idx%beg + 3) .or. &
+-                                    (s == stress_idx%beg + 4)) then
+-                                    E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k, l)/rho)**2d0) &
+-                                          /(4d0*G)
+-                                end if
+-                            end if
+-                        end do
+-                        tau_e(1) = q_cons_vf(s)%sf(j - 2, k, l)/rho
+-
+-                        pres = ( &
+-                               q_cons_vf(E_idx)%sf(j - 2, k, l) - &
+-                               0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k, l)**2.d0)/rho - &
+-                               pi_inf - E_e &
+-                               )/gamma
++                        tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
+                     end if
+ 
+                     if (bubbles) then
+@@ -961,9 +931,8 @@ contains
+                     end if
+ 
+                     ! Compute mixture sound Speed
+-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+-                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
+-                    j - 2, k, l, 0, c)
++                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
++                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+ 
+                     accel = accel_mag(j - 2, k, l)
+                 end if
+@@ -992,39 +961,21 @@ contains
+                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
+                         end do
+ 
+-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), &
++                        call s_compute_pressure( &
++                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                             q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+-                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k - 2, l), &
+-                            pi_inf, gamma, pres)
++                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/ &
++                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
++                            pi_inf, gamma, pres, rho, &
++                            q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
++                            q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+ 
+                         if (model_eqns == 4) then
+                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
+                         else if (hypoelasticity) then
+-                            ! calculate elastic contribution to Energy
+-                            E_e = 0d0
+-                            do s = stress_idx%beg, stress_idx%end
+-                                if (G > 0) then
+-                                    E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l)/rho)**2d0) &
+-                                          /(4d0*G)
+-                                    ! Additional terms in 2D and 3D
+-                                    if ((s == stress_idx%beg + 1) .or. &
+-                                        (s == stress_idx%beg + 3) .or. &
+-                                        (s == stress_idx%beg + 4)) then
+-                                        E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l)/rho)**2d0) &
+-                                              /(4d0*G)
+-                                    end if
+-                                end if
+-                            end do
+-
+                             do s = 1, 3
+                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
+                             end do
+-
+-                            pres = ( &
+-                                   q_cons_vf(E_idx)%sf(j - 2, k - 2, l) - &
+-                                   0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l)**2.d0)/rho - &
+-                                   pi_inf - E_e &
+-                                   )/gamma
+                         end if
+ 
+                         if (bubbles) then
+@@ -1047,9 +998,8 @@ contains
+                         end if
+ 
+                         ! Compute mixture sound speed
+-                        @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+-                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
+-                        j - 2, k - 2, l, 0, c)
++                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
++                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+ 
+                         accel = accel_mag(j - 2, k - 2, l)
+                     end if
+@@ -1085,12 +1035,12 @@ contains
+                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
+                             end do
+ 
+-                            pres = (q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2) - 0.5d0*rho*dot_product(vel, vel) - pi_inf)/gamma
++                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
++                                0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, pres)
+ 
+                             ! Compute mixture sound speed
+-                            @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+-                            ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
+-                            j - 2, k - 2, l - 2, 0, c)
++                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
++                                ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+ 
+                             accel = accel_mag(j - 2, k - 2, l - 2)
+                         end if
+@@ -1389,6 +1339,8 @@ contains
+ 
+     end subroutine s_write_probe_files ! -----------------------------------
+ 
++    @:s_compute_speed_of_sound()
++
+     !>  The goal of this subroutine is to write to the run-time
+         !!      information file basic footer information applicable to
+         !!      the current computation and to close the file when done.
+diff --git a/src/simulation/m_riemann_solvers.fpp b/src/simulation/m_riemann_solvers.fpp
+index 8832103..3dd3fd0 100644
+--- a/src/simulation/m_riemann_solvers.fpp
++++ b/src/simulation/m_riemann_solvers.fpp
+@@ -589,17 +589,17 @@ contains
+                             
+                             @:compute_average_state()
+ 
+-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
++                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
++                                    vel_L_rms, c_L)
+ 
+-                            @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
++                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
++                                    vel_R_rms, c_R)
+ 
+                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
+                                     ! variables are placeholders to call the subroutine.
+ 
+-                            @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+-                                vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
++                            call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
++                                vel_avg_rms, c_avg)
+ 
+                             if (any(Re_size > 0)) then
+                                 !$acc loop seq
+@@ -969,6 +969,7 @@ contains
+ 
+         ! Populating the buffers of the left and right Riemann problem
+         ! states variables, based on the choice of boundary conditions
++
+         call s_populate_riemann_states_variables_buffers( &
+             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+             dqL_prim_dy_vf, &
+@@ -981,6 +982,7 @@ contains
+             norm_dir, ix, iy, iz)
+ 
+         ! Reshaping inputted data based on dimensional splitting direction
++
+         call s_initialize_riemann_solver( &
+             q_prim_vf, &
+             flux_vf, flux_src_vf, &
+@@ -1059,6 +1061,9 @@ contains
+                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
+                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
++
++                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, advxb + i - 1)
++                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, advxb + i - 1)
+                                 end do
+ 
+                                 if (any(Re_size > 0)) then
+@@ -1103,17 +1108,17 @@ contains
+ 
+                                 @:compute_average_state()
+ 
+-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
++                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
++                                    vel_L_rms, c_L)
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
++                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
++                                    vel_R_rms, c_R)
+ 
+                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
+                                     ! variables are placeholders to call the subroutine.
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
++                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
++                                    vel_avg_rms, c_avg)
+ 
+                                 if (any(Re_size > 0)) then
+                                     !$acc loop seq
+@@ -1370,17 +1375,17 @@ contains
+ 
+                                 @:compute_average_state()
+ 
+-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
++                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
++                                    vel_L_rms, c_L)
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
++                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
++                                    vel_R_rms, c_R)
+ 
+                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
+                                     ! variables are placeholders to call the subroutine.
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
++                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
++                                    vel_avg_rms, c_avg)
+ 
+                                 if (wave_speeds == 1) then
+                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
+@@ -1740,17 +1745,17 @@ contains
+ 
+                                 end if
+ 
+-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
++                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
++                                    vel_L_rms, c_L)
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
++                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
++                                    vel_R_rms, c_R)
+ 
+                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
+                                     ! variables are placeholders to call the subroutine.
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
++                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
++                                    vel_avg_rms, c_avg)
+ 
+                                 if (wave_speeds == 1) then
+                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
+@@ -1945,6 +1950,7 @@ contains
+                     do l = is3%beg, is3%end
+                         do k = is2%beg, is2%end
+                             do j = is1%beg, is1%end
++
+                                 idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+ 
+                                 !$acc loop seq
+@@ -2055,17 +2061,17 @@ contains
+ 
+                                 @:compute_average_state()
+ 
+-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 0, c_L)
++                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
++                                    vel_L_rms, c_L)
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 0, c_R)
++                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
++                                    vel_R_rms, c_R)
+ 
+                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
+                                     ! variables are placeholders to call the subroutine.
+ 
+-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
++                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
++                                    vel_avg_rms, c_avg)
+ 
+                                 if (any(Re_size > 0)) then
+                                     !$acc loop seq
+@@ -4011,6 +4017,8 @@ contains
+ 
+     end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
+ 
++    @:s_compute_speed_of_sound()
++
+     !>  Deallocation and/or disassociation procedures that are
+         !!      needed to finalize the selected Riemann problem solver
+         !!  @param flux_vf       Intercell fluxes
+diff --git a/src/simulation/m_start_up.fpp b/src/simulation/m_start_up.fpp
+index f4adb86..8d67408 100644
+--- a/src/simulation/m_start_up.fpp
++++ b/src/simulation/m_start_up.fpp
+@@ -1124,7 +1124,8 @@ contains
+                                    /max(rho, sgm_eps)
+                     end do
+ 
+-                    pres = (v_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
++                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
++                        dyn_pres, pi_inf, gamma, rho, pres)
+ 
+                     do i = 1, num_fluids
+                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
