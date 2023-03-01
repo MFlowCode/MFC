@@ -146,6 +146,8 @@ module m_global_parameters
 
     ! ==========================================================================
 
+    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
+
     ! Formatted Database File(s) Structure Parameters ==========================
 
     integer :: format !< Format of the database file(s)
@@ -622,6 +624,8 @@ contains
             end if
         end if
 
+        allocate (adv(num_fluids))
+
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
         elseif (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
@@ -833,6 +837,8 @@ contains
         end if
 
         deallocate (proc_coords)
+
+        deallocate (adv)
 
 #ifdef MFC_MPI
 

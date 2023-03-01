@@ -833,8 +833,7 @@ contains
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, &
-                                    q_prim_rs${XYZ}$_vf, 0, k, r, 2, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
 
                     ! ============================================================
 
@@ -1287,6 +1286,8 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
         L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_supersonic_outflow_L ! ------------------------
+
+    @:s_compute_speed_of_sound()
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
