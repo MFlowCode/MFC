@@ -105,31 +105,31 @@ jobs:
           module load nvhpc
           /bin/bash mfc.sh test  -b mpirun --gpu -a
 
-  ice-gpu:
-    name: (COC-ICE) Test Suite - GPU
-    strategy:
-      matrix:
-        include:
-          - os: [self-hosted, cocice]
-    runs-on: ${{ matrix.os }}
-    if: github.repository == 'MFlowCode/MFC'
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+#   ice-gpu:
+#     name: (COC-ICE) Test Suite - GPU
+#     strategy:
+#       matrix:
+#         include:
+#           - os: [self-hosted, cocice]
+#     runs-on: ${{ matrix.os }}
+#     if: github.repository == 'MFlowCode/MFC'
+#     steps:
+#       - name: Clone
+#         uses: actions/checkout@v3
           
-      - name: Setup
-        run:  echo "test"
+#       - name: Setup
+#         run:  echo "test"
         
-      - name: Build
-        run:  |
-          module purge
-          module load nvhpc
-          /usr/bin/bash mfc.sh build -j 4 --gpu
+#       - name: Build
+#         run:  |
+#           module purge
+#           module load nvhpc
+#           /usr/bin/bash mfc.sh build -j 4 --gpu
 
-      - name: Test Suite
-        run:  |
-          qsub -I -q coc-ice-gpu -l nodes=1:ppn=8:gpus=2:teslav100
-          module purge
-          module load nvhpc
-          /usr/bin/bash mfc.sh test -j 4 -b mpirun --gpu -a
-          exit
+#       - name: Test Suite
+#         run:  |
+#           qsub -I -q coc-ice-gpu -l nodes=1:ppn=8:gpus=2:teslav100
+#           module purge
+#           module load nvhpc
+#           /usr/bin/bash mfc.sh test -j 4 -b mpirun --gpu -a
+#           exit
