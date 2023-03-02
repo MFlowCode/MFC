@@ -56,7 +56,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: self-hosted
+          - os: [self-hosted, wingtip]
     runs-on: ${{ matrix.os }}
     if: github.repository == 'MFlowCode/MFC'
     steps:
@@ -83,7 +83,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: self-hosted
+          - os: [self-hosted, wingtip]
     runs-on: ${{ matrix.os }}
     if: github.repository == 'MFlowCode/MFC'
     steps:
