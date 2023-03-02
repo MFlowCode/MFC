@@ -589,17 +589,17 @@ contains
                             
                             @:compute_average_state()
 
-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                            @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
+                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                            @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                            call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                vel_avg_rms, c_avg)
 
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
@@ -969,6 +969,7 @@ contains
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
+
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             dqL_prim_dy_vf, &
@@ -981,6 +982,7 @@ contains
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
+
         call s_initialize_riemann_solver( &
             q_prim_vf, &
             flux_vf, flux_src_vf, &
@@ -1059,6 +1061,9 @@ contains
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, advxb + i - 1)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, advxb + i - 1)
                                 end do
 
                                 if (any(Re_size > 0)) then
@@ -1103,17 +1108,17 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1370,17 +1375,17 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1740,17 +1745,17 @@ contains
 
                                 end if
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1945,6 +1950,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+
                                 idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                 !$acc loop seq
@@ -2055,17 +2061,17 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 0, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 0, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -4010,6 +4016,8 @@ contains
         ! END: Viscous Stresses in z-direction =============================
 
     end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
+
+    @:s_compute_speed_of_sound()
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
