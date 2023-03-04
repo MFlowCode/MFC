@@ -132,7 +132,7 @@ Email         (-@)  {ARG("email")}
         system = queues.get_system()
         cons.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
-        cons.print(f"Running [bold magenta]{common.format_list_to_string(names)}[/bold magenta]:")
+        cons.print(f"Running {common.format_list_to_string(names, 'bold magenta')}:")
         cons.indent()
 
         self.__create_batch_file(system, names)

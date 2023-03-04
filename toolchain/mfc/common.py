@@ -110,14 +110,20 @@ def delete_directory(dirpath: str) -> None:
         shutil.rmtree(dirpath)
 
 
-def get_py_program_output(filepath: str):
+def get_program_output(arguments: typing.List[str] = None, cwd=None):
+    if arguments is None:
+        arguments = []
+
+    proc = subprocess.Popen(arguments, cwd=cwd, stdout=subprocess.PIPE)
+
+    return (proc.communicate()[0].decode(), proc.returncode)
+
+
+def get_py_program_output(filepath: str, arguments: typing.List[str] = None):    
     dirpath  = os.path.abspath (os.path.dirname(filepath))
     filename = os.path.basename(filepath)
 
-    proc = subprocess.Popen(["python3", filename], cwd=dirpath,
-                            stdout=subprocess.PIPE)
-
-    return (proc.communicate()[0], proc.returncode)
+    return get_program_output(["python3", filename], cwd=dirpath)
 
 
 def isspace(s: str) -> bool:
@@ -145,18 +151,26 @@ def does_command_exist(s: str) -> bool:
     return 0 == os.system(f"command -v {s} > /dev/null 2>&1")
 
 
-def format_list_to_string(arr: list, empty = "nothing"):
+def format_list_to_string(arr: list, item_style=None, empty=None):
+    if empty is None:
+        empty = "nothing"
+    
+    pre, post = "", ""
+    if item_style is not None:
+        pre  = f"[{item_style}]"
+        post = f"[/{item_style}]"
+    
     if len(arr) == 0:
-        return empty
+        return f"{pre}{empty}{post}"
 
     if len(arr) == 1:
-        return arr[0]
+        return f"{pre}{arr[0]}{post}"
 
     if len(arr) == 2:
-        return f"{arr[0]} and {arr[1]}"
+        return f"{pre}{arr[0]}{post} and {pre}{arr[1]}{post}"
 
-    lhs = ', '.join(arr[:-1])
-    rhs = f", and {arr[-1]}"
+    lhs = ', '.join([ f"{pre}{e}{post}" for e in arr[:-1]])
+    rhs = f", and {pre}{arr[-1]}{post}"
 
     return lhs + rhs
 
