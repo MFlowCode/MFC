@@ -25,7 +25,6 @@ module m_helper
 
 contains
 
-#ifdef MFC_SIMULATION
     !>  The purpose of this subroutine is to compute the finite-
         !!      difference coefficients for the centered schemes utilized
         !!      in computations of first order spatial derivatives in the
@@ -37,24 +36,33 @@ contains
         !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
         !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, buff_size, &
-                                                                fd_number, fd_order)
+                                                                fd_number, fd_order, offset_s)
 
+        integer :: lB, lE !< loop bounds
         integer, intent(IN) :: q
         integer, intent(IN) :: buff_size, fd_number, fd_order
+        type(int_bounds_info), optional, intent(IN) :: offset_s
+        real(kind(0d0)), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
 
         real(kind(0d0)), &
             dimension(-buff_size:q + buff_size), &
             intent(IN) :: s_cc
 
-        real(kind(0d0)), &
-            dimension(-fd_number:fd_number, 0:q), &
-            intent(INOUT) :: fd_coeff_s
-
         integer :: i !< Generic loop iterator
+
+        if (present(offset_s)) then
+            lB = -offset_s%beg
+            lE = q + offset_s%end
+            allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
+        else
+            lB = 0
+            lE = q
+            allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
+        endif
 
         ! Computing the 1st order finite-difference coefficients
         if (fd_order == 1) then
-            do i = 0, q
+            do i = lB, lE
                 fd_coeff_s(-1, i) = 0d0
                 fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
                 fd_coeff_s(1, i) = -fd_coeff_s(0, i)
@@ -62,7 +70,7 @@ contains
 
             ! Computing the 2nd order finite-difference coefficients
         elseif (fd_order == 2) then
-            do i = 0, q
+            do i = lB, lE
                 fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
                 fd_coeff_s(0, i) = 0d0
                 fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
@@ -70,7 +78,7 @@ contains
 
             ! Computing the 4th order finite-difference coefficients
         else
-            do i = 0, q
+            do i = lB, lE
                 fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) - s_cc(i + 2) + 8d0*s_cc(i + 1))
                 fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
                 fd_coeff_s(0, i) = 0d0
@@ -80,68 +88,9 @@ contains
 
         end if
 
-    end subroutine s_compute_finite_difference_coefficients ! --------------
-#else
-     !> @name The purpose of this subroutine is to compute the finite-
-        !!      difference coefficients for the centered schemes utilized
-        !!      in computations of first order spatial derivatives in the
-        !!      s-coordinate direction. The s-coordinate direction refers
-        !!      to the x-, y- or z-coordinate direction, depending on the
-        !!      subroutine's inputs. Note that coefficients of up to 4th
-        !!      order accuracy are available.
-        !!  @param q Number of cells in the s-coordinate direction
-        !!  @param offset_s  Size of the ghost zone layer in the s-coordinate direction
-        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    subroutine s_compute_finite_difference_coefficients(q, offset_s, &
-                                                        s_cc, fd_coeff_s, buff_size, &
-                                                        fd_number, fd_order)
-
-        integer, intent(IN) :: q
-        type(int_bounds_info), intent(IN) :: offset_s
-        integer :: buff_size, fd_number, fd_order
-
-        real(kind(0d0)), &
-            dimension(-buff_size:q + buff_size), &
-            intent(IN) :: s_cc
-
-        real(kind(0d0)), &
-            dimension(-fd_number:fd_number, -offset_s%beg:q + offset_s%end), &
-            intent(INOUT) :: fd_coeff_s
-
-        integer :: i !< Generic loop iterator
-
-        ! Computing the 1st order finite-difference coefficients
-        if (fd_order == 1) then
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
-                fd_coeff_s(1, i) = -fd_coeff_s(0, i)
-            end do
-
-            ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order == 2) then
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-            end do
-
-            ! Computing the 4th order finite-difference coefficients
-        else
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) &
-                                         - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-                fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
-            end do
-
-        end if
+        deallocate(fd_coeff_s)
 
     end subroutine s_compute_finite_difference_coefficients ! --------------
-#endif
 
     !> Computes the bubble number density n from the primitive variables
         !! @param vftmp is the void fraction

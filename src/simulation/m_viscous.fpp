@@ -3,8 +3,6 @@
 !! @brief Contains module m_viscous
 #:include 'macros.fpp'
 
-#:include 'macros.fpp'
-
 !> @brief The module contains the subroutines used to compute viscous terms.
 module m_viscous
 
