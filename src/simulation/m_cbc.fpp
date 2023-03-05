@@ -124,6 +124,8 @@ module m_cbc
 
 contains
 
+    @:s_compute_speed_of_sound()
+
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
@@ -811,8 +813,7 @@ contains
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, &
-                                    q_prim_rs${XYZ}$_vf, 0, k, r, 2, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
 
                     ! ============================================================
 

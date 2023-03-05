@@ -71,3 +71,13 @@ When pushing to the stack, or creating a new case with the `create_case` functio
 If a trace is empty (that is, the empty string `""`), it will not appear in the final trace, but any case parameter variations associated with it will still be applied.
 
 Finally, the case is appended to the `cases` list, which will be returned by the `generate_cases` function.
+
+### Testing Post Process
+
+To test updated post process code, append the `-a` or `--test-all` option: 
+```console
+$ ./mfc.sh test -a -j 8
+```
+
+This argument will re-run the test stack with `parallel_io=True`, which generates silo_hdf5 files. It will also turn most write parameters (`*_wrt`) on. Then, it uses the [h5py](https://www.h5py.org/) library to ensure that there are no NaNs or Infinity's written to the silo files. Although adding this option does not guarantee that accurate silo files are generated, it does ensure that post process does not fail or produce malformed data. 
+

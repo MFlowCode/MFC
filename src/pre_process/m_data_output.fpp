@@ -178,15 +178,18 @@ contains
                         else if (i == stress_idx%beg) then !tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == E_idx) then !p
-                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j, 0, 0), q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, pi_inf, gamma, pres)
+                            call s_compute_pressure( &
+                                q_cons_vf(E_idx)%sf(j, 0, 0), &
+                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
+                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
+                                pi_inf, gamma, rho, pres)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
                             
-                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
 
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if

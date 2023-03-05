@@ -1124,7 +1124,8 @@ contains
                                    /max(rho, sgm_eps)
                     end do
 
-                    pres = (v_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
+                        dyn_pres, pi_inf, gamma, rho, pres)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
