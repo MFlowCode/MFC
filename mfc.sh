@@ -88,7 +88,7 @@ if [ "$1" == "load" ]; then
             MODULES=("allocations/1.0" "gcc/10.2.0" "python/3.8.6"
                      "openmpi/4.0.5-gcc10.2.0")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.9" "openmpi/4.0.5-nvhpc22.9")
+            MODULES=("openmpi/4.0.5-nvhpc22.9" "nvhpc/22.9")
         fi
 
         MODULES=("${MODULES[@]}" "python/3.8.6")

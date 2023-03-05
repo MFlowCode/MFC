@@ -146,6 +146,8 @@ module m_global_parameters
 
     ! ==========================================================================
 
+    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
+
     ! Formatted Database File(s) Structure Parameters ==========================
 
     integer :: format !< Format of the database file(s)
@@ -623,6 +625,8 @@ contains
             end if
         end if
 
+        allocate (adv(num_fluids))
+
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
         elseif (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
@@ -835,6 +839,8 @@ contains
 
         deallocate (proc_coords)
 
+        deallocate (adv)
+
 #ifdef MFC_MPI
 
         if (parallel_io) then
@@ -852,32 +858,37 @@ contains
     end subroutine s_finalize_global_parameters_module ! -----------------
 
     !> Computes the Simpson weights for quadrature
-    subroutine s_simpson(npt)
+        !! @param Npt is the number of bins that represent the polydisperse bubble population
+    subroutine s_simpson(Npt)
 
-        integer, intent(IN) :: npt
+        integer, intent(IN) :: Npt
         integer :: ir
         real(kind(0.d0)) :: R0mn
         real(kind(0.d0)) :: R0mx
         real(kind(0.d0)) :: dphi
         real(kind(0.d0)) :: tmp
         real(kind(0.d0)) :: sd
-
         real(kind(0.d0)), dimension(Npt) :: phi
+
+        ! nondiml. min. & max. initial radii for numerical quadrature
+        !sd   = 0.05D0
+        !R0mn = 0.75D0
+        !R0mx = 1.3D0
 
         sd = poly_sigma
         R0mn = 0.8d0*DEXP(-2.8d0*sd)
         R0mx = 0.2d0*DEXP(9.5d0*sd) + 1.d0
 
         ! phi = ln( R0 ) & return R0
-        do ir = 1, nb
+        do ir = 1, Npt
             phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(nb - 1)
+                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(Npt - 1)
             R0(ir) = DEXP(phi(ir))
         end do
         dphi = phi(2) - phi(1)
 
         ! weights for quadrature using Simpson's rule
-        do ir = 2, nb - 1
+        do ir = 2, Npt - 1
             ! Gaussian
             tmp = DEXP(-0.5d0*(phi(ir)/sd)**2)/DSQRT(2.d0*pi)/sd
             if (mod(ir, 2) == 0) then
@@ -889,8 +900,8 @@ contains
 
         tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
-        tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(nb) = tmp*dphi/3.d0
+        tmp = DEXP(-0.5d0*(phi(Npt)/sd)**2)/DSQRT(2.d0*pi)/sd
+        weight(Npt) = tmp*dphi/3.d0
 
     end subroutine s_simpson
 

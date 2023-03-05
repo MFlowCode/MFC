@@ -59,7 +59,6 @@ program p_main
 #endif
 
     use m_nvtx
-
     ! ==========================================================================
 
     implicit none
@@ -155,7 +154,7 @@ program p_main
     if (monopole) then
         call s_initialize_monopole_module()
     end if
-    if (any(Re_size > 1)) then
+    if (any(Re_size > 0)) then
         call s_initialize_viscous_module()
     end if
     call s_initialize_rhs_module()

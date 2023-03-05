@@ -32,7 +32,7 @@ contains
 
         integer :: i 
 
-        do i = 1, num_patches
+        do i = 1, num_patches_max
             if (i <= num_patches) then
                 ! call s_check_patch_geometry(i)
 

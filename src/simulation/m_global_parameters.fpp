@@ -1053,6 +1053,18 @@ contains
         real(kind(0.d0)) :: sd
         real(kind(0.d0)), dimension(nb) :: phi
 
+        ! nondiml. min. & max. initial radii for numerical quadrature
+        !sd   = 0.05D0
+        !R0mn = 0.75D0
+        !R0mx = 1.3D0
+
+        !sd   = 0.3D0
+        !R0mn = 0.3D0
+        !R0mx = 6.D0
+
+        !sd   = 0.7D0
+        !R0mn = 0.12D0
+        !R0mx = 150.D0
 
         sd = poly_sigma
         R0mn = 0.8d0*DEXP(-2.8d0*sd)
@@ -1076,12 +1088,10 @@ contains
                 weight(ir) = tmp*2.d0*dphi/3.d0
             end if
         end do
-
         tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
-
     end subroutine s_simpson
 
 end module m_global_parameters

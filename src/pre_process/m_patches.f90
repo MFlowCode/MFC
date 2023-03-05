@@ -1558,5 +1558,37 @@ contains
 
     end subroutine s_sweep_plane ! -----------------------------------------
 
+    subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
+        !$acc routine seq
+        real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
+
+        cart_y = cyl_y*sin(cyl_z)
+        cart_z = cyl_y*cos(cyl_z)
+
+    end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
+
+    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
+        !$acc routine seq
+        real(kind(0d0)), intent(IN) :: cyl_x, cyl_y
+
+        sph_phi = atan(cyl_y/cyl_x)
+
+    end subroutine s_convert_cylindrical_to_spherical_coord ! --------------
+
+    !> Archimedes spiral function
+    !! @param myth Angle
+    !! @param offset Thickness
+    !! @param a Starting position
+    function f_r(myth, offset, a)
+        !$acc routine seq
+        real(kind(0d0)), intent(IN) :: myth, offset, a
+        real(kind(0d0)) :: b
+        real(kind(0d0)) :: f_r
+
+        !r(th) = a + b*th
+
+        b = 2.d0*a/(2.d0*pi)
+        f_r = a + b*myth + offset
+    end function f_r
 
 end module m_patches

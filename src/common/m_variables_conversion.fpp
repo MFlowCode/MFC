@@ -80,7 +80,7 @@ module m_variables_conversion
 
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+    real(kind(0d0)), allocatable, public, dimension(:) :: gammas, pi_infs
     !$acc declare create(gammas, pi_infs)
 #endif
 
@@ -106,19 +106,26 @@ contains
     !>  This procedure conditionally calculates the appropriate pressure
         !! @param energy Energy
         !! @param alf Void Fraction
+        !! @param stress Shear Stress
+        !! @param mom Momentum
         !! @param dyn_p Dynamic Pressure
         !! @param pi_inf Liquid Stiffness
         !! @param gamma Specific Heat Ratio
         !! @param pres Pressure to calculate
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, pres)      
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, pres, stress, mom, G)      
 !$acc routine seq
 
-        real(kind(0d0)), intent(IN) :: energy, alf
+        real(kind(0d0)), intent(IN) :: energy, alf 
+        real(kind(0d0)), intent(IN), optional :: stress, mom, G
 
         real(kind(0d0)), intent(IN) :: dyn_p
         real(kind(0d0)), intent(OUT) :: pres
 
-        real(kind(0d0)), intent(IN) :: pi_inf, gamma
+        real(kind(0d0)), intent(IN) :: pi_inf, gamma, rho
+
+        real(kind(0d0)) :: E_e
+
+        integer :: s !< Generic loop iterator
 
         ! Depending on model_eqns and bubbles, the appropriate procedure
         ! for computing pressure is targeted by the procedure pointer
@@ -132,6 +139,28 @@ contains
                 (energy/ &
                 (rhoref*(1 - alf)) &
                 )**(1/gamma + 1) - pi_inf
+        end if
+
+        if (hypoelasticity .and. present(G)) then
+            ! calculate elastic contribution to Energy
+            E_e = 0d0
+            do s = stress_idx%beg, stress_idx%end
+                if (G > 0) then
+                    E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                    ! Additional terms in 2D and 3D
+                    if ((s == stress_idx%beg + 1) .or. &
+                        (s == stress_idx%beg + 3) .or. &
+                        (s == stress_idx%beg + 4)) then
+                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                    end if
+                end if
+            end do
+
+            pres = ( &
+                   energy - &
+                   0.5d0*(mom**2.d0)/rho - &
+                   pi_inf - E_e &
+                   )/gamma
         end if
 
     end subroutine s_compute_pressure
@@ -686,7 +715,7 @@ contains
                     ! If pre-processing, use non acc mixture subroutines
                         if (hypoelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                                                                rho_K, gamma_K, pi_inf_K, Re_K, G_K)
+                                                                rho_K, gamma_K, pi_inf_K, Re_K, G_K, fluid_pp(:)%G)
                         else
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K)
@@ -713,7 +742,7 @@ contains
 
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
-                                            dyn_pres_K, pi_inf_K, gamma_K, pres)
+                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
@@ -725,7 +754,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
+                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
                         
                         !$acc loop seq
                         do i = bubxb, bubxe
@@ -858,13 +887,7 @@ contains
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        !call s_comp_n_from_prim_cpu(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
-                        vftmp = q_prim_vf(alf_idx)%sf(j, k, l)
-                        R3 = 0d0
-                        do q = 1, nb
-                            R3 = R3 + weight(q)*(Rtmp(q)**3d0)
-                        end do
-                        nbub = (3.d0/(4.d0*pi))*vftmp/R3
+                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub

@@ -49,14 +49,14 @@ jobs:
         run:  /bin/bash mfc.sh build -j $(nproc)
 
       - name: Test Suite
-        run:  /bin/bash mfc.sh test  -j $(nproc)
+        run:  /bin/bash mfc.sh test  -j $(nproc) -a
 
   self-cpu:
     name: (Self) Test Suite - CPU
     strategy:
       matrix:
         include:
-          - os: self-hosted
+          - os: [self-hosted, wingtip]
     runs-on: ${{ matrix.os }}
     if: github.repository == 'MFlowCode/MFC'
     steps:
@@ -69,21 +69,21 @@ jobs:
       - name: Build
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
+          module load nvhpc
           /bin/bash mfc.sh build -j 4
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
-          /bin/bash mfc.sh test  -j 4
+          module load nvhpc
+          /bin/bash mfc.sh test  -j 4 -a
 
   self-gpu:
     name: (Self) Test Suite - GPU
     strategy:
       matrix:
         include:
-          - os: self-hosted
+          - os: [self-hosted, wingtip]
     runs-on: ${{ matrix.os }}
     if: github.repository == 'MFlowCode/MFC'
     steps:
@@ -96,12 +96,40 @@ jobs:
       - name: Build
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
+          module load nvhpc
           /bin/bash mfc.sh build -j 4 --gpu
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc/22.11
-          /bin/bash mfc.sh test  -b mpirun --gpu
+          module load nvhpc
+          /bin/bash mfc.sh test  -b mpirun --gpu -a
 
+#   ice-gpu:
+#     name: (COC-ICE) Test Suite - GPU
+#     strategy:
+#       matrix:
+#         include:
+#           - os: [self-hosted, cocice]
+#     runs-on: ${{ matrix.os }}
+#     if: github.repository == 'MFlowCode/MFC'
+#     steps:
+#       - name: Clone
+#         uses: actions/checkout@v3
+          
+#       - name: Setup
+#         run:  echo "test"
+        
+#       - name: Build
+#         run:  |
+#           module purge
+#           module load nvhpc
+#           /usr/bin/bash mfc.sh build -j 4 --gpu
+
+#       - name: Test Suite
+#         run:  |
+#           qsub -I -q coc-ice-gpu -l nodes=1:ppn=8:gpus=2:teslav100
+#           module purge
+#           module load nvhpc
+#           /usr/bin/bash mfc.sh test -j 4 -b mpirun --gpu -a
+#           exit
