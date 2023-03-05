@@ -130,23 +130,23 @@ program p_main
 
         ! Computing centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
-            call s_compute_finite_difference_coefficients(m, offset_x, x_cc, &
+            call s_compute_finite_difference_coefficients(m, x_cc, &
                                                           fd_coeff_x, buff_size, &
-                                                          fd_number, fd_order)
+                                                          fd_number, fd_order, offset_x)
         end if
 
         ! Computing centered finite-difference coefficients in y-direction
         if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. (n > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(n, offset_y, y_cc, &
+            call s_compute_finite_difference_coefficients(n, y_cc, &
                                                           fd_coeff_y, buff_size, &
-                                                          fd_number, fd_order)
+                                                          fd_number, fd_order, offset_y)
         end if
 
         ! Computing centered finite-difference coefficients in z-direction
         if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. (p > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(p, offset_z, z_cc, &
+            call s_compute_finite_difference_coefficients(p, z_cc, &
                                                           fd_coeff_z, buff_size, &
-                                                          fd_number, fd_order)
+                                                          fd_number, fd_order, offset_z)
         end if
 
         ! Adding the partial densities to the formatted database file ----------
