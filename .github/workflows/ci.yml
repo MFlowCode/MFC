@@ -70,13 +70,13 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh build -j 4
+          /bin/bash mfc.sh build -j 8
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh test  -j 4 -a
+          /bin/bash mfc.sh test  -j 8 -a
 
   self-gpu:
     name: (Self) Test Suite - GPU
@@ -97,13 +97,13 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh build -j 4 --gpu
+          /bin/bash mfc.sh build -j 8 --gpu
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh test  -b mpirun --gpu -a
+          /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a
 
 #   ice-gpu:
 #     name: (COC-ICE) Test Suite - GPU
