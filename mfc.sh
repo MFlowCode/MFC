@@ -77,12 +77,12 @@ if [ "$1" == "load" ]; then
         if [ "$u_cg" == "c" ]; then
             MODULES=("gcc/12.1.0")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.5" "cuda/nvhpc")
+            MODULES=("nvhpc/22.11" "cuda/nvhpc")
         fi
 
         MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
                 "hsi/5.0.2.p5" "xalt/1.2.1" "lsf-tools/2.0"
-                "cmake/3.23.1" "ninja/1.10.2" "spectrum-mpi/10.4.0.3-20210112")
+                "cmake/3.23.2" "ninja/1.10.2" "spectrum-mpi/10.4.0.3-20210112")
     elif [ "$u_computer" == "b" ]; then # Bridges2
         if [ "$u_cg" == "c" ]; then
             MODULES=("allocations/1.0" "gcc/10.2.0" "python/3.8.6"
