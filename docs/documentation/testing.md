@@ -22,6 +22,8 @@ To (re)generate *golden files*, append the `-g` (i.e `--generate`) option:
 $ ./mfc.sh test -g -j 8
 ```
 
+It is recommended that a range be specified when generating golden files for new test cases, as described in the previous section, in an effort not to regenerate the golden files of existing test cases.
+
 Adding a new test case can be done by modifying [cases.py](toolchain/mfc/tests/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](toolchain/mfc/tests/case.py). The function operates on two variables:
 
 - `stack`: A stack that holds the variations to the default case parameters. By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).

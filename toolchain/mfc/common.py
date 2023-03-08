@@ -123,7 +123,7 @@ def get_py_program_output(filepath: str, arguments: typing.List[str] = None):
     dirpath  = os.path.abspath (os.path.dirname(filepath))
     filename = os.path.basename(filepath)
 
-    return get_program_output(["python3", filename], cwd=dirpath)
+    return get_program_output(["python3", filename] + arguments, cwd=dirpath)
 
 
 def isspace(s: str) -> bool:
@@ -204,5 +204,7 @@ def get_loaded_modules() -> typing.List[str]:
     Returns a list of loaded modules.
     """
 
-    return subprocess.getoutput("module -t list").splitlines()
+    return [ l for l in subprocess.getoutput("module -t list").splitlines() if ' ' not in l ]
+
+
 

@@ -106,6 +106,7 @@ contains
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                          eta, q_prim_vf, patch_id_fp)
 
+        !$acc routine seq
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
@@ -225,6 +226,7 @@ contains
     subroutine s_assign_patch_species_primitive_variables_bubbles(patch_id, j, k, l, &
                                                 eta, q_prim_vf, patch_id_fp)
 
+        !$acc routine seq
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
@@ -577,6 +579,7 @@ contains
     subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                             eta, q_prim_vf, patch_id_fp)
 
+        !$acc routine seq
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
