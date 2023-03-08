@@ -1569,5 +1569,4 @@ contains
 
     end subroutine s_sweep_plane ! -----------------------------------------
 
-
 end module m_create_patches

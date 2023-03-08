@@ -1,4 +1,4 @@
-import argparse, dataclasses
+import re, argparse, dataclasses
 
 from .build     import get_mfc_target_names, get_target_names, get_dependencies_names
 from .common    import format_list_to_string
@@ -77,6 +77,7 @@ started, run ./mfc.sh build -h.""",
 
     add_common_arguments(run)
     run.add_argument("input",                  metavar="INPUT",                 type=str,                     help="Input file to run.")
+    run.add_argument("arguments",              metavar="ARGUMENTS", nargs='*',  type=str, default=[],         help="Additional arguments to pass to the case file.")
     run.add_argument("-e", "--engine",         choices=engines,                 type=str, default=engines[0], help="Job execution/submission engine choice.")
     run.add_argument("-p", "--partition",      metavar="PARTITION",             type=str, default="",         help="(Batch) Partition for job submission.")
     run.add_argument("-N", "--nodes",          metavar="NODES",                 type=int, default=1,          help="(Batch) Number of nodes.")
@@ -88,6 +89,8 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs="+",  type=str, default=[],         help="(Batch) Additional batch options.")
     run.add_argument("-b", "--binary",         choices=binaries,                type=str, default=None,       help="(Interactive) Override MPI execution binary")
     run.add_argument("-s", "--scratch",        action="store_true",                       default=False,      help="Build from scratch.")
+    run.add_argument("--ncu",                  action="store_true",                       default=False,      help="Profile with NVIDIA Nsight Compute.")
+    run.add_argument("--nsys",                 action="store_true",                       default=False,      help="Profile with NVIDIA Nsight Systems.")
     run.add_argument(      "--dry-run",        action="store_true",                       default=False,      help="(Batch) Run without submitting batch file.")
     run.add_argument("--case-optimization",    action="store_true",                       default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",       action="store_true",                       default=False,      help="(Testing) Do not rebuild MFC.")
@@ -112,5 +115,8 @@ started, run ./mfc.sh build -h.""",
     if args["command"] is None:
         parser.print_help()
         exit(-1)
+
+    # "Slugify" the name of the job
+    args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
     return args

@@ -100,10 +100,10 @@ program p_main
     ! Time-Marching Loop =======================================================
     do
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Save "I8" of "I0" @ t_step = "I0"")',            &
-                  int(100*(real(t_step + 1)/(t_step_stop - t_step_start + 1))), &
-                  (t_step      - t_step_start)/t_step_save + 1,                 &
-                  (t_step_stop - t_step_start)/t_step_save + 1,                 &
+            print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")',                                &
+                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                  (t_step      - t_step_start)/t_step_save + 1,                                       &
+                  (t_step_stop - t_step_start)/t_step_save + 1,                                       &
                   t_step
         end if
 
