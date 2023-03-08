@@ -53,12 +53,13 @@ contains
         if (present(offset_s)) then
             lB = -offset_s%beg
             lE = q + offset_s%end
-            allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
         else
             lB = 0
             lE = q
-            allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
         endif
+
+        if (allocated(fd_coeff_s)) deallocate(fd_coeff_s)
+        allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
 
         ! Computing the 1st order finite-difference coefficients
         if (fd_order == 1) then
@@ -87,8 +88,6 @@ contains
             end do
 
         end if
-
-        deallocate(fd_coeff_s)
 
     end subroutine s_compute_finite_difference_coefficients ! --------------
 
