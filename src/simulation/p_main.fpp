@@ -59,7 +59,6 @@ program p_main
 #endif
 
     use m_nvtx
-
     ! ==========================================================================
 
     implicit none
@@ -118,7 +117,6 @@ program p_main
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
         call s_check_input_file()
-
         print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
 
@@ -232,7 +230,6 @@ program p_main
                   t_step_stop - t_step_start + 1,                                                     &
                   t_step
         end if
-
         mytime = mytime + dt
 
         if (probe_wrt) then

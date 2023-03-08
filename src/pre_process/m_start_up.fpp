@@ -868,9 +868,6 @@ contains
 
     end subroutine s_check_input_file ! ------------------------------------
 
-
-
-
     !> The goal of this subroutine is to read in any preexisting
         !!      grid data as well as based on the imported grid, complete
         !!      the necessary global computational domain parameters.

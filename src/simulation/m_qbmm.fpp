@@ -18,6 +18,8 @@ module m_qbmm
 
     use m_variables_conversion !< State variables type conversion procedures
 
+    use m_helper
+
     ! ==========================================================================
 
     implicit none

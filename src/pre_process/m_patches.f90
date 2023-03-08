@@ -1,25 +1,68 @@
-module m_create_patches
+!>
+!! @file m_patches.f90
+!! @brief Contains module m_patches
+module m_patches
 
     ! Dependencies =============================================================
-    use m_derived_types         ! Definitions of the derived types
+    
+    use m_derived_types        !< Definitions of the derived types
 
-    use m_global_parameters     ! Global parameters for the code
+    use m_global_parameters    !< Definitions of the global parameters
 
-    use m_variables_conversion  ! Subroutines to change the state variables from
-    ! one form to another
+    use m_helper
 
-    use m_assign_patches
+    use m_assign_variables
     ! ==========================================================================
 
     implicit none
 
+    private; public :: s_line_segment, &
+        s_spiral, &
+        s_circle, &
+        s_varcircle, &
+        s_3dvarcircle, &
+        s_ellipse, &
+        s_ellipsoid, &
+        s_rectangle, &
+        s_sweep_line, &
+        s_isentropic_vortex, &
+        s_1D_analytical, &
+        s_1d_bubble_pulse, &
+        s_2D_analytical, &
+        s_3D_analytical, &
+        s_spherical_harmonic, &
+        s_sphere, &
+        s_cuboid, &
+        s_cylinder, &
+        s_sweep_plane
 
+
+    real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
+    real(kind(0d0)) :: length_x, length_y, length_z
     real(kind(0d0)) :: radius
+    real(kind(0d0)) :: epsilon, beta
+    integer :: smooth_patch_id
     real(kind(0d0)) :: smooth_coeff !<
     !! These variables are analogous in both meaning and use to the similarly
     !! named components in the ic_patch_parameters type (see m_derived_types.f90
     !! for additional details). They are employed as a means to more concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
+
+    real(kind(0d0)) :: eta !<
+    !! In the case that smoothing of patch boundaries is enabled and the boundary
+    !! between two adjacent patches is to be smeared out, this variable's purpose
+    !! is to act as a pseudo volume fraction to indicate the contribution of each
+    !! patch toward the composition of a cell's fluid state.
+
+    real(kind(0d0)) :: cart_y, cart_z
+    real(kind(0d0)) :: sph_phi !<
+    !! Variables to be used to hold cell locations in Cartesian coordinates if
+    !! 3D simulation is using cylindrical coordinates
+
+    real(kind(0d0)) :: a, b, c, d !<
+    !! When a line or a plane sweep patch geometry is employed, these variables
+    !! represent the coefficients associated with the equation describing the
+    !! said line or plane.
 
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
     !! These variables combine the centroid and length parameters associated with
@@ -27,113 +70,20 @@ module m_create_patches
     !! x-, y- and z-coordinate directions. They are used as a means to concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
 
-    real(kind(0d0)) :: length_x, length_y, length_z
-
-    real(kind(0d0)) :: a, b, c, d !<
-    !! When a line or a plane sweep patch geometry is employed, these variables
-    !! represent the coefficients associated with the equation describing the
-    !! said line or plane.
-
-    real(kind(0d0)) :: cart_y, cart_z
-    real(kind(0d0)) :: sph_phi !<
-    !! Variables to be used to hold cell locations in Cartesian coordinates if
-    !! 3D simulation is using cylindrical coordinates
-    
 contains
 
-    subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
-
-        real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
-
-        cart_y = cyl_y*sin(cyl_z)
-        cart_z = cyl_y*cos(cyl_z)
-
-    end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
-
-    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
-        real(kind(0d0)), intent(IN) :: cyl_x, cyl_y
-
-        sph_phi = atan(cyl_y/cyl_x)
-
-    end subroutine s_convert_cylindrical_to_spherical_coord ! --------------
-
-    subroutine s_perturb_sphere() ! ----------------------------------------
-
-        integer :: i, j, k, l !< generic loop operators
-
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: alpha_unadv
-        real(kind(0d0)) :: rand_real
-        call random_seed()
-
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-                    call random_number(rand_real)
-
-                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
-
-                    ! Perturb partial density fields to match perturbed volume fraction fields
-!                        IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
-                    if ((perturb_alpha /= 0d0) .and. (perturb_alpha /= 1d0)) then
-
-                        ! Derive new partial densities
-                        do l = 1, num_fluids
-                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
-                        end do
-
-                    end if
-                end do
-            end do
-        end do
-
-    end subroutine s_perturb_sphere ! --------------------------------------
-
-    subroutine s_perturb_surrounding_flow() ! ------------------------------
-
-        integer :: i, j, k, l !<  generic loop iterators
-
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: rand_real
-        call random_seed()
-
-        ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-
-                    perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
-                    ! IF (perturb_alpha == 1d0) THEN
-                    ! Perturb partial density
-!                            CALL RANDOM_NUMBER(rand_real)
-!                            rand_real = rand_real / 1d2 / 1d3
-!                            q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
-                    ! Perturb velocity
-                    call random_number(rand_real)
-                    rand_real = rand_real*1.d-2
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
-                    q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
-                    if (bubbles) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
-                    end if
-                    ! END IF
-                end do
-            end do
-        end do
-
-    end subroutine s_perturb_surrounding_flow ! ----------------------------
-
     !>          The line segment patch is a 1D geometry that may be used,
-        !!              for example, in creating a Riemann problem. The geometry
-        !!              of the patch is well-defined when its centroid and length
-        !!              in the x-coordinate direction are provided. Note that the
-        !!              line segment patch DOES NOT allow for the smearing of its
-        !!              boundaries.
-        !! @param patch_id patch identifier
-    subroutine s_line_segment(patch_id) ! ----------------------------------
+    !!              for example, in creating a Riemann problem. The geometry
+    !!              of the patch is well-defined when its centroid and length
+    !!              in the x-coordinate direction are provided. Note that the
+    !!              line segment patch DOES NOT allow for the smearing of its
+    !!              boundaries.
+    !! @param patch_id patch identifier
+    subroutine s_line_segment(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma
 
@@ -167,7 +117,8 @@ contains
                 x_boundary%end >= x_cc(i) .and. &
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
-                call s_assign_patch_primitive_variables(patch_id, i, 0, 0)
+                call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
+                                            eta, q_prim_vf, patch_id_fp)
 
                 !IF ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .AND. (model_eqns .NE. 4)) THEN
                 !    !zero density, reassign according to Tait EOS
@@ -185,9 +136,11 @@ contains
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
         !!  @param patch_id patch identifier
-    subroutine s_spiral(patch_id) ! ----------------------------------------
+    subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(kind(0d0)) :: th, thickness, nturns, mya
@@ -201,7 +154,7 @@ contains
         thickness = patch_icpp(patch_id)%length_x
         nturns = patch_icpp(patch_id)%length_y
 
-!
+    !
         logic_grid = 0
         do k = 0, int(m*91*nturns)
             th = k/real(int(m*91d0*nturns))*nturns*2.d0*pi
@@ -227,27 +180,13 @@ contains
         do j = 0, n
             do i = 0, m
                 if ((logic_grid(i, j, 0) == 1)) then
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                    eta, q_prim_vf, patch_id_fp)
                 end if
             end do
         end do
 
     end subroutine s_spiral ! ----------------------------------------------
-
-    !> Archimedes spiral function
-        !! @param myth Angle
-        !! @param offset Thickness
-        !! @param a Starting position
-    function f_r(myth, offset, a)
-        real(kind(0d0)), intent(IN) :: myth, offset, a
-        real(kind(0d0)) :: b
-        real(kind(0d0)) :: f_r
-
-        !r(th) = a + b*th
-
-        b = 2.d0*a/(2.d0*pi)
-        f_r = a + b*myth + offset
-    end function f_r
 
     !> The circular patch is a 2D geometry that may be used, for
         !!              example, in creating a bubble or a droplet. The geometry
@@ -255,9 +194,11 @@ contains
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-    subroutine s_circle(patch_id) ! ----------------------------------------
+    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j !< Generic loop iterators
 
@@ -284,21 +225,22 @@ contains
                 if (patch_icpp(patch_id)%smoothen) then
 
                     eta = tanh(smooth_coeff/min(dx, dy)* &
-                               (sqrt((x_cc(i) - x_centroid)**2 &
-                                     + (y_cc(j) - y_centroid)**2) &
+                            (sqrt((x_cc(i) - x_centroid)**2 &
+                                    + (y_cc(j) - y_centroid)**2) &
                                 - radius))*(-0.5d0) + 0.5d0
 
                 end if
 
                 if (((x_cc(i) - x_centroid)**2 &
-                     + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                     .and. &
-                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    + (y_cc(j) - y_centroid)**2 <= radius**2 &
+                    .and. &
+                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                eta, q_prim_vf, patch_id_fp)
 
                 end if
 
@@ -310,10 +252,12 @@ contains
     !>             The varcircle patch is a 2D geometry that may be used
         !!             . It  generatres an annulus
         !! @param patch_id is the patch identifier
-    subroutine s_varcircle(patch_id) ! ----------------------------------------
+    subroutine s_varcircle(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j
@@ -347,10 +291,11 @@ contains
                     myr >= radius - thickness/2.d0 .and. &
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
-                                                     dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                                                    dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
                 end if
 
             end do
@@ -358,10 +303,12 @@ contains
 
     end subroutine s_varcircle ! ----------------------------------------------
 
-    subroutine s_3dvarcircle(patch_id) ! ----------------------------------------
+    subroutine s_3dvarcircle(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -400,10 +347,11 @@ contains
                         myr >= radius - thickness/2.d0 .and. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
-                                                         dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                                                        dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
                     end if
 
                 end do
@@ -417,9 +365,11 @@ contains
         !!      are provided. Note that the elliptical patch DOES allow
         !!      for the smoothing of its boundary
         !! @param patch_id is the patch identifier
-    subroutine s_ellipse(patch_id) ! ---------------------------------------
+    subroutine s_ellipse(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j !< Generic loop operators
 
@@ -447,20 +397,21 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = tanh(smooth_coeff/min(dx, dy)* &
-                               (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
-                                     ((y_cc(j) - y_centroid)/b)**2) &
+                            (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
+                                    ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1d0))*(-0.5d0) + 0.5d0
                 end if
 
                 if ((((x_cc(i) - x_centroid)/a)**2 + &
-                     ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
-                     .and. &
-                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
+                    .and. &
+                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                    eta, q_prim_vf, patch_id_fp)
                 end if
             end do
         end do
@@ -472,10 +423,12 @@ contains
         !!       are provided. Note that the ellipsoidal patch DOES allow
         !!       for the smoothing of its boundary
         !! @param patch_id is the patch identifier
-    subroutine s_ellipsoid(patch_id) ! -------------------------------------
+    subroutine s_ellipsoid(patch_id, patch_id_fp, q_prim_vf) ! -------------------------------------
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -514,22 +467,23 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                   (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
-                                         ((cart_y - y_centroid)/b)**2 + &
-                                         ((cart_z - z_centroid)/c)**2) &
+                                (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
+                                        ((cart_y - y_centroid)/b)**2 + &
+                                        ((cart_z - z_centroid)/c)**2) &
                                     - 1d0))*(-0.5d0) + 0.5d0
                     end if
 
                     if ((((x_cc(i) - x_centroid)/a)**2 + &
-                         ((cart_y - y_centroid)/b)**2 + &
-                         ((cart_z - z_centroid)/c)**2 <= 1d0 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                        ((cart_y - y_centroid)/b)**2 + &
+                        ((cart_z - z_centroid)/c)**2 <= 1d0 &
+                        .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                     eta, q_prim_vf, patch_id_fp)
                     end if
                 end do
             end do
@@ -546,9 +500,11 @@ contains
         !!              rectangular patch DOES NOT allow for the smoothing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-    subroutine s_rectangle(patch_id) ! -------------------------------------
+    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf) ! -------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
@@ -591,7 +547,8 @@ contains
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     then
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                         !zero density, reassign according to Tait EOS
@@ -613,9 +570,11 @@ contains
         !!      in the sweep direction, are provided. Note that the sweep
         !!      line patch DOES allow the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-    subroutine s_sweep_line(patch_id) ! ------------------------------------
+    subroutine s_sweep_line(patch_id, patch_id_fp, q_prim_vf) ! ------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j !< Generic loop operators
 
@@ -644,17 +603,18 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy) &
-                                           *(a*x_cc(i) + b*y_cc(j) + c) &
-                                           /sqrt(a**2 + b**2))
+                                        *(a*x_cc(i) + b*y_cc(j) + c) &
+                                        /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0d0 &
-                     .and. &
-                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    .and. &
+                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                      eta, q_prim_vf, patch_id_fp)
 
                 end if
 
@@ -669,10 +629,12 @@ contains
         !!              and radius are provided. Notice that the patch DOES NOT
         !!              allow for the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-    subroutine s_isentropic_vortex(patch_id) ! ----------------------------
+    subroutine s_isentropic_vortex(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j
@@ -702,7 +664,8 @@ contains
                     then
 
                     call s_assign_patch_primitive_variables(patch_id, &
-                                                            i, j, 0)
+                                                            i, j, 0, &
+                                            eta, q_prim_vf, patch_id_fp)
 
                 end if
 
@@ -714,10 +677,12 @@ contains
     !>  This patch assigns the primitive variables as analytical
         !!  functions such that the code can be verified.
         !!  @param patch_id is the patch identifier
-    subroutine s_1D_analytical(patch_id) ! ---------------------------------
+    subroutine s_1D_analytical(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Placeholders for the cell boundary values
         real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
@@ -753,12 +718,13 @@ contains
                 x_boundary%end >= x_cc(i) .and. &
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
-                call s_assign_patch_primitive_variables(patch_id, i, 0, 0)
+                call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
+                                                eta, q_prim_vf, patch_id_fp)
 
                 !what variables to alter
                 !bump in pressure
                 q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                               (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                 !bump in void fraction
                 !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
@@ -785,12 +751,14 @@ contains
 
     end subroutine s_1D_analytical ! ---------------------------------------
 
-    subroutine s_1d_bubble_pulse(patch_id) ! ---------------------------------
+    subroutine s_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
         ! Description: This patch assigns the primitive variables as analytical
         !       functions such that the code can be verified.
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Placeholders for the cell boundary values
         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
@@ -826,12 +794,13 @@ contains
                 x_boundary%end >= x_cc(i) .and. &
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
-                call s_assign_patch_primitive_variables(patch_id, i, 0, 0)
+                call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
+                                                eta, q_prim_vf, patch_id_fp)
 
                 !what variables to alter
                 !sinusoid in pressure
                 q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                               (1d0 + 0.1d0*sin(-1d0*(x_cb(i) - x_centroid)*2d0*pi/length_x))
+                                            (1d0 + 0.1d0*sin(-1d0*(x_cb(i) - x_centroid)*2d0*pi/length_x))
 
                 !bump in void fraction
                 !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
@@ -861,9 +830,11 @@ contains
     !>  This patch assigns the primitive variables as analytical
         !!  functions such that the code can be verified.
         !!  @param patch_id is the patch identifier
-    subroutine s_2D_analytical(patch_id) ! ---------------------------------
+    subroutine s_2D_analytical(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
@@ -906,12 +877,13 @@ contains
                     y_boundary%end >= y_cc(j) .and. &
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0)
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     !what variables to alter
                     !x-y bump in pressure
                     q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                               (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
+                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !x-bump
                     !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
@@ -935,29 +907,29 @@ contains
                     ! Sinusoidal initial condition for all flow variables =============================
 
                     ! Cell-center values
-!                        a = 0d0
-!                        b = 0d0
-!                        c = 0d0
-!                        d = 0d0
-!                        q_prim_vf(adv_idx%beg)%sf(i,j,0) = SIN(x_cc(i)) * SIN(y_cc(j))
-!                        q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
-!                        q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
-!                        q_prim_vf(mom_idx%beg)%sf(i,j,0) = SIN(x_cc(i))
-!                        q_prim_vf(mom_idx%end)%sf(i,j,0) = SIN(y_cc(j))
-!                        q_prim_vf(E_idx)%sf(i,j,0) = 1d0
+    !                        a = 0d0
+    !                        b = 0d0
+    !                        c = 0d0
+    !                        d = 0d0
+    !                        q_prim_vf(adv_idx%beg)%sf(i,j,0) = SIN(x_cc(i)) * SIN(y_cc(j))
+    !                        q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
+    !                        q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
+    !                        q_prim_vf(mom_idx%beg)%sf(i,j,0) = SIN(x_cc(i))
+    !                        q_prim_vf(mom_idx%end)%sf(i,j,0) = SIN(y_cc(j))
+    !                        q_prim_vf(E_idx)%sf(i,j,0) = 1d0
 
                     ! Cell-average values
-!                       a = x_cc(i) - 5d-1*dx ! x-beg
-!                       b = x_cc(i) + 5d-1*dx ! x-end
-!                       c = y_cc(j) - 5d-1*dy ! y-beg
-!                       d = y_cc(j) + 5d-1*dy ! y-end
-!                       q_prim_vf(adv_idx%beg)%sf(i,j,0) = 1d0/((b-a)*(d-c)) * &
-!                               (COS(a)*COS(c) - COS(a)*COS(d) - COS(b)*COS(c) + COS(b)*COS(d))
-!                       q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
-!                       q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
-!                       q_prim_vf(mom_idx%beg)%sf(i,j,0) = (COS(a) - COS(b))/(b-a)
-!                       q_prim_vf(mom_idx%end)%sf(i,j,0) = (COS(c) - COS(d))/(d-c)
-!                       q_prim_vf(E_idx)%sf(i,j,0) = 1d0
+    !                       a = x_cc(i) - 5d-1*dx ! x-beg
+    !                       b = x_cc(i) + 5d-1*dx ! x-end
+    !                       c = y_cc(j) - 5d-1*dy ! y-beg
+    !                       d = y_cc(j) + 5d-1*dy ! y-end
+    !                       q_prim_vf(adv_idx%beg)%sf(i,j,0) = 1d0/((b-a)*(d-c)) * &
+    !                               (COS(a)*COS(c) - COS(a)*COS(d) - COS(b)*COS(c) + COS(b)*COS(d))
+    !                       q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
+    !                       q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
+    !                       q_prim_vf(mom_idx%beg)%sf(i,j,0) = (COS(a) - COS(b))/(b-a)
+    !                       q_prim_vf(mom_idx%end)%sf(i,j,0) = (COS(c) - COS(d))/(d-c)
+    !                       q_prim_vf(E_idx)%sf(i,j,0) = 1d0
                     ! ================================================================================
 
                     ! Initial pressure profile smearing for bubble collapse case of Tiwari (2013) ====
@@ -979,9 +951,11 @@ contains
     !>      This patch assigns the primitive variables as analytical
         !!      functions such that the code can be verified.
         !!      @param patch_id is the patch identifier
-    subroutine s_3D_analytical(patch_id) ! ---------------------------------
+    subroutine s_3D_analytical(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
 
         integer :: i, j, k !< generic loop iterators
@@ -1038,16 +1012,17 @@ contains
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                         !gaussian ball
                         !what variables to alter
                         !bump in pressure
                         q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)* &
-                                                       (1d0 + 0.2d0*exp(-1d0* &
+                                                    (1d0 + 0.2d0*exp(-1d0* &
                                                                         ((x_cb(i) - x_centroid)**2.d0 + &
-                                                                         (y_cb(j) - y_centroid)**2.d0 + &
-                                                                         (z_cb(k) - z_centroid)**2.d0) &
+                                                                        (y_cb(j) - y_centroid)**2.d0 + &
+                                                                        (z_cb(k) - z_centroid)**2.d0) &
                                                                         /(2.d0*0.5d0)))
 
                         !bump in void fraction
@@ -1060,7 +1035,7 @@ contains
                         !       q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
                         !                                               (1d0 + 0.2d0*exp(-1d0* &
                         !                                                                               ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-!                                                                                  /(2.d0*0.005d0)))
+    !                                                                                  /(2.d0*0.005d0)))
 
                         !reassign density
                         !         q_prim_vf(1)%sf(i, j, k) = &
@@ -1070,13 +1045,13 @@ contains
                         ! ================================================================================
 
                         ! Constant x-velocity in cylindrical grid ========================================
-!                        q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-!                        q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-!                        q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = COS(z_cc(k))
-!                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = -SIN(z_cc(k))
-!                        q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
-!                        q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
+    !                        q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
+    !                        q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
+    !                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
+    !                        q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = COS(z_cc(k))
+    !                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = -SIN(z_cc(k))
+    !                        q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
+    !                        q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
                         ! ================================================================================
 
                         ! Couette flow in cylindrical grid ===============================================
@@ -1100,9 +1075,11 @@ contains
     !>      This patch generates the shape of the spherical harmonics
         !!      as a perturbation to a perfect sphere
         !!      @param patch_id is the patch identifier
-    subroutine s_spherical_harmonic(patch_id) ! ----------------------------
+    subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
 
@@ -1139,10 +1116,10 @@ contains
                     end if
 
                     if (((x_cc(i) - x_centroid)**2 &
-                         + (cart_y - y_centroid)**2 &
-                         + (cart_z - z_centroid)**2 <= radius**2 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)))) &
+                        + (cart_y - y_centroid)**2 &
+                        + (cart_z - z_centroid)**2 <= radius**2 &
+                        .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)))) &
                         then
 
                         call s_convert_cylindrical_to_spherical_coord(x_cc(i), y_cc(j))
@@ -1176,7 +1153,7 @@ contains
                         elseif (epsilon == 4d0) then
                             if (beta == 0d0) then
                                 H = 3d0/16d0*sqrt(1d0/pi)*(35d0*cos(sph_phi)**4d0 - &
-                                                           3d1*cos(sph_phi)**2 + 3d0)
+                                                        3d1*cos(sph_phi)**2 + 3d0)
                             elseif (beta == 1d0) then
                                 H = -3d0/8d0*sqrt(5d0/pi)*exp(cmplx_i*z_cc(k))* &
                                     sin(sph_phi)*(7d0*cos(sph_phi)**3d0 - 3d0*cos(sph_phi))
@@ -1228,9 +1205,11 @@ contains
         !!              provided. Please note that the spherical patch DOES allow
         !!              for the smoothing of its boundary.
         !!      @param patch_id is the patch identifier
-    subroutine s_sphere(patch_id) ! ----------------------------------------
+    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k !< generic loop iterators
@@ -1271,28 +1250,29 @@ contains
                     if (patch_icpp(patch_id)%smoothen) then
 
                         eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                   (sqrt((x_cc(i) - x_centroid)**2 &
-                                         + (cart_y - y_centroid)**2 &
-                                         + (cart_z - z_centroid)**2) &
+                                (sqrt((x_cc(i) - x_centroid)**2 &
+                                        + (cart_y - y_centroid)**2 &
+                                        + (cart_z - z_centroid)**2) &
                                     - radius))*(-0.5d0) + 0.5d0
 
                     end if
 
                     if (((x_cc(i) - x_centroid)**2 &
-                         + (cart_y - y_centroid)**2 &
-                         + (cart_z - z_centroid)**2 <= radius**2 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                        + (cart_y - y_centroid)**2 &
+                        + (cart_z - z_centroid)**2 <= radius**2 &
+                        .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     end if
 
                     ! Initialization of the pressure field that corresponds to the bubble-collapse
-                     !! test case found in Tiwari et al. (2013)
+                    !! test case found in Tiwari et al. (2013)
                     ! radius_pressure = SQRT(x_cc(i)**2) ! 1D
                     ! radius_pressure = SQRT(x_cc(i)**2 + cart_y**2) ! 2D
                     ! radius_pressure = SQRT(x_cc(i)**2 + cart_y**2 + cart_z**2) ! 3D
@@ -1324,9 +1304,11 @@ contains
         !!              the cuboidal patch DOES NOT allow for the smearing of its
         !!              boundaries.
         !!      @param patch_id is the patch identifier
-    subroutine s_cuboid(patch_id) ! ----------------------------------------
+    subroutine s_cuboid(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1378,7 +1360,8 @@ contains
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     end if
                 end do
@@ -1396,9 +1379,11 @@ contains
         !!              that the cylindrical patch DOES allow for the smoothing
         !!              of its lateral boundary.
         !!      @param patch_id is the patch identifier
-    subroutine s_cylinder(patch_id) ! --------------------------------------
+    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf) ! --------------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1447,47 +1432,48 @@ contains
 
                         if (length_x /= dflt_real) then
                             eta = tanh(smooth_coeff/min(dy, dz)* &
-                                       (sqrt((cart_y - y_centroid)**2 &
-                                             + (cart_z - z_centroid)**2) &
+                                    (sqrt((cart_y - y_centroid)**2 &
+                                            + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         elseif (length_y /= dflt_real) then
                             eta = tanh(smooth_coeff/min(dx, dz)* &
-                                       (sqrt((x_cc(i) - x_centroid)**2 &
-                                             + (cart_z - z_centroid)**2) &
+                                    (sqrt((x_cc(i) - x_centroid)**2 &
+                                            + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         else
                             eta = tanh(smooth_coeff/min(dx, dy)* &
-                                       (sqrt((x_cc(i) - x_centroid)**2 &
-                                             + (cart_y - y_centroid)**2) &
+                                    (sqrt((x_cc(i) - x_centroid)**2 &
+                                            + (cart_y - y_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         end if
 
                     end if
 
                     if ((((length_x /= dflt_real .and. &
-                           (cart_y - y_centroid)**2 &
-                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                           x_boundary%beg <= x_cc(i) .and. &
-                           x_boundary%end >= x_cc(i)) &
-                          .or. &
-                          (length_y /= dflt_real .and. &
-                           (x_cc(i) - x_centroid)**2 &
-                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                           y_boundary%beg <= cart_y .and. &
-                           y_boundary%end >= cart_y) &
-                          .or. &
-                          (length_z /= dflt_real .and. &
-                           (x_cc(i) - x_centroid)**2 &
-                           + (cart_y - y_centroid)**2 <= radius**2 .and. &
-                           z_boundary%beg <= cart_z .and. &
-                           z_boundary%end >= cart_z)) &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                        (cart_y - y_centroid)**2 &
+                        + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                        x_boundary%beg <= x_cc(i) .and. &
+                        x_boundary%end >= x_cc(i)) &
+                        .or. &
+                        (length_y /= dflt_real .and. &
+                        (x_cc(i) - x_centroid)**2 &
+                        + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                        y_boundary%beg <= cart_y .and. &
+                        y_boundary%end >= cart_y) &
+                        .or. &
+                        (length_z /= dflt_real .and. &
+                        (x_cc(i) - x_centroid)**2 &
+                        + (cart_y - y_centroid)**2 <= radius**2 .and. &
+                        z_boundary%beg <= cart_z .and. &
+                        z_boundary%end >= cart_z)) &
+                        .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     end if
 
@@ -1505,9 +1491,11 @@ contains
         !!              in the sweep direction, are provided. Note that the sweep
         !!              plane patch DOES allow the smoothing of its boundary.
         !!      @param patch_id is the patch identifier
-    subroutine s_sweep_plane(patch_id) ! -----------------------------------
+    subroutine s_sweep_plane(patch_id, patch_id_fp, q_prim_vf) ! -----------------------------------
 
         integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1546,20 +1534,21 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy, dz) &
-                                               *(a*x_cc(i) + &
-                                                 b*cart_y + &
-                                                 c*cart_z + d) &
-                                               /sqrt(a**2 + b**2 + c**2))
+                                            *(a*x_cc(i) + &
+                                                b*cart_y + &
+                                                c*cart_z + d) &
+                                            /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0d0 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                        .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k)
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                    eta, q_prim_vf, patch_id_fp)
 
                     end if
 
@@ -1569,4 +1558,37 @@ contains
 
     end subroutine s_sweep_plane ! -----------------------------------------
 
-end module m_create_patches
+    subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
+        !$acc routine seq
+        real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
+
+        cart_y = cyl_y*sin(cyl_z)
+        cart_z = cyl_y*cos(cyl_z)
+
+    end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
+
+    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
+        !$acc routine seq
+        real(kind(0d0)), intent(IN) :: cyl_x, cyl_y
+
+        sph_phi = atan(cyl_y/cyl_x)
+
+    end subroutine s_convert_cylindrical_to_spherical_coord ! --------------
+
+    !> Archimedes spiral function
+    !! @param myth Angle
+    !! @param offset Thickness
+    !! @param a Starting position
+    function f_r(myth, offset, a)
+        !$acc routine seq
+        real(kind(0d0)), intent(IN) :: myth, offset, a
+        real(kind(0d0)) :: b
+        real(kind(0d0)) :: f_r
+
+        !r(th) = a + b*th
+
+        b = 2.d0*a/(2.d0*pi)
+        f_r = a + b*myth + offset
+    end function f_r
+
+end module m_patches

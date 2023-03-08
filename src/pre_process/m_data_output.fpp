@@ -2,6 +2,8 @@
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
+#:include 'inline_conversions.fpp'
+
 !> @brief This module takes care of writing the grid and initial condition
 !!              data files into the "0" time-step directory located in the folder
 !!              associated with the rank of the local processor, which is a sub-
@@ -14,6 +16,8 @@ module m_data_output
 
     use m_global_parameters     !< Global parameters for the code
 
+    use m_helper
+
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
 #ifdef MFC_MPI
@@ -23,6 +27,8 @@ module m_data_output
     use m_compile_specific
 
     use m_variables_conversion
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -87,6 +93,9 @@ contains
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)) :: pres                         !< Temporary pressure
+
+        real(kind(0d0)) :: nR3
+        real(kind(0d0)) :: ntmp
 
         t_step = 0
 
@@ -179,7 +188,8 @@ contains
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
-                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+                            
+                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
 
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if

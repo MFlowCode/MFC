@@ -3,6 +3,7 @@
 !! @brief Contains module m_variables_conversion
 
 #:include 'macros.fpp'
+#:include 'inline_conversions.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -16,6 +17,8 @@ module m_variables_conversion
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -671,6 +674,8 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
         
+        real(kind(0.d0)) :: ntmp
+        
         if (bubbles) then
             allocate(nRtmp(nb))
         else
@@ -734,6 +739,7 @@ contains
                                                         /qK_cons_vf(1)%sf(j, k, l)
                         end if
                     end do
+
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
@@ -748,7 +754,7 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc)
+                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
                         
                         !$acc loop seq
                         do i = bubxb, bubxe
@@ -881,13 +887,7 @@ contains
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        !call s_comp_n_from_prim_cpu(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub)
-                        vftmp = q_prim_vf(alf_idx)%sf(j, k, l)
-                        R3 = 0d0
-                        do q = 1, nb
-                            R3 = R3 + weight(q)*(Rtmp(q)**3d0)
-                        end do
-                        nbub = (3.d0/(4.d0*pi))*vftmp/R3
+                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
