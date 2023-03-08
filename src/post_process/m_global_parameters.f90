@@ -230,7 +230,6 @@ module m_global_parameters
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: poly_sigma
-    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     !> @}
 
     !> @name Index variables used for m_variables_conversion
