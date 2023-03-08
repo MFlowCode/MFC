@@ -5,4 +5,3 @@ typing
 PyYAML
 argparse
 dataclasses
-h5py
