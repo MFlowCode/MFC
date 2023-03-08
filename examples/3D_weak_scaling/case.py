@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
-parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory")
+parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
 
 ARGS = vars(parser.parse_args())
 DICT = json.loads(ARGS["dict"])
