@@ -842,50 +842,6 @@ contains
 
     end subroutine s_finalize_global_parameters_module ! -----------------
 
-    !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-
-        call s_quad(nRtmp**3, nR3)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-
-        call s_quad(Rtmp**3, R3)  !returns itself if NR0 = 1
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
-
     !> Computes the Simpson weights for quadrature
         !! @param Npt is the number of bins that represent the polydisperse bubble population
     subroutine s_simpson(Npt)

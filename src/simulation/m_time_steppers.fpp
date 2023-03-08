@@ -421,6 +421,8 @@ contains
 
         call cpu_time(finish)
 
+        time = time + (finish - start)
+
         if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else

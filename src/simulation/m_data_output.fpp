@@ -24,6 +24,8 @@ module m_data_output
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compile_specific
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -893,7 +895,7 @@ contains
                             nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
                             nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
                         end do
-                        !call s_comp_n_from_cons(alf, nR, nbub)
+                        !call comp_n_from_cons(alf, nR, nbub)
 
                         nR3 = 0d0
                         do s = 1, nb
@@ -984,7 +986,7 @@ contains
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
                                 nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
-                            !call s_comp_n_from_cons(alf, nR, nbub)
+                            !call comp_n_from_cons(alf, nR, nbub)
 
                             nR3 = 0d0
                             do s = 1, nb

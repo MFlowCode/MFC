@@ -19,6 +19,8 @@ module m_derived_variables
     use m_data_output           !< Data output module
 
     use m_time_steppers         !< Time-stepping algorithms
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -78,11 +80,14 @@ contains
 
         ! Computing centered finite difference coefficients
         if (probe_wrt) then
-            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x)
+            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
+                                                             fd_number, fd_order)
             if (n > 0) then
-                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y)
+                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
+                                                                 fd_number, fd_order)
                 if (p > 0) then
-                    call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z)
+                    call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
+                                                                     fd_number, fd_order)
                 end if
             end if
         end if
@@ -140,60 +145,6 @@ contains
         end if
 
     end subroutine s_compute_derived_variables ! ---------------------------
-
-    !>  The purpose of this subroutine is to compute the finite-
-        !!      difference coefficients for the centered schemes utilized
-        !!      in computations of first order spatial derivatives in the
-        !!      s-coordinate direction. The s-coordinate direction refers
-        !!      to the x-, y- or z-coordinate direction, depending on the
-        !!      subroutine's inputs. Note that coefficients of up to 4th
-        !!      order accuracy are available.
-        !!  @param q Number of cells in the s-coordinate direction
-        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s)
-
-        integer, intent(IN) :: q
-
-        real(kind(0d0)), &
-            dimension(-buff_size:q + buff_size), &
-            intent(IN) :: s_cc
-
-        real(kind(0d0)), &
-            dimension(-fd_number:fd_number, 0:q), &
-            intent(INOUT) :: fd_coeff_s
-
-        integer :: i !< Generic loop iterator
-
-        ! Computing the 1st order finite-difference coefficients
-        if (fd_order == 1) then
-            do i = 0, q
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
-                fd_coeff_s(1, i) = -fd_coeff_s(0, i)
-            end do
-
-            ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order == 2) then
-            do i = 0, q
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-            end do
-
-            ! Computing the 4th order finite-difference coefficients
-        else
-            do i = 0, q
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-                fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
-            end do
-
-        end if
-
-    end subroutine s_compute_finite_difference_coefficients ! --------------
 
     !> This subroutine receives as inputs the indicator of the
         !!      component of the acceleration that should be outputted and

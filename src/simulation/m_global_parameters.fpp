@@ -28,6 +28,8 @@ module m_global_parameters
 
     implicit none
 
+    real(kind(0d0)) :: time = 0
+
     ! Logistics ================================================================
     integer :: num_procs             !< Number of processors
     character(LEN=path_len) :: case_dir              !< Case folder location
@@ -1026,95 +1028,6 @@ contains
 
     end subroutine s_finalize_global_parameters_module ! -------------------
 
-    !>  Computes the bubble number density n from the conservative variables
-        !!  \f$ n = \sqrt{ \frac{4 \pi}{3} } \frac{ nR^3}{\alpha} \f$
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-!$acc routine seq
-
-        real(kind(0d0)), intent(IN) :: vftmp
-        real(kind(0d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0d0)), intent(OUT) :: ntmp
-        real(kind(0d0)) :: nR3
-        integer :: i
-
-        nR3 = 0d0
-        do i = 1, nb
-            nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
-        end do
-
-        !if (nR3 < 0d0) then
-        ! DO i = 1,nb
-        ! IF (nRtmp(i) < small_alf) THEN
-        ! nRtmp(i) = small_alf
-        ! END IF
-        ! END DO
-        ! nR3 = 1.d-12
-        !print *, vftmp, nR3, nRtmp(:)
-        !   stop 'nR3 is negative'
-        !end if
-        !if (vftmp < 0d0) then
-        ! vftmp = small_alf
-        ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
-        !print *, vftmp, nR3, nRtmp(:)
-        !   stop 'vf negative'
-        !end if
-
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !!  \f$ n = \sqrt{ \frac{3}{4 \pi} } \frac{ \alpha }{ R^3} \f$
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-!$acc routine seq
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-        integer :: i
-
-        R3 = 0d0
-        do i = 1, nb
-            R3 = R3 + weight(i)*(Rtmp(i)**3d0)
-        end do
-
-        if (R3 < 0d0) then
-            !PRINT*, vftmp, R3, Rtmp(:)
-            stop 'R3 is negative'
-        end if
-        if (vftmp < 0d0) then
-            !PRINT*, vftmp, R3, Rtmp(:)
-            stop 'vf negative'
-        end if
-
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-!$acc routine seq
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-        integer :: i
-
-        mom = 0d0
-        do i = 1, nb
-            mom = mom + weight(i)*func(i)
-        end do
-
-    end subroutine s_quad
-
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
@@ -1161,7 +1074,6 @@ contains
                 weight(ir) = tmp*2.d0*dphi/3.d0
             end if
         end do
-
         tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
