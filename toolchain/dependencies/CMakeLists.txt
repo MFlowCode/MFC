@@ -49,7 +49,7 @@ if (MFC_HDF5)
                            -DFORTRAN_LIBRARIES=ON
                            -DBUILD_TESTING=OFF
                            -DHDF5_BUILD_UTILS=OFF
-                           -DHDF5_BUILD_TOOLS=OFF
+                           -DHDF5_BUILD_TOOLS=ON
                            -DHDF5_BUILD_EXAMPLES=OFF
         )
     else()
