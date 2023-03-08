@@ -76,7 +76,7 @@ for binpath in {MFC::BINARIES}; do
         --cpu_per_rs   1                      \
         --gpu_per_rs   {1 if gpu else 0}      \
         --tasks_per_rs 1                      \
-        "$binpath"
+        {MFC::PROFILER} "$binpath"
 
     echo ""
 

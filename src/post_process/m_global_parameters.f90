@@ -20,12 +20,6 @@ module m_global_parameters
     !> @name Logistics
     !> @{
     integer :: num_procs            !< Number of processors
-    integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
-    integer, parameter :: path_len = 400  !< Maximum path length
-    integer, parameter :: name_len = 50   !< Maximum name length
-    real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
-    integer, parameter :: dflt_int = -100 !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     character(LEN=path_len) :: case_dir             !< Case folder location
     !> @}
 
@@ -247,10 +241,6 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     !> @}
-
-    ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
-    ! ==========================================================================
 
 contains
 
@@ -651,10 +641,6 @@ contains
         real(kind(0.d0)), dimension(Nb) :: k_m0
         real(kind(0.d0)), dimension(Nb) :: rho_m0
         real(kind(0.d0)), dimension(Nb) :: x_vw
-        ! polytropic index used to compute isothermal natural frequency
-        real(kind(0.d0)), parameter :: k_poly = 1.d0
-        ! universal gas constant
-        real(kind(0.d0)), parameter :: Ru = 8314.d0
 
         ! liquid physical properties
         real(kind(0.d0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
