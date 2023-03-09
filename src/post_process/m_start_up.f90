@@ -367,10 +367,6 @@ contains
             print '(A)', 'Unsupported choice for the value of format. '// &
                 'Exiting ...'
             call s_mpi_abort()
-        elseif ((precision /= 2) .and. (parallel_io .neqv. .false.)) then
-            print '(A)', 'Unsupported combination of precision and parallel IO. '// &
-                'Please use precision == 2 when enabling parallel_io.  Exiting ...'
-            call s_mpi_abort()
 
             ! Constraints on the precision of the formatted database file(s)
         elseif (precision /= 1 .and. precision /= 2) then
