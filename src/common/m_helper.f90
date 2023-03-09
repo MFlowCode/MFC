@@ -20,8 +20,7 @@ module m_helper
 
     private; public :: s_compute_finite_difference_coefficients, &
         s_comp_n_from_prim, &
-        s_comp_n_from_cons, &
-        s_quad
+        s_comp_n_from_cons
 
 contains
 
@@ -103,8 +102,7 @@ contains
         real(kind(0.d0)) :: R3
         real(kind(0.d0)), dimension(nb) :: weight
 
-        call s_quad(Rtmp**3.d0, R3, weight)
-
+        R3 = dot_product(weight, Rtmp**3.d0)
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
 
     end subroutine s_comp_n_from_prim
@@ -117,23 +115,9 @@ contains
         real(kind(0.d0)) :: nR3
         real(kind(0.d0)), dimension(nb) :: weight
 
-        call s_quad(nRtmp**3.d0, nR3, weight)
-
+        nR3 = dot_product(weight, nRtmp**3.d0)
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom, weight)
-        !$acc routine seq
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-        real(kind(0.d0)), dimension(nb) :: weight
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
 
 end module m_helper
