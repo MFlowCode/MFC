@@ -238,10 +238,8 @@ contains
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
-
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
-
                 end if
 
             end do
