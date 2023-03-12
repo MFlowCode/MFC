@@ -89,7 +89,7 @@ contains
 
         ! Namelist for all of the parameters to be inputed by the user
         namelist /user_inputs/ case_dir, old_grid, old_ic, &
-            t_step_old, m, n, p, x_domain, y_domain, z_domain, &
+            t_step_old, t_step_start, m, n, p, x_domain, y_domain, z_domain, &
             stretch_x, stretch_y, stretch_z, a_x, a_y, &
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, &
@@ -887,10 +887,10 @@ contains
         logical :: file_check
 
         ! Setting address of the local processor rank and time-step directory
-        write (proc_rank_dir, '(A,I0)') '/p', proc_rank
+        write (proc_rank_dir, '(A,I0)') '/p_all/p', proc_rank
         proc_rank_dir = trim(case_dir)//trim(proc_rank_dir)
 
-        write (t_step_dir, '(A,I0)') '/', t_step_old
+        write (t_step_dir, '(A,I0)') '/', t_step_start
         t_step_dir = trim(proc_rank_dir)//trim(t_step_dir)
 
         ! Inquiring as to the existence of the time-step directory
@@ -1264,7 +1264,7 @@ contains
         integer :: i
 
         ! Open the file to read
-        write (file_loc, '(I0,A)') t_step_old, '.dat'
+        write (file_loc, '(I0,A)') t_step_start, '.dat'
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -1308,7 +1308,6 @@ contains
             call s_mpi_abort()
         end if
         call s_mpi_barrier()
-        if (proc_rank == 0) call s_create_directory(trim(file_loc))
 
 #endif
 

@@ -34,7 +34,7 @@ examples/*/*.inp
 examples/*/*.dat
 examples/*/*.o*
 examples/*/silo*
-examples/*/restart*
+examples/*/restart_data*
 examples/*/*.out
 examples/*/binary
 examples/*/fort.1
