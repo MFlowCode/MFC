@@ -91,7 +91,76 @@ modified by users.
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does not use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
 
-## Example Runs
+### Restarting Cases
+
+When running a simulation, MFC generates a `./restart_data` folder in the case directory that contains `lustre_*.dat` files that can be used to restart a simulation from saved timesteps. This allows a user to run a simulation to some timestep $X$, then later continue it to run to another timestep $Y$, where $Y > X$. The user can also choose to add new patches at the intermediate timestep.
+
+If you want to restart a simulation, 
+
+- Set up the initial simulation, with:
+    - `t_step_start` : $t_i$
+    - `t_step_stop`  : $t_f$
+    - `t_step_save`  : $SF$
+in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the saving frequency time.
+- Run pre-process and simulation on the case.
+    - `./mfc.sh run case.py -t pre_process simulation `
+- As the simulation runs, it will create LUSTRE files for each saved timestep in `./restart_data`.
+- When the simulation stops, choose any LUSTRE file as the restarting point (lustre_ $t_s$.dat)
+- Create a new duplicate input file, (ex. `restart_case.py`), on which it should:
+
+1. For the Computational Domain Parameters 
+    - Have the following removed BUT `m`, `n`, and `p`:
+		- All domaing/mesh information
+			- `(xyz)_domain%beg`
+			- `(xyz)_domain%end`
+			- `stretch_(xyz)`
+			- `a_(xyz)`
+			- `(xyz)_a`
+			- `(xyz)_b`
+	- Have the following altered:
+		- `t_step_start` : $t_s$ # this is the point at which the simulation will restart
+		- `t_step_stop`  : $t_{f2}$ # your new final simulation time, which can be the same as $t_f$
+		- `t_step_save`  : ${SF}_2$ # if interested in changing the saving frequency 
+	- Have the following ADDED:
+		- `old_ic` : 'T' # to specify that we have initial conditions from previous simulations
+		- `old_grid` : 'T' # to specify that we have a grid from previous simulations (maybe I do not need m, n, and p, then?)
+		- `t_step_old` : $t_i$ # this is the time step used as the `t_step_start` of the original `case.py` file
+2. For the Simulation Algorithm Parameters
+	- Substitute `num_patches` to reflect the number of ADDED patches in the `restart_case.py` file. If no patches are added, set `num_patches: 0`
+
+3. For Patches
+	- Have all information about old patches (used in the `case.py` file) removed.
+		- `patch_icpp(1)%all variables`
+		- `patch_icpp(2)%all variables`
+		- `patch_icpp(num_patches)%all variables`
+	- Add information about new patches that will be introduced, if any. The parameter num_patches should reflect this addition.
+		- e.g. `patch_icpp(1)%some variables of interest`	
+
+4. For Fluid properties	
+	- Keep information about the fluid properties
+
+- Run pre-process and simulation on restart_case.py
+    - `./mfc.sh run restart_case.py -t pre_process simulation `
+	
+- Run the post_process
+	- There are several ways to do this. Keep in mind that, regardless of the .py file used, the post_process command will generate output files in the [`t_step_start`, `t_step_stop`] range, with `t_step_save` as the spacing between files.
+		- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run:
+		```console
+		$ ./mfc.sh run case.py -t post_process
+		$ ./mfc.sh run restart_case.py -t post_process
+		```
+		- The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
+
+We have provided an example `case.py` and `restart_case.py` in `/examples/1D_vacuum_restart/`. This simulation is a duplicate of the `1D_vacuum` case. It demonstrates stopping at timestep 7000, adding a new patch, and restarting the simulation. To test this code, run:
+
+```console
+$ ./mfc.sh run examples/1D_vacuum_restart/case.py -t pre_process simulation
+$ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t pre_process simulation
+$ ./mfc.sh run examples/1D_vacuum_restart/case.py -t post_process
+$ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
+```
+
+### Example Runs
 
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 

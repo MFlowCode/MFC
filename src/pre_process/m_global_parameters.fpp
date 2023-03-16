@@ -23,7 +23,7 @@ module m_global_parameters
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic               !< Use existing IC data
-    integer :: t_step_old           !< Existing IC/grid folder
+    integer :: t_step_old, t_step_start           !< Existing IC/grid folder
     ! ==========================================================================
 
     ! Computational Domain Parameters ==========================================
@@ -202,6 +202,7 @@ contains
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
+        t_step_start = dflt_int
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
