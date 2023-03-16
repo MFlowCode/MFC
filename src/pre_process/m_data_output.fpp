@@ -76,6 +76,7 @@ contains
         logical :: file_exist !< checks if file exists
 
         character(LEN=15) :: FMT
+        character(LEN=3) :: status
 
         character(LEN= &
                   int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !< Used to store
@@ -101,9 +102,15 @@ contains
 
         ! Outputting the Locations of the Cell-boundaries ==================
 
+        if (old_grid) then
+            status = 'old'
+        else
+            status = 'new'
+        end if
+
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS='new')
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
         write (1) x_cb(-1:m)
         close (1)
 
@@ -112,7 +119,7 @@ contains
             ! y-coordinate direction
             file_loc = trim(t_step_dir)//'/y_cb.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS='new')
+                  STATUS=status)
             write (1) y_cb(-1:n)
             close (1)
 
@@ -120,7 +127,7 @@ contains
             if (p > 0) then
                 file_loc = trim(t_step_dir)//'/z_cb.dat'
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS='new')
+                      STATUS=status)
                 write (1) z_cb(-1:p)
                 close (1)
             end if
@@ -133,7 +140,7 @@ contains
             file_loc = trim(t_step_dir)//'/q_cons_vf'//trim(file_num) &
                        //'.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS='new')
+                  STATUS=status)
             write (1) q_cons_vf(i)%sf
             close (1)
         end do
@@ -280,7 +287,7 @@ contains
         call s_initialize_mpi_data(q_cons_vf)
 
         ! Open the file to write all flow variables
-        write (file_loc, '(A)') '0.dat'
+        write (file_loc, '(I0,A)') t_step_start, '.dat'
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
         if (file_exist .and. proc_rank == 0) then
