@@ -55,34 +55,11 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-    !! The cell-boundary-average of the fluxes. They are initially determined by
-    !! reshaping flux_vf and flux_src_vf in a coordinate direction normal to the
-    !! domain boundary along which CBC is applied. flux_rs_vf and flux_src_rs_vf
-    !! are subsequently modified based on the selected CBC.
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho   !< Cell averaged partial densiy
-    real(kind(0d0)) :: rho         !< Cell averaged density
-    real(kind(0d0)), allocatable, dimension(:) :: vel         !< Cell averaged velocity
-    real(kind(0d0)) :: pres        !< Cell averaged pressure
-    real(kind(0d0)) :: E           !< Cell averaged energy
-    real(kind(0d0)) :: H           !< Cell averaged enthalpy
-    real(kind(0d0)), allocatable, dimension(:) :: adv         !< Cell averaged advected variables
-    real(kind(0d0)), allocatable, dimension(:) :: mf          !< Cell averaged mass fraction
-    real(kind(0d0)) :: gamma        !< Cell averaged specific heat ratio
-    real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
+
     real(kind(0d0)) :: c           !< Cell averaged speed of sound
     real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
 
-    real(kind(0d0)), allocatable, dimension(:) :: dalpha_rho_ds !< Spatial derivatives in s-dir of partial density
-    real(kind(0d0)), allocatable, dimension(:) :: dvel_ds !< Spatial derivatives in s-dir of velocity
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-    real(kind(0d0)), allocatable, dimension(:) :: dadv_ds !< Spatial derivatives in s-dir of advection variables
-
-    !! Note that these are only obtained in those cells on the domain boundary along which the
-    !! CBC is applied by employing finite differences (FD) on the cell-average primitive variables, q_prim_rs_vf.
-
-    real(kind(0d0)), dimension(3) :: lambda !< Eigenvalues (see Thompson 1987,1990)
-    real(kind(0d0)), allocatable, dimension(:) :: L      !< L matrix (see Thompson 1987,1990)
-
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
     ! CBC Coefficients =========================================================
@@ -92,8 +69,8 @@ module m_cbc
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
-! Bug with NVHPC when using nullified pointers in a declare create
-!    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
+    ! Bug with NVHPC when using nullified pointers in a declare create
+    !    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
@@ -118,9 +95,9 @@ module m_cbc
     integer :: cbc_dir, cbc_loc
 
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
-!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,alpha_rho,vel,adv,mf,Re, &
-!$acc                dalpha_rho_ds,dvel_ds,dadv_ds,lambda,L,ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-!$acc                pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj, cbc_dir, cbc_loc)
+!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,Re, &
+!$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
+!$acc                 pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj, cbc_dir, cbc_loc)
 
 contains
 
@@ -139,12 +116,6 @@ contains
             .and. &
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
 
-        ! Allocating the cell-average primitive variables
-        !allocate (q_prim_rs_vf(1:sys_size))
-
-        ! Allocating the cell-average and cell-boundary-average fluxes
-        !allocate (F_rs_vf(1:sys_size), F_src_rs_vf(1:sys_size))
-        !allocate (flux_rs_vf(1:sys_size), flux_src_rs_vf(1:sys_size))
         if (n == 0) then
             is2%beg = 0
 
@@ -276,21 +247,6 @@ contains
 
         end if
 
-        ! Allocating the cell-average partial densities, the velocity, the
-        ! advected variables, the mass fractions, as well as Weber numbers
-        allocate (alpha_rho(1:cont_idx%end))
-        allocate (vel(1:num_dims))
-        allocate (adv(1:adv_idx%end - E_idx))
-        allocate (mf(1:cont_idx%end))
-
-        ! Allocating the first-order spatial derivatives in the s-direction
-        ! of the partial densities, the velocity and the advected variables
-        allocate (dalpha_rho_ds(1:cont_idx%end))
-        allocate (dvel_ds(1:num_dims))
-        allocate (dadv_ds(1:adv_idx%end - E_idx))
-
-        ! Allocating L, see Thompson (1987, 1990)
-        allocate (L(1:adv_idx%end))
 
         ! Allocating the cell-width distribution in the s-direction
         allocate (ds(0:buff_size))
@@ -667,8 +623,6 @@ contains
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
-
-        ! Allocating L, see Thompson (1987, 1990)
 
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
@@ -1526,17 +1480,6 @@ contains
             end if
             deallocate (flux_rsz_vf, flux_src_rsz_vf)
         end if
-
-        ! Deallocating the cell-average partial densities, the velocity, the
-        ! advection variables, the mass fractions and also the Weber numbers
-        deallocate (alpha_rho, vel, adv, mf)
-
-        ! Deallocating the first-order spatial derivatives, in s-direction,
-        ! of the partial densities, the velocity and the advected variables
-        deallocate (dalpha_rho_ds, dvel_ds, dadv_ds)
-
-        ! Deallocating L, see Thompson (1987, 1990)
-        deallocate (L)
 
         ! Deallocating the cell-width distribution in the s-direction
         deallocate (ds)
