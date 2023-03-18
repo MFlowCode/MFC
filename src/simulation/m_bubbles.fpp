@@ -43,7 +43,6 @@ contains
         !!  @param bub_v_src   Bubble velocity equation source
         !!  @param bub_p_src   Bubble pressure equation source
         !!  @param bub_m_src   Bubble mass equation source
-
     subroutine s_initialize_bubbles_module() 
 
         integer :: i, j, k, l, q
