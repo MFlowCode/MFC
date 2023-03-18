@@ -415,14 +415,10 @@ contains
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
-                print '(A)', 'ICFL is NaN. Exiting ...'
-                ! print*, (dt/dx(:)),ABS(vel(1)),c
-
-                call s_mpi_abort()
+                call s_mpi_abort('ICFL is NaN. Exiting ...')
             elseif (icfl_max_glb > 1d0) then
-                print '(A)', 'ICFL is greater than 1.0. Exiting ...'
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort()
             end if
         end if
 
@@ -1255,8 +1251,7 @@ contains
                 end do
             elseif (p == 0) then
                 if (num_integrals /= 3) then
-                    print '(A)', 'Incorrect number of integrals'
-                    call s_mpi_abort()
+                    call s_mpi_abort('Incorrect number of integrals')
                 end if
 
                 rad = integral(1)%xmax
