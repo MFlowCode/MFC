@@ -920,10 +920,9 @@ contains
 
 #else
         if (proc_rank == 0) then
-            print '(A)', 'Conversion from primitive to '// &
+            call s_mpi_abort('Conversion from primitive to '// &
                 'conservative variables not '// &
-                'implemented. Exiting ...'
-            call s_mpi_abort()
+                'implemented. Exiting ...')
         end if
 #endif
 

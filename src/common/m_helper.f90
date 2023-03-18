@@ -20,7 +20,8 @@ module m_helper
 
     private; public :: s_compute_finite_difference_coefficients, &
         s_comp_n_from_prim, &
-        s_comp_n_from_cons
+        s_comp_n_from_cons, &
+        s_int_to_str
 
 contains
 
@@ -119,5 +120,12 @@ contains
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
+
+    subroutine s_int_to_str(i, res)
+        character(len=*) :: res
+        integer,intent(in) :: i
+        write(res,'(I0)') i
+        res = trim(res)
+    end subroutine
 
 end module m_helper

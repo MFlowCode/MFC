@@ -365,22 +365,6 @@ contains
 
         integer :: i, j, k
 
-        ! Solve linear system using Intel MKL (Hooke)
-!               nrhs = 1
-!               lda = ndim
-!               ldb = ndim
-!
-!               CALL DGESV(ndim, nrhs, A, lda, ipiv, b, ldb, info)
-!
-!               DO i = 1, ndim
-!                   sol(i) = b(i)
-!               END DO
-!
-!               IF (info /= 0) THEN
-!                   PRINT '(A)', 'Trouble solving linear system'
-!                   CALL s_mpi_abort()
-!               END IF
-
         ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede)
         ! Forward elimination
         do i = 1, ndim
