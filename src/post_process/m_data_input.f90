@@ -92,9 +92,8 @@ contains
 
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
-            print '(A)', 'Time-step folder '//trim(t_step_dir)// &
-                ' is missing. Exiting ...'
-            call s_mpi_abort()
+            call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
+                ' is missing. Exiting ...')
         end if
 
         ! Reading the Grid Data File for the x-direction ===================
@@ -110,9 +109,8 @@ contains
             read (1) x_cb(-1:m)
             close (1)
         else
-            print '(A)', 'File x_cb.dat is missing in '// &
-                trim(t_step_dir)//'. Exiting ...'
-            call s_mpi_abort()
+            call s_mpi_abort('File x_cb.dat is missing in '// &
+                trim(t_step_dir)//'. Exiting ...')
         end if
 
         ! Computing the cell-width distribution
@@ -138,9 +136,8 @@ contains
                 read (1) y_cb(-1:n)
                 close (1)
             else
-                print '(A)', 'File y_cb.dat is missing in '// &
-                    trim(t_step_dir)//'. Exiting ...'
-                call s_mpi_abort()
+                call s_mpi_abort('File y_cb.dat is missing in '// &
+                    trim(t_step_dir)//'. Exiting ...')
             end if
 
             ! Computing the cell-width distribution
@@ -166,9 +163,8 @@ contains
                     read (1) z_cb(-1:p)
                     close (1)
                 else
-                    print '(A)', 'File z_cb.dat is missing in '// &
-                        trim(t_step_dir)//'. Exiting ...'
-                    call s_mpi_abort()
+                    call s_mpi_abort('File z_cb.dat is missing in '// &
+                        trim(t_step_dir)//'. Exiting ...')
                 end if
 
                 ! Computing the cell-width distribution
@@ -200,10 +196,9 @@ contains
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
                 close (1)
             else
-                print '(A)', 'File q_cons_vf'//trim(file_num)// &
+                call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                     '.dat is missing in '//trim(t_step_dir)// &
-                    '. Exiting ...'
-                call s_mpi_abort()
+                    '. Exiting ...')
             end if
 
         end do
@@ -253,8 +248,7 @@ contains
             call MPI_FILE_READ(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-            call s_mpi_abort()
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
 
         ! Assigning local cell boundary locations
@@ -275,8 +269,7 @@ contains
                 call MPI_FILE_READ(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
-                print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-                call s_mpi_abort()
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
 
             ! Assigning local cell boundary locations
@@ -297,8 +290,7 @@ contains
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
-                    print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-                    call s_mpi_abort()
+                    call s_mpi_abort( 'File '//trim(file_loc)//' is missing. Exiting...')
                 end if
 
                 ! Assigning local cell boundary locations
@@ -364,8 +356,7 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-            call s_mpi_abort()
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)

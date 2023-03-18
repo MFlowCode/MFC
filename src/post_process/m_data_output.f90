@@ -483,10 +483,9 @@ contains
             ! database slave file has been performed without errors. If this
             ! is not the case, the post-process exits.
             if (dbfile == -1) then
-                print '(A)', 'Unable to create Silo-HDF5 database '// &
+                call s_mpi_abort('Unable to create Silo-HDF5 database '// &
                     'slave file '//trim(file_loc)//'. '// &
-                    'Exiting ...'
-                call s_mpi_abort()
+                    'Exiting ...')
             end if
 
             ! Next, analogous steps to the ones above are carried out by the
@@ -502,10 +501,9 @@ contains
                                 DB_HDF5, dbroot)
 
                 if (dbroot == -1) then
-                    print '(A)', 'Unable to create Silo-HDF5 database '// &
+                    call s_mpi_abort('Unable to create Silo-HDF5 database '// &
                         'master file '//trim(file_loc)//'. '// &
-                        'Exiting ...'
-                    call s_mpi_abort()
+                        'Exiting ...')
                 end if
 
             end if
@@ -529,10 +527,9 @@ contains
             ! Verifying that the creation and setup process of the formatted
             ! database slave file has been performed without errors. If this
             ! is not the case, the post-process exits.
-            if (err /= 0) then
-                print '(A)', 'Unable to create Binary database slave '// &
-                    'file '//trim(file_loc)//'. Exiting ...'
-                call s_mpi_abort()
+            if (err /= 0) then 
+                call s_mpi_abort('Unable to create Binary database slave '// &
+                    'file '//trim(file_loc)//'. Exiting ...')
             end if
 
             ! Further defining the structure of the formatted database slave
@@ -552,11 +549,10 @@ contains
                 open (dbroot, IOSTAT=err, FILE=trim(file_loc), &
                       FORM='unformatted', STATUS='replace')
 
-                if (err /= 0) then
-                    print '(A)', 'Unable to create Binary database '// &
-                        'master file '//trim(file_loc)// &
-                        '. Exiting ...'
-                    call s_mpi_abort()
+                if (err /= 0) then 
+                    call s_mpi_abort('Unable to create Binary database '// &
+                    'master file '//trim(file_loc)// &
+                    '. Exiting ...')
                 end if
 
                 write (dbroot) m_root, 0, 0, dbvars
