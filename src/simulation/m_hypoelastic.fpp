@@ -22,18 +22,16 @@ module m_hypoelastic
     private; public :: s_initialize_hypoelastic_module, &
             s_compute_hypoelastic_rhs
 
-
     real(kind(0d0)), allocatable, dimension(:) :: Gs
-!$acc declare create(Gs)
-
+    !$acc declare create(Gs)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
     real(kind(0d0)), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
     real(kind(0d0)), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-!$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+    !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
-!$acc declare create(rho_K_field, G_K_field)
+    !$acc declare create(rho_K_field, G_K_field)
     
 
 contains
@@ -57,16 +55,15 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device(Gs)
+        !$acc update device(Gs)
 
     end subroutine s_initialize_hypoelastic_module
 
-!    !>  The purpose of this procedure is to compute the source terms
-!        !!      that are needed for the elastic stress equations
-!        !!  @param idir Dimension splitting index
-!        !!  @param q_prim_vf Primitive variables
-!        !!  @param rhs_vf rhs variables
-!    subroutine s_compute_hypo_rhs(idir, q_prim_vf, rhs_vf)
+    !>  The purpose of this procedure is to compute the source terms
+        !!      that are needed for the elastic stress equations
+        !!  @param idir Dimension splitting index
+        !!  @param q_prim_vf Primitive variables
+        !!  @param rhs_vf rhs variables
     subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
 
 
@@ -86,7 +83,8 @@ contains
         if (idir == 1) then
             ! calculate velocity gradients + rho_K and G_K
             ! TODO: re-organize these loops one by one for GPU efficiency if possible?
-!$acc parallel loop collapse(3) gang vector default(present)
+
+            !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -101,7 +99,7 @@ contains
             end do
 
             if (ndirs > 1) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -129,7 +127,7 @@ contains
                 
                 ! 3D
                 if (ndirs == 3) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
@@ -169,7 +167,7 @@ contains
                 end if
             end if
 
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0,p
                 do l = 0,n
                     do k = 0,m
@@ -180,6 +178,7 @@ contains
                         end do
                         rho_K_field(k,l,q) = rho_K
                         G_K_field(k,l,q) = G_K
+
                         !TODO: take this out if not needed
                         if (G_K < 1000) then
                             G_K_field(k,l,q) = 0
@@ -189,7 +188,7 @@ contains
             end do
 
             ! apply rhs source term to elastic stress equation
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -203,7 +202,7 @@ contains
             end do
 
         elseif(idir == 2) then
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0,p
                 do l = 0,n
                     do k = 0,m
@@ -238,7 +237,7 @@ contains
             end do
 
         elseif(idir == 3) then
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
