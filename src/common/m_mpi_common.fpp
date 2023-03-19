@@ -69,7 +69,6 @@ contains
             intent(IN) :: q_cons_vf
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
-        integer :: ierr
 
 #ifdef MFC_MPI
 
