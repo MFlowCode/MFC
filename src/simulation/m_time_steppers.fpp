@@ -72,7 +72,6 @@ contains
         ix%beg = -buff_size; ix%end = m + buff_size
 
         if (n > 0) then
-
             iy%beg = -buff_size; iy%end = n + buff_size
 
             if (p > 0) then
@@ -80,12 +79,9 @@ contains
             else
                 iz%beg = 0; iz%end = 0
             end if
-
         else
-
             iy%beg = 0; iy%end = 0
             iz%beg = 0; iz%end = 0
-
         end if
 
         ! Allocating the cell-average conservative variables
