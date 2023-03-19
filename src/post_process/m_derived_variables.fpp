@@ -118,15 +118,8 @@ contains
         !!      function, gamma_sf, and derives from it the specific heat
         !!      ratio. The latter is stored in the derived flow quantity
         !!      storage variable, q_sf.
-        !!  @param gamma_sf Specific heat ratio function
         !!  @param q_sf Specific heat ratio
-    subroutine s_derive_specific_heat_ratio(gamma_sf, q_sf) ! --------------
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: gamma_sf
+    subroutine s_derive_specific_heat_ratio(q_sf) ! --------------
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -152,16 +145,8 @@ contains
         !!      pi_inf_sf, respectively. These are used to calculate the
         !!      values of the liquid stiffness, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
-        !!  @param gamma_sf Specific heat ratio
-        !!  @param pi_inf_sf Liquid stiffness function
         !!  @param q_sf Liquid stiffness
-    subroutine s_derive_liquid_stiffness(gamma_sf, pi_inf_sf, q_sf) ! ------
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: gamma_sf, pi_inf_sf
+    subroutine s_derive_liquid_stiffness(q_sf) ! ------
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -189,22 +174,12 @@ contains
         !!      the values of the speed of sound, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
         !! @param q_prim_vf Primitive variables
-        !! @param rho_sf Density
-        !! @param gamma_sf Specific heat ratio function
-        !! @param pi_inf_sf Liquid stiffness function
         !! @param q_sf Speed of sound
-    subroutine s_derive_sound_speed(q_prim_vf, rho_sf, gamma_sf, & ! ------
-                                    pi_inf_sf, q_sf)
+    subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: rho_sf, gamma_sf, pi_inf_sf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -594,19 +569,12 @@ contains
         !!      subsequently stored in the derived flow quantity storage
         !!      variable, q_sf.
         !!  @param q_cons_vf Conservative variables
-        !!  @param rho_sf Density
         !!  @param q_sf Numerical Schlieren function
-    subroutine s_derive_numerical_schlieren_function(q_cons_vf, rho_sf, q_sf)
+    subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: rho_sf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
