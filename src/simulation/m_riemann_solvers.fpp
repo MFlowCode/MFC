@@ -112,20 +112,6 @@ module m_riemann_solvers
         end subroutine s_abstract_riemann_solver
 
         !> The abstract interface to the subroutines that are utilized to compute
-        !! the wave speeds of the Riemann problem either directly or by the means
-        !! of pressure-velocity estimates. For more information please refer to:
-        !!      1) s_compute_direct_wave_speeds
-        !!      2) s_compute_pressure_velocity_wave_speeds
-        !!  @param i First coordinate location index
-        !!  @param j Second coordinate location index
-        !!  @param k Third coordinate location index
-        ! subroutine s_compute_abstract_wave_speeds(i, j, k)
-
-        !     integer, intent(IN) :: i, j, k
-
-        ! end subroutine s_compute_abstract_wave_speeds
-
-        !> The abstract interface to the subroutines that are utilized to compute
         !! the viscous source fluxes for either Cartesian or cylindrical geometries.
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
@@ -162,8 +148,6 @@ module m_riemann_solvers
         end subroutine s_compute_abstract_viscous_source_flux
 
     end interface ! ============================================================
-
-
 
     !> The cell-boundary values of the fluxes (src - source) that are computed
     !! through the chosen Riemann problem solver, and the direct evaluation of
@@ -488,7 +472,6 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-
                                 if (hypoelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
@@ -2221,20 +2204,6 @@ contains
         else
             s_compute_viscous_source_flux => s_compute_cartesian_viscous_source_flux
         end if
-
-        ! Associating the procedural pointer to the appropriate subroutine
-        ! that will be utilized in the conversion to the mixture variables
-
-        ! if (model_eqns == 1) then        ! Gamma/pi_inf model
-        !     s_convert_to_mixture_variables => &
-        !         s_convert_mixture_to_mixture_variables
-        ! elseif (bubbles) then           ! Volume fraction for bubbles
-        !     s_convert_to_mixture_variables => &
-        !         s_convert_species_to_mixture_variables_bubbles
-        ! else                            ! Volume fraction model
-        !     s_convert_to_mixture_variables => &
-        !         s_convert_species_to_mixture_variables
-        ! end if
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
@@ -4044,10 +4013,6 @@ contains
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()
-
-        ! Disassociating the procedural pointers to the procedures that were
-        ! utilized to compute the average state and estimate the wave speeds
-        ! s_compute_wave_speeds => null()
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the viscous source flux
