@@ -194,125 +194,10 @@ module m_riemann_solvers
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
 
-    !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
-    !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
-    !! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
-    !! of sound, shear and volume Reynolds numbers and the Weber numbers. These
-    !! variables are left and right states of the Riemann problem obtained from
-    !! qK_prim_rs_vf and kappaK_rs_vf.
-    !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho_L, alpha_rho_R
-    real(kind(0d0)) :: rho_L, rho_R
-    real(kind(0d0)), allocatable, dimension(:) :: vel_L, vel_R
-    real(kind(0d0)) :: pres_L, pres_R
-    real(kind(0d0)) :: E_L, E_R
-    real(kind(0d0)) :: H_L, H_R
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_L, alpha_R
-    real(kind(0d0)) :: Y_L, Y_R
-    real(kind(0d0)) :: gamma_L, gamma_R
-    real(kind(0d0)) :: pi_inf_L, pi_inf_R
-    real(kind(0d0)) :: c_L, c_R
-    real(kind(0d0)), dimension(2) :: Re_L, Re_R
-    real(kind(0d0)), allocatable, dimension(:) :: tau_e_L, tau_e_R
-    real(kind(0d0)), allocatable, dimension(:) :: G_L, G_R
-
-!$acc declare create(alpha_rho_L, alpha_rho_R,rho_L, rho_R,vel_L, vel_R,pres_L, pres_R, &
-!$acc    E_L, E_R, H_L, H_R, alpha_L, alpha_R, Y_L, Y_R, gamma_L, gamma_R,pi_inf_L, pi_inf_R, &
-!$acc    c_L, c_R,Re_L, Re_R,tau_e_L, tau_e_R, G_L, G_R)
-
-    !> @}
-
-    !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
-    !! bubble density, radius, radial velocity, pressure, wall pressure, and modified
-    !! pressure. These variables are left and right states of the Riemann problem obtained from
-    !! qK_prim_rs_vf and kappaK_rs_vf.
-    !> @{
-    real(kind(0d0)) :: nbub_L, nbub_R
-    real(kind(0d0)), allocatable, dimension(:) :: R0_L, R0_R
-    real(kind(0d0)), allocatable, dimension(:) :: V0_L, V0_R
-    real(kind(0d0)), allocatable, dimension(:) :: P0_L, P0_R
-    real(kind(0d0)), allocatable, dimension(:) :: pbw_L, pbw_R
-    real(kind(0d0)), allocatable, dimension(:, :) :: moms_L, moms_R
-    real(kind(0d0)) :: ptilde_L, ptilde_R
-    !> @}
-!$acc declare create(nbub_L, nbub_R, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, moms_L, moms_R, ptilde_L, ptilde_R )
-
-    !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
-    !> @{
-    real(kind(0d0)) :: G1_L, G1_R
-    real(kind(0d0)) :: G2_L, G2_R
-    real(kind(0d0)) :: G3_L, G3_R
-    real(kind(0d0)) :: G4_L, G4_R
-    real(kind(0d0)) :: G5_L, G5_R
-    real(kind(0d0)) :: G6_L, G6_R
-    real(kind(0d0)) :: G7_L, G7_R
-    real(kind(0d0)) :: G8_L, G8_R
-    !> @}
-
-    !> @name Star region pressure and velocity
-    !> @{
-    real(kind(0d0)) :: pres_S
-    real(kind(0d0)) :: vel_S
-    !> @}
-
-    !> @name Intercell solution used to calculated intercell flux
-    !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho_IC
-    real(kind(0d0)) :: rho_IC
-    real(kind(0d0)), allocatable, dimension(:) :: vel_IC
-    real(kind(0d0)) :: pres_IC
-    real(kind(0d0)) :: E_IC
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_IC
-    real(kind(0d0)), allocatable, dimension(:) :: tau_e_IC
-    !> @}
-
-    !> @name Surface tension pressure contribution
-    !> @{
-    real(kind(0d0)) :: dpres_L, dpres_R
-    !> @}
-!$acc declare create(pres_S, vel_S, alpha_IC, alpha_rho_IC, vel_IC, pres_IC, E_IC, rho_IC, tau_e_IC, dpres_L, dpres_R)
-
-    !> @name Roe or arithmetic average density, velocity, enthalpy, volume fractions,
-    !! specific heat ratio function, speed of sound, shear and volume Reynolds
-    !! numbers, Weber numbers and curvatures, at the cell-boundaries, computed
-    !! from the left and the right states of the Riemann problem
-    !> @{
-    real(kind(0d0)) :: rho_avg
-    real(kind(0d0)), allocatable, dimension(:) :: vel_avg
-    real(kind(0d0)) :: H_avg
-    type(scalar_field), allocatable, dimension(:) :: alpha_avg_rs_vf
-    real(kind(0d0)) :: gamma_avg
-    real(kind(0d0)) :: c_avg
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-!$acc declare create(rho_avg, vel_avg, H_avg, alpha_avg_rs_vf, gamma_avg, c_avg,  Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
-    !> @}
-
-    !> @name Left, right and star (S) region wave speeds
-    !> @{
-    real(kind(0d0)) :: s_L, s_R, s_S
-    !> @}
-
-    !> @name Star region variables (HLLC)
-    !> @{
-    real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
-    !> @}
-
-    !> Minus (M) and plus (P) wave speeds
-    !> @{
-    real(kind(0d0)) :: s_M, s_P
-    !> @}
-
-    !> Minus and plus wave speeds functions
-    !> @{
-    real(kind(0d0)) :: xi_M, xi_P
-    !> @}
-    real(kind(0d0)) :: xi_L, xi_R
-
-    real(kind(0d0)) :: start, finish
-
-!$acc declare create(s_L, s_R, s_S, rho_Star, E_Star, p_Star, p_K_Star, s_M, s_P, xi_M, xi_P, xi_L, xi_R)
+!$acc declare create(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 
     procedure(s_abstract_riemann_solver), &
         pointer :: s_riemann_solver => null() !<
@@ -2311,7 +2196,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device( Gs)
+        !$acc update device( Gs)
 
 
         if (any(Re_size > 0)) then
@@ -2324,19 +2209,9 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-!$acc update device(Res, Re_idx, Re_size)
+            !$acc update device(Res, Re_idx, Re_size)
         end if
 
-
-        allocate (vel_avg(1:num_dims))
-
-        allocate (G_L(1:num_fluids))
-        allocate (G_R(1:num_fluids))
-
-        if (riemann_solver == 3) then
-            allocate (alpha_rho_IC(1:cont_idx%end), vel_IC(1:num_dims))
-            allocate (alpha_IC(1:num_fluids))
-        end if
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -2345,22 +2220,6 @@ contains
         elseif (riemann_solver == 2) then
             s_riemann_solver => s_hllc_riemann_solver
         end if
-
-        if (bubbles) then
-            allocate (R0_L(nb), R0_R(nb))
-            allocate (V0_L(nb), V0_R(nb))
-            allocate (pbw_L(nb), pbw_R(nb))
-            if (qbmm) then
-                allocate (moms_L(nb, nmom), moms_R(nb, nmom))
-            else
-                if (.not. polytropic) then
-                    allocate (P0_L(nb), P0_R(nb))
-                end if
-            end if
-        end if
-
-        ! Associating the procedural pointers to the procedures that will be
-        ! utilized to compute the average state and estimate the wave speeds
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to compute the viscous source flux
@@ -2387,8 +2246,6 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        !allocate(qL_prim_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsx_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
         allocate (flux_rsx_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
@@ -2416,8 +2273,6 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
 
-        !allocate(qL_prim_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsy_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
         allocate (flux_rsy_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
@@ -2446,8 +2301,6 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
 
-        !allocate(qL_prim_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsz_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
         allocate (flux_rsz_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
@@ -4195,32 +4048,6 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_riemann_solvers_module() ! -----------------------
 
-        ! Deallocating the variables that were utilized to formulate the
-        ! left, right and average states of the Riemann problem, as well
-        ! the Riemann problem solution
-
-        integer :: i
-
-        deallocate (vel_avg)
-
-!TODO: check that deallocate statements aren't missing here (alpha_rho_L, alpha_L, etc.)
-!        deallocate (alpha_L, alpha_R, G_L, G_R)
-
-!        if (any(Re_size > 0)) deallocate (Re_avg_rs_vf)
-
-        if (riemann_solver == 3) then
-            deallocate (alpha_rho_IC, vel_IC)
-            deallocate (alpha_IC)
-        end if
-
-        if (bubbles) then
-            if (qbmm) then
-                deallocate (moms_L, moms_R)
-            end if
-            deallocate (R0_L, R0_R, pbw_L, pbw_R)
-            deallocate (V0_L, V0_R)
-        end if
-
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()
@@ -4247,8 +4074,6 @@ contains
         if (qbmm) then
             deallocate (mom_sp_rsx_vf)
         end if
-        !deallocate(qL_prim_rsx_vf)
-        !deallocate(qR_prim_rsx_vf)
 
         if (n == 0) return
 
@@ -4262,8 +4087,6 @@ contains
         if (qbmm) then
             deallocate (mom_sp_rsy_vf)
         end if
-        !deallocate(qL_prim_rsy_vf)
-        !deallocate(qR_prim_rsy_vf)
 
         if (p == 0) return
 
@@ -4277,8 +4100,6 @@ contains
         if (qbmm) then
             deallocate (mom_sp_rsz_vf)
         end if
-        !deallocate(qL_prim_rsz_vf)
-        !deallocate(qR_prim_rsz_vf)
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
 
