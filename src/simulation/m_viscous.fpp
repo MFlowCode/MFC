@@ -503,7 +503,7 @@ module m_viscous
                              dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
                              qR_prim, &
                              q_prim_qp, &
-                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, gm_vel_qp,  &
+                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp,  &
                              ix, iy, iz)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
@@ -521,10 +521,10 @@ module m_viscous
                              dqL_prim_dz_n, dqR_prim_dz_n
 
         type(vector_field) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
-        type(vector_field) :: gm_vel_qp
 
-        integer :: i, j, k, l, r !< Generic loop iterators
         type(int_bounds_info), intent(IN) :: ix, iy, iz
+
+        integer :: i, j, k, l
 
         do i = 1, num_dims
 
@@ -917,7 +917,6 @@ module m_viscous
                                                 dq_prim_dx_qp%vf(i), &
                                                 dq_prim_dy_qp%vf(i), &
                                                 dq_prim_dz_qp%vf(i), &
-                                                gm_vel_qp%vf(i), &
                                                 ix, iy, iz, buff_size)
                     end do
 
@@ -928,7 +927,6 @@ module m_viscous
                                                 dq_prim_dx_qp%vf(i), &
                                                 dq_prim_dy_qp%vf(i), &
                                                 dq_prim_dy_qp%vf(i), &
-                                                gm_vel_qp%vf(i), &
                                                 ix, iy, iz, buff_size)
                     end do
 
@@ -940,7 +938,6 @@ module m_viscous
                                             dq_prim_dx_qp%vf(i), &
                                             dq_prim_dx_qp%vf(i), &
                                             dq_prim_dx_qp%vf(i), &
-                                            gm_vel_qp%vf(i), &
                                             ix, iy, iz, buff_size)
                 end do
 
@@ -1289,14 +1286,13 @@ module m_viscous
         !!  @param grad_y Second coordinate direction component of the derivative
         !!  @param grad_z Third coordinate direction component of the derivative
         !!  @param norm Norm of the gradient vector
-    subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, norm, &
+    subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, &
                                      ix, iy, iz, buff_size)
 
         type(scalar_field), intent(IN) :: var
         type(scalar_field), intent(INOUT) :: grad_x
         type(scalar_field), intent(INOUT) :: grad_y
         type(scalar_field), intent(INOUT) :: grad_z
-        type(scalar_field), intent(INOUT) :: norm
 
         integer, intent(IN) :: buff_size
 
