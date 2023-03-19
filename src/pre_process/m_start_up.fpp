@@ -45,9 +45,7 @@ module m_start_up
 
     abstract interface ! ===================================================
 
-        subroutine s_read_abstract_grid_data_files(dflt_int)! ----------
-
-            integer, intent(IN) :: dflt_int
+        subroutine s_read_abstract_grid_data_files()! ----------
 
         end subroutine s_read_abstract_grid_data_files ! ---------------
 
@@ -170,10 +168,7 @@ contains
     !> The goal of this subroutine is to read in any preexisting
         !!      grid data as well as based on the imported grid, complete
         !!      the necessary global computational domain parameters.
-        !! @param dflt_int Default null integer
-    subroutine s_read_serial_grid_data_files(dflt_int) ! ---
-
-        integer, intent(IN) :: dflt_int
+    subroutine s_read_serial_grid_data_files() ! ---
 
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
@@ -423,10 +418,7 @@ contains
         !!      at the (non-)uniform cell-width distributions for all the
         !!      active coordinate directions and making sure that all of
         !!      the cell-widths are positively valued
-        !! @param dflt_int Default null integer
-    subroutine s_read_parallel_grid_data_files(dflt_int)
-
-        integer, intent(IN) :: dflt_int
+    subroutine s_read_parallel_grid_data_files()
 
 #ifdef MFC_MPI
 
