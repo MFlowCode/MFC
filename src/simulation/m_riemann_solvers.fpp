@@ -891,25 +891,25 @@ contains
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
-                   qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
                                         alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                     qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
                                         alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
@@ -1560,7 +1560,6 @@ contains
 
                                         !$acc loop seq
                                         do i = 1, nb
-
                                             PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3.d0)*weight(i)
                                             PbwR3Rbar = PbwR3Rbar + pbw_R(i)*(R0_R(i)**3.d0)*weight(i)
 
@@ -1569,7 +1568,6 @@ contains
 
                                             R3V2Lbar = R3V2Lbar + (R0_L(i)**3.d0)*(V0_L(i)**2.d0)*weight(i)
                                             R3V2Rbar = R3V2Rbar + (R0_R(i)**3.d0)*(V0_R(i)**2.d0)*weight(i)
-
                                         end do
                                     end if
 
@@ -1590,15 +1588,11 @@ contains
                                     if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
                                     end if
 
-                                    !ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
-
                                     rho_avg = 5d-1*(rho_L + rho_R)
-
                                     H_avg = 5d-1*(H_L + H_R)
-
                                     gamma_avg = 5d-1*(gamma_L + gamma_R)
-
                                     vel_avg_rms = 0d0
+
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
@@ -1741,7 +1735,6 @@ contains
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
-
                                 !$acc loop seq
                                 do i = bubxb, bubxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1752,7 +1745,6 @@ contains
                                 end do
 
                                 ! Geometrical source flux for cylindrical coordinates
-
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
@@ -1999,7 +1991,6 @@ contains
 
                                 ! Momentum flux.
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
@@ -2021,7 +2012,6 @@ contains
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
@@ -2033,7 +2023,6 @@ contains
                                                         (s_R - vel_R(idx1)))) - E_R))
 
                                 ! Volume fraction flux
-
                                 !$acc loop seq
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2055,7 +2044,7 @@ contains
                                                 dir_flg(idxi)* &
                                                 s_P*(xi_R - 1d0))
 
-                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    !if ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
@@ -2117,12 +2106,6 @@ contains
             end if
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
-
-        ! print*, 'xbounds are: ', is1%beg, is1%end
-        ! print*, 'ybounds are: ', is2%beg, is2%end
-        ! print*, 'zbounds are: ', is3%beg, is3%end
-
-        ! print*, 'about to get average state'
 
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
