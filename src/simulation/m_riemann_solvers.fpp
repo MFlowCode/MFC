@@ -119,11 +119,11 @@ module m_riemann_solvers
         !!  @param i First coordinate location index
         !!  @param j Second coordinate location index
         !!  @param k Third coordinate location index
-        subroutine s_compute_abstract_wave_speeds(i, j, k)
+        ! subroutine s_compute_abstract_wave_speeds(i, j, k)
 
-            integer, intent(IN) :: i, j, k
+        !     integer, intent(IN) :: i, j, k
 
-        end subroutine s_compute_abstract_wave_speeds
+        ! end subroutine s_compute_abstract_wave_speeds
 
         !> The abstract interface to the subroutines that are utilized to compute
         !! the viscous source fluxes for either Cartesian or cylindrical geometries.
@@ -193,7 +193,7 @@ module m_riemann_solvers
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
-    !$ acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
+    !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
@@ -2225,16 +2225,16 @@ contains
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
 
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-        elseif (bubbles) then           ! Volume fraction for bubbles
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else                            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
-        end if
+        ! if (model_eqns == 1) then        ! Gamma/pi_inf model
+        !     s_convert_to_mixture_variables => &
+        !         s_convert_mixture_to_mixture_variables
+        ! elseif (bubbles) then           ! Volume fraction for bubbles
+        !     s_convert_to_mixture_variables => &
+        !         s_convert_species_to_mixture_variables_bubbles
+        ! else                            ! Volume fraction model
+        !     s_convert_to_mixture_variables => &
+        !         s_convert_species_to_mixture_variables
+        ! end if
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
@@ -4047,7 +4047,7 @@ contains
 
         ! Disassociating the procedural pointers to the procedures that were
         ! utilized to compute the average state and estimate the wave speeds
-        s_compute_wave_speeds => null()
+        ! s_compute_wave_speeds => null()
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the viscous source flux
@@ -4055,7 +4055,7 @@ contains
 
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
-        s_convert_to_mixture_variables => null()
+        ! s_convert_to_mixture_variables => null()
 
         if (Re_size(1) > 0) then
             deallocate (Re_avg_rsx_vf)
