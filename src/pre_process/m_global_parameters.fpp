@@ -110,12 +110,6 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
-    integer :: buff_sie
-    !! The number of cells that are necessary to be able to store enough boundary
-    !! conditions data to march the solution in the physical computational domain
-    !! to the next time-step.
-
-    
 
 #ifdef MFC_MPI
 
@@ -678,7 +672,8 @@ contains
 
         omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
 
-            !!! thermal properties !!!
+        ! thermal properties --- 
+
         ! gas constants
         R_n = Ru/M_n
         R_v = Ru/M_v
