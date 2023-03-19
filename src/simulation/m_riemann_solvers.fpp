@@ -168,47 +168,47 @@ module m_riemann_solvers
     !> The cell-boundary values of the fluxes (src - source) that are computed
     !! through the chosen Riemann problem solver, and the direct evaluation of
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
-    !! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
+    !! dqK_prim_ds_vf where ds = dx, dy or dz.
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-
     !> @}
+    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
+    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 
+
+    !> The cell-boundary values of the geometrical source flux that are computed
+    !! through the chosen Riemann problem solver by using the left and right
+    !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
+    !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
-
-    !! The cell-boundary values of the geometrical source flux that are computed
-    !! through the chosen Riemann problem solver by using the left and right
-    !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
+    !> @}
+    !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
+    !$ acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
+    !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-!$acc declare create(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
+    !$acc declare create(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 
     procedure(s_abstract_riemann_solver), &
         pointer :: s_riemann_solver => null() !<
     !! Pointer to the procedure that is utilized to calculate either the HLL,
     !! HLLC or exact intercell fluxes, based on the choice of Riemann solver
-
-    procedure(s_compute_abstract_wave_speeds), &
-        pointer :: s_compute_wave_speeds => null() !<
-    !! Pointer to the subroutine that is utilized to compute the wave speeds of
-    !! the Riemann problem either directly or by the means of pressure-velocity
-    !! estimates, based on the selected method of estimation of the wave speeds
 
     procedure(s_compute_abstract_viscous_source_flux), &
         pointer :: s_compute_viscous_source_flux => null() !<
@@ -220,20 +220,14 @@ module m_riemann_solvers
     type(int_bounds_info) :: is1, is2, is3
     type(int_bounds_info) :: isx, isy, isz
     !> @}
-!$acc declare create( &
-!$acc    is1, is2, is3, isx, isy, isz)
-
-!$acc declare create(&
-!$acc    flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf, vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
-!$acc    flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf, mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
-
+    !$acc declare create(is1, is2, is3, isx, isy, isz)
  
     real(kind(0d0)), allocatable, dimension(:) ::  Gs
-!$acc declare create( Gs)
+    !$acc declare create(Gs)
 
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
+    !$acc declare create(Res)
 
 contains
 
@@ -774,7 +768,6 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! ------
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
@@ -2196,7 +2189,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-        !$acc update device( Gs)
+        !$acc update device(Gs)
 
 
         if (any(Re_size > 0)) then
@@ -2400,13 +2393,13 @@ contains
 
         isx = ix; isy = iy; isz = iz
 
-!$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
+        !$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then
 
             if (bc_x%beg == -4) then    ! Riemann state extrap. BC at beginning
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2417,7 +2410,7 @@ contains
                 end do
 
                 if (any(Re_size > 0)) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -2429,7 +2422,7 @@ contains
                     end do
 
                     if (n > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -2441,7 +2434,7 @@ contains
                         end do
 
                         if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -2461,7 +2454,7 @@ contains
 
             if (bc_x%end == -4) then    ! Riemann state extrap. BC at end
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2473,7 +2466,7 @@ contains
 
                 if (any(Re_size > 0)) then
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -2485,7 +2478,7 @@ contains
                     end do
 
                     if (n > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -2497,7 +2490,7 @@ contains
                         end do
 
                         if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -2520,7 +2513,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (bc_y%beg == -4) then    ! Riemann state extrap. BC at beginning
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2532,7 +2525,7 @@ contains
 
                 if (any(Re_size > 0)) then
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2542,7 +2535,7 @@ contains
                         end do
                     end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2553,7 +2546,7 @@ contains
                     end do
 
                     if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -2570,7 +2563,7 @@ contains
 
             if (bc_y%end == -4) then    ! Riemann state extrap. BC at end
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2582,7 +2575,7 @@ contains
 
                 if (any(Re_size > 0)) then
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2592,7 +2585,7 @@ contains
                         end do
                     end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2603,7 +2596,7 @@ contains
                     end do
 
                     if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -2623,7 +2616,7 @@ contains
         else
 
             if (bc_z%beg == -4) then    ! Riemann state extrap. BC at beginning
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2634,7 +2627,7 @@ contains
                 end do
 
                 if (any(Re_size > 0)) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2643,7 +2636,7 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2652,7 +2645,7 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2667,7 +2660,7 @@ contains
 
             if (bc_z%end == -4) then    ! Riemann state extrap. BC at end
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2678,7 +2671,7 @@ contains
                 end do
 
                 if (any(Re_size > 0)) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2687,7 +2680,8 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2696,7 +2690,8 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2753,7 +2748,8 @@ contains
         if (norm_dir == 1) then
 
             if (any(Re_size > 0)) then
-!$acc parallel loop collapse(4) gang vector default(present)
+
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2766,7 +2762,8 @@ contains
             end if
 
             if (qbmm) then
-!$acc parallel loop collapse(4) gang vector default(present)
+
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2784,7 +2781,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (any(Re_size > 0)) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -2797,7 +2794,7 @@ contains
             end if
 
             if (qbmm) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2815,7 +2812,7 @@ contains
         else
 
             if (any(Re_size > 0)) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -2828,7 +2825,7 @@ contains
             end if
 
             if (qbmm) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2905,8 +2902,8 @@ contains
 
         ! Viscous Stresses in z-direction ==================================
         if (norm_dir == 1) then
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -2931,8 +2928,8 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
+            if (Re_size(2) > 0) then ! Bulk stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -2959,8 +2956,8 @@ contains
 
             if (n == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -2968,7 +2965,7 @@ contains
                             avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j + 1, k, l))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
                                 dvel_avg_dy(i) = &
                                     5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
@@ -2985,18 +2982,15 @@ contains
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
-
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
                                     flux_src_vf(contxe + i)%sf(j, k, l) - &
                                     tau_Re(1, i)
-
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
                                     vel_src_rsx_vf(j, k, l, i)* &
                                     tau_Re(1, i)
-
                             end do
 
                         end do
@@ -3004,8 +2998,8 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, tau_Re)
+            if (Re_size(2) > 0) then ! Bulk stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3036,13 +3030,13 @@ contains
 
             if (p == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dz, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3058,7 +3052,7 @@ contains
                             tau_Re(1, 3) = (dvel_avg_dz(1)/y_cc(k) + dvel_avg_dx(3))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3077,8 +3071,8 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( avg_vel, dvel_avg_dz, tau_Re)
+            if (Re_size(2) > 0) then ! Bulk stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private( avg_vel, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3107,8 +3101,9 @@ contains
             ! Viscous Stresses in r-direction ==================================
         elseif (norm_dir == 2) then
 
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3116,7 +3111,7 @@ contains
                             avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j, k + 1, l))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 dvel_avg_dx(i) = &
@@ -3137,7 +3132,7 @@ contains
                                             - 2d0*avg_vel(2)/y_cb(k))/ &
                                            (3d0*Re_avg_rsy_vf(k, j, l, 1))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3157,7 +3152,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3192,7 +3187,7 @@ contains
             if (p == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3200,7 +3195,7 @@ contains
                             avg_vel(3) = 5d-1*(velL_vf(3)%sf(j, k, l) &
                                                + velR_vf(3)%sf(j, k + 1, l))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3217,7 +3212,7 @@ contains
                                             y_cb(k) + dvel_avg_dy(3))/ &
                                            Re_avg_rsy_vf(k, j, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3237,7 +3232,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3267,18 +3262,18 @@ contains
         else
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 avg_vel(i) = 5d-1*(velL_vf(i)%sf(j, k, l) &
                                                    + velR_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dx(i) = &
                                     5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
@@ -3291,7 +3286,7 @@ contains
                                           + dvelR_dy_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3314,9 +3309,8 @@ contains
                                            (3d0*Re_avg_rsz_vf(l, k, j, 1))/ &
                                            y_cc(k)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
-
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
                                     flux_src_vf(contxe + i)%sf(j, k, l) - &
                                     tau_Re(3, i)
@@ -3325,7 +3319,6 @@ contains
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
                                     vel_src_rsz_vf(l, k, j, i)* &
                                     tau_Re(3, i)
-
                             end do
 
                         end do
@@ -3334,7 +3327,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3435,7 +3428,7 @@ contains
         if (norm_dir == 1) then
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3461,7 +3454,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3489,12 +3482,12 @@ contains
             if (n == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
                                 dvel_avg_dy(i) = &
                                     5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
@@ -3510,7 +3503,7 @@ contains
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3530,7 +3523,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3558,12 +3551,12 @@ contains
             if (p == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3579,7 +3572,7 @@ contains
                             tau_Re(1, 3) = (dvel_avg_dz(1) + dvel_avg_dx(3))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
                                     flux_src_vf(contxe + i)%sf(j, k, l) - &
@@ -3598,7 +3591,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3628,12 +3621,12 @@ contains
         elseif (norm_dir == 2) then
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 dvel_avg_dx(i) = &
@@ -3653,7 +3646,7 @@ contains
                                             - 2d0*dvel_avg_dx(1))/ &
                                            (3d0*Re_avg_rsy_vf(k, j, l, 1))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3673,7 +3666,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3704,12 +3697,12 @@ contains
             if (p == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(  dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(  dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3725,7 +3718,7 @@ contains
                             tau_Re(2, 3) = (dvel_avg_dz(2) + dvel_avg_dy(3))/ &
                                            Re_avg_rsy_vf(k, j, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3745,7 +3738,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3775,26 +3768,26 @@ contains
         else
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dx(i) = &
                                     5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
                                           + dvelR_dx_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dy(i) = &
                                     5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3812,7 +3805,7 @@ contains
                                             - 2d0*dvel_avg_dy(2))/ &
                                            (3d0*Re_avg_rsz_vf(l, k, j, 1))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3832,7 +3825,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3897,7 +3890,7 @@ contains
 
         ! Reshaping Outputted Data in y-direction ==========================
         if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
@@ -3910,7 +3903,7 @@ contains
             end do
 
             if (cyl_coord) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
