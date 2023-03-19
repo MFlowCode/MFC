@@ -40,34 +40,6 @@ module m_initial_condition
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
-    real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
-    real(kind(0d0)) :: length_x, length_y, length_z
-    real(kind(0d0)) :: radius
-    real(kind(0d0)) :: epsilon, beta
-    integer :: smooth_patch_id
-    real(kind(0d0)) :: smooth_coeff !<
-    !! These variables are analogous in both meaning and use to the similarly
-    !! named components in the ic_patch_parameters type (see m_derived_types.f90
-    !! for additional details). They are employed as a means to more concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
-
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
-    !! These variables combine the centroid and length parameters associated with
-    !! a particular patch to yield the locations of the patch boundaries in the
-    !! x-, y- and z-coordinate directions. They are used as a means to concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
-
-    real(kind(0d0)) :: a, b, c, d !<
-    !! When a line or a plane sweep patch geometry is employed, these variables
-    !! represent the coefficients associated with the equation describing the
-    !! said line or plane.
-
-    real(kind(0d0)) :: eta !<
-    !! In the case that smoothing of patch boundaries is enabled and the boundary
-    !! between two adjacent patches is to be smeared out, this variable's purpose
-    !! is to act as a pseudo volume fraction to indicate the contribution of each
-    !! patch toward the composition of a cell's fluid state.
-
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
