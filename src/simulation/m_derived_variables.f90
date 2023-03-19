@@ -60,9 +60,9 @@ contains
             allocate (fd_coeff_x(-fd_number:fd_number, 0:m))
             if (n > 0) then
                 allocate (fd_coeff_y(-fd_number:fd_number, 0:n))
-                if (p > 0) then
-                    allocate (fd_coeff_z(-fd_number:fd_number, 0:p))
-                end if
+            end if
+            if (p > 0) then
+                allocate (fd_coeff_z(-fd_number:fd_number, 0:p))
             end if
         end if
 
@@ -71,25 +71,26 @@ contains
     !> Allocate and open derived variables. Computing FD coefficients.
     subroutine s_initialize_derived_variables() ! -----------------------------
 
-        ! Opening and writing header of CoM and flow probe files
-        if (proc_rank == 0) then
-            if (probe_wrt) then
+        if (probe_wrt) then
+            ! Opening and writing header of flow probe files
+            if (proc_rank == 0) then
                 call s_open_probe_files()
             end if
-        end if
 
-        ! Computing centered finite difference coefficients
-        if (probe_wrt) then
+            ! Computing centered finite difference coefficients
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                              fd_number, fd_order)
+
             if (n > 0) then
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
                                                                  fd_number, fd_order)
-                if (p > 0) then
-                    call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
-                                                                     fd_number, fd_order)
-                end if
             end if
+
+            if (p > 0) then
+                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
+                                                                 fd_number, fd_order)
+            end if
+
         end if
 
     end subroutine s_initialize_derived_variables ! -----------------------------
@@ -102,26 +103,27 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! IF ( probe_wrt .AND. (t_step > t_step_start + 2)) THEN
         if (probe_wrt) then
             call s_derive_acceleration_component(1, q_prim_ts(0)%vf, &
                                                  q_prim_ts(1)%vf, &
                                                  q_prim_ts(2)%vf, &
                                                  q_prim_ts(3)%vf, &
                                                  x_accel)
+
             if (n > 0) then
                 call s_derive_acceleration_component(2, q_prim_ts(0)%vf, &
                                                      q_prim_ts(1)%vf, &
                                                      q_prim_ts(2)%vf, &
                                                      q_prim_ts(3)%vf, &
                                                      y_accel)
-                if (p > 0) then
-                    call s_derive_acceleration_component(3, q_prim_ts(0)%vf, &
-                                                         q_prim_ts(1)%vf, &
-                                                         q_prim_ts(2)%vf, &
-                                                         q_prim_ts(3)%vf, &
-                                                         z_accel)
-                end if
+            end if
+
+            if (p > 0) then
+                call s_derive_acceleration_component(3, q_prim_ts(0)%vf, &
+                                                     q_prim_ts(1)%vf, &
+                                                     q_prim_ts(2)%vf, &
+                                                     q_prim_ts(3)%vf, &
+                                                     z_accel)
             end if
 
             do k = 0, p
@@ -218,7 +220,7 @@ contains
                 end do
             end do
 
-            ! Computing the acceleration component in the y-coordinate direction
+        ! Computing the acceleration component in the y-coordinate direction
         elseif (i == 2) then
             do l = 0, p
                 do k = 0, n
@@ -261,7 +263,7 @@ contains
                 end do
             end do
 
-            ! Computing the acceleration component in the z-coordinate direction
+        ! Computing the acceleration component in the z-coordinate direction
         else
             do l = 0, p
                 do k = 0, n
