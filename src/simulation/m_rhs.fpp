@@ -74,7 +74,6 @@ module m_rhs
     type(vector_field) :: dq_prim_dx_qp
     type(vector_field) :: dq_prim_dy_qp
     type(vector_field) :: dq_prim_dz_qp
-    type(vector_field) :: gm_vel_qp
     !> @}
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
@@ -160,7 +159,7 @@ module m_rhs
     !$acc declare create(Res)
 
 !$acc declare create(q_cons_qp,q_prim_qp,  &
-!$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,gm_vel_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
+!$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
 !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
 !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
@@ -317,16 +316,11 @@ contains
             @:ALLOCATE(dq_prim_dx_qp%vf(1:sys_size))
             @:ALLOCATE(dq_prim_dy_qp%vf(1:sys_size))
             @:ALLOCATE(dq_prim_dz_qp%vf(1:sys_size))
-            @:ALLOCATE(gm_vel_qp%vf(1:sys_size))
             
             if (any(Re_size > 0)) then
 
                 do l = mom_idx%beg, mom_idx%end
                     @:ALLOCATE(dq_prim_dx_qp%vf(l)%sf( &
-                              & ix%beg:ix%end, &
-                              & iy%beg:iy%end, &
-                              & iz%beg:iz%end))
-                    @:ALLOCATE(gm_vel_qp%vf(l)%sf( &
                               & ix%beg:ix%end, &
                               & iy%beg:iy%end, &
                               & iz%beg:iz%end))
@@ -733,7 +727,7 @@ contains
                                             dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
                                             qR_prim, &
                                             q_prim_qp, &
-                                            dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, gm_vel_qp, &
+                                            dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                             ix, iy, iz)
         call nvtxEndRange()
         
@@ -2492,7 +2486,6 @@ contains
         if (any(Re_size > 0)) then
             do l = mom_idx%beg, mom_idx%end
                 @:DEALLOCATE(dq_prim_dx_qp%vf(l)%sf)
-                @:DEALLOCATE(gm_vel_qp%vf(l)%sf)
             end do
 
             if (n > 0) then
@@ -2512,7 +2505,6 @@ contains
             @:DEALLOCATE(dq_prim_dx_qp%vf)
             @:DEALLOCATE(dq_prim_dy_qp%vf)
             @:DEALLOCATE(dq_prim_dz_qp%vf)
-            @:DEALLOCATE(gm_vel_qp%vf)
         end if
 
         if (any(Re_size > 0)) then

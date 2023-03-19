@@ -13,11 +13,6 @@ module m_helper
 
     implicit none
 
-    real(kind(0d0)) :: cart_y, cart_z
-    real(kind(0d0)) :: sph_phi !<
-    !! Variables to be used to hold cell locations in Cartesian coordinates if
-    !! 3D simulation is using cylindrical coordinates
-
     private; public :: s_compute_finite_difference_coefficients, &
         s_comp_n_from_prim, &
         s_comp_n_from_cons, &
