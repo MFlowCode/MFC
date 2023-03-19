@@ -39,8 +39,7 @@ module m_patches
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
     real(kind(0d0)) :: length_x, length_y, length_z
-    real(kind(0d0)) :: radius
-    real(kind(0d0)) :: epsilon, beta
+
     integer :: smooth_patch_id
     real(kind(0d0)) :: smooth_coeff !<
     !! These variables are analogous in both meaning and use to the similarly
@@ -58,11 +57,6 @@ module m_patches
     real(kind(0d0)) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if
     !! 3D simulation is using cylindrical coordinates
-
-    real(kind(0d0)) :: a, b, c, d !<
-    !! When a line or a plane sweep patch geometry is employed, these variables
-    !! represent the coefficients associated with the equation describing the
-    !! said line or plane.
 
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
     !! These variables combine the centroid and length parameters associated with
@@ -199,6 +193,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: radius
 
         integer :: i, j !< Generic loop iterators
 
@@ -256,6 +251,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: radius
 
         ! Generic loop iterators
         integer :: i, j
@@ -307,6 +303,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: radius
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -368,6 +365,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: a, b
 
         integer :: i, j !< Generic loop operators
 
@@ -427,6 +425,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: a, b, c
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -573,6 +572,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: a, b, c
 
         integer :: i, j !< Generic loop operators
 
@@ -636,6 +636,7 @@ contains
 
         ! Generic loop iterators
         integer :: i, j
+        real(kind(0d0)) :: radius
 
         ! Transferring isentropic vortex patch's centroid and radius info
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1079,6 +1080,9 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
+        real(kind(0d0)) :: epsilon, beta
+        real(kind(0d0)) :: radius
+
         integer :: i, j, k !< generic loop iterators
 
         complex(kind(0d0)) :: cmplx_i = (0d0, 1d0)
@@ -1208,6 +1212,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: radius
 
         ! Generic loop iterators
         integer :: i, j, k !< generic loop iterators
@@ -1382,6 +1387,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: radius
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1494,6 +1500,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: a, b, c, d
 
         integer :: i, j, k !< Generic loop iterators
 
