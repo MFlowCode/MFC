@@ -346,7 +346,7 @@ program p_main
         ! Adding the specific heat ratio to the formatted database file --------
         if (heat_ratio_wrt) then
 
-            call s_derive_specific_heat_ratio(gamma_sf, q_sf)
+            call s_derive_specific_heat_ratio(q_sf)
 
             write (varname, '(A)') 'heat_ratio'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -376,7 +376,7 @@ program p_main
         ! Adding the liquid stiffness to the formatted database file -----------
         if (pres_inf_wrt) then
 
-            call s_derive_liquid_stiffness(gamma_sf, pi_inf_sf, q_sf)
+            call s_derive_liquid_stiffness(q_sf)
 
             write (varname, '(A)') 'pres_inf'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -459,7 +459,7 @@ program p_main
         ! Adding numerical Schlieren function to formatted database file -------
         if (schlieren_wrt) then
 
-            call s_derive_numerical_schlieren_function(q_cons_vf, rho_sf, q_sf)
+            call s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
             write (varname, '(A)') 'schlieren'
             call s_write_variable_to_formatted_database_file(varname, t_step)

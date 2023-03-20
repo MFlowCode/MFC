@@ -13,11 +13,6 @@ module m_helper
 
     implicit none
 
-    real(kind(0d0)) :: cart_y, cart_z
-    real(kind(0d0)) :: sph_phi !<
-    !! Variables to be used to hold cell locations in Cartesian coordinates if
-    !! 3D simulation is using cylindrical coordinates
-
     private; public :: s_compute_finite_difference_coefficients, &
         s_comp_n_from_prim, &
         s_comp_n_from_cons, &
@@ -95,28 +90,28 @@ contains
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weight)
+    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
         real(kind(0.d0)), intent(OUT) :: ntmp
         real(kind(0.d0)) :: R3
-        real(kind(0.d0)), dimension(nb) :: weight
+        real(kind(0.d0)), dimension(nb) :: weights
 
-        R3 = dot_product(weight, Rtmp**3.d0)
+        R3 = dot_product(weights, Rtmp**3.d0)
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
 
     end subroutine s_comp_n_from_prim
 
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weight)
+    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
         real(kind(0.d0)), intent(OUT) :: ntmp  
         real(kind(0.d0)) :: nR3
-        real(kind(0.d0)), dimension(nb) :: weight
+        real(kind(0.d0)), dimension(nb) :: weights
 
-        nR3 = dot_product(weight, nRtmp**3.d0)
+        nR3 = dot_product(weights, nRtmp**3.d0)
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons

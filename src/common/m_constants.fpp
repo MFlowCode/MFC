@@ -10,8 +10,6 @@ module m_constants
     real(kind(0d0)), parameter :: sgm_eps   = 1d-16               !< Segmentation tolerance
     real(kind(0d0)), parameter :: small_alf = 1d-7                !< Small alf tolerance
     real(kind(0d0)), parameter :: pi        = 3.141592653589793d0 !< Pi
-    real(kind(0d0)), parameter :: k_poly    = 1.d0                !< polytropic index used to compute isothermal natural frequency
-    real(kind(0d0)), parameter :: Ru        = 8314.d0             !< Universal gas constant
     real(kind(0d0)), parameter :: verysmall = 1.d-12              !< Very small number
     
     integer, parameter :: num_stcls_min   = 5    !< Mininum # of stencils
