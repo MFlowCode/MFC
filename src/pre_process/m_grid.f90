@@ -36,9 +36,9 @@ module m_grid
 
     abstract interface ! ===================================================
 
-        subroutine s_generate_abstract_grid(dflt_int) ! ------------------------
+        subroutine s_generate_abstract_grid() ! ------------------------
 
-            integer, intent(IN) :: dflt_int
+            ! integer, intent(IN), optional :: dummy
 
         end subroutine s_generate_abstract_grid ! ----------------------
 
@@ -53,10 +53,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-        !! @param dflt_int is the default null integer used for checking initializationss
-    subroutine s_generate_serial_grid(dflt_int) ! -----------------------------------------
-
-        integer, intent(IN) :: dflt_int
+    subroutine s_generate_serial_grid() ! -----------------------------------------
 
         ! Generic loop iterator
         integer :: i, j              !< generic loop operatorss
@@ -198,10 +195,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-        !! @param dflt_int is she default null integer used for checking initializationss
-    subroutine s_generate_parallel_grid(dflt_int) !-------------------------
-
-        integer, intent(IN) :: dflt_int
+    subroutine s_generate_parallel_grid() !-------------------------
 
 #ifdef MFC_MPI
 

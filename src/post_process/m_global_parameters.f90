@@ -648,6 +648,11 @@ contains
         ! gas physical properties
         real(kind(0.d0)) :: gamma_m, gamma_n, M_n, mu_n
 
+        ! polytropic index used to compute isothermal natural frequency
+        real(kind(0.d0)), parameter :: k_poly = 1.d0
+        ! universal gas constant
+        real(kind(0.d0)), parameter :: Ru = 8314.d0
+
         rhol0 = rhoref
         pl0 = pref
 

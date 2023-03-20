@@ -107,15 +107,15 @@ program p_main
     call cpu_time(start)
 
     if (old_grid) then
-        call s_read_grid_data_files(dflt_int)
+        call s_read_grid_data_files()
         call s_check_grid_data_files()
     else
         if (parallel_io .neqv. .true.) then
-            call s_generate_grid(dflt_int)
+            call s_generate_grid()
         else
-            if (proc_rank == 0) call s_generate_grid(dflt_int)
+            if (proc_rank == 0) call s_generate_grid()
             call s_mpi_barrier()
-            call s_read_grid_data_files(dflt_int)
+            call s_read_grid_data_files()
             call s_check_grid_data_files()
         end if
     end if

@@ -71,14 +71,12 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: idir
 
-        real(kind(0d0)) :: Re_K, rho_K, G_K
-        real(kind(0d0)) :: gamma_K, pi_inf_K
+        real(kind(0d0)) :: rho_K, G_K
 
-        integer :: i, j, k, l, q !< Loop variables
+        integer :: i, k, l, q !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-
 
         if (idir == 1) then
             ! calculate velocity gradients + rho_K and G_K

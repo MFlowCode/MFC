@@ -14,16 +14,6 @@ module m_assign_variables
 
     implicit none
 
-    real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
-    real(kind(0d0)) :: length_x, length_y, length_z
-    real(kind(0d0)) :: radius
-    real(kind(0d0)) :: epsilon, beta
-    integer :: smooth_patch_id
-    real(kind(0d0)) :: smooth_coeff !<
-    !! These variables are analogous in both meaning and use to the similarly
-    !! named components in the ic_patch_parameters type (see m_derived_types.f90
-    !! for additional details). They are employed as a means to more concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
 
     type(scalar_field) :: alf_sum
 
@@ -118,7 +108,10 @@ contains
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(kind(0d0)) :: pres   !< pressure
         real(kind(0d0)) :: gamma  !< specific heat ratio function
+        real(kind(0d0)) :: x_centroid, y_centroid
+        real(kind(0d0)) :: epsilon, beta
 
+        integer :: smooth_patch_id
         integer :: i !< generic loop operator
 
         ! Assigning the mixture primitive variables of a uniform state patch
@@ -249,6 +242,7 @@ contains
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
+        integer :: smooth_patch_id
 
         ! Transferring the identity of the smoothing patch
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
@@ -598,6 +592,8 @@ contains
 
         real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
         ! Vector to hold original values of cell for smoothing purposes
+
+        integer :: smooth_patch_id
 
         integer :: i !< generic loop iterator
 
