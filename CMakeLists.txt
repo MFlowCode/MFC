@@ -251,7 +251,7 @@ function(MFC_SETUP_TARGET)
                 )
             elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo,autocompare,debug
+                    PRIVATE -gpu=keep,ptxinfo,lineinfo,autocompare,debug -O0
                 )
             endif()
         endif()
