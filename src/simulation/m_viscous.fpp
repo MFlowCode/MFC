@@ -1166,13 +1166,13 @@ module m_viscous
                                                  dv_ds_vf, &
                                                  norm_dir, &
                                                  ix, iy, iz, iv, &
-                                                 dL, dim, buff_size)
+                                                 dL, dim, buff_size_in)
 
         type(int_bounds_info) :: ix, iy, iz, iv
             
-        integer :: buff_size, dim
+        integer :: buff_size_in, dim
 
-        real(kind(0d0)), dimension(-buff_size:dim + buff_size) :: dL
+        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in) :: dL
         ! arrays of cell widths
 
         type(scalar_field), &
@@ -1285,28 +1285,28 @@ module m_viscous
         !!  @param grad_z Third coordinate direction component of the derivative
         !!  @param norm Norm of the gradient vector
     subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, &
-                                     ix, iy, iz, buff_size)
+                                     ix, iy, iz, buff_size_in)
 
         type(scalar_field), intent(IN) :: var
         type(scalar_field), intent(INOUT) :: grad_x
         type(scalar_field), intent(INOUT) :: grad_y
         type(scalar_field), intent(INOUT) :: grad_z
 
-        integer, intent(IN) :: buff_size
+        integer, intent(IN) :: buff_size_in
 
         integer :: j, k, l !< Generic loop iterators
 
         type(int_bounds_info) :: ix, iy, iz
 
-        ix%beg = -buff_size; ix%end = m + buff_size; 
+        ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then
-            iy%beg = -buff_size; iy%end = n + buff_size
+            iy%beg = -buff_size_in; iy%end = n + buff_size_in
         else
             iy%beg = -1; iy%end = 1
         end if
 
         if (p > 0) then
-            iz%beg = -buff_size; iz%end = p + buff_size
+            iz%beg = -buff_size_in; iz%end = p + buff_size_in
         else
             iz%beg = -1; iz%end = 1
         end if
@@ -1350,15 +1350,15 @@ module m_viscous
             end do
         end if
 
-        ix%beg = -buff_size; ix%end = m + buff_size; 
+        ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then
-            iy%beg = -buff_size; iy%end = n + buff_size
+            iy%beg = -buff_size_in; iy%end = n + buff_size_in
         else
             iy%beg = 0; iy%end = 0
         end if
 
         if (p > 0) then
-            iz%beg = -buff_size; iz%end = p + buff_size
+            iz%beg = -buff_size_in; iz%end = p + buff_size_in
         else
             iz%beg = 0; iz%end = 0
         end if
