@@ -386,13 +386,17 @@ contains
 
     end subroutine s_initialize_cbc_module ! -------------------------------
 
-    subroutine s_compute_cbc_coefficients(cbc_dir, cbc_loc) ! --------------
+
+    !>  Compute CBC coefficients
+        !!  @param cbc_dir_in CBC coordinate direction
+        !!  @param cbc_loc_in CBC coordinate location
+    subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in) ! --------------
         ! Description: The purpose of this subroutine is to compute the grid
         !              dependent FD and PI coefficients, or CBC coefficients,
         !              provided the CBC coordinate direction and location.
 
         ! CBC coordinate direction and location
-        integer, intent(IN) :: cbc_dir, cbc_loc
+        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
 
         ! Cell-boundary locations in the s-direction
         real(kind(0d0)), dimension(0:buff_size + 1) :: s_cb
@@ -401,7 +405,7 @@ contains
         integer :: i
 
         ! Associating CBC coefficients pointers
-        call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
+        call s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         ! Determining the cell-boundary locations in the s-direction
         s_cb(0) = 0d0
@@ -412,68 +416,68 @@ contains
 
         ! Computing CBC1 Coefficients ======================================
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-        if (cbc_dir == ${CBC_DIR}$) then
+        if (cbc_dir_in == ${CBC_DIR}$) then
             if (weno_order == 1) then
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -2d0/(ds(0) + ds(1))
-                fd_coef_${XYZ}$(1, cbc_loc) = -fd_coef_${XYZ}$(0, cbc_loc)
+                fd_coef_${XYZ}$(:, cbc_loc_in) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc_in) = -2d0/(ds(0) + ds(1))
+                fd_coef_${XYZ}$(1, cbc_loc_in) = -fd_coef_${XYZ}$(0, cbc_loc_in)
 
                 ! ==================================================================
 
                 ! Computing CBC2 Coefficients ======================================
             elseif (weno_order == 3) then
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                fd_coef_${XYZ}$(1, cbc_loc) = -4d0*fd_coef_${XYZ}$(0, cbc_loc)/3d0
-                fd_coef_${XYZ}$(2, cbc_loc) = fd_coef_${XYZ}$(0, cbc_loc)/3d0
+                fd_coef_${XYZ}$(:, cbc_loc_in) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc_in) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
+                fd_coef_${XYZ}$(1, cbc_loc_in) = -4d0*fd_coef_${XYZ}$(0, cbc_loc_in)/3d0
+                fd_coef_${XYZ}$(2, cbc_loc_in) = fd_coef_${XYZ}$(0, cbc_loc_in)/3d0
 
-                pi_coef_${XYZ}$(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
+                pi_coef_${XYZ}$(0, 0, cbc_loc_in) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
                 ! ==================================================================
 
                 ! Computing CBC4 Coefficients ======================================
             else
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
+                fd_coef_${XYZ}$(:, cbc_loc_in) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc_in) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
                                                - 1d1*ds(2) + 1d1*ds(3) &
                                                - 3d0*ds(4))
-                fd_coef_${XYZ}$(1, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(4, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(1, cbc_loc_in) = -48d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
+                fd_coef_${XYZ}$(2, cbc_loc_in) = 36d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
+                fd_coef_${XYZ}$(3, cbc_loc_in) = -16d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
+                fd_coef_${XYZ}$(4, cbc_loc_in) = 3d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
 
-                pi_coef_${XYZ}$(0, 0, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 0, cbc_loc_in) = &
                     ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
                      (s_cb(1) - s_cb(3)))/((s_cb(1) - s_cb(4))* &
                                            (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
-                pi_coef_${XYZ}$(0, 1, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 1, cbc_loc_in) = &
                     ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))* &
                      ((s_cb(1) - s_cb(3))*(s_cb(1) - s_cb(3)) - &
                       (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + &
                                            (s_cb(4) - s_cb(1)))))/ &
                     ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
                      (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_${XYZ}$(0, 2, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 2, cbc_loc_in) = &
                     (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))* &
                                          (s_cb(1) - s_cb(3)) + ((s_cb(0) - s_cb(2)) + &
                                                                 (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/ &
                     ((s_cb(2) - s_cb(0))*(s_cb(0) - s_cb(3))* &
                      (s_cb(0) - s_cb(4)))
-                pi_coef_${XYZ}$(1, 0, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 0, cbc_loc_in) = &
                     ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))* &
                      (s_cb(2) - s_cb(3)))/((s_cb(2) - s_cb(4))* &
                                            (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
-                pi_coef_${XYZ}$(1, 1, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 1, cbc_loc_in) = &
                     ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))* &
                      ((s_cb(1) - s_cb(3))*(s_cb(2) - s_cb(3)) + &
                       (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + &
                                            (s_cb(2) - s_cb(4)))))/ &
                     ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
                      (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_${XYZ}$(1, 2, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 2, cbc_loc_in) = &
                     ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))* &
                      (s_cb(2) - s_cb(4)))/((s_cb(0) - s_cb(2))* &
                                            (s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
@@ -488,24 +492,24 @@ contains
 
     end subroutine s_compute_cbc_coefficients ! ----------------------------
 
-        !!  The goal of the procedure is to associate the FD and PI
-        !!      coefficients, or CBC coefficients, with the appropriate
-        !!      targets, based on the coordinate direction and location
-        !!      of the CBC.
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
-    subroutine s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc) ! ---
+    !!  The goal of the procedure is to associate the FD and PI
+    !!      coefficients, or CBC coefficients, with the appropriate
+    !!      targets, based on the coordinate direction and location
+    !!      of the CBC.
+    !!  @param cbc_dir_in CBC coordinate direction
+    !!  @param cbc_loc_in CBC coordinate location
+    subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in) ! ---
 
-        integer, intent(IN) :: cbc_dir, cbc_loc
+        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
 
         integer :: i !< Generic loop iterator
 
         ! Associating CBC Coefficients in x-direction ======================
-        if (cbc_dir == 1) then
+        if (cbc_dir_in == 1) then
 
             !fd_coef => fd_coef_x; if (weno_order > 1) pi_coef => pi_coef_x
 
-            if (cbc_loc == -1) then
+            if (cbc_loc_in == -1) then
                 do i = 0, buff_size
                     ds(i) = dx(i)
                 end do
@@ -517,11 +521,11 @@ contains
             ! ==================================================================
 
             ! Associating CBC Coefficients in y-direction ======================
-        elseif (cbc_dir == 2) then
+        elseif (cbc_dir_in == 2) then
 
             !fd_coef => fd_coef_y; if (weno_order > 1) pi_coef => pi_coef_y
 
-            if (cbc_loc == -1) then
+            if (cbc_loc_in == -1) then
                 do i = 0, buff_size
                     ds(i) = dy(i)
                 end do
@@ -537,7 +541,7 @@ contains
 
             !fd_coef => fd_coef_z; if (weno_order > 1) pi_coef => pi_coef_z
 
-            if (cbc_loc == -1) then
+            if (cbc_loc_in == -1) then
                 do i = 0, buff_size
                     ds(i) = dz(i)
                 end do
@@ -563,8 +567,8 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
+        !!  @param cbc_dir_norm CBC coordinate direction
+        !!  @param cbc_loc_norm CBC coordinate location
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
@@ -969,8 +973,6 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
@@ -1256,8 +1258,6 @@ contains
         !!      are necessary in order to finalize the CBC application
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
