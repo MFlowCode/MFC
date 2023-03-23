@@ -457,11 +457,8 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module() ! -------------------
 
-        integer :: tmp_idx !< Temporary indexes storage
-        integer :: i, j !< Generic loop iterators
-        integer :: k !< Generic counter
+        integer :: i, j, k 
         integer :: fac
-        integer :: i1, i2, i3
 
         type(int_bounds_info) :: ix, iy, iz
 
@@ -951,7 +948,6 @@ contains
         real(kind(0.d0)), intent(OUT) :: Im_trans
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
-        real(kind(0.d0)) :: f_transcoeff
 
         c1 = imag*omega*peclet
         c2 = CSQRT(c1)
