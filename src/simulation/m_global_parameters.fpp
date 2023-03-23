@@ -279,7 +279,7 @@ module m_global_parameters
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v, G
+    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
@@ -457,11 +457,8 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module() ! -------------------
 
-        integer :: tmp_idx !< Temporary indexes storage
-        integer :: i, j !< Generic loop iterators
-        integer :: k !< Generic counter
+        integer :: i, j, k 
         integer :: fac
-        integer :: i1, i2, i3
 
         type(int_bounds_info) :: ix, iy, iz
 
@@ -862,7 +859,6 @@ contains
         M_v = fluid_pp(1)%M_v
         mu_v = fluid_pp(1)%mu_v
         k_v(:) = fluid_pp(1)%k_v
-        G = fluid_pp(1)%G
 
         gamma_n = fluid_pp(2)%gamma_v
         M_n = fluid_pp(2)%M_v
@@ -951,7 +947,6 @@ contains
         real(kind(0.d0)), intent(OUT) :: Im_trans
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
-        real(kind(0.d0)) :: f_transcoeff
 
         c1 = imag*omega*peclet
         c2 = CSQRT(c1)
