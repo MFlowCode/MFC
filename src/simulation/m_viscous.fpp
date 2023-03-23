@@ -549,19 +549,19 @@ module m_viscous
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dx_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, dx, dy, dz, buff_size)
                 elseif (i == 2) then
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dy_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, dx, dy, dz, buff_size)
                 else
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dz_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, dx, dy, dz, buff_size)
                 end if
             end do
 
@@ -1165,10 +1165,10 @@ module m_viscous
     subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, & ! --------
                                                  dv_ds_vf, &
                                                  norm_dir, &
-                                                 ix, iy, iz, iv, &
+                                                 ix, iy, iz, &
                                                  dxL, dyL, dzL, buff_size)
 
-        type(int_bounds_info) :: ix, iy, iz, iv
+        type(int_bounds_info) :: ix, iy, iz
             
         integer :: buff_size
 
