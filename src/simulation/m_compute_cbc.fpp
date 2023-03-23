@@ -27,10 +27,8 @@ contains
         !!      Thompson (1990). At the slip wall (frictionless wall),
         !!      the normal component of velocity is zero at all times,
         !!      while the transverse velocities may be nonzero.
-        !!  @param dflt_int Default null integer
-    subroutine s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -53,10 +51,8 @@ contains
         !!      see pg. 13 of Thompson (1987). The nonreflecting subsonic
         !!      buffer reduces the amplitude of any reflections caused by
         !!      outgoing waves.
-        !!  @param dflt_int Default null integer
-    subroutine s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -92,10 +88,8 @@ contains
         !!      see pg. 455, Thompson (1990). This nonreflecting subsonic
         !!      CBC assumes an incoming flow and reduces the amplitude of
         !!      any reflections caused by outgoing waves.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -116,10 +110,8 @@ contains
         !!      CBC see pg. 454 of Thompson (1990). This nonreflecting
         !!      subsonic CBC presumes an outgoing flow and reduces the
         !!      amplitude of any reflections caused by outgoing waves.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -154,10 +146,8 @@ contains
         !!      direction to the boundary. As a result, a fluid element
         !!      at the boundary is simply advected outward at the fluid
         !!      velocity.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -188,10 +178,8 @@ contains
         !!      CBC see pg. 455 Thompson (1990). The constant pressure
         !!      subsonic outflow maintains a fixed pressure at the CBC
         !!      boundary in absence of any transverse effects.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -223,10 +211,8 @@ contains
         !!      state, or nearly a steady state, CBC in which only the
         !!      transverse terms may generate a time dependence at the
         !!      inflow boundary.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -245,10 +231,8 @@ contains
         !!      of Thompson (1990). For the supersonic outflow CBC, the
         !!      flow evolution at the boundary is determined completely
         !!      by the interior data.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        integer, intent(IN) :: dflt_int
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds

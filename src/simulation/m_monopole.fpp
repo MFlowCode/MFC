@@ -94,7 +94,7 @@ contains
 
         integer :: ndirs
         
-        real(kind(0d0)) :: mytime, sound
+        real(kind(0d0)) :: the_time, sound
         real(kind(0d0)) :: s2, const_sos, s1
 
 
@@ -121,8 +121,8 @@ contains
 !$acc loop seq
                         do q = 1, num_mono
 
-                            mytime = t_step*dt
-                            if ((mytime >= delay(q)) .or. (delay(q) == dflt_real)) then
+                            the_time = t_step*dt
+                            if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
 !$acc loop seq
                                 do ii = 1, num_fluids
                                     myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
@@ -175,13 +175,13 @@ contains
                                 angle = 0.d0
                                 angle_z = 0.d0
 
-                                s2 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                s2 = f_g(the_time, sound, const_sos, q, term_index)* &
                                         f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
                                 !s2 = 1d0
 
                                 if (support(q) == 5) then
                                     term_index = 1
-                                    s1 = f_g(mytime, sound, const_sos, q, term_index)* &
+                                    s1 = f_g(the_time, sound, const_sos, q, term_index)* &
                                             f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
                                 end if
 
@@ -200,7 +200,7 @@ contains
                                     end if
                                 else if (p == 0) then
                                     ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
-                                    !    PRINT*, '====== Monopole magnitude: ', f_g(mytime,sound,const_sos,mono(q))
+                                    !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
                                     if (dir(q) /= dflt_real) then
                                         ! 2d
                                         !mono_mom_src(1,j,k,l) = s2
@@ -265,12 +265,12 @@ contains
     end subroutine
 
     !> This function gives the temporally varying amplitude of the pulse
-        !! @param mytime Simulation time
+        !! @param the_time Simulation time
         !! @param sos Sound speed
         !! @param mysos Alternative speed of sound for testing
-    function f_g(mytime, sos, mysos, nm, term_index)
+    function f_g(the_time, sos, mysos, nm, term_index)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: mytime, sos, mysos
+        real(kind(0d0)), intent(IN) :: the_time, sos, mysos
         integer, intent(IN) :: nm
         real(kind(0d0)) :: period, t0, sigt, pa
         real(kind(0d0)) :: offset
@@ -285,23 +285,23 @@ contains
             period = length(nm)/sos
             f_g = 0d0
             if (term_index == 1) then
-                f_g = mag(nm)*sin((mytime)*2.d0*pi/period)/mysos &
-                        + mag(nm)/foc_length(nm)*(1.d0/(2.d0*pi/period)*cos((mytime)*2.d0*pi/period) &
+                f_g = mag(nm)*sin((the_time)*2.d0*pi/period)/mysos &
+                        + mag(nm)/foc_length(nm)*(1.d0/(2.d0*pi/period)*cos((the_time)*2.d0*pi/period) &
                                                 - 1.d0/(2.d0*pi/period))
-            elseif (mytime <= (npulse(nm)*period + offset)) then
-                f_g = mag(nm)*sin((mytime + offset)*2.d0*pi/period)
+            elseif (the_time <= (npulse(nm)*period + offset)) then
+                f_g = mag(nm)*sin((the_time + offset)*2.d0*pi/period)
             end if
         else if (pulse(nm) == 2) then
             ! Gaussian pulse
             sigt = length(nm)/sos/7.d0
             t0 = 3.5d0*sigt
             f_g = mag(nm)/(dsqrt(2.d0*pi)*sigt)* &
-                    dexp(-0.5d0*((mytime - t0)**2.d0)/(sigt**2.d0))
+                    dexp(-0.5d0*((the_time - t0)**2.d0)/(sigt**2.d0))
         else if (pulse(nm) == 3) then
             ! Square wave
             sigt = length(nm)/sos
             t0 = 0d0; f_g = 0d0
-            if (mytime > t0 .and. mytime < sigt) then
+            if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
         else
