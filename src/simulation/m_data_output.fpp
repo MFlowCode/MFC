@@ -86,12 +86,6 @@ module m_data_output
     real(kind(0d0)) :: Rc_min !< Rc criterion maximum
     !> @}
 
-    ! @name Variables for computing acceleration
-    !> @{
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
-    !> @}
-
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
@@ -1413,17 +1407,6 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-        if (probe_wrt) then
-            allocate (accel_mag(0:m, 0:n, 0:p))
-            allocate (x_accel(0:m, 0:n, 0:p))
-            if (n > 0) then
-                allocate (y_accel(0:m, 0:n, 0:p))
-                if (p > 0) then
-                    allocate (z_accel(0:m, 0:n, 0:p))
-                end if
-            end if
-        end if
-
         if (parallel_io .neqv. .true.) then
             s_write_data_files => s_write_serial_data_files
         else
@@ -1441,16 +1424,6 @@ contains
         @:DEALLOCATE(icfl_sf)
         if (any(Re_size > 0)) then
             @:DEALLOCATE(vcfl_sf, Rc_sf)
-        end if
-
-        if (probe_wrt) then
-            deallocate(accel_mag, x_accel)
-            if (n > 0) then
-                deallocate(y_accel)
-                if (p > 0) then
-                    deallocate(z_accel)
-                end if
-            end if
         end if
 
         ! Disassociating the pointer to the procedure that was utilized to
