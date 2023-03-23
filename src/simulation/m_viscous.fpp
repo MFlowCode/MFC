@@ -549,19 +549,19 @@ module m_viscous
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dx_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, iv, dx, m, buff_size)
                 elseif (i == 2) then
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dy_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, iv, dy, n, buff_size)
                 else
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dz_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, iv, dz, p, buff_size)
                 end if
             end do
 
@@ -1166,15 +1166,13 @@ module m_viscous
                                                  dv_ds_vf, &
                                                  norm_dir, &
                                                  ix, iy, iz, iv, &
-                                                 dxL, dyL, dzL, buff_size)
+                                                 dL, dim, buff_size)
 
         type(int_bounds_info) :: ix, iy, iz, iv
             
-        integer :: buff_size
+        integer :: buff_size, dim
 
-        real(kind(0d0)), dimension(-buff_size:m + buff_size) :: dxL
-        real(kind(0d0)), dimension(-buff_size:n + buff_size) :: dyL
-        real(kind(0d0)), dimension(-buff_size:p + buff_size) :: dzL
+        real(kind(0d0)), dimension(-buff_size:dim + buff_size) :: dL
         ! arrays of cell widths
 
         type(scalar_field), &
@@ -1208,7 +1206,7 @@ module m_viscous
                         do i = iv%beg, iv%end
 
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dxL(j) &
+                                1d0/dL(j) &
                                 *( &
                                 vR_vf(i)%sf(j, k, l) &
                                 - vL_vf(i)%sf(j, k, l) &
@@ -1237,7 +1235,7 @@ module m_viscous
 !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dyL(k) &
+                                1d0/dL(k) &
                                 *( &
                                 vR_vf(i)%sf(j, k, l) &
                                 - vL_vf(i)%sf(j, k, l) &
@@ -1265,7 +1263,7 @@ module m_viscous
 !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dzL(l) &
+                                1d0/dL(l) &
                                 *( &
                                 vR_vf(i)%sf(j, k, l) &
                                 - vL_vf(i)%sf(j, k, l) &
