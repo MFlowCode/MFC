@@ -549,19 +549,19 @@ module m_viscous
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dx_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, dx, dy, dz, buff_size)
                 elseif (i == 2) then
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dy_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, dx, dy, dz, buff_size)
                 else
                     call s_apply_scalar_divergence_theorem( &
                         qL_prim(i)%vf(iv%beg:iv%end), &
                         qR_prim(i)%vf(iv%beg:iv%end), &
                         dq_prim_dz_qp%vf(iv%beg:iv%end), i, &
-                        ix, iy, iz, iv, dx, dy, dz, buff_size)
+                        ix, iy, iz, dx, dy, dz, buff_size)
                 end if
             end do
 
@@ -1165,16 +1165,16 @@ module m_viscous
     subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, & ! --------
                                                  dv_ds_vf, &
                                                  norm_dir, &
-                                                 ix, iy, iz, iv, &
-                                                 dxL, dyL, dzL, buff_size)
+                                                 ix, iy, iz, &
+                                                 dxL, dyL, dzL, buff_size_in)
 
-        type(int_bounds_info) :: ix, iy, iz, iv
+        type(int_bounds_info) :: ix, iy, iz
             
-        integer :: buff_size
+        integer :: buff_size_in
 
-        real(kind(0d0)), dimension(-buff_size:m + buff_size) :: dxL
-        real(kind(0d0)), dimension(-buff_size:n + buff_size) :: dyL
-        real(kind(0d0)), dimension(-buff_size:p + buff_size) :: dzL
+        real(kind(0d0)), dimension(-buff_size_in:m + buff_size_in) :: dxL
+        real(kind(0d0)), dimension(-buff_size_in:n + buff_size_in) :: dyL
+        real(kind(0d0)), dimension(-buff_size_in:p + buff_size_in) :: dzL
         ! arrays of cell widths
 
         type(scalar_field), &
@@ -1287,28 +1287,28 @@ module m_viscous
         !!  @param grad_z Third coordinate direction component of the derivative
         !!  @param norm Norm of the gradient vector
     subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, &
-                                     ix, iy, iz, buff_size)
+                                     ix, iy, iz, buff_size_in)
 
         type(scalar_field), intent(IN) :: var
         type(scalar_field), intent(INOUT) :: grad_x
         type(scalar_field), intent(INOUT) :: grad_y
         type(scalar_field), intent(INOUT) :: grad_z
 
-        integer, intent(IN) :: buff_size
+        integer, intent(IN) :: buff_size_in
 
         integer :: j, k, l !< Generic loop iterators
 
         type(int_bounds_info) :: ix, iy, iz
 
-        ix%beg = -buff_size; ix%end = m + buff_size; 
+        ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then
-            iy%beg = -buff_size; iy%end = n + buff_size
+            iy%beg = -buff_size_in; iy%end = n + buff_size_in
         else
             iy%beg = -1; iy%end = 1
         end if
 
         if (p > 0) then
-            iz%beg = -buff_size; iz%end = p + buff_size
+            iz%beg = -buff_size_in; iz%end = p + buff_size_in
         else
             iz%beg = -1; iz%end = 1
         end if
@@ -1352,15 +1352,15 @@ module m_viscous
             end do
         end if
 
-        ix%beg = -buff_size; ix%end = m + buff_size; 
+        ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then
-            iy%beg = -buff_size; iy%end = n + buff_size
+            iy%beg = -buff_size_in; iy%end = n + buff_size_in
         else
             iy%beg = 0; iy%end = 0
         end if
 
         if (p > 0) then
-            iz%beg = -buff_size; iz%end = p + buff_size
+            iz%beg = -buff_size_in; iz%end = p + buff_size_in
         else
             iz%beg = 0; iz%end = 0
         end if

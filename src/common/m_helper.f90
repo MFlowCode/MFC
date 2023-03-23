@@ -31,11 +31,11 @@ contains
         !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
         !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, buff_size, &
-                                                                fd_number, fd_order, offset_s)
+                                                                fd_number_in, fd_order_in, offset_s)
 
         integer :: lB, lE !< loop bounds
         integer, intent(IN) :: q
-        integer, intent(IN) :: buff_size, fd_number, fd_order
+        integer, intent(IN) :: buff_size, fd_number_in, fd_order_in
         type(int_bounds_info), optional, intent(IN) :: offset_s
         real(kind(0d0)), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
 
@@ -54,10 +54,10 @@ contains
         endif
 
         if (allocated(fd_coeff_s)) deallocate(fd_coeff_s)
-        allocate (fd_coeff_s(-fd_number:fd_number, lb:lE))
+        allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
 
         ! Computing the 1st order finite-difference coefficients
-        if (fd_order == 1) then
+        if (fd_order_in == 1) then
             do i = lB, lE
                 fd_coeff_s(-1, i) = 0d0
                 fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
@@ -65,7 +65,7 @@ contains
             end do
 
             ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order == 2) then
+        elseif (fd_order_in == 2) then
             do i = lB, lE
                 fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
                 fd_coeff_s(0, i) = 0d0
