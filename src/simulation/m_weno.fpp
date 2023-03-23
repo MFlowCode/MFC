@@ -487,9 +487,6 @@ contains
 
         integer :: t1, t2, c_rate, c_max
 
-
-        integer :: is1b, is2b, is3b, is1e, is2e, is3e
-
         is1 = is1_d
         is2 = is2_d
         is3 = is3_d
