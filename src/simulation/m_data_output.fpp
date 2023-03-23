@@ -788,6 +788,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
+        real(kind(0d0)) :: G
 
         integer :: i, j, k, l, s, q !< Generic loop iterator
 
