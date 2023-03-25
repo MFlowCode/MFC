@@ -12,7 +12,8 @@ COMMON = [
 
 
 PRE_PROCESS = COMMON + [
-    'old_grid', 'old_ic', 't_step_old', 'perturb_flow', 'perturb_flow_fluid',
+    'old_grid', 'old_ic', 't_step_old', 'vel_profile', 'instability_wave', 
+    'perturb_flow', 'perturb_flow_fluid',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
     'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV'
 ]

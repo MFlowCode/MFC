@@ -641,6 +641,12 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
+		if (vel_profile) then
+			q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
+                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
+                 + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
+		end if
+
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &
             (eta*patch_icpp(patch_id)%pres &
