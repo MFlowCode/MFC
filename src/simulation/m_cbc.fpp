@@ -28,35 +28,13 @@ module m_cbc
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_variables_conversion !< State variables type conversion procedures
+
+    use m_compute_cbc
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
-
-    abstract interface ! =======================================================
-
-        !> Abstract interface to the procedures that are utilized to calculate
-        !! the L variables. For additional information refer to the following:
-        !!            1) s_compute_slip_wall_L
-        !!            2) s_compute_nonreflecting_subsonic_buffer_L
-        !!            3) s_compute_nonreflecting_subsonic_inflow_L
-        !!            4) s_compute_nonreflecting_subsonic_outflow_L
-        !!            5) s_compute_force_free_subsonic_outflow_L
-        !!            6) s_compute_constant_pressure_subsonic_outflow_L
-        !!            7) s_compute_supersonic_inflow_L
-        !!            8) s_compute_supersonic_outflow_L
-        !! @param dflt_int Default null integer
-        subroutine s_compute_abstract_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-
-            integer, intent(IN) :: dflt_int
-            real(kind(0d0)), dimension(:), intent(IN) :: lambda, mf, dalpha_rho_ds, dvel_ds, dadv_ds
-            real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-            real(kind(0d0)), dimension(:), intent(INOUT) :: L
-
-        end subroutine s_compute_abstract_L
-
-    end interface ! ============================================================
 
     !! The cell-average primitive variables. They are obtained by reshaping (RS)
     !! q_prim_vf in the coordinate direction normal to the domain boundary along
@@ -77,34 +55,11 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-    !! The cell-boundary-average of the fluxes. They are initially determined by
-    !! reshaping flux_vf and flux_src_vf in a coordinate direction normal to the
-    !! domain boundary along which CBC is applied. flux_rs_vf and flux_src_rs_vf
-    !! are subsequently modified based on the selected CBC.
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho   !< Cell averaged partial densiy
-    real(kind(0d0)) :: rho         !< Cell averaged density
-    real(kind(0d0)), allocatable, dimension(:) :: vel         !< Cell averaged velocity
-    real(kind(0d0)) :: pres        !< Cell averaged pressure
-    real(kind(0d0)) :: E           !< Cell averaged energy
-    real(kind(0d0)) :: H           !< Cell averaged enthalpy
-    real(kind(0d0)), allocatable, dimension(:) :: adv         !< Cell averaged advected variables
-    real(kind(0d0)), allocatable, dimension(:) :: mf          !< Cell averaged mass fraction
-    real(kind(0d0)) :: gamma        !< Cell averaged specific heat ratio
-    real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
+
     real(kind(0d0)) :: c           !< Cell averaged speed of sound
     real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
 
-    real(kind(0d0)), allocatable, dimension(:) :: dalpha_rho_ds !< Spatial derivatives in s-dir of partial density
-    real(kind(0d0)), allocatable, dimension(:) :: dvel_ds !< Spatial derivatives in s-dir of velocity
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-    real(kind(0d0)), allocatable, dimension(:) :: dadv_ds !< Spatial derivatives in s-dir of advection variables
-
-    !! Note that these are only obtained in those cells on the domain boundary along which the
-    !! CBC is applied by employing finite differences (FD) on the cell-average primitive variables, q_prim_rs_vf.
-
-    real(kind(0d0)), dimension(3) :: lambda !< Eigenvalues (see Thompson 1987,1990)
-    real(kind(0d0)), allocatable, dimension(:) :: L      !< L matrix (see Thompson 1987,1990)
-
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
     ! CBC Coefficients =========================================================
@@ -114,8 +69,8 @@ module m_cbc
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
-! Bug with NVHPC when using nullified pointers in a declare create
-!    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
+    ! Bug with NVHPC when using nullified pointers in a declare create
+    !    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
@@ -124,12 +79,7 @@ module m_cbc
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the location of the CBC.
 
-!    real(kind(0d0)), pointer, dimension(:, :, :) :: pi_coef => null()
     ! ==========================================================================
-
-    ! procedure(s_compute_abstract_L), pointer :: s_compute_L => null()  !<
-!    procedure(s_compute_abstract_L), pointer :: s_compute_L => null() !<
-    !! Pointer to procedure used to calculate L variables, based on choice of CBC
 
     type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
 
@@ -140,11 +90,13 @@ module m_cbc
     integer :: cbc_dir, cbc_loc
 
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
-!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,alpha_rho,vel,adv,mf,Re, &
-!$acc                dalpha_rho_ds,dvel_ds,dadv_ds,lambda,L,ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-!$acc                pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj, cbc_dir, cbc_loc)
+!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,Re, &
+!$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
+!$acc                 pi_coef_x,pi_coef_y,pi_coef_z,  bcxb, bcxe, bcyb, bcye, bczb, bcze, is1, is2, is3, dj, cbc_dir, cbc_loc)
 
 contains
+
+    @:s_compute_speed_of_sound()
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -159,12 +111,6 @@ contains
             .and. &
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
 
-        ! Allocating the cell-average primitive variables
-        !allocate (q_prim_rs_vf(1:sys_size))
-
-        ! Allocating the cell-average and cell-boundary-average fluxes
-        !allocate (F_rs_vf(1:sys_size), F_src_rs_vf(1:sys_size))
-        !allocate (flux_rs_vf(1:sys_size), flux_src_rs_vf(1:sys_size))
         if (n == 0) then
             is2%beg = 0
 
@@ -296,21 +242,6 @@ contains
 
         end if
 
-        ! Allocating the cell-average partial densities, the velocity, the
-        ! advected variables, the mass fractions, as well as Weber numbers
-        allocate (alpha_rho(1:cont_idx%end))
-        allocate (vel(1:num_dims))
-        allocate (adv(1:adv_idx%end - E_idx))
-        allocate (mf(1:cont_idx%end))
-
-        ! Allocating the first-order spatial derivatives in the s-direction
-        ! of the partial densities, the velocity and the advected variables
-        allocate (dalpha_rho_ds(1:cont_idx%end))
-        allocate (dvel_ds(1:num_dims))
-        allocate (dadv_ds(1:adv_idx%end - E_idx))
-
-        ! Allocating L, see Thompson (1987, 1990)
-        allocate (L(1:adv_idx%end))
 
         ! Allocating the cell-width distribution in the s-direction
         allocate (ds(0:buff_size))
@@ -455,13 +386,17 @@ contains
 
     end subroutine s_initialize_cbc_module ! -------------------------------
 
-    subroutine s_compute_cbc_coefficients(cbc_dir, cbc_loc) ! --------------
+
+    !>  Compute CBC coefficients
+        !!  @param cbc_dir_in CBC coordinate direction
+        !!  @param cbc_loc_in CBC coordinate location
+    subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in) ! --------------
         ! Description: The purpose of this subroutine is to compute the grid
         !              dependent FD and PI coefficients, or CBC coefficients,
         !              provided the CBC coordinate direction and location.
 
         ! CBC coordinate direction and location
-        integer, intent(IN) :: cbc_dir, cbc_loc
+        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
 
         ! Cell-boundary locations in the s-direction
         real(kind(0d0)), dimension(0:buff_size + 1) :: s_cb
@@ -470,7 +405,7 @@ contains
         integer :: i
 
         ! Associating CBC coefficients pointers
-        call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
+        call s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         ! Determining the cell-boundary locations in the s-direction
         s_cb(0) = 0d0
@@ -481,68 +416,68 @@ contains
 
         ! Computing CBC1 Coefficients ======================================
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-        if (cbc_dir == ${CBC_DIR}$) then
+        if (cbc_dir_in == ${CBC_DIR}$) then
             if (weno_order == 1) then
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -2d0/(ds(0) + ds(1))
-                fd_coef_${XYZ}$(1, cbc_loc) = -fd_coef_${XYZ}$(0, cbc_loc)
+                fd_coef_${XYZ}$(:, cbc_loc_in) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc_in) = -2d0/(ds(0) + ds(1))
+                fd_coef_${XYZ}$(1, cbc_loc_in) = -fd_coef_${XYZ}$(0, cbc_loc_in)
 
                 ! ==================================================================
 
                 ! Computing CBC2 Coefficients ======================================
             elseif (weno_order == 3) then
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                fd_coef_${XYZ}$(1, cbc_loc) = -4d0*fd_coef_${XYZ}$(0, cbc_loc)/3d0
-                fd_coef_${XYZ}$(2, cbc_loc) = fd_coef_${XYZ}$(0, cbc_loc)/3d0
+                fd_coef_${XYZ}$(:, cbc_loc_in) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc_in) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
+                fd_coef_${XYZ}$(1, cbc_loc_in) = -4d0*fd_coef_${XYZ}$(0, cbc_loc_in)/3d0
+                fd_coef_${XYZ}$(2, cbc_loc_in) = fd_coef_${XYZ}$(0, cbc_loc_in)/3d0
 
-                pi_coef_${XYZ}$(0, 0, cbc_loc) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
+                pi_coef_${XYZ}$(0, 0, cbc_loc_in) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
                 ! ==================================================================
 
                 ! Computing CBC4 Coefficients ======================================
             else
 
-                fd_coef_${XYZ}$(:, cbc_loc) = 0d0
-                fd_coef_${XYZ}$(0, cbc_loc) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
+                fd_coef_${XYZ}$(:, cbc_loc_in) = 0d0
+                fd_coef_${XYZ}$(0, cbc_loc_in) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
                                                - 1d1*ds(2) + 1d1*ds(3) &
                                                - 3d0*ds(4))
-                fd_coef_${XYZ}$(1, cbc_loc) = -48d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(2, cbc_loc) = 36d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(3, cbc_loc) = -16d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
-                fd_coef_${XYZ}$(4, cbc_loc) = 3d0*fd_coef_${XYZ}$(0, cbc_loc)/25d0
+                fd_coef_${XYZ}$(1, cbc_loc_in) = -48d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
+                fd_coef_${XYZ}$(2, cbc_loc_in) = 36d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
+                fd_coef_${XYZ}$(3, cbc_loc_in) = -16d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
+                fd_coef_${XYZ}$(4, cbc_loc_in) = 3d0*fd_coef_${XYZ}$(0, cbc_loc_in)/25d0
 
-                pi_coef_${XYZ}$(0, 0, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 0, cbc_loc_in) = &
                     ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
                      (s_cb(1) - s_cb(3)))/((s_cb(1) - s_cb(4))* &
                                            (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
-                pi_coef_${XYZ}$(0, 1, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 1, cbc_loc_in) = &
                     ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))* &
                      ((s_cb(1) - s_cb(3))*(s_cb(1) - s_cb(3)) - &
                       (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + &
                                            (s_cb(4) - s_cb(1)))))/ &
                     ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
                      (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_${XYZ}$(0, 2, cbc_loc) = &
+                pi_coef_${XYZ}$(0, 2, cbc_loc_in) = &
                     (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))* &
                                          (s_cb(1) - s_cb(3)) + ((s_cb(0) - s_cb(2)) + &
                                                                 (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/ &
                     ((s_cb(2) - s_cb(0))*(s_cb(0) - s_cb(3))* &
                      (s_cb(0) - s_cb(4)))
-                pi_coef_${XYZ}$(1, 0, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 0, cbc_loc_in) = &
                     ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))* &
                      (s_cb(2) - s_cb(3)))/((s_cb(2) - s_cb(4))* &
                                            (s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
-                pi_coef_${XYZ}$(1, 1, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 1, cbc_loc_in) = &
                     ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))* &
                      ((s_cb(1) - s_cb(3))*(s_cb(2) - s_cb(3)) + &
                       (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + &
                                            (s_cb(2) - s_cb(4)))))/ &
                     ((s_cb(0) - s_cb(3))*(s_cb(1) - s_cb(3))* &
                      (s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
-                pi_coef_${XYZ}$(1, 2, cbc_loc) = &
+                pi_coef_${XYZ}$(1, 2, cbc_loc_in) = &
                     ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))* &
                      (s_cb(2) - s_cb(4)))/((s_cb(0) - s_cb(2))* &
                                            (s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
@@ -557,24 +492,24 @@ contains
 
     end subroutine s_compute_cbc_coefficients ! ----------------------------
 
-        !!  The goal of the procedure is to associate the FD and PI
-        !!      coefficients, or CBC coefficients, with the appropriate
-        !!      targets, based on the coordinate direction and location
-        !!      of the CBC.
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
-    subroutine s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc) ! ---
+    !!  The goal of the procedure is to associate the FD and PI
+    !!      coefficients, or CBC coefficients, with the appropriate
+    !!      targets, based on the coordinate direction and location
+    !!      of the CBC.
+    !!  @param cbc_dir_in CBC coordinate direction
+    !!  @param cbc_loc_in CBC coordinate location
+    subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in) ! ---
 
-        integer, intent(IN) :: cbc_dir, cbc_loc
+        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
 
         integer :: i !< Generic loop iterator
 
         ! Associating CBC Coefficients in x-direction ======================
-        if (cbc_dir == 1) then
+        if (cbc_dir_in == 1) then
 
             !fd_coef => fd_coef_x; if (weno_order > 1) pi_coef => pi_coef_x
 
-            if (cbc_loc == -1) then
+            if (cbc_loc_in == -1) then
                 do i = 0, buff_size
                     ds(i) = dx(i)
                 end do
@@ -586,11 +521,11 @@ contains
             ! ==================================================================
 
             ! Associating CBC Coefficients in y-direction ======================
-        elseif (cbc_dir == 2) then
+        elseif (cbc_dir_in == 2) then
 
             !fd_coef => fd_coef_y; if (weno_order > 1) pi_coef => pi_coef_y
 
-            if (cbc_loc == -1) then
+            if (cbc_loc_in == -1) then
                 do i = 0, buff_size
                     ds(i) = dy(i)
                 end do
@@ -606,7 +541,7 @@ contains
 
             !fd_coef => fd_coef_z; if (weno_order > 1) pi_coef => pi_coef_z
 
-            if (cbc_loc == -1) then
+            if (cbc_loc_in == -1) then
                 do i = 0, buff_size
                     ds(i) = dz(i)
                 end do
@@ -632,8 +567,8 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
+        !!  @param cbc_dir_norm CBC coordinate direction
+        !!  @param cbc_loc_norm CBC coordinate location
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
@@ -687,8 +622,6 @@ contains
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
-
-        ! Allocating L, see Thompson (1987, 1990)
 
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
@@ -833,8 +766,7 @@ contains
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, &
-                                    q_prim_rs${XYZ}$_vf, 0, k, r, 2, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
 
                     ! ============================================================
 
@@ -889,24 +821,22 @@ contains
                     lambda(2) = vel(dir_idx(1))
                     lambda(3) = vel(dir_idx(1)) + c
 
-                    ! call s_compute_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-
                     if ((cbc_loc == -1 .and. bc${XYZ}$b == -5) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -5)) then
-                        call s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                        call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -6) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -6)) then
-    call s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
-    call s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
-    call s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
-    call s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then
-    call s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else if ((cbc_loc == -1 .and. bc${XYZ}$b == -11) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -11)) then
-     call s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+     call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     else
-    call s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                     end if
 
                     ! Be careful about the cylindrical coordinate!
@@ -1036,258 +966,6 @@ contains
 
     end subroutine s_cbc ! -------------------------------------------------
 
-    !>  The L variables for the slip wall CBC, see pg. 451 of
-        !!      Thompson (1990). At the slip wall (frictionless wall),
-        !!      the normal component of velocity is zero at all times,
-        !!      while the transverse velocities may be nonzero.
-        !!  @param dflt_int Default null integer
-    subroutine s_compute_slip_wall_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i
-
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, advxe
-            L(i) = 0d0
-        end do
-
-        L(advxe) = L(1)
-
-    end subroutine s_compute_slip_wall_L ! ---------------------------------
-
-    !>  The L variables for the nonreflecting subsonic buffer CBC
-        !!      see pg. 13 of Thompson (1987). The nonreflecting subsonic
-        !!      buffer reduces the amplitude of any reflections caused by
-        !!      outgoing waves.
-        !!  @param dflt_int Default null integer
-    subroutine s_compute_nonreflecting_subsonic_buffer_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i !< Generic loop iterator
-
-        L(1) = (5d-1 - 5d-1*sign(1d0, lambda(1)))*lambda(1) &
-               *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, momxb
-            L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
-                   *(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
-        end do
-
-        do i = momxb + 1, momxe
-            L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
-                   *(dvel_ds(dir_idx(i - contxe)))
-        end do
-
-        do i = E_idx, advxe - 1
-            L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
-                   *(dadv_ds(i - momxe))
-        end do
-
-        L(advxe) = (5d-1 - 5d-1*sign(1d0, lambda(3)))*lambda(3) &
-                   *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
-
-    end subroutine s_compute_nonreflecting_subsonic_buffer_L ! -------------
-
-    !>  The L variables for the nonreflecting subsonic inflow CBC
-        !!      see pg. 455, Thompson (1990). This nonreflecting subsonic
-        !!      CBC assumes an incoming flow and reduces the amplitude of
-        !!      any reflections caused by outgoing waves.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_nonreflecting_subsonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i
-
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, advxe
-            L(i) = 0d0
-        end do
-
-    end subroutine s_compute_nonreflecting_subsonic_inflow_L ! -------------
-
-    !>  The L variables for the nonreflecting subsonic outflow
-        !!      CBC see pg. 454 of Thompson (1990). This nonreflecting
-        !!      subsonic CBC presumes an outgoing flow and reduces the
-        !!      amplitude of any reflections caused by outgoing waves.
-        !! @param dflt_int Default null integer
-subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i !> Generic loop iterator
-
-         L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, momxb
-            L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
-        end do
-
-        do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
-        end do
-
-        do i = E_idx, advxe - 1
-            L(i) = lambda(2)*(dadv_ds(i - momxe))
-        end do
-
-        ! bubble index
-        L(advxe) = 0d0
-
-    end subroutine s_compute_nonreflecting_subsonic_outflow_L ! ------------
-
-    !>  The L variables for the force-free subsonic outflow CBC,
-        !!      see pg. 454 of Thompson (1990). The force-free subsonic
-        !!      outflow sets to zero the sum of all of the forces which
-        !!      are acting on a fluid element for the normal coordinate
-        !!      direction to the boundary. As a result, a fluid element
-        !!      at the boundary is simply advected outward at the fluid
-        !!      velocity.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_force_free_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i !> Generic loop iterator
-
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, momxb
-            L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
-        end do
-
-        do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
-        end do
-
-        do i = E_idx, advxe - 1
-            L(i) = lambda(2)*(dadv_ds(i - momxe))
-        end do
-
-        L(advxe) = L(1) + 2d0*rho*c*lambda(2)*dvel_ds(dir_idx(1))
-
-    end subroutine s_compute_force_free_subsonic_outflow_L ! ---------------
-
-    !>  L variables for the constant pressure subsonic outflow
-        !!      CBC see pg. 455 Thompson (1990). The constant pressure
-        !!      subsonic outflow maintains a fixed pressure at the CBC
-        !!      boundary in absence of any transverse effects.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_constant_pressure_subsonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i !> Generic loop iterator
-
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, momxb
-            L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
-        end do
-
-        do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
-        end do
-
-        do i = E_idx, advxe - 1
-            L(i) = lambda(2)*(dadv_ds(i - momxe))
-        end do
-
-        L(advxe) = -L(1)
-
-    end subroutine s_compute_constant_pressure_subsonic_outflow_L ! --------
-
-    !>  L variables for the supersonic inflow CBC, see pg. 453
-        !!      Thompson (1990). The supersonic inflow CBC is a steady
-        !!      state, or nearly a steady state, CBC in which only the
-        !!      transverse terms may generate a time dependence at the
-        !!      inflow boundary.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_supersonic_inflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i
-
-        do i = 1, advxe
-            L(i) = 0d0
-        end do
-
-    end subroutine s_compute_supersonic_inflow_L ! -------------------------
-
-    !>  L variables for the supersonic outflow CBC, see pg. 453
-        !!      of Thompson (1990). For the supersonic outflow CBC, the
-        !!      flow evolution at the boundary is determined completely
-        !!      by the interior data.
-        !! @param dflt_int Default null integer
-    subroutine s_compute_supersonic_outflow_L(dflt_int, lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-!$acc routine seq
-        integer, intent(IN) :: dflt_int
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
-        integer :: i !< Generic loop iterator
-
-        L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
-
-        do i = 2, momxb
-            L(i) = lambda(2)*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
-        end do
-
-        do i = momxb + 1, momxe
-            L(i) = lambda(2)*(dvel_ds(dir_idx(i - contxe)))
-        end do
-
-        do i = E_idx, advxe - 1
-            L(i) = lambda(2)*(dadv_ds(i - momxe))
-        end do
-
-        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
-
-    end subroutine s_compute_supersonic_outflow_L ! ------------------------
-
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are required for the setup of the
@@ -1295,8 +973,6 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
@@ -1582,8 +1258,6 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
         !!      are necessary in order to finalize the CBC application
         !!  @param flux_vf Cell-boundary-average fluxes
         !!  @param flux_src_vf Cell-boundary-average flux sources
-        !!  @param cbc_dir CBC coordinate direction
-        !!  @param cbc_loc CBC coordinate location
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
@@ -1799,17 +1473,6 @@ subroutine s_compute_nonreflecting_subsonic_outflow_L(dflt_int, lambda, L, rho, 
             end if
             deallocate (flux_rsz_vf, flux_src_rsz_vf)
         end if
-
-        ! Deallocating the cell-average partial densities, the velocity, the
-        ! advection variables, the mass fractions and also the Weber numbers
-        deallocate (alpha_rho, vel, adv, mf)
-
-        ! Deallocating the first-order spatial derivatives, in s-direction,
-        ! of the partial densities, the velocity and the advected variables
-        deallocate (dalpha_rho_ds, dvel_ds, dadv_ds)
-
-        ! Deallocating L, see Thompson (1987, 1990)
-        deallocate (L)
 
         ! Deallocating the cell-width distribution in the s-direction
         deallocate (ds)

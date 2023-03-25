@@ -1,5 +1,15 @@
 # Getting Started
 
+## Fetching MFC
+
+You can either download MFC's [latest release from GitHub](https://github.com/MFlowCode/MFC/releases/latest) or clone the repository:
+
+```console
+$ git clone https://github.com/MFlowCode/MFC.git
+$ cd MFC
+$ git checkout <release tag>
+```
+
 ## Build Environment
 
 MFC can be built in multiple ways on various operating systems. Please select your desired configuration from the list bellow:
@@ -165,16 +175,6 @@ Thus, any modification outside of `~/MFC` should be considered as permanently lo
 session exit.
 
 </details>
-
-## Fetching MFC
-
-You can either download MFC's [latest release from GitHub](https://github.com/MFlowCode/MFC/releases/latest) or clone the repository:
-
-```console
-$ git clone https://github.com/MFlowCode/MFC.git
-$ cd MFC
-$ git checkout <release tag>
-```
 
 ## Building MFC
 

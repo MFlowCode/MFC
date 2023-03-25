@@ -22,7 +22,9 @@ To (re)generate *golden files*, append the `-g` (i.e `--generate`) option:
 $ ./mfc.sh test -g -j 8
 ```
 
-Adding a new test case can be done by modifying [cases.py](toolchain/mfc/tests/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](toolchain/mfc/tests/case.py). The function operates on two variables:
+It is recommended that a range be specified when generating golden files for new test cases, as described in the previous section, in an effort not to regenerate the golden files of existing test cases.
+
+Adding a new test case can be done by modifying [cases.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/case.py). The function operates on two variables:
 
 - `stack`: A stack that holds the variations to the default case parameters. By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).
 
@@ -71,3 +73,13 @@ When pushing to the stack, or creating a new case with the `create_case` functio
 If a trace is empty (that is, the empty string `""`), it will not appear in the final trace, but any case parameter variations associated with it will still be applied.
 
 Finally, the case is appended to the `cases` list, which will be returned by the `generate_cases` function.
+
+### Testing Post Process
+
+To test updated post process code, append the `-a` or `--test-all` option: 
+```console
+$ ./mfc.sh test -a -j 8
+```
+
+This argument will re-run the test stack with `parallel_io=True`, which generates silo_hdf5 files. It will also turn most write parameters (`*_wrt`) on. Then, it searches through the silo files using `h5dump` to ensure that there are no NaNs or Infinitys. Although adding this option does not guarantee that accurate silo files are generated, it does ensure that post process does not fail or produce malformed data. 
+

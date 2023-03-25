@@ -310,10 +310,9 @@ contains
                 ! Verifying that a valid decomposition of the computational
                 ! domain has been established. If not, the simulation exits.
                 if (proc_rank == 0 .and. ierr == -1) then
-                    print '(A)', 'Unsupported combination of values '// &
+                    call s_mpi_abort('Unsupported combination of values '// &
                         'of num_procs, m, n, p and '// &
-                        'weno_order. Exiting ...'
-                    call s_mpi_abort()
+                        'weno_order. Exiting ...')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
@@ -413,10 +412,9 @@ contains
                 ! Verifying that a valid decomposition of the computational
                 ! domain has been established. If not, the simulation exits.
                 if (proc_rank == 0 .and. ierr == -1) then
-                    print '(A)', 'Unsupported combination of values '// &
+                    call s_mpi_abort('Unsupported combination of values '// &
                         'of num_procs, m, n and '// &
-                        'weno_order. Exiting ...'
-                    call s_mpi_abort()
+                        'weno_order. Exiting ...')
                 end if
 
                 ! Creating new communicator using the Cartesian topology

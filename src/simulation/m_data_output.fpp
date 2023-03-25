@@ -24,6 +24,8 @@ module m_data_output
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compile_specific
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -82,12 +84,6 @@ module m_data_output
     real(kind(0d0)) :: vcfl_max !< VCFL criterion maximum
     real(kind(0d0)) :: ccfl_max !< CCFL criterion maximum
     real(kind(0d0)) :: Rc_min !< Rc criterion maximum
-    !> @}
-
-    ! @name Variables for computing acceleration
-    !> @{
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
     !> @}
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
@@ -224,11 +220,14 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
         real(kind(0d0)) :: rho        !< Cell-avg. density
         real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
         real(kind(0d0)) :: pres       !< Cell-avg. pressure
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(kind(0d0)) :: c          !< Cell-avg. sound speed
+        real(kind(0d0)) :: E          !< Cell-avg. energy
+        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
 
         ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
@@ -238,7 +237,7 @@ contains
         real(kind(0d0)) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, q !< Generic loop iterators
 
         integer :: Nfq
         real(kind(0d0)) :: fltr_dtheta   !<
@@ -265,33 +264,19 @@ contains
                         vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
                     end do
 
+                    vel_sum = 0d0
+                    do i = 1, num_dims
+                        vel_sum = vel_sum + vel(i)**2d0
+                    end do
+
                     pres = q_prim_vf(E_idx)%sf(j, k, l)
 
-                    ! Compute mixture sound speed
-                    if (alt_soundspeed) then
-                        do i = 1, num_fluids
-                            alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
-                        end do
-                        blkmod1 = ((gammas(1) + 1d0)*pres + &
-                                   pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1d0)*pres + &
-                                   pi_infs(2))/gammas(2)
-                        c = (1d0/(rho*(alpha(1)/blkmod1 + alpha(2)/blkmod2)))
-                    elseif (model_eqns == 3) then
-                        c = 0d0
-                        do i = 1, num_fluids
-                            c = c + q_prim_vf(i + advxb - 1)%sf(j, k, l)*(1d0/gammas(i) + 1d0)* &
-                                (pres + pi_infs(i)/(gammas(i) + 1d0))
-                        end do
-                    else
-                        c = (((gamma + 1d0)*pres + pi_inf)/(gamma*rho))
-                    end if
+                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum
 
-                    if (mixture_err .and. c < 0d0) then
-                        c = sgm_eps
-                    else
-                        c = sqrt(c)
-                    end if
+                    H = (E + pres)/rho
+
+                    ! Compute mixture sound speed
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
 
                     if (grid_geometry == 3) then
                         if (k == 0) then
@@ -424,14 +409,10 @@ contains
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
-                print '(A)', 'ICFL is NaN. Exiting ...'
-                ! print*, (dt/dx(:)),ABS(vel(1)),c
-
-                call s_mpi_abort()
+                call s_mpi_abort('ICFL is NaN. Exiting ...')
             elseif (icfl_max_glb > 1d0) then
-                print '(A)', 'ICFL is greater than 1.0. Exiting ...'
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort()
             end if
         end if
 
@@ -807,7 +788,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
-        real(kind(0d0)), dimension(1:1, 1:1, 1:1, 1:1) :: q_prim_redundant
+        real(kind(0d0)) :: G
 
         integer :: i, j, k, l, s, q !< Generic loop iterator
 
@@ -881,37 +862,19 @@ contains
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), &
+                    call s_compute_pressure( &
+                        q_cons_vf(1)%sf(j - 2, k, l), &
                         q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k, l), &
-                        pi_inf, gamma, pres)
+                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
+                        q_cons_vf(1)%sf(j - 2, k, l), &
+                        pi_inf, gamma, pres, rho, &
+                        q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
+                        q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
 
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-
                     else if (hypoelasticity) then
-                        ! calculate elastic contribution to Energy
-                        E_e = 0d0
-                        do s = stress_idx%beg, stress_idx%end
-                            if (G > 0) then
-                                E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k, l)/rho)**2d0) &
-                                      /(4d0*G)
-                                ! Additional terms in 2D and 3D
-                                if ((s == stress_idx%beg + 1) .or. &
-                                    (s == stress_idx%beg + 3) .or. &
-                                    (s == stress_idx%beg + 4)) then
-                                    E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k, l)/rho)**2d0) &
-                                          /(4d0*G)
-                                end if
-                            end if
-                        end do
-                        tau_e(1) = q_cons_vf(s)%sf(j - 2, k, l)/rho
-
-                        pres = ( &
-                               q_cons_vf(E_idx)%sf(j - 2, k, l) - &
-                               0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k, l)**2.d0)/rho - &
-                               pi_inf - E_e &
-                               )/gamma
+                        tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
                     if (bubbles) then
@@ -923,7 +886,7 @@ contains
                             nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
                             nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
                         end do
-                        !call s_comp_n_from_cons(alf, nR, nbub)
+                        !call comp_n_from_cons(alf, nR, nbub)
 
                         nR3 = 0d0
                         do s = 1, nb
@@ -961,9 +924,8 @@ contains
                     end if
 
                     ! Compute mixture sound Speed
-                    @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
-                    j - 2, k, l, 0, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -992,39 +954,21 @@ contains
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                            pi_inf, gamma, pres)
+                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/ &
+                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                            pi_inf, gamma, pres, rho, &
+                            q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
+                            q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
 
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
                         else if (hypoelasticity) then
-                            ! calculate elastic contribution to Energy
-                            E_e = 0d0
-                            do s = stress_idx%beg, stress_idx%end
-                                if (G > 0) then
-                                    E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l)/rho)**2d0) &
-                                          /(4d0*G)
-                                    ! Additional terms in 2D and 3D
-                                    if ((s == stress_idx%beg + 1) .or. &
-                                        (s == stress_idx%beg + 3) .or. &
-                                        (s == stress_idx%beg + 4)) then
-                                        E_e = E_e + ((q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l)/rho)**2d0) &
-                                              /(4d0*G)
-                                    end if
-                                end if
-                            end do
-
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
-
-                            pres = ( &
-                                   q_cons_vf(E_idx)%sf(j - 2, k - 2, l) - &
-                                   0.5d0*(q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l)**2.d0)/rho - &
-                                   pi_inf - E_e &
-                                   )/gamma
                         end if
 
                         if (bubbles) then
@@ -1033,7 +977,7 @@ contains
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
                                 nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
-                            !call s_comp_n_from_cons(alf, nR, nbub)
+                            !call comp_n_from_cons(alf, nR, nbub)
 
                             nR3 = 0d0
                             do s = 1, nb
@@ -1047,9 +991,8 @@ contains
                         end if
 
                         ! Compute mixture sound speed
-                        @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
-                        j - 2, k - 2, l, 0, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -1085,12 +1028,12 @@ contains
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
 
-                            pres = (q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2) - 0.5d0*rho*dot_product(vel, vel) - pi_inf)/gamma
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
+                                0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, pres)
 
                             ! Compute mixture sound speed
-                            @:compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                            ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, q_prim_redundant, &
-                            j - 2, k - 2, l - 2, 0, c)
+                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
+                                ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1303,8 +1246,7 @@ contains
                 end do
             elseif (p == 0) then
                 if (num_integrals /= 3) then
-                    print '(A)', 'Incorrect number of integrals'
-                    call s_mpi_abort()
+                    call s_mpi_abort('Incorrect number of integrals')
                 end if
 
                 rad = integral(1)%xmax
@@ -1389,6 +1331,8 @@ contains
 
     end subroutine s_write_probe_files ! -----------------------------------
 
+    @:s_compute_speed_of_sound()
+
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
         !!      the current computation and to close the file when done.
@@ -1464,17 +1408,6 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-        if (probe_wrt) then
-            allocate (accel_mag(0:m, 0:n, 0:p))
-            allocate (x_accel(0:m, 0:n, 0:p))
-            if (n > 0) then
-                allocate (y_accel(0:m, 0:n, 0:p))
-                if (p > 0) then
-                    allocate (z_accel(0:m, 0:n, 0:p))
-                end if
-            end if
-        end if
-
         if (parallel_io .neqv. .true.) then
             s_write_data_files => s_write_serial_data_files
         else
@@ -1492,16 +1425,6 @@ contains
         @:DEALLOCATE(icfl_sf)
         if (any(Re_size > 0)) then
             @:DEALLOCATE(vcfl_sf, Rc_sf)
-        end if
-
-        if (probe_wrt) then
-            deallocate(accel_mag, x_accel)
-            if (n > 0) then
-                deallocate(y_accel)
-                if (p > 0) then
-                    deallocate(z_accel)
-                end if
-            end if
         end if
 
         ! Disassociating the pointer to the procedure that was utilized to

@@ -20,12 +20,6 @@ module m_global_parameters
     !> @name Logistics
     !> @{
     integer :: num_procs            !< Number of processors
-    integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
-    integer, parameter :: path_len = 400  !< Maximum path length
-    integer, parameter :: name_len = 50   !< Maximum name length
-    real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
-    integer, parameter :: dflt_int = -100 !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     character(LEN=path_len) :: case_dir             !< Case folder location
     !> @}
 
@@ -146,6 +140,8 @@ module m_global_parameters
 
     ! ==========================================================================
 
+    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
+
     ! Formatted Database File(s) Structure Parameters ==========================
 
     integer :: format !< Format of the database file(s)
@@ -245,10 +241,6 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     !> @}
-
-    ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
-    ! ==========================================================================
 
 contains
 
@@ -622,6 +614,8 @@ contains
             end if
         end if
 
+        allocate (adv(num_fluids))
+
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
         elseif (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
@@ -647,16 +641,17 @@ contains
         real(kind(0.d0)), dimension(Nb) :: k_m0
         real(kind(0.d0)), dimension(Nb) :: rho_m0
         real(kind(0.d0)), dimension(Nb) :: x_vw
-        ! polytropic index used to compute isothermal natural frequency
-        real(kind(0.d0)), parameter :: k_poly = 1.d0
-        ! universal gas constant
-        real(kind(0.d0)), parameter :: Ru = 8314.d0
 
         ! liquid physical properties
         real(kind(0.d0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
 
         ! gas physical properties
         real(kind(0.d0)) :: gamma_m, gamma_n, M_n, mu_n
+
+        ! polytropic index used to compute isothermal natural frequency
+        real(kind(0.d0)), parameter :: k_poly = 1.d0
+        ! universal gas constant
+        real(kind(0.d0)), parameter :: Ru = 8314.d0
 
         rhol0 = rhoref
         pl0 = pref
@@ -834,6 +829,8 @@ contains
 
         deallocate (proc_coords)
 
+        deallocate (adv)
+
 #ifdef MFC_MPI
 
         if (parallel_io) then
@@ -849,50 +846,6 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! -----------------
-
-    !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-
-        call s_quad(nRtmp**3, nR3)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-
-        call s_quad(Rtmp**3, R3)  !returns itself if NR0 = 1
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
 
     !> Computes the Simpson weights for quadrature
         !! @param Npt is the number of bins that represent the polydisperse bubble population

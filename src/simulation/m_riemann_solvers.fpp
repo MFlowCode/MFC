@@ -112,20 +112,6 @@ module m_riemann_solvers
         end subroutine s_abstract_riemann_solver
 
         !> The abstract interface to the subroutines that are utilized to compute
-        !! the wave speeds of the Riemann problem either directly or by the means
-        !! of pressure-velocity estimates. For more information please refer to:
-        !!      1) s_compute_direct_wave_speeds
-        !!      2) s_compute_pressure_velocity_wave_speeds
-        !!  @param i First coordinate location index
-        !!  @param j Second coordinate location index
-        !!  @param k Third coordinate location index
-        subroutine s_compute_abstract_wave_speeds(i, j, k)
-
-            integer, intent(IN) :: i, j, k
-
-        end subroutine s_compute_abstract_wave_speeds
-
-        !> The abstract interface to the subroutines that are utilized to compute
         !! the viscous source fluxes for either Cartesian or cylindrical geometries.
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
@@ -163,167 +149,50 @@ module m_riemann_solvers
 
     end interface ! ============================================================
 
-
-
     !> The cell-boundary values of the fluxes (src - source) that are computed
     !! through the chosen Riemann problem solver, and the direct evaluation of
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
-    !! dqK_prim_ds_vf and kappaK_rs_vf, where ds = dx, dy or dz.
+    !! dqK_prim_ds_vf where ds = dx, dy or dz.
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-
     !> @}
+    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
+    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 
+
+    !> The cell-boundary values of the geometrical source flux that are computed
+    !! through the chosen Riemann problem solver by using the left and right
+    !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
+    !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
-
-    !! The cell-boundary values of the geometrical source flux that are computed
-    !! through the chosen Riemann problem solver by using the left and right
-    !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
+    !> @}
+    !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
+    !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
+    !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 
-    !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
-    !! partial densities, density, velocity, pressure, internal energy, energy, enthalpy, volume
-    !! fractions, mass fractions, the specific heat ratio and liquid stiffness functions, speed
-    !! of sound, shear and volume Reynolds numbers and the Weber numbers. These
-    !! variables are left and right states of the Riemann problem obtained from
-    !! qK_prim_rs_vf and kappaK_rs_vf.
-    !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho_L, alpha_rho_R
-    real(kind(0d0)) :: rho_L, rho_R
-    real(kind(0d0)), allocatable, dimension(:) :: vel_L, vel_R
-    real(kind(0d0)) :: pres_L, pres_R
-    real(kind(0d0)) :: E_L, E_R
-    real(kind(0d0)) :: H_L, H_R
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_L, alpha_R
-    real(kind(0d0)) :: Y_L, Y_R
-    real(kind(0d0)) :: gamma_L, gamma_R
-    real(kind(0d0)) :: pi_inf_L, pi_inf_R
-    real(kind(0d0)) :: c_L, c_R
-    real(kind(0d0)), dimension(2) :: Re_L, Re_R
-    real(kind(0d0)), allocatable, dimension(:) :: tau_e_L, tau_e_R
-    real(kind(0d0)), allocatable, dimension(:) :: G_L, G_R
-
-!$acc declare create(alpha_rho_L, alpha_rho_R,rho_L, rho_R,vel_L, vel_R,pres_L, pres_R, &
-!$acc    E_L, E_R, H_L, H_R, alpha_L, alpha_R, Y_L, Y_R, gamma_L, gamma_R,pi_inf_L, pi_inf_R, &
-!$acc    c_L, c_R,Re_L, Re_R,tau_e_L, tau_e_R, G_L, G_R)
-
-    !> @}
-
-    !> @name Left and right, WENO-reconstructed, cell-boundary values of cell-average
-    !! bubble density, radius, radial velocity, pressure, wall pressure, and modified
-    !! pressure. These variables are left and right states of the Riemann problem obtained from
-    !! qK_prim_rs_vf and kappaK_rs_vf.
-    !> @{
-    real(kind(0d0)) :: nbub_L, nbub_R
-    real(kind(0d0)), allocatable, dimension(:) :: R0_L, R0_R
-    real(kind(0d0)), allocatable, dimension(:) :: V0_L, V0_R
-    real(kind(0d0)), allocatable, dimension(:) :: P0_L, P0_R
-    real(kind(0d0)), allocatable, dimension(:) :: pbw_L, pbw_R
-    real(kind(0d0)), allocatable, dimension(:, :) :: moms_L, moms_R
-    real(kind(0d0)) :: ptilde_L, ptilde_R
-    !> @}
-!$acc declare create(nbub_L, nbub_R, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, moms_L, moms_R, ptilde_L, ptilde_R )
-
-    !> @name Gamma-related constants for use in exact Riemann solver (following Toro (1999) pp.153)
-    !> @{
-    real(kind(0d0)) :: G1_L, G1_R
-    real(kind(0d0)) :: G2_L, G2_R
-    real(kind(0d0)) :: G3_L, G3_R
-    real(kind(0d0)) :: G4_L, G4_R
-    real(kind(0d0)) :: G5_L, G5_R
-    real(kind(0d0)) :: G6_L, G6_R
-    real(kind(0d0)) :: G7_L, G7_R
-    real(kind(0d0)) :: G8_L, G8_R
-    !> @}
-
-    !> @name Star region pressure and velocity
-    !> @{
-    real(kind(0d0)) :: pres_S
-    real(kind(0d0)) :: vel_S
-    !> @}
-
-    !> @name Intercell solution used to calculated intercell flux
-    !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rho_IC
-    real(kind(0d0)) :: rho_IC
-    real(kind(0d0)), allocatable, dimension(:) :: vel_IC
-    real(kind(0d0)) :: pres_IC
-    real(kind(0d0)) :: E_IC
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_IC
-    real(kind(0d0)), allocatable, dimension(:) :: tau_e_IC
-    !> @}
-
-    !> @name Surface tension pressure contribution
-    !> @{
-    real(kind(0d0)) :: dpres_L, dpres_R
-    !> @}
-!$acc declare create(pres_S, vel_S, alpha_IC, alpha_rho_IC, vel_IC, pres_IC, E_IC, rho_IC, tau_e_IC, dpres_L, dpres_R)
-
-    !> @name Roe or arithmetic average density, velocity, enthalpy, volume fractions,
-    !! specific heat ratio function, speed of sound, shear and volume Reynolds
-    !! numbers, Weber numbers and curvatures, at the cell-boundaries, computed
-    !! from the left and the right states of the Riemann problem
-    !> @{
-    real(kind(0d0)) :: rho_avg
-    real(kind(0d0)), allocatable, dimension(:) :: vel_avg
-    real(kind(0d0)) :: H_avg
-    type(scalar_field), allocatable, dimension(:) :: alpha_avg_rs_vf
-    real(kind(0d0)) :: gamma_avg
-    real(kind(0d0)) :: c_avg
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-!$acc declare create(rho_avg, vel_avg, H_avg, alpha_avg_rs_vf, gamma_avg, c_avg,  Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
-    !> @}
-
-    !> @name Left, right and star (S) region wave speeds
-    !> @{
-    real(kind(0d0)) :: s_L, s_R, s_S
-    !> @}
-
-    !> @name Star region variables (HLLC)
-    !> @{
-    real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
-    !> @}
-
-    !> Minus (M) and plus (P) wave speeds
-    !> @{
-    real(kind(0d0)) :: s_M, s_P
-    !> @}
-
-    !> Minus and plus wave speeds functions
-    !> @{
-    real(kind(0d0)) :: xi_M, xi_P
-    !> @}
-    real(kind(0d0)) :: xi_L, xi_R
-
-    real(kind(0d0)) :: start, finish
-
-!$acc declare create(s_L, s_R, s_S, rho_Star, E_Star, p_Star, p_K_Star, s_M, s_P, xi_M, xi_P, xi_L, xi_R)
+    !$acc declare create(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 
     procedure(s_abstract_riemann_solver), &
         pointer :: s_riemann_solver => null() !<
     !! Pointer to the procedure that is utilized to calculate either the HLL,
     !! HLLC or exact intercell fluxes, based on the choice of Riemann solver
-
-    procedure(s_compute_abstract_wave_speeds), &
-        pointer :: s_compute_wave_speeds => null() !<
-    !! Pointer to the subroutine that is utilized to compute the wave speeds of
-    !! the Riemann problem either directly or by the means of pressure-velocity
-    !! estimates, based on the selected method of estimation of the wave speeds
 
     procedure(s_compute_abstract_viscous_source_flux), &
         pointer :: s_compute_viscous_source_flux => null() !<
@@ -335,20 +204,14 @@ module m_riemann_solvers
     type(int_bounds_info) :: is1, is2, is3
     type(int_bounds_info) :: isx, isy, isz
     !> @}
-!$acc declare create( &
-!$acc    is1, is2, is3, isx, isy, isz)
-
-!$acc declare create(&
-!$acc    flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf, vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
-!$acc    flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf, mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
-
+    !$acc declare create(is1, is2, is3, isx, isy, isz)
  
     real(kind(0d0)), allocatable, dimension(:) ::  Gs
-!$acc declare create( Gs)
+    !$acc declare create(Gs)
 
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
+    !$acc declare create(Res)
 
 contains
 
@@ -589,17 +452,17 @@ contains
                             
                             @:compute_average_state()
 
-                            @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                            @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
+                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                            @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                            call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                vel_avg_rms, c_avg)
 
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
@@ -609,7 +472,6 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-
                                 if (hypoelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
@@ -889,7 +751,6 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! ------
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
@@ -969,6 +830,7 @@ contains
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
+
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             dqL_prim_dy_vf, &
@@ -981,6 +843,7 @@ contains
             norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
+
         call s_initialize_riemann_solver( &
             q_prim_vf, &
             flux_vf, flux_src_vf, &
@@ -1028,25 +891,25 @@ contains
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
-                   qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
                                         alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                     qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
                                         alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
@@ -1059,6 +922,9 @@ contains
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, advxb + i - 1)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, advxb + i - 1)
                                 end do
 
                                 if (any(Re_size > 0)) then
@@ -1103,17 +969,17 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 2, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 2, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1370,17 +1236,17 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1694,7 +1560,6 @@ contains
 
                                         !$acc loop seq
                                         do i = 1, nb
-
                                             PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3.d0)*weight(i)
                                             PbwR3Rbar = PbwR3Rbar + pbw_R(i)*(R0_R(i)**3.d0)*weight(i)
 
@@ -1703,7 +1568,6 @@ contains
 
                                             R3V2Lbar = R3V2Lbar + (R0_L(i)**3.d0)*(V0_L(i)**2.d0)*weight(i)
                                             R3V2Rbar = R3V2Rbar + (R0_R(i)**3.d0)*(V0_R(i)**2.d0)*weight(i)
-
                                         end do
                                     end if
 
@@ -1724,15 +1588,11 @@ contains
                                     if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
                                     end if
 
-                                    !ptil(j, k, l) = 0.5d0*(ptilde_L + ptilde_R)
-
                                     rho_avg = 5d-1*(rho_L + rho_R)
-
                                     H_avg = 5d-1*(H_L + H_R)
-
                                     gamma_avg = 5d-1*(gamma_L + gamma_R)
-
                                     vel_avg_rms = 0d0
+
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2d0
@@ -1740,17 +1600,17 @@ contains
 
                                 end if
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 1, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 1, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1875,7 +1735,6 @@ contains
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
-
                                 !$acc loop seq
                                 do i = bubxb, bubxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1886,7 +1745,6 @@ contains
                                 end do
 
                                 ! Geometrical source flux for cylindrical coordinates
-
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
@@ -1945,6 +1803,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+
                                 idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                 !$acc loop seq
@@ -2055,17 +1914,17 @@ contains
 
                                 @:compute_average_state()
 
-                                @:compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, qL_prim_rs${XYZ}$_vf, j, k, l, 0, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
+                                    vel_L_rms, c_L)
 
-                                @:compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, 0, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
+                                    vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
 
-                                @:compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, qR_prim_rs${XYZ}$_vf, j + 1, k, l, -1, c_avg)
+                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                    vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -2132,7 +1991,6 @@ contains
 
                                 ! Momentum flux.
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
@@ -2154,7 +2012,6 @@ contains
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
@@ -2166,7 +2023,6 @@ contains
                                                         (s_R - vel_R(idx1)))) - E_R))
 
                                 ! Volume fraction flux
-
                                 !$acc loop seq
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2188,7 +2044,7 @@ contains
                                                 dir_flg(idxi)* &
                                                 s_P*(xi_R - 1d0))
 
-                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    !if ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
@@ -2251,12 +2107,6 @@ contains
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
 
-        ! print*, 'xbounds are: ', is1%beg, is1%end
-        ! print*, 'ybounds are: ', is2%beg, is2%end
-        ! print*, 'zbounds are: ', is3%beg, is3%end
-
-        ! print*, 'about to get average state'
-
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 call s_compute_viscous_source_flux( &
@@ -2305,7 +2155,7 @@ contains
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
         end do
-!$acc update device( Gs)
+        !$acc update device(Gs)
 
 
         if (any(Re_size > 0)) then
@@ -2318,19 +2168,9 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-!$acc update device(Res, Re_idx, Re_size)
+            !$acc update device(Res, Re_idx, Re_size)
         end if
 
-
-        allocate (vel_avg(1:num_dims))
-
-        allocate (G_L(1:num_fluids))
-        allocate (G_R(1:num_fluids))
-
-        if (riemann_solver == 3) then
-            allocate (alpha_rho_IC(1:cont_idx%end), vel_IC(1:num_dims))
-            allocate (alpha_IC(1:num_fluids))
-        end if
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -2340,22 +2180,6 @@ contains
             s_riemann_solver => s_hllc_riemann_solver
         end if
 
-        if (bubbles) then
-            allocate (R0_L(nb), R0_R(nb))
-            allocate (V0_L(nb), V0_R(nb))
-            allocate (pbw_L(nb), pbw_R(nb))
-            if (qbmm) then
-                allocate (moms_L(nb, nmom), moms_R(nb, nmom))
-            else
-                if (.not. polytropic) then
-                    allocate (P0_L(nb), P0_R(nb))
-                end if
-            end if
-        end if
-
-        ! Associating the procedural pointers to the procedures that will be
-        ! utilized to compute the average state and estimate the wave speeds
-
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to compute the viscous source flux
         if (grid_geometry == 3) then
@@ -2364,25 +2188,9 @@ contains
             s_compute_viscous_source_flux => s_compute_cartesian_viscous_source_flux
         end if
 
-        ! Associating the procedural pointer to the appropriate subroutine
-        ! that will be utilized in the conversion to the mixture variables
-
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-        elseif (bubbles) then           ! Volume fraction for bubbles
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else                            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
-        end if
-
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        !allocate(qL_prim_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsx_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
         allocate (flux_rsx_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
@@ -2410,8 +2218,6 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
 
-        !allocate(qL_prim_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsy_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
         allocate (flux_rsy_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
@@ -2440,8 +2246,6 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
 
-        !allocate(qL_prim_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
-        !allocate(qR_prim_rsz_vf(is1%beg + 1:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
         allocate (flux_rsz_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
@@ -2541,13 +2345,13 @@ contains
 
         isx = ix; isy = iy; isz = iz
 
-!$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
+        !$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then
 
             if (bc_x%beg == -4) then    ! Riemann state extrap. BC at beginning
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2558,7 +2362,7 @@ contains
                 end do
 
                 if (any(Re_size > 0)) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -2570,7 +2374,7 @@ contains
                     end do
 
                     if (n > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -2582,7 +2386,7 @@ contains
                         end do
 
                         if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -2602,7 +2406,7 @@ contains
 
             if (bc_x%end == -4) then    ! Riemann state extrap. BC at end
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2614,7 +2418,7 @@ contains
 
                 if (any(Re_size > 0)) then
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do k = isy%beg, isy%end
@@ -2626,7 +2430,7 @@ contains
                     end do
 
                     if (n > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do k = isy%beg, isy%end
@@ -2638,7 +2442,7 @@ contains
                         end do
 
                         if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                            !$acc parallel loop collapse(3) gang vector default(present)
                             do i = momxb, momxe
                                 do l = isz%beg, isz%end
                                     do k = isy%beg, isy%end
@@ -2661,7 +2465,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (bc_y%beg == -4) then    ! Riemann state extrap. BC at beginning
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2673,7 +2477,7 @@ contains
 
                 if (any(Re_size > 0)) then
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2683,7 +2487,7 @@ contains
                         end do
                     end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2694,7 +2498,7 @@ contains
                     end do
 
                     if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -2711,7 +2515,7 @@ contains
 
             if (bc_y%end == -4) then    ! Riemann state extrap. BC at end
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2723,7 +2527,7 @@ contains
 
                 if (any(Re_size > 0)) then
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2733,7 +2537,7 @@ contains
                         end do
                     end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
                             do j = isx%beg, isx%end
@@ -2744,7 +2548,7 @@ contains
                     end do
 
                     if (p > 0) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do i = momxb, momxe
                             do l = isz%beg, isz%end
                                 do j = isx%beg, isx%end
@@ -2764,7 +2568,7 @@ contains
         else
 
             if (bc_z%beg == -4) then    ! Riemann state extrap. BC at beginning
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2775,7 +2579,7 @@ contains
                 end do
 
                 if (any(Re_size > 0)) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2784,7 +2588,7 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2793,7 +2597,7 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2808,7 +2612,7 @@ contains
 
             if (bc_z%end == -4) then    ! Riemann state extrap. BC at end
 
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2819,7 +2623,7 @@ contains
                 end do
 
                 if (any(Re_size > 0)) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2828,7 +2632,8 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2837,7 +2642,8 @@ contains
                             end do
                         end do
                     end do
-!$acc parallel loop collapse(3) gang vector default(present)
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
                             do j = isx%beg, isx%end
@@ -2894,7 +2700,8 @@ contains
         if (norm_dir == 1) then
 
             if (any(Re_size > 0)) then
-!$acc parallel loop collapse(4) gang vector default(present)
+
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2907,7 +2714,8 @@ contains
             end if
 
             if (qbmm) then
-!$acc parallel loop collapse(4) gang vector default(present)
+
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2925,7 +2733,7 @@ contains
         elseif (norm_dir == 2) then
 
             if (any(Re_size > 0)) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -2938,7 +2746,7 @@ contains
             end if
 
             if (qbmm) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2956,7 +2764,7 @@ contains
         else
 
             if (any(Re_size > 0)) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
@@ -2969,7 +2777,7 @@ contains
             end if
 
             if (qbmm) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, 4
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3046,8 +2854,8 @@ contains
 
         ! Viscous Stresses in z-direction ==================================
         if (norm_dir == 1) then
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3072,8 +2880,8 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
+            if (Re_size(2) > 0) then ! Bulk stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3100,8 +2908,8 @@ contains
 
             if (n == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3109,7 +2917,7 @@ contains
                             avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j + 1, k, l))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
                                 dvel_avg_dy(i) = &
                                     5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
@@ -3126,18 +2934,15 @@ contains
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
-
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
                                     flux_src_vf(contxe + i)%sf(j, k, l) - &
                                     tau_Re(1, i)
-
                                 flux_src_vf(E_idx)%sf(j, k, l) = &
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
                                     vel_src_rsx_vf(j, k, l, i)* &
                                     tau_Re(1, i)
-
                             end do
 
                         end do
@@ -3145,8 +2950,8 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, tau_Re)
+            if (Re_size(2) > 0) then ! Bulk stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3177,13 +2982,13 @@ contains
 
             if (p == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dz, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3199,7 +3004,7 @@ contains
                             tau_Re(1, 3) = (dvel_avg_dz(1)/y_cc(k) + dvel_avg_dx(3))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3218,8 +3023,8 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( avg_vel, dvel_avg_dz, tau_Re)
+            if (Re_size(2) > 0) then ! Bulk stresses
+                !$acc parallel loop collapse(3) gang vector default(present) private( avg_vel, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3248,8 +3053,9 @@ contains
             ! Viscous Stresses in r-direction ==================================
         elseif (norm_dir == 2) then
 
-            if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
+            if (Re_size(1) > 0) then ! Shear stresses
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3257,7 +3063,7 @@ contains
                             avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j, k + 1, l))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 dvel_avg_dx(i) = &
@@ -3278,7 +3084,7 @@ contains
                                             - 2d0*avg_vel(2)/y_cb(k))/ &
                                            (3d0*Re_avg_rsy_vf(k, j, l, 1))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3298,7 +3104,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3333,7 +3139,7 @@ contains
             if (p == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3341,7 +3147,7 @@ contains
                             avg_vel(3) = 5d-1*(velL_vf(3)%sf(j, k, l) &
                                                + velR_vf(3)%sf(j, k + 1, l))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3358,7 +3164,7 @@ contains
                                             y_cb(k) + dvel_avg_dy(3))/ &
                                            Re_avg_rsy_vf(k, j, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3378,7 +3184,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3408,18 +3214,18 @@ contains
         else
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 avg_vel(i) = 5d-1*(velL_vf(i)%sf(j, k, l) &
                                                    + velR_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dx(i) = &
                                     5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
@@ -3432,7 +3238,7 @@ contains
                                           + dvelR_dy_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3455,9 +3261,8 @@ contains
                                            (3d0*Re_avg_rsz_vf(l, k, j, 1))/ &
                                            y_cc(k)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
-
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
                                     flux_src_vf(contxe + i)%sf(j, k, l) - &
                                     tau_Re(3, i)
@@ -3466,7 +3271,6 @@ contains
                                     flux_src_vf(E_idx)%sf(j, k, l) - &
                                     vel_src_rsz_vf(l, k, j, i)* &
                                     tau_Re(3, i)
-
                             end do
 
                         end do
@@ -3475,7 +3279,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3576,7 +3380,7 @@ contains
         if (norm_dir == 1) then
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3602,7 +3406,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3630,12 +3434,12 @@ contains
             if (n == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
                                 dvel_avg_dy(i) = &
                                     5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
@@ -3651,7 +3455,7 @@ contains
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3671,7 +3475,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3699,12 +3503,12 @@ contains
             if (p == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3720,7 +3524,7 @@ contains
                             tau_Re(1, 3) = (dvel_avg_dz(1) + dvel_avg_dx(3))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
                                     flux_src_vf(contxe + i)%sf(j, k, l) - &
@@ -3739,7 +3543,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3769,12 +3573,12 @@ contains
         elseif (norm_dir == 2) then
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 dvel_avg_dx(i) = &
@@ -3794,7 +3598,7 @@ contains
                                             - 2d0*dvel_avg_dx(1))/ &
                                            (3d0*Re_avg_rsy_vf(k, j, l, 1))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 2
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3814,7 +3618,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3845,12 +3649,12 @@ contains
             if (p == 0) return
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private(  dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private(  dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3866,7 +3670,7 @@ contains
                             tau_Re(2, 3) = (dvel_avg_dz(2) + dvel_avg_dy(3))/ &
                                            Re_avg_rsy_vf(k, j, l, 1)
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3886,7 +3690,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3916,26 +3720,26 @@ contains
         else
 
             if (Re_size(1) > 0) then              ! Shear stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dx(i) = &
                                     5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
                                           + dvelR_dx_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dy(i) = &
                                     5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j, k, l + 1))
                             end do
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
                                 dvel_avg_dz(i) = &
                                     5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
@@ -3953,7 +3757,7 @@ contains
                                             - 2d0*dvel_avg_dy(2))/ &
                                            (3d0*Re_avg_rsz_vf(l, k, j, 1))
 
-!$acc loop seq
+                            !$acc loop seq
                             do i = 1, 3
 
                                 flux_src_vf(contxe + i)%sf(j, k, l) = &
@@ -3973,7 +3777,7 @@ contains
             end if
 
             if (Re_size(2) > 0) then              ! Bulk stresses
-!$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
+                !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -4011,6 +3815,8 @@ contains
 
     end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
 
+    @:s_compute_speed_of_sound()
+
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
         !!  @param flux_vf       Intercell fluxes
@@ -4036,7 +3842,7 @@ contains
 
         ! Reshaping Outputted Data in y-direction ==========================
         if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
@@ -4049,7 +3855,7 @@ contains
             end do
 
             if (cyl_coord) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
@@ -4187,39 +3993,9 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_riemann_solvers_module() ! -----------------------
 
-        ! Deallocating the variables that were utilized to formulate the
-        ! left, right and average states of the Riemann problem, as well
-        ! the Riemann problem solution
-
-        integer :: i
-
-        deallocate (vel_avg)
-
-!TODO: check that deallocate statements aren't missing here (alpha_rho_L, alpha_L, etc.)
-!        deallocate (alpha_L, alpha_R, G_L, G_R)
-
-!        if (any(Re_size > 0)) deallocate (Re_avg_rs_vf)
-
-        if (riemann_solver == 3) then
-            deallocate (alpha_rho_IC, vel_IC)
-            deallocate (alpha_IC)
-        end if
-
-        if (bubbles) then
-            if (qbmm) then
-                deallocate (moms_L, moms_R)
-            end if
-            deallocate (R0_L, R0_R, pbw_L, pbw_R)
-            deallocate (V0_L, V0_R)
-        end if
-
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
         s_riemann_solver => null()
-
-        ! Disassociating the procedural pointers to the procedures that were
-        ! utilized to compute the average state and estimate the wave speeds
-        s_compute_wave_speeds => null()
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the viscous source flux
@@ -4227,7 +4003,7 @@ contains
 
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
-        s_convert_to_mixture_variables => null()
+        ! s_convert_to_mixture_variables => null()
 
         if (Re_size(1) > 0) then
             deallocate (Re_avg_rsx_vf)
@@ -4239,8 +4015,6 @@ contains
         if (qbmm) then
             deallocate (mom_sp_rsx_vf)
         end if
-        !deallocate(qL_prim_rsx_vf)
-        !deallocate(qR_prim_rsx_vf)
 
         if (n == 0) return
 
@@ -4254,8 +4028,6 @@ contains
         if (qbmm) then
             deallocate (mom_sp_rsy_vf)
         end if
-        !deallocate(qL_prim_rsy_vf)
-        !deallocate(qR_prim_rsy_vf)
 
         if (p == 0) return
 
@@ -4269,8 +4041,6 @@ contains
         if (qbmm) then
             deallocate (mom_sp_rsz_vf)
         end if
-        !deallocate(qL_prim_rsz_vf)
-        !deallocate(qR_prim_rsz_vf)
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
 

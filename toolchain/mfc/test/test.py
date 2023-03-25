@@ -1,4 +1,4 @@
-import os
+import os, math, shutil
 
 from ..printer import cons
 from ..        import common
@@ -6,8 +6,8 @@ from ..state   import ARG
 from .case     import TestCase
 from .cases    import generate_cases
 from ..        import sched
-from ..common  import MFCException
-from ..build   import build_targets
+from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
+from ..build   import build_targets, get_install_dirpath
 from .         import pack as packer
 
 import rich, rich.table
@@ -80,20 +80,17 @@ def test():
 
         return
 
+    codes = ["pre_process", "simulation"] + (["post_process"] if ARG('test_all') else [])
     if not ARG("case_optimization"):
-        build_targets(["pre_process", "simulation"])
+        build_targets(codes)
 
     range_str = f"from [bold magenta]{ARG('from')}[/bold magenta] to [bold magenta]{ARG('to')}[/bold magenta]"
 
     if len(ARG("only")) > 0:
-        range_str = "Only " + common.format_list_to_string([
-            f"[bold magenta]{uuid}[/bold magenta]" for uuid in ARG("only")
-        ], "Nothing to run")
-
-
-    cons.print(f"[bold]Test[/bold] | {range_str} ({len(CASES)} test{'s' if len(CASES) != 1 else ''})")
+        range_str = "Only " + format_list_to_string(ARG("only"), "bold magenta", "Nothing to run")
+    
+    cons.print(f"[bold]Test {format_list_to_string(codes, 'magenta')}[/bold] | {range_str} ({len(CASES)} test{'s' if len(CASES) != 1 else ''})")
     cons.indent()
-
 
     # Run CASES with multiple threads (if available)
     cons.print()
@@ -110,24 +107,23 @@ def test():
         sched.Task(ppn=case.ppn, func=handle_case, args=[ case ]) for case in CASES
     ]
     sched.sched(tasks, nThreads)
-    
+
     cons.print()
     if nFAIL == 0:
-        cons.print(f"Tested [bold green]✓[/bold green]")
-        cons.unindent()
+        cons.print(f"Tested Simulation [bold green]✓[/bold green]")
     else:
         if nFAIL == 1:
             raise MFCException(f"Testing: There was [bold red]1[/bold red] failure.")
         else:
             raise MFCException(f"Testing: There were [bold red]{nFAIL}[/bold red] failures.")
 
+    cons.unindent()
+
 
 def handle_case(test: TestCase):
     global nFAIL
     
     try:
-        test.create_directory()
-
         if test.params.get("qbmm", 'F') == 'T':
             tol = 1e-10
         elif test.params.get("bubbles", 'F') == 'T':
@@ -137,9 +133,10 @@ def handle_case(test: TestCase):
         else:
             tol = 1e-12
 
-        cmd = test.run()
+        test.create_directory("case_pre_sim")
+        cmd = test.run("case_pre_sim", ["pre_process", "simulation"])
 
-        out_filepath = os.path.join(test.get_dirpath(), "out.txt")
+        out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
 
         common.file_write(out_filepath, cmd.stdout)
 
@@ -160,7 +157,58 @@ def handle_case(test: TestCase):
 
             packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
 
+        if ARG("test_all"):
+            test.params.update({
+                'parallel_io'       : 'T',
+                'cons_vars_wrt'     : 'T',
+                'prim_vars_wrt'     : 'T',
+                'alpha_rho_wrt(1)'  : 'T',
+                'rho_wrt'           : 'T',
+                'mom_wrt(1)'        : 'T',
+                'vel_wrt(1)'        : 'T',
+                'E_wrt'             : 'T',
+                'pres_wrt'          : 'T',
+                'alpha_wrt(1)'      : 'T',
+                'gamma_wrt'         : 'T',
+                'heat_ratio_wrt'    : 'T',
+                'pi_inf_wrt'        : 'T',
+                'pres_inf_wrt'      : 'T',
+                'c_wrt'             : 'T',
+            })
+            
+            if test.params['p'] != 0:
+                test.params['omega_wrt'] = 'T'
+                test.params['fd_order'] = 1            
+            
+            test.create_directory("case_post")
+            cmd = test.run("case_post", ["pre_process", "simulation", "post_process"])
+            out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
+            common.file_write(out_filepath, cmd.stdout)
+
+            for t_step in [ i*test["t_step_save"] for i in range(0, math.floor(test["t_step_stop"] / test["t_step_save"]) + 1) ]:
+                silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
+        
+                h5dump = f"{get_install_dirpath()}/bin/h5dump"
+            
+                if ARG("no_hdf5"):
+                    if not does_command_exist("h5dump"):
+                        raise MFCException("--no-hdf5 was specified and h5dump couldn't be found.")
+                    
+                    h5dump = shutil.which("h5dump")
+
+                output, err = get_program_output([h5dump, silo_filepath])
+
+                if err != 0:
+                    raise MFCException(f"""Test {test}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+
+                if "nan," in output:
+                    raise MFCException(f"""Test {test}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+
+                if "inf," in output:
+                    raise MFCException(f"""Test {test}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+
         cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+
     except Exception as exc:
         nFAIL = nFAIL + 1
 

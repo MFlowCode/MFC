@@ -1,6 +1,6 @@
 /build/
 .vscode/
-src/*/case.fpp
+src/*/include/case.fpp
 src/*/autogen/
 
 *.swo
@@ -21,6 +21,10 @@ __pycache__
 /tests/*/**
 !/tests/golden.txt
 
+# NVIDIA Nsight Compute
+*.nsys-rep
+*.sqlite
+
 examples/*batch/*/
 examples/*/D/*
 examples/*/p*
@@ -30,10 +34,9 @@ examples/*/*.inp
 examples/*/*.dat
 examples/*/*.o*
 examples/*/silo*
-examples/*/restart*
+examples/*/restart_data*
 examples/*/*.out
 examples/*/binary
 examples/*/fort.1
-examples/*/pre_process.sh
-examples/*/simulation.sh
-examples/*/post_process.sh
+examples/*/*.sh
+examples/*/*.err

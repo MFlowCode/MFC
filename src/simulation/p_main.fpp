@@ -59,7 +59,6 @@ program p_main
 #endif
 
     use m_nvtx
-
     ! ==========================================================================
 
     implicit none
@@ -118,7 +117,6 @@ program p_main
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
         call s_check_input_file()
-
         print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
 
@@ -156,7 +154,7 @@ program p_main
     if (monopole) then
         call s_initialize_monopole_module()
     end if
-    if (any(Re_size > 1)) then
+    if (any(Re_size > 0)) then
         call s_initialize_viscous_module()
     end if
     call s_initialize_rhs_module()
@@ -226,13 +224,12 @@ program p_main
     ! Time-stepping Loop =======================================================
     do
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',       &
-                  int(100*(real(t_step + 1)/(t_step_stop - t_step_start + 1))), &
-                  t_step      - t_step_start + 1,                               &
-                  t_step_stop - t_step_start + 1,                               &
+            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',                             &
+                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                  t_step      - t_step_start + 1,                                                     &
+                  t_step_stop - t_step_start + 1,                                                     &
                   t_step
         end if
-
         mytime = mytime + dt
 
         if (probe_wrt) then
@@ -330,8 +327,9 @@ program p_main
                     do k = 0, n
                         do j = 0, m
                             if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, j, k, l, proc_rank, t_step, m, n, p
-                                STOP "Error"
+                                print *, "NaN(s) in timestep output.", j, k, l, proc_rank, t_step, m, n, p
+                                
+                                error stop "NaN(s) in timestep output."
                             end if
                         end do
                     end do
