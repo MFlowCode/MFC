@@ -22,9 +22,9 @@ Ly = 59.0
 Lz = 59.0
 
 # Number of grid cells
-Nx = 127
-Ny = 127
-Nz = 127
+Nx = 255
+Ny = 255
+Nz = 255
 
 # Grid spacing
 dx      = Lx/float(Nx)
