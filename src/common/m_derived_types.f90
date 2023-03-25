@@ -6,15 +6,9 @@
 !!              types used in the pre-process code.
 module m_derived_types
 
+    use m_constants !< Constants
+    
     implicit none
-
-    integer, parameter :: num_fluids_max = 10 !<
-    !! Maximum number of fluids in the simulation
-
-    integer, parameter :: num_probes_max = 10 !<
-    !! Maximum number of flow probes in the simulation
-
-    integer, parameter :: num_patches_max = 10
 
     !> Derived type adding the field position (fp) as an attribute
     type field_position

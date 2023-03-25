@@ -26,19 +26,23 @@ module m_start_up
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compile_specific
+
+    use m_helper
+
+    use m_checker
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_start_up_module, &
- s_read_input_file, &
- s_check_input_file, &
- s_read_data_files, &
- s_read_serial_data_files, &
- s_read_parallel_data_files, &
- s_populate_grid_variables_buffers, &
- s_initialize_internal_energy_equations, &
- s_finalize_start_up_module
+                         s_read_input_file, &
+                         s_check_input_file, &
+                         s_read_data_files, &
+                         s_read_serial_data_files, &
+                         s_read_parallel_data_files, &
+                         s_populate_grid_variables_buffers, &
+                         s_initialize_internal_energy_equations, &
+                         s_finalize_start_up_module
 
     abstract interface ! ===================================================
 
@@ -71,6 +75,9 @@ contains
 
         logical :: file_exist !<
             !! Logical used to check the existence of the input file
+
+        integer :: iostatus
+            !! Integer to check iostat of file read
 
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
@@ -107,7 +114,14 @@ contains
                   FORM='formatted', &
                   ACTION='read', &
                   STATUS='old')
-            read (1, NML=user_inputs); close (1)
+            read (1, NML=user_inputs, iostat=iostatus)
+
+            if (iostatus /= 0) then
+                call s_mpi_abort('Invalid line in simulation.inp. It is '// &
+                    'likely due to a datatype mismatch. Exiting ...')
+            end if
+
+            close (1)
 
             ! Store BC information into global BC
             bc_x_glb%beg = bc_x%beg
@@ -123,8 +137,7 @@ contains
             p_glb = p
 
         else
-            print '(A)', trim(file_path)//' is missing. Exiting ...'
-            call s_mpi_abort()
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
 
     end subroutine s_read_input_file ! -------------------------------------
@@ -143,431 +156,17 @@ contains
         ! Generic loop iterators
         integer :: i, j
 
-        integer :: bub_fac !for allowing an extra fluid_pp if there are bubbles
-
-        bub_fac = 0
-        if (bubbles .and. (num_fluids == 1)) bub_fac = 1
-
         ! Logistics ========================================================
         file_path = trim(case_dir)//'/.'
 
         call my_inquire(file_path, file_exist)
 
         if (file_exist .neqv. .true.) then
-            print '(A)', trim(file_path)//' is missing. Exiting ...'
-            call s_mpi_abort()
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
         ! ==================================================================
 
-#if !(defined(_OPENACC) && defined(__PGI))
-        if (cu_mpi) then
-            print '(A)', 'Unsupported value of cu_mpi. Exiting ...'
-            call s_mpi_abort()
-        end if
-#endif
-
-#ifndef MFC_cuTENSOR
-        if (cu_tensor) then
-            print '(A)', 'Unsupported value of cu_tensor. MFC was not built '// &
-                'with the NVIDIA cuTENSOR library. Exiting ...'
-            call s_mpi_abort()
-        end if
-#endif
-
-        ! Computational Domain Parameters ==================================
-        if (m <= 0) then
-            print '(A)', 'Unsupported value of m. Exiting ...'
-            call s_mpi_abort()
-        elseif (n < 0) then
-            print '(A)', 'Unsupported value of n. Exiting ...'
-            call s_mpi_abort()
-        elseif (p < 0) then
-            print '(A)', 'Unsupported value of p. Exiting ...'
-            call s_mpi_abort()
-        elseif (cyl_coord .and. p > 0 .and. mod(p, 2) /= 1) then
-            print '(A)', 'Unsupported value of p. Exiting ...'
-            call s_mpi_abort()
-        elseif (n == 0 .and. p > 0) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'n and p. Exiting ...'
-            call s_mpi_abort()
-        elseif (dt <= 0) then
-            print '(A)', 'Unsupported value of dt. Exiting ...'
-            call s_mpi_abort()
-        elseif (t_step_start < 0) then
-            print '(A)', 'Unsupported value of t_step_start. Exiting ...'
-            call s_mpi_abort()
-        elseif (t_step_stop <= t_step_start) then
-            print '(A)', 'Unsupported combination of values of '// &
-                't_step_start and t_step_stop. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (t_step_save > t_step_stop - t_step_start) then
-            print '(A)', 'Unsupported combination of values of '// &
-                't_step_start, t_step_stop and '// &
-                't_step_save. Exiting ...'
-            call s_mpi_abort()
-        end if
-        ! ==================================================================
-
-        ! Simulation Algorithm Parameters ==================================
-        if (all(model_eqns /= (/1, 2, 3, 4/))) then
-            print '(A)', 'Unsupported value of model_eqns. Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 2 .and. bubbles .and. bubble_model == 1) then
-            print '(A)', 'The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)'
-            call s_mpi_abort()
-        elseif (bubbles .and. nb < 1) then
-            print '(A)', 'The Ensemble-Averaged Bubble Model requires nb >= 1'
-            call s_mpi_abort()
-        elseif (bubbles .and. bubble_model == 3 .and. (polytropic .neqv. .true.)) then
-            print '(A)', 'RP bubbles require polytropic compression'
-            call s_mpi_abort()
-        elseif (cyl_coord .and. bubbles) then
-            print '(A)', 'Bubble models untested in cylindrical coordinates'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. bubbles) then
-            print '(A)', 'Bubble models untested with 6-equation model'
-            call s_mpi_abort()
-        elseif (model_eqns == 1 .and. bubbles) then
-            print '(A)', 'Bubble models untested with pi-gamma model'
-            call s_mpi_abort()
-        elseif (model_eqns == 4 .and. num_fluids /= 1) then
-            print '(A)', 'The 4-equation model implementation is not a multi-component and requires num_fluids = 1'
-            call s_mpi_abort()
-        elseif (bubbles .and. weno_vars /= 2) then
-            print '(A)', 'Bubble modeling requires weno_vars = 2'
-            call s_mpi_abort()
-            !TODO: Comment this out when testing riemann with hll
-        elseif (bubbles .and. riemann_solver /= 2) then
-            print '(A)', 'Bubble modeling requires riemann_solver = 2'
-            call s_mpi_abort()
-        elseif ((bubbles .neqv. .true.) .and. polydisperse) then
-            print '(A)', 'Polydisperse bubble modeling requires the bubble switch to be activated'
-            call s_mpi_abort()
-        elseif (polydisperse .and. (poly_sigma == dflt_real)) then
-            print '(A)', 'Polydisperse bubble modeling requires poly_sigma > 0'
-            call s_mpi_abort()
-        elseif (qbmm .and. (bubbles .neqv. .true.)) then
-            print '(A)', 'QBMM requires bubbles'
-            call s_mpi_abort()
-        elseif (qbmm .and. (nnode /= 4)) then
-            print '(A)', 'nnode not supported'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. riemann_solver /= 2) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and riemann_solver (please use riemann_solver = 2). '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. alt_soundspeed) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and alt_soundspeed. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. avg_state == 1) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and Roe average (please use avg_state = 2). '// &
-                'Exiting ...'
-            call s_mpi_abort()
-       elseif (bubbles .and. avg_state == 1) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'bubbles and Roe average (please use avg_state = 2). '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. wave_speeds == 2) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and wave_speeds (please use wave_speeds = 1). '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 3 .and. (cyl_coord .and. p /= 0)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns (6-eq) and cylindrical coordinates. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (num_fluids /= dflt_int &
-                .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids)) then
-            print '(A)', 'Unsupported value of num_fluids. Exiting ...'
-            call s_mpi_abort()
-        elseif ((model_eqns == 1 .and. num_fluids /= dflt_int) &
-                .or. &
-                (model_eqns == 2 .and. num_fluids == dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns and num_fluids. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 1 .and. adv_alphan) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns and adv_alphan. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 1 .and. mpp_lim) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'model_eqns and mpp_lim. Exiting ...'
-            call s_mpi_abort()
-        elseif (num_fluids == 1 .and. mpp_lim) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'num_fluids and mpp_lim. Exiting ...'
-            call s_mpi_abort()
-        elseif (time_stepper < 1 .or. time_stepper > 5) then
-            if (time_stepper /= 23) then
-                print '(A)', 'Unsupported value of time_stepper. Exiting ...'
-                call s_mpi_abort()
-            end if
-        elseif (all(weno_vars /= (/1, 2/))) then
-            print '(A)', 'Unsupported value of weno_vars. Exiting ...'
-            call s_mpi_abort()
-        elseif (all(weno_order /= (/1, 3, 5/))) then
-            print '(A)', 'Unsupported value of weno_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (m + 1 < num_stcls_min*weno_order) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'm and weno_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (n + 1 < min(1, n)*num_stcls_min*weno_order) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'n and weno_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (p + 1 < min(1, p)*num_stcls_min*weno_order) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'p and weno_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (weno_eps <= 0d0 .or. weno_eps > 1d-6) then
-            print '(A)', 'Unsupported value of weno_eps. Exiting ...'
-            call s_mpi_abort()
-        elseif (weno_order == 1 .and. mapped_weno) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'weno_order and mapped_weno. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (weno_order /= 5 .and. mp_weno) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'weno_order and mp_weno. Exiting ...'
-            call s_mpi_abort()
-        elseif (riemann_solver < 1 .or. riemann_solver > 3) then
-            print '(A)', 'Unsupported value of riemann_solver. Exiting ...'
-            call s_mpi_abort()
-        elseif (all(wave_speeds /= (/dflt_int, 1, 2/))) then
-            print '(A)', 'Unsupported value of wave_speeds. Exiting ...'
-            call s_mpi_abort()
-        elseif ((riemann_solver /= 3 .and. wave_speeds == dflt_int) &
-                .or. &
-                (riemann_solver == 3 .and. wave_speeds /= dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'riemann_solver and wave_speeds. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (all(avg_state /= (/dflt_int, 1, 2/))) then
-            print '(A)', 'Unsupported value of avg_state. Exiting ...'
-            call s_mpi_abort()
-        elseif (riemann_solver /= 3 .and. avg_state == dflt_int) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'riemann_solver and avg_state. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (bc_x%beg < -12 .or. bc_x%beg > -1) then
-            print '(A)', 'Unsupported value of bc_x%beg. Exiting ...'
-            call s_mpi_abort()
-        elseif (bc_x%end < -12 .or. bc_x%end > -1) then
-            print '(A)', 'Unsupported value of bc_x%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
-                .or. &
-                (bc_x%end == -1 .and. bc_x%beg /= -1)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'bc_x%beg and bc_x%end. Exiting ...'
-            call s_mpi_abort()
-        elseif (bc_y%beg /= dflt_int &
-                .and. &
-                (((cyl_coord .neqv. .true.) .and. (bc_y%beg < -12 .or. bc_y%beg > -1)) &
-                 .or. &
-                 (cyl_coord .and. p == 0 .and. bc_y%beg /= -2) &
-                 .or. &
-                 (cyl_coord .and. p > 0 .and. bc_y%beg /= -13))) then
-            print '(A)', 'Unsupported value of bc_y%beg. Exiting ...'
-            call s_mpi_abort()
-        elseif (bc_y%end /= dflt_int &
-                .and. &
-                (bc_y%end < -12 .or. bc_y%end > -1)) then
-            print '(A)', 'Unsupported value of bc_y%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
-                .or. &
-                (n > 0 .and. bc_y%beg == dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'n and bc_y%beg. Exiting ...'
-            call s_mpi_abort()
-        elseif ((n == 0 .and. bc_y%end /= dflt_int) &
-                .or. &
-                (n > 0 .and. bc_y%end == dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'n and bc_y%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((bc_y%beg == -1 .and. bc_y%end /= -1) &
-                .or. &
-                (bc_y%end == -1 .and. bc_y%beg /= -1)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'bc_y%beg and bc_y%end. Exiting ...'
-            call s_mpi_abort()
-        elseif (bc_z%beg /= dflt_int &
-                .and. &
-                (bc_z%beg < -12 .or. bc_z%beg > -1)) then
-            print '(A)', 'Unsupported value of bc_z%beg. Exiting ...'
-            call s_mpi_abort()
-        elseif (bc_z%end /= dflt_int &
-                .and. &
-                (bc_z%end < -12 .or. bc_z%end > -1)) then
-            print '(A)', 'Unsupported value of bc_z%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
-                .or. &
-                (p > 0 .and. bc_z%beg == dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'p and bc_z%beg. Exiting ...'
-            call s_mpi_abort()
-        elseif ((p == 0 .and. bc_z%end /= dflt_int) &
-                .or. &
-                (p > 0 .and. bc_z%end == dflt_int)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'p and bc_z%end. Exiting ...'
-            call s_mpi_abort()
-        elseif ((bc_z%beg == -1 .and. bc_z%end /= -1) &
-                .or. &
-                (bc_z%end == -1 .and. bc_z%beg /= -1)) then
-            print '(A)', 'Unsupported combination of values of '// &
-                'bc_z%beg and bc_z%end. Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 1 .and. alt_soundspeed) then
-            print '(A)', 'Unsupported combination of model_eqns '// &
-                'and alt_soundspeed. Exiting ...'
-            call s_mpi_abort()
-        elseif (model_eqns == 4 .and. alt_soundspeed) then
-            print '(A)', 'Unsupported combination of model_eqns '// &
-                'and alt_soundspeed. Exiting ...'
-            call s_mpi_abort()
-        elseif ((num_fluids /= 2 .and. num_fluids /= 3) .and. alt_soundspeed) then
-            print '(A)', 'Unsupported combination of num_fluids '// &
-                'and alt_soundspeed. Exiting ...'
-            call s_mpi_abort()
-        elseif (riemann_solver /= 2 .and. alt_soundspeed) then
-            print '(A)', 'Unsupported combination of riemann_solver '// &
-                'and alt_soundspeed. Exiting ...'
-            call s_mpi_abort()
-        elseif (hypoelasticity .and. (riemann_solver /= 1)) then
-            print '(A)', 'hypoelasticity requires riemann_solver = 1'// &
-                'Exiting ...'
-            call s_mpi_abort()
-        end if
-        ! END: Simulation Algorithm Parameters =============================
-
-        ! Finite Difference Parameters =====================================
-        if (fd_order /= dflt_int &
-            .and. &
-            fd_order /= 1 .and. fd_order /= 2 .and. fd_order /= 4) then
-            print '(A)', 'Unsupported choice for the value of '// &
-                'fd_order. Exiting ...'
-            call s_mpi_abort()
-        elseif (probe_wrt .and. fd_order == dflt_int) then
-            print '(A)', 'Unsupported choice of the combination of '// &
-                'values for probe_wrt, and fd_order. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        elseif (integral_wrt .and. (bubbles .neqv. .true.)) then
-            print '(A)', 'Unsupported choice of the combination of '// &
-                'values for integral_wrt, and bubbles. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        end if
-        ! END: Finite Difference Parameters ================================
-
-        ! Fluids Physical Parameters =======================================
-        do i = 1, num_fluids
-
-            if (fluid_pp(i)%gamma /= dflt_real &
-                .and. &
-                fluid_pp(i)%gamma <= 0d0) then
-                print '(A,I0,A)', 'Unsupported value of '// &
-                    'fluid_pp(', i, ')%'// &
-                    'gamma. Exiting ...'
-                call s_mpi_abort()
-            elseif (model_eqns == 1 &
-                    .and. &
-                    fluid_pp(i)%gamma /= dflt_real) then
-                print '(A,I0,A)', 'Unsupported combination '// &
-                    'of values of model_eqns '// &
-                    'and fluid_pp(', i, ')%'// &
-                    'gamma. Exiting ...'
-                call s_mpi_abort()
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
-                    .or. &
-                    (i > num_fluids + bub_fac .and. fluid_pp(i)%gamma /= dflt_real)) &
-                then
-                print '(A,I0,A)', 'Unsupported combination '// &
-                    'of values of num_fluids '// &
-                    'and fluid_pp(', i, ')%'// &
-                    'gamma. Exiting ...'
-                call s_mpi_abort()
-            elseif (fluid_pp(i)%pi_inf /= dflt_real &
-                    .and. &
-                    fluid_pp(i)%pi_inf < 0d0) then
-                print '(A,I0,A)', 'Unsupported value of '// &
-                    'fluid_pp(', i, ')%'// &
-                    'pi_inf. Exiting ...'
-                call s_mpi_abort()
-            elseif (model_eqns == 1 &
-                    .and. &
-                    fluid_pp(i)%pi_inf /= dflt_real) then
-                print '(A,I0,A)', 'Unsupported combination '// &
-                    'of values of model_eqns '// &
-                    'and fluid_pp(', i, ')%'// &
-                    'pi_inf. Exiting ...'
-                call s_mpi_abort()
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
-                    .or. &
-                    (i > num_fluids + bub_fac .and. fluid_pp(i)%pi_inf /= dflt_real)) &
-                then
-                print '(A,I0,A)', 'Unsupported combination '// &
-                    'of values of num_fluids '// &
-                    'and fluid_pp(', i, ')%'// &
-                    'pi_inf. Exiting ...'
-                call s_mpi_abort()
-            end if
-
-            do j = 1, 2
-
-                if (fluid_pp(i)%Re(j) /= dflt_real &
-                    .and. &
-                    fluid_pp(i)%Re(j) <= 0d0) then
-                    print '(A,I0,A,I0,A)', 'Unsupported value of '// &
-                        'fluid_pp(', i, ')%'// &
-                        'Re(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (model_eqns == 1 &
-                    .and. &
-                    fluid_pp(i)%Re(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of model_eqns '// &
-                        'and fluid_pp(', i, ')%'// &
-                        'Re(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-                if (i > num_fluids &
-                    .and. &
-                    fluid_pp(i)%Re(j) /= dflt_real) then
-                    print '(A,I0,A,I0,A)', 'Unsupported combination '// &
-                        'of values of num_fluids '// &
-                        'and fluid_pp(', i, ')%'// &
-                        'Re(', j, '). Exiting ...'
-                    call s_mpi_abort()
-                end if
-
-            end do
-
-        end do
-        ! END: Fluids Physical Parameters ==================================
+        call s_check_inputs()
 
     end subroutine s_check_input_file ! ------------------------------------
 
@@ -600,9 +199,8 @@ contains
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
 
-        if (file_exist .neqv. .true.) then
-            print '(A)', trim(file_path)//' is missing. Exiting ...'
-            call s_mpi_abort()
+        if (file_exist .neqv. .true.) then 
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
 
         ! Cell-boundary Locations in x-direction ===========================
@@ -617,8 +215,7 @@ contains
                   STATUS='old')
             read (2) x_cb(-1:m); close (2)
         else
-            print '(A)', trim(file_path)//' is missing. Exiting ...'
-            call s_mpi_abort()
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
 
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
@@ -639,8 +236,7 @@ contains
                       STATUS='old')
                 read (2) y_cb(-1:n); close (2)
             else
-                print '(A)', trim(file_path)//' is missing. Exiting ...'
-                call s_mpi_abort()
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
             end if
 
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
@@ -663,8 +259,7 @@ contains
                       STATUS='old')
                 read (2) z_cb(-1:p); close (2)
             else
-                print '(A)', trim(file_path)//' is missing. Exiting ...'
-                call s_mpi_abort()
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
             end if
 
             dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
@@ -686,8 +281,7 @@ contains
                           STATUS='old')
                     read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
                 else
-                    print '(A)', trim(file_path)//' is missing. Exiting ...'
-                    call s_mpi_abort()
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                 end if
             end do
         else
@@ -703,8 +297,7 @@ contains
                           STATUS='old')
                     read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
                 else
-                    print '(A)', trim(file_path)//' is missing. Exiting ...'
-                    call s_mpi_abort()
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                 end if
             end do
         end if
@@ -750,8 +343,7 @@ contains
             call MPI_FILE_READ(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-            call s_mpi_abort()
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
 
         ! Assigning local cell boundary locations
@@ -772,8 +364,7 @@ contains
                 call MPI_FILE_READ(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
-                print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-                call s_mpi_abort()
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
 
             ! Assigning local cell boundary locations
@@ -794,8 +385,7 @@ contains
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
-                    print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-                    call s_mpi_abort()
+                    call s_mpi_abort( 'File '//trim(file_loc)//'is missing. Exiting...')
                 end if
 
                 ! Assigning local cell boundary locations
@@ -862,8 +452,7 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            print '(A)', 'File ', trim(file_loc), ' is missing. Exiting...'
-            call s_mpi_abort()
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
@@ -1113,7 +702,8 @@ contains
                                    /max(rho, sgm_eps)
                     end do
 
-                    pres = (v_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
+                        dyn_pres, pi_inf, gamma, rho, pres)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &

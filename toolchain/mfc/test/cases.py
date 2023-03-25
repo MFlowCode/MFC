@@ -2,7 +2,7 @@ import typing
 
 from ..    import common
 from .case import TestCase, create_case, CaseGeneratorStack
-
+from ..printer import cons
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -130,6 +130,15 @@ def generate_cases() -> typing.List[TestCase]:
 
             alter_riemann_solvers(num_fluids)
 
+            if num_fluids == 1:
+                stack.push(f"Viscous", {
+                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11})
+
+                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
+                cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+
+                stack.pop()
+
             if num_fluids == 2:
                 stack.push(f"Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
@@ -141,8 +150,8 @@ def generate_cases() -> typing.List[TestCase]:
                 stack.pop()
                 stack.pop()
 
-            stack.pop()        
-    
+            stack.pop() 
+
     def alter_2d(dimInfo, dimParams):
         stack.push("Axisymmetric", {
             'num_fluids' : 2, 'bc_y%beg': -2, 'cyl_coord': 'T',
@@ -261,7 +270,6 @@ def generate_cases() -> typing.List[TestCase]:
 
             if len(dimInfo[0]) >= 3:
                 stack.pop()
-
 
     def alter_hypoelasticity(dimInfo, dimParams):
         # Hypoelasticity checks

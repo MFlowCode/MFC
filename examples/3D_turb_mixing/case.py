@@ -22,9 +22,9 @@ Ly = 59.0
 Lz = 59.0
 
 # Number of grid cells
-Nx = 191
-Ny = 191
-Nz = 191
+Nx = 127
+Ny = 127
+Nz = 127
 
 # Grid spacing
 dx      = Lx/float(Nx)
@@ -49,7 +49,7 @@ t_step_stop     = int(Nt)
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
-    'case_dir'                      : '\'.\'',
+    # 'case_dir'                      : '\'.\'',
     'run_time_info'                 : 'T',
     # ==========================================================================
 

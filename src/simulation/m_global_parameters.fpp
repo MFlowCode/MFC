@@ -28,21 +28,15 @@ module m_global_parameters
 
     implicit none
 
+    real(kind(0d0)) :: time = 0
+
     ! Logistics ================================================================
     integer :: num_procs             !< Number of processors
-    integer, parameter :: num_stcls_min = 5     !< Mininum # of stencils
-    integer, parameter :: path_len = 400   !< Maximum path length
-    integer, parameter :: name_len = 50    !< Maximum name length
-    character, parameter :: dflt_char = ' '   !< Default string value
-    real(kind(0d0)), parameter :: dflt_real = -1d6  !< Default real value
-    integer, parameter :: dflt_int = -100  !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
-    integer, parameter :: fourier_rings = 5     !< Fourier filter ring limit
     character(LEN=path_len) :: case_dir              !< Case folder location
     logical :: run_time_info         !< Run-time output flag
     integer :: t_step_old            !< Existing IC/grid folder
-    real(kind(0d0)), parameter :: small_alf = 1d-7 !< Small alf tolerance
     ! ==========================================================================
+
     ! Computational Domain Parameters ==========================================
     integer :: proc_rank !< Rank of the local processor
 
@@ -265,7 +259,6 @@ module m_global_parameters
 
     logical :: qbmm      !< Quadrature moment method
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
-    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     integer :: nmomsp    !< Number of moments required by ensemble-averaging
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
@@ -286,7 +279,7 @@ module m_global_parameters
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v, G
+    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
@@ -319,11 +312,6 @@ module m_global_parameters
     logical :: weno_flat, riemann_flat, cu_mpi
 
     ! ======================================================================
-
-    ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0 !< Pi
-
-    ! ==========================================================================
 
 contains
 
@@ -469,11 +457,8 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module() ! -------------------
 
-        integer :: tmp_idx !< Temporary indexes storage
-        integer :: i, j !< Generic loop iterators
-        integer :: k !< Generic counter
+        integer :: i, j, k 
         integer :: fac
-        integer :: i1, i2, i3
 
         type(int_bounds_info) :: ix, iy, iz
 
@@ -874,7 +859,6 @@ contains
         M_v = fluid_pp(1)%M_v
         mu_v = fluid_pp(1)%mu_v
         k_v(:) = fluid_pp(1)%k_v
-        G = fluid_pp(1)%G
 
         gamma_n = fluid_pp(2)%gamma_v
         M_n = fluid_pp(2)%M_v
@@ -963,7 +947,6 @@ contains
         real(kind(0.d0)), intent(OUT) :: Im_trans
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
-        real(kind(0.d0)) :: f_transcoeff
 
         c1 = imag*omega*peclet
         c2 = CSQRT(c1)
@@ -1040,95 +1023,6 @@ contains
 
     end subroutine s_finalize_global_parameters_module ! -------------------
 
-    !>  Computes the bubble number density n from the conservative variables
-        !!  \f$ n = \sqrt{ \frac{4 \pi}{3} } \frac{ nR^3}{\alpha} \f$
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-!$acc routine seq
-
-        real(kind(0d0)), intent(IN) :: vftmp
-        real(kind(0d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0d0)), intent(OUT) :: ntmp
-        real(kind(0d0)) :: nR3
-        integer :: i
-
-        nR3 = 0d0
-        do i = 1, nb
-            nR3 = nR3 + weight(i)*(nRtmp(i)**3d0)
-        end do
-
-        !if (nR3 < 0d0) then
-        ! DO i = 1,nb
-        ! IF (nRtmp(i) < small_alf) THEN
-        ! nRtmp(i) = small_alf
-        ! END IF
-        ! END DO
-        ! nR3 = 1.d-12
-        !print *, vftmp, nR3, nRtmp(:)
-        !   stop 'nR3 is negative'
-        !end if
-        !if (vftmp < 0d0) then
-        ! vftmp = small_alf
-        ! ntmp = DSQRT( (4.d0*pi/3.d0)*nR3/1.d-12 )
-        !print *, vftmp, nR3, nRtmp(:)
-        !   stop 'vf negative'
-        !end if
-
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !!  \f$ n = \sqrt{ \frac{3}{4 \pi} } \frac{ \alpha }{ R^3} \f$
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-!$acc routine seq
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-        integer :: i
-
-        R3 = 0d0
-        do i = 1, nb
-            R3 = R3 + weight(i)*(Rtmp(i)**3d0)
-        end do
-
-        if (R3 < 0d0) then
-            !PRINT*, vftmp, R3, Rtmp(:)
-            stop 'R3 is negative'
-        end if
-        if (vftmp < 0d0) then
-            !PRINT*, vftmp, R3, Rtmp(:)
-            stop 'vf negative'
-        end if
-
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-!$acc routine seq
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-        integer :: i
-
-        mom = 0d0
-        do i = 1, nb
-            mom = mom + weight(i)*func(i)
-        end do
-
-    end subroutine s_quad
-
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
@@ -1175,7 +1069,6 @@ contains
                 weight(ir) = tmp*2.d0*dphi/3.d0
             end if
         end do
-
         tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd

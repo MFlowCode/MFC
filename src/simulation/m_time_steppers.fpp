@@ -56,7 +56,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_time_steppers_module() ! -----------------------
 
-        type(int_bounds_info) :: ix, iy, iz !<
+        type(int_bounds_info) :: ix_t, iy_t, iz_t !<
             !! Indical bounds in the x-, y- and z-directions
 
         integer :: i, j !< Generic loop iterators
@@ -69,23 +69,19 @@ contains
         end if
 
         ! Setting the indical bounds in the x-, y- and z-directions
-        ix%beg = -buff_size; ix%end = m + buff_size
+        ix_t%beg = -buff_size; ix_t%end = m + buff_size
 
         if (n > 0) then
-
-            iy%beg = -buff_size; iy%end = n + buff_size
+            iy_t%beg = -buff_size; iy_t%end = n + buff_size
 
             if (p > 0) then
-                iz%beg = -buff_size; iz%end = p + buff_size
+                iz_t%beg = -buff_size; iz_t%end = p + buff_size
             else
-                iz%beg = 0; iz%end = 0
+                iz_t%beg = 0; iz_t%end = 0
             end if
-
         else
-
-            iy%beg = 0; iy%end = 0
-            iz%beg = 0; iz%end = 0
-
+            iy_t%beg = 0; iy_t%end = 0
+            iz_t%beg = 0; iz_t%end = 0
         end if
 
         ! Allocating the cell-average conservative variables
@@ -97,9 +93,9 @@ contains
 
         do i = 1, num_ts
             do j = 1, sys_size
-                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(ix%beg:ix%end, &
-                                                iy%beg:iy%end, &
-                                                iz%beg:iz%end))
+                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
+                                                iy_t%beg:iy_t%end, &
+                                                iz_t%beg:iz_t%end))
             end do
         end do
 
@@ -113,9 +109,9 @@ contains
 
             do i = 0, 3
                 do j = 1, sys_size
-                    @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(ix%beg:ix%end, &
-                                                    iy%beg:iy%end, &
-                                                    iz%beg:iz%end))
+                    @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
+                                                    iy_t%beg:iy_t%end, &
+                                                    iz_t%beg:iz_t%end))
                 end do
             end do
         end if
@@ -124,33 +120,33 @@ contains
         @:ALLOCATE(q_prim_vf(1:sys_size))
         
         do i = 1, adv_idx%end
-            @:ALLOCATE(q_prim_vf(i)%sf(ix%beg:ix%end, &
-                                      iy%beg:iy%end, &
-                                      iz%beg:iz%end))
+            @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                                      iy_t%beg:iy_t%end, &
+                                      iz_t%beg:iz_t%end))
         end do
 
         if (bubbles) then
             do i = bub_idx%beg, bub_idx%end
-                @:ALLOCATE(q_prim_vf(i)%sf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                                          iy_t%beg:iy_t%end, &
+                                          iz_t%beg:iz_t%end))
             end do
         end if
 
         if (hypoelasticity) then
 
             do i = stress_idx%beg, stress_idx%end
-                @:ALLOCATE(q_prim_vf(i)%sf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                                          iy_t%beg:iy_t%end, &
+                                          iz_t%beg:iz_t%end))
             end do
         end if
 
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
-                @:ALLOCATE(q_prim_vf(i)%sf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, &
-                                          iz%beg:iz%end))
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                                          iy_t%beg:iy_t%end, &
+                                          iz_t%beg:iz_t%end))
             end do
         end if
 
@@ -420,6 +416,8 @@ contains
         call nvtxEndRange
 
         call cpu_time(finish)
+
+        time = time + (finish - start)
 
         if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)

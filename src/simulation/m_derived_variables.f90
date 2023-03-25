@@ -19,14 +19,16 @@ module m_derived_variables
     use m_data_output           !< Data output module
 
     use m_time_steppers         !< Time-stepping algorithms
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_derived_variables_module, &
- s_initialize_derived_variables, &
- s_compute_derived_variables, &
- s_finalize_derived_variables_module
+                     s_initialize_derived_variables, &
+                     s_compute_derived_variables, &
+                     s_finalize_derived_variables_module
 
     !> @name Finite-difference coefficients
     !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
@@ -37,6 +39,12 @@ module m_derived_variables
     real(kind(0d0)), public, allocatable, dimension(:, :) :: fd_coeff_x
     real(kind(0d0)), public, allocatable, dimension(:, :) :: fd_coeff_y
     real(kind(0d0)), public, allocatable, dimension(:, :) :: fd_coeff_z
+    !> @}
+
+    ! @name Variables for computing acceleration
+    !> @{
+    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
+    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
     !> @}
 
 contains
@@ -58,8 +66,17 @@ contains
             allocate (fd_coeff_x(-fd_number:fd_number, 0:m))
             if (n > 0) then
                 allocate (fd_coeff_y(-fd_number:fd_number, 0:n))
+            end if
+            if (p > 0) then
+                allocate (fd_coeff_z(-fd_number:fd_number, 0:p))
+            end if
+
+            allocate (accel_mag(0:m, 0:n, 0:p))
+            allocate (x_accel(0:m, 0:n, 0:p))
+            if (n > 0) then
+                allocate (y_accel(0:m, 0:n, 0:p))
                 if (p > 0) then
-                    allocate (fd_coeff_z(-fd_number:fd_number, 0:p))
+                    allocate (z_accel(0:m, 0:n, 0:p))
                 end if
             end if
         end if
@@ -69,22 +86,26 @@ contains
     !> Allocate and open derived variables. Computing FD coefficients.
     subroutine s_initialize_derived_variables() ! -----------------------------
 
-        ! Opening and writing header of CoM and flow probe files
-        if (proc_rank == 0) then
-            if (probe_wrt) then
+        if (probe_wrt) then
+            ! Opening and writing header of flow probe files
+            if (proc_rank == 0) then
                 call s_open_probe_files()
             end if
-        end if
 
-        ! Computing centered finite difference coefficients
-        if (probe_wrt) then
-            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x)
+            ! Computing centered finite difference coefficients
+            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
+                                                             fd_number, fd_order)
+
             if (n > 0) then
-                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y)
-                if (p > 0) then
-                    call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z)
-                end if
+                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
+                                                                 fd_number, fd_order)
             end if
+
+            if (p > 0) then
+                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
+                                                                 fd_number, fd_order)
+            end if
+
         end if
 
     end subroutine s_initialize_derived_variables ! -----------------------------
@@ -97,26 +118,27 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! IF ( probe_wrt .AND. (t_step > t_step_start + 2)) THEN
         if (probe_wrt) then
             call s_derive_acceleration_component(1, q_prim_ts(0)%vf, &
                                                  q_prim_ts(1)%vf, &
                                                  q_prim_ts(2)%vf, &
                                                  q_prim_ts(3)%vf, &
                                                  x_accel)
+
             if (n > 0) then
                 call s_derive_acceleration_component(2, q_prim_ts(0)%vf, &
                                                      q_prim_ts(1)%vf, &
                                                      q_prim_ts(2)%vf, &
                                                      q_prim_ts(3)%vf, &
                                                      y_accel)
-                if (p > 0) then
-                    call s_derive_acceleration_component(3, q_prim_ts(0)%vf, &
-                                                         q_prim_ts(1)%vf, &
-                                                         q_prim_ts(2)%vf, &
-                                                         q_prim_ts(3)%vf, &
-                                                         z_accel)
-                end if
+            end if
+
+            if (p > 0) then
+                call s_derive_acceleration_component(3, q_prim_ts(0)%vf, &
+                                                     q_prim_ts(1)%vf, &
+                                                     q_prim_ts(2)%vf, &
+                                                     q_prim_ts(3)%vf, &
+                                                     z_accel)
             end if
 
             do k = 0, p
@@ -141,60 +163,6 @@ contains
 
     end subroutine s_compute_derived_variables ! ---------------------------
 
-    !>  The purpose of this subroutine is to compute the finite-
-        !!      difference coefficients for the centered schemes utilized
-        !!      in computations of first order spatial derivatives in the
-        !!      s-coordinate direction. The s-coordinate direction refers
-        !!      to the x-, y- or z-coordinate direction, depending on the
-        !!      subroutine's inputs. Note that coefficients of up to 4th
-        !!      order accuracy are available.
-        !!  @param q Number of cells in the s-coordinate direction
-        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s)
-
-        integer, intent(IN) :: q
-
-        real(kind(0d0)), &
-            dimension(-buff_size:q + buff_size), &
-            intent(IN) :: s_cc
-
-        real(kind(0d0)), &
-            dimension(-fd_number:fd_number, 0:q), &
-            intent(INOUT) :: fd_coeff_s
-
-        integer :: i !< Generic loop iterator
-
-        ! Computing the 1st order finite-difference coefficients
-        if (fd_order == 1) then
-            do i = 0, q
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
-                fd_coeff_s(1, i) = -fd_coeff_s(0, i)
-            end do
-
-            ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order == 2) then
-            do i = 0, q
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-            end do
-
-            ! Computing the 4th order finite-difference coefficients
-        else
-            do i = 0, q
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-                fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
-            end do
-
-        end if
-
-    end subroutine s_compute_finite_difference_coefficients ! --------------
-
     !> This subroutine receives as inputs the indicator of the
         !!      component of the acceleration that should be outputted and
         !!      the primitive variables. From those inputs, it proceeds
@@ -202,17 +170,17 @@ contains
         !!      which are subsequently stored in derived flow quantity
         !!      storage variable, q_sf.
         !!  @param i Acceleration component indicator
-        !!  @param q_prim_vf Primitive variables
+        !!  @param q_prim_vf0 Primitive variables
         !!  @param q_prim_vf1 Primitive variables
         !!  @param q_prim_vf2 Primitive variables
         !!  @param q_prim_vf3 Primitive variables
         !!  @param q_sf Acceleration component
-    subroutine s_derive_acceleration_component(i, q_prim_vf, q_prim_vf1, &
+    subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
                                                q_prim_vf2, q_prim_vf3, q_sf) ! ----------
 
         integer, intent(IN) :: i
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf0
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf1
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf2
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf3
@@ -227,7 +195,7 @@ contains
                 do k = 0, n
                     do j = 0, m
 
-                        q_sf(j, k, l) = (11d0*q_prim_vf(mom_idx%beg)%sf(j, k, l) &
+                        q_sf(j, k, l) = (11d0*q_prim_vf0(mom_idx%beg)%sf(j, k, l) &
                                          - 18d0*q_prim_vf1(mom_idx%beg)%sf(j, k, l) &
                                          + 9d0*q_prim_vf2(mom_idx%beg)%sf(j, k, l) &
                                          - 2d0*q_prim_vf3(mom_idx%beg)%sf(j, k, l))/(6d0*dt)
@@ -235,31 +203,31 @@ contains
                         do r = -fd_number, fd_number
                             if (n == 0) then ! 1D simulation
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf(mom_idx%beg)%sf(r + j, k, l)
+                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
                             elseif (p == 0) then ! 2D simulation
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf(mom_idx%beg)%sf(r + j, k, l) &
-                                                + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf(mom_idx%beg)%sf(j, r + k, l)
+                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(mom_idx%beg)%sf(r + j, k, l) &
+                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(mom_idx%beg)%sf(j, r + k, l)
                             else ! 3D simulation
                                 if (grid_geometry == 3) then
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf(mom_idx%beg)%sf(r + j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf(mom_idx%beg)%sf(j, r + k, l) &
-                                                    + q_prim_vf(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf(mom_idx%beg)%sf(j, k, r + l)/y_cc(k)
+                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(mom_idx%beg)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(mom_idx%beg)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(mom_idx%beg)%sf(j, k, r + l)/y_cc(k)
                                 else
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf(mom_idx%beg)%sf(r + j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf(mom_idx%beg)%sf(j, r + k, l) &
-                                                    + q_prim_vf(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf(mom_idx%beg)%sf(j, k, r + l)
+                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(mom_idx%beg)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(mom_idx%beg)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(mom_idx%beg)%sf(j, k, r + l)
                                 end if
                             end if
                         end do
@@ -267,13 +235,13 @@ contains
                 end do
             end do
 
-            ! Computing the acceleration component in the y-coordinate direction
+        ! Computing the acceleration component in the y-coordinate direction
         elseif (i == 2) then
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
 
-                        q_sf(j, k, l) = (11d0*q_prim_vf(mom_idx%beg + 1)%sf(j, k, l) &
+                        q_sf(j, k, l) = (11d0*q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l) &
                                          - 18d0*q_prim_vf1(mom_idx%beg + 1)%sf(j, k, l) &
                                          + 9d0*q_prim_vf2(mom_idx%beg + 1)%sf(j, k, l) &
                                          - 2d0*q_prim_vf3(mom_idx%beg + 1)%sf(j, k, l))/(6d0*dt)
@@ -281,28 +249,28 @@ contains
                         do r = -fd_number, fd_number
                             if (p == 0) then ! 2D simulation
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf(mom_idx%beg + 1)%sf(r + j, k, l) &
-                                                + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf(mom_idx%beg + 1)%sf(j, r + k, l)
+                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(mom_idx%beg + 1)%sf(r + j, k, l) &
+                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l)
                             else ! 3D simulation
                                 if (grid_geometry == 3) then
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf(mom_idx%beg + 1)%sf(r + j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf(mom_idx%beg + 1)%sf(j, r + k, l) &
-                                                    + q_prim_vf(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l)/y_cc(k) &
-                                                    - (q_prim_vf(mom_idx%end)%sf(j, k, l)**2d0)/y_cc(k)
+                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(mom_idx%beg + 1)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, k, r + l)/y_cc(k) &
+                                                    - (q_prim_vf0(mom_idx%end)%sf(j, k, l)**2d0)/y_cc(k)
                                 else
                                     q_sf(j, k, l) = q_sf(j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                    q_prim_vf(mom_idx%beg + 1)%sf(r + j, k, l) &
-                                                    + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                    q_prim_vf(mom_idx%beg + 1)%sf(j, r + k, l) &
-                                                    + q_prim_vf(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                    q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l)
+                                                    + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                    q_prim_vf0(mom_idx%beg + 1)%sf(r + j, k, l) &
+                                                    + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l) &
+                                                    + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                    q_prim_vf0(mom_idx%beg + 1)%sf(j, k, r + l)
                                 end if
                             end if
                         end do
@@ -310,12 +278,12 @@ contains
                 end do
             end do
 
-            ! Computing the acceleration component in the z-coordinate direction
+        ! Computing the acceleration component in the z-coordinate direction
         else
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_sf(j, k, l) = (11d0*q_prim_vf(mom_idx%end)%sf(j, k, l) &
+                        q_sf(j, k, l) = (11d0*q_prim_vf0(mom_idx%end)%sf(j, k, l) &
                                          - 18d0*q_prim_vf1(mom_idx%end)%sf(j, k, l) &
                                          + 9d0*q_prim_vf2(mom_idx%end)%sf(j, k, l) &
                                          - 2d0*q_prim_vf3(mom_idx%end)%sf(j, k, l))/(6d0*dt)
@@ -323,22 +291,22 @@ contains
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf(mom_idx%end)%sf(r + j, k, l) &
-                                                + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf(mom_idx%end)%sf(j, r + k, l) &
-                                                + q_prim_vf(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                q_prim_vf(mom_idx%end)%sf(j, k, r + l)/y_cc(k) &
-                                                + (q_prim_vf(mom_idx%end)%sf(j, k, l)* &
-                                                   q_prim_vf(mom_idx%beg + 1)%sf(j, k, l))/y_cc(k)
+                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(mom_idx%end)%sf(r + j, k, l) &
+                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(mom_idx%end)%sf(j, r + k, l) &
+                                                + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                q_prim_vf0(mom_idx%end)%sf(j, k, r + l)/y_cc(k) &
+                                                + (q_prim_vf0(mom_idx%end)%sf(j, k, l)* &
+                                                   q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l))/y_cc(k)
                             else
                                 q_sf(j, k, l) = q_sf(j, k, l) &
-                                                + q_prim_vf(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
-                                                q_prim_vf(mom_idx%end)%sf(r + j, k, l) &
-                                                + q_prim_vf(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
-                                                q_prim_vf(mom_idx%end)%sf(j, r + k, l) &
-                                                + q_prim_vf(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
-                                                q_prim_vf(mom_idx%end)%sf(j, k, r + l)
+                                                + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
+                                                q_prim_vf0(mom_idx%end)%sf(r + j, k, l) &
+                                                + q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l)*fd_coeff_y(r, k)* &
+                                                q_prim_vf0(mom_idx%end)%sf(j, r + k, l) &
+                                                + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
+                                                q_prim_vf0(mom_idx%end)%sf(j, k, r + l)
                             end if
                         end do
                     end do
@@ -356,6 +324,16 @@ contains
         if (proc_rank == 0) then
             if (probe_wrt) then
                 call s_close_probe_files()
+            end if
+        end if
+
+        if (probe_wrt) then
+            deallocate(accel_mag, x_accel)
+            if (n > 0) then
+                deallocate(y_accel)
+                if (p > 0) then
+                    deallocate(z_accel)
+                end if
             end if
         end if
 

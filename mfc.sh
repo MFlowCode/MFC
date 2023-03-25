@@ -77,18 +77,18 @@ if [ "$1" == "load" ]; then
         if [ "$u_cg" == "c" ]; then
             MODULES=("gcc/12.1.0")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.5" "cuda/nvhpc")
+            MODULES=("nvhpc/22.11" "cuda/nvhpc")
         fi
 
         MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
                 "hsi/5.0.2.p5" "xalt/1.2.1" "lsf-tools/2.0"
-                "cmake/3.23.1" "ninja/1.10.2" "spectrum-mpi/10.4.0.3-20210112")
+                "cmake/3.23.2" "ninja/1.10.2" "spectrum-mpi/10.4.0.3-20210112")
     elif [ "$u_computer" == "b" ]; then # Bridges2
         if [ "$u_cg" == "c" ]; then
             MODULES=("allocations/1.0" "gcc/10.2.0" "python/3.8.6"
                      "openmpi/4.0.5-gcc10.2.0")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.9" "openmpi/4.0.5-nvhpc22.9")
+            MODULES=("openmpi/4.0.5-nvhpc22.9" "nvhpc/22.9")
         fi
 
         MODULES=("${MODULES[@]}" "python/3.8.6")
@@ -115,10 +115,10 @@ if [ "$1" == "load" ]; then
         if [ "$u_cg" == "c" ]; then
             MODULES=("gcc/11.1.0" "openmpi/4.0.5_gcc")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("cuda/11.5.1" "/sw/wombat/Nvidia_HPC_SDK/modulefiles/nvhpc/22.1")
+            MODULES=("nvhpc/22.11")
         fi
 
-        MODULES=("${MODULES[@]}" "cmake/3.22.1" "python/3.9.9")
+        MODULES=("${MODULES[@]}" "cmake/3.25.1" "python/3.10.8")
     elif [ "$u_computer" == "e" ]; then # Expanse
         if [ "$u_cg" == "c" ]; then
             warn "Please set CC=icc, CXX=icx, and FC=ifort."
@@ -132,12 +132,12 @@ if [ "$1" == "load" ]; then
         MODULES=("${MODULES[@]}" "python/3.8.5")
     elif [ "$u_computer" == "p" ]; then # Phoenix
         if [ "$u_cg" == "c" ]; then
-            MODULES=("intel/19.0.5" "mvapich2/2.3.2")
+            MODULES=("gcc/10.3.0-o57x6h" "mvapich2/2.3.6-ouywal")
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("cuda/11.2" "nvhpc/22.1")
+            MODULES=("cuda/11.7.0-7sdye3" "nvhpc/22.11")
         fi
 
-        MODULES=("${MODULES[@]}" "python/3.7.4" "cmake/3.20.3")
+        MODULES=("${MODULES[@]}" "python/3.9.12-rkxvr6" "cmake/3.23.1-327dbl")
     elif [ "$u_computer" == "c" ]; then # Crusher
         if [ "$u_cg" == "c" ]; then
             MODULES=()
@@ -312,7 +312,7 @@ else
 fi
 
 if [ "$bShouldInstallCMake" = true ]; then
-    version="3.24.2"
+    version="3.25.2"
     arch="$(uname -m)"
 
     bErrorDoSelfDownload=false

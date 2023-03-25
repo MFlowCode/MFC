@@ -7,6 +7,23 @@ from ..run       import queues, mpi_bins
 from ..run.input import MFCInputFile
 
 
+def profiler_prepend():
+    if ARG("ncu"):
+        if not common.does_command_exist("ncu"):
+            raise common.MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
+
+        return ["ncu", "--nvtx", "--mode=launch-and-attach",
+                       "--cache-control=none", "--clock-control=none"]
+
+    if ARG("nsys"):
+        if not common.does_command_exist("nsys"):
+            raise common.MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
+
+        return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"]
+
+    return []
+
+
 @dataclasses.dataclass
 class Engine:
     name: str
@@ -51,14 +68,16 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 """
 
     def get_exec_cmd(self, target_name: str) -> typing.List[str]:
-        binpath = self.get_binpath(target_name)
+        cmd = []
 
-        if not ARG("mpi"):
-            return [binpath]
+        if ARG("mpi"):
+            cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
 
-        flags = ARG("flags")[:]
+        cmd += profiler_prepend()
 
-        return [self.mpibin.bin] + self.mpibin.gen_params() + flags + [binpath]
+        cmd.append(self.get_binpath(target_name))
+
+        return cmd
 
 
     def run(self, names: typing.List[str]) -> None:
@@ -132,7 +151,7 @@ Email         (-@)  {ARG("email")}
         system = queues.get_system()
         cons.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
 
-        cons.print(f"Running [bold magenta]{common.format_list_to_string(names)}[/bold magenta]:")
+        cons.print(f"Running {common.format_list_to_string(names, 'bold magenta')}:")
         cons.indent()
 
         self.__create_batch_file(system, names)
@@ -224,6 +243,7 @@ exit $code
     def __batch_evaluate(self, s: str, system: queues.QueueSystem, names: typing.List[str]):
         replace_list = [
             ("{MFC::PROLOGUE}", self.__generate_prologue(system, names)),
+            ("{MFC::PROFILER}", ' '.join(profiler_prepend())),
             ("{MFC::EPILOGUE}", self.__generate_epilogue()),
             ("{MFC::BINARIES}", ' '.join([f"'{self.get_binpath(x)}'" for x in names]))
         ]

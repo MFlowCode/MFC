@@ -18,13 +18,14 @@ module m_qbmm
 
     use m_variables_conversion !< State variables type conversion procedures
 
+    use m_helper
+
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff
 
-    real(kind(0d0)), parameter :: verysmall = 1.d-12
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
 
     #:if MFC_CASE_OPTIMIZATION

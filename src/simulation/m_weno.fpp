@@ -1,8 +1,8 @@
 !>
 !! @file m_weno.f90
 !! @brief Contains module m_weno
-
 #:include 'macros.fpp'
+
 
 !> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
 !!              that is supplemented with monotonicity preserving bounds (MPWENO)
@@ -486,9 +486,6 @@ contains
         integer :: i, j, k, l, r, s, w
 
         integer :: t1, t2, c_rate, c_max
-
-
-        integer :: is1b, is2b, is3b, is1e, is2e, is3e
 
         is1 = is1_d
         is2 = is2_d

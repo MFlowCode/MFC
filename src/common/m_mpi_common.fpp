@@ -69,7 +69,6 @@ contains
             intent(IN) :: q_cons_vf
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
-        integer :: ierr
 
 #ifdef MFC_MPI
 
@@ -310,14 +309,22 @@ contains
     end subroutine s_mpi_reduce_maxloc ! -----------------------------------
 
     !> The subroutine terminates the MPI execution environment.
-    subroutine s_mpi_abort() ! ---------------------------------------------
+    subroutine s_mpi_abort(prnt) ! ---------------------------------------------
+
+        character(len=*), intent(in), optional :: prnt
+
+        if (present(prnt)) then
+            print*, prnt
+            call flush(6)
+
+        end if
 
 #ifndef MFC_MPI
 
         stop 1
 
 #else
-
+        
         ! Terminating the MPI environment
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
 

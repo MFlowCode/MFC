@@ -28,9 +28,9 @@ program p_main
 
     use m_compile_specific      !< Compile-specific procedures
 
-    use m_assign_patches
+    use m_patches
 
-    use m_check_patches
+    use m_assign_variables
     ! ==========================================================================
 
     implicit none
@@ -71,7 +71,8 @@ program p_main
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
     call s_initialize_grid_module()
-    call s_initialize_assign_patches_module()
+    call s_initialize_initial_condition_module()
+    call s_initialize_assign_variables_module()
 
     ! Associate pointers for serial or parallel I/O
     if (parallel_io .neqv. .true.) then
@@ -106,15 +107,15 @@ program p_main
     call cpu_time(start)
 
     if (old_grid) then
-        call s_read_grid_data_files(dflt_int)
+        call s_read_grid_data_files()
         call s_check_grid_data_files()
     else
         if (parallel_io .neqv. .true.) then
-            call s_generate_grid(dflt_int)
+            call s_generate_grid()
         else
-            if (proc_rank == 0) call s_generate_grid(dflt_int)
+            if (proc_rank == 0) call s_generate_grid()
             call s_mpi_barrier()
-            call s_read_grid_data_files(dflt_int)
+            call s_read_grid_data_files()
             call s_check_grid_data_files()
         end if
     end if
@@ -163,12 +164,12 @@ program p_main
     s_write_data_files => null()
 
     ! Deallocation procedures for the modules
-    call s_finalize_assign_patches_module()
     call s_finalize_grid_module()
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()
     call s_finalize_data_output_module()
     call s_finalize_global_parameters_module()
+    call s_finialize_assign_variables_module()
 
     ! Finalization of the MPI environment
     call s_mpi_finalize()

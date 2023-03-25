@@ -15,7 +15,7 @@ def __print_greeting():
     max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
 
     host_line    = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
-    targets_line = f"[bold]--targets {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in ARG('targets')], 'None')}[/bold]"
+    targets_line = f"[bold]--targets {format_list_to_string(ARG('targets'), 'magenta', 'None')}[/bold]"
     help_line    = "$ ./mfc.sh \[build, run, test, clean] --help"
 
     MFC_SIDEBAR_LINES = [
