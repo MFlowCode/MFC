@@ -42,7 +42,7 @@ contains
     subroutine s_generate_initial_condition() ! ----------------------------
 
         integer :: i  !< Generic loop operator
-
+		
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
@@ -161,6 +161,8 @@ contains
 
         if (perturb_flow) call s_perturb_surrounding_flow()
         if (perturb_sph) call s_perturb_sphere()
+
+		if (instability_wave) call s_superposition_instability_wave()
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
