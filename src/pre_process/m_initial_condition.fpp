@@ -289,40 +289,43 @@ contains
 	subroutine s_superposition_instability_wave() ! ------------------------------
 		real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
 		real(kind(0d0)) :: tr,ti
+		real(kind(0d0)) :: Ly
 		integer :: i,j,k
 
+		Ly = y_domain%end - y_domain%beg
+		
 		write(*,*) "generate instability waves ..."
 
 		wave = 0d0
 		wave1 = 0d0
 		wave2 = 0d0
 		if (p .eq. 0) then
-			call s_instability_wave(2*pi*4.0/59.0,0d0,tr,ti,wave_tmp,0d0)
+			call s_instability_wave(2*pi*4.0/Ly,0d0,tr,ti,wave_tmp,0d0)
 			wave = wave + wave_tmp
-			call s_instability_wave(2*pi*2.0/59.0,0d0,tr,ti,wave_tmp,0d0)
+			call s_instability_wave(2*pi*2.0/Ly,0d0,tr,ti,wave_tmp,0d0)
 			wave = wave + wave_tmp
-			call s_instability_wave(2*pi*1.0/59.0,0d0,tr,ti,wave_tmp,0d0)
+			call s_instability_wave(2*pi*1.0/Ly,0d0,tr,ti,wave_tmp,0d0)
 			wave = wave + wave_tmp
 			wave = wave*0.05
 		else
-			call s_instability_wave(2*pi*4.0/59.0,0d0,tr,ti,wave_tmp,0d0)
+			call s_instability_wave(2*pi*4.0/Ly,0d0,tr,ti,wave_tmp,0d0)
 			wave1 = wave1 + wave_tmp
-			call s_instability_wave(2*pi*2.0/59.0,0d0,tr,ti,wave_tmp,0d0)
+			call s_instability_wave(2*pi*2.0/Ly,0d0,tr,ti,wave_tmp,0d0)
 			wave1 = wave1 + wave_tmp
-			call s_instability_wave(2*pi*1.0/59.0,0d0,tr,ti,wave_tmp,0d0)
+			call s_instability_wave(2*pi*1.0/Ly,0d0,tr,ti,wave_tmp,0d0)
 			wave1 = wave1 + wave_tmp
 			
-			call s_instability_wave(2*pi*4.0/59.0, 2*pi*4.0/59.0,tr,ti,wave_tmp,11d0/31d0*2*pi)
+			call s_instability_wave(2*pi*4.0/Ly, 2*pi*4.0/Ly,tr,ti,wave_tmp,2*pi*0.8147d0)
 			wave2 = wave2 + wave_tmp
-			call s_instability_wave(2*pi*2.0/59.0, 2*pi*2.0/59.0,tr,ti,wave_tmp,13d0/31d0*2*pi)
+			call s_instability_wave(2*pi*2.0/Ly, 2*pi*2.0/Ly,tr,ti,wave_tmp,2*pi*0.9058d0)
 			wave2 = wave2 + wave_tmp
-			call s_instability_wave(2*pi*1.0/59.0, 2*pi*1.0/59.0,tr,ti,wave_tmp,17d0/31d0*2*pi)
+			call s_instability_wave(2*pi*1.0/Ly, 2*pi*1.0/Ly,tr,ti,wave_tmp,2*pi*0.0270d0)
 			wave2 = wave2 + wave_tmp
-			call s_instability_wave(2*pi*4.0/59.0,-2*pi*4.0/59.0,tr,ti,wave_tmp,19d0/31d0*2*pi)
+			call s_instability_wave(2*pi*4.0/Ly,-2*pi*4.0/Ly,tr,ti,wave_tmp,2*pi*0.5324d0)
 			wave2 = wave2 + wave_tmp
-			call s_instability_wave(2*pi*2.0/59.0,-2*pi*2.0/59.0,tr,ti,wave_tmp,23d0/31d0*2*pi)
+			call s_instability_wave(2*pi*2.0/Ly,-2*pi*2.0/Ly,tr,ti,wave_tmp,2*pi*0.2975d0)
 			wave2 = wave2 + wave_tmp
-			call s_instability_wave(2*pi*1.0/59.0,-2*pi*1.0/59.0,tr,ti,wave_tmp,29d0/31d0*2*pi)
+			call s_instability_wave(2*pi*1.0/Ly,-2*pi*1.0/Ly,tr,ti,wave_tmp,2*pi*0.7634d0)
 			wave2 = wave2 + wave_tmp
 
 			wave = 0.05*wave1+0.15*wave2
@@ -441,7 +444,7 @@ contains
 		! Compute Eigenvalues & Eigenfunctions
 		call cg(5*(n+1),5*(n+1),ar,ai,wr,wi,zr,zi,fv1,fv2,fv3,ierr)
 
-		! Find the most unstable wave and normalize it
+		! Find the most unstable wave
 		call find_unstable_mode(5*(n+1),wr,wi,zr,zi,tr,ti,vr,vi)
 
 		! Normalize
