@@ -56,8 +56,13 @@ jobs:
         run:  /bin/bash mfc.sh build -j $(nproc) ${{ matrix.debug }}
 
       - name: Test Suite
-        run:  /bin/bash mfc.sh test  -j $(nproc) -a ${{ matrix.debug }}
-
+        if: matrix.debug == '--debug'
+        run:  /bin/bash mfc.sh test  -j $(nproc) -a --debug
+        
+      - name: Test Suite
+        if: matrix.debug == '--no-debug'
+        run:  /bin/bash mfc.sh test  -j $(nproc) -a 
+        
   self-cpu:
     name: (Self) Test Suite - CPU
     strategy:
@@ -83,7 +88,7 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh test  -j 8 -a 
+          /bin/bash mfc.sh test -j 8 -a 
           
   self-cpu-debug:
     name: (Self) Test Suite - CPU - debug
@@ -110,7 +115,7 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh test  -j 8 -a --debug
+          /bin/bash mfc.sh test -j 8 --debug
 
   self-gpu:
     name: (Self) Test Suite - GPU
@@ -164,7 +169,7 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a --debug
+          /bin/bash mfc.sh test -j 8 -b mpirun --gpu --debug
 
 #   ice-gpu:
 #     name: (COC-ICE) Test Suite - GPU
