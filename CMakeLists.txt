@@ -120,6 +120,10 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             $<$<COMPILE_LANGUAGE:Fortran:-minline>
         )
     endif()
+    
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-C -g -O0 -traceback -Kieee -Mchkptr -Mchkstk -Minform=inform -Mbackslash -Mbounds)
+    endif()
 endif()
 
 
