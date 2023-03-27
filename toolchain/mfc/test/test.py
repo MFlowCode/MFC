@@ -187,6 +187,8 @@ def handle_case(test: TestCase):
 
             for t_step in [ i*test["t_step_save"] for i in range(0, math.floor(test["t_step_stop"] / test["t_step_save"]) + 1) ]:
                 silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
+                if not os.path.exists(silo_filepath):
+                    silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
         
                 h5dump = f"{get_install_dirpath()}/bin/h5dump"
             
