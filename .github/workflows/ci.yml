@@ -64,6 +64,7 @@ jobs:
       matrix:
         include:
           - os: [self-hosted, wingtip]
+          - debug: [--debug, --no-debug]
     runs-on: ${{ matrix.os }}
     if: github.repository == 'MFlowCode/MFC'
     steps:
@@ -77,13 +78,13 @@ jobs:
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh build -j 8
+          /bin/bash mfc.sh build -j 8 ${{ matrix.debug }}
 
       - name: Test Suite
         run:  |
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
-          /bin/bash mfc.sh test  -j 8 -a
+          /bin/bash mfc.sh test  -j 8 -a ${{ matrix.debug }}
 
   self-gpu:
     name: (Self) Test Suite - GPU
