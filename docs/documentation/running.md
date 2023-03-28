@@ -144,10 +144,10 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 	- There are several ways to do this. Keep in mind that, regardless of the .py file used, the post_process command will generate output files in the [`t_step_start`, `t_step_stop`] range, with `t_step_save` as the spacing between files.
 		- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run:
 
-		```console
-		$ ./mfc.sh run case.py -t post_process
-		$ ./mfc.sh run restart_case.py -t post_process
-		```
+```console
+$ ./mfc.sh run case.py -t post_process
+$ ./mfc.sh run restart_case.py -t post_process
+```
 
 		- The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
 
