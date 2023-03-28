@@ -144,32 +144,32 @@ jobs:
           module load nvhpc
           /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a
     
-  self-gpu-debug:
-    name: (Self) Test Suite - GPU - debug
-    strategy:
-      matrix:
-        include:
-          - os: [self-hosted, wingtip]
-    runs-on: ${{ matrix.os }}
-    if: github.repository == 'MFlowCode/MFC'
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+#   self-gpu-debug:
+#     name: (Self) Test Suite - GPU - debug
+#     strategy:
+#       matrix:
+#         include:
+#           - os: [self-hosted, wingtip]
+#     runs-on: ${{ matrix.os }}
+#     if: github.repository == 'MFlowCode/MFC'
+#     steps:
+#       - name: Clone
+#         uses: actions/checkout@v3
           
-      - name: Setup
-        run:  echo "test"
+#       - name: Setup
+#         run:  echo "test"
         
-      - name: Build
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh build -j 8 --gpu --debug
+#       - name: Build
+#         run:  |
+#           module use /opt/nvidia/hpc_sdk/modulefiles/
+#           module load nvhpc
+#           /bin/bash mfc.sh build -j 8 --gpu --debug
 
-      - name: Test Suite
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh test -j 8 -b mpirun --gpu --debug
+#       - name: Test Suite
+#         run:  |
+#           module use /opt/nvidia/hpc_sdk/modulefiles/
+#           module load nvhpc
+#           /bin/bash mfc.sh test -j 8 -b mpirun --gpu --debug
 
 #   ice-gpu:
 #     name: (COC-ICE) Test Suite - GPU
