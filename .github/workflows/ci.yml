@@ -57,7 +57,7 @@ jobs:
 
       - name: Test Suite
         if: matrix.debug == '--debug'
-        run:  /bin/bash mfc.sh test  -j $(nproc) -a --debug
+        run:  /bin/bash mfc.sh test  -j $(nproc) --debug
         
       - name: Test Suite
         if: matrix.debug == '--no-debug'

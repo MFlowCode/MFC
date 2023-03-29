@@ -142,14 +142,12 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 	
 - Run the post_process
 	- There are several ways to do this. Keep in mind that, regardless of the .py file used, the post_process command will generate output files in the [`t_step_start`, `t_step_stop`] range, with `t_step_save` as the spacing between files.
-		- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run:
+	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
 
 ```console
 $ ./mfc.sh run case.py -t post_process
 $ ./mfc.sh run restart_case.py -t post_process
-```
-
-		- The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
+```	
 
 We have provided an example `case.py` and `restart_case.py` in `/examples/1D_vacuum_restart/`. This simulation is a duplicate of the `1D_vacuum` case. It demonstrates stopping at timestep 7000, adding a new patch, and restarting the simulation. To test this code, run:
 
