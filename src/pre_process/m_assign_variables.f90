@@ -485,7 +485,7 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-		! Set streamwise velocity to hypertangent function of y
+        ! Set streamwise velocity to hypertangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
@@ -686,7 +686,7 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-		! Set streamwise velocity to hypertangent function of y
+        ! Set streamwise velocity to hypertangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
