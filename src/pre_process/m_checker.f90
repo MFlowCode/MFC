@@ -569,13 +569,13 @@ contains
         if ((vel_profile .eqv. .true.) .and. (n == 0)) then
             call s_mpi_abort('Unsupported choices of the combination of values for '//&
                 'vel_profile and n. Exiting ...')
-		end if
+        end if
 
         ! Constraints on the instability wave
         if ((instability_wave .eqv. .true.) .and. (n == 0)) then
             call s_mpi_abort('Unsupported choices of the combination of values for '//&
                 'instability_wave and n. Exiting ...')
-		end if
+        end if
 
         ! Constraints on the stiffened equation of state fluids parameters
         do i = 1, num_fluids
