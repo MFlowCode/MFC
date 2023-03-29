@@ -96,7 +96,7 @@ contains
     subroutine s_generate_initial_condition() ! ----------------------------
 
         integer :: i  !< Generic loop operator
-		
+
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
@@ -215,7 +215,7 @@ contains
 
         if (perturb_flow) call s_perturb_surrounding_flow()
         if (perturb_sph) call s_perturb_sphere()
-		if (instability_wave) call s_superposition_instability_wave()
+        if (instability_wave) call s_superposition_instability_wave()
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
@@ -292,9 +292,9 @@ contains
     !>  This subroutine computes velocity perturbations for a temporal mixing  
         !!              layer with hypertangent mean streamwise velocity profile 
         !!              obtained from linear stability analysis. For a 2D case, 
-		!!              instability waves with spatial wavenumbers, (4,0), (2,0), 
-		!!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4), 
-		!!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
+        !!              instability waves with spatial wavenumbers, (4,0), (2,0), 
+        !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4), 
+        !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave() ! ------------------------
         real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
         real(kind(0d0)) :: tr,ti
@@ -307,7 +307,7 @@ contains
         wave1 = 0d0
         wave2 = 0d0
         
-		! Compute 2D waves
+        ! Compute 2D waves
         call s_instability_wave(2*pi*4.0/Ly,0d0,tr,ti,wave_tmp,0d0)
         wave1 = wave1 + wave_tmp
         call s_instability_wave(2*pi*2.0/Ly,0d0,tr,ti,wave_tmp,0d0)
@@ -317,7 +317,7 @@ contains
         wave = wave1*0.05
 		
         if (p > 0) then
-			! Compute 3D waves with phase shifts.
+            ! Compute 3D waves with phase shifts.
             call s_instability_wave(2*pi*4.0/Ly, 2*pi*4.0/Ly,tr,ti,wave_tmp,2*pi*11d0/31d0)
             wave2 = wave2 + wave_tmp
             call s_instability_wave(2*pi*2.0/Ly, 2*pi*2.0/Ly,tr,ti,wave_tmp,2*pi*13d0/31d0)
@@ -333,7 +333,7 @@ contains
             wave = wave + 0.15*wave2
         end if
         
-		! Superpose velocity perturbuations (instability waves) to the velocity field
+        ! Superpose velocity perturbuations (instability waves) to the velocity field
         do k = 0, p
         do j = 0, n
         do i = 0, m
@@ -349,10 +349,10 @@ contains
 	end subroutine s_superposition_instability_wave ! ----------------------
 
     !>  This subroutine computes instability waves corresponding to the spatial 
-		!!              wavenumbers (alpha, beta) for x and z directions, 
-		!!              respectively. The eigenvalue problem is derived from the 
-		!!              linearized Euler equations with parallel mean flow 
-		!!              assumption (See Sandham 1989 PhD thesis for details).
+        !!              wavenumbers (alpha, beta) for x and z directions, 
+        !!              respectively. The eigenvalue problem is derived from the 
+        !!              linearized Euler equations with parallel mean flow 
+        !!              assumption (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha,beta,tr,ti,wave,shift)
         real(kind(0d0)),intent(in) :: alpha, beta !<  spatial wavenumbers
         real(kind(0d0)),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
@@ -387,7 +387,7 @@ contains
         
         ! Compute differential operator in y-dir
         ! based on 4th order central difference (inner)
-		! and 2nd order central difference (near boundaries)
+        ! and 2nd order central difference (near boundaries)
         dy = y_cc(1)-y_cc(0)
         d=0d0
         d(1,0)=-1/(2*dy)
@@ -414,8 +414,8 @@ contains
         end do
         
         ! Compute B and C, then A = B + C
-		! B includes terms without differential operator, and
-		! C includes terms with differential operator
+        ! B includes terms without differential operator, and
+        ! C includes terms with differential operator
         br=0d0
         bi=0d0
         ci=0d0
@@ -443,7 +443,7 @@ contains
             ii = 5; jj = 4; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = (gam-1)*beta/rho_mean(j);
             ii = 5; jj = 5; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j);
         
-        	do k=0,n
+            do k=0,n
                 ii = 1; jj = 3; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -rho_mean(j)*d(j,k);
                 ii = 3; jj = 1; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -t_mean(j)*d(j,k)/(rho_mean(j)*gam*mach**2);
                 ii = 3; jj = 5; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -d(j,k)/(gam*mach**2);
@@ -462,21 +462,21 @@ contains
     end subroutine s_instability_wave
 
     !>  This subroutine generates an instability wave using the most unstable
-	    !!              eigenvalue and corresponding eigenvector among the 
-		!!              given set of eigenvalues and eigenvectors.
+        !!              eigenvalue and corresponding eigenvector among the 
+        !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(nl,wr,wi,zr,zi,alpha,beta,wave,shift)
         integer nl
-		real(kind(0d0)), dimension(0:nl-1) :: wr,wi !< eigenvalues
-		real(kind(0d0)), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
+        real(kind(0d0)), dimension(0:nl-1) :: wr,wi !< eigenvalues
+        real(kind(0d0)), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
         real(kind(0d0)), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
         real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave
-		real(kind(0d0)) :: alpha,beta,ang,shift
-		real(kind(0d0)) :: norm
+        real(kind(0d0)) :: alpha,beta,ang,shift
+        real(kind(0d0)) :: norm
         real(kind(0d0)) :: tr,ti,cr,ci !< temporary memory
-		integer idx
+        integer idx
         integer i,j,k
         
-		! Find the most unstable eigenvalue and corresponding eigenvector
+        ! Find the most unstable eigenvalue and corresponding eigenvector
         k=0
         do i=1,nl-1
             if (wi(i) .gt. wi(k)) then
@@ -486,7 +486,7 @@ contains
         vr = zr(:,k)
         vi = zi(:,k)
 		
-		! Normalize the eigenvector by its component with the largest modulus.
+        ! Normalize the eigenvector by its component with the largest modulus.
 	    norm = 0d0
         do i=0,nl-1
             if (dsqrt(vr(i)**2+vi(i)**2) .gt. norm) then
@@ -503,12 +503,12 @@ contains
             vni(i) = ci
         end do
 		
-		! Generate an instability wave
+        ! Generate an instability wave
         do i=0,m
         do j=0,n
         do k=0,p
             if (beta .eq. 0) then
-			    ang = alpha*x_cc(i)
+                ang = alpha*x_cc(i)
             else 
                 ang = alpha*x_cc(i)+beta*z_cc(k)+shift
             end if
