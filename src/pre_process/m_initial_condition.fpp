@@ -348,11 +348,11 @@ contains
     
 	end subroutine s_superposition_instability_wave ! ----------------------
 
-    !>  This subroutine computes instability waves corresponding to the spatial 
-        !!              wavenumbers (alpha, beta) for x and z directions, 
-        !!              respectively. The eigenvalue problem is derived from the 
-        !!              linearized Euler equations with parallel mean flow 
-        !!              assumption (See Sandham 1989 PhD thesis for details).
+    !>  This subroutine computes instability waves for a given set of spatial
+        !!              wavenumbers (alpha, beta) in x and z directions.
+        !!              The eigenvalue problem is derived from the linearized
+        !!              Euler equations with parallel mean flow assumption
+        !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha,beta,tr,ti,wave,shift)
         real(kind(0d0)),intent(in) :: alpha, beta !<  spatial wavenumbers
         real(kind(0d0)),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
