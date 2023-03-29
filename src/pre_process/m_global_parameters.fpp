@@ -97,11 +97,9 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     integer :: precision !< Precision of output files
 
-	! Hypertangent velocity profile
-	logical :: vel_profile
+    logical :: vel_profile !< Set hypertangent streamwise velocity profile
 	
-	! Add instability waves to surrounding fluid
-	logical :: instability_wave
+    logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
@@ -250,8 +248,8 @@ contains
 
         parallel_io = .false.
         precision = 2
-		vel_profile = .false.
-		instability_wave = .false.
+        vel_profile = .false.
+        instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_sph = .false.
@@ -293,6 +291,7 @@ contains
 
             patch_icpp(i)%p0 = dflt_real
             patch_icpp(i)%m0 = dflt_real
+			
         end do
 
         ! Tait EOS
