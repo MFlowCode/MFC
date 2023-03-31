@@ -89,6 +89,12 @@ modified by users.
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does not use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
 
+### Profiling with NVIDIA Nsight
+
+MFC provides two different argument to facilitate profiling with NVIDIA Nsight. **Please ensure that the used argument is placed at the end so that their respective flags can be appended.**
+- Nsight Systems (Nsys): `./mfc.sh run ... --nsys [nsys flags]` allows one to visualize MFC's system-wide performance with [NVIDIA Nsight Systems](https://developer.nvidia.com/nsight-systems). NSys is best for getting a general understanding of the order and execution times of major subroutines (WENO, Riemann, etc.) in MFC. When used, `--nsys` will run the simulation and generate `.nsys-rep` files in the case directory for all targets. These files can then be imported into Nsight System's GUI, which can be downloaded [here](https://developer.nvidia.com/nsight-systems/get-started#latest-Platforms). It is best to run case files with a few timesteps so that the report files remain small. Learn more about NVIDIA Nsight Systems [here](https://docs.nvidia.com/nsight-systems/UserGuide/index.html).
+- Nsight Compute (NCU): `./mfc.sh run ... --ncu [ncu flags]` allows one to conduct kernel-level profiling with [NVIDIA Nsight Compute](https://developer.nvidia.com/nsight-compute). NCU provides profiling information for every subroutine called and is more detailed than NSys. When used, `--ncu` will output profiling information for all subroutines, including elapsed clock cycles, memory used, and more after the simulation is run. Please note that adding this argument will significantly slow down the simulation and should only be used on case files with a few timesteps. Learn more about NVIDIA Nsight Compute [here](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html).
+
 ### Restarting Cases
 
 When running a simulation, MFC generates a `./restart_data` folder in the case directory that contains `lustre_*.dat` files that can be used to restart a simulation from saved timesteps. This allows a user to run a simulation to some timestep $X$, then later continue it to run to another timestep $Y$, where $Y > X$. The user can also choose to add new patches at the intermediate timestep.
