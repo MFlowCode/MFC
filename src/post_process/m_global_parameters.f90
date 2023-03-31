@@ -187,12 +187,6 @@ module m_global_parameters
     logical :: schlieren_wrt
     !> @}
 
-    !> @name Options for Fourier decomposition in the azimuthal direction if 3D
-    !! cylindrical coordinates are used
-    !> @{
-    logical :: fourier_decomp
-    !> @}
-
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
     !! Amplitude coefficients of the numerical Schlieren function that are used
     !! to adjust the intensity of numerical Schlieren renderings for individual
@@ -315,8 +309,6 @@ contains
         schlieren_wrt = .false.
 
         schlieren_alpha = dflt_real
-
-        fourier_decomp = .false.
 
         fd_order = dflt_int
 

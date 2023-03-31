@@ -95,7 +95,6 @@ module m_global_parameters
     logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
-    integer :: weno_vars      !< WENO-reconstructed state variables type
     logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
@@ -344,7 +343,6 @@ contains
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
-        weno_vars = dflt_int
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.

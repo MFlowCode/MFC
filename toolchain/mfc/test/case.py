@@ -24,7 +24,6 @@ BASE_CFG = {
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
-    'weno_vars'                    : 2,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
     'mapped_weno'                  : 'F',
