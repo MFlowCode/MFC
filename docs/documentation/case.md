@@ -74,10 +74,7 @@ Definition of the parameters is described in the following subsections.
 
 | Parameter        | Type           | Description                      |
 | ---:             |    :----:      |          :---                    |
-| `case_dir`       | String         | Case script directory            |
 | `run_time_info`  | Logical        | Output run-time information      |
-
-- `case_dir` specifies the directory where the python input file is located.
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
 
@@ -90,6 +87,7 @@ Definition of the parameters is described in the following subsections.
 | `a_x[y,z]`               | Real    | Rate at which the grid is stretched in the $x$[y,z]-direction |
 | `x[y,z]_a`               | Real    | Beginning of the stretching in the negative $x$[y,z]-direction |
 | `x[y,z]_b`               | Real    | Beginning of the stretching in the positive $x$[y,z]-direction |
+| `loops_x[y,z]`           | Integer | Number of times to recursively apply grid stretching |
 | `cyl_coord`              | Logical | Cylindrical coordinates (2D: Axisymmetric, 3D: Cylindrical) |
 | `m`                      | Integer | Number of grid cells in the $x$-coordinate direction |
 | `n`                      | Integer | Number of grid cells in the $y$-coordinate direction |
@@ -117,7 +115,8 @@ The grid is gradually stretched such that the domain boundaries are pushed away 
 
 $$ x_{cb,stretch} = x_{cb} + \frac{x_{cb}}{a_x} \Bigg[ \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_a)}{L} \right) \right] + \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_b)}{L} \right) \right] -2 \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_b-x_a)}{2L} \right) \right]  \Bigg] $$
 
-where `x_cb` and `x_[cb,stretch]` are the coordinates of a cell boundary at the original and stretched domains, respectively. `L` is the domain length along the `x` axis: `L`=`x_domain%end`-`x_domain%beg`. Crudely speaking, `x_a` and `x_b` define the coordinates at which the grid begins to get stretched in the negative and positive directions along the $x$ axis, respectively. $a_x$ defines the smoothness of the stretching. Stretching along the $y$ and $z$ axes follows the same logistics. Optimal choice of the parameters for grid stretching is case-dependent and left to the user.
+where `x_cb` and `x_[cb,stretch]` are the coordinates of a cell boundary at the original and stretched domains, respectively. `L` is the domain length along the `x` axis: `L`=`x_domain%end`-`x_domain%beg`. Crudely speaking, `x_a` and `x_b` define the coordinates at which the grid begins to get stretched in the negative and positive directions along the $x$ axis, respectively. $a_x$ defines the smoothness of the stretching. Stretching along the $y$ and $z$ axes follows the same logistics. Optimal choice of the parameters for grid stretching is case-dependent and left to the user. `loops_x[y,z]` defines the number of times
+the grid stretching funciton is applied and has a default value of one.
 
 - `cyl_coord` activates cylindrical coordinates. The domain is defined in $x$-$y$-$z$ cylindrical coordinates, instead of Cartesian coordinates. Domain discritization is accordingly conducted along the axes of cylindrical coordinates. Wnen $p=0$, the domain is defined on $x$-$y$ axi-symmetric coordinates. In both Coordinates, mesh stretching can be defined along the $x$- and $y$-axes. MPI topology is automatically optimized to maximize the parallel efficiency for given choice of coordinate systems.
 
@@ -202,24 +201,15 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
 | `mpp_lim`	             | Logical | Mixture physical parameters limits |
 | `mixture_err`          | Logical | Mixture properties correction |
-| `time_stepper`         | Integer | Runge--Kutta order [1--5] |
-| `weno_vars`	           | Integer | WENO reconstruction on [1] Conservative; [2] Primitive variables |
+| `time_stepper`         | Integer | Runge--Kutta order [1--3] |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	           | Real    | WENO perturbation (avoid division by zero) |
-| `char_decomp`	         | Logical | Characteristic decomposition |
 | `mapped_weno`	         | Logical | WENO with mapping of nonlinear weights |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
 | `avg_state`	           | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
-| `commute_err` †*       | Logical | Commutative error correction via cell-interior quadrature	 |
-| `split_err` †*         | Logical | Dimensional splitting error correction via cell-boundary	 |
-| `reg_eps` *            | Real    | Interface thickness parameter for regularization terms	 |
-| `flux_lim` *           | Integer | Choice of flux limiter: [1] Minmod; [2] MC; [3] Ospre; [4] Superbee; [5] Sweby; [6] van Albada; [7] van Leer.    |
-| `tvd_rhs_flux` *       | Logical | Apply TVD flux limiter to intercell fluxes outside Riemann solver	 |
-| `tvd_riemann_flux` *   | Logical | Apply TVD flux limiter to cell edges inside Riemann solver	 |
-| `tvd_wave_speeds` *    | Logical | TVD wave-speeds for flux computation inside Riemann solver	 |
 
 - \* Options that work only with `model_eqns` $=2$.
 - † Options that work only with `cyl_coord` $=$ `False`.
@@ -251,15 +241,9 @@ where $\alpha_i$ is the void fraction of $i$-th component. When a single-compone
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer. 
 Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md#Gottlieb98)).
 
-- `weno_vars` specifies the choice of state variables that are reconstructed using a WENO scheme by an integer of 1 or 2. 
-
-- `weno_vars` $=$ 1 and 2 correspond to conservative variables and primitive variables, respectively.
-
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
 
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights. Practically, `weno_eps` $<10^{-6}$ is used.
-
-- `char_decomp` activates projection of the state variables onto characteristic fields prior to WENO reconstruction.
 
 - `mapped_weno` activates mapping of the nonlinear WENO weights to the more accurate nonlinear weights in order to reinstate the optimal order of accuracy of the reconstruction in the proximity of critical points ([Henrick et al., 2005](references.md#Henrick05)).
 
@@ -274,19 +258,6 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
 `wave_speeds` $=$ 1 and 2 correspond to the direct method ([Batten et al., 1997](references.md#Batten97)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md#Toro13)), respectively.
 
-- `commute_err` activates WENO reconstruction of the cell-averaged variables at the cell-interior Gaussian quadrature points, following the two-point, fourth order Gaussian quadrature rule ([Titarev and Toro, 2004](references.md#Titarev04)).
-
-- `split_err` activates numerical approximation of the left or right cell-boundary integral-average of the given variables by getting the arithmetic mean of their WENO-reconstructed values at the cell-boundary Gaussian quadrature points, following the two-point, fourth order Gaussian quadrature rule ([Titarev and Toro, 2004](references.md#Titarev04)). When `commute_err` and `split_err` are set `True` and the 5th-order WENO is used, the global order of accuracy of the spatial integration of the governing equations becomes fourth order ([Coralic and Colonius, 2014](references.md#Coralic14)).
-
-- `reg_eps` specifies the magnitude of interface regularization for two-component flows that prevents diffusion of the phase interface ([Tiwari et al., 2013](references.md#Tiwari13)). The default value of `reg_eps` is unity. When `reg_eps` is undefined, interface regularization is not used. Details of implementation and assessment are addressed in [Meng (2016)](references.md#Meng16); [Schmidmayer et al. (2019)](references.md#Schmidmayer19).
-
-- `flux_lim` specifies the choice of flux limiter that is used in simulation by an integer from 1 through 7 as listed in table [Flux Limiters](#flux-limiters). When `flux_lim` is undefined, flux limiter is not applied. Details of the limiters and their implementations in MFC can be found in [Meng (2016)](references.md#Meng16).
-
-- `tvd_rhs_flux` activates a specified flux limiter to inte-rcell fluxes outside Riemann solver.
-
-- `tvd_riemann_flux` activate a specified flux limiter to cell edges inside the Riemann solver. `tvd_rhs_flux` and `tvd_riemann_flux` are mutually exclusive.
-
-- `tvd_wave_speeds` activates the use of the TVD wave speeds for flux computation inside the Riemann solver when `tvd_riemann_flux` is set `True`.
 
 ### 6. Formatted Output
 
@@ -297,7 +268,6 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 | `parallel_io`        | Logical | Parallel I/O	|
 | `cons_vars_wrt`      | Logical | Write conservative variables \|
 | `prim_vars_wrt`      | Logical | Write primitive variables	|
-| `fourier_decomp`     | Logical | Apply a spatial Fourier decomposition to the output variables	|
 | `alpha_rho_wrt(i)`   | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`            | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`         | Logical | Add the $i$-direction momentum to the database	 |
@@ -317,8 +287,6 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
 | `num_probes`         | Integer | Number of probes	|
 | `probe(i)%[x,y,z]`   | Real	   | Coordinates of probe $i$	|
-| `com_wrt(i)`         | Logical | Add the center of mass of fluid $i$ to the database	|
-| `cb_wrt(i)`          | Logical | Add coherent body data of fluid $i$ to the database |
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -339,10 +307,6 @@ Parallel I/O enables the use of different number of processors in each of the pr
 - `fd_order` specifies the order of finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4. `fd_order` $=$ 1, 2, and 4 correspond to the first, second, and fourth order finite difference schemes, respectively.
 
 - `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
-
-- `com_wrt(i)` activates output of the center of mass of $i$-th fluid component into the database.
-
-- `cb_wrt(i)` activates output of the coherent body mass of $i$-th fluid component in the domain into the database.
 
 
 ### 7. Acoustic Source
@@ -485,20 +449,6 @@ types exclusive to one-, two-, and three-dimensional problems. The patch type nu
 corresponds to the input value in `input.py` labeled  `patch_icpp(j)%geometry` where
 $j$ is the patch index. Each patch requires a different set of parameters, which are 
 also listed in this table.
-
-### Flux limiters
-
-| #    | Description |
-| ---: | :----       |
-|    1 | Minmod      |
-|    2 | MC          |
-|    3 | Ospre       |
-|    4 | Superbee    |
-|    5 | Sweby       |
-|    6 | van Albada  |
-|    7 | van Leer    |
-
-The flux limiters supported by the MFC are listed in table [Flux Limiters](#flux-limiters). Each limiter can be specified by specifying the value of `flux_lim`. Details of their implementations can be found in [Meng (2016)](references.md#Meng16).
 
 ### Monopole supports
 

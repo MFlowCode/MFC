@@ -63,9 +63,6 @@ print(json.dumps({
     'mixture_err'                  : 'T',
     # Use TVD RK3 for time marching
     'time_stepper'                 : 3,
-    # Reconstruct the primitive variables to minimize spurious
-    # oscillations
-    'weno_vars'                    : 2,
     # Use WENO5
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
