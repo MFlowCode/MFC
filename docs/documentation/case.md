@@ -66,7 +66,7 @@ There are multiple sets of parameters that must be specified in the python input
 6. [Formatted Database and Structure Parameters](#6-formatted-output)
 7. [(Optional) Acoustic Source Parameters](#7-acoustic-source)
 8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
-9. [(Optional) Velocity Field Parameters] (#9-velocity-field)
+9. [(Optional) Velocity Field Parameters](#9-velocity-field)
 
 Items 7, 8, and 9 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, and initial velocity field setup, respectively.
 Definition of the parameters is described in the following subsections.
@@ -439,23 +439,23 @@ Implementation of the parameterse into the model follow [Ando (2010)](references
 
 | Parameter      | Type    | Description                                    |
 | ---:           | :----:  |          :---                                  |
-| 'perturb_flow' | Logical | Perturb the initlal velocity field by random noise |
-| 'perturb_sph'  | Logical | Perturb the initial partial density by random noise |
-| 'perturb_sph_fluid'  | Integer | Fluid component whose partial density to be perturbed |
+| `perturb_flow` | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_sph`  | Logical | Perturb the initial partial density by random noise |
+| `perturb_sph_fluid`  | Integer | Fluid component whose partial density to be perturbed |
 | `vel_profile`  | Logical  | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `instability_wave` | Logical  | Perturb the initial velocity field by instability waves |
 
 The table lists velocity field parameters. The parameters are optionally used to define initial velocity profiles and perturbations.
 
-- 'perturb_flow' activates the perturbation of initial velocity by random noise.
+- `perturb_flow` activates the perturbation of initial velocity by random noise.
 
-- 'perturb_sph' activates the perturbation of intial partial density by random noise. 
+- `perturb_sph` activates the perturbation of intial partial density by random noise. 
 
-- 'perturb_sph_fluid' specifies the fluid component whose the partial density to be perturbed.
+- `perturb_sph_fluid` specifies the fluid component whose the partial density to be perturbed.
 
-- 'vel_profile' activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
+- `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- 'instability_wave' activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for 2D and 3D cases, together with 'vel_profile'=true.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for 2D and 3D cases, together with 'vel_profile'=true.
 
 
 ## Enumerations
