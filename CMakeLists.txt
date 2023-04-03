@@ -106,9 +106,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-r8>
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Mr8intrinsics>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
         -Minfo=accel
     )
