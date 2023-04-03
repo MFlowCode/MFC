@@ -68,7 +68,7 @@ There are multiple sets of parameters that must be specified in the python input
 8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
 9. [(Optional) Velocity field parameters] (#9-velocity-field)
 
-Items 7, 8, and 9 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, and initial velocity field modification, respectively.
+Items 7, 8, and 9 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, and initial velocity field setup, respectively.
 Definition of the parameters is described in the following subsections.
 
 ### 1. Runtime
@@ -436,6 +436,7 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
 
 ### 9. Velocity field
+
 | Parameter      | Type    | Description                                    |
 | ---:           | :----:  |          :---                                  |
 | 'perturb_flow' | Logical | Perturb the initlal velocity field by random noise |
