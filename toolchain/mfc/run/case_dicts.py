@@ -110,12 +110,12 @@ for f_id in range(1,10+1):
 
 POST_PROCESS = COMMON + [
     't_step_start', 't_step_stop', 't_step_save', 'alt_soundspeed',
-    'mixture_err', 'format', 'coarsen_silo',
+    'mixture_err', 'format', 'schlieren_wrt', 'schlieren_alpha', 'fd_order',
     'fourier_modes%beg', 'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
-    'qm_wrt', 'schlieren_wrt', 'schlieren_alpha', 'fd_order'
+    'qm_wrt'
 ]
 
 for cmp_id in range(1,3+1):
