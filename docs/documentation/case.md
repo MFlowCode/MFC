@@ -407,7 +407,7 @@ Implementation of the parameterse into the model follow [Ando (2010)](references
 |  -2  | Normal         | Reflective |
 |  -3  | Normal         | Ghost cell extrapolation |
 |  -4  | Normal         | Riemann extrapolation |
-|  -5  | Normal         | Slip wall |
+|  -5  | Characteristic | Slip wall |
 |  -6  | Characteristic | Non-reflecting subsonic buffer |
 |  -7  | Characteristic | Non-reflecting subsonic inflow |
 |  -8  | Characteristic | Non-reflecting subsonic outflow |
