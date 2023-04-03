@@ -230,17 +230,6 @@ elif [ "$1" == "format" ]; then
     ok "MFC has been fprettify'ied."
 
     exit 0
-elif [ "$1" == "cloc" ]; then
-    if ! command -v cloc > /dev/null 2>&1; then
-        error "cloc (github.com/AlDanial/cloc) is not installed."
-
-        exit 1
-    fi
-
-    cloc .          --exclude-dir=build,tests,examples,.vscode,.github \
-         --fullpath --not-match-d=src/*/*/autogen
-
-    exit $?
 elif [ "$1" == "docker" ]; then
     shift;
 
