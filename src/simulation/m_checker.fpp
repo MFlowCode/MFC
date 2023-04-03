@@ -87,8 +87,6 @@ contains
                 call s_mpi_abort('Bubble models untested with 6-equation model')
             elseif (model_eqns == 1) then
                 call s_mpi_abort('Bubble models untested with pi-gamma model')
-            elseif (weno_vars /= 2) then
-                call s_mpi_abort('Bubble modeling requires weno_vars = 2')
             !TODO: Comment this out when testing riemann with hll
             elseif (riemann_solver /= 2) then
                 call s_mpi_abort('Bubble modeling requires riemann_solver = 2')
