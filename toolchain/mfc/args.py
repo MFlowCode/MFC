@@ -26,6 +26,7 @@ started, run ./mfc.sh build -h.""",
     build = parsers.add_parser(name="build", help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     clean = parsers.add_parser(name="clean", help="Clean build artifacts.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bench = parsers.add_parser(name="bench", help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count = parsers.add_parser(name="count", help="Count LOC in MFC.",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     def add_common_arguments(p, mask = None):
         if mask is None:
@@ -98,6 +99,9 @@ started, run ./mfc.sh build -h.""",
     # === BENCH ===
     add_common_arguments(bench, "t")
 
+    # === COUNT ===
+    add_common_arguments(count)
+
     args: dict = vars(parser.parse_args())
 
     # Add default arguments of other subparsers
@@ -109,7 +113,7 @@ started, run ./mfc.sh build -h.""",
                     args[key] = val
 
     for a, b in [("run",   run  ), ("test",  test ), ("build", build),
-                 ("clean", clean), ("bench", bench)]:
+                 ("clean", clean), ("bench", bench), ("count", count)]:
         append_defaults_to_data(a, b)
 
     if args["command"] is None:
