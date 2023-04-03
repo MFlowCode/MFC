@@ -66,7 +66,7 @@ There are multiple sets of parameters that must be specified in the python input
 6. [Formatted Database and Structure Parameters](#6-formatted-output)
 7. [(Optional) Acoustic Source Parameters](#7-acoustic-source)
 8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
-9. [(Optional) Velocity Field Parameters](#9-velocity-field)
+9. [(Optional) Velocity Field Setup Parameters](#9-velocity-field-setup)
 
 Items 7, 8, and 9 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, and initial velocity field setup, respectively.
 Definition of the parameters is described in the following subsections.
@@ -435,7 +435,7 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
 Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
 
-### 9. Velocity Field
+### 9. Velocity Field Setup
 
 | Parameter      | Type    | Description                                    |
 | ---:           | :----:  |          :---                                  |
