@@ -66,8 +66,9 @@ There are multiple sets of parameters that must be specified in the python input
 6. [Formatted Database and Structure Parameters](#6-formatted-output)
 7. [(Optional) Acoustic Source Parameters](#7-acoustic-source)
 8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
+9. [(Optional) Velocity Field Setup Parameters](#9-velocity-field-setup)
 
-Items 7 and 8 are optional sets of parameters that activate the acoustic source model and ensemble-averaged bubble model, respectively.
+Items 7, 8, and 9 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, and initial velocity field setup, respectively.
 Definition of the parameters is described in the following subsections.
 
 ### 1. Runtime
@@ -295,10 +296,10 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 | `format`             | Integer | Output format. [1]: Silo-HDF5; [2] Binary	|
 | `precision`          | Integer | [1] Single; [2] Double	 |
 | `parallel_io`        | Logical | Parallel I/O	|
-| `cons_vars_wrt`      | Logical | Write conservative variables \|
+| `cons_vars_wrt`      | Logical | Write conservative variables |
 | `prim_vars_wrt`      | Logical | Write primitive variables	|
 | `fourier_decomp`     | Logical | Apply a spatial Fourier decomposition to the output variables	|
-| `alpha_rho_wrt(i)`   | Logical | Add the partial density of the fluid $i$ to the database \|
+| `alpha_rho_wrt(i)`   | Logical | Add the partial density of the fluid $i$ to the database |
 | `rho_wrt`            | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`         | Logical | Add the $i$-direction momentum to the database	 |
 | `vel_wrt(i)`         | Logical | Add the $i$-direction velocity to the database	  |
@@ -307,11 +308,12 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 | `alpha_wrt(i)`       | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`          | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`     | Logical | Add the specific heat ratio to the database	|
-| `pi_inf_wrt`         | Logical | Add the liquid stiffness function to the database \|
+| `pi_inf_wrt`         | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`       | Logical | Add the liquid stiffness to the formatted database	 |
 | `c_wrt`              | Logical | Add the sound speed to the database	 |
 | `omega_wrt(i)`       | Logical | Add the $i$-direction vorticity to the database	 |
 | `schlieren_wrt`      | Logical | Add the numerical schlieren to the database|
+| `qm_wrt`             | Logical | Add the Q-criterion to the database|
 | `fd_order`           | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
@@ -432,6 +434,29 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 `mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively. 
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
 Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
+
+### 9. Velocity Field Setup
+
+| Parameter      | Type    | Description                                    |
+| ---:           | :----:  |          :---                                  |
+| `perturb_flow` | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_sph`  | Logical | Perturb the initial partial density by random noise |
+| `perturb_sph_fluid`  | Integer | Fluid component whose partial density to be perturbed |
+| `vel_profile`  | Logical  | Set the mean streamwise velocity to hyperbolic tangent profile |
+| `instability_wave` | Logical  | Perturb the initial velocity field by instability waves |
+
+The table lists velocity field parameters. The parameters are optionally used to define initial velocity profiles and perturbations.
+
+- `perturb_flow` activates the perturbation of initial velocity by random noise.
+
+- `perturb_sph` activates the perturbation of intial partial density by random noise. 
+
+- `perturb_sph_fluid` specifies the fluid component whose the partial density to be perturbed.
+
+- `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
+
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for 2D and 3D cases, together with `vel_profile`=TRUE.
+
 
 ## Enumerations
 
