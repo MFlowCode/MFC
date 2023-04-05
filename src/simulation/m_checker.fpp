@@ -87,8 +87,6 @@ contains
                 call s_mpi_abort('Bubble models untested with 6-equation model')
             elseif (model_eqns == 1) then
                 call s_mpi_abort('Bubble models untested with pi-gamma model')
-            elseif (weno_vars /= 2) then
-                call s_mpi_abort('Bubble modeling requires weno_vars = 2')
             !TODO: Comment this out when testing riemann with hll
             elseif (riemann_solver /= 2) then
                 call s_mpi_abort('Bubble modeling requires riemann_solver = 2')
@@ -161,8 +159,6 @@ contains
             if (time_stepper /= 23) then 
                 call s_mpi_abort('Unsupported value of time_stepper. Exiting ...')
             end if
-        elseif (all(weno_vars /= (/1, 2/))) then
-            call s_mpi_abort('Unsupported value of weno_vars. Exiting ...')
         elseif (all(weno_order /= (/1, 3, 5/))) then
             call s_mpi_abort('Unsupported value of weno_order. Exiting ...')
         elseif (m + 1 < num_stcls_min*weno_order) then 

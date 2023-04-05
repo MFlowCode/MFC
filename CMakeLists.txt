@@ -71,9 +71,7 @@ list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake")
 # === Compiler Flags
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
         $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
-        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-double-8>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -108,9 +106,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-r8>
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Mr8intrinsics>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
         -Minfo=accel
     )

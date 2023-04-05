@@ -29,7 +29,6 @@ print(json.dumps({
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
-    'weno_vars'                    : 2,
     'weno_order'                   : 3,
     'weno_eps'                     : 1.E-16,
     'mapped_weno'                  : 'T',
