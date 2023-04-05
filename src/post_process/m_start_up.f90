@@ -53,8 +53,7 @@ contains
             omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
-            parallel_io, coarsen_silo, fourier_decomp, &
-            rhoref, pref, bubbles, R0ref, nb, &
+            parallel_io, rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma
 
