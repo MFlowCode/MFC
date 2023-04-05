@@ -302,8 +302,10 @@ contains
         integer :: i,j,k
         
         Lx = x_domain%end - x_domain%beg
-        Lz = z_domain%end - z_domain%beg
-                
+        if (p > 0) then
+            Lz = z_domain%end - z_domain%beg
+        end if
+ 
         wave = 0d0
         wave1 = 0d0
         wave2 = 0d0
