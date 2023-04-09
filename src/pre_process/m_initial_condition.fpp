@@ -27,10 +27,10 @@ module m_initial_condition
     use m_patches
 
     use m_assign_variables
-	
-    use m_eigen_solver			! Subroutines to solve eigenvalue problem for
+
+    use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
     ! complex general matrix
-	
+
     ! ==========================================================================
     ! ==========================================================================
 
@@ -298,37 +298,40 @@ contains
     subroutine s_superposition_instability_wave() ! ------------------------
         real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
         real(kind(0d0)) :: tr,ti
-        real(kind(0d0)) :: Ly
+        real(kind(0d0)) :: Lx,Lz
         integer :: i,j,k
         
-        Ly = y_domain%end - y_domain%beg
-                
+        Lx = x_domain%end - x_domain%beg
+        if (p > 0) then
+            Lz = z_domain%end - z_domain%beg
+        end if
+ 
         wave = 0d0
         wave1 = 0d0
         wave2 = 0d0
         
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Ly,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*4.0/Lx,0d0,tr,ti,wave_tmp,0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Ly,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*2.0/Lx,0d0,tr,ti,wave_tmp,0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Ly,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*1.0/Lx,0d0,tr,ti,wave_tmp,0d0)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
-		
+
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Ly, 2*pi*4.0/Ly,tr,ti,wave_tmp,2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*11d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ly, 2*pi*2.0/Ly,tr,ti,wave_tmp,2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*13d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ly, 2*pi*1.0/Ly,tr,ti,wave_tmp,2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*17d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Ly,-2*pi*4.0/Ly,tr,ti,wave_tmp,2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx,-2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*19d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ly,-2*pi*2.0/Ly,tr,ti,wave_tmp,2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx,-2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*23d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ly,-2*pi*1.0/Ly,tr,ti,wave_tmp,2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx,-2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*29d0/31d0)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -346,7 +349,7 @@ contains
         end do
         end do
     
-	end subroutine s_superposition_instability_wave ! ----------------------
+    end subroutine s_superposition_instability_wave ! ----------------------
 
     !>  This subroutine computes instability waves for a given set of spatial
         !!              wavenumbers (alpha, beta) in x and z directions.
@@ -360,7 +363,7 @@ contains
         real(kind(0d0)),dimension(0:n,0:n) :: d !< differential operator in y dir
         real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: ar,ai,br,bi,ci !< matrices for eigenvalue problem
         real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: wr,wi	!< eigenvalues
+        real(kind(0d0)),dimension(0:5*(n+1)-1) :: wr,wi !< eigenvalues
         real(kind(0d0)),dimension(0:5*(n+1)-1) :: fv1,fv2,fv3 !< temporary memory
         real(kind(0d0)) :: tr,ti !< most unstable eigenvalue
         real(kind(0d0)),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
@@ -380,9 +383,9 @@ contains
         
         ! Assign mean profiles
         do j=0,n
-        	u_mean(j)=tanh(y_cc(j))
-        	t_mean(j)=1+0.5*(gam-1)*mach**2*(1-u_mean(j)**2)
-        	rho_mean(j)=1/T_mean(j)
+            u_mean(j)=tanh(y_cc(j))
+            t_mean(j)=1+0.5*(gam-1)*mach**2*(1-u_mean(j)**2)
+            rho_mean(j)=1/T_mean(j)
         end do
         
         ! Compute differential operator in y-dir
@@ -393,24 +396,24 @@ contains
         d(1,0)=-1/(2*dy)
         d(1,2)= 1/(2*dy)
         do j=2,n-2
-        	d(j,j-2)= 1/(12*dy)
-        	d(j,j-1)=-8/(12*dy)
-        	d(j,j+1)= 8/(12*dy)
-        	d(j,j+2)=-1/(12*dy)
+            d(j,j-2)= 1/(12*dy)
+            d(j,j-1)=-8/(12*dy)
+            d(j,j+1)= 8/(12*dy)
+            d(j,j+2)=-1/(12*dy)
         end do
         d(n-1,n-2)=-1/(2*dy)
         d(n-1,n)  = 1/(2*dy)
         
         ! Compute y-derivatives of rho, u, T
         do j=0,n
-        	drho_mean(j)=0
-        	du_mean(j)=0
-        	dt_mean(j)=0
-        	do k=0,n
-        		drho_mean(j) = drho_mean(j)+d(j,k)*rho_mean(k)
-        		du_mean(j) = du_mean(j)+d(j,k)*u_mean(k)
-        		dt_mean(j) = dt_mean(j)+d(j,k)*t_mean(k)
-        	end do
+            drho_mean(j)=0
+            du_mean(j)=0
+            dt_mean(j)=0
+            do k=0,n
+                drho_mean(j) = drho_mean(j)+d(j,k)*rho_mean(k)
+                du_mean(j) = du_mean(j)+d(j,k)*u_mean(k)
+                dt_mean(j) = dt_mean(j)+d(j,k)*t_mean(k)
+            end do
         end do
         
         ! Compute B and C, then A = B + C
@@ -455,7 +458,7 @@ contains
         
         ! Compute eigenvalues and eigenvectors
         call cg(5*(n+1),5*(n+1),ar,ai,wr,wi,zr,zi,fv1,fv2,fv3,ierr)
-		
+
         ! Generate instability wave
         call s_generate_wave(5*(n+1),wr,wi,zr,zi,alpha,beta,wave,shift)
 
@@ -485,9 +488,9 @@ contains
         end do
         vr = zr(:,k)
         vi = zi(:,k)
-		
+
         ! Normalize the eigenvector by its component with the largest modulus.
-	    norm = 0d0
+        norm = 0d0
         do i=0,nl-1
             if (dsqrt(vr(i)**2+vi(i)**2) .gt. norm) then
                 idx = i
@@ -502,7 +505,7 @@ contains
             vnr(i) = cr
             vni(i) = ci
         end do
-		
+
         ! Generate an instability wave
         do i=0,m
         do j=0,n
@@ -512,17 +515,17 @@ contains
             else 
                 ang = alpha*x_cc(i)+beta*z_cc(k)+shift
             end if
-            wave(1,i,j,k) = vnr(j)*cos(ang)-vni(j)*sin(ang) ! rho
-            wave(2,i,j,k) = vnr((n+1)+j)*cos(ang)-vni((n+1)+j)*sin(ang)	! u
-            wave(3,i,j,k) = vnr(2*(n+1)+j)*cos(ang)-vni(2*(n+1)+j)*sin(ang)	! v
-            wave(4,i,j,k) = vnr(3*(n+1)+j)*cos(ang)-vni(3*(n+1)+j)*sin(ang)	! w
-            wave(5,i,j,k) = vnr(4*(n+1)+j)*cos(ang)-vni(4*(n+1)+j)*sin(ang)	! T
+            wave(1,i,j,k) = vnr(j)*cos(ang)-vni(j)*sin(ang)                 ! rho
+            wave(2,i,j,k) = vnr((n+1)+j)*cos(ang)-vni((n+1)+j)*sin(ang)     ! u
+            wave(3,i,j,k) = vnr(2*(n+1)+j)*cos(ang)-vni(2*(n+1)+j)*sin(ang) ! v
+            wave(4,i,j,k) = vnr(3*(n+1)+j)*cos(ang)-vni(3*(n+1)+j)*sin(ang) ! w
+            wave(5,i,j,k) = vnr(4*(n+1)+j)*cos(ang)-vni(4*(n+1)+j)*sin(ang) ! T
         end do
         end do
         end do
-	
-	end subroutine s_generate_wave
-	
+    
+    end subroutine s_generate_wave
+
     !>  Deallocation procedures for the module
     subroutine s_finalize_initial_condition_module() ! ---------------------
 
