@@ -23,8 +23,18 @@ jobs:
         include:
           - os:  ubuntu-latest
             debug: --no-debug
+            intel: false
           - os:  ubuntu-latest
             debug: --debug
+            intel: false
+          - os:  ubuntu-latest
+            debug: --no-debug
+            intel: true
+            intel-command: source /opt/intel/oneapi/setvars.sh
+          - os:  ubuntu-latest
+            debug: --debug
+            intel: true
+            intel-command: source /opt/intel/oneapi/setvars.sh
           - os:  macos-latest
             debug: --no-debug
             gcc: 11
@@ -36,7 +46,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v3
 
-      - name: Setup
+      - name: Setup MacOS
         if:   matrix.os == 'macos-latest'
         run: |
           echo "OMPI_FC=gfortran-${{ matrix.gcc }}" >> $GITHUB_ENV
@@ -48,21 +58,46 @@ jobs:
           brew install wget make python make cmake coreutils gcc@${{ matrix.gcc }}
           HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-${{ matrix.gcc }} --verbose --build-from-source open-mpi
 
-      - name: Setup
-        if:   matrix.os == 'ubuntu-latest'
+      - name: Setup Ubuntu
+        if:   matrix.os == 'ubuntu-latest' && matrix.intel == false
         run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-       
-      - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc) ${{ matrix.debug }}
 
-      - name: Test Suite
+      - name: Setup Ubuntu (Intel)
+        if:   matrix.os == 'ubuntu-latest' && matrix.intel == true
+        run: |
+          sudo apt install tar wget make cmake python3 python3-dev
+          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt-get update
+          sudo apt-get install -y intel-oneapi-common-vars intel-oneapi-compiler-fortran-2022.1.0 intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0 intel-oneapi-mkl-2021.4.0 intel-oneapi-mpi-2021.7.1 intel-oneapi-mpi-devel-2021.7.1
+          source /opt/intel/oneapi/setvars.sh
+          echo "CXX=$(which icpc)"          >> $GITHUB_ENV
+          echo "CC=$(which icc)"            >> $GITHUB_ENV
+          echo "FC=$(which ifort)"          >> $GITHUB_ENV
+          echo "OMPI_FC=$(which ifort)"     >> $GITHUB_ENV
+          echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
+          echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
+          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          ${{ matrix.intel-command }}
+          /bin/bash mfc.sh build -j $(nproc) ${{ matrix.debug }}
+
+      - name: Test Suite (Debug)
         if: matrix.debug == '--debug'
-        run:  /bin/bash mfc.sh test  -j $(nproc) --debug
-        
-      - name: Test Suite
+        run: |
+          ${{ matrix.intel-command }}
+          /bin/bash mfc.sh test  -j $(nproc) --debug
+
+      - name: Test Suite (No Debug)
         if: matrix.debug == '--no-debug'
-        run:  /bin/bash mfc.sh test  -j $(nproc) -a 
-        
+        run: |
+          ${{ matrix.intel-command }}
+          /bin/bash mfc.sh test -j $(nproc) -a
+          
   self-cpu:
     name: (Self) Test Suite - CPU
     strategy:
@@ -143,7 +178,7 @@ jobs:
           module use /opt/nvidia/hpc_sdk/modulefiles/
           module load nvhpc
           /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a
-    
+
 #   self-gpu-debug:
 #     name: (Self) Test Suite - GPU - debug
 #     strategy:

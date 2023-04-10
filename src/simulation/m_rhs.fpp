@@ -178,7 +178,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_rhs_module() ! ---------------------------------
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, d !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -308,7 +308,6 @@ contains
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
-
         ! Allocation of dq_prim_ds_qp ======================================
 
         if (any(Re_size > 0)) then
@@ -448,7 +447,6 @@ contains
                 end if
             end if
         end if
-
         ! ==================================================================
 
         ! Allocation of gm_alphaK_n =====================================
@@ -547,7 +545,6 @@ contains
 
             end if
         end do
-
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         if (alt_soundspeed) then
@@ -575,7 +572,6 @@ contains
 !$acc update device(Res, Re_idx, Re_size)
         end if
 
-
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
@@ -583,6 +579,7 @@ contains
         elseif (riemann_solver == 2) then
             s_riemann_solver => s_hllc_riemann_solver
         end if
+
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -597,20 +594,15 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-!$acc parallel loop collapse(4) gang vector default(present)
+
+!$acc parallel loop collapse(5) gang vector default(present)
         do i = 1, sys_size
             do l = startz, p - startz
                 do k = starty, n - starty
                     do j = startx, m - startx
-                        flux_gsrc_n(1)%vf(i)%sf(j, k, l) = 0d0
-
-                        if (n > 0) then
-                            flux_gsrc_n(2)%vf(i)%sf(j, k, l) = 0d0
-                        end if
-
-                        if (p > 0) then
-                            flux_gsrc_n(3)%vf(i)%sf(j, k, l) = 0d0
-                        end if
+                        do d = 1, num_dims
+                            flux_gsrc_n(d)%vf(i)%sf(j, k, l) = 0d0;
+                        end do
                     end do
                 end do
             end do
