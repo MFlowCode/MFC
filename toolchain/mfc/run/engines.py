@@ -8,18 +8,18 @@ from ..run.input import MFCInputFile
 
 
 def profiler_prepend():
-    if ARG("ncu"):
+    if ARG("ncu") is not None:
         if not common.does_command_exist("ncu"):
             raise common.MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
 
         return ["ncu", "--nvtx", "--mode=launch-and-attach",
-                       "--cache-control=none", "--clock-control=none"]
+                       "--cache-control=none", "--clock-control=none"] + ARG("ncu")
 
-    if ARG("nsys"):
+    if ARG("nsys") is not None:
         if not common.does_command_exist("nsys"):
             raise common.MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
 
-        return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"]
+        return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
     return []
 
