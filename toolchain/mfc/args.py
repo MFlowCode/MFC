@@ -70,7 +70,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-o", "--only",        nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
     test.add_argument("-b", "--binary",      choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
-    test.add_argument("-a", "--test-all",  action="store_true", default=False, help="Run the Post Process Tests too.")
+    test.add_argument("-a", "--test-all",    action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
 
     # === RUN ===
@@ -87,11 +87,11 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("-a", "--account",        metavar="ACCOUNT",               type=str, default="",         help="(Batch) Account to charge.")
     run.add_argument("-@", "--email",          metavar="EMAIL",                 type=str, default="",         help="(Batch) Email for job notification.")
     run.add_argument("-#", "--name",           metavar="NAME",                  type=str, default="MFC",      help="(Batch) Job name.")
-    run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs="+",  type=str, default=[],         help="(Batch) Additional batch options.")
+    run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs='+',  type=str, default=[],         help="(Batch) Additional batch options.")
     run.add_argument("-b", "--binary",         choices=binaries,                type=str, default=None,       help="(Interactive) Override MPI execution binary")
     run.add_argument("-s", "--scratch",        action="store_true",                       default=False,      help="Build from scratch.")
-    run.add_argument("--ncu",                  action="store_true",                       default=False,      help="Profile with NVIDIA Nsight Compute.")
-    run.add_argument("--nsys",                 action="store_true",                       default=False,      help="Profile with NVIDIA Nsight Systems.")
+    run.add_argument("--ncu",                  nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Compute.")
+    run.add_argument("--nsys",                 nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Systems.")
     run.add_argument(      "--dry-run",        action="store_true",                       default=False,      help="(Batch) Run without submitting batch file.")
     run.add_argument("--case-optimization",    action="store_true",                       default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",       action="store_true",                       default=False,      help="(Testing) Do not rebuild MFC.")
