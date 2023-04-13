@@ -104,6 +104,10 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     )
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-g -O0 -traceback -debug)
+    endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
