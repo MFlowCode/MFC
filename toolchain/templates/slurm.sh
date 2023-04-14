@@ -74,24 +74,21 @@ for binpath in {MFC::BINARIES}; do
 
     echo -e ":) Running $binpath:"
 
-#>
-#> Note: This MPI executable might not be well supported
-#>       on your system - if at all. {MFC::BIN} refers to
-#>       the path the MFC executable.
-#>
-#>srun                                   \
-#>     --nodes={nodes}                   \
-#>     --ntasks-per-node {cpus_per_node} \
-#>     --mpi=pmi2		                 \
-#>     {MFC::PROFILER} "{MFC::BIN}"
-#>
-#> srun --mpi=pmix                   \
-#>      {MFC::PROFILER} "{MFC::BIN}"
-#>
+    if command -v srun > /dev/null 2>&1; then
+        srun                                   \
+            --nodes           {nodes}          \
+            --ntasks-per-node {tasks_per_node} \
+            {MFC::PROFILER} "$binpath"
 
-    mpirun                         \
-        -np {nodes*tasks_per_node} \
-        {MFC::PROFILER} "$binpath"
+        #>
+        #> srun --mpi=pmix                 \
+        #>      {MFC::PROFILER} "$binpath"
+        #>
+    else
+        mpirun                         \
+            -np {nodes*tasks_per_node} \
+            {MFC::PROFILER} "$binpath"
+    fi
 
 done
 
