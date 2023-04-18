@@ -144,7 +144,6 @@ jobs:
           . ./mfc.sh load -c p -m g
           mv misc/run-phoenix-release-gpu.sh ./
           sbatch run-phoenix-release-gpu.sh
-          cat test.out
 
       - name: Print
         run: |
