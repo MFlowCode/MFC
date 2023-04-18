@@ -112,7 +112,7 @@ jobs:
       - name: Build
         run:  |
           . ./mfc.sh load -c p -m g
-          ./mfc.sh build -j 8
+          ./mfc.sh build -j 2
 
       - name: Test
         run: |
@@ -137,7 +137,7 @@ jobs:
       - name: Build
         run:  |
           . ./mfc.sh load -c p -m g
-          ./mfc.sh build -j 8 --gpu
+          ./mfc.sh build -j 2 --gpu
 
       - name: Test
         run: |
