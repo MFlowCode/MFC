@@ -98,86 +98,139 @@ jobs:
           ${{ matrix.intel-command }}
           /bin/bash mfc.sh test -j $(nproc) -a
           
-  self-cpu:
-    name: (Self) Test Suite - CPU
-    strategy:
-      matrix:
-        include:
-          - os: [self-hosted, wingtip]
-    runs-on: ${{ matrix.os }}
-    if: github.repository == 'MFlowCode/MFC'
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+
+    self-cpu-release:
+      name: Test CPU release - nvhpc
+      runs-on:
+        group: phoenix
+        labels: self-hosted
+      if: github.repository == 'MFlowCode/MFC'
+      steps:
+        - name: Clone
+          uses: actions/checkout@v3
           
-      - name: Setup
-        run:  echo "test"
+        - name: Build
+          run:  |
+            . ./mfc.sh load -c p -m g
+            ./mfc.sh build -j 8
+            
+        - name: Test
+          run: |
+            . ./mfc.sh load -c p -m g
+            mv misc/run-phoenix-release-cpu.sh ./
+            sbatch run-phoenix-release-cpu.sh
+
+        - name: Print
+          run: |
+            cat test.out
+
+    self-gpu-release:
+      name: Test GPU release - nvhpc
+      runs-on:
+        group: phoenix
+        labels: self-hosted
+      if: github.repository == 'MFlowCode/MFC'
+      steps:
+        - name: Clone
+          uses: actions/checkout@v3
+          
+        - name: Build
+          run:  |
+            . ./mfc.sh load -c p -m g
+            ./mfc.sh build -j 8 --gpu
+            
+        - name: Test
+          run: |
+            . ./mfc.sh load -c p -m g
+            mv misc/run-phoenix-release-gpu.sh ./
+            sbatch run-phoenix-release-gpu.sh
+            cat test.out
+
+        - name: Print
+          run: |
+            cat test.out
+
+
+  # self-cpu:
+  #   name: (Self) Test Suite - CPU
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - os: [self-hosted, wingtip]
+  #   runs-on: ${{ matrix.os }}
+  #   if: github.repository == 'MFlowCode/MFC'
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v3
+          
+  #     - name: Setup
+  #       run:  echo "test"
         
-      - name: Build
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh build -j 8 
+  #     - name: Build
+  #       run:  |
+  #         module use /opt/nvidia/hpc_sdk/modulefiles/
+  #         module load nvhpc
+  #         /bin/bash mfc.sh build -j 8 
 
-      - name: Test Suite
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh test -j 8 -a 
+  #     - name: Test Suite
+  #       run:  |
+  #         module use /opt/nvidia/hpc_sdk/modulefiles/
+  #         module load nvhpc
+  #         /bin/bash mfc.sh test -j 8 -a 
           
-  self-cpu-debug:
-    name: (Self) Test Suite - CPU - debug
-    strategy:
-      matrix:
-        include:
-          - os: [self-hosted, wingtip]
-    runs-on: ${{ matrix.os }}
-    if: github.repository == 'MFlowCode/MFC'
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+  # self-cpu-debug:
+  #   name: (Self) Test Suite - CPU - debug
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - os: [self-hosted, wingtip]
+  #   runs-on: ${{ matrix.os }}
+  #   if: github.repository == 'MFlowCode/MFC'
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v3
           
-      - name: Setup
-        run:  echo "test"
+  #     - name: Setup
+  #       run:  echo "test"
         
-      - name: Build
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh build -j 8 --debug
+  #     - name: Build
+  #       run:  |
+  #         module use /opt/nvidia/hpc_sdk/modulefiles/
+  #         module load nvhpc
+  #         /bin/bash mfc.sh build -j 8 --debug
 
-      - name: Test Suite
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh test -j 8 --debug
+  #     - name: Test Suite
+  #       run:  |
+  #         module use /opt/nvidia/hpc_sdk/modulefiles/
+  #         module load nvhpc
+  #         /bin/bash mfc.sh test -j 8 --debug
 
-  self-gpu:
-    name: (Self) Test Suite - GPU
-    strategy:
-      matrix:
-        include:
-          - os: [self-hosted, wingtip]
-    runs-on: ${{ matrix.os }}
-    if: github.repository == 'MFlowCode/MFC'
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+  # self-gpu:
+  #   name: (Self) Test Suite - GPU
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - os: [self-hosted, wingtip]
+  #   runs-on: ${{ matrix.os }}
+  #   if: github.repository == 'MFlowCode/MFC'
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v3
           
-      - name: Setup
-        run:  echo "test"
+  #     - name: Setup
+  #       run:  echo "test"
         
-      - name: Build
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh build -j 8 --gpu 
+  #     - name: Build
+  #       run:  |
+  #         module use /opt/nvidia/hpc_sdk/modulefiles/
+  #         module load nvhpc
+  #         /bin/bash mfc.sh build -j 8 --gpu 
 
-      - name: Test Suite
-        run:  |
-          module use /opt/nvidia/hpc_sdk/modulefiles/
-          module load nvhpc
-          /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a
+  #     - name: Test Suite
+  #       run:  |
+  #         module use /opt/nvidia/hpc_sdk/modulefiles/
+  #         module load nvhpc
+  #         /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a
 
 #   self-gpu-debug:
 #     name: (Self) Test Suite - GPU - debug
