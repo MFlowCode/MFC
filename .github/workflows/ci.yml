@@ -121,6 +121,7 @@ jobs:
           sbatch run-phoenix-release-cpu.sh
 
       - name: Print
+        if: always()
         run: |
           cat test.out
 
@@ -146,6 +147,7 @@ jobs:
           sbatch run-phoenix-release-gpu.sh
 
       - name: Print
+        if: always()
         run: |
           cat test.out
 
