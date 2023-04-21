@@ -227,9 +227,9 @@ contains
 
         integer :: i, j, k, l !< generic loop operators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: alpha_unadv
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: alpha_unadv
+        real(wp) :: rand_real
         call random_seed()
 
         do k = 0, p
@@ -259,8 +259,8 @@ contains
 
         integer :: i, j, k, l !<  generic loop iterators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: rand_real
         call random_seed()
 
         ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
@@ -296,9 +296,9 @@ contains
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4), 
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave() ! ------------------------
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
-        real(kind(0d0)) :: tr,ti
-        real(kind(0d0)) :: Lx,Lz
+        real(wp), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
+        real(wp) :: tr,ti
+        real(wp) :: Lx,Lz
         integer :: i,j,k
         
         Lx = x_domain%end - x_domain%beg
@@ -357,19 +357,19 @@ contains
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha,beta,tr,ti,wave,shift)
-        real(kind(0d0)),intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
-        real(kind(0d0)),dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
-        real(kind(0d0)),dimension(0:n,0:n) :: d !< differential operator in y dir
-        real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: ar,ai,br,bi,ci !< matrices for eigenvalue problem
-        real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: fv1,fv2,fv3 !< temporary memory
-        real(kind(0d0)) :: tr,ti !< most unstable eigenvalue
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
-        real(kind(0d0)),dimension(5,0:m,0:n,0:p) :: wave !< instability wave
-        real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)) :: gam,pi_inf,rho1,mach,c1
+        real(wp),intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(wp),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
+        real(wp),dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
+        real(wp),dimension(0:n,0:n) :: d !< differential operator in y dir
+        real(wp),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: ar,ai,br,bi,ci !< matrices for eigenvalue problem
+        real(wp),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: zr,zi !< eigenvectors
+        real(wp),dimension(0:5*(n+1)-1) :: wr,wi !< eigenvalues
+        real(wp),dimension(0:5*(n+1)-1) :: fv1,fv2,fv3 !< temporary memory
+        real(wp) :: tr,ti !< most unstable eigenvalue
+        real(wp),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
+        real(wp),dimension(5,0:m,0:n,0:p) :: wave !< instability wave
+        real(wp) :: shift !< phase shift
+        real(wp) :: gam,pi_inf,rho1,mach,c1
         integer :: ierr
         integer :: j, k, l !<  generic loop iterators
         integer :: ii, jj !< block matrix indicies
@@ -469,13 +469,13 @@ contains
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(nl,wr,wi,zr,zi,alpha,beta,wave,shift)
         integer nl
-        real(kind(0d0)), dimension(0:nl-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave
-        real(kind(0d0)) :: alpha,beta,ang,shift
-        real(kind(0d0)) :: norm
-        real(kind(0d0)) :: tr,ti,cr,ci !< temporary memory
+        real(wp), dimension(0:nl-1) :: wr,wi !< eigenvalues
+        real(wp), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
+        real(wp), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
+        real(wp), dimension(5,0:m,0:n,0:p) :: wave
+        real(wp) :: alpha,beta,ang,shift
+        real(wp) :: norm
+        real(wp) :: tr,ti,cr,ci !< temporary memory
         integer idx
         integer i,j,k
         

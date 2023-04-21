@@ -35,7 +35,7 @@ module m_derived_variables
  s_compute_speed_of_sound, &
  s_finalize_derived_variables_module
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: gm_rho_sf !<
+    real(wp), allocatable, dimension(:, :, :) :: gm_rho_sf !<
     !! Gradient magnitude (gm) of the density for each cell of the computational
     !! sub-domain. This variable is employed in the calculation of the numerical
     !! Schlieren function.
@@ -45,9 +45,9 @@ module m_derived_variables
     !! active coordinate directions, the centered family of the finite-difference
     !! schemes is used.
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :), public :: fd_coeff_x
-    real(kind(0d0)), allocatable, dimension(:, :), public :: fd_coeff_y
-    real(kind(0d0)), allocatable, dimension(:, :), public :: fd_coeff_z
+    real(wp), allocatable, dimension(:, :), public :: fd_coeff_x
+    real(wp), allocatable, dimension(:, :), public :: fd_coeff_y
+    real(wp), allocatable, dimension(:, :), public :: fd_coeff_z
     !> @}
 
     integer, private :: flg  !<
@@ -121,7 +121,7 @@ contains
         !!  @param q_sf Specific heat ratio
     subroutine s_derive_specific_heat_ratio(q_sf) ! --------------
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -148,7 +148,7 @@ contains
         !!  @param q_sf Liquid stiffness
     subroutine s_derive_liquid_stiffness(q_sf) ! ------
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -181,7 +181,7 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_prim_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -190,7 +190,7 @@ contains
         integer :: i, j, k !< Generic loop iterators
 
         ! Fluid bulk modulus for alternate sound speed
-        real(kind(0d0)) :: blkmod1, blkmod2
+        real(wp) :: blkmod1, blkmod2
 
         ! Computing speed of sound values from those of pressure, density,
         ! specific heat ratio function and the liquid stiffness function
@@ -238,12 +238,12 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
-        real(kind(0d0)), dimension(-offset_x%beg:m + offset_x%end, &
+        real(wp), dimension(-offset_x%beg:m + offset_x%end, &
                                    -offset_y%beg:n + offset_y%end, &
                                    -offset_z%beg:p + offset_z%end), &
             intent(INOUT) :: q_sf
 
-        real(kind(0d0)) :: top, bottom, slope !< Flux limiter calcs
+        real(wp) :: top, bottom, slope !< Flux limiter calcs
         integer :: j, k, l !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
@@ -330,9 +330,9 @@ contains
     subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(IN) :: ndim
-        real(kind(0d0)), dimension(ndim, ndim), intent(INOUT) :: A
-        real(kind(0d0)), dimension(ndim), intent(INOUT) :: b
-        real(kind(0d0)), dimension(ndim), intent(OUT) :: sol
+        real(wp), dimension(ndim, ndim), intent(INOUT) :: A
+        real(wp), dimension(ndim), intent(INOUT) :: b
+        real(wp), dimension(ndim), intent(OUT) :: sol
         integer, dimension(ndim) :: ipiv
 
         integer :: nrhs, lda, ldb, info
@@ -387,7 +387,7 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_prim_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -486,16 +486,16 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_prim_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
             intent(INOUT) :: q_sf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
 
-        real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
+        real(wp) :: trS, trS2, trO2, Q, IIS
         integer :: j, k, l, r, jj, kk !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
@@ -576,22 +576,22 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
             intent(INOUT) :: q_sf
 
-        real(kind(0d0)) :: drho_dx, drho_dy, drho_dz !<
+        real(wp) :: drho_dx, drho_dy, drho_dz !<
             !! Spatial derivatives of the density in the x-, y- and z-directions
 
-        real(kind(0d0)), dimension(2) :: gm_rho_max !<
+        real(wp), dimension(2) :: gm_rho_max !<
             !! Maximum value of the gradient magnitude (gm) of the density field
             !! in entire computational domain and not just the local sub-domain.
             !! The first position in the variable contains the maximum value and
             !! the second contains the rank of the processor on which it occured.
 
-        real(kind(0d0)) :: alpha_unadv !< Unadvected volume fraction
+        real(wp) :: alpha_unadv !< Unadvected volume fraction
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -652,7 +652,7 @@ contains
 
         ! Determining the local maximum of the gradient magnitude of density
         ! and bookkeeping the result, along with rank of the local processor
-        gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, kind(0d0))/)
+        gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
 
         ! Comparing the local maximum gradient magnitude of the density on
         ! this processor to the those computed on the remaining processors.

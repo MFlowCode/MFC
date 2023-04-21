@@ -130,17 +130,17 @@ module m_rhs
 
     !> @name Bubble dynamic source terms
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: bub_mom_src
+    real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
+    real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
+    real(wp), allocatable, dimension(:, :, :, :, :) :: bub_mom_src
 
     type(scalar_field) :: divu !< matrix for div(u)
     !> @}
 
     !> @name Monopole source terms
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
+    real(wp), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
+    real(wp), allocatable, dimension(:, :, :, :) :: mono_mom_src
     !> @}
 
     !> @name Saved fluxes for testing
@@ -148,14 +148,14 @@ module m_rhs
     type(scalar_field) :: alf_sum
     !> @}
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
+    real(wp), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
+    real(wp), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
 
-    real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
+    real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
     !$acc declare create(gamma_min, pres_inf)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res
+    real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 
 !$acc declare create(q_cons_qp,q_prim_qp,  &
@@ -168,7 +168,7 @@ module m_rhs
 !$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
 !$acc   ixt, iyt, izt)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
+    real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
 !$acc declare create(nbub)
 
 contains
@@ -621,25 +621,25 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: t_step
         
-        real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
+        real(wp) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
+        real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
 
-        real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
+        real(wp) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
                            Cpbw, Cpinf, Cpinf_dot, &
                            myH, myHdot, rddot, alf_gas
 
-        real(kind(0d0)) :: pb, mv, vflux, pldot, pbdot
+        real(wp) :: pb, mv, vflux, pldot, pbdot
 
-        real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
+        real(wp) :: n_tait, B_tait, angle, angle_z
 
-        real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
+        real(wp), dimension(nb) :: Rtmp, Vtmp
+        real(wp) :: myR, myV, alf, myP, myRho, R2Vav
         integer :: ndirs
 
-        real(kind(0d0)) :: mytime, sound
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: s2, const_sos, s1
+        real(wp) :: mytime, sound
+        real(wp) :: start, finish
+        real(wp) :: s2, const_sos, s1
 
         integer :: i, j, k, l, r, q, ii, id !< Generic loop iterators
         integer :: term_index
@@ -1700,19 +1700,19 @@ contains
             !! function, liquid stiffness function (two variations of the last two
             !! ones), shear and volume Reynolds numbers and the Weber numbers
         !> @{
-        real(kind(0d0)) :: pres_relax
-        real(kind(0d0)), dimension(num_fluids) :: pres_K_init
-        real(kind(0d0)) :: f_pres
-        real(kind(0d0)) :: df_pres
-        real(kind(0d0)), dimension(num_fluids) :: rho_K_s
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0)) :: sum_alpha
-        real(kind(0d0)) :: rho
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)), dimension(2) :: Re
+        real(wp) :: pres_relax
+        real(wp), dimension(num_fluids) :: pres_K_init
+        real(wp) :: f_pres
+        real(wp) :: df_pres
+        real(wp), dimension(num_fluids) :: rho_K_s
+        real(wp), dimension(num_fluids) :: alpha_rho
+        real(wp), dimension(num_fluids) :: alpha
+        real(wp) :: sum_alpha
+        real(wp) :: rho
+        real(wp) :: dyn_pres
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp), dimension(2) :: Re
 
         integer :: i, j, k, l, q, iter !< Generic loop iterators
         integer :: relax !< Relaxation procedure determination variable
@@ -2377,7 +2377,7 @@ contains
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 

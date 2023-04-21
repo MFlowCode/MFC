@@ -37,24 +37,24 @@ module m_patches
         s_sweep_plane
 
 
-    real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
-    real(kind(0d0)) :: length_x, length_y, length_z
+    real(wp) :: x_centroid, y_centroid, z_centroid
+    real(wp) :: length_x, length_y, length_z
 
     integer :: smooth_patch_id
-    real(kind(0d0)) :: smooth_coeff !<
+    real(wp) :: smooth_coeff !<
     !! These variables are analogous in both meaning and use to the similarly
     !! named components in the ic_patch_parameters type (see m_derived_types.f90
     !! for additional details). They are employed as a means to more concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
 
-    real(kind(0d0)) :: eta !<
+    real(wp) :: eta !<
     !! In the case that smoothing of patch boundaries is enabled and the boundary
     !! between two adjacent patches is to be smeared out, this variable's purpose
     !! is to act as a pseudo volume fraction to indicate the contribution of each
     !! patch toward the composition of a cell's fluid state.
 
-    real(kind(0d0)) :: cart_y, cart_z
-    real(kind(0d0)) :: sph_phi !<
+    real(wp) :: cart_y, cart_z
+    real(wp) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if
     !! 3D simulation is using cylindrical coordinates
 
@@ -78,7 +78,7 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma
+        real(wp) :: pi_inf, gamma, lit_gamma
 
         integer :: i, j  !< Generic loop operators
 
@@ -136,8 +136,8 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
-        real(kind(0d0)) :: th, thickness, nturns, mya
-        real(kind(0d0)) :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
+        real(wp) :: th, thickness, nturns, mya
+        real(wp) :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -192,7 +192,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        real(wp) :: radius
 
         integer :: i, j !< Generic loop iterators
 
@@ -250,12 +250,12 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        real(wp) :: radius
 
         ! Generic loop iterators
         integer :: i, j
 
-        real(kind(0d0)) :: myr, thickness
+        real(wp) :: myr, thickness
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -302,12 +302,12 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        real(wp) :: radius
 
         ! Generic loop iterators
         integer :: i, j, k
 
-        real(kind(0d0)) :: myr, thickness
+        real(wp) :: myr, thickness
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -364,7 +364,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b
+        real(wp) :: a, b
 
         integer :: i, j !< Generic loop operators
 
@@ -424,7 +424,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b, c
+        real(wp) :: a, b, c
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -502,7 +502,7 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
         integer :: i, j !< generic loop iterators
 
@@ -571,7 +571,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b, c
+        real(wp) :: a, b, c
 
         integer :: i, j !< Generic loop operators
 
@@ -635,7 +635,7 @@ contains
 
         ! Generic loop iterators
         integer :: i, j
-        real(kind(0d0)) :: radius
+        real(wp) :: radius
 
         ! Transferring isentropic vortex patch's centroid and radius info
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -683,7 +683,7 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Placeholders for the cell boundary values
-        real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
+        real(wp) :: a, b, c, d, pi_inf, gamma, lit_gamma
 
         ! Generic loop iterators
         integer :: i, j
@@ -759,7 +759,7 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Placeholders for the cell boundary values
-        real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+        real(wp) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
 
         ! Generic loop iterators
         integer :: i, j
@@ -834,8 +834,8 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-        real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
+        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
 
         integer :: i, j !< generic loop iterators
 
@@ -954,7 +954,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
 
         integer :: i, j, k !< generic loop iterators
 
@@ -1079,13 +1079,13 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-        real(kind(0d0)) :: epsilon, beta
-        real(kind(0d0)) :: radius
+        real(wp) :: epsilon, beta
+        real(wp) :: radius
 
         integer :: i, j, k !< generic loop iterators
 
-        complex(kind(0d0)) :: cmplx_i = (0d0, 1d0)
-        complex(kind(0d0)) :: H
+        complex(wp) :: cmplx_i = (0d0, 1d0)
+        complex(wp) :: H
 
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1190,7 +1190,7 @@ contains
                             end if
                         end if
 
-                        q_prim_vf(adv_idx%beg)%sf(i, j, k) = 1d0 - abs(real(H, kind(0d0)))
+                        q_prim_vf(adv_idx%beg)%sf(i, j, k) = 1d0 - abs(real(H, wp))
 
                     end if
 
@@ -1211,12 +1211,12 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        real(wp) :: radius
 
         ! Generic loop iterators
         integer :: i, j, k !< generic loop iterators
 
-        real(kind(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !<
+        real(wp) :: radius_pressure, pressure_bubble, pressure_inf !<
             !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
 
@@ -1386,7 +1386,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        real(wp) :: radius
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1499,7 +1499,7 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b, c, d
+        real(wp) :: a, b, c, d
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1564,7 +1564,7 @@ contains
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
+        real(wp), intent(IN) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
         cart_z = cyl_y*cos(cyl_z)
@@ -1573,7 +1573,7 @@ contains
 
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: cyl_x, cyl_y
+        real(wp), intent(IN) :: cyl_x, cyl_y
 
         sph_phi = atan(cyl_y/cyl_x)
 
@@ -1585,9 +1585,9 @@ contains
     !! @param a Starting position
     function f_r(myth, offset, a)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: myth, offset, a
-        real(kind(0d0)) :: b
-        real(kind(0d0)) :: f_r
+        real(wp), intent(IN) :: myth, offset, a
+        real(wp) :: b
+        real(wp) :: f_r
 
         !r(th) = a + b*th
 

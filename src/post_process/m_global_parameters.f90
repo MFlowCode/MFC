@@ -49,18 +49,18 @@ module m_global_parameters
 
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
+    real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
     real(kind(0.0)), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
     !> @}
 
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc
+    real(wp), allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc
     !> @}
 
     !> Cell-width distributions in the x-, y- and z-coordinate directions
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: dx, dy, dz
+    real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     integer :: buff_size !<
@@ -140,7 +140,7 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
+    real(wp), allocatable, dimension(:) :: adv !< Advection variables
 
     ! Formatted Database File(s) Structure Parameters ==========================
 
@@ -185,7 +185,7 @@ module m_global_parameters
     logical :: schlieren_wrt
     !> @}
 
-    real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
+    real(wp), dimension(num_fluids_max) :: schlieren_alpha    !<
     !! Amplitude coefficients of the numerical Schlieren function that are used
     !! to adjust the intensity of numerical Schlieren renderings for individual
     !! fluids. This enables waves and interfaces of varying strenghts and in all
@@ -205,23 +205,23 @@ module m_global_parameters
 
     !> @name Reference parameters for Tait EOS
     !> @{
-    real(kind(0d0)) :: rhoref, pref
+    real(wp) :: rhoref, pref
     !> @}
 
     !> @name Bubble modeling variables and parameters
     !> @{
     integer :: nb
-    real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
-    real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
+    real(wp) :: R0ref
+    real(wp) :: Ca, Web, Re_inv
+    real(wp), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: poly_sigma
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: poly_sigma
     !> @}
 
     !> @name Index variables used for m_variables_conversion

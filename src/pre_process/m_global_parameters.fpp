@@ -44,13 +44,13 @@ module m_global_parameters
     integer :: grid_geometry !<
     !! Cylindrical coordinates (either axisymmetric or full 3D)
 
-    real(kind(0d0)), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
+    real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
     !! Locations of cell-centers (cc) in x-, y- and z-directions, respectively
 
-    real(kind(0d0)), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
+    real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
     !! Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
 
-    real(kind(0d0)) :: dx, dy, dz !<
+    real(wp) :: dx, dy, dz !<
     !! Minimum cell-widths in the x-, y- and z-coordinate directions
 
     type(bounds_info) :: x_domain, y_domain, z_domain !<
@@ -63,10 +63,10 @@ module m_global_parameters
     ! directions. The "a" parameters are a measure of the rate at which the grid
     ! is stretched while the remaining parameters are indicative of the location
     ! on the grid at which the stretching begins.
-    real(kind(0d0)) :: a_x, a_y, a_z
+    real(wp) :: a_x, a_y, a_z
     integer :: loops_x, loops_y, loops_z
-    real(kind(0d0)) :: x_a, y_a, z_a
-    real(kind(0d0)) :: x_b, y_b, z_b
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     ! ==========================================================================
 
@@ -105,7 +105,7 @@ module m_global_parameters
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
     logical :: perturb_sph
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
-    real(kind(0d0)), dimension(num_fluids_max) :: fluid_rho
+    real(wp), dimension(num_fluids_max) :: fluid_rho
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -145,18 +145,18 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    real(kind(0d0)) :: rhoref, pref !< Reference parameters for Tait EOS
+    real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
 
     !> @name Bubble modeling
     !> @{
     integer :: nb
-    real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
-    real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
+    real(wp) :: R0ref
+    real(wp) :: Ca, Web, Re_inv
+    real(wp), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
-    real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
+    real(wp) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -164,10 +164,10 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: poly_sigma
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
     !> @}

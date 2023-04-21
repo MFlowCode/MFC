@@ -49,13 +49,13 @@ program p_main
     integer :: i, j, k, l
     !> @}
 
-    real(kind(0d0)) :: total_volume !<
+    real(wp) :: total_volume !<
     !! Variable for the total volume of the second volume fraction
     !! to later on track the evolution of the radius of a bubble over time
 
-    real(kind(0d0)) :: pres
-    real(kind(0d0)) :: c
-    real(kind(0d0)) :: H 
+    real(wp) :: pres
+    real(wp) :: c
+    real(wp) :: H 
 
     ! Initialization of the MPI environment
     call s_mpi_initialize()

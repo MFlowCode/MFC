@@ -66,16 +66,16 @@ program p_main
     integer :: err_code, ierr
 
     integer :: t_step, i, j, k, l !< Iterator for the time-stepping loop
-    real(kind(0d0)) :: time_avg, time_final
-    real(kind(0d0)) :: io_time_avg, io_time_final
-    real(kind(0d0)), allocatable, dimension(:) :: proc_time
-    real(kind(0d0)), allocatable, dimension(:) :: io_proc_time
+    real(wp) :: time_avg, time_final
+    real(wp) :: io_time_avg, io_time_final
+    real(wp), allocatable, dimension(:) :: proc_time
+    real(wp), allocatable, dimension(:) :: io_proc_time
     logical :: file_exists
-    real(kind(0d0)) :: start, finish
+    real(wp) :: start, finish
     integer :: nt
 
 #ifdef _OPENACC
-    real(kind(0d0)) :: starttime, endtime
+    real(wp) :: starttime, endtime
     integer :: num_devices, local_size, num_nodes, ppn, my_device_num
     integer :: dev, devNum, local_rank
 #ifdef MFC_MPI

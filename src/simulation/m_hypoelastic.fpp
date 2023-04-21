@@ -22,15 +22,15 @@ module m_hypoelastic
     private; public :: s_initialize_hypoelastic_module, &
             s_compute_hypoelastic_rhs
 
-    real(kind(0d0)), allocatable, dimension(:) :: Gs
+    real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
+    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
+    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
+    real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
     !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
+    real(wp), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     !$acc declare create(rho_K_field, G_K_field)
     
 
@@ -71,7 +71,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: idir
 
-        real(kind(0d0)) :: rho_K, G_K
+        real(wp) :: rho_K, G_K
 
         integer :: i, k, l, q !< Loop variables
         integer :: ndirs  !< Number of coordinate directions

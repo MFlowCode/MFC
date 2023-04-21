@@ -37,13 +37,13 @@ module m_assign_variables
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
                                                 eta, q_prim_vf, patch_id_fp)
 
-            import :: scalar_field, sys_size, n, m, p
+            import :: scalar_field, sys_size, n, m, p, wp
 
             integer, intent(IN) :: patch_id
             integer, intent(IN) :: j, k, l
             integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
             type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-            real(kind(0d0)) :: eta !<
+            real(wp) :: eta !<
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
 
@@ -100,16 +100,16 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
+        real(wp) :: eta !<
 
         integer, intent(IN) :: j, k, l
 
-        real(kind(0d0)) :: rho    !< density
-        real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(kind(0d0)) :: pres   !< pressure
-        real(kind(0d0)) :: gamma  !< specific heat ratio function
-        real(kind(0d0)) :: x_centroid, y_centroid
-        real(kind(0d0)) :: epsilon, beta
+        real(wp) :: rho    !< density
+        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+        real(wp) :: pres   !< pressure
+        real(wp) :: gamma  !< specific heat ratio function
+        real(wp) :: x_centroid, y_centroid
+        real(wp) :: epsilon, beta
 
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
@@ -223,22 +223,22 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
+        real(wp) :: eta !<
         integer, intent(IN) :: j, k, l
 
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
         ! variables of the current and smoothing patches
-        real(kind(0d0)) :: rho          !< density
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: lit_gamma    !< specific heat ratio
-        real(kind(0d0)) :: pi_inf       !< stiffness from SEOS
-        real(kind(0d0)) :: orig_rho
-        real(kind(0d0)) :: orig_gamma
-        real(kind(0d0)) :: orig_pi_inf
-        real(kind(0d0)) :: muR, muV
+        real(wp) :: rho          !< density
+        real(wp) :: gamma
+        real(wp) :: lit_gamma    !< specific heat ratio
+        real(wp) :: pi_inf       !< stiffness from SEOS
+        real(wp) :: orig_rho
+        real(wp) :: orig_gamma
+        real(wp) :: orig_pi_inf
+        real(wp) :: muR, muV
 
-        real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
+        real(wp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
@@ -584,20 +584,20 @@ contains
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
+        real(wp) :: eta !<
         integer, intent(IN) :: j, k, l
 
-        real(kind(0d0)) :: rho
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)) :: orig_rho
-        real(kind(0d0)) :: orig_gamma
-        real(kind(0d0)) :: orig_pi_inf !<
+        real(wp) :: rho
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp) :: orig_rho
+        real(wp) :: orig_gamma
+        real(wp) :: orig_pi_inf !<
             !! Density, the specific heat ratio function and the liquid stiffness
             !! function, respectively, obtained from the combination of primitive
             !! variables of the current and smoothing patches
 
-        real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
+        real(wp), dimension(sys_size) :: orig_prim_vf !<
         ! Vector to hold original values of cell for smoothing purposes
 
         integer :: smooth_patch_id

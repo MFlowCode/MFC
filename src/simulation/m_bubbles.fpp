@@ -77,32 +77,32 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         type(scalar_field), intent(IN) :: divu
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub 
+        real(wp), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub 
         integer, intent(IN) :: t_step, id
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: bub_adv_src
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb ), intent(INOUT) :: bub_r_src, &
+        real(wp), dimension(0:m, 0:n, 0:p), intent(INOUT) :: bub_adv_src
+        real(wp), dimension(0:m, 0:n, 0:p, 1:nb ), intent(INOUT) :: bub_r_src, &
                                                                           bub_v_src, &
                                                                           bub_p_src, &
                                                                           bub_m_src
 
         !< Bubble number density
 
-        real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
+        real(wp) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
                            Cpbw, Cpinf, Cpinf_dot, &
                            myH, myHdot, rddot, alf_gas
 
-        real(kind(0d0)) :: pb, mv, vflux, pldot, pbdot
+        real(wp) :: pb, mv, vflux, pldot, pbdot
 
-        real(kind(0d0)) :: n_tait, B_tait
+        real(wp) :: n_tait, B_tait
 
-        real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(kind(0d0)), dimension(num_fluids) :: myalpha, myalpha_rho
-        real(kind(0d0)) :: start, finish
+        real(wp), dimension(nb) :: Rtmp, Vtmp
+        real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
+        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        real(wp) :: start, finish
 
-        real(kind(0d0)), dimension(2) :: Re !< Reynolds number
+        real(wp), dimension(2) :: Re !< Reynolds number
 
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
@@ -284,9 +284,9 @@ contains
         !!  @param fpb Internal bubble pressure
     function f_cpbw(fR0, fR, fV, fpb)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
+        real(wp), intent(IN) :: fR0, fR, fV, fpb
 
-        real(kind(0d0)) :: f_cpbw
+        real(wp) :: f_cpbw
 
         if (polytropic) then
             f_cpbw = (Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
@@ -303,10 +303,10 @@ contains
         !!  @param fBtait Tait EOS parameter
     function f_H(fCpbw, fCpinf, fntait, fBtait)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fntait, fBtait
+        real(wp), intent(IN) :: fCpbw, fCpinf, fntait, fBtait
 
-        real(kind(0d0)) :: tmp1, tmp2, tmp3
-        real(kind(0d0)) :: f_H
+        real(wp) :: tmp1, tmp2, tmp3
+        real(wp) :: f_H
 
         tmp1 = (fntait - 1.d0)/fntait
         tmp2 = (fCpbw/(1.d0 + fBtait) + 1.d0)**tmp1
@@ -323,10 +323,10 @@ contains
         !! @param fH Bubble enthalpy
     function f_cgas(fCpinf, fntait, fBtait, fH)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpinf, fntait, fBtait, fH
+        real(wp), intent(IN) :: fCpinf, fntait, fBtait, fH
 
-        real(kind(0d0)) :: tmp
-        real(kind(0d0)) :: f_cgas
+        real(wp) :: tmp
+        real(wp) :: f_cgas
 
         ! get sound speed for Gilmore equations "C" -> c_gas
         tmp = (fCpinf/(1.d0 + fBtait) + 1.d0)**((fntait - 1.d0)/fntait)
@@ -346,10 +346,10 @@ contains
         !!  @param divu Divergence of velocity
     function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
+        real(wp), intent(IN) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
-        real(kind(0d0)) :: c2_liquid
-        real(kind(0d0)) :: f_cpinfdot
+        real(wp) :: c2_liquid
+        real(wp) :: f_cpinfdot
 
         ! get sound speed squared for liquid (only needed for pbdot)
         ! c_l^2 = gam (p+B) / (rho*(1-alf))
@@ -376,11 +376,11 @@ contains
         !!  @param fpbdot Time derivative of the internal bubble pressure
     function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
-        real(kind(0d0)), intent(IN) :: fR, fV, fR0, fpbdot
+        real(wp), intent(IN) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
+        real(wp), intent(IN) :: fR, fV, fR0, fpbdot
 
-        real(kind(0d0)) :: tmp1, tmp2
-        real(kind(0d0)) :: f_Hdot
+        real(wp) :: tmp1, tmp2
+        real(wp) :: f_Hdot
 
         if (polytropic) then
             tmp1 = (fR0/fR)**(3.d0*gam)
@@ -412,8 +412,8 @@ contains
         !!  @param fCpbw Boundary wall pressure
     function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCp, fRho, fR, fV, fR0, fCpbw
-        real(kind(0d0)) :: f_rddot_RP
+        real(wp), intent(IN) :: fCp, fRho, fR, fV, fR0, fCpbw
+        real(wp) :: f_rddot_RP
 
             !! rddot = (1/r) (  -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho )
             !! rddot = (1/r) (  -3/2 rdot^2 + (tmp1 - Cp)/rho )
@@ -434,11 +434,11 @@ contains
         !!  @param fBtait Tait EOS parameter
     function f_rddot(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpbw, fR, fV, fH, fHdot
-        real(kind(0d0)), intent(IN) :: fcgas, fntait, fBtait
+        real(wp), intent(IN) :: fCpbw, fR, fV, fH, fHdot
+        real(wp), intent(IN) :: fcgas, fntait, fBtait
 
-        real(kind(0d0)) :: tmp1, tmp2, tmp3
-        real(kind(0d0)) :: f_rddot
+        real(wp) :: tmp1, tmp2, tmp3
+        real(wp) :: f_rddot
 
         tmp1 = fV/fcgas
         tmp2 = 1.d0 + 4.d0*Re_inv/fcgas/fR*(fCpbw/(1.d0 + fBtait) + 1.d0) &
@@ -457,8 +457,8 @@ contains
         !!  @param fpb Internal bubble pressure
     function f_cpbw_KM(fR0, fR, fV, fpb)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
-        real(kind(0d0)) :: f_cpbw_KM
+        real(wp), intent(IN) :: fR0, fR, fV, fpb
+        real(wp) :: f_cpbw_KM
 
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
@@ -484,11 +484,11 @@ contains
         !!  @param fC Current sound speed
     function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fpbdot, fCp, fCpbw
-        real(kind(0d0)), intent(IN) :: fRho, fR, fV, fR0, fC
+        real(wp), intent(IN) :: fpbdot, fCp, fCpbw
+        real(wp), intent(IN) :: fRho, fR, fV, fR0, fC
 
-        real(kind(0d0)) :: tmp1, tmp2, cdot_star
-        real(kind(0d0)) :: f_rddot_KM
+        real(wp) :: tmp1, tmp2, cdot_star
+        real(wp) :: f_rddot_KM
 
         if (polytropic) then
             cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR

@@ -26,7 +26,7 @@ module m_viscous
     type(int_bounds_info) :: is1, is2, is3
  !$acc declare create(is1, is2, is3, iv)   
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res
+    real(wp), allocatable, dimension(:, :) :: Res
 !$acc declare create(Res)
 
 
@@ -65,11 +65,11 @@ module m_viscous
 
         type(scalar_field), dimension(1:sys_size) :: tau_Re_vf
 
-        real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
-        real(kind(0d0)), dimension(2) :: Re_visc
-        real(kind(0d0)), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
+        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
+        real(wp), dimension(2) :: Re_visc
+        real(wp), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
+        real(wp), dimension(num_dims, num_dims) :: tau_Re
 
         integer :: i, j, k, l, q !< Generic loop iterator
 
@@ -506,7 +506,7 @@ module m_viscous
                              dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp,  &
                              ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
+        real(wp), dimension(startx:, starty:, startz:, 1:), &
              intent(INOUT) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
                               qL_prim_rsy_vf, qR_prim_rsy_vf, &
                               qL_prim_rsz_vf, qR_prim_rsz_vf
@@ -953,7 +953,7 @@ module m_viscous
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
 
         integer, intent(IN) :: norm_dir
 
@@ -1058,7 +1058,7 @@ module m_viscous
 
         type(int_bounds_info) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
 
         integer, intent(IN) :: norm_dir
 
@@ -1172,7 +1172,7 @@ module m_viscous
             
         integer :: buff_size_in, dim
 
-        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in) :: dL
+        real(wp), dimension(-buff_size_in:dim + buff_size_in) :: dL
         ! arrays of cell widths
 
         type(scalar_field), &

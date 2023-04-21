@@ -169,10 +169,10 @@ contains
     subroutine s_1st_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         ! Stage 1 of 1 =====================================================
 
@@ -241,10 +241,10 @@ contains
     subroutine s_2nd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         ! Stage 1 of 2 =====================================================
 
@@ -323,10 +323,10 @@ contains
     subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         ! Stage 1 of 3 =====================================================
 

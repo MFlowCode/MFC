@@ -24,13 +24,13 @@ module m_monopole
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
+    real(wp), allocatable, dimension(:, :) :: loc_mono
     !$acc declare create(loc_mono)
 
-    real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
+    real(wp), allocatable, dimension(:) :: foc_length, aperture
     !$acc declare create(foc_length, aperture)
 
-    real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
+    real(wp), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
 
 
@@ -76,26 +76,26 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         !> @name Monopole source terms
         !> @{
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(inout) :: mono_mass_src, mono_e_src
-        real(kind(0d0)), dimension(1:num_dims, 0:m, 0:n, 0:p), intent(inout) :: mono_mom_src
+        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: mono_mass_src, mono_e_src
+        real(wp), dimension(1:num_dims, 0:m, 0:n, 0:p), intent(inout) :: mono_mom_src
         !> @}
 
         integer, intent(IN) :: t_step, id
 
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
+        real(wp) :: myR, myV, alf, myP, myRho, R2Vav
 
         integer :: i, j, k, l, q, ii !< generic loop variables
         integer :: term_index
         
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
+        real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
 
-        real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
+        real(wp) :: n_tait, B_tait, angle, angle_z
 
 
         integer :: ndirs
         
-        real(kind(0d0)) :: the_time, sound
-        real(kind(0d0)) :: s2, const_sos, s1
+        real(wp) :: the_time, sound
+        real(wp) :: s2, const_sos, s1
 
 
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -270,11 +270,11 @@ contains
         !! @param mysos Alternative speed of sound for testing
     function f_g(the_time, sos, mysos, nm, term_index)
 !$acc routine seq
-        real(kind(0d0)), intent(IN) :: the_time, sos, mysos
+        real(wp), intent(IN) :: the_time, sos, mysos
         integer, intent(IN) :: nm
-        real(kind(0d0)) :: period, t0, sigt, pa
-        real(kind(0d0)) :: offset
-        real(kind(0d0)) :: f_g
+        real(wp) :: period, t0, sigt, pa
+        real(wp) :: offset
+        real(wp) :: f_g
         integer :: term_index
 
         offset = 0d0
@@ -317,20 +317,20 @@ contains
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 !$acc routine seq
-         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
+         real(wp), dimension(3), intent(IN) :: mono_loc
         integer, intent(IN) :: nm
-        real(kind(0d0)), intent(IN) :: mono_leng
+        real(wp), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l
 
         integer :: q
-        real(kind(0d0)) :: h, hx, hy, hz
-        real(kind(0d0)) :: hx_cyl, hy_cyl, hz_cyl
-        real(kind(0d0)) :: hxnew, hynew
-        real(kind(0d0)) :: hxnew_cyl, hynew_cyl
-        real(kind(0d0)) :: sig
-        real(kind(0d0)) :: f_delta
-        real(kind(0d0)) :: angle
-        real(kind(0d0)) :: angle_z
+        real(wp) :: h, hx, hy, hz
+        real(wp) :: hx_cyl, hy_cyl, hz_cyl
+        real(wp) :: hxnew, hynew
+        real(wp) :: hxnew_cyl, hynew_cyl
+        real(wp) :: sig
+        real(wp) :: f_delta
+        real(wp) :: angle
+        real(wp) :: angle_z
 
         if (n == 0) then
             sig = dx(j)

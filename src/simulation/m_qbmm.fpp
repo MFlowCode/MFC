@@ -26,7 +26,7 @@ module m_qbmm
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
+    real(wp), allocatable, dimension(:, :, :, :, :) :: momrhs
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
@@ -218,13 +218,13 @@ contains
         type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(nmom) :: moms
-        real(kind(0d0)), dimension(nb) :: Rvec
-        real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: n_tait, B_tait
+        real(wp), dimension(nmom) :: moms
+        real(wp), dimension(nb) :: Rvec
+        real(wp), dimension(nnode, nb) :: wght, abscX, abscY
+        real(wp), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
+        real(wp) :: pres, rho, nbub, c, alf, R3, momsum
+        real(wp) :: start, finish
+        real(wp) :: n_tait, B_tait
 
         integer :: j, k, l, q, r, s !< Loop variables
         integer :: id1, id2, id3
@@ -342,14 +342,14 @@ contains
 
     subroutine s_chyqmom(momin, wght, abscX, abscY)
 !$acc routine seq
-        real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(nmom), intent(IN) :: momin
+        real(wp), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
+        real(wp), dimension(nmom), intent(IN) :: momin
 
-        real(kind(0d0)), dimension(0:2, 0:2) :: moms
-        real(kind(0d0)), dimension(3) :: M1, M3
-        real(kind(0d0)), dimension(2) :: myrho, myrho3, up, up3, Vf
-        real(kind(0d0)) :: bu, bv, d20, d11, d02, c20, c11, c02
-        real(kind(0d0)) :: mu2avg, mu2, vp21, vp22, rho21, rho22
+        real(wp), dimension(0:2, 0:2) :: moms
+        real(wp), dimension(3) :: M1, M3
+        real(wp), dimension(2) :: myrho, myrho3, up, up3, Vf
+        real(wp) :: bu, bv, d20, d11, d02, c20, c11, c02
+        real(wp) :: mu2avg, mu2, vp21, vp22, rho21, rho22
 
         moms(0, 0) = momin(1)
         moms(1, 0) = momin(2)
@@ -403,9 +403,9 @@ contains
 
     subroutine s_hyqmom(frho, fup, fmom)
         !$acc routine seq
-        real(kind(0d0)), dimension(2), intent(INOUT) :: frho, fup
-        real(kind(0d0)), dimension(3), intent(IN) :: fmom
-        real(kind(0d0)) :: bu, d2, c2
+        real(wp), dimension(2), intent(INOUT) :: frho, fup
+        real(wp), dimension(3), intent(IN) :: fmom
+        real(wp) :: bu, d2, c2
 
         bu = fmom(2)/fmom(1)
         d2 = fmom(3)/fmom(1)

@@ -79,7 +79,7 @@ contains
         character(LEN=3) :: status
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !< Used to store
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !< Used to store
             !! the number, in character form, of the currently
             !! manipulated conservative variable data file
 
@@ -89,14 +89,14 @@ contains
         integer :: i, j, k, l !< Generic loop iterator
         integer :: t_step
 
-        real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub                         !< Temporary bubble number density
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
-        real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres                         !< Temporary pressure
+        real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
+        real(wp) :: nbub                         !< Temporary bubble number density
+        real(wp) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
+        real(wp) :: rho                          !< Temporary density
+        real(wp) :: pres                         !< Temporary pressure
 
-        real(kind(0d0)) :: nR3
-        real(kind(0d0)) :: ntmp
+        real(wp) :: nR3
+        real(wp) :: ntmp
 
         t_step = 0
 
@@ -316,10 +316,10 @@ contains
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
                 call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_DOUBLE_PRECISION, status, ierr)
+                                        mpi_p, status, ierr)
             end do
         else
             do i = 1, sys_size !TODO: check if this is right
@@ -329,10 +329,10 @@ contains
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
                 call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_DOUBLE_PRECISION, status, ierr)
+                                        mpi_p, status, ierr)
             end do
         end if
 

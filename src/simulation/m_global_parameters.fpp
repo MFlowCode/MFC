@@ -28,7 +28,7 @@ module m_global_parameters
 
     implicit none
 
-    real(kind(0d0)) :: time = 0
+    real(wp) :: time = 0
 
     ! Logistics ================================================================
     integer :: num_procs             !< Number of processors
@@ -59,20 +59,20 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
+    real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
 
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
+    real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    real(kind(0d0)) :: dt !< Size of the time-step
+    real(wp) :: dt !< Size of the time-step
 
 !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
@@ -105,7 +105,7 @@ module m_global_parameters
         integer :: weno_order     !< Order of the WENO reconstruction
     #:endif
 
-    real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
+    real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
     logical :: mapped_weno    !< WENO with mapping of nonlinear weights
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
@@ -184,7 +184,7 @@ module m_global_parameters
     !! the dimensionally split system of equations.
     !> @{
     integer, dimension(3) :: dir_idx
-    real(kind(0d0)), dimension(3) :: dir_flg
+    real(wp), dimension(3) :: dir_flg
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
 !$acc declare create(dir_idx, dir_flg, dir_idx_tau)
@@ -228,7 +228,7 @@ module m_global_parameters
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
-    real(kind(0d0)) :: rhoref, pref
+    real(wp) :: rhoref, pref
     !> @}
 !$acc declare create(rhoref, pref)
 
@@ -240,21 +240,21 @@ module m_global_parameters
         integer :: nb       !< Number of eq. bubble sizes
     #:endif
 
-    real(kind(0d0)) :: R0ref    !< Reference bubble size
-    real(kind(0d0)) :: Ca       !< Cavitation number
-    real(kind(0d0)) :: Web      !< Weber number
-    real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
-    real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
-    real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
-    real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+    real(wp) :: R0ref    !< Reference bubble size
+    real(wp) :: Ca       !< Cavitation number
+    real(wp) :: Web      !< Weber number
+    real(wp) :: Re_inv   !< Inverse Reynolds number
+    real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
+    real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
+    real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
-    real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
+    real(wp), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
+    real(wp) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     logical :: qbmm      !< Quadrature moment method
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
@@ -275,12 +275,12 @@ module m_global_parameters
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: gam
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: mul0, ss, gamma_v, mu_v
+    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: gam
     !> @}
 !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     !> @name Acoustic monopole parameters
@@ -301,12 +301,12 @@ module m_global_parameters
      integer :: strxb, strxe
      !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+    real(wp), allocatable, dimension(:) :: gammas, pi_infs
     !$acc declare create(gammas, pi_infs)
 
 
-    real(kind(0d0)) :: mytime       !< Current simulation time
-    real(kind(0d0)) :: finaltime    !< Final simulation time
+    real(wp) :: mytime       !< Current simulation time
+    real(wp) :: finaltime    !< Final simulation time
 
     logical :: weno_flat, riemann_flat, cu_mpi
 

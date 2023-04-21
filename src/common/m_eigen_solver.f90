@@ -8,6 +8,8 @@
 !!              modifications for compatibility.
 module m_eigen_solver
 
+    use m_precision_select
+
     implicit none
 
     private; public :: cg,cbal,corth,comqr2,csroot,cdiv,pythag
@@ -52,8 +54,8 @@ contains
 !
 !     ------------------------------------------------------------------	
 		integer nm,nl,is1,is2,ierr
-		real(kind(0d0)), dimension(nm,nl) :: ar,ai,zr,zi
-		real(kind(0d0)), dimension(nl) :: wr,wi,fv1,fv2,fv3
+		real(wp), dimension(nm,nl) :: ar,ai,zr,zi
+		real(wp), dimension(nl) :: wr,wi,fv1,fv2,fv3
 
 		if (nl .le. nm) go to 10
 		ierr = 10*nl
@@ -126,9 +128,9 @@ contains
 !
 !     ------------------------------------------------------------------
 		integer i,j,k,l,ml,nl,jj,nm,igh,low,iexc
-		real(kind(0d0)), dimension(nm,nl) :: ar,ai
-		real(kind(0d0)), dimension(nl) :: scale
-		real(kind(0d0)) :: c,f,g,r,s,b2,radix
+		real(wp), dimension(nm,nl) :: ar,ai
+		real(wp), dimension(nl) :: scale
+		real(wp) :: c,f,g,r,s,b2,radix
 		logical noconv
 
 		radix = 16.0d0
@@ -296,9 +298,9 @@ contains
 !
 !     ------------------------------------------------------------------
 		integer i,j,ml,nl,ii,jj,la,mp,nm,igh,kp1,low
-		real(kind(0d0)),dimension(nm,nl) :: ar,ai
-		real(kind(0d0)),dimension(igh) :: ortr,orti
-		real(kind(0d0)) :: f,g,h,fi,fr,scale,c
+		real(wp),dimension(nm,nl) :: ar,ai
+		real(wp),dimension(igh) :: ortr,orti
+		real(wp) :: f,g,h,fi,fr,scale,c
 
 		integer mll
 		mll = 6
@@ -462,10 +464,10 @@ contains
 !     ------------------------------------------------------------------
 		integer i,j,k,l,ml,nl,en,ii,jj,ll,nm,nn,igh,ip1,&
               itn,its,low,lp1,enm1,iend,ierr
-		real(kind(0d0)),dimension(nm,nl) :: hr,hi,zr,zi
-		real(kind(0d0)),dimension(nl) :: wr,wi
-		real(kind(0d0)),dimension(igh) :: ortr,orti
-		real(kind(0d0)) :: si,sr,ti,tr,xi,xr,yi,yr,zzi,zzr,&
+		real(wp),dimension(nm,nl) :: hr,hi,zr,zi
+		real(wp),dimension(nl) :: wr,wi
+		real(wp),dimension(igh) :: ortr,orti
+		real(wp) :: si,sr,ti,tr,xi,xr,yi,yr,zzi,zzr,&
 						norm,tst1,tst2,c,d
 !
 		ierr = 0
@@ -885,12 +887,12 @@ contains
 	end subroutine cbabk2
 	  
     subroutine csroot(xr,xi,yr,yi)
-		real(kind(0d0)) :: xr,xi,yr,yi
+		real(wp) :: xr,xi,yr,yi
 !
 !     (yr,yi) = complex dsqrt(xr,xi) 
 !     branch chosen so that yr .ge. 0.0 and sign(yi) .eq. sign(xi)
 !
-		real(kind(0d0)) :: s,tr,ti,c
+		real(wp) :: s,tr,ti,c
 		tr = xr
 		ti = xi
 		call pythag(tr,ti,c)
@@ -904,11 +906,11 @@ contains
     end subroutine csroot
 	  
 	subroutine cdiv(ar,ai,br,bi,cr,ci)
-		real(kind(0d0)) :: ar,ai,br,bi,cr,ci
+		real(wp) :: ar,ai,br,bi,cr,ci
 !
 !     complex division, (cr,ci) = (ar,ai)/(br,bi)
 !
-		real(kind(0d0)) :: s,ars,ais,brs,bis
+		real(wp) :: s,ars,ais,brs,bis
 		s = dabs(br) + dabs(bi)
 		ars = ar/s
 		ais = ai/s
@@ -921,11 +923,11 @@ contains
     end subroutine cdiv
 
 	subroutine pythag(a,b,c)
-		real(kind(0d0)) :: a,b,c
+		real(wp) :: a,b,c
 !
 !     finds dsqrt(a**2+b**2) without overflow or destructive underflow
 !
-		real(kind(0d0)) :: p,r,s,t,u
+		real(wp) :: p,r,s,t,u
 		p = dmax1(dabs(a),dabs(b))
 		if (p .eq. 0.0d0) go to 20
 		r = (dmin1(dabs(a),dabs(b))/p)**2
