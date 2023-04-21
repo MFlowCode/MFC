@@ -755,7 +755,7 @@ contains
         c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
         trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
-        Re_trans = dble(trans)
+        Re_trans = (trans)
         Im_trans = aimag(trans)
 
     end subroutine s_transcoeff
@@ -856,7 +856,7 @@ contains
         ! phi = ln( R0 ) & return R0
         do ir = 1, Npt
             phi(ir) = log(R0mn) &
-                      + dble(ir - 1)*log(R0mx/R0mn)/dble(Npt - 1)
+                      + (ir - 1)*log(R0mx/R0mn)/(Npt - 1)
             R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)

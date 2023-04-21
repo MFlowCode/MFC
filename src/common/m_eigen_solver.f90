@@ -846,8 +846,8 @@ contains
 !     ------------------------------------------------------------------
 !
       integer i,j,k,ml,nl,ii,nm,igh,low
-      double precision scale(nl),zr(nm,ml),zi(nm,ml)
-      double precision s
+      real(wp) scale(nl),zr(nm,ml),zi(nm,ml)
+      real(wp) s
 
       if (ml .eq. 0) go to 200
       if (igh .eq. low) go to 120
