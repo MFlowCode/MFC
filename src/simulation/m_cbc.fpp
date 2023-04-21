@@ -638,6 +638,7 @@ contains
         if (cbc_dir == ${CBC_DIR}$) then
 
             ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
+
             if (weno_order == 3) then
 
                 call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
@@ -719,6 +720,7 @@ contains
 
             end if
             ! ==================================================================
+
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
             !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
@@ -952,6 +954,7 @@ contains
 
                 end do
             end do
+
         end if
         #:endfor
 
@@ -1063,7 +1066,7 @@ contains
 
             if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
+                do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1085,7 +1088,6 @@ contains
                     end do
                 end do
             end if
-
 
 
             ! END: Reshaping Inputted Data in x-direction ======================
@@ -1141,7 +1143,7 @@ contains
 
             if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
+                do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1162,7 +1164,7 @@ contains
                         end do
                     end do
                 end do
-            end if                
+            end if           
 
 
             ! END: Reshaping Inputted Data in y-direction ======================
@@ -1218,7 +1220,7 @@ contains
 
             if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
+                do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1240,7 +1242,6 @@ contains
                     end do
                 end do                
             end if
-
 
         end if
         ! END: Reshaping Inputted Data in z-direction ======================
@@ -1303,7 +1304,7 @@ contains
 
             if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
+                do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1355,7 +1356,7 @@ contains
 
             if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
+                do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
@@ -1408,7 +1409,7 @@ contains
 
             if(riemann_solver == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, advxe
+                do i = advxb, advxe
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
