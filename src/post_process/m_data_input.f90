@@ -117,7 +117,7 @@ contains
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
 
         ! Computing the cell-center locations
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         ! ==================================================================
 
@@ -144,7 +144,7 @@ contains
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
 
             ! Computing the cell-center locations
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             ! ==================================================================
 
@@ -171,7 +171,7 @@ contains
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
 
                 ! Computing the cell-center locations
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
 
             end if
 
@@ -256,7 +256,7 @@ contains
         ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         ! Computing the cell center location
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (n > 0) then
             ! Read in cell boundary locations in y-direction
@@ -277,7 +277,7 @@ contains
             ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
             ! Computing the cell center location
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
                 ! Read in cell boundary locations in z-direction
@@ -298,7 +298,7 @@ contains
                 ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
                 ! Computing the cell center location
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
             end if
         end if
 
@@ -320,8 +320,8 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -410,7 +410,7 @@ contains
             end do
 
             do i = 1, buff_size
-                x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
+                x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
             end do
 
         end if
@@ -446,7 +446,7 @@ contains
             end do
 
             do i = 1, buff_size
-                x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
+                x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
             end do
 
         end if
@@ -488,7 +488,7 @@ contains
                 end do
 
                 do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
+                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
                 end do
 
             end if
@@ -524,7 +524,7 @@ contains
                 end do
 
                 do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
+                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
                 end do
 
             end if
@@ -566,7 +566,7 @@ contains
                     end do
 
                     do i = 1, buff_size
-                        z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
+                        z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
                     end do
 
                 end if
@@ -602,7 +602,7 @@ contains
                     end do
 
                     do i = 1, buff_size
-                        z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
+                        z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
                     end do
 
                 end if

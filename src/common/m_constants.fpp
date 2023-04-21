@@ -8,11 +8,11 @@ module m_constants
 
     character, parameter :: dflt_char = ' ' !< Default string value
     
-    real(wp), parameter :: dflt_real = -1d6                !< Default real value
-    real(wp), parameter :: sgm_eps   = 1d-16               !< Segmentation tolerance
-    real(wp), parameter :: small_alf = 1d-7                !< Small alf tolerance
-    real(wp), parameter :: pi        = 3.141592653589793d0 !< Pi
-    real(wp), parameter :: verysmall = 1.d-12              !< Very small number
+    real(wp), parameter :: dflt_real = (-1._wp * (10._wp ** 6))                !< Default real value
+    real(wp), parameter :: sgm_eps   = (1._wp * (10._wp ** -(16)))               !< Segmentation tolerance
+    real(wp), parameter :: small_alf = (1._wp * (10._wp ** -(7)))                !< Small alf tolerance
+    real(wp), parameter :: pi        = 3.141592653589793_wp !< Pi
+    real(wp), parameter :: verysmall = (1._wp * (10._wp ** -(12)))              !< Very small number
     
     integer, parameter :: num_stcls_min   = 5    !< Mininum # of stencils
     integer, parameter :: path_len        = 400  !< Maximum path length

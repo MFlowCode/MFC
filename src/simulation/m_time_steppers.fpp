@@ -229,7 +229,7 @@ contains
         if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
-            time_avg = 0d0
+            time_avg = 0._wp
         end if
 
         ! ==================================================================
@@ -294,7 +294,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
@@ -311,7 +311,7 @@ contains
         if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
-            time_avg = 0d0
+            time_avg = 0._wp
         end if
 
         ! ==================================================================
@@ -377,9 +377,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -402,8 +402,8 @@ contains
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
@@ -422,7 +422,7 @@ contains
         if (t_step >= 4) then
             time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
-            time_avg = 0d0
+            time_avg = 0._wp
         end if
 
         ! ==================================================================

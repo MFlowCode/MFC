@@ -283,7 +283,7 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
-            patch_icpp(i)%tau_e = 0d0
+            patch_icpp(i)%tau_e = 0._wp
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real
@@ -314,7 +314,7 @@ contains
         nmom = 1
         sigR = dflt_real
         sigV = dflt_real
-        rhoRV = 0d0
+        rhoRV = 0._wp
         dist_type = dflt_int
         R0_type = dflt_int
 
@@ -336,7 +336,7 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%G = 0d0
+            fluid_pp(i)%G = 0._wp
         end do
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
@@ -450,9 +450,9 @@ contains
                 end if
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 1d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 1._wp
                 else if (nb > 1) then
                     if (R0_type == 1) then
                         call s_simpson
@@ -460,7 +460,7 @@ contains
                         print *, 'Invalid R0 type - abort'
                         stop
                     end if
-                    V0(:) = 1d0
+                    V0(:) = 1._wp
                 else
                     stop 'Invalid value of nb'
                 end if
@@ -471,8 +471,8 @@ contains
                 if (.not. polytropic) then
                     call s_initialize_nonpoly
                 else
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
             end if
 
@@ -543,9 +543,9 @@ contains
                 end do
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
                     if (R0_type == 1) then
                         call s_simpson
@@ -553,7 +553,7 @@ contains
                         print *, 'Invalid R0 type - abort'
                         stop
                     end if
-                    V0(:) = 1d0
+                    V0(:) = 1._wp
                 else
                     stop 'Invalid value of nb'
                 end if
@@ -561,8 +561,8 @@ contains
                 if (.not. polytropic) then
                     call s_initialize_nonpoly
                 else
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
             end if
         end if
@@ -620,27 +620,27 @@ contains
         !! for non-polytropic processes
     subroutine s_initialize_nonpoly
         integer :: ir
-        real(kind(0.d0)) :: rhol0
-        real(kind(0.d0)) :: pl0
-        real(kind(0.d0)) :: uu
-        real(kind(0.d0)) :: D_m
-        real(kind(0.d0)) :: temp
-        real(kind(0.d0)) :: omega_ref
-        real(kind(0.d0)), dimension(Nb) :: chi_vw0
-        real(kind(0.d0)), dimension(Nb) :: cp_m0
-        real(kind(0.d0)), dimension(Nb) :: k_m0
-        real(kind(0.d0)), dimension(Nb) :: rho_m0
-        real(kind(0.d0)), dimension(Nb) :: x_vw
+        real(kind(0._wp)) :: rhol0
+        real(kind(0._wp)) :: pl0
+        real(kind(0._wp)) :: uu
+        real(kind(0._wp)) :: D_m
+        real(kind(0._wp)) :: temp
+        real(kind(0._wp)) :: omega_ref
+        real(kind(0._wp)), dimension(Nb) :: chi_vw0
+        real(kind(0._wp)), dimension(Nb) :: cp_m0
+        real(kind(0._wp)), dimension(Nb) :: k_m0
+        real(kind(0._wp)), dimension(Nb) :: rho_m0
+        real(kind(0._wp)), dimension(Nb) :: x_vw
         ! polytropic index used to compute isothermal natural frequency
-        real(kind(0.d0)), parameter :: k_poly = 1.d0
+        real(kind(0._wp)), parameter :: k_poly = 1._wp
         ! universal gas constant
-        real(kind(0.d0)), parameter :: Ru = 8314.d0
+        real(kind(0._wp)), parameter :: Ru = 8314._wp
 
         ! liquid physical properties
-        real(kind(0.d0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
+        real(kind(0._wp)) :: mul0, ss, pv, gamma_v, M_v, mu_v
 
         ! gas physical properties
-        real(kind(0.d0)) :: gamma_m, gamma_n, M_n, mu_n
+        real(kind(0._wp)) :: gamma_m, gamma_n, M_n, mu_n
 
         rhol0 = rhoref
         pl0 = pref
@@ -669,13 +669,13 @@ contains
         k_n(:) = fluid_pp(2)%k_v
 
         gamma_m = gamma_n
-        if (thermal == 2) gamma_m = 1.d0 !isothermal
+        if (thermal == 2) gamma_m = 1._wp !isothermal
 
-        temp = 293.15d0
-        D_m = 0.242d-4
+        temp = 293.15_wp
+        D_m = (0.242_wp * (10._wp ** -(4)))
         uu = sqrt(pl0/rhol0)
 
-        omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
+        omega_ref = 3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/Web
 
         ! thermal properties --- 
 
@@ -683,29 +683,29 @@ contains
         R_n = Ru/M_n
         R_v = Ru/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
-        phi_vn = (1.d0 + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
-                 /(sqrt(8.d0)*sqrt(1.d0 + M_v/M_n))
-        phi_nv = (1.d0 + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
-                 /(sqrt(8.d0)*sqrt(1.d0 + M_n/M_v))
+        phi_vn = (1._wp + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_v/M_n))
+        phi_nv = (1._wp + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_n/M_v))
         ! internal bubble pressure
-        pb0 = pl0 + 2.d0*ss/(R0ref*R0)
+        pb0 = pl0 + 2._wp*ss/(R0ref*R0)
 
         ! mass fraction of vapor
-        chi_vw0 = 1.d0/(1.d0 + R_v/R_n*(pb0/pv - 1.d0))
+        chi_vw0 = 1._wp/(1._wp + R_v/R_n*(pb0/pv - 1._wp))
         ! specific heat for gas/vapor mixture
-        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1.d0) &
-                + (1.d0 - chi_vw0)*R_n*gamma_n/(gamma_n - 1.d0)
+        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1._wp) &
+                + (1._wp - chi_vw0)*R_n*gamma_n/(gamma_n - 1._wp)
         ! mole fraction of vapor
         x_vw = M_n*chi_vw0/(M_v + (M_n - M_v)*chi_vw0)
         ! thermal conductivity for gas/vapor mixture
-        k_m0 = x_vw*k_v/(x_vw + (1.d0 - x_vw)*phi_vn) &
-               + (1.d0 - x_vw)*k_n/(x_vw*phi_nv + 1.d0 - x_vw)
+        k_m0 = x_vw*k_v/(x_vw + (1._wp - x_vw)*phi_vn) &
+               + (1._wp - x_vw)*k_n/(x_vw*phi_nv + 1._wp - x_vw)
         ! mixture density
         rho_m0 = pv/(chi_vw0*R_v*temp)
 
         ! mass of gas/vapor computed using dimensional quantities
-        mass_n0 = 4.d0*(pb0 - pv)*pi/(3.d0*R_n*temp*rhol0)*R0**3
-        mass_v0 = 4.d0*pv*pi/(3.d0*R_v*temp*rhol0)*R0**3
+        mass_n0 = 4._wp*(pb0 - pv)*pi/(3._wp*R_n*temp*rhol0)*R0**3
+        mass_v0 = 4._wp*pv*pi/(3._wp*R_v*temp*rhol0)*R0**3
         ! Peclet numbers
         Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
         Pe_c = uu*R0ref/D_m
@@ -721,22 +721,22 @@ contains
 
         ! bubble wall temperature, normalized by T0, in the liquid
         ! keeps a constant (cold liquid assumption)
-        Tw = 1.d0
+        Tw = 1._wp
         ! natural frequencies
-        omegaN = sqrt(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
+        omegaN = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
 
-        pl0 = 1.d0
+        pl0 = 1._wp
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_c*R0(ir), &
                               Re_trans_c(ir), Im_trans_c(ir))
         end do
-        Im_trans_T = 0d0
-        Im_trans_c = 0d0
+        Im_trans_T = 0._wp
+        Im_trans_c = 0._wp
 
-        rhoref = 1.d0
-        pref = 1.d0
+        rhoref = 1._wp
+        pref = 1._wp
     end subroutine s_initialize_nonpoly
 
     !> Computes the transfer coefficient for the non-polytropic bubble compression process
@@ -746,18 +746,18 @@ contains
         !! @param Im_trans Imaginary part of the transport coefficients
     subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
-        real(kind(0.d0)), intent(IN) :: omega
-        real(kind(0.d0)), intent(IN) :: peclet
-        real(kind(0.d0)), intent(OUT) :: Re_trans
-        real(kind(0.d0)), intent(OUT) :: Im_trans
+        real(kind(0._wp)), intent(IN) :: omega
+        real(kind(0._wp)), intent(IN) :: peclet
+        real(kind(0._wp)), intent(OUT) :: Re_trans
+        real(kind(0._wp)), intent(OUT) :: Im_trans
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
-        real(kind(0.d0)) :: f_transcoeff
+        real(kind(0._wp)) :: f_transcoeff
 
         c1 = imag*omega*peclet
         c2 = CSQRT(c1)
         c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
-        trans = ((c2/c3 - 1.d0)**(-1) - 3.d0/c1)**(-1) ! transfer function
+        trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
         Re_trans = dble(trans)
         Im_trans = aimag(trans)
@@ -827,12 +827,12 @@ contains
     subroutine s_simpson
 
         integer :: ir
-        real(kind(0.d0)) :: R0mn
-        real(kind(0.d0)) :: R0mx
-        real(kind(0.d0)) :: dphi
-        real(kind(0.d0)) :: tmp
-        real(kind(0.d0)) :: sd
-        real(kind(0.d0)), dimension(nb) :: phi
+        real(kind(0._wp)) :: R0mn
+        real(kind(0._wp)) :: R0mx
+        real(kind(0._wp)) :: dphi
+        real(kind(0._wp)) :: tmp
+        real(kind(0._wp)) :: sd
+        real(kind(0._wp)), dimension(nb) :: phi
 
         ! nondiml. min. & max. initial radii for numerical quadrature
         !sd   = 0.05D0
@@ -848,8 +848,8 @@ contains
         !R0mx = 150.D0
 
         sd = poly_sigma
-        R0mn = 0.8d0*exp(-2.8d0*sd)
-        R0mx = 0.2d0*exp(9.5d0*sd) + 1.d0
+        R0mn = 0.8_wp*exp(-2.8_wp*sd)
+        R0mx = 0.2_wp*exp(9.5_wp*sd) + 1._wp
 
         ! phi = ln( R0 ) & return R0
         do ir = 1, nb
@@ -862,17 +862,17 @@ contains
         ! weights for quadrature using Simpson's rule
         do ir = 2, nb - 1
             ! Gaussian
-            tmp = exp(-0.5d0*(phi(ir)/sd)**2)/sqrt(2.d0*pi)/sd
+            tmp = exp(-0.5_wp*(phi(ir)/sd)**2)/sqrt(2._wp*pi)/sd
             if (mod(ir, 2) == 0) then
-                weight(ir) = tmp*4.d0*dphi/3.d0
+                weight(ir) = tmp*4._wp*dphi/3._wp
             else
-                weight(ir) = tmp*2.d0*dphi/3.d0
+                weight(ir) = tmp*2._wp*dphi/3._wp
             end if
         end do
-        tmp = exp(-0.5d0*(phi(1)/sd)**2)/sqrt(2.d0*pi)/sd
-        weight(1) = tmp*dphi/3.d0
-        tmp = exp(-0.5d0*(phi(nb)/sd)**2)/sqrt(2.d0*pi)/sd
-        weight(nb) = tmp*dphi/3.d0
+        tmp = exp(-0.5_wp*(phi(1)/sd)**2)/sqrt(2._wp*pi)/sd
+        weight(1) = tmp*dphi/3._wp
+        tmp = exp(-0.5_wp*(phi(nb)/sd)**2)/sqrt(2._wp*pi)/sd
+        weight(nb) = tmp*dphi/3._wp
     end subroutine s_simpson
 
 end module m_global_parameters

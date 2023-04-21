@@ -215,7 +215,7 @@ program p_main
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
     if (t_step == 0) then
-        mytime = 0d0
+        mytime = 0._wp
     else
         mytime = t_step*dt
     end if
@@ -225,7 +225,7 @@ program p_main
     do
         if (proc_rank == 0) then
             print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',                             &
-                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                  int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                   t_step      - t_step_start + 1,                                                     &
                   t_step_stop - t_step_start + 1,                                                     &
                   t_step
@@ -266,8 +266,8 @@ program p_main
             end if
 
             if (proc_rank == 0) then
-                time_final = 0d0
-                io_time_final = 0d0
+                time_final = 0._wp
+                io_time_final = 0._wp
                 if (num_procs == 1) then
                     time_final = time_avg
                     io_time_final = io_time_avg

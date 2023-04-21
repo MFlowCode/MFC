@@ -21,9 +21,9 @@ module m_bubbles
 
     implicit none
 
-    real(kind(0.d0)) :: chi_vw  !< Bubble wall properties (Ando 2010)
-    real(kind(0.d0)) :: k_mw    !< Bubble wall properties (Ando 2010)
-    real(kind(0.d0)) :: rho_mw  !< Bubble wall properties (Ando 2010)
+    real(kind(0._wp)) :: chi_vw  !< Bubble wall properties (Ando 2010)
+    real(kind(0._wp)) :: k_mw    !< Bubble wall properties (Ando 2010)
+    real(kind(0._wp)) :: rho_mw  !< Bubble wall properties (Ando 2010)
     !$acc declare create(chi_vw, k_mw, rho_mw)
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
@@ -111,14 +111,14 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    bub_adv_src(j, k, l) = 0d0
+                    bub_adv_src(j, k, l) = 0._wp
 
 !$acc loop seq
                     do q = 1, nb
-                        bub_r_src(j, k, l, q) = 0d0
-                        bub_v_src(j, k, l, q) = 0d0
-                        bub_p_src(j, k, l, q) = 0d0
-                        bub_m_src(j, k, l, q) = 0d0
+                        bub_r_src(j, k, l, q) = 0._wp
+                        bub_v_src(j, k, l, q) = 0._wp
+                        bub_p_src(j, k, l, q) = 0._wp
+                        bub_m_src(j, k, l, q) = 0._wp
                     end do
                 end do
             end do
@@ -135,23 +135,23 @@ contains
                         Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
                     end do
 
-                    R3 = 0d0
+                    R3 = 0._wp
 
                     !$acc loop seq
                     do q = 1, nb
-                        R3 = R3 + weight(q)*Rtmp(q)**3.d0
+                        R3 = R3 + weight(q)*Rtmp(q)**3._wp
                     end do
 
-                    nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                    nbub(j, k, l) = (3._wp/(4._wp*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
 
-                    R2Vav = 0d0
+                    R2Vav = 0._wp
 
                     !$acc loop seq
                     do q = 1, nb
-                        R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
+                        R2Vav = R2Vav + weight(q)*Rtmp(q)**2._wp*Vtmp(q)
                     end do
 
-                    bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
+                    bub_adv_src(j, k, l) = 4._wp*pi*nbub(j, k, l)*R2Vav
 
                 end do
             end do
@@ -172,9 +172,9 @@ contains
                             myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
                         end do
 
-                        myRho = 0d0
-                        n_tait = 0d0
-                        B_tait = 0d0
+                        myRho = 0._wp
+                        n_tait = 0._wp
+                        B_tait = 0._wp
 
                         if (mpp_lim .and. (num_fluids > 2)) then
                             !$acc loop seq
@@ -196,7 +196,7 @@ contains
                             B_tait = pi_infs(1)
                         end if
 
-                        n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                        n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
@@ -212,9 +212,9 @@ contains
                             pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
                             bub_p_src(j, k, l, q) = nbub(j, k, l)*pbdot
-                            bub_m_src(j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
+                            bub_m_src(j, k, l, q) = nbub(j, k, l)*vflux*4._wp*pi*(myR**2._wp)
                         else
-                            pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
+                            pb = 0._wp; mv = 0._wp; vflux = 0._wp; pbdot = 0._wp
                         end if
 
                         if (bubble_model == 1) then
@@ -231,7 +231,7 @@ contains
                             Cpinf = myP
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                             ! c_gas = sqrt( n_tait*(Cpbw+B_tait) / myRho)
-                            c_liquid = sqrt(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
+                            c_liquid = sqrt(n_tait*(myP + B_tait)/(myRho*(1._wp - alf)))
                             rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
@@ -241,13 +241,13 @@ contains
 
                         bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
 
-                        if (alf < 1.d-11) then
-                            bub_adv_src(j, k, l) = 0d0
-                            bub_r_src(j, k, l, q) = 0d0
-                            bub_v_src(j, k, l, q) = 0d0
+                        if (alf < (1._wp * (10._wp ** -(11)))) then
+                            bub_adv_src(j, k, l) = 0._wp
+                            bub_r_src(j, k, l, q) = 0._wp
+                            bub_v_src(j, k, l, q) = 0._wp
                             if (.not. polytropic) then
-                                bub_p_src(j, k, l, q) = 0d0
-                                bub_m_src(j, k, l, q) = 0d0
+                                bub_p_src(j, k, l, q) = 0._wp
+                                bub_m_src(j, k, l, q) = 0._wp
                             end if
                         end if
                     end do
@@ -289,9 +289,9 @@ contains
         real(wp) :: f_cpbw
 
         if (polytropic) then
-            f_cpbw = (Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
+            f_cpbw = (Ca + 2._wp/Web/fR0)*((fR0/fR)**(3._wp*gam)) - Ca - 4._wp*Re_inv*fV/fR - 2._wp/(fR*Web)
         else
-            f_cpbw = fpb - 1.d0 - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
+            f_cpbw = fpb - 1._wp - 4._wp*Re_inv*fV/fR - 2._wp/(fR*Web)
         end if
 
     end function f_cpbw
@@ -308,11 +308,11 @@ contains
         real(wp) :: tmp1, tmp2, tmp3
         real(wp) :: f_H
 
-        tmp1 = (fntait - 1.d0)/fntait
-        tmp2 = (fCpbw/(1.d0 + fBtait) + 1.d0)**tmp1
-        tmp3 = (fCpinf/(1.d0 + fBtait) + 1.d0)**tmp1
+        tmp1 = (fntait - 1._wp)/fntait
+        tmp2 = (fCpbw/(1._wp + fBtait) + 1._wp)**tmp1
+        tmp3 = (fCpinf/(1._wp + fBtait) + 1._wp)**tmp1
 
-        f_H = (tmp2 - tmp3)*fntait*(1.d0 + fBtait)/(fntait - 1.d0)
+        f_H = (tmp2 - tmp3)*fntait*(1._wp + fBtait)/(fntait - 1._wp)
 
     end function f_H
 
@@ -329,10 +329,10 @@ contains
         real(wp) :: f_cgas
 
         ! get sound speed for Gilmore equations "C" -> c_gas
-        tmp = (fCpinf/(1.d0 + fBtait) + 1.d0)**((fntait - 1.d0)/fntait)
-        tmp = fntait*(1.d0 + fBtait)*tmp
+        tmp = (fCpinf/(1._wp + fBtait) + 1._wp)**((fntait - 1._wp)/fntait)
+        tmp = fntait*(1._wp + fBtait)*tmp
 
-        f_cgas = sqrt(tmp + (fntait - 1.d0)*fH)
+        f_cgas = sqrt(tmp + (fntait - 1._wp)*fH)
 
     end function f_cgas
 
@@ -356,7 +356,7 @@ contains
         if (mpp_lim) then
             c2_liquid = fntait*(fP + fBtait)/fRho
         else
-            c2_liquid = fntait*(fP + fBtait)/(fRho*(1.d0 - falf))
+            c2_liquid = fntait*(fP + fBtait)/(fRho*(1._wp - falf))
         end if
 
         ! \dot{Cp_inf} = rho sound^2 (alf_src - divu)
@@ -383,23 +383,23 @@ contains
         real(wp) :: f_Hdot
 
         if (polytropic) then
-            tmp1 = (fR0/fR)**(3.d0*gam)
-            tmp1 = -3.d0*gam*(Ca + 2d0/Web/fR0)*tmp1*fV/fR
+            tmp1 = (fR0/fR)**(3._wp*gam)
+            tmp1 = -3._wp*gam*(Ca + 2._wp/Web/fR0)*tmp1*fV/fR
         else
             tmp1 = fpbdot
         end if
-        tmp2 = (2.d0/Web + 4.d0*Re_inv*fV)*fV/(fR**2.d0)
+        tmp2 = (2._wp/Web + 4._wp*Re_inv*fV)*fV/(fR**2._wp)
 
         f_Hdot = &
-            (fCpbw/(1.d0 + fBtait) + 1.d0)**(-1.d0/fntait)*(tmp1 + tmp2) &
-            - (fCpinf/(1.d0 + fBtait) + 1.d0)**(-1.d0/fntait)*fCpinf_dot
+            (fCpbw/(1._wp + fBtait) + 1._wp)**(-1._wp/fntait)*(tmp1 + tmp2) &
+            - (fCpinf/(1._wp + fBtait) + 1._wp)**(-1._wp/fntait)*fCpinf_dot
 
         ! Hdot = (Cpbw/(1+B) + 1)^(-1/n_tait)*(-3 gam)*(R0/R)^(3gam) V/R
-        !f_Hdot = ((fCpbw/(1d0+fBtait)+1.d0)**(-1.d0/fntait))*(-3.d0)*gam * &
-        !            ( (fR0/fR)**(3.d0*gam ))*(fV/fR)
+        !f_Hdot = ((fCpbw/(1._wp+fBtait)+1._wp)**(-1._wp/fntait))*(-3._wp)*gam * &
+        !            ( (fR0/fR)**(3._wp*gam ))*(fV/fR)
 
         ! Hdot = Hdot - (Cpinf/(1+B) + 1)^(-1/n_tait) Cpinfdot
-        !f_Hdot = f_Hdot - ((fCpinf/(1.d0+fBtait)+1.d0)**(-1.d0/fntait))*fCpinf_dot
+        !f_Hdot = f_Hdot - ((fCpinf/(1._wp+fBtait)+1._wp)**(-1._wp/fntait))*fCpinf_dot
 
     end function f_Hdot
 
@@ -419,7 +419,7 @@ contains
             !! rddot = (1/r) (  -3/2 rdot^2 + (tmp1 - Cp)/rho )
             !! rddot = (1/r) (  tmp2 )
 
-        f_rddot_RP = (-1.5d0*(fV**2d0) + (fCpbw - fCp)/fRho)/fR
+        f_rddot_RP = (-1.5_wp*(fV**2._wp) + (fCpbw - fCp)/fRho)/fR
 
     end function f_rddot_RP
 
@@ -441,12 +441,12 @@ contains
         real(wp) :: f_rddot
 
         tmp1 = fV/fcgas
-        tmp2 = 1.d0 + 4.d0*Re_inv/fcgas/fR*(fCpbw/(1.d0 + fBtait) + 1.d0) &
-               **(-1.d0/fntait)
-        tmp3 = 1.5d0*fV**2d0*(tmp1/3.d0 - 1.d0) + fH*(1.d0 + tmp1) &
-               + fR*fHdot*(1.d0 - tmp1)/fcgas
+        tmp2 = 1._wp + 4._wp*Re_inv/fcgas/fR*(fCpbw/(1._wp + fBtait) + 1._wp) &
+               **(-1._wp/fntait)
+        tmp3 = 1.5_wp*fV**2._wp*(tmp1/3._wp - 1._wp) + fH*(1._wp + tmp1) &
+               + fR*fHdot*(1._wp - tmp1)/fcgas
 
-        f_rddot = tmp3/(fR*(1.d0 - tmp1)*tmp2)
+        f_rddot = tmp3/(fR*(1._wp - tmp1)*tmp2)
 
     end function f_rddot
 
@@ -461,15 +461,15 @@ contains
         real(wp) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
+            f_cpbw_KM = Ca*((fR0/fR)**(3._wp*gam)) - Ca + 1._wp
             if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                                              (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+                                              (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
         else
             f_cpbw_KM = fpb
         end if
 
-        if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
-        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
+        if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2._wp/(fR*Web)
+        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4._wp*Re_inv*fV/fR
 
     end function f_cpbw_KM
 
@@ -491,25 +491,25 @@ contains
         real(wp) :: f_rddot_KM
 
         if (polytropic) then
-            cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
+            cdot_star = -3._wp*gam*Ca*((fR0/fR)**(3._wp*gam))*fV/fR
             if (Web /= dflt_real) cdot_star = cdot_star - &
-                                              3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
+                                              3._wp*gam*(2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))*fV/fR
         else
             cdot_star = fpbdot
         end if
 
-        if (Web /= dflt_real) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
-        if (Re_inv /= dflt_real) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
+        if (Web /= dflt_real) cdot_star = cdot_star + (2._wp/Web)*fV/(fR**2._wp)
+        if (Re_inv /= dflt_real) cdot_star = cdot_star + 4._wp*Re_inv*((fV/fR)**2._wp)
 
         tmp1 = fV/fC
-        tmp2 = 1.5d0*(fV**2d0)*(tmp1/3d0 - 1d0) + &
-               (1d0 + tmp1)*(fCpbw - fCp)/fRho + &
+        tmp2 = 1.5_wp*(fV**2._wp)*(tmp1/3._wp - 1._wp) + &
+               (1._wp + tmp1)*(fCpbw - fCp)/fRho + &
                cdot_star*fR/(fRho*fC)
 
         if (Re_inv == dflt_real) then
-            f_rddot_KM = tmp2/(fR*(1d0 - tmp1))
+            f_rddot_KM = tmp2/(fR*(1._wp - tmp1))
         else
-            f_rddot_KM = tmp2/(fR*(1d0 - tmp1) + 4d0*Re_inv/(fRho*fC))
+            f_rddot_KM = tmp2/(fR*(1._wp - tmp1) + 4._wp*Re_inv/(fRho*fC))
         end if
 
     end function f_rddot_KM
@@ -519,17 +519,17 @@ contains
     !>  @param iR0 Current bubble size index
     subroutine s_bwproperty(pb, iR0)
 !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: pb
+        real(kind(0._wp)), intent(IN) :: pb
         integer, intent(IN) :: iR0
 
-        real(kind(0.d0)) :: x_vw
+        real(kind(0._wp)) :: x_vw
 
         ! mass fraction of vapor
-        chi_vw = 1.d0/(1.d0 + R_v/R_n*(pb/pv - 1.d0))
+        chi_vw = 1._wp/(1._wp + R_v/R_n*(pb/pv - 1._wp))
         ! mole fraction of vapor & thermal conductivity of gas mixture
         x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-        k_mw = x_vw*k_v(iR0)/(x_vw + (1.d0 - x_vw)*phi_vn) &
-               + (1.d0 - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1.d0 - x_vw)
+        k_mw = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vn) &
+               + (1._wp - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1._wp - x_vw)
         ! gas mixture density
         rho_mw = pv/(chi_vw*R_v*Tw)
 
@@ -542,20 +542,20 @@ contains
         !!  @param iR0 Bubble size index
     function f_vflux(fR, fV, fmass_v, iR0)
 !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: fR
-        real(kind(0.d0)), intent(IN) :: fV
-        real(kind(0.d0)), intent(IN) :: fmass_v
+        real(kind(0._wp)), intent(IN) :: fR
+        real(kind(0._wp)), intent(IN) :: fV
+        real(kind(0._wp)), intent(IN) :: fmass_v
         integer, intent(IN) :: iR0
 
-        real(kind(0.d0)) :: chi_bar
-        real(kind(0.d0)) :: grad_chi
-        real(kind(0.d0)) :: f_vflux
+        real(kind(0._wp)) :: chi_bar
+        real(kind(0._wp)) :: grad_chi
+        real(kind(0._wp)) :: f_vflux
 
         if (thermal == 3) then !transfer
             ! constant transfer model
             chi_bar = fmass_v/(fmass_v + mass_n0(iR0))
             grad_chi = -Re_trans_c(iR0)*(chi_bar - chi_vw)
-            f_vflux = rho_mw*grad_chi/Pe_c/(1.d0 - chi_vw)/fR
+            f_vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
         else
             ! polytropic
             f_vflux = pv*fV/(R_v*Tw)
@@ -573,26 +573,26 @@ contains
         !!  @param iR0 Bubble size index
     function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0)
 !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: fvflux
-        real(kind(0.d0)), intent(IN) :: fR
-        real(kind(0.d0)), intent(IN) :: fV
-        real(kind(0.d0)), intent(IN) :: fpb
-        real(kind(0.d0)), intent(IN) :: fmass_v
+        real(kind(0._wp)), intent(IN) :: fvflux
+        real(kind(0._wp)), intent(IN) :: fR
+        real(kind(0._wp)), intent(IN) :: fV
+        real(kind(0._wp)), intent(IN) :: fpb
+        real(kind(0._wp)), intent(IN) :: fmass_v
         integer, intent(IN) :: iR0
 
-        real(kind(0.d0)) :: T_bar
-        real(kind(0.d0)) :: grad_T
-        real(kind(0.d0)) :: tmp1, tmp2
-        real(kind(0.d0)) :: f_bpres_dot
+        real(kind(0._wp)) :: T_bar
+        real(kind(0._wp)) :: grad_T
+        real(kind(0._wp)) :: tmp1, tmp2
+        real(kind(0._wp)) :: f_bpres_dot
 
         if (thermal == 3) then
             T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &
                     *(mass_n0(iR0) + mass_v0(iR0))/(mass_n0(iR0) + fmass_v)
             grad_T = -Re_trans_T(iR0)*(T_bar - Tw)
-            f_bpres_dot = 3.d0*gamma_m*(-fV*fpb + fvflux*R_v*Tw &
+            f_bpres_dot = 3._wp*gamma_m*(-fV*fpb + fvflux*R_v*Tw &
                                         + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
         else
-            f_bpres_dot = -3.d0*gamma_m*fV/fR*(fpb - pv)
+            f_bpres_dot = -3._wp*gamma_m*fV/fR*(fpb - pv)
         end if
 
     end function f_bpres_dot

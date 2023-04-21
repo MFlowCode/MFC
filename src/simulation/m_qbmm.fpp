@@ -63,7 +63,7 @@ contains
         #:endif
 
         @:ALLOCATE(momrhs(3, 0:2, 0:2, nterms, nb))
-        momrhs = 0d0
+        momrhs = 0._wp
 
         ! Assigns the required RHS moments for moment transport equations
         ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
@@ -71,84 +71,84 @@ contains
             do i1 = 0, 2; do i2 = 0, 2
                     if ((i1 + i2) <= 2) then
                         if (bubble_model == 3) then
-                            momrhs(1, i1, i2, 1, q) = -1.d0 + i1
-                            momrhs(2, i1, i2, 1, q) = -1.d0 + i2
-                            momrhs(3, i1, i2, 1, q) = 0d0
+                            momrhs(1, i1, i2, 1, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 1, q) = -1._wp + i2
+                            momrhs(3, i1, i2, 1, q) = 0._wp
 
-                            momrhs(1, i1, i2, 2, q) = -1.d0 + i1
-                            momrhs(2, i1, i2, 2, q) = 1.d0 + i2
-                            momrhs(3, i1, i2, 2, q) = 0d0
+                            momrhs(1, i1, i2, 2, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 2, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 2, q) = 0._wp
 
-                            momrhs(1, i1, i2, 3, q) = -1.d0 + i1 - 3.d0*gam
-                            momrhs(2, i1, i2, 3, q) = -1.d0 + i2
-                            momrhs(3, i1, i2, 3, q) = 3.d0*gam
+                            momrhs(1, i1, i2, 3, q) = -1._wp + i1 - 3._wp*gam
+                            momrhs(2, i1, i2, 3, q) = -1._wp + i2
+                            momrhs(3, i1, i2, 3, q) = 3._wp*gam
 
-                            momrhs(1, i1, i2, 4, q) = -1.d0 + i1
-                            momrhs(2, i1, i2, 4, q) = 1.d0 + i2
-                            momrhs(3, i1, i2, 4, q) = 0d0
+                            momrhs(1, i1, i2, 4, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 4, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 4, q) = 0._wp
 
                             if (Re_inv /= dflt_real) then
                                 ! add viscosity
-                                momrhs(1, i1, i2, 5, q) = -2.d0 + i1
+                                momrhs(1, i1, i2, 5, q) = -2._wp + i1
                                 momrhs(2, i1, i2, 5, q) = i2
-                                momrhs(3, i1, i2, 5, q) = 0d0
+                                momrhs(3, i1, i2, 5, q) = 0._wp
                             end if
 
                             if (Web /= dflt_real) then
                                 ! add surface tension
-                                momrhs(1, i1, i2, 6, q) = -2.d0 + i1
-                                momrhs(2, i1, i2, 6, q) = -1.d0 + i2
-                                momrhs(3, i1, i2, 6, q) = 0d0
+                                momrhs(1, i1, i2, 6, q) = -2._wp + i1
+                                momrhs(2, i1, i2, 6, q) = -1._wp + i2
+                                momrhs(3, i1, i2, 6, q) = 0._wp
                             end if
                         else if (bubble_model == 2) then
                             ! KM with approximation of 1/(1-V/C) = 1+V/C
-                            momrhs(1, i1, i2, 1, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 1, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 1, q) = 0d0
+                            momrhs(1, i1, i2, 1, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 1, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 1, q) = 0._wp
 
-                            momrhs(1, i1, i2, 2, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 2, q) = 2d0 + i2
-                            momrhs(3, i1, i2, 2, q) = 0d0
+                            momrhs(1, i1, i2, 2, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 2, q) = 2._wp + i2
+                            momrhs(3, i1, i2, 2, q) = 0._wp
 
-                            momrhs(1, i1, i2, 3, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 3, q) = 3d0 + i2
-                            momrhs(3, i1, i2, 3, q) = 0d0
+                            momrhs(1, i1, i2, 3, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 3, q) = 3._wp + i2
+                            momrhs(3, i1, i2, 3, q) = 0._wp
 
-                            momrhs(1, i1, i2, 4, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 4, q) = -1d0 + i2
-                            momrhs(3, i1, i2, 4, q) = 0d0
+                            momrhs(1, i1, i2, 4, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 4, q) = -1._wp + i2
+                            momrhs(3, i1, i2, 4, q) = 0._wp
 
-                            momrhs(1, i1, i2, 5, q) = -1d0 + i1
+                            momrhs(1, i1, i2, 5, q) = -1._wp + i1
                             momrhs(2, i1, i2, 5, q) = i2
-                            momrhs(3, i1, i2, 5, q) = 0d0
+                            momrhs(3, i1, i2, 5, q) = 0._wp
 
-                            momrhs(1, i1, i2, 6, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 6, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 6, q) = 0d0
+                            momrhs(1, i1, i2, 6, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 6, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 6, q) = 0._wp
 
-                            momrhs(1, i1, i2, 7, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 7, q) = -1d0 + i2
-                            momrhs(3, i1, i2, 7, q) = 3d0*gam
+                            momrhs(1, i1, i2, 7, q) = -1._wp + i1 - 3._wp*gam
+                            momrhs(2, i1, i2, 7, q) = -1._wp + i2
+                            momrhs(3, i1, i2, 7, q) = 3._wp*gam
 
-                            momrhs(1, i1, i2, 8, q) = -1d0 + i1 - 3d0*gam
+                            momrhs(1, i1, i2, 8, q) = -1._wp + i1 - 3._wp*gam
                             momrhs(2, i1, i2, 8, q) = i2
-                            momrhs(3, i1, i2, 8, q) = 3d0*gam
+                            momrhs(3, i1, i2, 8, q) = 3._wp*gam
 
-                            momrhs(1, i1, i2, 9, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 9, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 9, q) = 3d0*gam
+                            momrhs(1, i1, i2, 9, q) = -1._wp + i1 - 3._wp*gam
+                            momrhs(2, i1, i2, 9, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 9, q) = 3._wp*gam
 
-                            momrhs(1, i1, i2, 10, q) = -1d0 + i1 - 3d0*gam
+                            momrhs(1, i1, i2, 10, q) = -1._wp + i1 - 3._wp*gam
                             momrhs(2, i1, i2, 10, q) = i2
-                            momrhs(3, i1, i2, 10, q) = 3d0*gam
+                            momrhs(3, i1, i2, 10, q) = 3._wp*gam
 
-                            momrhs(1, i1, i2, 11, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 11, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 11, q) = 3d0*gam
+                            momrhs(1, i1, i2, 11, q) = -1._wp + i1 - 3._wp*gam
+                            momrhs(2, i1, i2, 11, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 11, q) = 3._wp*gam
 
-                            momrhs(1, i1, i2, 12, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 12, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 12, q) = 0d0
+                            momrhs(1, i1, i2, 12, q) = -1._wp + i1
+                            momrhs(2, i1, i2, 12, q) = 1._wp + i2
+                            momrhs(3, i1, i2, 12, q) = 0._wp
                         end if
                     end if
                 end do; end do
@@ -175,35 +175,35 @@ contains
 
     subroutine s_coeff(pres, rho, c, coeffs)
 !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: pres, rho, c
-        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
+        real(kind(0._wp)), intent(IN) :: pres, rho, c
+        real(kind(0._wp)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
         integer :: i1, i2
 
-        coeffs = 0d0
+        coeffs = 0._wp
 
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
-                        coeffs(1, i1, i2) = -1d0*i2*pres/rho
-                        coeffs(2, i1, i2) = -3d0*i2/2d0
+                        coeffs(1, i1, i2) = -1._wp*i2*pres/rho
+                        coeffs(2, i1, i2) = -3._wp*i2/2._wp
                         coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
-                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
+                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
+                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
-                        coeffs(1, i1, i2) = -3d0*i2/2d0
+                        coeffs(1, i1, i2) = -3._wp*i2/2._wp
                         coeffs(2, i1, i2) = -i2/c
-                        coeffs(3, i1, i2) = i2/(2d0*c*c)
+                        coeffs(3, i1, i2) = i2/(2._wp*c*c)
                         coeffs(4, i1, i2) = -i2*pres/rho
-                        coeffs(5, i1, i2) = -2d0*i2*pres/(c*rho)
+                        coeffs(5, i1, i2) = -2._wp*i2*pres/(c*rho)
                         coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
                         coeffs(7, i1, i2) = i2/rho
-                        coeffs(8, i1, i2) = 2d0*i2/(c*rho)
+                        coeffs(8, i1, i2) = 2._wp*i2/(c*rho)
                         coeffs(9, i1, i2) = i2/(c*c*rho)
-                        coeffs(10, i1, i2) = -3d0*i2*gam/(c*rho)
-                        coeffs(11, i1, i2) = -3d0*i2*gam/(c*c*rho)
+                        coeffs(10, i1, i2) = -3._wp*i2*gam/(c*rho)
+                        coeffs(11, i1, i2) = -3._wp*i2*gam/(c*c*rho)
                         coeffs(12, i1, i2) = i1
                     end if
                 end if
@@ -245,10 +245,10 @@ contains
                     rho = q_prim_vf(contxb)%sf(id1, id2, id3)
                     if (bubble_model == 2) then
                         n_tait = gammas(1)
-                        n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                        n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
                         B_tait = pi_infs(1)
-                        c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
-                        if (c > 0.d0) then
+                        c = n_tait*(pres + B_tait)/(rho*(1._wp - alf))
+                        if (c > 0._wp) then
                             c = sqrt(c)
                         else
                             c = sgm_eps
@@ -258,18 +258,18 @@ contains
                     call s_coeff(pres, rho, c, coeff)
 
                     ! SHB: Manually adjusted pressure here for no-coupling case
-                    ! pres = 1d0/0.3d0
+                    ! pres = 1._wp/0.3_wp
 
                     if (alf > small_alf) then
 
-                        R3 = 0d0
+                        R3 = 0._wp
 
                         !$acc loop seq
                         do q = 1, nb
-                            R3 = R3 + weight(q)*q_prim_vf(bubrs(q))%sf(id1, id2, id3)**3d0
+                            R3 = R3 + weight(q)*q_prim_vf(bubrs(q))%sf(id1, id2, id3)**3._wp
                         end do
 
-                        nbub = (3.d0/(4.d0*pi))*alf/R3
+                        nbub = (3._wp/(4._wp*pi))*alf/R3
 
                         !$acc loop seq
                         do q = 1, nb
@@ -288,7 +288,7 @@ contains
                                 !$acc loop seq
                                 do i1 = 0, 2
                                     if ((i1 + i2) <= 2) then
-                                        momsum = 0d0
+                                        momsum = 0._wp
                                         !$acc loop seq
                                         do j = 1, nterms           
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
@@ -303,14 +303,14 @@ contains
                             
                         end do
 
-                        momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
-                        momsp(2)%sf(id1, id2, id3) = 4.d0*pi*nbub*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0)
-                        momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 2d0, 0d0)
-                        if (abs(gam - 1.d0) <= 1.d-4) then
+                        momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp)
+                        momsp(2)%sf(id1, id2, id3) = 4._wp*pi*nbub*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp)
+                        momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 2._wp, 0._wp)
+                        if (abs(gam - 1._wp) <= (1._wp * (10._wp ** -(4)))) then
                             ! Gam \approx 1, don't risk imaginary quadrature
-                            momsp(4)%sf(id1, id2, id3) = 1.d0
+                            momsp(4)%sf(id1, id2, id3) = 1._wp
                         else
-                            momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
+                            momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp*(1._wp - gam), 0._wp, 3._wp*gam)
                         end if
 
                     
@@ -321,15 +321,15 @@ contains
                             do i1 = 0, 2
                                 !$acc loop seq
                                 do i2 = 0, 2
-                                    moms3d(i1, i2, q)%sf(id1, id2, id3) = 0d0
+                                    moms3d(i1, i2, q)%sf(id1, id2, id3) = 0._wp
                                 end do
                             end do
                         end do
 
-                        momsp(1)%sf(id1, id2, id3) = 0d0
-                        momsp(2)%sf(id1, id2, id3) = 0d0
-                        momsp(3)%sf(id1, id2, id3) = 0d0
-                        momsp(4)%sf(id1, id2, id3) = 0d0
+                        momsp(1)%sf(id1, id2, id3) = 0._wp
+                        momsp(2)%sf(id1, id2, id3) = 0._wp
+                        momsp(3)%sf(id1, id2, id3) = 0._wp
+                        momsp(4)%sf(id1, id2, id3) = 0._wp
 
                     end if
 
@@ -363,17 +363,17 @@ contains
         d20 = moms(2, 0)/moms(0, 0)
         d11 = moms(1, 1)/moms(0, 0)
         d02 = moms(0, 2)/moms(0, 0)
-        c20 = d20 - bu**2d0; 
+        c20 = d20 - bu**2._wp; 
         c11 = d11 - bu*bv; 
-        c02 = d02 - bv**2d0; 
-        M1 = (/1d0, 0d0, c20/)
+        c02 = d02 - bv**2._wp; 
+        M1 = (/1._wp, 0._wp, c20/)
         call s_hyqmom(myrho, up, M1)
         Vf = c11*up/c20
 
-        mu2avg = c02 - sum(myrho(:)*(Vf(:)**2d0))
-        mu2avg = maxval((/mu2avg, 0d0/))
+        mu2avg = c02 - sum(myrho(:)*(Vf(:)**2._wp))
+        mu2avg = maxval((/mu2avg, 0._wp/))
         mu2 = mu2avg
-        M3 = (/1d0, 0d0, mu2/)
+        M3 = (/1._wp, 0._wp, mu2/)
         call s_hyqmom(myrho3, up3, M3)
 
         vp21 = up3(1)
@@ -409,9 +409,9 @@ contains
 
         bu = fmom(2)/fmom(1)
         d2 = fmom(3)/fmom(1)
-        c2 = d2 - bu**2d0
-        frho(1) = fmom(1)/2d0; 
-        frho(2) = fmom(1)/2d0; 
+        c2 = d2 - bu**2._wp
+        frho(1) = fmom(1)/2._wp; 
+        frho(2) = fmom(1)/2._wp; 
         c2 = maxval((/c2, verysmall/))
         fup(1) = bu - sqrt(c2)
         fup(2) = bu + sqrt(c2)
@@ -420,12 +420,12 @@ contains
 
     function f_quad(abscX, abscY, wght, q, r, s)
         !$acc routine seq
-        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), intent(IN) :: q, r, s
-        real(kind(0.d0)) :: f_quad_RV, f_quad
+        real(kind(0._wp)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
+        real(kind(0._wp)), intent(IN) :: q, r, s
+        real(kind(0._wp)) :: f_quad_RV, f_quad
         integer :: i
 
-        f_quad = 0d0
+        f_quad = 0._wp
         do i = 1, nb
             f_quad_RV = sum(wght(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
             f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
@@ -435,9 +435,9 @@ contains
 
     function f_quad2D(abscX, abscY, wght, pow)
         !$acc routine seq
-        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght
-        real(kind(0.d0)), dimension(3), intent(IN) :: pow
-        real(kind(0.d0)) :: f_quad2D
+        real(kind(0._wp)), dimension(nnode), intent(IN) :: abscX, abscY, wght
+        real(kind(0._wp)), dimension(3), intent(IN) :: pow
+        real(kind(0._wp)) :: f_quad2D
 
         f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
     end function f_quad2D

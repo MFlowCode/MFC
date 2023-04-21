@@ -102,12 +102,12 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        mono_mass_src(j, k, l) = 0d0; mono_mom_src(1, j, k, l) = 0d0; mono_e_src(j, k, l) = 0d0; 
+                        mono_mass_src(j, k, l) = 0._wp; mono_mom_src(1, j, k, l) = 0._wp; mono_e_src(j, k, l) = 0._wp; 
                         if (n > 0) then
-                            mono_mom_src(2, j, k, l) = 0d0
+                            mono_mom_src(2, j, k, l) = 0._wp
                         end if
                         if (p > 0) then
-                            mono_mom_src(3, j, k, l) = 0d0
+                            mono_mom_src(3, j, k, l) = 0._wp
                         end if
                     end do
                 end do
@@ -129,9 +129,9 @@ contains
                                     myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
                                 end do
 
-                                myRho = 0d0
-                                n_tait = 0d0
-                                B_tait = 0d0
+                                myRho = 0._wp
+                                n_tait = 0._wp
+                                B_tait = 0._wp
 
                                 if (bubbles) then
                                     if (mpp_lim .and. (num_fluids > 2)) then
@@ -161,23 +161,23 @@ contains
                                         B_tait = B_tait + myalpha(ii)*pi_infs(ii)
                                     end do
                                 end if
-                                n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                                n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
 
-                                sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                                sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1._wp)/n_tait)*B_tait)/myRho
                                 sound = sqrt(sound)
 !                                            const_sos = sqrt(n_tait)
-                                const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                                const_sos = n_tait*((1.01_wp * (10._wp ** 5)) + ((n_tait - 1._wp)/n_tait)*B_tait)/myRho
                                 const_sos = sqrt(const_sos)
                                 !TODO: does const_sos need to be changed?
 
                                 term_index = 2
 
-                                angle = 0.d0
-                                angle_z = 0.d0
+                                angle = 0._wp
+                                angle_z = 0._wp
 
                                 s2 = f_g(the_time, sound, const_sos, q, term_index)* &
                                         f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
-                                !s2 = 1d0
+                                !s2 = 1._wp
 
                                 if (support(q) == 5) then
                                     term_index = 1
@@ -191,7 +191,7 @@ contains
                                 if (n == 0) then
 
                                     ! 1D
-                                    if (dir(q) < -0.1d0) then
+                                    if (dir(q) < -0.1_wp) then
                                         !left-going wave
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
                                     else
@@ -232,10 +232,10 @@ contains
 
                                 if (model_eqns /= 4) then
                                     if (support(q) == 5) then
-!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
-                                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2._wp/(n_tait - 1._wp)
+                                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2._wp/(n_tait - 1._wp)
                                     else
-                                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1._wp)
                                     end if
                                 end if
 
@@ -277,30 +277,30 @@ contains
         real(wp) :: f_g
         integer :: term_index
 
-        offset = 0d0
+        offset = 0._wp
         if (delay(nm) /= dflt_real) offset = delay(nm)
 
         if (pulse(nm) == 1) then
             ! Sine wave
             period = length(nm)/sos
-            f_g = 0d0
+            f_g = 0._wp
             if (term_index == 1) then
-                f_g = mag(nm)*sin((the_time)*2.d0*pi/period)/mysos &
-                        + mag(nm)/foc_length(nm)*(1.d0/(2.d0*pi/period)*cos((the_time)*2.d0*pi/period) &
-                                                - 1.d0/(2.d0*pi/period))
+                f_g = mag(nm)*sin((the_time)*2._wp*pi/period)/mysos &
+                        + mag(nm)/foc_length(nm)*(1._wp/(2._wp*pi/period)*cos((the_time)*2._wp*pi/period) &
+                                                - 1._wp/(2._wp*pi/period))
             elseif (the_time <= (npulse(nm)*period + offset)) then
-                f_g = mag(nm)*sin((the_time + offset)*2.d0*pi/period)
+                f_g = mag(nm)*sin((the_time + offset)*2._wp*pi/period)
             end if
         else if (pulse(nm) == 2) then
             ! Gaussian pulse
-            sigt = length(nm)/sos/7.d0
-            t0 = 3.5d0*sigt
-            f_g = mag(nm)/(sqrt(2.d0*pi)*sigt)* &
-                    exp(-0.5d0*((the_time - t0)**2.d0)/(sigt**2.d0))
+            sigt = length(nm)/sos/7._wp
+            t0 = 3.5_wp*sigt
+            f_g = mag(nm)/(sqrt(2._wp*pi)*sigt)* &
+                    exp(-0.5_wp*((the_time - t0)**2._wp)/(sigt**2._wp))
         else if (pulse(nm) == 3) then
             ! Square wave
             sigt = length(nm)/sos
-            t0 = 0d0; f_g = 0d0
+            t0 = 0._wp; f_g = 0._wp
             if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
@@ -334,13 +334,13 @@ contains
 
         if (n == 0) then
             sig = dx(j)
-            sig = sig*2.5d0
+            sig = sig*2.5_wp
         else if (p == 0) then
             sig = maxval((/dx(j), dy(k)/))
-            sig = sig*2.5d0
+            sig = sig*2.5_wp
         else
             sig = maxval((/dx(j), dy(k), dz(l)/))
-            sig = sig*2.5d0
+            sig = sig*2.5_wp
         end if
 
         if (n == 0) then      !1D
@@ -348,29 +348,29 @@ contains
                 ! 1D delta function
                 hx = abs(mono_loc(1) - x_cc(j))
 
-                f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                            exp(-0.5d0*(hx/(sig/2.d0))**2.d0)
+                f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                            exp(-0.5_wp*(hx/(sig/2._wp))**2._wp)
             else if (support(nm) == 0) then
                 ! Support for all x
-                f_delta = 1.d0
+                f_delta = 1._wp
             end if
         else if (p == 0) then !2D
             hx = mono_loc(1) - x_cc(j)
             hy = mono_loc(2) - y_cc(k)
             if (support(nm) == 1) then
                 ! 2D delta function
-                sig = mono_leng/20.d0
-                h = sqrt(hx**2.d0 + hy**2.d0)
+                sig = mono_leng/20._wp
+                h = sqrt(hx**2._wp + hy**2._wp)
 
-                f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                            exp(-0.5d0*((h/(sig/2.d0))**2.d0))
+                f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                            exp(-0.5_wp*((h/(sig/2._wp))**2._wp))
             else if (support(nm) == 2) then
                 !only support for y \pm some value
                 if (abs(hy) < length(nm)) then
-                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                                exp(-0.5d0*(hx/(sig/2.d0))**2.d0)
+                    f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                                exp(-0.5_wp*(hx/(sig/2._wp))**2._wp)
                 else
-                    f_delta = 0d0
+                    f_delta = 0._wp
                 end if
             else if (support(nm) == 3) then
                 ! Only support along some line
@@ -379,29 +379,29 @@ contains
 
                 ! Rotate actual point by -theta
                 hxnew = cos(dir(nm))*hx + sin(dir(nm))*hy
-                hynew = -1.d0*sin(dir(nm))*hx + cos(dir(nm))*hy
-                if (abs(hynew) < mono_loc(3)/2.d0) then
-                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                hynew = -1._wp*sin(dir(nm))*hx + cos(dir(nm))*hy
+                if (abs(hynew) < mono_loc(3)/2._wp) then
+                    f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                                exp(-0.5_wp*(hxnew/(sig/2._wp))**2._wp)
                 else
-                    f_delta = 0d0
+                    f_delta = 0._wp
                 end if
             else if (support(nm) == 4) then
                 ! Support for all y
-                f_delta = 1.d0/(sqrt(2.d0*pi)*sig)* &
-                            exp(-0.5d0*(hx/sig)**2.d0)
+                f_delta = 1._wp/(sqrt(2._wp*pi)*sig)* &
+                            exp(-0.5_wp*(hx/sig)**2._wp)
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
                 hy = y_cc(k) - mono_loc(2)
 
-                hxnew = foc_length(nm) - sqrt(hy**2.d0 + (foc_length(nm) - hx)**2.d0)
-                if ((abs(hy) < aperture(nm)/2.d0) .and. (hx < foc_length(nm))) then
-                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                hxnew = foc_length(nm) - sqrt(hy**2._wp + (foc_length(nm) - hx)**2._wp)
+                if ((abs(hy) < aperture(nm)/2._wp) .and. (hx < foc_length(nm))) then
+                    f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                                exp(-0.5_wp*(hxnew/(sig/2._wp))**2._wp)
                     angle = -atan(hy/(foc_length(nm) - hx))
                 else
-                    f_delta = 0d0
+                    f_delta = 0._wp
                 end if
             end if
         else !3D
@@ -413,56 +413,56 @@ contains
 
                 ! Rotate actual point by -theta
                 hxnew = cos(dir(nm))*hx + sin(dir(nm))*hy
-                hynew = -1.d0*sin(dir(nm))*hx + cos(dir(nm))*hy
+                hynew = -1._wp*sin(dir(nm))*hx + cos(dir(nm))*hy
 
                 if (abs(hynew) < length(nm)/2. .and. &
                     abs(hz) < length(nm)/2.) then
-                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                                exp(-0.5_wp*(hxnew/(sig/2._wp))**2._wp)
                 else
-                    f_delta = 0d0
+                    f_delta = 0._wp
                 end if
             else if (support(nm) == 4) then
                 ! Support for all x,y
-                f_delta = 1.d0/(sqrt(2.d0*pi)*sig)* &
-                            exp(-0.5d0*(hz/sig)**2.d0)
+                f_delta = 1._wp/(sqrt(2._wp*pi)*sig)* &
+                            exp(-0.5_wp*(hz/sig)**2._wp)
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
                 hy = y_cc(k) - mono_loc(2)
                 hz = z_cc(l) - mono_loc(3)
 
-                hxnew = foc_length(nm) - sqrt(hy**2.d0 + hz**2.d0 + (foc_length(nm) - hx)**2.d0)
-                if ((sqrt(hy**2.d0 + hz**2.d0) < aperture(nm)/2.d0) .and. &
+                hxnew = foc_length(nm) - sqrt(hy**2._wp + hz**2._wp + (foc_length(nm) - hx)**2._wp)
+                if ((sqrt(hy**2._wp + hz**2._wp) < aperture(nm)/2._wp) .and. &
                     (hx < foc_length(nm))) then
 
-                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                                exp(-0.5_wp*(hxnew/(sig/2._wp))**2._wp)
 
                     angle = -atan(hy/(foc_length(nm) - hx))
                     angle_z = -atan(hz/(foc_length(nm) - hx))
                 else
-                    f_delta = 0d0
+                    f_delta = 0._wp
                 end if
             else if (support(nm) == 6) then
                 ! Support for cylindrical coordinate system
                 !sig = maxval((/dx(j), dy(k)*sin(dz(l)), dz(l)*cos(dz(l))/))
                 sig = dx(j)
-                sig = sig*2.5d0
+                sig = sig*2.5_wp
                 hx_cyl = x_cc(j) - mono_loc(1)
                 hy_cyl = y_cc(k)*sin(z_cc(l)) - mono_loc(2)
                 hz_cyl = y_cc(k)*cos(z_cc(l)) - mono_loc(3)
 
                 ! Rotate actual point by -theta
                 hxnew_cyl = cos(dir(nm))*hx_cyl + sin(dir(nm))*hy_cyl
-                hynew_cyl = -1.d0*sin(dir(nm))*hx_cyl + cos(dir(nm))*hy_cyl
+                hynew_cyl = -1._wp*sin(dir(nm))*hx_cyl + cos(dir(nm))*hy_cyl
 
                 if (abs(hynew_cyl) < length(nm)/2. .and. &
                     abs(hz_cyl) < length(nm)/2.) then
-                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
-                              exp(-0.5d0*(hxnew_cyl/(sig/2.d0))**2.d0)
+                    f_delta = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)* &
+                              exp(-0.5_wp*(hxnew_cyl/(sig/2._wp))**2._wp)
                 else
-                    f_delta = 0d0
+                    f_delta = 0._wp
                 end if
 
             end if

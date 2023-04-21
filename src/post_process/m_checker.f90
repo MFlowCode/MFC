@@ -193,7 +193,7 @@ contains
             call s_int_to_str(i,iStr)
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
-                fluid_pp(i)%gamma <= 0d0) then
+                fluid_pp(i)%gamma <= 0._wp) then
                 call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &
                     'gamma. Exiting ...')
@@ -204,7 +204,7 @@ contains
                     'of values of model_eqns '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'gamma. Exiting ...')
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
+            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0._wp) &
                     .or. &
                     (i > num_fluids + bub_fac .and. fluid_pp(i)%gamma /= dflt_real)) &
                 then
@@ -214,7 +214,7 @@ contains
                     'gamma. Exiting ...')
             elseif (fluid_pp(i)%pi_inf /= dflt_real &
                     .and. &
-                    fluid_pp(i)%pi_inf < 0d0) then
+                    fluid_pp(i)%pi_inf < 0._wp) then
                 call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
@@ -225,7 +225,7 @@ contains
                     'of values of model_eqns '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
+            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0._wp) &
                     .or. &
                     (i > num_fluids + bub_fac .and. fluid_pp(i)%pi_inf /= dflt_real)) &
                 then
@@ -369,7 +369,7 @@ contains
             call s_int_to_str(i,iStr)
             if (schlieren_alpha(i) /= dflt_real &
                 .and. &
-                schlieren_alpha(i) <= 0d0) then
+                schlieren_alpha(i) <= 0._wp) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                     'schlieren_alpha('//trim(iStr)//'). Exiting ...')
             elseif (((i > num_fluids .or. (schlieren_wrt .neqv. .true.)) &
@@ -378,7 +378,7 @@ contains
                     .or. &
                     ((i <= num_fluids .and. schlieren_wrt) &
                      .and. &
-                     schlieren_alpha(i) <= 0d0)) then
+                     schlieren_alpha(i) <= 0._wp)) then
                 call s_mpi_abort('Unsupported choice of the '// &
                     'combination of values for '// &
                     'num_fluids, schlieren_wrt and '// &

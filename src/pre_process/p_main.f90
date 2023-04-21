@@ -137,7 +137,7 @@ program p_main
     end if
 
     if (proc_rank == 0) then
-        time_final = 0d0
+        time_final = 0._wp
         if (num_procs == 1) then
             time_final = time_avg
             print *, "Final Time", time_final

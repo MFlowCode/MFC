@@ -123,35 +123,35 @@ contains
             ! Density
             q_prim_vf(1)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%rho &
-                + (1d0 - eta)*patch_icpp(smooth_patch_id)%rho
+                + (1._wp - eta)*patch_icpp(smooth_patch_id)%rho
 
             ! Velocity
             do i = 1, E_idx - mom_idx%beg
                 q_prim_vf(i + 1)%sf(j, k, l) = &
-                    1d0/q_prim_vf(1)%sf(j, k, l)* &
+                    1._wp/q_prim_vf(1)%sf(j, k, l)* &
                     (eta*patch_icpp(patch_id)%rho &
                      *patch_icpp(patch_id)%vel(i) &
-                     + (1d0 - eta)*patch_icpp(smooth_patch_id)%rho &
+                     + (1._wp - eta)*patch_icpp(smooth_patch_id)%rho &
                      *patch_icpp(smooth_patch_id)%vel(i))
             end do
 
             ! Specific heat ratio function
             q_prim_vf(gamma_idx)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%gamma &
-                + (1d0 - eta)*patch_icpp(smooth_patch_id)%gamma
+                + (1._wp - eta)*patch_icpp(smooth_patch_id)%gamma
 
             ! Pressure
             q_prim_vf(E_idx)%sf(j, k, l) = &
-                1d0/q_prim_vf(gamma_idx)%sf(j, k, l)* &
+                1._wp/q_prim_vf(gamma_idx)%sf(j, k, l)* &
                 (eta*patch_icpp(patch_id)%gamma &
                  *patch_icpp(patch_id)%pres &
-                 + (1d0 - eta)*patch_icpp(smooth_patch_id)%gamma &
+                 + (1._wp - eta)*patch_icpp(smooth_patch_id)%gamma &
                  *patch_icpp(smooth_patch_id)%pres)
 
             ! Liquid stiffness function
             q_prim_vf(pi_inf_idx)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%pi_inf &
-                + (1d0 - eta)*patch_icpp(smooth_patch_id)%pi_inf
+                + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
             ! Assigning mixture primitive variables of isentropic vortex patch
         else
@@ -172,40 +172,40 @@ contains
 
             ! Density
             q_prim_vf(1)%sf(j, k, 0) = &
-                rho*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
-                     (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                rho*(1._wp - (rho/pres)*(epsilon/(2._wp*pi))* &
+                     (epsilon/(8._wp*beta*(gamma + 1._wp)*pi))* &
+                     exp(2._wp*beta*(1._wp - (x_cc(j) - x_centroid)**2 &
                                    - (y_cc(k) - y_centroid)**2)) &
                      )**gamma
 
             ! Velocity
             q_prim_vf(2)%sf(j, k, 0) = &
-                vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2._wp*pi))* &
+                exp(beta*(1._wp - (x_cc(j) - x_centroid)**2 &
                           - (y_cc(k) - y_centroid)**2))
             q_prim_vf(3)%sf(j, k, 0) = &
-                vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2._wp*pi))* &
+                exp(beta*(1._wp - (x_cc(j) - x_centroid)**2 &
                           - (y_cc(k) - y_centroid)**2))
 
             ! Pressure
             q_prim_vf(4)%sf(j, k, 0) = &
-                pres*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
-                      (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                pres*(1._wp - (rho/pres)*(epsilon/(2._wp*pi))* &
+                      (epsilon/(8._wp*beta*(gamma + 1._wp)*pi))* &
+                      exp(2._wp*beta*(1._wp - (x_cc(j) - x_centroid)**2 &
                                     - (y_cc(k) - y_centroid)**2)) &
-                      )**(gamma + 1d0)
+                      )**(gamma + 1._wp)
 
             ! Specific heat ratio function
             q_prim_vf(5)%sf(j, k, 0) = gamma
 
             ! Liquid stiffness function
-            q_prim_vf(6)%sf(j, k, 0) = 0d0
+            q_prim_vf(6)%sf(j, k, 0) = 0._wp
 
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < (1._wp * (10._wp ** -(16)))) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_mixture_primitive_variables ! ------------
 
@@ -254,13 +254,13 @@ contains
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0d0
+            alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
                 alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
             end do
 
             do i = adv_idx%beg, adv_idx%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1.d0 - q_prim_vf(alf_idx)%sf) &
+                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(alf_idx)%sf) &
                                   /alf_sum%sf
             end do
         end if
@@ -281,13 +281,13 @@ contains
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0d0
+            alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
                 alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
             end do
 
             do i = adv_idx%beg, adv_idx%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1.d0 - q_prim_vf(alf_idx)%sf) &
+                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(alf_idx)%sf) &
                                   /alf_sum%sf
             end do
         end if
@@ -307,15 +307,15 @@ contains
 
                 if (qbmm) then
                     if (dist_type == 1) then
-                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
+                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
-                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2)*(muR**2)
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2)*muR*muV
@@ -367,13 +367,13 @@ contains
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0d0
+            alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
                 alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
             end do
 
             do i = adv_idx%beg, adv_idx%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1.d0 - q_prim_vf(alf_idx)%sf) &
+                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(alf_idx)%sf) &
                                   /alf_sum%sf
             end do
         end if
@@ -386,18 +386,18 @@ contains
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
-                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
+                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
-                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2d0)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2d0)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
@@ -423,13 +423,13 @@ contains
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &
             (eta*patch_icpp(patch_id)%pres &
-             + (1d0 - eta)*orig_prim_vf(E_idx))
+             + (1._wp - eta)*orig_prim_vf(E_idx))
 
         ! Volume fractions \alpha
         do i = adv_idx%beg, adv_idx%end
             q_prim_vf(i)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%alpha(i - E_idx) &
-                + (1d0 - eta)*orig_prim_vf(i)
+                + (1._wp - eta)*orig_prim_vf(i)
         end do
 
         ! Elastic Shear Stress
@@ -437,19 +437,19 @@ contains
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
                 q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
                     (eta*patch_icpp(patch_id)%tau_e(i) &
-                     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+                     + (1._wp - eta)*orig_prim_vf(i + stress_idx%beg - 1))
             end do
         end if
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0d0
+            alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
                 alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
             end do
 
             do i = adv_idx%beg, adv_idx%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1.d0 - q_prim_vf(alf_idx)%sf) &
+                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(alf_idx)%sf) &
                                   /alf_sum%sf
             end do
         end if
@@ -460,13 +460,13 @@ contains
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = &
                     eta*patch_icpp(patch_id)%alpha_rho(i) &
-                    + (1d0 - eta)*orig_prim_vf(i)
+                    + (1._wp - eta)*orig_prim_vf(i)
             end do
         else
             !get mixture density from pressure via Tait EOS
             pi_inf = fluid_pp(1)%pi_inf
             gamma = fluid_pp(1)%gamma
-            lit_gamma = (1.d0 + gamma)/gamma
+            lit_gamma = (1._wp + gamma)/gamma
 
             ! \rho = (( p_l + pi_inf)/( p_ref + pi_inf))**(1/little_gam) * rhoref(1-alf)
             q_prim_vf(1)%sf(j, k, l) = &
@@ -482,14 +482,14 @@ contains
         do i = 1, E_idx - mom_idx%beg
             q_prim_vf(i + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(i) &
-                 + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
+                 + (1._wp - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
         ! Set streamwise velocity to hypertangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
-                + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
+                + (1._wp - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
 
         ! Smoothed bubble variables
@@ -500,27 +500,27 @@ contains
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
-                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
+                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
-                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2d0)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2d0)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
                     ! q_prim_vf(bub_idx%rs(i))%sf(j,k,l) = &
                     !     (eta * R0(i)*patch_icpp(patch_id)%r0 &
-                    !     + (1d0-eta)*orig_prim_vf(bub_idx%rs(i)))
+                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%rs(i)))
                     ! q_prim_vf(bub_idx%vs(i))%sf(j,k,l) = &
                     !     (eta * V0(i)*patch_icpp(patch_id)%v0 &
-                    !     + (1d0-eta)*orig_prim_vf(bub_idx%vs(i)))
+                    !     + (1._wp-eta)*orig_prim_vf(bub_idx%vs(i)))
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
                     q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV
 
@@ -535,13 +535,13 @@ contains
 
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0d0
+            alf_sum%sf = 0._wp
             do i = adv_idx%beg, adv_idx%end - 1
                 alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
             end do
 
             do i = adv_idx%beg, adv_idx%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1.d0 - q_prim_vf(alf_idx)%sf) &
+                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(alf_idx)%sf) &
                                   /alf_sum%sf
             end do
         end if
@@ -559,7 +559,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < (1._wp * (10._wp ** -(16)))) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables_bubbles ! ------------
 
@@ -667,12 +667,12 @@ contains
         do i = 1, cont_idx%end
             q_prim_vf(i)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%alpha_rho(i) &
-                + (1d0 - eta)*orig_prim_vf(i)
+                + (1._wp - eta)*orig_prim_vf(i)
         end do
         do i = adv_idx%beg, adv_idx%end
             q_prim_vf(i)%sf(j, k, l) = &
                 eta*patch_icpp(patch_id)%alpha(i - E_idx) &
-                + (1d0 - eta)*orig_prim_vf(i)
+                + (1._wp - eta)*orig_prim_vf(i)
         end do
 
         ! Density and the specific heat ratio and liquid stiffness functions
@@ -683,27 +683,27 @@ contains
         do i = 1, E_idx - mom_idx%beg
             q_prim_vf(i + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(i) &
-                 + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
+                 + (1._wp - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
         ! Set streamwise velocity to hypertangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
-                + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
+                + (1._wp - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
 
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &
             (eta*patch_icpp(patch_id)%pres &
-             + (1d0 - eta)*orig_prim_vf(E_idx))
+             + (1._wp - eta)*orig_prim_vf(E_idx))
 
         ! Elastic Shear Stress
         if (hypoelasticity) then
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
                 q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
                     (eta*patch_icpp(patch_id)%tau_e(i) &
-                     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+                     + (1._wp - eta)*orig_prim_vf(i + stress_idx%beg - 1))
             end do
         end if
 
@@ -715,7 +715,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < (1._wp * (10._wp ** -(16)))) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables ! ------------
 

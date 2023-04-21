@@ -140,7 +140,7 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the line segment patch
-        if (n > 0 .or. patch_icpp(patch_id)%length_x <= 0d0 &
+        if (n > 0 .or. patch_icpp(patch_id)%length_x <= 0._wp &
             .or. &
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
@@ -164,7 +164,7 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the circle patch
-        if (n == 0 .or. p > 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
+        if (n == 0 .or. p > 0 .or. patch_icpp(patch_id)%radius <= 0._wp &
             .or. &
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
@@ -194,9 +194,9 @@ contains
             .or. &
             patch_icpp(patch_id)%y_centroid == dflt_real &
             .or. &
-            patch_icpp(patch_id)%length_x <= 0d0 &
+            patch_icpp(patch_id)%length_x <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%length_y <= 0d0) then
+            patch_icpp(patch_id)%length_y <= 0._wp) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'geometric parameters of rectangle '// &
@@ -278,11 +278,11 @@ contains
         ! Constraints on the isentropic vortex patch geometric parameters
         if (n == 0 .or. p > 0 .or. model_eqns == 2 &
             .or. &
-            patch_icpp(patch_id)%radius <= 0d0 &
+            patch_icpp(patch_id)%radius <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%epsilon <= 0d0 &
+            patch_icpp(patch_id)%epsilon <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%beta <= 0d0) then
+            patch_icpp(patch_id)%beta <= 0._wp) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
             'geometric parameters of isentropic '// &
@@ -308,7 +308,7 @@ contains
             .or. &
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
-            patch_icpp(patch_id)%length_x <= 0d0) then
+            patch_icpp(patch_id)%length_x <= 0._wp) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'geometric parameters of 1D analytical '// &
@@ -332,9 +332,9 @@ contains
             .or. &
             patch_icpp(patch_id)%y_centroid == dflt_real &
             .or. &
-            patch_icpp(patch_id)%length_x <= 0d0 &
+            patch_icpp(patch_id)%length_x <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%length_y <= 0d0) then
+            patch_icpp(patch_id)%length_y <= 0._wp) then
  
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'geometric parameters of 2D analytical '// &
@@ -360,11 +360,11 @@ contains
             .or. &
             patch_icpp(patch_id)%z_centroid == dflt_real &
             .or. &
-            patch_icpp(patch_id)%length_x <= 0d0 &
+            patch_icpp(patch_id)%length_x <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%length_y <= 0d0 &
+            patch_icpp(patch_id)%length_y <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%length_z <= 0d0) then
+            patch_icpp(patch_id)%length_z <= 0._wp) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'geometric parameters of 3D analytical '// &
@@ -384,7 +384,7 @@ contains
         ! Constraints on the geometric parameters of the sphere patch
         if (p == 0 &
             .or. &
-            patch_icpp(patch_id)%radius <= 0d0 &
+            patch_icpp(patch_id)%radius <= 0._wp &
             .or. &
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
@@ -412,7 +412,7 @@ contains
         ! Constraints on the geometric parameters of the spherical harmonic patch
         if (p == 0 &
             .or. &
-            patch_icpp(patch_id)%radius <= 0d0 &
+            patch_icpp(patch_id)%radius <= 0._wp &
             .or. &
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
@@ -420,9 +420,9 @@ contains
             .or. &
             patch_icpp(patch_id)%z_centroid == dflt_real &
             .or. &
-            all(patch_icpp(patch_id)%epsilon /= (/1d0, 2d0, 3d0, 4d0, 5d0/)) &
+            all(patch_icpp(patch_id)%epsilon /= (/1._wp, 2._wp, 3._wp, 4._wp, 5._wp/)) &
             .or. &
-            patch_icpp(patch_id)%beta < 0d0 &
+            patch_icpp(patch_id)%beta < 0._wp &
             .or. &
             patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon) then
 
@@ -453,11 +453,11 @@ contains
             .or. &
             patch_icpp(patch_id)%z_centroid == dflt_real &
             .or. &
-            patch_icpp(patch_id)%length_x <= 0d0 &
+            patch_icpp(patch_id)%length_x <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%length_y <= 0d0 &
+            patch_icpp(patch_id)%length_y <= 0._wp &
             .or. &
-            patch_icpp(patch_id)%length_z <= 0d0) then
+            patch_icpp(patch_id)%length_z <= 0._wp) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'geometric parameters of cuboid '// &
@@ -486,23 +486,23 @@ contains
             .or. &
             patch_icpp(patch_id)%z_centroid == dflt_real &
             .or. &
-            (patch_icpp(patch_id)%length_x <= 0d0 .and. &
-             patch_icpp(patch_id)%length_y <= 0d0 .and. &
-             patch_icpp(patch_id)%length_z <= 0d0) &
+            (patch_icpp(patch_id)%length_x <= 0._wp .and. &
+             patch_icpp(patch_id)%length_y <= 0._wp .and. &
+             patch_icpp(patch_id)%length_z <= 0._wp) &
             .or. &
-            (patch_icpp(patch_id)%length_x > 0d0 .and. &
+            (patch_icpp(patch_id)%length_x > 0._wp .and. &
              (patch_icpp(patch_id)%length_y /= dflt_real .or. &
               patch_icpp(patch_id)%length_z /= dflt_real)) &
             .or. &
-            (patch_icpp(patch_id)%length_y > 0d0 .and. &
+            (patch_icpp(patch_id)%length_y > 0._wp .and. &
              (patch_icpp(patch_id)%length_x /= dflt_real .or. &
               patch_icpp(patch_id)%length_z /= dflt_real)) &
             .or. &
-            (patch_icpp(patch_id)%length_z > 0d0 .and. &
+            (patch_icpp(patch_id)%length_z > 0._wp .and. &
              (patch_icpp(patch_id)%length_x /= dflt_real .or. &
               patch_icpp(patch_id)%length_y /= dflt_real)) &
             .or. &
-            patch_icpp(patch_id)%radius <= 0d0) then
+            patch_icpp(patch_id)%radius <= 0._wp) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'geometric parameters of cylinder '// &
@@ -685,7 +685,7 @@ contains
               .or. &
               patch_icpp(patch_id)%smooth_patch_id == 0 &
               .or. &
-              patch_icpp(patch_id)%smooth_coeff <= 0d0)) &
+              patch_icpp(patch_id)%smooth_coeff <= 0._wp)) &
             .or. &
             ((patch_icpp(patch_id)%smoothen .neqv. .true.) &
              .and. &
@@ -746,12 +746,12 @@ contains
             .or. &
             (p > 0 .and. patch_icpp(patch_id)%vel(3) == dflt_real) &
             !                               .OR.                           &
-            !                 patch_icpp(patch_id)%pres <= 0d0             &
+            !                 patch_icpp(patch_id)%pres <= 0._wp             &
             .or. &
             (model_eqns == 1 .and. &
-             (patch_icpp(patch_id)%rho <= 0d0 .or. &
-              patch_icpp(patch_id)%gamma <= 0d0 .or. &
-              patch_icpp(patch_id)%pi_inf < 0d0)) &
+             (patch_icpp(patch_id)%rho <= 0._wp .or. &
+              patch_icpp(patch_id)%gamma <= 0._wp .or. &
+              patch_icpp(patch_id)%pi_inf < 0._wp)) &
             .or. &
             (patch_icpp(patch_id)%geometry == 5 &
              .and. &
@@ -759,7 +759,7 @@ contains
             .or. &
             (model_eqns == 2 &
              .and. &
-             (any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0d0) ))) then
+             (any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp) ))) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                 'primitive variables of active '// &
