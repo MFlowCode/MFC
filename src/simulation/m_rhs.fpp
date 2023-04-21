@@ -540,19 +540,7 @@ contains
                     flux_src_n(i)%vf(l)%sf => &
                         flux_src_n(1)%vf(l)%sf
 
-
-                    !$acc enter data attach(flux_n(i)%vf(l)%sf)
-                    if(l == adv_idx%beg) then
-                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
-                    end if
-
-                    if(l >= adv_idx%beg + 1 .and. l <= adv_idx%end .and. riemann_solver == 1) then
-                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
-                    end if                        
-
-                    if(l >= mom_idx%beg .and. l <= E_idx .and. any(Re_size > 0)) then
-                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
-                    end if
+                    !$acc enter data attach(flux_n(i)%vf(l)%sf, flux_src_n(i)%vf(l)%sf)
                 end do
 
             end if
