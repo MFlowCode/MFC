@@ -1788,7 +1788,7 @@ contains
                         !$acc loop seq
                         do iter = 0, 49
 
-                            if (DABS(f_pres) > 1d-10) then
+                            if (abs(f_pres) > 1d-10) then
                                 pres_relax = pres_relax - f_pres/df_pres
 
                                 ! Physical pressure

@@ -893,7 +893,7 @@ contains
                             nR3 = nR3 + weight(s)*(nR(s)**3d0)
                         end do
 
-                        nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+                        nbub = sqrt((4.d0*pi/3.d0)*nR3/alf)
 
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
@@ -984,7 +984,7 @@ contains
                                 nR3 = nR3 + weight(s)*(nR(s)**3d0)
                             end do
 
-                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+                            nbub = sqrt((4.d0*pi/3.d0)*nR3/alf)
 
                             R(:) = nR(:)/nbub
                             Rdot(:) = nRdot(:)/nbub
@@ -1230,7 +1230,7 @@ contains
                             int_pres = int_pres + (pres - 1.d0)**2.d0
                         end if
                     end do
-                    int_pres = dsqrt(int_pres/(1.d0*npts))
+                    int_pres = sqrt(int_pres/(1.d0*npts))
 
                     if (num_procs > 1) then
                         tmp = int_pres
@@ -1262,16 +1262,16 @@ contains
                             trigger = .false.
                             if (i == 1) then
                                 !inner portion
-                                if (dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad - 0.5d0*thickness)) &
+                                if (sqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad - 0.5d0*thickness)) &
                                     trigger = .true.
                             elseif (i == 2) then
                                 !net region
-                                if (dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad - 0.5d0*thickness) .and. &
-                                    dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad + 0.5d0*thickness)) &
+                                if (sqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad - 0.5d0*thickness) .and. &
+                                    sqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) < (rad + 0.5d0*thickness)) &
                                     trigger = .true.
                             elseif (i == 3) then
                                 !everything else
-                                if (dsqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad + 0.5d0*thickness)) &
+                                if (sqrt(x_cb(j)**2.d0 + y_cb(k)**2.d0) > (rad + 0.5d0*thickness)) &
                                     trigger = .true.
                             end if
 

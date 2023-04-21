@@ -164,10 +164,10 @@ contains
                                 n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
                                 sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
-                                sound = dsqrt(sound)
-!                                            const_sos = dsqrt(n_tait)
+                                sound = sqrt(sound)
+!                                            const_sos = sqrt(n_tait)
                                 const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
-                                const_sos = dsqrt(const_sos)
+                                const_sos = sqrt(const_sos)
                                 !TODO: does const_sos need to be changed?
 
                                 term_index = 2
@@ -295,8 +295,8 @@ contains
             ! Gaussian pulse
             sigt = length(nm)/sos/7.d0
             t0 = 3.5d0*sigt
-            f_g = mag(nm)/(dsqrt(2.d0*pi)*sigt)* &
-                    dexp(-0.5d0*((the_time - t0)**2.d0)/(sigt**2.d0))
+            f_g = mag(nm)/(sqrt(2.d0*pi)*sigt)* &
+                    exp(-0.5d0*((the_time - t0)**2.d0)/(sigt**2.d0))
         else if (pulse(nm) == 3) then
             ! Square wave
             sigt = length(nm)/sos
@@ -348,8 +348,8 @@ contains
                 ! 1D delta function
                 hx = abs(mono_loc(1) - x_cc(j))
 
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                            dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
+                f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                            exp(-0.5d0*(hx/(sig/2.d0))**2.d0)
             else if (support(nm) == 0) then
                 ! Support for all x
                 f_delta = 1.d0
@@ -360,15 +360,15 @@ contains
             if (support(nm) == 1) then
                 ! 2D delta function
                 sig = mono_leng/20.d0
-                h = dsqrt(hx**2.d0 + hy**2.d0)
+                h = sqrt(hx**2.d0 + hy**2.d0)
 
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                            dexp(-0.5d0*((h/(sig/2.d0))**2.d0))
+                f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                            exp(-0.5d0*((h/(sig/2.d0))**2.d0))
             else if (support(nm) == 2) then
                 !only support for y \pm some value
                 if (abs(hy) < length(nm)) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
+                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                                exp(-0.5d0*(hx/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
@@ -381,24 +381,24 @@ contains
                 hxnew = cos(dir(nm))*hx + sin(dir(nm))*hy
                 hynew = -1.d0*sin(dir(nm))*hx + cos(dir(nm))*hy
                 if (abs(hynew) < mono_loc(3)/2.d0) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
             else if (support(nm) == 4) then
                 ! Support for all y
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
-                            dexp(-0.5d0*(hx/sig)**2.d0)
+                f_delta = 1.d0/(sqrt(2.d0*pi)*sig)* &
+                            exp(-0.5d0*(hx/sig)**2.d0)
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
                 hy = y_cc(k) - mono_loc(2)
 
-                hxnew = foc_length(nm) - dsqrt(hy**2.d0 + (foc_length(nm) - hx)**2.d0)
+                hxnew = foc_length(nm) - sqrt(hy**2.d0 + (foc_length(nm) - hx)**2.d0)
                 if ((abs(hy) < aperture(nm)/2.d0) .and. (hx < foc_length(nm))) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                     angle = -atan(hy/(foc_length(nm) - hx))
                 else
                     f_delta = 0d0
@@ -417,27 +417,27 @@ contains
 
                 if (abs(hynew) < length(nm)/2. .and. &
                     abs(hz) < length(nm)/2.) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
             else if (support(nm) == 4) then
                 ! Support for all x,y
-                f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
-                            dexp(-0.5d0*(hz/sig)**2.d0)
+                f_delta = 1.d0/(sqrt(2.d0*pi)*sig)* &
+                            exp(-0.5d0*(hz/sig)**2.d0)
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
                 hy = y_cc(k) - mono_loc(2)
                 hz = z_cc(l) - mono_loc(3)
 
-                hxnew = foc_length(nm) - dsqrt(hy**2.d0 + hz**2.d0 + (foc_length(nm) - hx)**2.d0)
-                if ((dsqrt(hy**2.d0 + hz**2.d0) < aperture(nm)/2.d0) .and. &
+                hxnew = foc_length(nm) - sqrt(hy**2.d0 + hz**2.d0 + (foc_length(nm) - hx)**2.d0)
+                if ((sqrt(hy**2.d0 + hz**2.d0) < aperture(nm)/2.d0) .and. &
                     (hx < foc_length(nm))) then
 
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                                exp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
 
                     angle = -atan(hy/(foc_length(nm) - hx))
                     angle_z = -atan(hz/(foc_length(nm) - hx))
@@ -459,8 +459,8 @@ contains
 
                 if (abs(hynew_cyl) < length(nm)/2. .and. &
                     abs(hz_cyl) < length(nm)/2.) then
-                    f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                              dexp(-0.5d0*(hxnew_cyl/(sig/2.d0))**2.d0)
+                    f_delta = 1.d0/(sqrt(2.d0*pi)*sig/2.d0)* &
+                              exp(-0.5d0*(hxnew_cyl/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if

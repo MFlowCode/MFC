@@ -492,9 +492,9 @@ contains
         ! Normalize the eigenvector by its component with the largest modulus.
         norm = 0d0
         do i=0,nl-1
-            if (dsqrt(vr(i)**2+vi(i)**2) .gt. norm) then
+            if (sqrt(vr(i)**2+vi(i)**2) .gt. norm) then
                 idx = i
-                norm = dsqrt(vr(i)**2+vi(i)**2)
+                norm = sqrt(vr(i)**2+vi(i)**2)
             end if
         end do
 

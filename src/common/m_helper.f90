@@ -112,7 +112,7 @@ contains
         real(kind(0.d0)), dimension(nb) :: weights
 
         nR3 = dot_product(weights, nRtmp**3.d0)
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+        ntmp = sqrt((4.d0*pi/3.d0)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
 

@@ -210,8 +210,8 @@ contains
 
         do 200 j = k, l
             if (j .eq. i) go to 200
-            c = c + dabs(ar(j,i)) + dabs(ai(j,i))
-            r = r + dabs(ar(i,j)) + dabs(ai(i,j))
+            c = c + abs(ar(j,i)) + abs(ai(j,i))
+            r = r + abs(ar(i,j)) + abs(ai(i,j))
 200     continue
 !     .......... guard against zero c or r due to underflow ..........
         if (c .eq. 0.0d0 .or. r .eq. 0.0d0) go to 270
@@ -289,7 +289,7 @@ contains
 !        ortr and orti contain further information about the
 !          transformations.  only elements low through igh are used.
 !
-!     calls pythag for  dsqrt(a*a + b*b) .
+!     calls pythag for  sqrt(a*a + b*b) .
 !
 !     questions and comments should be directed to burton s. garbow,
 !     mathematics and computer science div, argonne national laboratory
@@ -316,7 +316,7 @@ contains
 			scale = 0.0d0
 !     .......... scale column (algol tol then not needed) ..........
         do 90 i = ml, igh
-        scale = scale + dabs(ar(i,ml-1)) + dabs(ai(i,ml-1))
+        scale = scale + abs(ar(i,ml-1)) + abs(ai(i,ml-1))
 90		continue
         if (scale .eq. 0d0) go to 180
         mp = ml + igh
@@ -328,7 +328,7 @@ contains
             h = h + ortr(i) * ortr(i) + orti(i) * orti(i)
 100     continue
 !
-        g = dsqrt(h)
+        g = sqrt(h)
 		call pythag(ortr(ml),orti(ml),f)
         if (f .eq. 0d0) go to 103
         h = h + f * g
@@ -454,7 +454,7 @@ contains
 !
 !     calls cdiv for complex division.
 !     calls csroot for complex square root.
-!     calls pythag for  dsqrt(a*a + b*b) .
+!     calls pythag for  sqrt(a*a + b*b) .
 !
 !     questions and comments should be directed to burton s. garbow,
 !     mathematics and computer science div, argonne national laboratory
@@ -489,8 +489,8 @@ contains
 !     .......... for i=igh-1 step -1 until low+1 do -- ..........
 105 	do 140 ii = 1, iend
         i = igh - ii
-        if (dabs(ortr(i)) .eq. 0d0 .and. dabs(orti(i)) .eq. 0d0) go to 140
-        if (dabs(hr(i,i-1)) .eq. 0d0 .and. dabs(hi(i,i-1)) .eq. 0d0) go to 140
+        if (abs(ortr(i)) .eq. 0d0 .and. abs(orti(i)) .eq. 0d0) go to 140
+        if (abs(hr(i,i-1)) .eq. 0d0 .and. abs(hi(i,i-1)) .eq. 0d0) go to 140
 !     .......... norm below is negative of h formed in corth ..........
         norm = hr(i,i-1) * ortr(i) + hi(i,i-1) * orti(i)
         ip1 = i + 1
@@ -525,7 +525,7 @@ contains
 !
         do 170 i = l, igh
         ll = min0(i+1,igh)
-        if (dabs(hi(i,i-1)) .eq. 0d0) go to 170
+        if (abs(hi(i,i-1)) .eq. 0d0) go to 170
         call pythag(hr(i,i-1),hi(i,i-1),norm)
         yr = hr(i,i-1) / norm
         yi = hi(i,i-1) / norm
@@ -571,9 +571,9 @@ contains
 240 	do 260 ll = low, en
         l = en + low - ll
         if (l .eq. low) go to 300
-        tst1 = dabs(hr(l-1,l-1)) + dabs(hi(l-1,l-1)) &
-             + dabs(hr(l,l)) + dabs(hi(l,l))
-        tst2 = tst1 + dabs(hr(l,l-1))
+        tst1 = abs(hr(l-1,l-1)) + abs(hi(l-1,l-1)) &
+             + abs(hr(l,l)) + abs(hi(l,l))
+        tst2 = tst1 + abs(hr(l,l-1))
         if (tst2 .eq. tst1) go to 300
 260 	continue
 !     .......... form shift ..........
@@ -596,7 +596,7 @@ contains
 		si = si - xi
 		go to 340
 !     .......... form exceptional shift ..........
-320 	sr = dabs(hr(en,enm1)) + dabs(hr(enm1,en-2))
+320 	sr = abs(hr(en,enm1)) + abs(hr(enm1,en-2))
 		si = 0.0d0
 !
 340 	do 360 i = low, en
@@ -638,7 +638,7 @@ contains
 500 	continue
 !
 		si = hi(en,en)
-		if (dabs(si) .eq. 0d0) go to 540
+		if (abs(si) .eq. 0d0) go to 540
 		call pythag(hr(en,en),si,norm)
 		sr = hr(en,en) / norm
 		si = si / norm
@@ -684,7 +684,7 @@ contains
 
 600 	continue
 !
-        if (dabs(si) .eq. 0d0) go to 240
+        if (abs(si) .eq. 0d0) go to 240
 !
         do 630 i = 1, en
         yr = hr(i,en)
@@ -714,7 +714,7 @@ contains
 !
 		do i = 1, nl
         do j = i, nl
-            tr = dabs(hr(i,j)) + dabs(hi(i,j))
+            tr = abs(hr(i,j)) + abs(hi(i,j))
             if (tr .gt. norm) norm = tr
 		end do
 		end do
@@ -751,7 +751,7 @@ contains
 765         continue
             call cdiv(zzr,zzi,yr,yi,hr(i,en),hi(i,en))
 !     .......... overflow control ..........
-            tr = dabs(hr(i,en)) + dabs(hi(i,en))
+            tr = abs(hr(i,en)) + abs(hi(i,en))
             if (tr .eq. 0.0d0) go to 780
             tst1 = tr
             tst2 = tst1 + 1.0d0/tst1
@@ -889,14 +889,14 @@ contains
     subroutine csroot(xr,xi,yr,yi)
 		real(wp) :: xr,xi,yr,yi
 !
-!     (yr,yi) = complex dsqrt(xr,xi) 
+!     (yr,yi) = complex sqrt(xr,xi) 
 !     branch chosen so that yr .ge. 0.0 and sign(yi) .eq. sign(xi)
 !
 		real(wp) :: s,tr,ti,c
 		tr = xr
 		ti = xi
 		call pythag(tr,ti,c)
-		s = dsqrt(0.5d0*(c + dabs(tr)))
+		s = sqrt(0.5d0*(c + abs(tr)))
 		if (tr .ge. 0.0d0) yr = s
 		if (ti .lt. 0.0d0) s = -s
 		if (tr .le. 0.0d0) yi = s
@@ -911,7 +911,7 @@ contains
 !     complex division, (cr,ci) = (ar,ai)/(br,bi)
 !
 		real(wp) :: s,ars,ais,brs,bis
-		s = dabs(br) + dabs(bi)
+		s = abs(br) + abs(bi)
 		ars = ar/s
 		ais = ai/s
 		brs = br/s
@@ -925,12 +925,12 @@ contains
 	subroutine pythag(a,b,c)
 		real(wp) :: a,b,c
 !
-!     finds dsqrt(a**2+b**2) without overflow or destructive underflow
+!     finds sqrt(a**2+b**2) without overflow or destructive underflow
 !
 		real(wp) :: p,r,s,t,u
-		p = dmax1(dabs(a),dabs(b))
+		p = dmax1(abs(a),abs(b))
 		if (p .eq. 0.0d0) go to 20
-		r = (dmin1(dabs(a),dabs(b))/p)**2
+		r = (dmin1(abs(a),abs(b))/p)**2
 10 		continue
         t = 4.0d0 + r
         if (t .eq. 4.0d0) go to 20

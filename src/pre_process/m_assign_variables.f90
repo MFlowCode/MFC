@@ -315,10 +315,10 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2d0)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
 
@@ -394,10 +394,10 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2d0)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2d0)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2d0)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2d0)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
@@ -508,10 +508,10 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2d0)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2d0)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2d0)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2d0)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else

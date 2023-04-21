@@ -673,7 +673,7 @@ contains
 
         temp = 293.15d0
         D_m = 0.242d-4
-        uu = DSQRT(pl0/rhol0)
+        uu = sqrt(pl0/rhol0)
 
         omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
 
@@ -683,10 +683,10 @@ contains
         R_n = Ru/M_n
         R_v = Ru/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
-        phi_vn = (1.d0 + DSQRT(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_v/M_n))
-        phi_nv = (1.d0 + DSQRT(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_n/M_v))
+        phi_vn = (1.d0 + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
+                 /(sqrt(8.d0)*sqrt(1.d0 + M_v/M_n))
+        phi_nv = (1.d0 + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
+                 /(sqrt(8.d0)*sqrt(1.d0 + M_n/M_v))
         ! internal bubble pressure
         pb0 = pl0 + 2.d0*ss/(R0ref*R0)
 
@@ -723,7 +723,7 @@ contains
         ! keeps a constant (cold liquid assumption)
         Tw = 1.d0
         ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
+        omegaN = sqrt(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
 
         pl0 = 1.d0
         do ir = 1, Nb
@@ -848,30 +848,30 @@ contains
         !R0mx = 150.D0
 
         sd = poly_sigma
-        R0mn = 0.8d0*DEXP(-2.8d0*sd)
-        R0mx = 0.2d0*DEXP(9.5d0*sd) + 1.d0
+        R0mn = 0.8d0*exp(-2.8d0*sd)
+        R0mx = 0.2d0*exp(9.5d0*sd) + 1.d0
 
         ! phi = ln( R0 ) & return R0
         do ir = 1, nb
-            phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(nb - 1)
-            R0(ir) = DEXP(phi(ir))
+            phi(ir) = log(R0mn) &
+                      + dble(ir - 1)*log(R0mx/R0mn)/dble(nb - 1)
+            R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)
 
         ! weights for quadrature using Simpson's rule
         do ir = 2, nb - 1
             ! Gaussian
-            tmp = DEXP(-0.5d0*(phi(ir)/sd)**2)/DSQRT(2.d0*pi)/sd
+            tmp = exp(-0.5d0*(phi(ir)/sd)**2)/sqrt(2.d0*pi)/sd
             if (mod(ir, 2) == 0) then
                 weight(ir) = tmp*4.d0*dphi/3.d0
             else
                 weight(ir) = tmp*2.d0*dphi/3.d0
             end if
         end do
-        tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
+        tmp = exp(-0.5d0*(phi(1)/sd)**2)/sqrt(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
-        tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
+        tmp = exp(-0.5d0*(phi(nb)/sd)**2)/sqrt(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
     end subroutine s_simpson
 

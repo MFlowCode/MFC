@@ -230,8 +230,8 @@ contains
                             ! Keller-Miksis bubbles
                             Cpinf = myP
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                            ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
+                            ! c_gas = sqrt( n_tait*(Cpbw+B_tait) / myRho)
+                            c_liquid = sqrt(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
                             rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
@@ -332,7 +332,7 @@ contains
         tmp = (fCpinf/(1.d0 + fBtait) + 1.d0)**((fntait - 1.d0)/fntait)
         tmp = fntait*(1.d0 + fBtait)*tmp
 
-        f_cgas = DSQRT(tmp + (fntait - 1.d0)*fH)
+        f_cgas = sqrt(tmp + (fntait - 1.d0)*fH)
 
     end function f_cgas
 

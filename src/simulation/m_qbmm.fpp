@@ -249,7 +249,7 @@ contains
                         B_tait = pi_infs(1)
                         c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
                         if (c > 0.d0) then
-                            c = DSQRT(c)
+                            c = sqrt(c)
                         else
                             c = sgm_eps
                         end if
@@ -413,8 +413,8 @@ contains
         frho(1) = fmom(1)/2d0; 
         frho(2) = fmom(1)/2d0; 
         c2 = maxval((/c2, verysmall/))
-        fup(1) = bu - DSQRT(c2)
-        fup(2) = bu + DSQRT(c2)
+        fup(1) = bu - sqrt(c2)
+        fup(2) = bu + sqrt(c2)
 
     end subroutine s_hyqmom
 

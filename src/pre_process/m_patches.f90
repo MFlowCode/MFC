@@ -277,7 +277,7 @@ contains
         ! the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
-                myr = dsqrt((x_cc(i) - x_centroid)**2 &
+                myr = sqrt((x_cc(i) - x_centroid)**2 &
                             + (y_cc(j) - y_centroid)**2)
 
                 if (myr <= radius + thickness/2.d0 .and. &
@@ -288,7 +288,7 @@ contains
                                                     eta, q_prim_vf, patch_id_fp)
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
-                                                    dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                                                    exp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
                 end if
 
             end do
@@ -334,7 +334,7 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    myr = dsqrt((x_cc(i) - x_centroid)**2 &
+                    myr = sqrt((x_cc(i) - x_centroid)**2 &
                                 + (y_cc(j) - y_centroid)**2)
 
                     if (myr <= radius + thickness/2.d0 .and. &
@@ -345,7 +345,7 @@ contains
                                                     eta, q_prim_vf, patch_id_fp)
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
-                                                        dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                                                        exp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
                     end if
 
                 end do
@@ -722,7 +722,7 @@ contains
                 !what variables to alter
                 !bump in pressure
                 q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                                            (1d0 + 0.2d0*exp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                 !bump in void fraction
                 !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
@@ -881,11 +881,11 @@ contains
                     !what variables to alter
                     !x-y bump in pressure
                     q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
+                            (1d0 + 0.2d0*exp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !x-bump
                     !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                    !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                    !(1d0 + 0.2d0*exp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !bump in void fraction
                     !q_prim_vf(adv_idx%beg)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * &
