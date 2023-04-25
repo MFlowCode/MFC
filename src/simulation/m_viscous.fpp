@@ -1084,7 +1084,7 @@ module m_viscous
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        !$acc enter data copyin(is1, is2, is3, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1107,10 +1107,12 @@ module m_viscous
                             is1, is2, is3)
         end if
 
+        print*, "after"
+
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
@@ -1122,7 +1124,7 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 3) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -1134,7 +1136,7 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end

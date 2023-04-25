@@ -157,6 +157,7 @@ program p_main
     if (any(Re_size > 0)) then
         call s_initialize_viscous_module()
     end if
+    
     call s_initialize_rhs_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
@@ -205,9 +206,9 @@ program p_main
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
-!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
-!$acc update device(sys_size, buff_size)
-!$acc update device(m, n, p)
+!$acc enter data copyin(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
+!$acc enter data copyin(sys_size, buff_size)
+!$acc enter data copyin(m, n, p)
     do i = 1, sys_size
 !$acc update device(q_cons_ts(1)%vf(i)%sf)
     end do
@@ -238,12 +239,14 @@ program p_main
             end do
         end if
 
+        print*, "- 1 - s_compute_derived_variables"
         call s_compute_derived_variables(t_step)
 
 #ifdef DEBUG
         print *, 'Computed derived vars'
 #endif
 
+        print*, "- 2 - time stepper"
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
@@ -255,6 +258,7 @@ program p_main
 
         ! Time-stepping loop controls
 
+        print*, "- 3 - MPI"
         if (t_step == t_step_stop) then
 
             call s_mpi_barrier()

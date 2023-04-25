@@ -42,9 +42,7 @@ module m_weno
     !> @{
         real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
-
-
-
+    !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
 
     ! WENO Coefficients ========================================================
 
@@ -66,6 +64,9 @@ module m_weno
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
+    !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
+    !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
+    !$acc declare link(poly_coef_L, poly_coef_R)
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
     !! left and the right quadrature points, in x-, y- and z-directions. Note
@@ -85,6 +86,7 @@ module m_weno
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
     !> @}
+    !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z, d_L, d_R)
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
     !! that the first array dimension identifies the smoothness indicator, the
@@ -98,24 +100,18 @@ module m_weno
     real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
+    !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z, beta_coef)
 
     ! END: WENO Coefficients ===================================================
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
+    !$acc declare link(v_size)
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1, is2, is3
     !> @}
-
-    real(kind(0d0)) :: test
-
-!$acc declare create( &
-!$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-!$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-!$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-!$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
-!$acc                v_size, is1, is2, is3, test)
+    !$acc declare create(is1, is2, is3)
 
 contains
 
@@ -487,20 +483,24 @@ contains
 
         integer :: t1, t2, c_rate, c_max
 
+        print*, "s_weno"
+
         is1 = is1_d
         is2 = is2_d
         is3 = is3_d
 
-!$acc update device(is1, is2, is3)
+        !$acc enter data copyin(is1, is2, is3)
 
+        print*, "weno_init"
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
                                    norm_dir, weno_dir)
         end if
+        print*, "weno_body"
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -511,9 +511,9 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -524,9 +524,9 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -537,13 +537,13 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             end if
 
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -606,13 +606,13 @@ contains
                             end do
                         end do
                     end do
-!$acc end parallel loop
+                    !$acc end parallel loop
             end if
             #:endfor
         else
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-!$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
+                !$acc parallel loop gang vector collapse(3) default(present) private(dvd, poly, beta, alpha, omega)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -696,7 +696,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
 
                 if (mp_weno) then
                     call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
@@ -706,8 +706,6 @@ contains
             end if
             #:endfor
         end if
-
-        
 
     end subroutine s_weno
 
@@ -739,11 +737,10 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-
-        !$acc update device(v_size)
+        !$acc enter data copyin(v_size)
 
         if (weno_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do j = 1, v_size
                 do q = is3%beg, is3%end
                     do l = is2%beg, is2%end
@@ -753,7 +750,7 @@ contains
                     end do
                 end do
             end do
-!$acc end parallel loop
+            !$acc end parallel loop
         end if
 
         ! ==================================================================
@@ -783,7 +780,7 @@ contains
                 end if
             else
 #endif
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, v_size
                     do q = is3%beg, is3%end
                         do l = is2%beg, is2%end
@@ -793,7 +790,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
 #if MFC_cuTENSOR
             end if
 #endif
@@ -815,7 +812,7 @@ contains
                 end block
             else
 #endif
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, v_size
                     do q = is3%beg, is3%end
                         do l = is2%beg, is2%end
@@ -825,7 +822,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
 #if MFC_cuTENSOR
             end if
 #endif

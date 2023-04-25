@@ -88,15 +88,17 @@ contains
         @:ALLOCATE(q_cons_ts(1:num_ts))
 
         do i = 1, num_ts
-            @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
+            allocate(q_cons_ts(i)%vf(1:sys_size))
         end do
 
         do i = 1, num_ts
             do j = 1, sys_size
-                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
+                allocate(q_cons_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
                                                 iy_t%beg:iy_t%end, &
                                                 iz_t%beg:iz_t%end))
             end do
+            
+            @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
 
         ! Allocating the cell-average primitive ts variables
@@ -104,15 +106,19 @@ contains
             @:ALLOCATE(q_prim_ts(0:3))
 
             do i = 0, 3
-                @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
+                allocate(q_prim_ts(i)%vf(1:sys_size))
             end do
 
             do i = 0, 3
                 do j = 1, sys_size
-                    @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
-                                                    iy_t%beg:iy_t%end, &
-                                                    iz_t%beg:iz_t%end))
+                    allocate(q_prim_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
+                                                   iy_t%beg:iy_t%end, &
+                                                   iz_t%beg:iz_t%end))
                 end do
+            end do
+
+            do i = 0, 3
+                @:ACC_SETUP_VFs(q_prim_ts(i))
             end do
         end if
 
@@ -334,20 +340,23 @@ contains
 
         call nvtxStartRange("Time_Step")
 
+        print*, "step -> rhs"
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 !        call s_compute_rhs_full(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 
+        print*, "step -< rti"
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
         end if
 
+        print*, "step -> time_step_cycling"
         if (probe_wrt) then
             call s_time_step_cycling(t_step)
         end if
 
         if (t_step == t_step_stop) return
 
-!$acc parallel loop collapse(4) gang vector default(present)
+        !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n
@@ -360,18 +369,21 @@ contains
             end do
         end do
 
+        print*, "step -> s_apply_fourier_filter"
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
+        print*, "step -> s_pressure_relaxation_procedure"
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
 
+        print*, "step -> s_compute_rhs"
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 !        call s_compute_rhs_full(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
-!$acc parallel loop collapse(4) gang vector default(present)
+        !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
                 do k = 0, n

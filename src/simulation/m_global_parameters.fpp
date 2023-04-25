@@ -55,7 +55,7 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry
     !> @}
-!$acc declare create(cyl_coord, grid_geometry)
+!$acc declare link(cyl_coord, grid_geometry)
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -74,7 +74,7 @@ module m_global_parameters
 
     real(kind(0d0)) :: dt !< Size of the time-step
 
-!$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+!$acc declare link(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -121,10 +121,10 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order)
+        !$acc declare link(num_dims, weno_polyn, weno_order)
     #:endif
 
-!$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+!$acc declare link(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -167,7 +167,7 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     !> @}
 
-!$acc declare create(bub_idx)
+!$acc declare link(bub_idx)
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -176,7 +176,7 @@ module m_global_parameters
     integer, dimension(2) :: Re_size
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @}
-!$acc declare create(Re_size, Re_idx)
+!$acc declare link(Re_size, Re_idx)
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
@@ -187,7 +187,7 @@ module m_global_parameters
     real(kind(0d0)), dimension(3) :: dir_flg
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
-!$acc declare create(dir_idx, dir_flg, dir_idx_tau)
+!$acc declare link(dir_idx, dir_flg, dir_idx_tau)
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
@@ -196,7 +196,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-!$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, stress_idx)
+!$acc declare link(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, stress_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -230,7 +230,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)) :: rhoref, pref
     !> @}
-!$acc declare create(rhoref, pref)
+!$acc declare link(rhoref, pref)
 
     !> @name Bubble modeling
     !> @{
@@ -263,15 +263,15 @@ module m_global_parameters
     integer :: R0_type
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(nb)
+        !$acc declare link(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc declare link(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
     !> @}
-!$acc declare create(mom_sp, mom_3d)
+!$acc declare link(mom_sp, mom_3d)
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
@@ -282,14 +282,14 @@ module m_global_parameters
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
-!$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+!$acc declare link(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     !> @name Acoustic monopole parameters
     !> @{
     logical :: monopole !< Monopole switch
     type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
     integer :: num_mono !< Number of monopoles
     !> @}
-!$acc declare create(monopole, mono, num_mono)
+!$acc declare link(monopole, mono, num_mono)
 
 
 
@@ -299,10 +299,10 @@ module m_global_parameters
      integer :: intxb, intxe
      integer :: bubxb, bubxe
      integer :: strxb, strxe
-     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
+     !$acc declare link(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-    !$acc declare create(gammas, pi_infs)
+    !$acc declare link(gammas, pi_infs)
 
 
     real(kind(0d0)) :: mytime       !< Current simulation time
@@ -463,8 +463,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-!$acc update device(weno_polyn)
-!$acc update device(nb)
+!$acc enter data copyin(weno_polyn,nb)
         #:endif
 
 
@@ -728,7 +727,7 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
-!$acc update device(Re_size)
+!$acc enter data copyin(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
@@ -771,7 +770,7 @@ contains
             startz = -buff_size
         end if
 
-!$acc update device(startx, starty, startz)
+!$acc enter data copyin(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -794,13 +793,14 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-
-!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+!$acc enter data copyin(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
+
+        !$acc enter data copyin(dx, x_cc, x_cb)
 
         if (n == 0) return;
         
@@ -808,11 +808,15 @@ contains
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
 
+        !$acc enter data copyin(dy, y_cc, y_cb)
+
         if (p == 0) return;
         
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
+
+        !$acc enter data copyin(dz, z_cc, z_cb)
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 

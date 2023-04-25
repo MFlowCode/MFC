@@ -59,11 +59,13 @@ module m_rhs
     !! This variable contains the WENO-reconstructed values of the cell-average
     !! conservative variables, which are located in q_cons_vf, at cell-interior
     !! Gaussian quadrature points (QP).
+    !$acc declare create(q_cons_qp)
 
     type(vector_field) :: q_prim_qp !<
     !! The primitive variables at cell-interior Gaussian quadrature points. These
     !! are calculated from the conservative variables and gradient magnitude (GM)
     !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
+    !$acc declare create(q_prim_qp)
 
     !> @name The first-order spatial derivatives of the primitive variables at cell-
     !! interior Guassian quadrature points. These are WENO-reconstructed from
@@ -71,28 +73,26 @@ module m_rhs
     !! of the divergence theorem on the integral-average cell-boundary values
     !! of the primitive variables, located in qK_prim_n, where K = L or R.
     !> @{
-    type(vector_field) :: dq_prim_dx_qp
-    type(vector_field) :: dq_prim_dy_qp
-    type(vector_field) :: dq_prim_dz_qp
+    type(vector_field) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
     !> @}
+    !$acc declare create(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average first-order spatial derivatives of the primitive variables. The
     !! cell-average of the first-order spatial derivatives may be found in the
     !! variables dq_prim_ds_qp, where s = x, y or z.
     !> @{
-    type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n
-    type(vector_field), allocatable, dimension(:) :: dqL_prim_dy_n
-    type(vector_field), allocatable, dimension(:) :: dqL_prim_dz_n
-    type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n
-    type(vector_field), allocatable, dimension(:) :: dqR_prim_dy_n
-    type(vector_field), allocatable, dimension(:) :: dqR_prim_dz_n
+    type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
+    type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
     !> @}
+    !$acc declare link(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
+    !$acc declare link(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 
     type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
     !! quadrature points. gm_alpha_qp is calculated from individual first-order
     !! spatial derivatives located in dq_prim_ds_qp.
+    !$acc declare create(gm_alpha_qp)
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
@@ -100,6 +100,7 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
     !> @}
+    !$acc declare link(gm_alphaL_n, gm_alphaR_n)
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
     !! source). These are computed by applying the chosen Riemann problem solver
@@ -109,67 +110,70 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_src_n
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
     !> @}
+    !$acc declare link(flux_n, flux_src_n, flux_gsrc_n)
 
     !> @name Additional field for capillary source terms
     !> @{
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     !> @}
+    !$acc declare link(tau_Re_vf)
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
+    !$acc declare link(qL_prim, qR_prim)
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
+    !$acc declare create(iv)
 
     !> @name Indical bounds in the x-, y- and z-directions
     !> @{
     type(int_bounds_info) :: ix, iy, iz
     !> @}
+    !$acc declare create(ix, iy, iz)
 
     type(int_bounds_info) :: is1, is2, is3
+    !$acc declare create(is1, is2, is3)
 
     type(int_bounds_info) :: ixt, iyt, izt
+    !$acc declare create(ixt, iyt, izt)
 
     !> @name Bubble dynamic source terms
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: bub_mom_src
-
     type(scalar_field) :: divu !< matrix for div(u)
     !> @}
+    !$acc declare link(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, bub_mom_src)
+    !$acc declare create(divu)
 
     !> @name Monopole source terms
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
     !> @}
+    !$acc declare link(mono_mass_src, mono_e_src, mono_mom_src)
 
     !> @name Saved fluxes for testing
     !> @{
     type(scalar_field) :: alf_sum
     !> @}
+    !$acc declare create(alf_sum)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
+    !$acc declare link(blkmod1, blkmod2, alpha1, alpha2, Kterm)
+    !$acc declare link(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
+    !$acc declare link(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
 
     real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
-    !$acc declare create(gamma_min, pres_inf)
+    !$acc declare link(gamma_min, pres_inf)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-    !$acc declare create(Res)
-
-!$acc declare create(q_cons_qp,q_prim_qp,  &
-!$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
-!$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
-!$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
-!$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
-!$acc   bub_mom_src,alf_sum, &
-!$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-!$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-!$acc   ixt, iyt, izt)
+    !$acc declare link(Res)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-!$acc declare create(nbub)
+    !$acc declare link(nbub)
 
 contains
 
@@ -188,7 +192,7 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
-!$acc update device(ix, iy, iz)
+!$acc enter data copyin(ix, iy, iz)
 
         if (any(Re_size > 0) .and. cyl_coord) then
             @:ALLOCATE(tau_Re_vf(1:sys_size))
@@ -204,30 +208,32 @@ contains
         
         ixt = ix; iyt = iy; izt = iz
 
-        @:ALLOCATE(q_cons_qp%vf(1:sys_size))
-        @:ALLOCATE(q_prim_qp%vf(1:sys_size))
+        allocate(q_cons_qp%vf(1:sys_size))
+        allocate(q_prim_qp%vf(1:sys_size))
 
         do l = 1, sys_size
-            @:ALLOCATE(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            allocate(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
         do l = mom_idx%beg, E_idx
-            @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
         do l = adv_idx%end + 1, sys_size
-            @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
+        @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
+  
         do l = 1, cont_idx%end
-            q_prim_qp%vf(l)%sf => &
-                q_cons_qp%vf(l)%sf
+            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
 
         do l = adv_idx%beg, adv_idx%end
-            q_prim_qp%vf(l)%sf => &
-                q_cons_qp%vf(l)%sf
+            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
 
@@ -312,14 +318,14 @@ contains
 
         if (any(Re_size > 0)) then
 
-            @:ALLOCATE(dq_prim_dx_qp%vf(1:sys_size))
-            @:ALLOCATE(dq_prim_dy_qp%vf(1:sys_size))
-            @:ALLOCATE(dq_prim_dz_qp%vf(1:sys_size))
+            allocate(dq_prim_dx_qp%vf(1:sys_size))
+            allocate(dq_prim_dy_qp%vf(1:sys_size))
+            allocate(dq_prim_dz_qp%vf(1:sys_size))
             
             if (any(Re_size > 0)) then
 
                 do l = mom_idx%beg, mom_idx%end
-                    @:ALLOCATE(dq_prim_dx_qp%vf(l)%sf( &
+                    allocate(dq_prim_dx_qp%vf(l)%sf( &
                               & ix%beg:ix%end, &
                               & iy%beg:iy%end, &
                               & iz%beg:iz%end))
@@ -328,7 +334,7 @@ contains
                 if (n > 0) then
 
                     do l = mom_idx%beg, mom_idx%end
-                        @:ALLOCATE(dq_prim_dy_qp%vf(l)%sf( &
+                        allocate(dq_prim_dy_qp%vf(l)%sf( &
                                  & ix%beg:ix%end, &
                                  & iy%beg:iy%end, &
                                  & iz%beg:iz%end))
@@ -336,7 +342,7 @@ contains
 
                     if (p > 0) then
                         do l = mom_idx%beg, mom_idx%end
-                            @:ALLOCATE(dq_prim_dz_qp%vf(l)%sf( &
+                            allocate(dq_prim_dz_qp%vf(l)%sf( &
                                      & ix%beg:ix%end, &
                                      & iy%beg:iy%end, &
                                      & iz%beg:iz%end))
@@ -350,6 +356,8 @@ contains
         end if
         ! END: Allocation of dq_prim_ds_qp =================================
 
+        @:ACC_SETUP_VFs(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+
         ! Allocation/Association of dqK_prim_ds_n =======================
         @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
         @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
@@ -360,21 +368,21 @@ contains
 
         if (any(Re_size > 0)) then
             do i = 1, num_dims
-                @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqL_prim_dz_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
-                @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
+                allocate(dqL_prim_dx_n(i)%vf(1:sys_size))
+                allocate(dqL_prim_dy_n(i)%vf(1:sys_size))
+                allocate(dqL_prim_dz_n(i)%vf(1:sys_size))
+                allocate(dqR_prim_dx_n(i)%vf(1:sys_size))
+                allocate(dqR_prim_dy_n(i)%vf(1:sys_size))
+                allocate(dqR_prim_dz_n(i)%vf(1:sys_size))
                 
                 if (any(Re_size > 0)) then
 
                     do l = mom_idx%beg, mom_idx%end
-                        @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf( &
+                        allocate(dqL_prim_dx_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
                                  & iy%beg:iy%end, &
                                  & iz%beg:iz%end))
-                        @:ALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf( &
+                        allocate(dqR_prim_dx_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
                                  & iy%beg:iy%end, &
                                  & iz%beg:iz%end))
@@ -382,11 +390,11 @@ contains
 
                     if (n > 0) then
                         do l = mom_idx%beg, mom_idx%end
-                            @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf( &
+                            allocate(dqL_prim_dy_n(i)%vf(l)%sf( &
                                      & ix%beg:ix%end, &
                                      & iy%beg:iy%end, &
                                      & iz%beg:iz%end))
-                            @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf( &
+                            allocate(dqR_prim_dy_n(i)%vf(l)%sf( &
                                      & ix%beg:ix%end, &
                                      & iy%beg:iy%end, &
                                      & iz%beg:iz%end))
@@ -395,11 +403,11 @@ contains
 
                     if (p > 0) then
                         do l = mom_idx%beg, mom_idx%end
-                            @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf( &
+                            allocate(dqL_prim_dz_n(i)%vf(l)%sf( &
                                      & ix%beg:ix%end, &
                                      & iy%beg:iy%end, &
                                      & iz%beg:iz%end))
-                            @:ALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf( &
+                            allocate(dqR_prim_dz_n(i)%vf(l)%sf( &
                                      & ix%beg:ix%end, &
                                      & iy%beg:iy%end, &
                                      & iz%beg:iz%end))
@@ -408,6 +416,7 @@ contains
 
                 end if
 
+                @:ACC_SETUP_VFs(dqL_prim_dx_n(i), dqL_prim_dy_n(i), dqL_prim_dz_n(i))
             end do
         end if
         ! END: Allocation/Association of d K_prim_ds_n ==================
@@ -472,7 +481,9 @@ contains
            @:ALLOCATE(mono_E_src(0:m, 0:n, 0:p))
         end if
 
-        @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        allocate(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        !$acc enter data copyin(divu)
+        !$acc enter data create(divu%sf)
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
         @:ALLOCATE(flux_n(1:num_dims))
@@ -481,18 +492,17 @@ contains
 
         do i = 1, num_dims
 
-            @:ALLOCATE(flux_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
+            allocate(flux_n(i)%vf(1:sys_size))
+            allocate(flux_src_n(i)%vf(1:sys_size))
+            allocate(flux_gsrc_n(i)%vf(1:sys_size))
 
             if (i == 1) then
-
                 do l = 1, sys_size
-                    @:ALLOCATE(flux_n(i)%vf(l)%sf( &
+                    allocate(flux_n(i)%vf(l)%sf( &
                              & ix%beg:ix%end, &
                              & iy%beg:iy%end, &
                              & iz%beg:iz%end))
-                    @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
+                    allocate(flux_gsrc_n(i)%vf(l)%sf( &
                             & ix%beg:ix%end, &
                             & iy%beg:iy%end, &
                             & iz%beg:iz%end))
@@ -500,51 +510,55 @@ contains
 
                 if (any(Re_size > 0)) then
                     do l = mom_idx%beg, E_idx
-                        @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
+                        allocate(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
                                  & iy%beg:iy%end, &
                                  & iz%beg:iz%end))
                     end do
                 end if
 
-                @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
+                allocate(flux_src_n(i)%vf(adv_idx%beg)%sf( &
                          & ix%beg:ix%end, &
                          & iy%beg:iy%end, &
                          & iz%beg:iz%end))
 
                 if (riemann_solver == 1) then
                     do l = adv_idx%beg + 1, adv_idx%end
-                        @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
+                        allocate(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
                                  & iy%beg:iy%end, &
                                  & iz%beg:iz%end))
                     end do
-                else
-                    do l = adv_idx%beg + 1, adv_idx%end
-                        flux_src_n(i)%vf(l)%sf => &
-                            flux_src_n(i)%vf(adv_idx%beg)%sf
-                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
-                    end do
                 end if
-
             else
                 do l = 1, sys_size
-                    @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
+                    allocate(flux_gsrc_n(i)%vf(l)%sf( &
                               ix%beg:ix%end, &
                               iy%beg:iy%end, &
                               iz%beg:iz%end))
                 end do
+            end if
+
+            @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
+
+            if (i == 1) then
+                if (riemann_solver /= 1) then
+                    do l = adv_idx%beg + 1, adv_idx%end
+                        flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
+            
+                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
+                    end do
+                end if
+            else
                 do l = 1, sys_size
-                    flux_n(i)%vf(l)%sf => &
-                        flux_n(1)%vf(l)%sf
-                    flux_src_n(i)%vf(l)%sf => &
-                        flux_src_n(1)%vf(l)%sf
+                    flux_n(i)%vf(l)%sf     => flux_n(1)%vf(l)%sf
+                    flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
 
-                    !$acc enter data attach(flux_n(i)%vf(l)%sf, flux_src_n(i)%vf(l)%sf)
+                    !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
                 end do
-
             end if
         end do
+
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         if (alt_soundspeed) then
@@ -557,7 +571,7 @@ contains
             gamma_min(i) = 1d0/fluid_pp(i)%gamma + 1d0
             pres_inf(i) = fluid_pp(i)%pi_inf/(1d0 + fluid_pp(i)%gamma)
         end do
-!$acc update device(gamma_min, pres_inf)
+        !$acc update device(gamma_min, pres_inf)
 
         if (any(Re_size > 0)) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -569,7 +583,8 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-!$acc update device(Res, Re_idx, Re_size)
+            
+            !$acc update device(Res, Re_idx, Re_size)
         end if
 
         ! Associating procedural pointer to the subroutine that will be
@@ -595,7 +610,7 @@ contains
         end if
 
 
-!$acc parallel loop collapse(5) gang vector default(present)
+        !$acc parallel loop collapse(5) gang vector default(present)
         do i = 1, sys_size
             do l = startz, p - startz
                 do k = starty, n - starty
@@ -652,9 +667,11 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
-        !$acc update device(ix, iy, iz)
+        !$acc enter data copyin(ix, iy, iz)
 
         ! Association/Population of Working Variables ======================
+
+        print*, "Association/Population of Working Variables"
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = iz%beg, iz%end
@@ -668,6 +685,7 @@ contains
 
 
         call nvtxStartRange("RHS-MPI")
+        print*, "MPI"
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange
 
@@ -676,6 +694,7 @@ contains
 
         ! Converting Conservative to Primitive Variables ==================
 
+        print*, "Converting Conservative to Primitive Variables"
         if (mpp_lim .and. bubbles) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = iz%beg, iz%end
@@ -698,6 +717,7 @@ contains
         end if
 
         call nvtxStartRange("RHS-CONVERT")
+        print*, "CONVERT"
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
             q_prim_qp%vf, &
@@ -710,9 +730,11 @@ contains
         if (t_step == t_step_stop) return
         ! ==================================================================
 
+        print*, "s_mom_inv"
         if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
 
         call nvtxStartRange("Viscous")
+        print*, "Viscous"
         if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                             dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                                             qL_prim, &
@@ -725,6 +747,7 @@ contains
         call nvtxEndRange()
         
         ! Dimensional Splitting Loop =======================================
+        print*, "Dimensional Splitting Loop"
 
         do id = 1, num_dims
 
@@ -812,6 +835,7 @@ contains
 
             ! Computing Riemann Solver Flux and Source Flux =================
 
+            print*, "rhs -> s_riemann_solver"
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -831,8 +855,10 @@ contains
 
             ! ===============================================================
 
+
+            print*, "alt_soundspeed"
             if (alt_soundspeed) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -856,10 +882,11 @@ contains
             end if
 
             call nvtxStartRange("RHS_Flux_Add")
-
+            print*, "RHS_Flux_Add"
             
             if (id == 1) then
-                
+
+                print*, "---- s_cbc"
                 if (bc_x%beg <= -5) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
@@ -871,6 +898,7 @@ contains
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
 
+                print*, "---- here"
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do q = 0, p
@@ -884,6 +912,7 @@ contains
                     end do
                 end do
 
+                print*, "---- riemann_solver == 1"
                 if (riemann_solver == 1) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
@@ -931,16 +960,17 @@ contains
                             end if
                         end do
                     else
+                        print*, "here"
                         !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do q = 0, p
                                 do l = 0, n
                                     do k = 0, m
                                         rhs_vf(j)%sf(k, l, q) = &
-                                            rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
-                                            q_cons_qp%vf(j)%sf(k, l, q)* &
-                                            (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                                             - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
+                                            rhs_vf(j)%sf(k, l, q) + 1d0/dx(k) !* &
+                                            !q_cons_qp%vf(j)%sf(k, l, q)! * &
+                                           ! (flux_src_n(1)%vf(j)%sf(k, l, q) &
+                                           !  - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
                                     end do
                                 end do
                             end do
@@ -948,6 +978,7 @@ contains
                     end if
                 end if
 
+                print*, "---- bubbles"
                 if (bubbles) then
                     if (qbmm) then
 
@@ -978,36 +1009,40 @@ contains
                             end do
                         end do
                     else
-!$acc parallel loop collapse(3) gang vector default(present)
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
+                        print*, "todo"
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 0, 0
+                            do k = 0, 0
+                                do j = 0, 100
                                     divu%sf(j, k, l) = 0d0
-                                    divu%sf(j, k, l) = &
-                                        5d-1/dx(j)*(q_prim_qp%vf(contxe + id)%sf(j + 1, k, l) - &
-                                                    q_prim_qp%vf(contxe + id)%sf(j - 1, k, l))
-
+            !                        !divu%sf(j, k, l) = &
+            !                        !    5d-1/dx(j)*(q_prim_qp%vf(contxe + id)%sf(j + 1, k, l) - &
+            !                        !                q_prim_qp%vf(contxe + id)%sf(j - 1, k, l))
+!
                                 end do
                             end do
                         end do
 
-                        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                        if (id == ndirs) then                        
-                            call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                                 q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
-                        end if
+                    !    ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+                    !    if (id == ndirs) then                        
+                    !        call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
+                    !                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
+                    !    end if
                     end if
                 end if    
 
+                print*, "---- monopole"
                 if (monopole) then
-                    ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then 
-                        call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
-                                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                             rhs_vf)
-                    end if
+                    print*, "todo"
+                !    ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+                !    if (id == ndirs) then 
+                !        call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
+                !                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
+                !                             rhs_vf)
+                !    end if
                 end if
 
+                print*, "---- model_eqns == 3"
                 if (model_eqns == 3) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do l = 0, p
@@ -1025,6 +1060,8 @@ contains
                         end do
                     end do
                 end if
+
+                print*, "---- any(Re_size > 0)"
 
                 if (any(Re_size > 0)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
@@ -1148,7 +1185,7 @@ contains
                             end if
                         end do
                     else
-!$acc parallel loop collapse(4) gang vector default(present)
+                        !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do l = 0, p
                                 do k = 0, n
@@ -1555,6 +1592,7 @@ contains
                 end if
 
                 call nvtxStartRange("bubbles")
+                print*, "bubbles"
                 if (bubbles .and. (.not. qbmm)) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
@@ -1579,7 +1617,7 @@ contains
                 call nvtxEndRange()
 
                 call nvtxStartRange("Monopole")
-
+                print*, "Monopole"
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                     if (id == ndirs) then 
@@ -1650,10 +1688,10 @@ contains
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
-
-
+            print*, "RHS_Hypoelasticity"
             if (hypoelasticity) then
-
+                
+                print*, "s_compute_hypoelastic_rhs"
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
 
             end if
@@ -1662,20 +1700,25 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
+
+        print*, "run_time_info .or. probe_wrt"
         if (run_time_info .or. probe_wrt) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) iy%beg = -buff_size; 
             if (p > 0) iz%beg = -buff_size; 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-            !$acc update device(ix, iy, iz)
+            
+            !$acc enter data copyin(ix, iy, iz)
+
+            print*, "todo"
 
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do l = iz%beg, iz%end
                     do k = iy%beg, iy%end
                         do j = ix%beg, ix%end
-                            q_prim_vf(i)%sf(j, k, l) = q_prim_qp%vf(i)%sf(j, k, l)
+                        !    q_prim_vf(i)%sf(j, k, l) = q_prim_qp%vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
