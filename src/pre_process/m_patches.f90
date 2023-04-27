@@ -836,6 +836,7 @@ contains
 
         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(kind(0d0)) :: l, U0 !< Taylor Green Vortex parameters
 
         integer :: i, j !< generic loop iterators
 
@@ -861,7 +862,8 @@ contains
         ! ensure that only the current patch contributes to the fluid
         ! state in the cells that this patch covers.
         eta = 1d0
-
+        l = 1d0
+        U0 = 0.1
         ! Checking whether the patch covers a particular cell in the
         ! domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out,
@@ -880,8 +882,8 @@ contains
 
                     !what variables to alter
                     !x-y bump in pressure
-                    q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
+                    !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
+                            !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
 
                     !x-bump
                     !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
@@ -929,7 +931,7 @@ contains
     !                       q_prim_vf(mom_idx%end)%sf(i,j,0) = (COS(c) - COS(d))/(d-c)
     !                       q_prim_vf(E_idx)%sf(i,j,0) = 1d0
                     ! ================================================================================
-
+                   
                     ! Initial pressure profile smearing for bubble collapse case of Tiwari (2013) ====
                     !IF((       (x_cc(i))**2                     &
                     !         + (y_cc(j))**2 <= 1d0**2)) THEN
@@ -938,6 +940,13 @@ contains
                     !    q_prim_vf(E_idx)%sf(i,j,0) = 1d5 + 1d0/SQRT(x_cc(i)**2+y_cc(j)**2) &
                     !                                    * ((1d5/25d0) - 1d5)
                     !END IF
+                    ! ================================================================================
+
+                    ! Taylor Green Vortex===============================================
+                    q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/l)*COS(y_cc(j)/l)
+                    q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/l)*SIN(y_cc(j)/l)
+                    q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/l + COS(2*y_cc(j))/l)* &
+                                                            (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
                     ! ================================================================================
 
                 end if
