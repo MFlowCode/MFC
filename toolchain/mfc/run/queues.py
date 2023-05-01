@@ -1,7 +1,7 @@
 import os, typing, dataclasses
 
 from .. import common
-
+from ..state import ARG
 
 @dataclasses.dataclass
 class QueueSystem:
@@ -27,6 +27,9 @@ class PBSSystem(QueueSystem):
         return common.does_command_exist("qsub")
 
     def gen_submit_cmd(self, filename: str) -> typing.List[str]:
+        if ARG("wait"):
+            raise common.MFCException("PBS Queue: Sorry, --wait is unimplemented.")
+
         return ["qsub", filename]
 
 
@@ -38,7 +41,12 @@ class LSFSystem(QueueSystem):
         return common.does_command_exist("bsub") and common.does_command_exist("bqueues")
 
     def gen_submit_cmd(self, filename: str) -> None:
-        return ["bsub", filename]
+        cmd = ["bsub"]
+
+        if ARG("wait"):
+            cmd += ["--wait"]        
+
+        return cmd + [filename]
 
 
 class SLURMSystem(QueueSystem):
@@ -49,7 +57,12 @@ class SLURMSystem(QueueSystem):
         return common.does_command_exist("sbatch")
 
     def gen_submit_cmd(self, filename: str) -> None:
-        return ["sbatch", filename]
+        cmd = ["sbatch"]
+    
+        if ARG("wait"):
+            cmd += ["--wait"]
+
+        return cmd + [filename]
 
 
 QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
