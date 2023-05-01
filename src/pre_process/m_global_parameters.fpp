@@ -279,6 +279,8 @@ contains
             patch_icpp(i)%alpha_rho = dflt_real
             patch_icpp(i)%rho = dflt_real
             patch_icpp(i)%vel = dflt_real
+            patch_icpp(i)%vortex_l = dflt_real
+            patch_icpp(i)%vortex_vel = dflt_real
             patch_icpp(i)%pres = dflt_real
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
