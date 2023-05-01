@@ -818,30 +818,6 @@ contains
             ! ===============================================================
             call nvtxStartRange("RHS-Riemann")
 
-            ! Computing Riemann Solver Flux and Source Flux =================
-            ! do l = 0, p
-            !     do k = 0, n
-            !         do j = 0, m
-            !             do q = 1, sys_size
-            !                 if(isnan(q_prim_qp%vf(q)%sf(j,k,l))) then
-            !                     write(*,*) t_step,id,q,j,k,l,'q_prim_qp'
-            !                 end if
-            !             end do
-            !             do q = momxb,momxe
-            !                 if(isnan(dqR_prim_dx_n(id)%vf(q)%sf(j,k,l))) then
-            !                     write(*,*) t_step,id,q,j,k,l,'dqR_prim_dx_n'
-            !                 end if
-            !                 if(isnan(dqR_prim_dy_n(id)%vf(q)%sf(j,k,l))) then
-            !                     write(*,*) t_step,id,q,j,k,l,'dqR_prim_dy_n'
-            !                 end if
-            !                 if(isnan(dqR_prim_dz_n(id)%vf(q)%sf(j,k,l))) then
-            !                     write(*,*) t_step,id,q,j,k,l,'dqR_prim_dz_n'
-            !                 end if
-            !             end do
-            !         end do
-            !     end do
-            ! end do
-
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -858,22 +834,7 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-            ! do l = 0, p
-            !     do k = 0, n
-            !         do j = 0, m
-            !             do q = 1, sys_size
-            !                 if(isnan(flux_n(id)%vf(q)%sf(j,k,l))) then
-            !                     write(*,*) t_step,id,q,j,k,l,'flux_n'
-            !                 end if
-            !             end do
-            !             do q = momxb,advxe
-            !                 if(isnan(flux_src_n(id)%vf(q)%sf(j,k,l))) then
-            !                     write(*,*) t_step,id,q,j,k,l,'flux_src_n'
-            !                 end if
-            !             end do
-            !         end do
-            !     end do
-            ! end do
+
             ! ===============================================================
 
 

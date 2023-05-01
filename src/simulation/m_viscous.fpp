@@ -97,13 +97,11 @@ module m_viscous
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            ! Added --------------------------------------------------------------
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else                                
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
-                            ! Added --------------------------------------------------------------
                         end do
 
                         if (bubbles) then
@@ -206,13 +204,11 @@ module m_viscous
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            ! Added --------------------------------------------------------------
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else                                
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
-                            ! Added --------------------------------------------------------------
                         end do
 
                         if (bubbles) then
@@ -312,13 +308,11 @@ module m_viscous
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            ! Added --------------------------------------------------------------
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else                                
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
-                            ! Added --------------------------------------------------------------
                         end do
 
                         if (bubbles) then
@@ -422,13 +416,11 @@ module m_viscous
     !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            ! Added --------------------------------------------------------------
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else                                
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
-                            ! Added --------------------------------------------------------------
                         end do
 
                         if (bubbles) then

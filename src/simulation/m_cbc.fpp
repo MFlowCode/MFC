@@ -767,7 +767,6 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
-                    ! write(44,*) cbc_dir,r,k,adv,c
                     ! ============================================================
 
                     ! First-Order Spatial Derivatives of Primitive Variables =====
