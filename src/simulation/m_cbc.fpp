@@ -750,7 +750,7 @@ contains
                     end do
 
                     if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, 0, k, r)
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
 
                     else
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
@@ -767,7 +767,7 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
-
+                    ! write(44,*) cbc_dir,r,k,adv,c
                     ! ============================================================
 
                     ! First-Order Spatial Derivatives of Primitive Variables =====
