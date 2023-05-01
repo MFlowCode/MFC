@@ -238,6 +238,11 @@ contains
         real(kind(0d0)) :: orig_pi_inf
         real(kind(0d0)) :: muR, muV
 
+        real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+        real(kind(0d0)) :: pres   !< pressure
+        real(kind(0d0)) :: x_centroid, y_centroid
+        real(kind(0d0)) :: epsilon, beta
+
         real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
@@ -557,6 +562,53 @@ contains
                 end if
             end do
         end if
+      
+        if (patch_icpp(patch_id)%geometry == 6) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            epsilon = patch_icpp(patch_id)%epsilon
+            beta = patch_icpp(patch_id)%beta
+
+            ! Reference density, velocity, pressure and specific heat ratio
+            ! function of the isentropic vortex patch
+            rho = patch_icpp(patch_id)%rho
+            vel = patch_icpp(patch_id)%vel
+            pres = patch_icpp(patch_id)%pres
+            gamma = patch_icpp(patch_id)%gamma
+
+            ! Density
+            q_prim_vf(1)%sf(j, k, 0) = &
+                rho*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
+                     (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
+                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                                   - (y_cc(k) - y_centroid)**2)) &
+                     )**gamma
+
+            ! Velocity
+            q_prim_vf(2)%sf(j, k, 0) = &
+                vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2d0*pi))* &
+                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                          - (y_cc(k) - y_centroid)**2))
+            q_prim_vf(3)%sf(j, k, 0) = &
+                vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2d0*pi))* &
+                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                          - (y_cc(k) - y_centroid)**2))
+
+            ! Pressure
+            q_prim_vf(4)%sf(j, k, 0) = &
+                pres*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
+                      (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
+                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                                    - (y_cc(k) - y_centroid)**2)) &
+                      )**(gamma + 1d0)
+
+            ! Specific heat ratio function
+            q_prim_vf(5)%sf(j, k, 0) = gamma
+
+            ! Liquid stiffness function
+            q_prim_vf(6)%sf(j, k, 0) = 0d0
+
+        end if
 
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
@@ -585,6 +637,7 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: eta !<
+
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0)) :: rho
@@ -596,6 +649,11 @@ contains
             !! Density, the specific heat ratio function and the liquid stiffness
             !! function, respectively, obtained from the combination of primitive
             !! variables of the current and smoothing patches
+
+        real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+        real(kind(0d0)) :: pres   !< pressure
+        real(kind(0d0)) :: x_centroid, y_centroid
+        real(kind(0d0)) :: epsilon, beta
 
         real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
         ! Vector to hold original values of cell for smoothing purposes
@@ -712,6 +770,53 @@ contains
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 q_prim_vf(i)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l)
             end do
+        end if
+        
+        if (patch_icpp(patch_id)%geometry == 6) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            epsilon = patch_icpp(patch_id)%epsilon
+            beta = patch_icpp(patch_id)%beta
+
+            ! Reference density, velocity, pressure and specific heat ratio
+            ! function of the isentropic vortex patch
+            rho = patch_icpp(patch_id)%rho
+            vel = patch_icpp(patch_id)%vel
+            pres = patch_icpp(patch_id)%pres
+            gamma = patch_icpp(patch_id)%gamma
+
+            ! Density
+            q_prim_vf(1)%sf(j, k, 0) = &
+                rho*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
+                     (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
+                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                                   - (y_cc(k) - y_centroid)**2)) &
+                     )**gamma
+
+            ! Velocity
+            q_prim_vf(2)%sf(j, k, 0) = &
+                vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2d0*pi))* &
+                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                          - (y_cc(k) - y_centroid)**2))
+            q_prim_vf(3)%sf(j, k, 0) = &
+                vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2d0*pi))* &
+                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                          - (y_cc(k) - y_centroid)**2))
+
+            ! Pressure
+            q_prim_vf(4)%sf(j, k, 0) = &
+                pres*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
+                      (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
+                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
+                                    - (y_cc(k) - y_centroid)**2)) &
+                      )**(gamma + 1d0)
+
+            ! Specific heat ratio function
+            q_prim_vf(5)%sf(j, k, 0) = gamma
+
+            ! Liquid stiffness function
+            q_prim_vf(6)%sf(j, k, 0) = 0d0
+
         end if
 
         ! Updating the patch identities bookkeeping variable

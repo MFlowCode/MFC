@@ -184,6 +184,10 @@ contains
                 elseif (patch_icpp(i)%geometry == 18) then
                     call s_varcircle(i, patch_id_fp, q_prim_vf)
 
+                    ! TaylorGreen vortex patch
+                elseif (patch_icpp(i)%geometry == 20) then
+                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)    
+
                 end if
 
             end do
