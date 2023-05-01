@@ -132,7 +132,7 @@ if [ "$1" == "load" ]; then
         MODULES=("${MODULES[@]}" "python/3.8.5")
     elif [ "$u_computer" == "p" ]; then # Phoenix
         if [ "$u_cg" == "c" ]; then
-            MODULES=("gcc/10.3.0-o57x6h" "mvapich2/2.3.6-ouywal")
+            MODULES=("gcc/10.3.0-o57x6h" "openmpi/4.1.4")
         elif [ "$u_cg" == "g" ]; then
             MODULES=("cuda/11.7.0-7sdye3" "nvhpc/22.11")
         fi

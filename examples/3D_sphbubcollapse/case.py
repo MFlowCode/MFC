@@ -108,7 +108,7 @@ print(json.dumps({
     'patch_icpp(1)%vel(3)'         : 0.E+00,
     'patch_icpp(1)%pres'           : 1.E+05,
     'patch_icpp(1)%alpha_rho(1)'   : 1000.E+00,
-    'patch_icpp(1)%alpha_rho(2)'   : 0.E+00,
+    'patch_icpp(1)%alpha_rho(2)'   : 0.1E+00,
     'patch_icpp(1)%alpha(1)'       : 0.9E+00,
     'patch_icpp(1)%alpha(2)'       : 0.1E+00,
     # ==========================================================================
@@ -129,10 +129,10 @@ print(json.dumps({
     'patch_icpp(2)%vel(2)'         : 0.E+00,
     'patch_icpp(2)%vel(3)'         : 0.E+00,
     'patch_icpp(2)%pres'           : 1.E+03,
-    'patch_icpp(2)%alpha_rho(1)'   : 0.E+00,
-    'patch_icpp(2)%alpha_rho(2)'   : 0.19E+00,
-    'patch_icpp(2)%alpha(1)'       : 0.9E+00,
-    'patch_icpp(2)%alpha(2)'       : 0.1E+00,
+    'patch_icpp(2)%alpha_rho(1)'   : 100.E+00,
+    'patch_icpp(2)%alpha_rho(2)'   : 0.9E+00,
+    'patch_icpp(2)%alpha(1)'       : 0.1E+00,
+    'patch_icpp(2)%alpha(2)'       : 0.9E+00,
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================
