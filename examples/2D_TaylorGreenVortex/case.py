@@ -65,7 +65,7 @@ print(json.dumps({
     # Patch 1: Base ============================================
     # Uncomment the configuration of the Taylor Green Vortex in 
     # 2D analytical patch under m_patch.f90
-    'patch_icpp(1)%geometry'       : 7,
+    'patch_icpp(1)%geometry'       : 20,
     'patch_icpp(1)%x_centroid'     : 0.0,
     'patch_icpp(1)%y_centroid'     : 0.0,
     'patch_icpp(1)%length_x'       : 2.0*L, 
@@ -73,6 +73,10 @@ print(json.dumps({
     'patch_icpp(1)%vel(1)'         : 0.E+00,
     'patch_icpp(1)%vel(2)'         : 0.E+00,
     'patch_icpp(1)%pres'           : 1.E+05,
+    # Define the characteristic length of the vortex
+    'patch_icpp(1)%vortex_l'       : l,
+    # Define the characteristic velocity of the vortex
+    'patch_icpp(1)%vortex_vel'     : 0.1,
     'patch_icpp(1)%alpha_rho(1)'   : 1.22,
     'patch_icpp(1)%alpha(1)'       : 1.,
     # ==========================================================
