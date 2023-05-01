@@ -505,7 +505,7 @@ contains
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
         integer :: i, j !< generic loop iterators
-
+        
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1d0 + gamma)/gamma
