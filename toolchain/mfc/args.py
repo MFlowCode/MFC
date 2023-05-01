@@ -95,6 +95,7 @@ started, run ./mfc.sh build -h.""",
     run.add_argument(      "--dry-run",        action="store_true",                       default=False,      help="(Batch) Run without submitting batch file.")
     run.add_argument("--case-optimization",    action="store_true",                       default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",       action="store_true",                       default=False,      help="(Testing) Do not rebuild MFC.")
+    run.add_argument("--wait",                 action="store_true",                       default=False,      help="(Batch) Wait for the job to finish.")
 
     # === BENCH ===
     add_common_arguments(bench, "t")
