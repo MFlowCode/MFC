@@ -89,8 +89,6 @@ contains
             call MPI_BCAST(patch_icpp(i)%tau_e(1), 6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alpha_rho(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alpha(1), num_fluids_max - 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%vortex_l, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%vortex_vel, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! Fluids physical parameters

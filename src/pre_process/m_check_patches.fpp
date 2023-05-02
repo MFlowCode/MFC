@@ -314,7 +314,7 @@ contains
             .or. &
             patch_icpp(patch_id)%length_y <= 0d0 &
             .or. &
-            patch_icpp(patch_id)%vortex_l <= 0d0) then
+            patch_icpp(patch_id)%vel(2)<= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
             'geometric parameters of Taylor Green '// &
