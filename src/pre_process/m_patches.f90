@@ -711,8 +711,10 @@ contains
         ! ensure that only the current patch contributes to the fluid
         ! state in the cells that this patch covers.
         eta = 1d0
-        U0 = patch_icpp(patch_id)%vortex_vel
-        L0 = patch_icpp(patch_id)%vortex_l
+        ! U0 is the characteristic velocity of the vortex
+        U0 = patch_icpp(patch_id)%vel(1) 
+        ! L0 is the characteristic length of the vortex
+        L0 = patch_icpp(patch_id)%vel(2)
         ! Checking whether the patch covers a particular cell in the
         ! domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out,
@@ -732,7 +734,7 @@ contains
                     ! Assign Parameters =========================================================
                     q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/L0)*COS(y_cc(j)/L0)
                     q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/L0)*SIN(y_cc(j)/L0)
-                    q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/L0 + &
+                    q_prim_vf(E_idx        )%sf(i,j,0) = patch_icpp(patch_id)%pres + (COS(2*x_cc(i))/L0 + &
                                                             COS(2*y_cc(j))/L0)* &
                                                             (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
                     ! ================================================================================
@@ -1014,10 +1016,10 @@ contains
                     ! ================================================================================
 
                     ! Taylor Green Vortex===============================================
-                    q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/l)*COS(y_cc(j)/l)
-                    q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/l)*SIN(y_cc(j)/l)
-                    q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/l + COS(2*y_cc(j))/l)* &
-                                                            (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
+                    ! q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/l)*COS(y_cc(j)/l)
+                    ! q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/l)*SIN(y_cc(j)/l)
+                    ! q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/l + COS(2*y_cc(j))/l)* &
+                    !                                         (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
                     ! ================================================================================
 
                 end if
