@@ -25,10 +25,10 @@ print(json.dumps({
     'm'                            : 199,
     'n'                            : 199,
     'p'                            : 0,
-    'dt'                           : 5.0E-09,
+    'dt'                           : 1.0E-08,
     't_step_start'                 : 0,
-    't_step_stop'                  : 20000,
-    't_step_save'                  : 200,
+    't_step_stop'                  : 10000,
+    't_step_save'                  : 100,
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -70,13 +70,9 @@ print(json.dumps({
     'patch_icpp(1)%y_centroid'     : 0.0,
     'patch_icpp(1)%length_x'       : 2.0*L, 
     'patch_icpp(1)%length_y'       : 2.0*L,  
-    'patch_icpp(1)%vel(1)'         : 0.E+00,
-    'patch_icpp(1)%vel(2)'         : 0.E+00,
+    'patch_icpp(1)%vel(1)'         : 1.E-01, # Define the characteristic velocity of the vortex
+    'patch_icpp(1)%vel(2)'         : 1.E+00, # Define the characteristic length of the vortex
     'patch_icpp(1)%pres'           : 1.E+05,
-    # Define the characteristic length of the vortex
-    'patch_icpp(1)%vortex_l'       : l,
-    # Define the characteristic velocity of the vortex
-    'patch_icpp(1)%vortex_vel'     : 0.1,
     'patch_icpp(1)%alpha_rho(1)'   : 1.22,
     'patch_icpp(1)%alpha(1)'       : 1.,
     # ==========================================================
@@ -86,7 +82,7 @@ print(json.dumps({
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
     # Shear viscosity of STD air
-    'fluid_pp(1)%Re(1)'            : 0.0000184,
+    'fluid_pp(1)%Re(1)'            : 0.0001,
     # ==========================================================
 }))
 # ==============================================================================
