@@ -334,11 +334,7 @@ contains
                     end if
                 else
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
-                    if (.not. vel_profile) then
-                        q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV
-                    else
-                        q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV*tanh(y_cc(k))
-                    end if
+                    q_prim_vf(bub_idx%vs(i))%sf(j, k, l) = muV
                     if (.not. polytropic) then
                         q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = patch_icpp(patch_id)%p0
                         q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = patch_icpp(patch_id)%m0
