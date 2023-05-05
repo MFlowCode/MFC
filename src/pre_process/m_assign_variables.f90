@@ -602,12 +602,6 @@ contains
                                     - (y_cc(k) - y_centroid)**2)) &
                       )**(gamma + 1d0)
 
-            ! Specific heat ratio function
-            q_prim_vf(5)%sf(j, k, 0) = gamma
-
-            ! Liquid stiffness function
-            q_prim_vf(6)%sf(j, k, 0) = 0d0
-
         end if
 
         ! Updating the patch identities bookkeeping variable
@@ -810,12 +804,6 @@ contains
                       exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
                                     - (y_cc(k) - y_centroid)**2)) &
                       )**(gamma + 1d0)
-
-            ! Specific heat ratio function
-            q_prim_vf(5)%sf(j, k, 0) = gamma
-
-            ! Liquid stiffness function
-            q_prim_vf(6)%sf(j, k, 0) = 0d0
 
         end if
 
