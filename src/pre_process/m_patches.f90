@@ -65,6 +65,7 @@ module m_patches
     !! perform the actions necessary to lay out a particular patch on the grid.
 
 contains
+
     !>          The line segment patch is a 1D geometry that may be used,
     !!              for example, in creating a Riemann problem. The geometry
     !!              of the patch is well-defined when its centroid and length

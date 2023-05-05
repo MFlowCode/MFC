@@ -113,6 +113,9 @@ contains
 
         nR3 = dot_product(weights, nRtmp**3.d0)
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+        !ntmp = (3.d0/(4.d0*pi))*0.00001
+
+        !print *, "nbub", ntmp
 
     end subroutine s_comp_n_from_cons
 

@@ -96,12 +96,12 @@ contains
 
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
-            & 'num_fluids','time_stepper', 'riemann_solver',  'num_mono',      & 
+            & 'num_fluids','time_stepper', 'weno_vars', 'riemann_solver',      & 
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', & 
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'bc_x_glb%beg',  & 
             & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &
             & 'bc_z_glb%end', 'fd_order', 'num_probes', 'num_integrals',       &
-            & 'bubble_model', 'thermal', 'R0_type']
+            & 'bubble_model', 'thermal', 'R0_type', 'num_mono' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -518,6 +518,9 @@ contains
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1
         end if
+
+        bc_x%beg = -3
+        bc_x%end = -3
 
         if (parallel_io) then
             if (proc_coords(1) < rem_cells) then

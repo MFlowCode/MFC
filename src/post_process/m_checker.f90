@@ -246,6 +246,14 @@ contains
         elseif (precision /= 1 .and. precision /= 2) then
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'precision. Exiting ...')
+
+            ! Constraints on the option to coarsen the formatted database files
+        elseif (coarsen_silo .and. format /= 1) then
+            call s_mpi_abort('Unsupported combination of values of format '// &
+                'and coarsen_silo. Exiting ...')
+        elseif (coarsen_silo .and. n == 0) then
+            call s_mpi_abort('Unsupported combination of values of n '// &
+                'and coarsen_silo. Exiting ...')
         end if
 
         ! Constraints on the post-processing of the partial densities
