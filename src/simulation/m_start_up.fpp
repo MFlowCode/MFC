@@ -83,8 +83,8 @@ contains
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
-            mpp_lim, time_stepper, weno_eps, weno_flat, &
-            riemann_flat, cu_mpi, cu_tensor, &
+            mpp_lim, time_stepper, weno_vars, &
+            weno_eps, weno_flat, riemann_flat, cu_mpi, cu_tensor, &
             mapped_weno, mp_weno, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &

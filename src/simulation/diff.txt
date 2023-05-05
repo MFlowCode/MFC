@@ -1,0 +1,172 @@
+diff --git a/src/simulation/m_rhs.f90 b/src/simulation/m_rhs.f90
+index af10416..4bde93f 100644
+--- a/src/simulation/m_rhs.f90
++++ b/src/simulation/m_rhs.f90
+@@ -254,42 +254,11 @@ contains
+         do l = 1, sys_size
+             allocate (q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+ !$acc enter data create(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+-        end do
+-
+-        do l = mom_idx%beg, E_idx
+-            allocate (q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+-!$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+-        end do
+-
+-!        if (hypoelasticity) then
+-!            do l = stress_idx%beg, stress_idx%end
+-!                allocate(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+-!!$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+-!            end do
+-!        end if
+-
+-        do l = adv_idx%end + 1, sys_size
+             allocate (q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+ !$acc enter data create(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+         end do
+ 
+-        do l = 1, cont_idx%end
+-            q_prim_qp%vf(l)%sf => &
+-                q_cons_qp%vf(l)%sf
+-!$acc enter data attach(q_prim_qp%vf(l)%sf)
+-        end do
+-
+-        do l = adv_idx%beg, adv_idx%end
+-            q_prim_qp%vf(l)%sf => &
+-                q_cons_qp%vf(l)%sf
+-!$acc enter data attach(q_prim_qp%vf(l)%sf)
+-        end do
+-
+-!        do l = stress_idx%beg, stress_idx%end
+-!            q_prim_qp%vf(l)%sf => &
+-!                q_cons_qp%vf(l)%sf
+-!!$acc enter data attach(q_prim_qp%vf(l)%sf)
+-!        end do
++       
+ 
+         ! ==================================================================
+ 
+@@ -636,13 +605,13 @@ contains
+ !$acc enter data create(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+                     end do
+                 else
+-                    !IF ( (num_fluids > 1) .AND. (bubbles .NEQV. .TRUE.)) THEN
+                     do l = adv_idx%beg + 1, adv_idx%end
+-                        flux_src_n(i)%vf(l)%sf => &
+-                            flux_src_n(i)%vf(adv_idx%beg)%sf
+-!$acc enter data attach(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
++                        allocate (flux_src_n(i)%vf(l)%sf( &
++                                  ix%beg:ix%end, &
++                                  iy%beg:iy%end, &
++                                  iz%beg:iz%end))
++!$acc enter data create(flux_src_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+                     end do
+-                    !END IF
+                 end if
+ 
+             else
+@@ -654,12 +623,18 @@ contains
+ !$acc enter data create(flux_gsrc_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+                 end do
+                 do l = 1, sys_size
+-                    flux_n(i)%vf(l)%sf => &
+-                        flux_n(1)%vf(l)%sf
+-                    flux_src_n(i)%vf(l)%sf => &
+-                        flux_src_n(1)%vf(l)%sf
+-
+-!$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
++                    allocate (flux_gsrc_n(i)%vf(l)%sf( &
++                              ix%beg:ix%end, &
++                              iy%beg:iy%end, &
++                              iz%beg:iz%end))
++!$acc enter data create(flux_gsrc_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
++                end do
++                do l = 1, sys_size
++                    allocate (flux_gsrc_n(i)%vf(l)%sf( &
++                              ix%beg:ix%end, &
++                              iy%beg:iy%end, &
++                              iz%beg:iz%end))
++!$acc enter data create(flux_gsrc_n(i)%vf(l)%sf(ix%beg:ix%end,iy%beg:iy%end,iz%beg:iz%end))
+                 end do
+ 
+             end if
+@@ -859,6 +834,7 @@ contains
+                 do k = iy%beg, iy%end
+                     do j = ix%beg, ix%end
+                         q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
++                        q_prim_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
+                     end do
+                 end do
+             end do
+@@ -5437,15 +5413,6 @@ subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x_flat, vL_y_f
+ 
+         integer :: i, j, k, l !< Generic loop iterators
+ 
+-        do j = cont_idx%beg, cont_idx%end
+-!$acc exit data detach(q_prim_qp%vf(j)%sf)
+-            nullify (q_prim_qp%vf(j)%sf)
+-        end do
+-
+-        do j = adv_idx%beg, adv_idx%end
+-!$acc exit data detach(q_prim_qp%vf(j)%sf)
+-            nullify (q_prim_qp%vf(j)%sf)
+-        end do
+ 
+         do j = mom_idx%beg, E_idx
+             deallocate (q_cons_qp%vf(j)%sf)
+diff --git a/src/simulation/m_riemann_solvers.fpp b/src/simulation/m_riemann_solvers.fpp
+index c03317a..6eefed3 100644
+--- a/src/simulation/m_riemann_solvers.fpp
++++ b/src/simulation/m_riemann_solvers.fpp
+@@ -4599,6 +4599,7 @@ contains
+                 do l = is3%beg, is3%end
+                     do j = is1%beg, is1%end
+                         do k = is2%beg, is2%end
++
+                             flux_vf(i)%sf(k, j, l) = &
+                                 flux_rsy_vf_flat(j, k, l, i)
+                         end do
+@@ -4624,8 +4625,10 @@ contains
+             do l = is3%beg, is3%end
+                 do j = is1%beg, is1%end
+                     do k = is2%beg, is2%end
+-                        flux_src_vf(advxb)%sf(k, j, l) = &
++                        do i = advxb, advxe
++                        flux_src_vf(i)%sf(k, j, l) = &
+                             flux_src_rsy_vf_flat(j, k, l, advxb)
++                        end do
+                     end do
+                 end do
+             end do
+@@ -4652,7 +4655,6 @@ contains
+                 do j = is1%beg, is1%end
+                     do k = is2%beg, is2%end
+                         do l = is3%beg, is3%end
+-
+                             flux_vf(i)%sf(l, k, j) = &
+                                 flux_rsz_vf_flat(j, k, l, i)
+                         end do
+@@ -4678,8 +4680,10 @@ contains
+             do j = is1%beg, is1%end
+                 do k = is2%beg, is2%end
+                     do l = is3%beg, is3%end
+-                        flux_src_vf(advxb)%sf(l, k, j) = &
++                        do i = advxb, advxe
++                        flux_src_vf(i)%sf(l, k, j) = &
+                             flux_src_rsz_vf_flat(j, k, l, advxb)
++                        end do
+                     end do
+                 end do
+             end do
+@@ -4715,8 +4719,10 @@ contains
+             do l = is3%beg, is3%end
+                 do k = is2%beg, is2%end
+                     do j = is1%beg, is1%end
+-                        flux_src_vf(advxb)%sf(j, k, l) = &
++                        do i = advxb, advxe
++                        flux_src_vf(i)%sf(j, k, l) = &
+                             flux_src_rsx_vf_flat(j, k, l, advxb)
++                        end do
+                     end do
+                 end do
+             end do

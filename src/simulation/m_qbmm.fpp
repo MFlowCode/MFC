@@ -67,92 +67,183 @@ contains
 
         ! Assigns the required RHS moments for moment transport equations
         ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
-        do q = 1, nb
-            do i1 = 0, 2; do i2 = 0, 2
-                    if ((i1 + i2) <= 2) then
-                        if (bubble_model == 3) then
-                            momrhs(1, i1, i2, 1, q) = -1.d0 + i1
-                            momrhs(2, i1, i2, 1, q) = -1.d0 + i2
-                            momrhs(3, i1, i2, 1, q) = 0d0
 
-                            momrhs(1, i1, i2, 2, q) = -1.d0 + i1
-                            momrhs(2, i1, i2, 2, q) = 1.d0 + i2
-                            momrhs(3, i1, i2, 2, q) = 0d0
+        if(.not. polytropic) then
+            do q = 1, nb
+                do i1 = 0, 2; do i2 = 0, 2
+                        if ((i1 + i2) <= 2) then
+                            if (bubble_model == 3) then
+                                momrhs(1, i1, i2, 1, q) = -1.d0 + i1
+                                momrhs(2, i1, i2, 1, q) = -1.d0 + i2
+                                momrhs(3, i1, i2, 1, q) = 0d0
 
-                            momrhs(1, i1, i2, 3, q) = -1.d0 + i1 - 3.d0*gam
-                            momrhs(2, i1, i2, 3, q) = -1.d0 + i2
-                            momrhs(3, i1, i2, 3, q) = 3.d0*gam
+                                momrhs(1, i1, i2, 2, q) = -1.d0 + i1
+                                momrhs(2, i1, i2, 2, q) = 1.d0 + i2
+                                momrhs(3, i1, i2, 2, q) = 0d0
 
-                            momrhs(1, i1, i2, 4, q) = -1.d0 + i1
-                            momrhs(2, i1, i2, 4, q) = 1.d0 + i2
-                            momrhs(3, i1, i2, 4, q) = 0d0
+                                momrhs(1, i1, i2, 3, q) = -1.d0 + i1 
+                                momrhs(2, i1, i2, 3, q) = -1.d0 + i2
+                                momrhs(3, i1, i2, 3, q) = 0d0
 
-                            if (Re_inv /= dflt_real) then
-                                ! add viscosity
-                                momrhs(1, i1, i2, 5, q) = -2.d0 + i1
+                                momrhs(1, i1, i2, 4, q) = -1.d0 + i1
+                                momrhs(2, i1, i2, 4, q) = 1.d0 + i2
+                                momrhs(3, i1, i2, 4, q) = 0d0
+
+                                if (Re_inv /= dflt_real) then
+                                    ! add viscosity
+                                    momrhs(1, i1, i2, 5, q) = -2.d0 + i1
+                                    momrhs(2, i1, i2, 5, q) = i2
+                                    momrhs(3, i1, i2, 5, q) = 0d0
+                                end if
+
+                                if (Web /= dflt_real) then
+                                    ! add surface tension
+                                    momrhs(1, i1, i2, 6, q) = -2.d0 + i1
+                                    momrhs(2, i1, i2, 6, q) = -1.d0 + i2
+                                    momrhs(3, i1, i2, 6, q) = 0d0
+                                end if
+                            else if (bubble_model == 2) then
+                                ! KM with approximation of 1/(1-V/C) = 1+V/C
+                                momrhs(1, i1, i2, 1, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 1, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 1, q) = 0d0
+
+                                momrhs(1, i1, i2, 2, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 2, q) = 2d0 + i2
+                                momrhs(3, i1, i2, 2, q) = 0d0
+
+                                momrhs(1, i1, i2, 3, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 3, q) = 3d0 + i2
+                                momrhs(3, i1, i2, 3, q) = 0d0
+
+                                momrhs(1, i1, i2, 4, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 4, q) = -1d0 + i2
+                                momrhs(3, i1, i2, 4, q) = 0d0
+
+                                momrhs(1, i1, i2, 5, q) = -1d0 + i1
                                 momrhs(2, i1, i2, 5, q) = i2
                                 momrhs(3, i1, i2, 5, q) = 0d0
-                            end if
 
-                            if (Web /= dflt_real) then
-                                ! add surface tension
-                                momrhs(1, i1, i2, 6, q) = -2.d0 + i1
-                                momrhs(2, i1, i2, 6, q) = -1.d0 + i2
+                                momrhs(1, i1, i2, 6, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 6, q) = 1d0 + i2
                                 momrhs(3, i1, i2, 6, q) = 0d0
+
+                                momrhs(1, i1, i2, 7, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 7, q) = -1d0 + i2
+                                momrhs(3, i1, i2, 7, q) = 0d0
+
+                                momrhs(1, i1, i2, 8, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 8, q) = i2
+                                momrhs(3, i1, i2, 8, q) = 0d0
+
+                                momrhs(1, i1, i2, 9, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 9, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 9, q) = 0d0
+
+                                momrhs(1, i1, i2, 10, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 10, q) = i2
+                                momrhs(3, i1, i2, 10, q) = 0d0
+
+                                momrhs(1, i1, i2, 11, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 11, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 11, q) = 0d0
+
+                                momrhs(1, i1, i2, 12, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 12, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 12, q) = 0d0
                             end if
-                        else if (bubble_model == 2) then
-                            ! KM with approximation of 1/(1-V/C) = 1+V/C
-                            momrhs(1, i1, i2, 1, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 1, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 1, q) = 0d0
-
-                            momrhs(1, i1, i2, 2, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 2, q) = 2d0 + i2
-                            momrhs(3, i1, i2, 2, q) = 0d0
-
-                            momrhs(1, i1, i2, 3, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 3, q) = 3d0 + i2
-                            momrhs(3, i1, i2, 3, q) = 0d0
-
-                            momrhs(1, i1, i2, 4, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 4, q) = -1d0 + i2
-                            momrhs(3, i1, i2, 4, q) = 0d0
-
-                            momrhs(1, i1, i2, 5, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 5, q) = i2
-                            momrhs(3, i1, i2, 5, q) = 0d0
-
-                            momrhs(1, i1, i2, 6, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 6, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 6, q) = 0d0
-
-                            momrhs(1, i1, i2, 7, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 7, q) = -1d0 + i2
-                            momrhs(3, i1, i2, 7, q) = 3d0*gam
-
-                            momrhs(1, i1, i2, 8, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 8, q) = i2
-                            momrhs(3, i1, i2, 8, q) = 3d0*gam
-
-                            momrhs(1, i1, i2, 9, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 9, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 9, q) = 3d0*gam
-
-                            momrhs(1, i1, i2, 10, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 10, q) = i2
-                            momrhs(3, i1, i2, 10, q) = 3d0*gam
-
-                            momrhs(1, i1, i2, 11, q) = -1d0 + i1 - 3d0*gam
-                            momrhs(2, i1, i2, 11, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 11, q) = 3d0*gam
-
-                            momrhs(1, i1, i2, 12, q) = -1d0 + i1
-                            momrhs(2, i1, i2, 12, q) = 1d0 + i2
-                            momrhs(3, i1, i2, 12, q) = 0d0
                         end if
-                    end if
-                end do; end do
-        end do
+                    end do; end do
+            end do            
+
+        else
+            do q = 1, nb
+                do i1 = 0, 2; do i2 = 0, 2
+                        if ((i1 + i2) <= 2) then
+                            if (bubble_model == 3) then
+                                momrhs(1, i1, i2, 1, q) = -1.d0 + i1
+                                momrhs(2, i1, i2, 1, q) = -1.d0 + i2
+                                momrhs(3, i1, i2, 1, q) = 0d0
+
+                                momrhs(1, i1, i2, 2, q) = -1.d0 + i1
+                                momrhs(2, i1, i2, 2, q) = 1.d0 + i2
+                                momrhs(3, i1, i2, 2, q) = 0d0
+
+                                momrhs(1, i1, i2, 3, q) = -1.d0 + i1 - 3.d0*gam
+                                momrhs(2, i1, i2, 3, q) = -1.d0 + i2
+                                momrhs(3, i1, i2, 3, q) = 3.d0*gam
+
+                                momrhs(1, i1, i2, 4, q) = -1.d0 + i1
+                                momrhs(2, i1, i2, 4, q) = 1.d0 + i2
+                                momrhs(3, i1, i2, 4, q) = 0d0
+
+                                if (Re_inv /= dflt_real) then
+                                    ! add viscosity
+                                    momrhs(1, i1, i2, 5, q) = -2.d0 + i1
+                                    momrhs(2, i1, i2, 5, q) = i2
+                                    momrhs(3, i1, i2, 5, q) = 0d0
+                                end if
+
+                                if (Web /= dflt_real) then
+                                    ! add surface tension
+                                    momrhs(1, i1, i2, 6, q) = -2.d0 + i1
+                                    momrhs(2, i1, i2, 6, q) = -1.d0 + i2
+                                    momrhs(3, i1, i2, 6, q) = 0d0
+                                end if
+                            else if (bubble_model == 2) then
+                                ! KM with approximation of 1/(1-V/C) = 1+V/C
+                                momrhs(1, i1, i2, 1, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 1, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 1, q) = 0d0
+
+                                momrhs(1, i1, i2, 2, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 2, q) = 2d0 + i2
+                                momrhs(3, i1, i2, 2, q) = 0d0
+
+                                momrhs(1, i1, i2, 3, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 3, q) = 3d0 + i2
+                                momrhs(3, i1, i2, 3, q) = 0d0
+
+                                momrhs(1, i1, i2, 4, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 4, q) = -1d0 + i2
+                                momrhs(3, i1, i2, 4, q) = 0d0
+
+                                momrhs(1, i1, i2, 5, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 5, q) = i2
+                                momrhs(3, i1, i2, 5, q) = 0d0
+
+                                momrhs(1, i1, i2, 6, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 6, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 6, q) = 0d0
+
+                                momrhs(1, i1, i2, 7, q) = -1d0 + i1 - 3d0*gam
+                                momrhs(2, i1, i2, 7, q) = -1d0 + i2
+                                momrhs(3, i1, i2, 7, q) = 3d0*gam
+
+                                momrhs(1, i1, i2, 8, q) = -1d0 + i1 - 3d0*gam
+                                momrhs(2, i1, i2, 8, q) = i2
+                                momrhs(3, i1, i2, 8, q) = 3d0*gam
+
+                                momrhs(1, i1, i2, 9, q) = -1d0 + i1 - 3d0*gam
+                                momrhs(2, i1, i2, 9, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 9, q) = 3d0*gam
+
+                                momrhs(1, i1, i2, 10, q) = -1d0 + i1 - 3d0*gam
+                                momrhs(2, i1, i2, 10, q) = i2
+                                momrhs(3, i1, i2, 10, q) = 3d0*gam
+
+                                momrhs(1, i1, i2, 11, q) = -1d0 + i1 - 3d0*gam
+                                momrhs(2, i1, i2, 11, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 11, q) = 3d0*gam
+
+                                momrhs(1, i1, i2, 12, q) = -1d0 + i1
+                                momrhs(2, i1, i2, 12, q) = 1d0 + i2
+                                momrhs(3, i1, i2, 12, q) = 0d0
+                            end if
+                        end if
+                    end do; end do
+            end do
+        end if
 
         !$acc update device(momrhs)
 
@@ -175,7 +266,7 @@ contains
 
     subroutine s_coeff(pres, rho, c, coeffs)
 !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: pres, rho, c
+        real(kind(0.d0)), intent(INOUT) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
         integer :: i1, i2
 
@@ -187,7 +278,7 @@ contains
                         ! RPE
                         coeffs(1, i1, i2) = -1d0*i2*pres/rho
                         coeffs(2, i1, i2) = -3d0*i2/2d0
-                        coeffs(3, i1, i2) = i2/rho
+                        coeffs(3, i1, i2) = i2*pref/rho
                         coeffs(4, i1, i2) = i1
                         if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
                         if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
@@ -199,11 +290,11 @@ contains
                         coeffs(4, i1, i2) = -i2*pres/rho
                         coeffs(5, i1, i2) = -2d0*i2*pres/(c*rho)
                         coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
-                        coeffs(7, i1, i2) = i2/rho
-                        coeffs(8, i1, i2) = 2d0*i2/(c*rho)
-                        coeffs(9, i1, i2) = i2/(c*c*rho)
-                        coeffs(10, i1, i2) = -3d0*i2*gam/(c*rho)
-                        coeffs(11, i1, i2) = -3d0*i2*gam/(c*c*rho)
+                        coeffs(7, i1, i2) = i2*pref/rho
+                        coeffs(8, i1, i2) = 2d0*i2*pref/(c*rho)
+                        coeffs(9, i1, i2) = i2*pref/(c*c*rho)
+                        coeffs(10, i1, i2) = -3d0*i2*gam*pref/(c*rho)
+                        coeffs(11, i1, i2) = -3d0*i2*gam*pref/(c*c*rho)
                         coeffs(12, i1, i2) = i1
                     end if
                 end if
@@ -211,34 +302,38 @@ contains
 
     end subroutine s_coeff
 
-    subroutine s_mom_inv(q_prim_vf, momsp, moms3d, ix, iy, iz)
+    subroutine s_mom_inv(q_cons_vf,q_prim_vf, momsp, moms3d, pb, rhs_pb, ix, iy, iz, nbub_sc)
 
-        type(scalar_field), dimension(:), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(INOUT) :: q_prim_vf, q_cons_vf
         type(scalar_field), dimension(:), intent(INOUT) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:) :: nbub_sc
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(nmom) :: moms
+        real(kind(0d0)), dimension(nmom) :: moms, msum
         real(kind(0d0)), dimension(nb) :: Rvec
         real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
+        real(kind(0d0)), dimension(nnode, nb) :: wght_pb, wght_pbdot
         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum
+        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: n_tait, B_tait
 
         integer :: j, k, l, q, r, s !< Loop variables
         integer :: id1, id2, id3
         integer :: i1, i2
+        real(kind(0d0)) :: pv
 
-        is1 = ix; is2 = iy; is3 = iz
-
-        !$acc update device(is1, is2, is3)
+        pv = fluid_pp(1)%pv 
+!$acc update device(pv)
 
 
 !$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
-        do id3 = is3%beg, is3%end
-            do id2 = is2%beg, is2%end
-                do id1 = is1%beg, is1%end
+        do id3 = iz%beg, iz%end
+            do id2 = iy%beg, iy%end
+                do id1 = ix%beg, ix%end
 
                     alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
                     pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
@@ -247,13 +342,17 @@ contains
                         n_tait = gammas(1)
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = pi_infs(1)
-                        c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
+                        B_tait = pi_infs(1)*(n_tait - 1) / n_tait
+
+                        c = n_tait*(pres + B_tait) /(rho * (1d0 - alf))
+
                         if (c > 0.d0) then
                             c = DSQRT(c)
                         else
                             c = sgm_eps
                         end if
                     end if
+
 
                     call s_coeff(pres, rho, c, coeff)
 
@@ -269,7 +368,9 @@ contains
                             R3 = R3 + weight(q)*q_prim_vf(bubrs(q))%sf(id1, id2, id3)**3d0
                         end do
 
-                        nbub = (3.d0/(4.d0*pi))*alf/R3
+                        nbub = (3.d0/(4.d0*pi)) * (alf / R3)
+
+                        !nbub = nbub_sc(id1, id2, id3)
 
                         !$acc loop seq
                         do q = 1, nb
@@ -278,11 +379,44 @@ contains
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
 
-                           
+                            call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q), id1)
 
-                            call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
+                            
+                            q_prim_vf(bubmoms(q, 1))%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 0d0, 0d0, 0d0)
+                            q_prim_vf(bubmoms(q, 2))%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 1d0, 0d0, 0d0)
+                            q_prim_vf(bubmoms(q, 3))%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 0d0, 1d0, 0d0)
+                            q_prim_vf(bubmoms(q, 4))%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 2d0, 0d0, 0d0)
+                            q_prim_vf(bubmoms(q, 5))%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 1d0, 1d0, 0d0)
+                            q_prim_vf(bubmoms(q, 6))%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 0d0, 2d0, 0d0)
 
+                            do r = 1, 6
+                                q_cons_vf(bubmoms(q, r))%sf(id1, id2, id3) = nbub * q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
+                            end do
 
+                            if(id1 == -4) then
+                                r = 6
+                                !print *, "DIFF", r, moms(r) - q_prim_vf(bubmoms(q,r))%sf(id1, id2, id3)
+                                !print *, "MOMS", moms
+                                !print *, "nbub", nbub
+                                !print *, "abscX", abscX
+                                !print *, "abscY", abscY
+                                !print *, "Weight", wght
+
+                                if(abs(moms(r) - q_prim_vf(bubmoms(q,r))%sf(id1, id2, id3)) > 1d-13) then
+                                    error stop "NaN(s) in qbmm inversion"
+                                end if
+                            end if
+
+                            if(.not. polytropic) then
+                                 do j = 1, nnode
+                                    !rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*abscY(j, q)/ abscX(j, q)) * (pb(id1, id2, id3, j, q) - pv)                                                       
+
+                                    wght_pb(j, q) = wght(j, q) * pb(id1, id2, id3, j, q) / pref
+                                    wght_pbdot(j, q) = wght(j, q) * (pb(id1, id2, id3, j, q) - pv) / pref
+                                end do
+                            end if
+
+                            r = 1
                             !$acc loop seq
                             do i2 = 0, 2
                                 !$acc loop seq
@@ -290,15 +424,58 @@ contains
                                     if ((i1 + i2) <= 2) then
                                         momsum = 0d0
                                         !$acc loop seq
-                                        do j = 1, nterms           
+                                        do j = 1, nterms
+                                            if(bubble_model == 3 .and. j == 3 .and. (.not. polytropic)) then          
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                            else if(bubble_model == 2 .and. j >= 7 .and. j <= 9 .and. (.not. polytropic)) then
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                            else if(bubble_model == 2 .and. j >= 10 .and. j <= 11 .and. (.not. polytropic)) then
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght_pbdot(:, q), momrhs(:, i1, i2, j, q))
+                                            else
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
+                                            end if
+
+                                            if(i1 == 0 .and. i2 == 1 .and. id1 == -4 .and. j == 3 .and. (.not. polytropic)) then
+                                                print *, "MOMSUM", i1, i2, momsum, pb(id1, id2, id3, :, 1) / pref                                           
+                                            end if    
+                                            if(i1 == 0 .and. i2 == 1 .and. id1 == -4 .and. j == 3 .and. polytropic) then
+                                                print *, "MOMSUM", i1, i2, momsum,  1d0 / abscX ** (3d0*gam)
+                                            end if
+
+
+
                                         end do
+                                        
                                         moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub * momsum
+                                        msum(r) = momsum
+                                        r = r + 1
 
                                     end if
                                 end do
                             end do
+
+                            if(.not. polytropic) then
+                                                                                
+                                do j = 1, nnode
+
+                                    drdt = (msum(2)*moms(1) - msum(1)*moms(2)) / (moms(1)**2d0)
+                                    if(j == 1 .or. j == 2) then
+                                        drdt2 = (1d0 / (2d0 *DSQRT((moms(4)/moms(1)) - (moms(2)/ moms(1))**2d0))) * -1d0
+                                    else
+                                        drdt2 = (1d0 / (2d0 *DSQRT((moms(4)/moms(1)) - (moms(2)/ moms(1))**2d0))) * 1d0
+                                    end if
+                                    drdt2 = drdt2 * ( ((msum(3)*moms(1) - msum(1)*moms(4)) / moms(1)**2d0) - 2d0*(moms(2) / moms(1)) * ((msum(2)*moms(1) - msum(1)*moms(2)) / moms(1)**2d0) )
+
+                                    drdt = drdt + drdt2
+
+                                    rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*drdt/ abscX(j, q)) * (pb(id1, id2, id3, j, q) - pv)                                                  
+                                end do
+                                        
+                            end if
 
                             
                         end do
@@ -310,8 +487,15 @@ contains
                             ! Gam \approx 1, don't risk imaginary quadrature
                             momsp(4)%sf(id1, id2, id3) = 1.d0
                         else
-                            momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
+                            if(polytropic) then
+                                momsp(4)%sf(id1, id2, id3) = pref*f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
+                            else
+                                momsp(4)%sf(id1, id2, id3) = pref*f_quad(abscX, abscY, wght_pb, 3d0, 0d0, 0d0)                               
+                            end if
                         end if
+
+
+
 
                     
                     else
@@ -340,10 +524,11 @@ contains
 
     end subroutine s_mom_inv
 
-    subroutine s_chyqmom(momin, wght, abscX, abscY)
+    subroutine s_chyqmom(momin, wght, abscX, abscY, id1)
 !$acc routine seq
         real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
         real(kind(0d0)), dimension(nmom), intent(IN) :: momin
+        integer, intent(IN) :: id1
 
         real(kind(0d0)), dimension(0:2, 0:2) :: moms
         real(kind(0d0)), dimension(3) :: M1, M3
@@ -363,9 +548,12 @@ contains
         d20 = moms(2, 0)/moms(0, 0)
         d11 = moms(1, 1)/moms(0, 0)
         d02 = moms(0, 2)/moms(0, 0)
+
+
         c20 = d20 - bu**2d0; 
         c11 = d11 - bu*bv; 
         c02 = d02 - bv**2d0; 
+
         M1 = (/1d0, 0d0, c20/)
         call s_hyqmom(myrho, up, M1)
         Vf = c11*up/c20
@@ -398,6 +586,22 @@ contains
         abscY(3) = Vf(2) + vp21
         abscY(4) = Vf(2) + vp22
         abscY = bv + abscY
+
+        if(id1 == -4) then
+            !print *, "Moms",momin
+            !print *, "M1", M1
+            !print *, "up", up
+            !print *, "Vf", Vf
+            !print *, "mu2avg", mu2avg
+            !print *, "Rdot", abscY
+            !print *, "vp", vp21, vp22
+            !print *, "Vf", Vf + bv 
+        end if
+
+        if(c20 < 0d0 .or. mu2avg < 0d0) then
+            print *, id1
+            error stop "NaN(s) in qbmm"
+        end if
 
     end subroutine s_chyqmom
 

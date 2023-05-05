@@ -24,6 +24,7 @@ module m_variables_conversion
     implicit none
 
     private; public :: s_initialize_variables_conversion_module, &
+ s_initialize_pb, &
  s_convert_to_mixture_variables, &
  s_convert_mixture_to_mixture_variables, &
  s_convert_species_to_mixture_variables_bubbles, &
@@ -161,6 +162,10 @@ contains
                    0.5d0*(mom**2.d0)/rho - &
                    pi_inf - E_e &
                    )/gamma
+
+
+
+
         end if
 
     end subroutine s_compute_pressure
@@ -567,7 +572,7 @@ contains
         end if
 
 !$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
-!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, preston, thermal, poly_sigma)
 
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
@@ -638,6 +643,57 @@ contains
         end if
 
     end subroutine s_initialize_variables_conversion_module ! --------------
+
+    subroutine s_initialize_pb(qK_cons_vf, pb)
+    
+        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf 
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(INOUT) :: pb 
+        real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
+        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
+        integer :: i, j, k, l 
+        real(kind(0d0)) :: pres, mu, sig, pv, vftmp, nbub_sc
+        real(kind(0d0)), dimension(nb) :: nRtmp
+        real(kind(0d0)) :: gamma
+
+        pv = fluid_pp(1)%pv
+        gamma = 1d0/fluid_pp(2)%gamma + 1d0
+        !$acc update device(pv, gamma)
+
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, rho_K, nRtmp, mu, sig, gamma_K, pi_inf_K, dyn_pres_K, pres)
+        do l = izb, ize
+            do k = iyb, iye
+                do j = ixb, ixe
+
+                    !$acc loop seq
+                    do i = 1, nb
+                        nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
+                    end do
+
+                    vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
+
+                    call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+
+
+                    
+                    !$acc loop seq
+                    do i = 1, nb
+                        mu = qK_cons_vf(bubxb + 1)%sf(j, k, l)/nbub_sc
+                        sig = (qK_cons_vf(bubxb + 3)%sf(j, k, l) / nbub_sc  -  mu**2)**0.5
+
+                        pb(j, k, l, 1, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu - sig)**(3d0*gamma) + pv
+                        pb(j, k, l, 2, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu - sig)**(3d0*gamma) + pv
+                        pb(j, k, l, 3, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu + sig)**(3d0*gamma) + pv
+                        pb(j, k, l, 4, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu + sig)**(3d0*gamma) + pv 
+
+                    end do
+
+                end do
+            end do
+        end do
+
+  
+
+    end subroutine s_initialize_pb
 
     !> The following procedure handles the conversion between
         !!      the conservative variables and the primitive variables.
@@ -740,11 +796,21 @@ contains
                         end if
                     end do
 
+
+
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
 
+                    if(j == 47) then
+                        !print *, "pres var", pres
+                        !print *, "alf", qK_cons_vf(alf_idx)%sf(j, k, l)
+                        !print *, "energy", qK_cons_vf(E_idx)%sf(j, k, l)
+                        !print *, "dyn", dyn_pres_K
+                    end if
+
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
+
 
                     if (bubbles) then
                         !$acc loop seq
@@ -755,11 +821,18 @@ contains
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
                         call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
-                        
+
+                        if(j == -4) then
+                            !print *, "nbub var", nbub_sc
+                        end if
+
+                        !nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+
                         !$acc loop seq
                         do i = bubxb, bubxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
                         end do
+
                     end if
 
                     if (hypoelasticity) then
@@ -887,6 +960,7 @@ contains
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
+
                         call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end

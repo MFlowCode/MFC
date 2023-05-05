@@ -1507,7 +1507,7 @@ contains
 
                                         V0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, vs(i))
                                         V0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, vs(i))
-                                        if (.not. polytropic) then
+                                        if (.not. polytropic .and. .not. qbmm) then
                                             P0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, ps(i))
                                             P0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, ps(i))
                                         end if
@@ -1676,6 +1676,11 @@ contains
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
 
                                 ! Include p_tilde
+
+                                if(j == 47) then
+                                    !print *, "alpha rec", qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)
+                                end if
+
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -1707,6 +1712,7 @@ contains
                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
                                                         (s_R - vel_R(dir_idx(1))))) - E_R))
 
+                                   
                                 ! Volume fraction flux
 
                                 !$acc loop seq
@@ -2021,6 +2027,8 @@ contains
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
                                                         (s_R - vel_R(idx1)))) - E_R))
+
+
 
                                 ! Volume fraction flux
                                 !$acc loop seq

@@ -485,13 +485,6 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-        ! Set streamwise velocity to hypertangent function of y
-        if (vel_profile) then
-            q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
-                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
-                + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
-        end if
-
         ! Smoothed bubble variables
         if (bubbles) then
             do i = 1, nb
@@ -546,7 +539,7 @@ contains
             end do
         end if
 
-        if (bubbles .and. (.not. polytropic)) then
+        if (bubbles .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
                 if (q_prim_vf(bub_idx%ps(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
@@ -685,13 +678,6 @@ contains
                 (eta*patch_icpp(patch_id)%vel(i) &
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
-
-        ! Set streamwise velocity to hypertangent function of y
-        if (vel_profile) then
-            q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
-                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
-                + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
-        end if
 
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &

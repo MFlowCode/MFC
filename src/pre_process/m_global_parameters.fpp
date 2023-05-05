@@ -97,9 +97,6 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     integer :: precision !< Precision of output files
 
-    logical :: vel_profile !< Set hypertangent streamwise velocity profile
-    logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
-
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -247,8 +244,6 @@ contains
 
         parallel_io = .false.
         precision = 2
-        vel_profile = .false.
-        instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_sph = .false.
@@ -468,7 +463,7 @@ contains
                 print *, 'R0 weights: ', weight(:)
                 print *, 'R0 abscissas: ', R0(:)
 
-                if (.not. polytropic) then
+                if (.not. polytropic .and. .not. qbmm) then
                     call s_initialize_nonpoly
                 else
                     rhoref = 1.d0
@@ -558,7 +553,7 @@ contains
                     stop 'Invalid value of nb'
                 end if
 
-                if (.not. polytropic) then
+                if ((.not. polytropic) .and. (.not. qbmm)) then
                     call s_initialize_nonpoly
                 else
                     rhoref = 1.d0

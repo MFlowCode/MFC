@@ -221,6 +221,10 @@ program p_main
     end if
     finaltime = t_step_stop*dt
 
+    if(qbmm .and. (.not. polytropic)) then
+        call s_initialize_pb(q_cons_ts(1)%vf, pb_ts(1)%sf)
+    end if
+
     ! Time-stepping Loop =======================================================
     do
         if (proc_rank == 0) then
