@@ -45,15 +45,15 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: q_root_sf
     real(wp), allocatable, dimension(:, :, :) :: cyl_q_sf
     ! Single precision storage for flow variables
-    real(kind(0.0)), allocatable, dimension(:, :, :), public :: q_sf_s
-    real(kind(0.0)), allocatable, dimension(:, :, :) :: q_root_sf_s
-    real(kind(0.0)), allocatable, dimension(:, :, :) :: cyl_q_sf_s
+    real(sp), allocatable, dimension(:, :, :), public :: q_sf_s
+    real(sp), allocatable, dimension(:, :, :) :: q_root_sf_s
+    real(sp), allocatable, dimension(:, :, :) :: cyl_q_sf_s
 
     ! The spatial and data extents array variables contain information about the
     ! minimum and maximum values of the grid and flow variable(s), respectively.
     ! The purpose of bookkeeping this information is to boost the visualization
     ! of the Silo-HDF5 database file(s) in VisIt.
-    real(wp), allocatable, dimension(:, :) :: spatial_extents
+    real(dp), allocatable, dimension(:, :) :: spatial_extents
     real(wp), allocatable, dimension(:, :) :: data_extents
 
     ! The size of the ghost zone layer at beginning of each coordinate direction
@@ -127,7 +127,7 @@ contains
                                    -offset_x%beg:m + offset_x%end))
         end if
 
-        if (precision == 1) then
+        if (precision == 1 .and. wp == double_precision) then
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end, &
                 -offset_y%beg:n + offset_y%end, &
                 -offset_z%beg:p + offset_z%end))
@@ -140,7 +140,7 @@ contains
 
         if (n == 0) then
             allocate (q_root_sf(0:m_root, 0:0, 0:0))
-            if (precision == 1) then
+            if (precision == 1 .and. wp == double_precision) then
                 allocate (q_root_sf_s(0:m_root, 0:0, 0:0))
             end if
         end if
@@ -577,18 +577,18 @@ contains
 
             elseif (p > 0) then
                 if (grid_geometry == 3) then
-                    spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
+                    spatial_extents(:, 0) = dble((/minval(y_cb), minval(z_cb), &
                                               minval(x_cb), maxval(y_cb), &
-                                              maxval(z_cb), maxval(x_cb)/)
+                                              maxval(z_cb), maxval(x_cb)/))
                 else
-                    spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
+                    spatial_extents(:, 0) = dble((/minval(x_cb), minval(y_cb), &
                                               minval(z_cb), maxval(x_cb), &
-                                              maxval(y_cb), maxval(z_cb)/)
+                                              maxval(y_cb), maxval(z_cb)/))
                 end if
 
             else
-                spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
-                                          maxval(x_cb), maxval(y_cb)/)
+                spatial_extents(:, 0) = dble((/minval(x_cb), minval(y_cb), &
+                                          maxval(x_cb), maxval(y_cb)/))
 
             end if
 
@@ -622,22 +622,22 @@ contains
             ! with its offsets that indicate the presence and size of ghost
             ! zone layer(s), are put in the formatted database slave file.
 
-            if (precision == 1) then
+            if (precision == 1 .and. wp == double_precision) then
                 if (p > 0) then
                     do i = -1-offset_z%beg,p + offset_z%end
-                        z_cb_s(i) = real(z_cb(i)) 
+                        z_cb_s(i) = real(z_cb(i), sp) 
                     end do
                 else
                     do i = -1-offset_x%beg,m + offset_x%end
-                        x_cb_s(i) = real(x_cb(i)) 
+                        x_cb_s(i) = real(x_cb(i), sp) 
                     end do
 
                     do i = -1-offset_y%beg,n + offset_y%end
-                        y_cb_s(i) = real(y_cb(i)) 
+                        y_cb_s(i) = real(y_cb(i), sp) 
                     end do
                 end if
             end if
-
+            
             #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
             if (precision == ${PRECISION}$) then
                 if (p > 0) then
@@ -671,6 +671,7 @@ contains
                 end if
             end if
             #:endfor
+            
             ! END: Silo-HDF5 Database Format ===================================
 
             ! Binary Database Format ===========================================
@@ -776,30 +777,57 @@ contains
             ! and write it to the formatted database master file.
             if (n == 0) then
 
+                if (precision == 1 .and. wp == double_precision) then
+                    x_cc_s = real(x_cc, sp)
+                    q_sf_s = real(q_sf, sp)
+                elseif (precision == 1 .and. wp == single_precision) then
+                    x_cc_s = x_cc
+                    q_sf_s = q_sf
+                end if
+
                 ! Writing the curve object associated with the local process
                 ! to the formatted database slave file
-                err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
-                                 x_cc(0:m), q_sf, DB_DOUBLE, m + 1, &
-                                 DB_F77NULL, ierr)
+                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                if (precision == ${PRECISION}$) then
+                    err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
+                                    x_cc${SFX}$(0:m), q_sf${SFX}$, ${DBT}$, m + 1, &
+                                    DB_F77NULL, ierr)
+                end if
+                #:endfor
 
                 ! Assembling the local grid and flow variable data for the
                 ! entire computational domain on to the root process
+
                 if (num_procs > 1) then
                     call s_mpi_defragment_1d_grid_variable()
                     call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
+
+                    if (precision == 1) then
+                        x_root_cc_s = real(x_root_cc, sp)
+                        q_root_sf_s = real(q_root_sf, sp)
+                    end if
                 else
-                    x_root_cc = x_cc(0:m)
-                    q_root_sf = q_sf
+                    if (precision == 1) then
+                        x_root_cc_s = real(x_cc, sp)
+                        q_root_sf_s = real(q_sf, sp)
+                    else
+                        x_root_cc = x_cc
+                        q_root_sf = q_sf
+                    end if
                 end if
 
                 ! Writing the curve object associated with the root process
                 ! to the formatted database master file
                 if (proc_rank == 0) then
-                    err = DBPUTCURVE(dbroot, trim(varname), &
-                                     len_trim(varname), &
-                                     x_root_cc, q_root_sf, &
-                                     DB_DOUBLE, m_root + 1, &
-                                     DB_F77NULL, ierr)
+                    #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                    if (precision == ${PRECISION}$) then
+                        err = DBPUTCURVE(dbroot, trim(varname), &
+                                        len_trim(varname), &
+                                        x_root_cc${SFX}$, q_root_sf${SFX}$, &
+                                        ${DBT}$, m_root + 1, &
+                                        DB_F77NULL, ierr)
+                    end if
+                    #:endfor
                 end if
 
                 return
@@ -846,25 +874,57 @@ contains
                 ! Finally, each of the local processor(s) proceeds to write
                 ! the flow variable data that it is responsible for to the
                 ! formatted database slave file.
-
-                if (precision == 1) then
-                    do i = -offset_x%beg, m + offset_x%end
-                        do j = -offset_y%beg, n + offset_y%end
-                            do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i,j,k) = real(q_sf(i, j, k))
+                if (wp == double_precision) then
+                    if (precision == 1) then
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    q_sf_s(i,j,k) = real(q_sf(i, j, k))
+                                end do
                             end do
                         end do
-                    end do
-                end if
-
-                if (grid_geometry == 3) then
-                    do i = -offset_x%beg, m + offset_x%end
-                        do j = -offset_y%beg, n + offset_y%end
-                            do k = -offset_z%beg, p + offset_z%end
-                                cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                        if (grid_geometry == 3) then
+                            do i = -offset_x%beg, m + offset_x%end
+                                do j = -offset_y%beg, n + offset_y%end
+                                    do k = -offset_z%beg, p + offset_z%end
+                                        cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                                    end do
+                                end do
+                            end do
+                        end if
+                    else
+                        if (grid_geometry == 3) then
+                            do i = -offset_x%beg, m + offset_x%end
+                                do j = -offset_y%beg, n + offset_y%end
+                                    do k = -offset_z%beg, p + offset_z%end
+                                        cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                                    end do
+                                end do
+                            end do
+                        end if
+                    end if 
+                elseif (wp == single_precision) then
+                    if (precision == 2) then
+                        call s_mpi_abort("Single working precision is not compatible"//&
+                            "double silo precision")
+                    else
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    q_sf_s(i,j,k) = q_sf(i, j, k)
+                                end do
                             end do
                         end do
-                    end do
+                        if (grid_geometry == 3) then
+                            do i = -offset_x%beg, m + offset_x%end
+                                do j = -offset_y%beg, n + offset_y%end
+                                    do k = -offset_z%beg, p + offset_z%end
+                                        cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                                    end do
+                                end do
+                            end do
+                        end if
+                    end if
                 end if
 
                 #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
