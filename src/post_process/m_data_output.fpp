@@ -127,7 +127,7 @@ contains
                                    -offset_x%beg:m + offset_x%end))
         end if
 
-        if (precision == 1 .and. wp == double_precision) then
+        if (precision == 1) then
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end, &
                 -offset_y%beg:n + offset_y%end, &
                 -offset_z%beg:p + offset_z%end))
@@ -622,7 +622,7 @@ contains
             ! with its offsets that indicate the presence and size of ghost
             ! zone layer(s), are put in the formatted database slave file.
 
-            if (precision == 1 .and. wp == double_precision) then
+            if (precision == 1) then
                 if (p > 0) then
                     do i = -1-offset_z%beg,p + offset_z%end
                         z_cb_s(i) = real(z_cb(i), sp) 
@@ -879,7 +879,7 @@ contains
                         do i = -offset_x%beg, m + offset_x%end
                             do j = -offset_y%beg, n + offset_y%end
                                 do k = -offset_z%beg, p + offset_z%end
-                                    q_sf_s(i,j,k) = real(q_sf(i, j, k))
+                                    q_sf_s(i,j,k) = real(q_sf(i, j, k), sp)
                                 end do
                             end do
                         end do
@@ -904,26 +904,21 @@ contains
                         end if
                     end if 
                 elseif (wp == single_precision) then
-                    if (precision == 2) then
-                        call s_mpi_abort("Single working precision is not compatible"//&
-                            "double silo precision")
-                    else
+                    do i = -offset_x%beg, m + offset_x%end
+                        do j = -offset_y%beg, n + offset_y%end
+                            do k = -offset_z%beg, p + offset_z%end
+                                q_sf_s(i,j,k) = q_sf(i, j, k)
+                            end do
+                        end do
+                    end do
+                    if (grid_geometry == 3) then
                         do i = -offset_x%beg, m + offset_x%end
                             do j = -offset_y%beg, n + offset_y%end
                                 do k = -offset_z%beg, p + offset_z%end
-                                    q_sf_s(i,j,k) = q_sf(i, j, k)
+                                    cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
                                 end do
                             end do
                         end do
-                        if (grid_geometry == 3) then
-                            do i = -offset_x%beg, m + offset_x%end
-                                do j = -offset_y%beg, n + offset_y%end
-                                    do k = -offset_z%beg, p + offset_z%end
-                                        cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
-                                    end do
-                                end do
-                            end do
-                        end if
                     end if
                 end if
 
