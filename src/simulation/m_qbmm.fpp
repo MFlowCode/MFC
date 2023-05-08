@@ -247,6 +247,7 @@ contains
                         n_tait = gammas(1)
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = pi_infs(1)
+                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
                         c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
                         if (c > 0.d0) then
                             c = DSQRT(c)

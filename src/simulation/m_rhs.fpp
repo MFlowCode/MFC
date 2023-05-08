@@ -770,6 +770,15 @@ contains
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
 
+                if (bubbles) then
+                    iv%beg = bubxb; iv%end = bubxe
+                    call s_reconstruct_cell_boundary_values( &
+                        q_prim_qp%vf(iv%beg:iv%end), &
+                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                        id)
+                end if
+                                    
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
                 if (weno_Re_flux) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &

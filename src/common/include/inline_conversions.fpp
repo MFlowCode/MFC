@@ -32,11 +32,11 @@
 
             if (mpp_lim .and. (num_fluids > 1)) then
                 c = (1d0/gamma + 1d0)* &
-                      (pres + pi_inf)/rho
+                      (pres + pi_inf/(gamma+1d0))/rho
             else
                 c = &
                     (1d0/gamma + 1d0)* &    
-                    (pres + pi_inf)/ &
+                    (pres + pi_inf/(gamma+1d0))/ &
                     (rho*(1d0 - adv(num_fluids)))
             end if
         else 
@@ -48,6 +48,7 @@
         else
             c = sqrt(c)
         end if
+
     end subroutine s_compute_speed_of_sound
 #:enddef
 

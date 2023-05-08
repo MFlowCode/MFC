@@ -271,7 +271,8 @@ contains
         end if
 
         ! Computing Mixture Variables from Original Primitive Variables
-        call s_convert_species_to_mixture_variables( &
+        ! call s_convert_species_to_mixture_variables( &
+        call s_convert_to_mixture_variables( &
             q_prim_vf, j, k, l, &
             orig_rho, &
             orig_gamma, &
@@ -346,9 +347,10 @@ contains
                 end if
             end do
         end if
-
+  
         ! Density and the specific heat ratio and liquid stiffness functions
-        call s_convert_species_to_mixture_variables( &
+        ! call s_convert_species_to_mixture_variables( &
+        call s_convert_to_mixture_variables( &
             q_prim_vf, j, k, l, &
             patch_icpp(patch_id)%rho, &
             patch_icpp(patch_id)%gamma, &
@@ -417,7 +419,8 @@ contains
         end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
-        call s_convert_species_to_mixture_variables( &
+        ! call s_convert_species_to_mixture_variables( &
+        call s_convert_to_mixture_variables( &
             q_prim_vf, j, k, l, &
             patch_icpp(smooth_patch_id)%rho, &
             patch_icpp(smooth_patch_id)%gamma, &
@@ -480,7 +483,8 @@ contains
         end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
-        call s_convert_species_to_mixture_variables(q_prim_vf, j, k, l, &
+        ! call s_convert_species_to_mixture_variables(q_prim_vf, j, k, l, &
+        call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
                                                     rho, gamma, pi_inf)
 
         ! Velocity
