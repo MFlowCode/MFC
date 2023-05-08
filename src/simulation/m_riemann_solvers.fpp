@@ -1420,7 +1420,7 @@ contains
                 
                 elseif (model_eqns == 2 .and. bubbles) then
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, & 
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms)
+                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1492,6 +1492,41 @@ contains
                                     pi_inf_R = pi_infs(1)
                                 end if
 
+                                if (any(Re_size > 0)) then
+                                    if (num_fluids == 1) then ! Need to consider case with num_fluids >= 2
+                                        !$acc loop seq
+                                        do i = 1, 2
+                                            Re_L(i) = dflt_real
+
+                                            if (Re_size(i) > 0) Re_L(i) = 0d0
+
+                                            !$acc loop seq
+                                            do q = 1, Re_size(i)
+                                                Re_L(i) = (1d0-qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
+                                                        + Re_L(i)
+                                            end do
+
+                                            Re_L(i) = 1d0/max(Re_L(i), sgm_eps)
+
+                                        end do
+
+                                        !$acc loop seq
+                                        do i = 1, 2
+                                            Re_R(i) = dflt_real
+
+                                            if (Re_size(i) > 0) Re_R(i) = 0d0
+
+                                            !$acc loop seq
+                                            do q = 1, Re_size(i)
+                                                Re_R(i) = (1d0-qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
+                                                        + Re_R(i)
+                                            end do
+
+                                            Re_R(i) = 1d0/max(Re_R(i), sgm_eps)
+                                        end do
+                                    end if 
+                                end if
+                                
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
 
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
@@ -1611,6 +1646,13 @@ contains
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                     vel_avg_rms, c_avg)
+
+                                if (any(Re_size > 0)) then
+                                    !$acc loop seq
+                                    do i = 1, 2
+                                        Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
+                                    end do
+                                end if
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)

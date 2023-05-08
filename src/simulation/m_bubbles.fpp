@@ -195,8 +195,9 @@ contains
                             n_tait = gammas(1)
                             B_tait = pi_infs(1)
                         end if
-
+                        
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
