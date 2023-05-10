@@ -13,6 +13,7 @@ option(MFC_SIMULATION    "Build simulation"    OFF)
 option(MFC_POST_PROCESS  "Build post_process"  OFF)
 option(MFC_DOCUMENTATION "Build documentation" OFF)
 option(MFC_ALL           "Build everything"    OFF)
+option(MFC_SINGLE_PRECISION "Build double precision" OFF)
 
 if (MFC_BUILD_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -154,6 +155,12 @@ endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(MFC_DEBUG)
+endif()
+
+if (MFC_SINGLE_PRECISION)
+    add_compile_definitions(MFC_SINGLE_PRECISION)
+else()
+    add_compile_definitions(MFC_DOUBLE_PRECISION)
 endif()
 
 ## === HANDLE_SOURCES

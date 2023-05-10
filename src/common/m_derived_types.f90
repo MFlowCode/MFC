@@ -7,7 +7,7 @@
 module m_derived_types
 
     use m_constants !< Constants
-    use m_precision_select
+    
     
     implicit none
 

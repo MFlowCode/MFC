@@ -819,22 +819,22 @@ contains
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
         integer :: ir
-        real(kind(0._wp)) :: rhol0
-        real(kind(0._wp)) :: pl0
-        real(kind(0._wp)) :: uu
-        real(kind(0._wp)) :: D_m
-        real(kind(0._wp)) :: temp
-        real(kind(0._wp)) :: omega_ref
-        real(kind(0._wp)), dimension(Nb) :: chi_vw0
-        real(kind(0._wp)), dimension(Nb) :: cp_m0
-        real(kind(0._wp)), dimension(Nb) :: k_m0
-        real(kind(0._wp)), dimension(Nb) :: rho_m0
-        real(kind(0._wp)), dimension(Nb) :: x_vw
+        real(wp) :: rhol0
+        real(wp) :: pl0
+        real(wp) :: uu
+        real(wp) :: D_m
+        real(wp) :: temp
+        real(wp) :: omega_ref
+        real(wp), dimension(Nb) :: chi_vw0
+        real(wp), dimension(Nb) :: cp_m0
+        real(wp), dimension(Nb) :: k_m0
+        real(wp), dimension(Nb) :: rho_m0
+        real(wp), dimension(Nb) :: x_vw
 
-        real(kind(0._wp)), parameter :: k_poly = 1._wp !<
+        real(wp), parameter :: k_poly = 1._wp !<
             !! polytropic index used to compute isothermal natural frequency
 
-        real(kind(0._wp)), parameter :: Ru = 8314._wp !<
+        real(wp), parameter :: Ru = 8314._wp !<
             !! universal gas constant
 
         rhol0 = rhoref
@@ -939,10 +939,10 @@ contains
         !!  @param Im_trans Imaginary part of transfer coefficient
     subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
-        real(kind(0._wp)), intent(IN) :: omega
-        real(kind(0._wp)), intent(IN) :: peclet
-        real(kind(0._wp)), intent(OUT) :: Re_trans
-        real(kind(0._wp)), intent(OUT) :: Im_trans
+        real(wp), intent(IN) :: omega
+        real(wp), intent(IN) :: peclet
+        real(wp), intent(OUT) :: Re_trans
+        real(wp), intent(OUT) :: Im_trans
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
 
@@ -1025,12 +1025,12 @@ contains
     subroutine s_simpson
 
         integer :: ir
-        real(kind(0._wp)) :: R0mn
-        real(kind(0._wp)) :: R0mx
-        real(kind(0._wp)) :: dphi
-        real(kind(0._wp)) :: tmp
-        real(kind(0._wp)) :: sd
-        real(kind(0._wp)), dimension(nb) :: phi
+        real(wp) :: R0mn
+        real(wp) :: R0mx
+        real(wp) :: dphi
+        real(wp) :: tmp
+        real(wp) :: sd
+        real(wp), dimension(nb) :: phi
 
         ! nondiml. min. & max. initial radii for numerical quadrature
         !sd   = 0.05D0

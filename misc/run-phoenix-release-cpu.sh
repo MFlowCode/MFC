@@ -11,4 +11,5 @@
 cd $SLURM_SUBMIT_DIR                            # Change to working directory
 echo $(pwd)
 . ./mfc.sh load -c p -m g
-./mfc.sh test -j 12 -b mpirun -a
+./mfc.sh test -j 12 -b mpirun -a --no-single
+./mfc.sh test -j 12 -b mpirun -a --single

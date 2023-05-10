@@ -133,6 +133,9 @@ def handle_case(test: TestCase):
         else:
             tol = 1e-12
 
+        if ARG('single'):
+            tol = 1e8*tol
+
         test.create_directory("case_pre_sim")
         cmd = test.run("case_pre_sim", ["pre_process", "simulation"])
 

@@ -8,7 +8,7 @@
 !!              modifications for compatibility.
 module m_eigen_solver
 
-    use m_precision_select
+    use m_constants
 
     implicit none
 

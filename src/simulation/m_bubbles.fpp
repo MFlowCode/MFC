@@ -21,9 +21,9 @@ module m_bubbles
 
     implicit none
 
-    real(kind(0._wp)) :: chi_vw  !< Bubble wall properties (Ando 2010)
-    real(kind(0._wp)) :: k_mw    !< Bubble wall properties (Ando 2010)
-    real(kind(0._wp)) :: rho_mw  !< Bubble wall properties (Ando 2010)
+    real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
+    real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
+    real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
     !$acc declare create(chi_vw, k_mw, rho_mw)
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
@@ -520,10 +520,10 @@ contains
     !>  @param iR0 Current bubble size index
     subroutine s_bwproperty(pb, iR0)
 !$acc routine seq
-        real(kind(0._wp)), intent(IN) :: pb
+        real(wp), intent(IN) :: pb
         integer, intent(IN) :: iR0
 
-        real(kind(0._wp)) :: x_vw
+        real(wp) :: x_vw
 
         ! mass fraction of vapor
         chi_vw = 1._wp/(1._wp + R_v/R_n*(pb/pv - 1._wp))
@@ -543,14 +543,14 @@ contains
         !!  @param iR0 Bubble size index
     function f_vflux(fR, fV, fmass_v, iR0)
 !$acc routine seq
-        real(kind(0._wp)), intent(IN) :: fR
-        real(kind(0._wp)), intent(IN) :: fV
-        real(kind(0._wp)), intent(IN) :: fmass_v
+        real(wp), intent(IN) :: fR
+        real(wp), intent(IN) :: fV
+        real(wp), intent(IN) :: fmass_v
         integer, intent(IN) :: iR0
 
-        real(kind(0._wp)) :: chi_bar
-        real(kind(0._wp)) :: grad_chi
-        real(kind(0._wp)) :: f_vflux
+        real(wp) :: chi_bar
+        real(wp) :: grad_chi
+        real(wp) :: f_vflux
 
         if (thermal == 3) then !transfer
             ! constant transfer model
@@ -574,17 +574,17 @@ contains
         !!  @param iR0 Bubble size index
     function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0)
 !$acc routine seq
-        real(kind(0._wp)), intent(IN) :: fvflux
-        real(kind(0._wp)), intent(IN) :: fR
-        real(kind(0._wp)), intent(IN) :: fV
-        real(kind(0._wp)), intent(IN) :: fpb
-        real(kind(0._wp)), intent(IN) :: fmass_v
+        real(wp), intent(IN) :: fvflux
+        real(wp), intent(IN) :: fR
+        real(wp), intent(IN) :: fV
+        real(wp), intent(IN) :: fpb
+        real(wp), intent(IN) :: fmass_v
         integer, intent(IN) :: iR0
 
-        real(kind(0._wp)) :: T_bar
-        real(kind(0._wp)) :: grad_T
-        real(kind(0._wp)) :: tmp1, tmp2
-        real(kind(0._wp)) :: f_bpres_dot
+        real(wp) :: T_bar
+        real(wp) :: grad_T
+        real(wp) :: tmp1, tmp2
+        real(wp) :: f_bpres_dot
 
         if (thermal == 3) then
             T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &

@@ -92,11 +92,11 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0._wp)), intent(IN) :: vftmp
-        real(kind(0._wp)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0._wp)), intent(OUT) :: ntmp
-        real(kind(0._wp)) :: R3
-        real(kind(0._wp)), dimension(nb) :: weights
+        real(wp), intent(IN) :: vftmp
+        real(wp), dimension(nb), intent(IN) :: Rtmp
+        real(wp), intent(OUT) :: ntmp
+        real(wp) :: R3
+        real(wp), dimension(nb) :: weights
 
         R3 = dot_product(weights, Rtmp**3._wp)
         ntmp = (3._wp/(4._wp*pi))*vftmp/R3
@@ -105,11 +105,11 @@ contains
 
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0._wp)), intent(IN) :: vftmp
-        real(kind(0._wp)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0._wp)), intent(OUT) :: ntmp  
-        real(kind(0._wp)) :: nR3
-        real(kind(0._wp)), dimension(nb) :: weights
+        real(wp), intent(IN) :: vftmp
+        real(wp), dimension(nb), intent(IN) :: nRtmp
+        real(wp), intent(OUT) :: ntmp  
+        real(wp) :: nR3
+        real(wp), dimension(nb) :: weights
 
         nR3 = dot_product(weights, nRtmp**3._wp)
         ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)

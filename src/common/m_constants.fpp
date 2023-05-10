@@ -4,7 +4,20 @@
 
 module m_constants
 
-    use m_precision_select
+    use mpi
+
+    integer, parameter :: sp = selected_real_kind(6, 37)
+    integer, parameter :: dp = selected_real_kind(15, 307)
+
+#ifdef MFC_DOUBLE_PRECISION
+    integer, parameter :: wp = dp
+    integer, parameter :: mpi_p = MPI_DOUBLE_PRECISION
+#endif
+
+#ifdef MFC_SINGLE_PRECISION
+    integer, parameter :: wp = sp
+    integer, parameter :: mpi_p = MPI_REAL
+#endif
 
     character, parameter :: dflt_char = ' ' !< Default string value
     

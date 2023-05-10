@@ -909,8 +909,6 @@ contains
 
         real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(wp) :: l, U0 !< Taylor Green Vortex parameters
 
         integer :: i, j !< generic loop iterators
@@ -938,7 +936,7 @@ contains
         ! state in the cells that this patch covers.
         eta = 1._wp
         l = 1._wp
-        U0 = 10._wp ** -1
+        U0 = 10._wp ** (-1)
         ! Checking whether the patch covers a particular cell in the
         ! domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out,

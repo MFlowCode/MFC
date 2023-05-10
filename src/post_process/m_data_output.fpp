@@ -140,7 +140,7 @@ contains
 
         if (n == 0) then
             allocate (q_root_sf(0:m_root, 0:0, 0:0))
-            if (precision == 1 .and. wp == double_precision) then
+            if (precision == 1) then
                 allocate (q_root_sf_s(0:m_root, 0:0, 0:0))
             end if
         end if
@@ -769,10 +769,10 @@ contains
             ! and write it to the formatted database master file.
             if (n == 0) then
 
-                if (precision == 1 .and. wp == double_precision) then
+                if (precision == 1 .and. wp ==  dp) then
                     x_cc_s = real(x_cc, sp)
                     q_sf_s = real(q_sf, sp)
-                elseif (precision == 1 .and. wp == single_precision) then
+                elseif (precision == 1 .and. wp == sp) then
                     x_cc_s = x_cc
                     q_sf_s = q_sf
                 end if
@@ -866,7 +866,7 @@ contains
                 ! Finally, each of the local processor(s) proceeds to write
                 ! the flow variable data that it is responsible for to the
                 ! formatted database slave file.
-                if (wp == double_precision) then
+                if (wp == dp) then
                     if (precision == 1) then
                         do i = -offset_x%beg, m + offset_x%end
                             do j = -offset_y%beg, n + offset_y%end
@@ -895,7 +895,7 @@ contains
                             end do
                         end if
                     end if 
-                elseif (wp == single_precision) then
+                elseif (wp == dp) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end

@@ -175,8 +175,8 @@ contains
 
     subroutine s_coeff(pres, rho, c, coeffs)
 !$acc routine seq
-        real(kind(0._wp)), intent(IN) :: pres, rho, c
-        real(kind(0._wp)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
+        real(wp), intent(IN) :: pres, rho, c
+        real(wp), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
         integer :: i1, i2
 
         coeffs = 0._wp
@@ -247,6 +247,7 @@ contains
                         n_tait = gammas(1)
                         n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
                         B_tait = pi_infs(1)
+                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
                         c = n_tait*(pres + B_tait)/(rho*(1._wp - alf))
                         if (c > 0._wp) then
                             c = sqrt(c)
@@ -420,9 +421,9 @@ contains
 
     function f_quad(abscX, abscY, wght, q, r, s)
         !$acc routine seq
-        real(kind(0._wp)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
-        real(kind(0._wp)), intent(IN) :: q, r, s
-        real(kind(0._wp)) :: f_quad_RV, f_quad
+        real(wp), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
+        real(wp), intent(IN) :: q, r, s
+        real(wp) :: f_quad_RV, f_quad
         integer :: i
 
         f_quad = 0._wp
@@ -435,9 +436,9 @@ contains
 
     function f_quad2D(abscX, abscY, wght, pow)
         !$acc routine seq
-        real(kind(0._wp)), dimension(nnode), intent(IN) :: abscX, abscY, wght
-        real(kind(0._wp)), dimension(3), intent(IN) :: pow
-        real(kind(0._wp)) :: f_quad2D
+        real(wp), dimension(nnode), intent(IN) :: abscX, abscY, wght
+        real(wp), dimension(3), intent(IN) :: pow
+        real(wp) :: f_quad2D
 
         f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
     end function f_quad2D

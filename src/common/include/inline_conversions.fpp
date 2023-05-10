@@ -32,11 +32,11 @@
 
             if (mpp_lim .and. (num_fluids > 1)) then
                 c = (1._wp/gamma + 1._wp)* &
-                      (pres + pi_inf)/rho
+                      (pres + pi_inf/(gamma+1._wp))/rho
             else
                 c = &
                     (1._wp/gamma + 1._wp)* &    
-                    (pres + pi_inf)/ &
+                    (pres + pi_inf/(gamma + 1._wp))/ &
                     (rho*(1._wp - adv(num_fluids)))
             end if
         else 

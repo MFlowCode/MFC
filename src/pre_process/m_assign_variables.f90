@@ -238,14 +238,11 @@ contains
         real(wp) :: orig_pi_inf
         real(wp) :: muR, muV
 
-        real(wp), dimension(sys_size) :: orig_prim_vf !<
+        real(wp), dimension(sys_size) :: orig_prim_vf !< Vector to hold original values of cell for smoothing purposes
         real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(wp) :: pres   !< pressure
         real(wp) :: x_centroid, y_centroid
         real(wp) :: epsilon, beta
-
-        real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
-            !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
         integer :: smooth_patch_id
@@ -648,14 +645,11 @@ contains
             !! function, respectively, obtained from the combination of primitive
             !! variables of the current and smoothing patches
 
-        real(wp), dimension(sys_size) :: orig_prim_vf !<
+        real(wp), dimension(sys_size) :: orig_prim_vf !< Vector to hold original values of cell for smoothing purposes
         real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(wp) :: pres   !< pressure
         real(wp) :: x_centroid, y_centroid
         real(wp) :: epsilon, beta
-
-        real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
-        ! Vector to hold original values of cell for smoothing purposes
 
         integer :: smooth_patch_id
 

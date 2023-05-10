@@ -175,7 +175,7 @@ contains
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0._wp))
+                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,wp)
                     q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                 end do
             end do
@@ -224,7 +224,7 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0._wp))
+                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,wp)
                         q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                     end do
                 end do

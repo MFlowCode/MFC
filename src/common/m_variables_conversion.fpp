@@ -158,7 +158,7 @@ contains
 
             pres = ( &
                    energy - &
-                   0.5_wp*(mom**2._wp)/rho - &
+                   (5._wp * (10._wp ** (-1)))*(mom**2._wp)/rho - &
                    pi_inf - E_e &
                    )/gamma
         end if
@@ -235,7 +235,6 @@ contains
 
         real(wp), optional, dimension(2), intent(OUT) :: Re_K
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K
-        real(wp), optional, dimension(2), intent(OUT) :: Re_K
 
         real(wp), optional, intent(OUT) :: G_K
         real(wp), optional, dimension(num_fluids), intent(IN) :: G
@@ -510,7 +509,7 @@ contains
         real(wp), dimension(num_fluids), intent(IN) :: alpha_rho_K, alpha_K !<
             !! Partial densities and volume fractions
 
-        real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
+        real(wp), dimension(2), intent(OUT) :: Re_K
 
         integer, intent(IN) :: k, l, r
         integer :: i, j !< Generic loop iterators
@@ -731,7 +730,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterators
         
-        real(kind(0._wp)) :: ntmp
+        real(wp) :: ntmp
         
         if (bubbles) then
             allocate(nRtmp(nb))
