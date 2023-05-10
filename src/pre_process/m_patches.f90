@@ -26,6 +26,7 @@ module m_patches
         s_rectangle, &
         s_sweep_line, &
         s_isentropic_vortex, &
+        s_2D_TaylorGreen_vortex, &
         s_1D_analytical, &
         s_1d_bubble_pulse, &
         s_2D_analytical, &
@@ -505,7 +506,7 @@ contains
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
         integer :: i, j !< generic loop iterators
-
+        
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1._wp + gamma)/gamma
@@ -671,6 +672,78 @@ contains
         end do
 
     end subroutine s_isentropic_vortex ! -----------------------------------
+    
+    !> The Taylor Green vortex is 2D decaying vortex that may be used,
+        !!              for example, to verify the effects of viscous attenuation.
+        !!              Geometry of the patch is well-defined when its centroid
+        !!              are provided.
+        !! @param patch_id is the patch identifier
+    subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
+
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+
+        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(kind(0d0)) :: L0, U0 !< Taylor Green Vortex parameters
+
+        integer :: i, j !< generic loop iterators
+
+        pi_inf = fluid_pp(1)%pi_inf
+        gamma = fluid_pp(1)%gamma
+        lit_gamma = (1d0 + gamma)/gamma
+
+        ! Transferring the patch's centroid and length information
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        length_x = patch_icpp(patch_id)%length_x
+        length_y = patch_icpp(patch_id)%length_y
+
+        ! Computing the beginning and the end x- and y-coordinates
+        ! of the patch based on its centroid and lengths
+        x_boundary%beg = x_centroid - 0.5d0*length_x
+        x_boundary%end = x_centroid + 0.5d0*length_x
+        y_boundary%beg = y_centroid - 0.5d0*length_y
+        y_boundary%end = y_centroid + 0.5d0*length_y
+
+        ! Since the patch doesn't allow for its boundaries to be
+        ! smoothed out, the pseudo volume fraction is set to 1 to
+        ! ensure that only the current patch contributes to the fluid
+        ! state in the cells that this patch covers.
+        eta = 1d0
+        ! U0 is the characteristic velocity of the vortex
+        U0 = patch_icpp(patch_id)%vel(1) 
+        ! L0 is the characteristic length of the vortex
+        L0 = patch_icpp(patch_id)%vel(2)
+        ! Checking whether the patch covers a particular cell in the
+        ! domain and verifying whether the current patch has the
+        ! permission to write to that cell. If both queries check out,
+        ! the primitive variables of the current patch are assigned
+        ! to this cell.
+        do j = 0, n
+            do i = 0, m
+                if (x_boundary%beg <= x_cc(i) .and. &
+                    x_boundary%end >= x_cc(i) .and. &
+                    y_boundary%beg <= y_cc(j) .and. &
+                    y_boundary%end >= y_cc(j) .and. &
+                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
+
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                    eta, q_prim_vf, patch_id_fp)
+
+                    ! Assign Parameters =========================================================
+                    q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/L0)*COS(y_cc(j)/L0)
+                    q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/L0)*SIN(y_cc(j)/L0)
+                    q_prim_vf(E_idx        )%sf(i,j,0) = patch_icpp(patch_id)%pres + (COS(2*x_cc(i))/L0 + &
+                                                            COS(2*y_cc(j))/L0)* &
+                                                            (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
+                    ! ================================================================================
+
+                end if
+            end do
+        end do
+
+    end subroutine s_2D_TaylorGreen_Vortex ! -----------------------------------
 
     !>  This patch assigns the primitive variables as analytical
         !!  functions such that the code can be verified.
@@ -836,6 +909,9 @@ contains
 
         real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
+        real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(wp) :: l, U0 !< Taylor Green Vortex parameters
 
         integer :: i, j !< generic loop iterators
 
@@ -861,7 +937,8 @@ contains
         ! ensure that only the current patch contributes to the fluid
         ! state in the cells that this patch covers.
         eta = 1._wp
-
+        l = 1._wp
+        U0 = 10._wp ** -1
         ! Checking whether the patch covers a particular cell in the
         ! domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out,
@@ -929,7 +1006,7 @@ contains
     !                       q_prim_vf(mom_idx%end)%sf(i,j,0) = (COS(c) - COS(d))/(d-c)
     !                       q_prim_vf(E_idx)%sf(i,j,0) = 1._wp
                     ! ================================================================================
-
+                   
                     ! Initial pressure profile smearing for bubble collapse case of Tiwari (2013) ====
                     !IF((       (x_cc(i))**2                     &
                     !         + (y_cc(j))**2 <= 1._wp**2)) THEN
@@ -938,6 +1015,13 @@ contains
                     !    q_prim_vf(E_idx)%sf(i,j,0) = (1._wp * (10._wp ** 5)) + 1._wp/SQRT(x_cc(i)**2+y_cc(j)**2) &
                     !                                    * (((1._wp * (10._wp ** 5))/25._wp) - (1._wp * (10._wp ** 5)))
                     !END IF
+                    ! ================================================================================
+
+                    ! Taylor Green Vortex===============================================
+                    ! q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/l)*COS(y_cc(j)/l)
+                    ! q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/l)*SIN(y_cc(j)/l)
+                    ! q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/l + COS(2*y_cc(j))/l)* &
+                    !                                         (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
                     ! ================================================================================
 
                 end if

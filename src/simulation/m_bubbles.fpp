@@ -197,6 +197,7 @@ contains
                         end if
 
                         n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
+                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)

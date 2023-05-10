@@ -255,7 +255,7 @@ contains
                     end do
 
                     if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, j, k, l)
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
                     end if
@@ -302,7 +302,6 @@ contains
                         end if
 
                         if (any(Re_size > 0)) then
-
                             if (grid_geometry == 3) then
                                 vcfl_sf(j, k, l) = maxval(dt/Re) &
                                                    /min(dx(j), dy(k), fltr_dtheta)**2._wp

@@ -48,6 +48,7 @@
         else
             c = sqrt(c)
         end if
+
     end subroutine s_compute_speed_of_sound
 #:enddef
 

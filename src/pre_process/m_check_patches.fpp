@@ -78,6 +78,8 @@ contains
                     print *, '2d var circle'
                 elseif (patch_icpp(i)%geometry == 19) then
                     print *, '3d var circle'
+                elseif (patch_icpp(i)%geometry == 20) then
+                    call s_check_2D_TaylorGreen_vortex_patch_geometry(i)    
                 else
                     call s_mpi_abort('Unsupported choice of the '// &
                             'geometry of active patch '//trim(iStr)//&
@@ -291,6 +293,36 @@ contains
         end if
 
     end subroutine s_check_isentropic_vortex_patch_geometry ! --------------
+
+    !>  This subroutine verifies that the geometric parameters of
+        !!      the Taylor Green vortex patch have been entered by the user
+        !!      consistently.
+        !!  @param patch_id Patch identifier
+    subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id) ! --------
+
+        integer, intent(IN) :: patch_id
+        call s_int_to_str(patch_id, iStr)
+
+        ! Constraints on the TaylorGreen vortex patch geometric parameters
+        if (n == 0 .or. p > 0 &
+            .or. &
+            patch_icpp(patch_id)%x_centroid == dflt_real &
+            .or. &
+            patch_icpp(patch_id)%y_centroid == dflt_real &
+            .or. &
+            patch_icpp(patch_id)%length_x <= 0d0 &
+            .or. &
+            patch_icpp(patch_id)%length_y <= 0d0 &
+            .or. &
+            patch_icpp(patch_id)%vel(2)<= 0d0) then
+
+            call s_mpi_abort('Inconsistency(ies) detected in '// &
+            'geometric parameters of Taylor Green '// &
+            'vortex patch '//trim(iStr)//'. Exiting ...')
+
+        end if
+
+    end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry! --------------
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the analytical patch have consistently been inputted by

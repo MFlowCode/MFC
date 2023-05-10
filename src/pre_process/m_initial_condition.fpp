@@ -184,6 +184,10 @@ contains
                 elseif (patch_icpp(i)%geometry == 18) then
                     call s_varcircle(i, patch_id_fp, q_prim_vf)
 
+                    ! TaylorGreen vortex patch
+                elseif (patch_icpp(i)%geometry == 20) then
+                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)    
+
                 end if
 
             end do
@@ -377,10 +381,14 @@ contains
         ! Set fluid flow properties
         gam = 1.+1./fluid_pp(1)%gamma
         pi_inf = fluid_pp(1)%pi_inf*(gam-1.)/gam
-        rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
+        if (bubbles .and. num_fluids == 1) then
+            rho1 = patch_icpp(1)%alpha_rho(1)/(1d0-patch_icpp(1)%alpha(1))
+        else
+            rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
+        end if
         c1 = sqrt((gam*(patch_icpp(1)%pres+pi_inf))/rho1)
         mach = 1./c1
-        
+
         ! Assign mean profiles
         do j=0,n
             u_mean(j)=tanh(y_cc(j))
