@@ -72,6 +72,9 @@ contains
         ! Simulation Algorithm Parameters ==================================
         if (all(model_eqns /= (/1, 2, 3, 4/))) then
             call s_mpi_abort('Unsupported value of model_eqns. Exiting ...')
+        elseif (wp == single_precision .and. precision == 2) then
+            call s_mpi_abort('Unsupported combination of working precision'// &
+                            'and silo precision')
         end if
 
         if (bubbles) then

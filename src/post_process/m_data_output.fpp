@@ -624,20 +624,12 @@ contains
 
             if (precision == 1) then
                 if (p > 0) then
-                    do i = -1-offset_z%beg,p + offset_z%end
-                        z_cb_s(i) = real(z_cb(i), sp) 
-                    end do
-                else
-                    do i = -1-offset_x%beg,m + offset_x%end
-                        x_cb_s(i) = real(x_cb(i), sp) 
-                    end do
-
-                    do i = -1-offset_y%beg,n + offset_y%end
-                        y_cb_s(i) = real(y_cb(i), sp) 
-                    end do
+                    z_cb_s = real(z_cb, sp) 
                 end if
+                x_cb_s = real(x_cb, sp)
+                y_cb_s = real(y_cb, sp) 
             end if
-            
+
             #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
             if (precision == ${PRECISION}$) then
                 if (p > 0) then
@@ -655,7 +647,7 @@ contains
                                         'x', 1, 'y', 1, 'z', 1, &
                                         x_cb${SFX}$, y_cb${SFX}$, z_cb${SFX}$, dims, 3, &
                                         ${DBT}$, DB_COLLINEAR, &
-                                        optlist, ierr)
+                                        optlist, ierr)  
                     end if
                     err = DBFREEOPTLIST(optlist)
                 else
@@ -683,17 +675,17 @@ contains
             ! in multidimensions.
             if (p > 0) then
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, kind(0.0)), &
-                        real(y_cb, kind(0.0)), &
-                        real(z_cb, kind(0.0))
+                    write (dbfile) real(x_cb, sp), &
+                        real(y_cb, sp), &
+                        real(z_cb, sp)
                 else
                     write (dbfile) x_cb, y_cb, z_cb
                 end if
 
             elseif (n > 0) then
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, kind(0.0)), &
-                        real(y_cb, kind(0.0))
+                    write (dbfile) real(x_cb, sp), &
+                        real(y_cb, sp)
                 else
                     write (dbfile) x_cb, y_cb
                 end if
@@ -845,7 +837,7 @@ contains
                 if (num_procs > 1) then
                     call s_mpi_gather_data_extents(q_sf, data_extents)
                 else
-                    data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
+                    data_extents(:, 0) = dble((/minval(q_sf), maxval(q_sf)/))
                 end if
 
                 ! Next, the root process proceeds to write the gathered flow

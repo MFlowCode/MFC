@@ -65,6 +65,9 @@ contains
             ! Constraints on model equations and number of fluids in the flow
         elseif (all(model_eqns /= (/1, 2, 3, 4/))) then
             call s_mpi_abort('Unsupported value of model_eqns. Exiting ...')
+        elseif (wp == single_precision .and. precision == 2) then
+            call s_mpi_abort('Unsupported combination of working precision'// &
+                            'and silo precision')
         elseif (num_fluids /= dflt_int &
                 .and. &
                 (num_fluids < 1 .or. num_fluids > num_fluids)) then
