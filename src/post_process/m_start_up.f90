@@ -54,7 +54,7 @@ contains
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, coarsen_silo, fourier_decomp, &
-            rhoref, pref, bubbles, R0ref, nb, &
+            rhoref, pref, bubbles, qbmm, sigR, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma
 

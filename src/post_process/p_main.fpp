@@ -506,7 +506,7 @@ program p_main
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
             end do
-            if (polytropic .neqv. .true.) then
+            if ((polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 !nP
                 do i = 1, nb
                     q_sf = q_cons_vf(bub_idx%ps(i))%sf( &

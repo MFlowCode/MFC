@@ -199,6 +199,7 @@ contains
                         end if
 
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                        B_tait = B_tait * (n_tait - 1d0) / n_tait
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)

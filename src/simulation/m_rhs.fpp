@@ -640,6 +640,7 @@ contains
                            myH, myHdot, rddot, alf_gas
 
         real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
+        real(kind(0d0)) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
@@ -649,7 +650,7 @@ contains
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
-        integer :: i, j, k, l, r, q, ii, id !< Generic loop iterators
+        integer :: i, j, k, l,  q, ii, id !< Generic loop iterators
         integer :: term_index
 
         ! Configuring Coordinate Direction Indexes =========================
@@ -896,6 +897,45 @@ contains
                     end do
                 end do
 
+                if(qbmm .and. (.not. polytropic)) then
+                    do i = 1, nb
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        nb_dot = flux_n(1)%vf(bubxb  + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
+                                        nR_dot = flux_n(1)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
+                                        nR2_dot = flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 )* &
+                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+
+                                        if(q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                        end if
+
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
                !print *, "Flux", rhs_vf(alf_idx)%sf(44, 0, 0)
 
@@ -1099,6 +1139,47 @@ contains
                         end do
                     end do
                 end do
+
+                if(qbmm .and. (.not. polytropic)) then
+                    do i = 1, nb
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        nb_dot = flux_n(2)%vf(bubxb  + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
+                                        nR_dot = flux_n(2)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
+                                        nR2_dot = flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 )* &
+                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+
+                                        if(q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                        end if
+
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+
                 ! Applying source terms to the RHS of the advection equations
 
                 if (riemann_solver == 1) then
@@ -1424,6 +1505,46 @@ contains
                         end do
                     end do
 
+                    if(qbmm .and. (.not. polytropic)) then
+                        do i = 1, nb
+                            do q = 1, nnode
+                                do l = 0, p
+                                    do k = 0, n
+                                        do j = 0, m
+                                            nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                            nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            nb_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l))
+                                            nR_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l))
+                                            nR2_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l))
+
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 )* &
+                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+
+                                            if(q <= 2) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+
+                                            else
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                            end if
+
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end if                    
+
                     if (riemann_solver == 1) then
                         do j = advxb, advxe
                             do k = 0, p
@@ -1516,6 +1637,46 @@ contains
                             end do
                         end do
                     end do
+
+                    if(qbmm .and. (.not. polytropic)) then
+                        do i = 1, nb
+                            do q = 1, nnode
+                                do l = 0, p
+                                    do k = 0, n
+                                        do j = 0, m
+                                            nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                            nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            nb_dot = flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
+                                            nR_dot = flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
+                                            nR2_dot = flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 )* &
+                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+
+                                            if(q <= 2) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+
+                                            else
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                            end if
+
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end if
 
                     if (riemann_solver == 1) then
                         !$acc parallel loop collapse(4) gang vector default(present)
