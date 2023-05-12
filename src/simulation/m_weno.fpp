@@ -691,11 +691,6 @@ contains
                                 end if
 
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-
-                                if(j == 45 .and. i == alf_idx) then
-                                    !print *, v_rs_ws_x(j+2, k, l, i), v_rs_ws_x(j+1, k, l, i), v_rs_ws_x(j+0, k, l, i), v_rs_ws_x(j-1, k, l, i), v_rs_ws_x(j-2, k, l, i)
-                                end if
-
                             end do
                         end do
                     end do
@@ -1002,20 +997,13 @@ contains
                                          vR_UL, &
                                          vR_LC))
 
-                        if(j == 47 .and. i == alf_idx) then
-                            !print *, "before",  d_MD, d_LC, vR_UL, vR_MD, vR_LC, vR_min, vR_max, vR_rs_vf(j, k, l, i)
-                        end if
-
                         vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
                                                       + (sign(5d-1, vR_min - vR_rs_vf(j, k, l, i)) &
                                                          + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
                                                       *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                            abs(vR_max - vR_rs_vf(j, k, l, i)))
 
-                        if(j == 47 .and. i == alf_idx) then
-                            !print *, "after", d_MD, d_LC, vR_UL, vR_MD, vR_LC, vR_min, vR_max, vR_rs_vf(j, k, l, i)
-                        end if                        
-                        ! END: Right Monotonicity Preserving Bound =========================
+                         ! END: Right Monotonicity Preserving Bound =========================
                     end do
                 end do
             end do

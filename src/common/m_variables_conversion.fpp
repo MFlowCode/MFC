@@ -651,45 +651,34 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
         integer :: i, j, k, l 
-        real(kind(0d0)) :: pres, mu, sig, pv, vftmp, nbub_sc
+        real(kind(0d0)) :: pres, mu, sig, vftmp, nbub_sc
         real(kind(0d0)), dimension(nb) :: nRtmp
-        real(kind(0d0)) :: gamma
 
-        pv = fluid_pp(1)%pv
-        gamma = 1d0/fluid_pp(2)%gamma + 1d0
-        !$acc update device(pv, gamma)
-
+#ifdef MFC_SIMULATION
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, rho_K, nRtmp, mu, sig, gamma_K, pi_inf_K, dyn_pres_K, pres)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
 
-                    !$acc loop seq
-                    do i = 1, nb
-                        nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
-                    end do
-
-                    vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
-
-                    call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
-
-
+                    nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+                    
                     
                     !$acc loop seq
                     do i = 1, nb
-                        mu = qK_cons_vf(bubxb + 1)%sf(j, k, l)/nbub_sc
-                        sig = (qK_cons_vf(bubxb + 3)%sf(j, k, l) / nbub_sc  -  mu**2)**0.5
+                        mu = qK_cons_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)/nbub_sc
+                        sig = (qK_cons_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) / nbub_sc  -  mu**2)**0.5
 
-                        pb(j, k, l, 1, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu - sig)**(3d0*gamma) + pv
-                        pb(j, k, l, 2, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu - sig)**(3d0*gamma) + pv
-                        pb(j, k, l, 3, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu + sig)**(3d0*gamma) + pv
-                        pb(j, k, l, 4, i) = (pref - pv) * (R0(i)**(3d0*gamma)) / (mu + sig)**(3d0*gamma) + pv 
+                        pb(j, k, l, 1, i) = (pb0(i) - pv ) * (R0(i)**(3d0*gam)) / (mu - sig)**(3d0*gam) + pv
+                        pb(j, k, l, 2, i) = (pb0(i) - pv ) * (R0(i)**(3d0*gam)) / (mu - sig)**(3d0*gam) + pv
+                        pb(j, k, l, 3, i) = (pb0(i) - pv ) * (R0(i)**(3d0*gam)) / (mu + sig)**(3d0*gam) + pv
+                        pb(j, k, l, 4, i) = (pb0(i) - pv ) * (R0(i)**(3d0*gam)) / (mu + sig)**(3d0*gam) + pv
 
                     end do
 
                 end do
             end do
         end do
+#endif
 
   
 
@@ -722,7 +711,7 @@ contains
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
 
         real(kind(0d0)), dimension(:), allocatable :: nRtmp
-        real(kind(0d0)) :: vftmp, nR3, nbub_sc
+        real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
 
         real(kind(0d0)) :: G_K
 
@@ -738,7 +727,7 @@ contains
             allocate(nRtmp(0))
         endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K, R3tmp)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -802,13 +791,6 @@ contains
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
 
-                    if(j == 47) then
-                        !print *, "pres var", pres
-                        !print *, "alf", qK_cons_vf(alf_idx)%sf(j, k, l)
-                        !print *, "energy", qK_cons_vf(E_idx)%sf(j, k, l)
-                        !print *, "dyn", dyn_pres_K
-                    end if
-
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
 
@@ -820,18 +802,43 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                        if(qbmm) then
+                            nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
-                        if(j == -4) then
-                            !print *, "nbub var", nbub_sc
+                            !$acc loops eq
+                            do i = bubxb , bubxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                            end do
+
+#ifdef MFC_SIMULATION                            
+                            qK_prim_vf(bubxb)%sf(j, k, l) = qK_cons_vf(bubxb)%sf(j, k, l)                            
+#endif
+
+                         else
+                            call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+
+                            !$acc loop seq
+                            do i = bubxb, bubxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                            end do
+
+                            
+
                         end if
 
-                        !nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+                        
 
-                        !$acc loop seq
-                        do i = bubxb, bubxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
-                        end do
+                        if(qbmm) then
+
+                            R3tmp = 0d0
+                            do i = 1, nb
+                                R3tmp = R3tmp + weight(i)* 0.5d0 * (qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) + dsqrt(qK_prim_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) - qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) **2d0) ) ** 3d0
+                                R3tmp = R3tmp + weight(i)* 0.5d0 * (qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) - dsqrt(qK_prim_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) - qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) **2d0) ) ** 3d0
+                            end do
+                                                        
+                            !qK_cons_vf(alf_idx)%sf(j, k, l) = nbub_sc * (4d0 * pi / 3d0) * R3tmp
+                                                          
+                        end if
 
                     end if
 
@@ -891,7 +898,7 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: nbub, R3, vftmp
+        real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
 
         real(kind(0d0)) :: G
@@ -961,7 +968,19 @@ contains
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
 
-                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                        if(.not. qbmm) then
+                            call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                        else
+                            R3tmp = 0d0
+                            do i = 1, nb
+                                R3tmp = R3tmp + weight(i) * 0.5d0 * (Rtmp(i) + sigR) ** 3d0
+                                R3tmp = R3tmp + weight(i) * 0.5d0 * (Rtmp(i) - sigR) ** 3d0 
+                            end do
+
+                            nbub = 3d0 * q_prim_vf(alf_idx)%sf(j, k, l) / (4d0 * pi * R3tmp)
+                        end if
+                   
+                        
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub

@@ -619,6 +619,16 @@ contains
                             pref = 1.d0
                         end if
                     end if
+
+                    if(qbmm) then
+                        pv = fluid_pp(1)%pv 
+                        @:ALLOCATE(pb0(nb))
+                        do i = 1, nb
+                            pb0(i) = pref + 2d0 / Web / R0(i)
+                        end do
+
+                    end if
+
                 end if
 
                 if (hypoelasticity) then

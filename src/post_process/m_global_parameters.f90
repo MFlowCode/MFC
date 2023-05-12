@@ -223,6 +223,7 @@ module m_global_parameters
     real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
+    logical :: qbmm
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -230,6 +231,8 @@ module m_global_parameters
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: poly_sigma
+    real(kind(0d0)) :: sigR 
+    integer :: nmom  
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -326,10 +329,12 @@ contains
 
         ! Bubble modeling
         bubbles = .false.
+        qbmm = .false.
         R0ref = dflt_real
         nb = dflt_int
         polydisperse = .false.
         poly_sigma = dflt_real
+        sigR = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
@@ -337,7 +342,7 @@ contains
         !!      any other tasks needed to properly setup the module
     subroutine s_initialize_global_parameters_module() ! ----------------------
 
-        integer :: i, fac
+        integer :: i, j, fac
 
         ! Setting m_root equal to m in the case of a 1D serial simulation
         if (num_procs == 1 .and. n == 0) m_root = m
@@ -386,33 +391,58 @@ contains
                 alf_idx = 1
             end if
 
+            if(qbmm) then
+                    nmom = 6
+            end if
+
             if (bubbles) then
+
                 bub_idx%beg = sys_size + 1
-                bub_idx%end = sys_size + 2*nb
-                if (polytropic .neqv. .true.) then
-                    bub_idx%end = sys_size + 4*nb
+                if (qbmm) then
+                    bub_idx%end = adv_idx%end + nb*nmom
+                else
+                    if (.not. polytropic) then
+                        bub_idx%end = sys_size + 4*nb
+                    else
+                        bub_idx%end = sys_size + 2*nb
+                    end if
                 end if
                 sys_size = bub_idx%end
+
+                
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
                 allocate (weight(nb), R0(nb), V0(nb))
 
-                do i = 1, nb
-                    if (polytropic .neqv. .true.) then
-                        fac = 4
-                    else
-                        fac = 2
-                    end if
+                if(qbmm) then
+                    allocate(bub_idx%moms(nb, nmom))
+                    do i = 1, nb
+                        do j = 1, nmom
+                            bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
+                        end do
+                        bub_idx%rs(i) = bub_idx%moms(i, 2)
+                        bub_idx%vs(i) = bub_idx%moms(i, 3)
+                    end do
+                else
+                  do i = 1, nb
+                        if (polytropic .neqv. .true.) then
+                            fac = 4
+                        else
+                            fac = 2
+                        end if
 
-                    bub_idx%rs(i) = bub_idx%beg + (i - 1)*fac
-                    bub_idx%vs(i) = bub_idx%rs(i) + 1
+                        bub_idx%rs(i) = bub_idx%beg + (i - 1)*fac
+                        bub_idx%vs(i) = bub_idx%rs(i) + 1
 
-                    if (polytropic .neqv. .true.) then
-                        bub_idx%ps(i) = bub_idx%vs(i) + 1
-                        bub_idx%ms(i) = bub_idx%ps(i) + 1
-                    end if
-                end do
+                        if (polytropic .neqv. .true.) then
+                            bub_idx%ps(i) = bub_idx%vs(i) + 1
+                            bub_idx%ms(i) = bub_idx%ps(i) + 1
+                        end if
+                    end do
+                end if
+
+
 
                 if (nb == 1) then
                     weight(:) = 1d0
@@ -431,6 +461,8 @@ contains
                     rhoref = 1.d0
                     pref = 1.d0
                 end if
+
+                
             end if
 
             if (hypoelasticity) then
