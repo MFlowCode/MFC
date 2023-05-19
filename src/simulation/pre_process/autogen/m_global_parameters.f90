@@ -1,6 +1,9 @@
 !>
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
+!! @author S. Bryngelson, K. Schimdmayer, V. Coralic, J. Meng, K. Maeda, T. Colonius
+!! @version 1.0
+!! @date JUNE 06 2019
 
 !> @brief This module contains all of the parameters characterizing the
 !!              computational domain, simulation algorithm, initial condition
@@ -20,10 +23,15 @@ module m_global_parameters
 
     ! Logistics ================================================================
     integer :: num_procs            !< Number of processors
+    integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
+    integer, parameter :: path_len = 400  !< Maximum path length
+    integer, parameter :: name_len = 50   !< Maximum name length
+    real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
+    integer, parameter :: dflt_int = -100 !< Default integer value
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic               !< Use existing IC data
-    integer :: t_step_old, t_step_start           !< Existing IC/grid folder
+    integer :: t_step_old           !< Existing IC/grid folder
     ! ==========================================================================
 
     ! Computational Domain Parameters ==========================================
@@ -110,7 +118,6 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
-
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
@@ -153,6 +160,7 @@ module m_global_parameters
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
+    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
@@ -169,18 +177,11 @@ module m_global_parameters
     integer :: R0_type   !1 = simpson
     !> @}
 
-    !> @name Index variables used for m_variables_conversion
-    !> @{
-    integer :: momxb, momxe
-    integer :: advxb, advxe
-    integer :: contxb, contxe
-    integer :: intxb, intxe
-    integer :: bubxb, bubxe
-    integer :: strxb, strxe
-    !> @}
-
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
+    ! Mathematical and Physical Constants ======================================
+    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
+    ! ==========================================================================
 
 contains
 
@@ -192,14 +193,15 @@ contains
         integer :: i !< Generic loop operator
 
         ! Logistics
-        case_dir = '.'
+        case_dir = ' '
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
-        t_step_start = dflt_int
 
         ! Computational domain parameters
-        m = dflt_int; n = 0; p = 0
+        m = dflt_int
+        n = dflt_int
+        p = dflt_int
 
         cyl_coord = .false.
 
@@ -387,7 +389,7 @@ contains
             if (bubbles) then
                 alf_idx = adv_idx%end
             else
-                alf_idx = 1
+                alf_idx = 0
             end if
 
             if (bubbles) then
@@ -463,36 +465,11 @@ contains
                 print *, 'R0 weights: ', weight(:)
                 print *, 'R0 abscissas: ', R0(:)
 
-                if(.not. qbmm) then
-                    if (.not. polytropic .and. .not. qbmm) then
-                        call s_initialize_nonpoly
-                    else
-                        rhoref = 1.d0
-                        pref = 1.d0
-                    end if
-                end if
-
-                if(qbmm) then
-                    if(polytropic) then
-                        allocate(pb0(nb))
-                        if(Web /= dflt_real) then
-                            do i = 1, nb
-                                pb0(i) = pref + 2d0 * fluid_pp(1)%ss / (R0(i)*R0ref)
-                            end do
-                        else
-                            do i = 1, nb
-                                pb0 = pref
-                            end do
-                        end if
-
-
-                        pb0 = pb0 / pref
-                        pref = 1d0
-                        rhoref = 1d0
-
-                    else
-                        call s_initialize_nonpoly
-                    end if
+                if (.not. polytropic) then
+                    call s_initialize_nonpoly
+                else
+                    rhoref = 1.d0
+                    pref = 1.d0
                 end if
             end if
 
@@ -578,30 +555,14 @@ contains
                     stop 'Invalid value of nb'
                 end if
 
-                if ((.not. polytropic) .and. (.not. qbmm)) then
+                if (.not. polytropic) then
                     call s_initialize_nonpoly
                 else
                     rhoref = 1.d0
                     pref = 1.d0
                 end if
-
-
             end if
         end if
-
-        momxb = mom_idx%beg
-        momxe = mom_idx%end
-        advxb = adv_idx%beg
-        advxe = adv_idx%end
-        contxb = cont_idx%beg
-        contxe = cont_idx%end
-        bubxb = bub_idx%beg
-        bubxe = bub_idx%end
-        strxb = stress_idx%beg
-        strxe = stress_idx%end
-        intxb = internalEnergies_idx%beg
-        intxe = internalEnergies_idx%end
-
         ! ==================================================================
 
 #ifdef MFC_MPI
@@ -699,8 +660,7 @@ contains
 
         omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
 
-        ! thermal properties --- 
-
+            !!! thermal properties !!!
         ! gas constants
         R_n = Ru/M_n
         R_v = Ru/M_v
@@ -732,29 +692,22 @@ contains
         Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
         Pe_c = uu*R0ref/D_m
         ! nondimensional properties
-        !if(.not. qbmm) then
-            R_n = rhol0*R_n*temp/pl0
-            R_v = rhol0*R_v*temp/pl0
-            k_n = k_n/k_m0
-            k_v = k_v/k_m0
-            pb0 = pb0/pl0
-            pv = pv/pl0
-            Tw = 1.d0
-            pl0 = 1.d0
+        R_n = rhol0*R_n*temp/pl0
+        R_v = rhol0*R_v*temp/pl0
+        k_n = k_n/k_m0
+        k_v = k_v/k_m0
+        pb0 = pb0/pl0
+        pv = pv/pl0
 
-            print *, 'pb0 nondim/final', pb0
-
-            rhoref = 1.d0
-            pref = 1.d0
-        !end if
+        print *, 'pb0 nondim/final', pb0
 
         ! bubble wall temperature, normalized by T0, in the liquid
         ! keeps a constant (cold liquid assumption)
-        
+        Tw = 1.d0
         ! natural frequencies
         omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
 
-        
+        pl0 = 1.d0
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
@@ -763,8 +716,9 @@ contains
         end do
         Im_trans_T = 0d0
         Im_trans_c = 0d0
- 
-        
+
+        rhoref = 1.d0
+        pref = 1.d0
     end subroutine s_initialize_nonpoly
 
     !> Computes the transfer coefficient for the non-polytropic bubble compression process
@@ -800,7 +754,11 @@ contains
 
         if (parallel_io .neqv. .true.) return
 
-#ifdef MFC_MPI
+#ifndef MFC_MPI
+
+        print '(A)', '[m_global_parameters] s_initialize_parallel_io not supported without MPI.'
+
+#else
 
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
@@ -850,7 +808,51 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! ----------------------
-    
+
+    !> Computes the bubble number density n from the conservative variables
+        !! @param vftmp is the void fraction
+        !! @param nRtmp is the bubble number  density times the bubble radii
+        !! @param ntmp is the output number bubble density
+    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
+        real(kind(0.d0)), intent(IN) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
+        real(kind(0.d0)), intent(OUT) :: ntmp
+        real(kind(0.d0)) :: nR3
+
+        call s_quad(nRtmp**3.d0, nR3)  !returns itself if NR0 = 1
+        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+        ! ntmp = 1d0
+
+    end subroutine s_comp_n_from_cons
+
+    !> Computes the bubble number density n from the primitive variables
+        !! @param vftmp is the void fraction
+        !! @param Rtmp is the  bubble radii
+        !! @param ntmp is the output number bubble density
+    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
+        real(kind(0.d0)), intent(IN) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
+        real(kind(0.d0)), intent(OUT) :: ntmp
+        real(kind(0.d0)) :: R3
+
+        call s_quad(Rtmp**3.d0, R3)  !returns itself if NR0 = 1
+        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
+        ! ntmp = 1d0
+
+    end subroutine s_comp_n_from_prim
+
+    !> Computes the quadrature for polydisperse bubble populations
+        !! @param func is the bubble dynamic variables for each bin
+        !! @param mom is the computed moment
+    subroutine s_quad(func, mom)
+
+        real(kind(0.d0)), dimension(nb), intent(IN) :: func
+        real(kind(0.d0)), intent(OUT) :: mom
+
+        mom = dot_product(weight, func)
+
+    end subroutine s_quad
+
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
@@ -897,10 +899,12 @@ contains
                 weight(ir) = tmp*2.d0*dphi/3.d0
             end if
         end do
+
         tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
+
     end subroutine s_simpson
 
 end module m_global_parameters

@@ -621,11 +621,28 @@ contains
                     end if
 
                     if(qbmm) then
-                        pv = fluid_pp(1)%pv 
-                        @:ALLOCATE(pb0(nb))
-                        do i = 1, nb
-                            pb0(i) = pref + 2d0 / Web / R0(i)
-                        end do
+
+                        if(polytropic) then
+                            pv = fluid_pp(1)%pv 
+                            @:ALLOCATE(pb0(nb))
+                            if(Web /= dflt_real) then
+                                do i = 1, nb
+                                    pb0(i) = pref + 2d0 * fluid_pp(1)%ss / (R0(i)*R0ref)
+                                end do
+                            else
+                                do i = 1, nb
+                                    pb0 = pref
+                                end do
+                            end if
+                            pb0 = pb0 / pref
+                            pv = pv / pref
+
+                            pref = 1d0
+                            rhoref = 1d0
+
+                        else
+                            call s_initialize_nonpoly
+                        end if
 
                     end if
 
@@ -841,6 +858,7 @@ contains
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 
+
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
         integer :: ir
@@ -929,21 +947,25 @@ contains
         Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
         Pe_c = uu*R0ref/D_m
 
+        Tw = temp
+
         ! nondimensional properties
-        R_n = rhol0*R_n*temp/pl0
-        R_v = rhol0*R_v*temp/pl0
-        k_n = k_n/k_m0
-        k_v = k_v/k_m0
-        pb0 = pb0/pl0
-        pv = pv/pl0
+        !if(.not. qbmm) then
+            R_n = rhol0*R_n*temp/pl0
+            R_v = rhol0*R_v*temp/pl0
+            k_n = k_n/k_m0
+            k_v = k_v/k_m0
+            pb0 = pb0/pl0
+            pv = pv/pl0
+            Tw = 1.d0
+            pl0 = 1.d0
 
-        ! bubble wall temperature, normalized by T0, in the liquid
-        ! keeps a constant (cold liquid assumption)
-        Tw = 1.d0
+            rhoref = 1.d0
+            pref = 1.d0
+        !end if
+
         ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
-
-        pl0 = 1.d0
+        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0   
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
@@ -953,8 +975,7 @@ contains
         Im_trans_T = 0d0
         Im_trans_c = 0d0
 
-        rhoref = 1.d0
-        pref = 1.d0
+
     end subroutine s_initialize_nonpoly
 
     !>  Computes transfer coefficient for non-polydisperse bubble modeling (Preston 2007)

@@ -39,6 +39,7 @@ module m_qbmm
     integer, allocatable, dimension(:)    :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
 
+
 !$acc declare create(momrhs, nterms, is1, is2, is3)
 !$acc declare create(bubrs, bubmoms)
 
@@ -52,7 +53,7 @@ contains
 
             if (bubble_model == 2) then
                 ! Keller-Miksis without viscosity/surface tension
-                nterms = 26
+                nterms = 32
             else if (bubble_model == 3) then
                 ! Rayleigh-Plesset with viscosity/surface tension
                 nterms = 7
@@ -213,7 +214,29 @@ contains
                                 momrhs(2, i1, i2, 26, q) =   i2
                                 momrhs(3, i1, i2, 26, q) = 0d0 
 
+                                momrhs(1, i1, i2, 27, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 27, q) = -1d0 + i2
+                                momrhs(3, i1, i2, 27, q) = 0d0 
 
+                                momrhs(1, i1, i2, 28, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 28, q) =   i2
+                                momrhs(3, i1, i2, 28, q) = 0d0 
+
+                                momrhs(1, i1, i2, 29, q) = -2d0 + i1 
+                                momrhs(2, i1, i2, 29, q) =   i2
+                                momrhs(3, i1, i2, 29, q) = 0d0 
+
+                                momrhs(1, i1, i2, 30, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 30, q) = -1d0 + i2
+                                momrhs(3, i1, i2, 30, q) = 0d0 
+
+                                momrhs(1, i1, i2, 31, q) = -1d0 + i1 
+                                momrhs(2, i1, i2, 31, q) =   i2
+                                momrhs(3, i1, i2, 31, q) = 0d0 
+
+                                momrhs(1, i1, i2, 32, q) = -2d0 + i1 
+                                momrhs(2, i1, i2, 32, q) =   i2
+                                momrhs(3, i1, i2, 32, q) = 0d0 
                             end if
                         end if
                     end do; end do
@@ -390,6 +413,73 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
+        subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
+!$acc routine seq
+        real(kind(0.d0)), intent(INOUT) :: pres, rho, c
+        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
+        integer :: i1, i2, q
+
+        coeffs = 0d0
+
+        do i2 = 0, 2; do i1 = 0, 2
+                if ((i1 + i2) <= 2) then
+                    if (bubble_model == 3) then
+                        ! RPE
+                        coeffs(1, i1, i2) = -1d0*i2*pres/rho
+                        coeffs(2, i1, i2) = -3d0*i2/2d0
+                        coeffs(3, i1, i2) = i2*(pref)/rho
+                        coeffs(4, i1, i2) = i1
+                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
+                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
+                        coeffs(7, i1, i2) = 0d0
+                    else if (bubble_model == 2) then
+                        ! KM with approximation of 1/(1-V/C) = 1+V/C
+                        coeffs(1, i1, i2) = -3d0*i2/2d0
+                        coeffs(2, i1, i2) = -i2/c
+                        coeffs(3, i1, i2) = i2/(2d0*c*c)
+                        coeffs(4, i1, i2) = -i2*pres/rho
+                        coeffs(5, i1, i2) = -2d0*i2*pres/(c*rho)
+                        coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
+                        coeffs(7, i1, i2) = i2*(pref )/rho
+                        coeffs(8, i1, i2) = 2d0*i2*(pref )/(c*rho)
+                        coeffs(9, i1, i2) = i2*(pref )/(c*c*rho)
+                        coeffs(10, i1, i2) = -3d0*i2*gam*(pref)/(c*rho)
+                        coeffs(11, i1, i2) = -3d0*i2*gam*(pref)/(c*c*rho)
+                        coeffs(12, i1, i2) = i1
+                        coeffs(13, i1, i2) = 0d0
+                        coeffs(14, i1, i2) = 0d0
+                        coeffs(15, i1, i2) = 0d0
+                        if(Re_inv /= dflt_real) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
+                        if(Web /= dflt_real) coeffs(17, i1, i2) = -i2*2d0/Web/rho 
+                        if(Re_inv /= dflt_real) then
+                            coeffs(18, i1, i2) = i2*6d0*Re_inv/(rho*c)
+                            coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
+                            coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
+                            coeffs(21, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c*c)
+                            coeffs(22, i1, i2) = -i2*4d0*(pref )/(rho*rho*c)
+                            coeffs(23, i1, i2) = -i2*4d0*(pref )/(rho*rho*c*c)
+                            coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
+                            if(Web /= dflt_real) then
+                                coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
+                            end if
+                            coeffs(26, i1, i2) = -12d0*i2*gam*(pref)*Re_inv/(rho*rho*c*c)
+                        end if
+                        coeffs(27, i1, i2) = 3d0*i2*gam*R_v*Tw / (c*rho)
+                        coeffs(28, i1, i2) = 3d0*i2*gam*R_v*Tw / (c*c*rho)
+                        if(Re_inv /= dflt_real) then
+                            coeffs(29, i1, i2) =  12d0*i2*gam*R_v*Tw*Re_inv/(rho*rho*c*c)
+                        end if
+                        coeffs(30, i1, i2) = 3d0*i2*gam / (c*rho)
+                        coeffs(31, i1, i2) = 3d0*i2*gam / (c*c*rho)
+                        if(Re_inv /= dflt_real) then
+                            coeffs(32, i1, i2) =  12d0*i2*gam*Re_inv/(rho*rho*c*c)
+                        end if
+                    end if
+                end if
+            end do; end do
+
+    end subroutine s_coeff_nonpoly
+
     subroutine s_coeff(pres, rho, c, coeffs)
 !$acc routine seq
         real(kind(0.d0)), intent(INOUT) :: pres, rho, c
@@ -447,22 +537,22 @@ contains
 
     end subroutine s_coeff
 
-    subroutine s_mom_inv(q_cons_vf,q_prim_vf, momsp, moms3d, pb, rhs_pb, ix, iy, iz, nbub_sc)
+    subroutine s_mom_inv(q_cons_vf,q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub_sc)
 
         type(scalar_field), dimension(:), intent(INOUT) :: q_prim_vf, q_cons_vf
         type(scalar_field), dimension(:), intent(INOUT) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb, rhs_mv
         real(kind(0d0)), dimension(startx:, starty:, startz:) :: nbub_sc
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)), dimension(nmom) :: moms, msum
         real(kind(0d0)), dimension(nb) :: Rvec
         real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(nnode, nb) :: wght_pb
+        real(kind(0d0)), dimension(nnode, nb) :: wght_pb, wght_mv, wght_ht, ht
         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2
+        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: n_tait, B_tait
 
@@ -495,7 +585,11 @@ contains
                     end if
 
 
-                    call s_coeff(pres, rho, c, coeff)
+                    if(polytropic) then
+                        call s_coeff(pres, rho, c, coeff)
+                    else
+                        call s_coeff_nonpoly(pres, rho, c, coeff)
+                    end if
 
                     ! SHB: Manually adjusted pressure here for no-coupling case
                     ! pres = 1d0/0.3d0
@@ -516,21 +610,42 @@ contains
 
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
-                            if(id1 == 24) then
-                                !print *, "MOMS", moms
-                            end if
-
-
-                            if(.not. polytropic) then
-                                 do j = 1, nnode
-                                    wght_pb(j, q) = wght(j, q) * (pb(id1, id2, id3, j, q) - pv) / (pref - pv)
-                                end do
-                            end if
-
                             if(polytropic) then
                                  do j = 1, nnode
                                     wght_pb(j, q) = wght(j, q) * (pb0(q) - pv) / (pref - pv)
                                 end do                                
+                            end if
+
+                            if(id1 == 49) then
+                                print *, "MOMS", moms
+                                !print *, "pb", pb(id1, id2, id3, 1:4, q)
+                                !print *, "mv", mv(id1, id2, id3, 1:4, q)
+                            end if
+
+                            if(.not. polytropic) then
+                                do j = 1, nnode
+                                    chi_vw = 1.d0/(1.d0 + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1.d0))
+                                    x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
+                                    k_mw = x_vw*k_v(q)/(x_vw + (1.d0 - x_vw)*phi_vn) &
+                                        + (1.d0 - x_vw)*k_n(q)/(x_vw*phi_nv + 1.d0 - x_vw)
+                                    rho_mw = pv/(chi_vw*R_v*Tw)
+                                    rhs_mv(id1, id2, id3, j, q) = - Re_trans_c(q)*( (mv(id1, id2, id3, j, q) / (mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
+                                    rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q) /Pe_c/(1.d0 - chi_vw)/ abscX(j, q)
+
+                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j,q)/R0(q))**3 &
+                                            *(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
+                                    grad_T = -Re_trans_T(q)*(T_bar - Tw)         
+                                    ht(j, q) =  pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
+
+                                end do
+                            end if
+
+                            if(.not. polytropic) then
+                                 do j = 1, nnode
+                                    wght_pb(j, q) = wght(j, q) * (pb(id1, id2, id3, j, q)) / (pref)
+                                    wght_mv(j, q) = wght(j, q) * (rhs_mv(id1, id2, id3, j, q))
+                                    wght_ht(j, q) = wght(j, q) * ht(j, q)
+                                end do
                             end if
 
                             r = 1
@@ -551,6 +666,12 @@ contains
                                             else if(bubble_model == 2 .and. ((j >= 10 .and. j <= 11) .or. (j == 26))) then
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                            else if(bubble_model == 2 .and. (j >= 27 .and. j <= 29) .and. (.not. polytropic)) then
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, q), momrhs(:, i1, i2, j, q))
+                                            else if(bubble_model == 2 .and. (j >= 30 .and. j <= 32) .and. (.not. polytropic)) then
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, q), momrhs(:, i1, i2, j, q))
                                             else
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
@@ -580,7 +701,11 @@ contains
 
                                     drdt = drdt + drdt2
 
-                                    rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*drdt/ abscX(j, q)) * (pb(id1, id2, id3, j, q) - pv)                                                  
+                                    rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*drdt/ abscX(j, q)) * (pb(id1, id2, id3, j, q)) 
+                                    rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q)  + (3d0 * gam / abscX(j, q)) * rhs_mv(id1, id2, id3, j, q) * R_v * Tw  
+                                    rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q)  + (3d0 * gam / abscX(j, q)) * ht(j, q)
+
+                                    rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q) * (4d0 * pi * abscX(j, q) ** 2d0)                                               
                                 end do
                                         
                             end if
@@ -599,7 +724,7 @@ contains
                                 momsp(4)%sf(id1, id2, id3) = (pref - pv)*f_quad(abscX, abscY, wght_pb, 3d0*(1d0 - gam), 0d0, 3d0*gam) + pv * f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0) & 
                                                                 - 4d0*Re_inv*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0) - (2d0 / Web) * f_quad(abscX, abscY, wght, 2d0, 0d0, 0d0)
                             else
-                                momsp(4)%sf(id1, id2, id3) = (pref - pv)*f_quad(abscX, abscY, wght_pb, 3d0, 0d0, 0d0) + pv * f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)  &
+                                momsp(4)%sf(id1, id2, id3) = (pref)*f_quad(abscX, abscY, wght_pb, 3d0, 0d0, 0d0)  &
                                                                 - 4d0*Re_inv*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0) - (2d0 / Web) * f_quad(abscX, abscY, wght, 2d0, 0d0, 0d0)  
 
                             end if

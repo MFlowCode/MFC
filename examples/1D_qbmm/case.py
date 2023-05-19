@@ -4,10 +4,10 @@ import math
 import json
 
 x0      = 10.E-06
-p0      = 1.
-rho0    = 1.
+p0      = 101325.
+rho0    = 1000.
 
-c0      = math.sqrt( 1/rho0 )
+c0      = math.sqrt( p0/rho0 )
 patm    = 1.
 
 #water props
@@ -15,7 +15,6 @@ n_tait  = 7.1
 B_tait  = 306.E+06 / p0 
 mul0    = 1.002E-03     #viscosity
 ss      = 0.07275       #surface tension
-#pv      = 2.3388E+03 / p0    #vapor pressure
 pv      = 2.3388E+03 
 
 gamma_v = 1.33
@@ -36,18 +35,15 @@ gamma_gas = 1.4
 #reference bubble size
 R0ref   = 10.E-06
 
-pa      =   1.E+06 / p0
 
 #Characteristic velocity
 uu = math.sqrt( p0/rho0 )
 #Cavitation number
-# Ca = (p0 - pv)/(rho0*(uu**2.))
-Ca = 1.
+Ca = (p0 - pv)/(rho0*(uu**2.))
 #Weber number
-We = rho0*(uu**2.)*R0ref/ss
-We = p0*R0ref/ss
+We =  p0*R0ref/ss
 #Inv. bubble Reynolds number
-Re_inv = mul0/(rho0*uu*R0ref)
+Re_inv = mul0/(p0*R0ref)
 
 #IC setup
 vf0     = 4.E-5
@@ -149,38 +145,48 @@ print(json.dumps({
     # 'patch_icpp(1)%length_x'       : 20.E-03/x0,
     'patch_icpp(2)%alter_patch(1)' : 'T',
     'patch_icpp(2)%vel(1)'         : 0.0,
-    'patch_icpp(2)%pres'           : 2*101325/p0,
+    'patch_icpp(2)%pres'           : 10*101325/p0,
     'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1000/rho0,
     'patch_icpp(2)%alpha(1)'       : vf0,
     'patch_icpp(2)%r0'             : 1.,
     'patch_icpp(2)%v0'             : 0.,
     # ==========================================================
 
-    # Fluids Physical Parameters ===============================
+    # Fluids Physical Parameters ===============================================
     # Surrounding liquid
     'fluid_pp(1)%gamma'             : 1.E+00/(n_tait-1.E+00),
     'fluid_pp(1)%pi_inf'            : n_tait*B_tait/(n_tait-1.),
+    'fluid_pp(1)%mul0'              : mul0,
+    'fluid_pp(1)%ss'                : ss,
     'fluid_pp(1)%pv'                : pv,
+    'fluid_pp(1)%gamma_v'           : gamma_v,
+    'fluid_pp(1)%M_v'               : M_v,
+    'fluid_pp(1)%mu_v'              : mu_v,
+    'fluid_pp(1)%k_v'               : k_v,
 
-    # Last fluid_pp is always reserved for bubble gas state ===
-    # if applicable  ==========================================
+    # Last fluid_pp is always reserved for bubble gas state ===================
+    # if applicable  ==========================================================
     'fluid_pp(2)%gamma'             : 1./(gamma_gas-1.),
     'fluid_pp(2)%pi_inf'            : 0.0E+00,
-    # ==========================================================
-
-    # Non-polytropic gas compression model AND/OR Tait EOS =====
-    'pref'                  : 101325/p0,
-    'rhoref'                : 1000/rho0,
+    'fluid_pp(2)%gamma_v'           : gamma_n,
+    'fluid_pp(2)%M_v'               : M_n,
+    'fluid_pp(2)%mu_v'              : mu_n,
+    'fluid_pp(2)%k_v'               : k_n,
+    
+    #Non-polytropic gas compression model AND/OR Tait EOS =====
+    'pref'                  : p0,
+    'rhoref'                : rho0,
     # ==========================================================
 
     # Bubbles ==================================================
     'bubbles'               : 'T',
     'bubble_model'          : 2,
-    'polytropic'            : 'T',
+    'polytropic'            : 'F',
     'polydisperse'          : 'F',
     'R0_type'               : 1,
     'poly_sigma'            : 0.3,
-    #'thermal'               : 3,
+    'thermal'               : 3,
+    'Ca'                    : Ca,	
     'R0ref'                 : myr0,
     'nb'                    : 3,
     'Web'                   : We,
@@ -192,16 +198,6 @@ print(json.dumps({
     'rhoRV'              : 0.0,
     # ==========================================================
 
-    # Acoustic source ==========================================
-    'Monopole'                  : 'F',
-    'num_mono'                  : 1,
-    'Mono(1)%loc(1)'            : -5E-03/x0,
-    'Mono(1)%npulse'            : 1,
-    'Mono(1)%dir'               : 1.,
-    'Mono(1)%pulse'             : 1,
-    'Mono(1)%mag'               : 1*pa,
-    'Mono(1)%length'            : (1./(300000.))*cact/x0,
-    # ==========================================================
 }))
 
 # ==============================================================================
