@@ -1,9 +1,22 @@
+# 1 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
 !>
 !! @file m_variables_conversion.f90
 !! @brief Contains module m_variables_conversion
 
-#:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
+# 1 "/Users/anand/MFC/src/common/include/macros.fpp" 1
+# 6 "/Users/anand/MFC/src/common/include/macros.fpp"
+
+
+# 25 "/Users/anand/MFC/src/common/include/macros.fpp"
+
+
+
+# 45 "/Users/anand/MFC/src/common/include/macros.fpp"
+# 6 "/Users/anand/MFC/src/common/m_variables_conversion.fpp" 2
+# 1 "/Users/anand/MFC/src/common/include/inline_conversions.fpp" 1
+# 59 "/Users/anand/MFC/src/common/include/inline_conversions.fpp"
+
+# 7 "/Users/anand/MFC/src/common/m_variables_conversion.fpp" 2
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -536,9 +549,87 @@ contains
 
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
-        @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+allocate(gammas (1:num_fluids))
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc enter data create(gammas (1:num_fluids))
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 539 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+allocate(pi_infs(1:num_fluids))
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc enter data create(pi_infs(1:num_fluids))
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 540 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+allocate(Gs     (1:num_fluids))
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc enter data create(Gs     (1:num_fluids))
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 541 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
 
         do i = 1, num_fluids
             gammas(i)  = fluid_pp(i)%gamma
@@ -550,7 +641,33 @@ contains
 #ifdef MFC_SIMULATION
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+allocate(Res(1:2, 1:maxval(Re_size)))
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc enter data create(Res(1:2, 1:maxval(Re_size)))
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 553 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
             
             do i = 1, 2
                 do j = 1, Re_size(i)
@@ -563,7 +680,33 @@ contains
 #endif
 
         if (bubbles) then
-            @:ALLOCATE(bubrs(1:nb))
+
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN ALLOCATE (src/common/macros.fpp) ====
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+allocate(bubrs(1:nb))
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc enter data create(bubrs(1:nb))
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  ALLOCATE (src/common/macros.fpp) ====
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ================================================
+# 566 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
@@ -1204,10 +1347,62 @@ contains
         deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
 
-        @:DEALLOCATE(gammas, pi_infs, Gs)
+
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN DEALLOCATE (src/common/macros.fpp) ====
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+deallocate(gammas, pi_infs, Gs)
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc exit data delete(gammas, pi_infs, Gs)
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  DEALLOCATE (src/common/macros.fpp) ====
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1207 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
         
         if (bubbles) then
-            @:DEALLOCATE(bubrs)
+
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==== BEGIN DEALLOCATE (src/common/macros.fpp) ====
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+deallocate(bubrs)
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+!$acc exit data delete(bubrs)
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ====  END  DEALLOCATE (src/common/macros.fpp) ====
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+! ==================================================
+# 1210 "/Users/anand/MFC/src/common/m_variables_conversion.fpp"
+
         end if
 
         ! Nullifying the procedure pointer to the subroutine transfering/

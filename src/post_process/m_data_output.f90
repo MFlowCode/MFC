@@ -42,12 +42,13 @@ module m_data_output
     ! gather the flow variable(s) from all sub-domains on to the root process.
     ! If the run is not parallel, but serial, then q_root_sf is equal to q_sf.
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: q_sf
+    real(kind(0d0)), allocatable, dimension(:, :, :), public :: dft_q_sf
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: coarse_x_q_sf
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: coarse_xy_q_sf
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: coarse_xyz_q_sf
     real(kind(0d0)), allocatable, dimension(:, :, :) :: q_root_sf
     real(kind(0d0)), allocatable, dimension(:, :, :) :: cyl_q_sf
-    ! Single precision storage for flow variables
-    real(kind(0.0)), allocatable, dimension(:, :, :), public :: q_sf_s
-    real(kind(0.0)), allocatable, dimension(:, :, :) :: q_root_sf_s
-    real(kind(0.0)), allocatable, dimension(:, :, :) :: cyl_q_sf_s
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: cyl_coarse_q_sf
 
     ! The spatial and data extents array variables contain information about the
     ! minimum and maximum values of the grid and flow variable(s), respectively.
@@ -122,28 +123,29 @@ contains
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
+            if (coarsen_silo) then
+                allocate (cyl_coarse_q_sf(-offset_y%beg:(n/2) + offset_y%end, &
+                                          -offset_z%beg:(p/2) + offset_z%end, &
+                                          -offset_x%beg:(m/2) + offset_x%end))
+            else
                 allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end, &
                                    -offset_z%beg:p + offset_z%end, &
                                    -offset_x%beg:m + offset_x%end))
-        end if
-
-        if (precision == 1) then
-            allocate (q_sf_s(-offset_x%beg:m + offset_x%end, &
-                -offset_y%beg:n + offset_y%end, &
-                -offset_z%beg:p + offset_z%end))
-            if (grid_geometry == 3) then
-                allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end, &
-                                    -offset_z%beg:p + offset_z%end, &
-                                    -offset_x%beg:m + offset_x%end))
             end if
         end if
-
-        if (n == 0) then
-            allocate (q_root_sf(0:m_root, 0:0, 0:0))
-            if (precision == 1) then
-                allocate (q_root_sf_s(0:m_root, 0:0, 0:0))
-            end if
+        if (coarsen_silo) then
+            allocate (coarse_x_q_sf(-offset_x%beg:(m/2) + offset_x%end, &
+                                    -offset_y%beg:n + offset_y%end, &
+                                    -offset_z%beg:p + offset_z%end))
+            allocate (coarse_xy_q_sf(-offset_x%beg:(m/2) + offset_x%end, &
+                                     -offset_y%beg:(n/2) + offset_y%end, &
+                                     -offset_z%beg:p + offset_z%end))
+            allocate (coarse_xyz_q_sf(-offset_x%beg:(m/2) + offset_x%end, &
+                                      -offset_y%beg:(n/2) + offset_y%end, &
+                                      -offset_z%beg:(p/2) + offset_z%end))
         end if
+
+        if (n == 0) allocate (q_root_sf(0:m_root, 0:0, 0:0))
 
         ! Allocating the spatial and data extents and also the variables for
         ! the offsets and the one bookkeeping the number of cell-boundaries
@@ -183,22 +185,37 @@ contains
                     lo_offset = (/offset_x%beg, offset_y%beg, offset_z%beg/)
                     hi_offset = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
-                
-                if (grid_geometry == 3) then
-                    dims = (/n + offset_y%beg + offset_y%end + 2, &
-                                p + offset_z%beg + offset_z%end + 2, &
-                                m + offset_x%beg + offset_x%end + 2/)
+                if (coarsen_silo) then
+                    if (grid_geometry == 3) then
+                        dims = (/(n/2) + offset_y%beg + offset_y%end + 2, &
+                                 (p/2) + offset_z%beg + offset_z%end + 2, &
+                                 (m/2) + offset_x%beg + offset_x%end + 2/)
+                    else
+                        dims = (/(m/2) + offset_x%beg + offset_x%end + 2, &
+                                 (n/2) + offset_y%beg + offset_y%end + 2, &
+                                 (p/2) + offset_z%beg + offset_z%end + 2/)
+                    end if
                 else
-                    dims = (/m + offset_x%beg + offset_x%end + 2, &
-                                n + offset_y%beg + offset_y%end + 2, &
-                                p + offset_z%beg + offset_z%end + 2/)
+                    if (grid_geometry == 3) then
+                        dims = (/n + offset_y%beg + offset_y%end + 2, &
+                                 p + offset_z%beg + offset_z%end + 2, &
+                                 m + offset_x%beg + offset_x%end + 2/)
+                    else
+                        dims = (/m + offset_x%beg + offset_x%end + 2, &
+                                 n + offset_y%beg + offset_y%end + 2, &
+                                 p + offset_z%beg + offset_z%end + 2/)
+                    end if
                 end if
             else
                 lo_offset = (/offset_x%beg, offset_y%beg/)
                 hi_offset = (/offset_x%end, offset_y%end/)
-
-                dims = (/m + offset_x%beg + offset_x%end + 2, &
-                            n + offset_y%beg + offset_y%end + 2/)
+                if (coarsen_silo) then
+                    dims = (/(m/2) + offset_x%beg + offset_x%end + 2, &
+                             (n/2) + offset_y%beg + offset_y%end + 2/)
+                else
+                    dims = (/m + offset_x%beg + offset_x%end + 2, &
+                             n + offset_y%beg + offset_y%end + 2/)
+                end if
             end if
         end if
 
@@ -207,7 +224,11 @@ contains
         if (format == 1) then
 
             ! Creating the directory associated with the local process
-            dbdir = trim(case_dir)//'/silo_hdf5'
+            if (coarsen_silo) then
+                dbdir = trim(case_dir)//'/coarse_silo_hdf5'
+            else
+                dbdir = trim(case_dir)//'/silo_hdf5'
+            end if
 
             write (proc_rank_dir, '(A,I0)') '/p', proc_rank
 
@@ -409,6 +430,19 @@ contains
         end if
 
         ! END: Querying Number of Flow Variable(s) in Binary Output ========
+
+        ! Modifiying the value of the precision variable, which is used to
+        ! indicate the floating point precision of the data that is stored
+        ! in the formatted database file(s). This is performed so that this
+        ! variable may be directly used as input to the functions that are
+        ! in charge of writing the data. Only possible for Silo-HDF5 format.
+        if (format == 1) then
+            if (precision == 1) then          ! Single precision
+                precision = DB_FLOAT
+            else
+                precision = DB_DOUBLE        ! Double precision
+            end if
+        end if
 
     end subroutine s_initialize_data_output_module ! --------------------------
 
@@ -622,55 +656,86 @@ contains
             ! with its offsets that indicate the presence and size of ghost
             ! zone layer(s), are put in the formatted database slave file.
 
-            if (precision == 1) then
-                if (p > 0) then
-                    do i = -1-offset_z%beg,p + offset_z%end
-                        z_cb_s(i) = real(z_cb(i)) 
-                    end do
-                else
-                    do i = -1-offset_x%beg,m + offset_x%end
-                        x_cb_s(i) = real(x_cb(i)) 
+            if (coarsen_silo) then
+                coarse_x_cb(-1 - offset_x%beg:-1) = x_cb(-1 - offset_x%beg:-1)
+                coarse_x_cb(m/2:(m/2) + offset_x%end) = x_cb(m:m + offset_x%end)
+                do i = 1, m, 2
+                    coarse_x_cb((i - 1)/2) = x_cb(i)
+                end do
+
+                if (n > 0) then
+                    coarse_y_cb(-1 - offset_y%beg:-1) = y_cb(-1 - offset_y%beg:-1)
+                    coarse_y_cb(n/2:(n/2) + offset_y%end) = y_cb(n:n + offset_y%end)
+                    do i = 1, n, 2
+                        coarse_y_cb((i - 1)/2) = y_cb(i)
                     end do
 
-                    do i = -1-offset_y%beg,n + offset_y%end
-                        y_cb_s(i) = real(y_cb(i)) 
-                    end do
+                    if (p > 0) then
+                        coarse_z_cb(-1 - offset_z%beg:-1) = z_cb(-1 - offset_z%beg:-1)
+                        coarse_z_cb(p/2:(p/2) + offset_z%end) = z_cb(p:p + offset_z%end)
+                        do i = 1, p, 2
+                            coarse_z_cb((i - 1)/2) = z_cb(i)
+                        end do
+                    end if
                 end if
             end if
 
-            #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-            if (precision == ${PRECISION}$) then
-                if (p > 0) then
-                    err = DBMKOPTLIST(2, optlist)
-                    err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                    err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+            if (p > 0) then
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                if (coarsen_silo) then
                     if (grid_geometry == 3) then
                         err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                        'x', 1, 'y', 1, 'z', 1, &
-                                        y_cb${SFX}$, z_cb${SFX}$, x_cb${SFX}$, dims, 3, &
-                                        ${DBT}$, DB_COLLINEAR, &
-                                        optlist, ierr)
+                                      'x', 1, 'y', 1, 'z', 1, &
+                                      coarse_y_cb, coarse_z_cb, coarse_x_cb, dims, 3, &
+                                      precision, DB_COLLINEAR, &
+                                      optlist, ierr)
                     else
                         err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                        'x', 1, 'y', 1, 'z', 1, &
-                                        x_cb${SFX}$, y_cb${SFX}$, z_cb${SFX}$, dims, 3, &
-                                        ${DBT}$, DB_COLLINEAR, &
-                                        optlist, ierr)
+                                      'x', 1, 'y', 1, 'z', 1, &
+                                      coarse_x_cb, coarse_y_cb, coarse_z_cb, dims, 3, &
+                                      precision, DB_COLLINEAR, &
+                                      optlist, ierr)
                     end if
-                    err = DBFREEOPTLIST(optlist)
                 else
-                    err = DBMKOPTLIST(2, optlist)
-                    err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                    err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                'x', 1, 'y', 1, 'z', 1, &
-                                x_cb${SFX}$, y_cb${SFX}$, DB_F77NULL, dims, 2, &
-                                ${DBT}$, DB_COLLINEAR, &
-                                optlist, ierr)
-                    err = DBFREEOPTLIST(optlist)
+                    if (grid_geometry == 3) then
+                        err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                      'x', 1, 'y', 1, 'z', 1, &
+                                      y_cb, z_cb, x_cb, dims, 3, &
+                                      precision, DB_COLLINEAR, &
+                                      optlist, ierr)
+                    else
+                        err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                      'x', 1, 'y', 1, 'z', 1, &
+                                      x_cb, y_cb, z_cb, dims, 3, &
+                                      precision, DB_COLLINEAR, &
+                                      optlist, ierr)
+                    end if
                 end if
+                err = DBFREEOPTLIST(optlist)
+
+            else
+                err = DBMKOPTLIST(2, optlist)
+                err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                if (coarsen_silo) then
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                  'x', 1, 'y', 1, 'z', 1, &
+                                  coarse_x_cb, coarse_y_cb, DB_F77NULL, dims, 2, &
+                                  precision, DB_COLLINEAR, &
+                                  optlist, ierr)
+                else
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                  'x', 1, 'y', 1, 'z', 1, &
+                                  x_cb, y_cb, DB_F77NULL, dims, 2, &
+                                  precision, DB_COLLINEAR, &
+                                  optlist, ierr)
+                end if
+                err = DBFREEOPTLIST(optlist)
+
             end if
-            #:endfor
+
             ! END: Silo-HDF5 Database Format ===================================
 
             ! Binary Database Format ===========================================
@@ -847,54 +912,79 @@ contains
                 ! the flow variable data that it is responsible for to the
                 ! formatted database slave file.
 
-                if (precision == 1) then
-                    do i = -offset_x%beg, m + offset_x%end
-                        do j = -offset_y%beg, n + offset_y%end
-                            do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i,j,k) = real(q_sf(i, j, k))
-                            end do
-                        end do
-                    end do
-                end if
+                if (coarsen_silo) call s_coarsen_variable()
 
                 if (grid_geometry == 3) then
-                    do i = -offset_x%beg, m + offset_x%end
-                        do j = -offset_y%beg, n + offset_y%end
-                            do k = -offset_z%beg, p + offset_z%end
-                                cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                    if (coarsen_silo) then
+                        do i = -offset_x%beg, (m/2) + offset_x%end
+                            do j = -offset_y%beg, (n/2) + offset_y%end
+                                do k = -offset_z%beg, (p/2) + offset_z%end
+                                    cyl_coarse_q_sf(j, k, i) = coarse_xyz_q_sf(i, j, k)
+                                end do
                             end do
                         end do
-                    end do
-                end if
-
-                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                if (precision == ${PRECISION}$) then
-                    if (p > 0) then
-                        if (grid_geometry == 3) then
-                            err = DBPUTQV1(dbfile, trim(varname), &
-                                            len_trim(varname), &
-                                            'rectilinear_grid', 16, &
-                                            cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                            0, ${DBT}$, DB_ZONECENT, &
-                                            DB_F77NULL, ierr)
-                        else
-                            err = DBPUTQV1(dbfile, trim(varname), &
-                                            len_trim(varname), &
-                                            'rectilinear_grid', 16, &
-                                            q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                            0, ${DBT}$, DB_ZONECENT, &
-                                            DB_F77NULL, ierr)
-                        end if
                     else
-                        err = DBPUTQV1(dbfile, trim(varname), &
-                                        len_trim(varname), &
-                                        'rectilinear_grid', 16, &
-                                        q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
-                                        0, ${DBT}$, DB_ZONECENT, &
-                                        DB_F77NULL, ierr)
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                                end do
+                            end do
+                        end do
                     end if
                 end if
-                #:endfor
+
+                if (p > 0) then
+                    if (coarsen_silo) then
+                        if (grid_geometry == 3) then
+                            err = DBPUTQV1(dbfile, trim(varname), &
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           cyl_coarse_q_sf, dims - 1, 3, DB_F77NULL, &
+                                           0, precision, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
+                        else
+                            err = DBPUTQV1(dbfile, trim(varname), &
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           coarse_xyz_q_sf, dims - 1, 3, DB_F77NULL, &
+                                           0, precision, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
+                        end if
+                    else
+                        if (grid_geometry == 3) then
+                            err = DBPUTQV1(dbfile, trim(varname), &
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           cyl_q_sf, dims - 1, 3, DB_F77NULL, &
+                                           0, precision, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
+                        else
+                            err = DBPUTQV1(dbfile, trim(varname), &
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           q_sf, dims - 1, 3, DB_F77NULL, &
+                                           0, precision, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
+                        end if
+                    end if
+                else
+                    if (coarsen_silo) then
+                        err = DBPUTQV1(dbfile, trim(varname), &
+                                       len_trim(varname), &
+                                       'rectilinear_grid', 16, &
+                                       coarse_xy_q_sf, dims - 1, 2, DB_F77NULL, &
+                                       0, precision, DB_ZONECENT, &
+                                       DB_F77NULL, ierr)
+                    else
+                        err = DBPUTQV1(dbfile, trim(varname), &
+                                       len_trim(varname), &
+                                       'rectilinear_grid', 16, &
+                                       q_sf, dims - 1, 2, DB_F77NULL, &
+                                       0, precision, DB_ZONECENT, &
+                                       DB_F77NULL, ierr)
+                    end if
+                end if
 
             end if
 
@@ -939,6 +1029,49 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file ! -----------
 
+    subroutine s_coarsen_variable() ! --------------------------------------
+        ! Description: The purpose of this subroutine is to coarsen any variable
+        ! that is to be written to the formatted database file by averaging every
+        ! two cells together into a single value. This averaging is done separately
+        ! in each dimension.
+
+        ! Generic loop iterator
+        integer :: i, j, k
+
+        ! Average q_sf onto coarser grid
+        coarse_x_q_sf(-offset_x%beg:-1, :, :) = q_sf(-offset_x%beg:-1, :, :)
+        coarse_x_q_sf((m/2) + 1:(m/2) + offset_x%end, :, :) = q_sf(m + 1:m + offset_x%end, :, :)
+        do i = 1, m, 2
+            coarse_x_q_sf((i - 1)/2, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end) &
+                = 5d-1*(q_sf(i, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end) + &
+                        q_sf(i - 1, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
+        end do
+        if (mod(m, 2) == 0) coarse_x_q_sf(m/2, :, :) = q_sf(m, :, :)
+
+        if (n > 0) then
+            coarse_xy_q_sf(:, -offset_y%beg:-1, :) = coarse_x_q_sf(:, -offset_y%beg:-1, :)
+            coarse_xy_q_sf(:, (n/2) + 1:(n/2) + offset_y%end, :) = coarse_x_q_sf(:, n + 1:n + offset_y%end, :)
+            do i = 1, n, 2
+                coarse_xy_q_sf(-offset_x%beg:(m/2) + offset_x%end, (i - 1)/2, -offset_z%beg:p + offset_z%end) &
+                    = 5d-1*(coarse_x_q_sf(-offset_x%beg:(m/2) + offset_x%end, i, -offset_z%beg:p + offset_z%end) + &
+                            coarse_x_q_sf(-offset_x%beg:(m/2) + offset_x%end, i - 1, -offset_z%beg:p + offset_z%end))
+            end do
+            if (mod(n, 2) == 0) coarse_xy_q_sf(:, n/2, :) = coarse_x_q_sf(:, n, :)
+
+            if (p > 0) then
+                coarse_xyz_q_sf(:, :, -offset_z%beg:-1) = coarse_xy_q_sf(:, :, -offset_z%beg:-1)
+                coarse_xyz_q_sf(:, :, (p/2) + 1:(p/2) + offset_z%end) = coarse_xy_q_sf(:, :, p + 1:p + offset_z%end)
+                do i = 1, p, 2
+                    coarse_xyz_q_sf(-offset_x%beg:(m/2) + offset_x%end, -offset_y%beg:(n/2) + offset_y%end, (i - 1)/2) &
+                        = 5d-1*(coarse_xy_q_sf(-offset_x%beg:(m/2) + offset_x%end, -offset_y%beg:(n/2) + offset_y%end, i) + &
+                                coarse_xy_q_sf(-offset_x%beg:(m/2) + offset_x%end, -offset_y%beg:(n/2) + offset_y%end, i - 1))
+                end do
+                if (mod(p, 2) == 0) coarse_xyz_q_sf(:, :, p/2) = coarse_xy_q_sf(:, :, p)
+            end if
+        end if
+
+    end subroutine s_coarsen_variable ! ------------------------------------
+
     subroutine s_close_formatted_database_file() ! -------------------------
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
@@ -973,9 +1106,14 @@ contains
         ! that were written to the formatted database file(s). Note that the
         ! root variable is only deallocated in the case of a 1D computation.
         deallocate (q_sf)
+        if (coarsen_silo) deallocate (coarse_x_q_sf, coarse_xy_q_sf, coarse_xyz_q_sf)
         if (n == 0) deallocate (q_root_sf)
         if (grid_geometry == 3) then
-            deallocate (cyl_q_sf)
+            if (coarsen_silo) then
+                deallocate (cyl_coarse_q_sf)
+            else
+                deallocate (cyl_q_sf)
+            end if
         end if
 
         ! Deallocating spatial and data extents and also the variables for

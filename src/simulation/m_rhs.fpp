@@ -622,13 +622,13 @@ contains
 
     end subroutine s_initialize_rhs_module ! -------------------------------
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, t_step) ! -------
+    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb, rhs_mv
         integer, intent(IN) :: t_step
         
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
@@ -676,7 +676,7 @@ contains
         end do
 
         call nvtxStartRange("RHS-MPI")
-        call s_populate_conservative_variables_buffers(pb)
+        call s_populate_conservative_variables_buffers(pb, mv)
         call nvtxEndRange
         
         ! ==================================================================
@@ -719,7 +719,7 @@ contains
         if (t_step == t_step_stop) return
         ! ==================================================================
 
-        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, ix, iy, iz, nbub)
+        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub)
 
 
 
@@ -915,19 +915,19 @@ contains
                                         nR2_dot = flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
 
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 )* &
-                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
 
                                         if(q <= 2) then
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
 
                                         else
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
                                         end if
 
                                     end do
@@ -1158,19 +1158,19 @@ contains
                                         nR2_dot = flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
 
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 )* &
-                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
 
                                         if(q <= 2) then
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
 
                                         else
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
                                         end if
 
                                     end do
@@ -1523,19 +1523,19 @@ contains
                                             nR2_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l))
 
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 )* &
-                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
 
                                             if(q <= 2) then
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
 
                                             else
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
                                             end if
 
                                         end do
@@ -1656,19 +1656,19 @@ contains
                                             nR2_dot = flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
 
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 )* &
-                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i) - pv)
+                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
 
                                             if(q <= 2) then
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
 
                                             else
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i) - pv)
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
                                                 rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(R2 - R**2)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i) - pv)
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
                                             end if
 
                                         end do
@@ -2133,11 +2133,11 @@ contains
     !>  The purpose of this procedure is to populate the buffers
         !!      of the conservative variables, depending on the selected
         !!      boundary conditions.
-    subroutine s_populate_conservative_variables_buffers(pb) ! ---------------
+    subroutine s_populate_conservative_variables_buffers(pb, mv) ! ---------------
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
 
         ! Population of Buffers in x-direction =============================
 
@@ -2164,6 +2164,22 @@ contains
                                 do q = 1, nnode
                                     pb(-j, k, l, q, i) = &
                                        pb(0, k, l, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do q = 1, nnode
+                                    mv(-j, k, l, q, i) = &
+                                       mv(0, k, l, q, i)
                                 end do
                             end do
                         end do
@@ -2225,6 +2241,22 @@ contains
                 end do
             end if
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do q = 1, nnode
+                                    mv(-j, k, l, q, i) = &
+                                       mv(m - (j - 1), k, l, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
 
 
         else                            ! Processor BC at beginning
@@ -2257,6 +2289,22 @@ contains
                                 do q = 1, nnode
                                     pb(m + j, k, l, q, i) = &
                                        pb(m, k, l, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do q = 1, nnode
+                                    mv(m + j, k, l, q, i) = &
+                                       mv(m, k, l, q, i)
                                 end do
                             end do
                         end do
@@ -2320,6 +2368,22 @@ contains
                 end do
             end if
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do q = 1, nnode
+                                    mv(m + j, k, l, q, i) = &
+                                       mv(j - 1, k, l, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         else                            ! Processor BC at end
 
             call s_mpi_sendrecv_conservative_variables_buffers( &
@@ -2349,6 +2413,37 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, -j, k, q, i) = &
+                                       pb(l, 0, k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, -j, k, q, i) = &
+                                       mv(l, 0, k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         elseif (bc_y%beg == -13) then    ! Axis BC at beginning
 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -2396,6 +2491,38 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, -j, k, q, i) = &
+                                       pb(l, j-1, k - ((p+1)/2), q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, -j, k, q, i) = &
+                                       mv(l, j-1, k - ((p+1)/2), q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         elseif (bc_y%beg == -2) then     ! Symmetry BC at beginning
             !$acc parallel loop collapse(3) gang vector default(present)
             do k = 0, p
@@ -2419,6 +2546,38 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, -j, k, q, i) = &
+                                       pb(l, j-1, k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, -j, k, q, i) = &
+                                       mv(l, j-1, k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         elseif (bc_y%beg == -1) then     ! Periodic BC at beginning
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -2431,6 +2590,38 @@ contains
                     end do
                 end do
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, -j, k, q, i) = &
+                                       pb(l, n - (j-1), k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, -j, k, q, i) = &
+                                       mv(l, n - (j-1), k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
 
         else                            ! Processor BC at beginning
 
@@ -2451,6 +2642,38 @@ contains
                     end do
                 end do
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, n + j, k, q, i) = &
+                                       pb(l, n , k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, n + j, k, q, i) = &
+                                       mv(l, n , k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if            
 
         elseif (bc_y%end == -2) then     ! Symmetry BC at end
 
@@ -2476,6 +2699,37 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, n + j, k, q, i) = &
+                                       pb(l, n - (j-1), k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, n + j, k, q, i) = &
+                                       mv(l, n - (j-1), k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         elseif (bc_y%end == -1) then     ! Periodic BC at end
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -2489,6 +2743,38 @@ contains
                     end do
                 end do
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(l, n + j, k, q, i) = &
+                                       pb(l, (j-1), k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(l, n + j, k, q, i) = &
+                                       mv(l, (j-1), k, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if            
 
         else                            ! Processor BC at end
 
@@ -2519,6 +2805,38 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(k, l, -j, q, i) = &
+                                       pb(k, l, 0, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(k, l, -j, q, i) = &
+                                       mv(k, l, 0, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         elseif (bc_z%beg == -2) then     ! Symmetry BC at beginning
 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -2543,6 +2861,38 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(k, l, -j, q, i) = &
+                                       pb(k, l, j-1, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if    
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(k, l, -j, q, i) = &
+                                       mv(k, l, j-1, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
+
         elseif (bc_z%beg == -1) then     ! Periodic BC at beginning
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -2555,6 +2905,38 @@ contains
                     end do
                 end do
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(k, l, -j, q, i) = &
+                                       pb(k, l, p - (j-1), q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(k, l, -j, q, i) = &
+                                       mv(k, l, p - (j-1), q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
 
         else                            ! Processor BC at beginning
 
@@ -2576,6 +2958,37 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(k, l, p+j, q, i) = &
+                                       pb(k, l, p, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(k, l, p+j, q, i) = &
+                                       mv(k, l, p, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
         elseif (bc_z%end == -2) then     ! Symmetry BC at end
             !$acc parallel loop collapse(3) gang vector default(present)
             do j = 1, buff_size
@@ -2599,6 +3012,37 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(k, l, p + j, q, i) = &
+                                       pb(k, l, p - (j-1), q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(k, l, p + j, q, i) = &
+                                       mv(k, l, p - (j-1), q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
         elseif (bc_z%end == -1) then     ! Periodic BC at end
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -2612,6 +3056,37 @@ contains
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    pb(k, l, p + j, q, i) = &
+                                       pb(k, l, j-1, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if 
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, nb
+                    do j = 1, buff_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                do q = 1, nnode
+                                    mv(k, l, p + j, q, i) = &
+                                       mv(k, l, j-1, q, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         else                            ! Processor BC at end
 
             call s_mpi_sendrecv_conservative_variables_buffers( &
