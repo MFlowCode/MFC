@@ -60,13 +60,18 @@ contains
 
     end subroutine s_mpi_initialize ! --------------------------------------
 
-    subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers) ! --------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
+        type(integer_field), &
+            optional, &
+            intent(IN) :: ib_markers
+
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
+        integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
 
 #ifdef MFC_MPI
 
@@ -123,6 +128,61 @@ contains
                 call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
 
             end do
+        end if
+#endif
+
+#ifndef MFC_POST_PROCESS
+        if (present(ib_markers)) then
+
+#ifdef MPI_SIMULATION
+            MPI_IO_IB_DATA%var%sf => ib_markers%sf
+#else
+            MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
+#endif
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_IO_IB_DATA%view, ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
+
+        end if
+#endif
+
+#ifndef MFC_POST_PROCESS
+        if (present(ib_markers)) then
+            do j = 1, num_ibs
+                if (patch_ib(j)%c > 0) then
+
+#ifdef MFC_PRE_PROCESS
+                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
+#endif
+
+                    airfoil_glb(1) = 3*Np*num_procs
+                    airfoil_loc(1) = 3*Np
+                    airfoil_start(1) = 3*proc_rank*Np
+
+#ifdef MFC_PRE_PROCESS
+                    do i = 1, Np
+                        MPI_IO_airfoil_IB_DATA%var(i)%x = airfoil_grid_l(i)%x
+                        MPI_IO_airfoil_IB_DATA%var(i)%y = airfoil_grid_l(i)%y
+                    end do
+#endif
+
+                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
+                                                  MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), ierr)
+                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(1), ierr)
+
+#ifdef MFC_PRE_PROCESS
+                    do i = 1, Np
+                        MPI_IO_airfoil_IB_DATA%var(Np + i)%x = airfoil_grid_u(i)%x
+                        MPI_IO_airfoil_IB_DATA%var(Np + i)%y = airfoil_grid_u(i)%y
+                    end do
+#endif
+                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
+                                                  MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), ierr)
+                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(2), ierr)
+
+                end if
+            end do
+
         end if
 #endif
 

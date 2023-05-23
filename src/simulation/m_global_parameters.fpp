@@ -148,6 +148,8 @@ module m_global_parameters
     !! Starting cell-center index of local processor in global grid
 
     type(mpi_io_var), public :: MPI_IO_DATA
+    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
+    type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
 
     !> @name MPI info for parallel IO with Lustre file systems
     !> @{
@@ -254,6 +256,23 @@ module m_global_parameters
     real(kind(0d0)) :: rhoref, pref
     !> @}
     !$acc declare create(rhoref, pref)
+
+    !> @name Immersed Boundaries
+    !> @{
+    logical :: ib
+    integer :: num_ibs
+
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    integer :: Np
+    !! Database of the immersed boundary patch parameters for each of the
+    !! patches employed in the configuration of the initial condition. Note that
+    !! the maximum allowable number of patches, num_patches_max, may be changed
+    !! in the module m_derived_types.f90.
+    ! ==========================================================================
+
+    !$acc declare create(ib, num_ibs, patch_ib)
+    !> @}
 
     !> @name Bubble modeling
     !> @{
@@ -426,6 +445,10 @@ contains
         rhoref = dflt_real
         pref = dflt_real
 
+        ! Immersed Boundaries
+        ib = .false.
+        num_ibs = dflt_int
+
         ! Bubble modeling
         bubbles = .false.
         bubble_model = 1
@@ -435,7 +458,7 @@ contains
         R0ref = dflt_real
 
         #:if not MFC_CASE_OPTIMIZATION
-            nb = dflt_int
+            nb = 1
             weno_order = dflt_int
         #:endif
 
@@ -791,6 +814,10 @@ contains
         wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
         !$acc update device(wa_flg)
 
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
+        Np = 0
+
+        !$acc update device(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
@@ -937,6 +964,8 @@ contains
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
         end if
+
+        if (ib) MPI_IO_IB_DATA%var%sf => null()
 
     end subroutine s_finalize_global_parameters_module ! -------------------
 

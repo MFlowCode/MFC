@@ -8,7 +8,7 @@ module m_constants
 
     real(kind(0d0)), parameter :: dflt_real = -1d6                !< Default real value
     real(kind(0d0)), parameter :: sgm_eps = 1d-16               !< Segmentation tolerance
-    real(kind(0d0)), parameter :: small_alf = 1d-7                !< Small alf tolerance
+    real(kind(0d0)), parameter :: small_alf = 1d-11                !< Small alf tolerance
     real(kind(0d0)), parameter :: pi = 3.141592653589793d0 !< Pi
     real(kind(0d0)), parameter :: verysmall = 1.d-12              !< Very small number
 

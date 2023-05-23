@@ -43,6 +43,8 @@ module m_rhs
 
     use m_viscous
 
+    use m_ibm
+
     use m_nvtx
 
     use m_boundary_conditions
@@ -1852,9 +1854,25 @@ contains
             end if
             call nvtxEndRange
         end do
+
+        if (ib) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ib_markers%sf(j, k, l) /= 0) then
+                            do i = 1, sys_size
+                                rhs_vf(i)%sf(j, k, l) = 0d0
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        end if
+
         ! END: Dimensional Splitting Loop =================================
 
-        if (run_time_info .or. probe_wrt) then
+        if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) iy%beg = -buff_size; 
