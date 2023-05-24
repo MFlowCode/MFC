@@ -360,8 +360,8 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `R0ref` 			 | Real		  | Reference bubble radius |
 | `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0|
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
-| `poly_sigma` †	       | Real 		|	Standard deviation for PDF of polydisperse bubble populations |
-| `R0_type` †	       | Integer 		|	Quadrature rule for PDF of polydisperse bubble populations |
+| `poly_sigma` 	       | Real 		|	Standard deviation for PDF of polydisperse bubble populations |
+| `R0_type` 	       | Integer 		|	Quadrature rule for PDF of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -372,11 +372,11 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `M_v` †     	 | Real 		| Molecular weight |
 | `mu_v` †	     | Real 		|	Viscosity |
 | `k_v` †	       | Real 		|	Thermal conductivity |
-| `qbmm` †	       | Logical 		|	Quadrature by  method of moments|
-| `dist_type` †	       | Integer 		|	Joint PDF for bubble radius and velocity (only when qbmm is true)|
-| `sigR` †	       | Real 		|	Standard deviation for PDF of bubble radius (only when qbmm is true) |
-| `sigV` †	       | Real 		|	Standard deviation for PDF of bubble velocity (only when qbmm is true) |
-| `rhoRV` †	       | Real 		|	Correlation coefficient for joint PDF of bubble radius and velocity (only when qbmm is true) |
+| `qbmm` 	       | Logical 		|	Quadrature by  method of moments|
+| `dist_type` 	       | Integer 		|	Joint PDF for bubble radius and velocity (only when qbmm is true)|
+| `sigR` 	       | Real 		|	Standard deviation for PDF of bubble radius (only when qbmm is true) |
+| `sigV` 	       | Real 		|	Standard deviation for PDF of bubble velocity (only when qbmm is true) |
+| `rhoRV`	       | Real 		|	Correlation coefficient for joint PDF of bubble radius and velocity (only when qbmm is true) |
 
 
 
