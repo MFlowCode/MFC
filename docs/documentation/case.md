@@ -360,8 +360,8 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `R0ref` 			 | Real		  | Reference bubble radius |
 | `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0|
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
-| `poly_sigma` 	       | Real 		|	Standard deviation for PDF of polydisperse bubble populations |
-| `R0_type` 	       | Integer 		|	Quadrature rule for PDF of polydisperse bubble populations |
+| `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
+| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
