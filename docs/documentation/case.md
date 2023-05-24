@@ -400,7 +400,11 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 
 - `R0ref` specifies the reference bubble radius.
 
-- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the bubble radius.
+- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibirum bubble radius.
+
+- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations. `R0_type` $=$ 1 corresponds to simpson's rule. 
+
+- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibirium bubble radius for polydisperse populations. 
 
 - `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
@@ -408,6 +412,16 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 `mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively. 
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
 Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
+
+- `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity. 
+
+- `dist_type` specifies the initial joint PDF of initial bubble radius and bubble velocity required in qbmm. `dist_type` $=$ 1  and 2 correspond to binormal and lognormal-normal distributions respectively. 
+
+- `sigR` specifies the standard deviation of the PDF of bubble radius required in qbmm.  
+
+- `sigV` specifies the standard deviation of the PDF of bubble velocity required in qbmm.  
+
+- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.  
 
 ### 9. Velocity Field Setup
 
