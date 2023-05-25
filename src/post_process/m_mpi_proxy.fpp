@@ -929,15 +929,13 @@ contains
                                 r = sys_size*(j + buff_size) &
                                     + sys_size*buff_size*k + (i - 1) &
                                     + sys_size*buff_size*(n + 1)*l
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
-                                
-                                #if defined(__INTEL_COMPILER)
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)                             
+#if defined(__INTEL_COMPILER)
                                 if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-                                #endif 
-                                
+#endif                                
                             end do
                         end do
                     end do
@@ -1011,15 +1009,13 @@ contains
                                 r = (i - 1) + sys_size*(j - m - 1) &
                                     + sys_size*buff_size*k &
                                     + sys_size*buff_size*(n + 1)*l
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
-                                
-                                #if defined(__INTEL_COMPILER)
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)                                
+#if defined(__INTEL_COMPILER)
                                 if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-                                #endif 
-                                
+#endif                                 
                             end do
                         end do
                     end do
@@ -1108,14 +1104,12 @@ contains
                                     (k + buff_size) + sys_size* &
                                     (m + 2*buff_size + 1)*buff_size*l
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
-                                
-                                #if defined(__INTEL_COMPILER)
+#if defined(__INTEL_COMPILER)
                                 if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-                                #endif 
-                                
+#endif            
                             end do
                         end do
                     end do
@@ -1196,14 +1190,12 @@ contains
                                     (k - n - 1) + sys_size* &
                                     (m + 2*buff_size + 1)*buff_size*l
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
-                                
-                                #if defined(__INTEL_COMPILER)
+#if defined(__INTEL_COMPILER)
                                 if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-                                #endif 
-                                
+#endif 
                             end do
                         end do
                     end do
@@ -1297,14 +1289,12 @@ contains
                                     + sys_size*(m + 2*buff_size + 1)* &
                                     (n + 2*buff_size + 1)*(l + buff_size)
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
-                                
-                                #if defined(__INTEL_COMPILER)
+#if defined(__INTEL_COMPILER)
                                 if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-                                #endif 
-                                
+#endif                           
                             end do
                         end do
                     end do
@@ -1390,14 +1380,12 @@ contains
                                     + sys_size*(m + 2*buff_size + 1)* &
                                     (n + 2*buff_size + 1)*(l - p - 1)
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
-                                
-                                #if defined(__INTEL_COMPILER)
+#if defined(__INTEL_COMPILER)
                                 if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-                                #endif                      
-                                
+#endif 
                             end do
                         end do
                     end do
