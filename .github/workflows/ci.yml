@@ -27,14 +27,14 @@ jobs:
           - os:  ubuntu-latest
             debug: --debug
             intel: false
-#           - os:  ubuntu-latest
-#             debug: --no-debug
-#             intel: true
-#             intel-command: source /opt/intel/oneapi/setvars.sh
-#           - os:  ubuntu-latest
-#             debug: --debug
-#             intel: true
-#             intel-command: source /opt/intel/oneapi/setvars.sh
+          - os:  ubuntu-latest
+            debug: --no-debug
+            intel: true
+            intel-command: source /opt/intel/oneapi/setvars.sh
+          - os:  ubuntu-latest
+            debug: --debug
+            intel: true
+            intel-command: source /opt/intel/oneapi/setvars.sh
           - os:  macos-latest
             debug: --no-debug
             gcc: 11
