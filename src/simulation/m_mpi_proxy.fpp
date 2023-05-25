@@ -22,6 +22,8 @@ module m_mpi_proxy
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_common
+
+    use ieee_arithmetic
     ! ==========================================================================
 
     implicit none
@@ -468,6 +470,10 @@ contains
                     start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                 end if
             end if
+
+            if (proc_rank == 0) then
+                print *, m, n, p, bc_y%beg, bc_y%end
+            end if
             ! ==================================================================
 
             ! 1D Cartesian Processor Topology ==================================
@@ -510,8 +516,6 @@ contains
             proc_coords(1) = proc_coords(1) + 1
         end if
 
-        print *, bc_x%beg
-
         ! Boundary condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
             proc_coords(1) = proc_coords(1) + 1
@@ -527,10 +531,6 @@ contains
             end if
         end if
         ! ==================================================================
-
-        if (proc_rank == 0) then
-            print *, m, n, p
-        end if
 
 #endif
 
@@ -866,7 +866,11 @@ contains
                             do i = 1, sys_size
                                 r = (i - 1) + sys_size* &
                                     (j + buff_size*((k + 1) + (n + 1)*l))
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)                                
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                end if
                             end do
                         end do
                     end do
@@ -991,7 +995,11 @@ contains
                             do i = 1, sys_size
                                 r = (i - 1) + sys_size* &
                                     ((j - m - 1) + buff_size*(k + (n + 1)*l))
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)                                
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                end if
                             end do
                         end do
                     end do
@@ -1021,6 +1029,8 @@ contains
                             end do
                         end do
                     end do
+
+
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
@@ -1131,6 +1141,10 @@ contains
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + buff_size*l))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                end if
                             end do
                         end do
                     end do
@@ -1264,6 +1278,10 @@ contains
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k - n - 1) + buff_size*l))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    print *, "Error", j, k, l, i
+                                    error stop "NaN(s) in recv"
+                                end if
                             end do
                         end do
                     end do
@@ -1405,6 +1423,10 @@ contains
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                       (l + buff_size)))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    print *, "Error", j, k, l, i
+                                    error stop "NaN(s) in recv"
+                                end if
                             end do
                         end do
                     end do
@@ -1538,6 +1560,10 @@ contains
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                       (l - p - 1)))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    print *, "Error", j, k, l, i
+                                    error stop "NaN(s) in recv"
+                                end if
                             end do
                         end do
                     end do
