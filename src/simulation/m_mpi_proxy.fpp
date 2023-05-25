@@ -22,7 +22,7 @@ module m_mpi_proxy
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_mpi_common
-
+    
     use ieee_arithmetic
     ! ==========================================================================
 
