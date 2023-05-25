@@ -471,9 +471,6 @@ contains
                 end if
             end if
 
-            if (proc_rank == 0) then
-                print *, m, n, p, bc_y%beg, bc_y%end
-            end if
             ! ==================================================================
 
             ! 1D Cartesian Processor Topology ==================================
