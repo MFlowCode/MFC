@@ -270,7 +270,7 @@ contains
                     end do
 
                     pres = q_prim_vf(E_idx)%sf(j, k, l)
-                    
+
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_sum
 
                     H = (E + pres)/rho
@@ -302,8 +302,9 @@ contains
                         end if
 
                         if (any(Re_size > 0)) then
+
                             if (grid_geometry == 3) then
-                                vcfl_sf(j, k, l) = maxval(dt/Re) &
+                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
                                                    /min(dx(j), dy(k), fltr_dtheta)**2d0
 
                                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
@@ -311,7 +312,7 @@ contains
                                                      fltr_dtheta*(abs(vel(3)) + c)) &
                                                  /maxval(1d0/Re)
                             else
-                                vcfl_sf(j, k, l) = maxval(dt/Re) &
+                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
                                                    /min(dx(j), dy(k), dz(l))**2d0
 
                                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
@@ -326,10 +327,10 @@ contains
                         !2D
                         icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
                                                   dy(k)/(abs(vel(2)) + c))
-
+                        
                         if (any(Re_size > 0)) then
 
-                            vcfl_sf(j, k, l) = maxval(dt/Re)/min(dx(j), dy(k))**2d0
+                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/min(dx(j), dy(k))**2d0
 
                             Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                                  dy(k)*(abs(vel(2)) + c)) &
@@ -343,7 +344,7 @@ contains
 
                         if (any(Re_size > 0)) then
 
-                            vcfl_sf(j, k, l) = maxval(dt/Re)/dx(j)**2d0
+                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/dx(j)**2d0
 
                             Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1d0/Re)
 
