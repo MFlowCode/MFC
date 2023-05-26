@@ -302,6 +302,7 @@ contains
                         end if
 
                         if (any(Re_size > 0)) then
+
                             if (grid_geometry == 3) then
                                 vcfl_sf(j, k, l) = maxval(dt/Re) &
                                                    /min(dx(j), dy(k), fltr_dtheta)**2._wp
@@ -326,7 +327,7 @@ contains
                         !2D
                         icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
                                                   dy(k)/(abs(vel(2)) + c))
-
+                        
                         if (any(Re_size > 0)) then
 
                             vcfl_sf(j, k, l) = maxval(dt/Re)/min(dx(j), dy(k))**2._wp

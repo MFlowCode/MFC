@@ -361,7 +361,10 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `polytropic`   | Logical	| Polytropic gas compression |
 | `thermal` 		 | Integer	| Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
 | `R0ref` 			 | Real		  | Reference bubble radius |
+| `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0|
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
+| `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
+| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -372,6 +375,13 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `M_v` †     	 | Real 		| Molecular weight |
 | `mu_v` †	     | Real 		|	Viscosity |
 | `k_v` †	       | Real 		|	Thermal conductivity |
+| `qbmm` 	       | Logical 		|	Quadrature by  method of moments|
+| `dist_type` 	       | Integer 		|	Joint probability density function for bubble radius and velocity (only when qbmm is true)|
+| `sigR` 	       | Real 		|	Standard deviation for probability density function of bubble radius (only when qbmm is true) |
+| `sigV` 	       | Real 		|	Standard deviation for probability density function of bubble velocity (only when qbmm is true) |
+| `rhoRV`	       | Real 		|	Correlation coefficient for joint probability density function of bubble radius and velocity (only when qbmm is true) |
+
+
 
 These options work only for gas-liquid two component flows. Component indexes are required to be 1 for liquid and 2 for gas.
 
@@ -388,12 +398,18 @@ This table lists the ensemble-averaged bubble model parameters.
 - `polytropic` activates polytropic gas compression in the bubble.
 When `polytropic` is set `False`, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](references.md#Preston07)).
 
+- `polydisperse` activates polydispersity in the bubble model by means of a probability density function (PDF) of the equiliibrium bubble radius. 
+
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal` $=$ 1, 2, and 3 correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md#Preston07), respectively.
 
 - `R0ref` specifies the reference bubble radius.
 
-- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the bubble radius.
+- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibirum bubble radius.
+
+- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations. `R0_type` $=$ 1 corresponds to simpson's rule. 
+
+- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibirium bubble radius for polydisperse populations. 
 
 - `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
@@ -401,6 +417,16 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 `mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively. 
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
 Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
+
+- `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity. 
+
+- `dist_type` specifies the initial joint PDF of initial bubble radius and bubble velocity required in qbmm. `dist_type` $=$ 1  and 2 correspond to binormal and lognormal-normal distributions respectively. 
+
+- `sigR` specifies the standard deviation of the PDF of bubble radius required in qbmm.  
+
+- `sigV` specifies the standard deviation of the PDF of bubble velocity required in qbmm.  
+
+- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.  
 
 ### 9. Velocity Field Setup
 
