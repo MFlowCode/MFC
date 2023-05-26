@@ -308,14 +308,14 @@ contains
 
         integer :: i
 
-        @:DEALLOCATE(Gs(1:num_fluids))
-        @:DEALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
-        @:DEALLOCATE(du_dx(0:m,0:n,0:p))
+        @:DEALLOCATE(Gs)
+        @:DEALLOCATE(rho_K_field, G_K_field)
+        @:DEALLOCATE(du_dx)
         if (n > 0) then
-            @:DEALLOCATE(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
+            @:DEALLOCATE(du_dy, dv_dx, dv_dy)
             if (p > 0) then
-                @:DEALLOCATE(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
-                @:DEALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+                @:DEALLOCATE(du_dz, dv_dz)
+                @:DEALLOCATE(dw_dx, dw_dy, dw_dz)
             end if
         end if
 
