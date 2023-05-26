@@ -374,6 +374,8 @@ program p_main
         call s_finalize_viscous_module()
     end if
 
+    if (hypoelasticity) call s_finalize_hypoelastic_module()
+
     ! Terminating MPI execution environment
     call s_mpi_finalize()
 

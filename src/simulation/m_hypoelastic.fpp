@@ -20,7 +20,8 @@ module m_hypoelastic
     implicit none
 
     private; public :: s_initialize_hypoelastic_module, &
-            s_compute_hypoelastic_rhs
+            s_compute_hypoelastic_rhs, &
+            s_finalize_hypoelastic_module
 
     real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
@@ -302,5 +303,22 @@ contains
         end if
 
     end subroutine s_compute_hypoelastic_rhs
+
+    subroutine s_finalize_hypoelastic_module() ! --------------------
+
+        integer :: i
+
+        @:DEALLOCATE(Gs(1:num_fluids))
+        @:DEALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
+        @:DEALLOCATE(du_dx(0:m,0:n,0:p))
+        if (n > 0) then
+            @:DEALLOCATE(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
+            if (p > 0) then
+                @:DEALLOCATE(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
+                @:DEALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+            end if
+        end if
+
+    end subroutine s_finalize_hypoelastic_module
 
 end module m_hypoelastic

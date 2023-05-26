@@ -129,12 +129,15 @@ def handle_case(test: TestCase):
         elif test.params.get("bubbles", 'F') == 'T':
             tol = 1e-10
         elif test.params.get("hypoelasticity", 'F') == 'T':
-            tol = 1e-7
+            tol = 1e-10
         else:
             tol = 1e-12
 
         if ARG('single'):
-            tol = 1e8*tol
+            if test.params.get("hypoelasticity", 'F') == 'T':
+                tol = 1e8*tol
+            else:
+                tol = 1e8*tol
 
         test.create_directory("case_pre_sim")
         cmd = test.run("case_pre_sim", ["pre_process", "simulation"])

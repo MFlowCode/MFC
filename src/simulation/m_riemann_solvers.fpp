@@ -438,7 +438,7 @@ contains
                                 do i = 1, strxe - strxb + 1
                                     ! Elastic contribution to energy if G large enough
                                     !TODO take out if statement if stable without
-                                    if ((G_L > 1000) .and. (G_R > 1000)) then
+                                    if ((G_L > 1000._wp) .and. (G_R > 1000._wp)) then
                                         E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                         E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                         ! Additional terms in 2D and 3D
