@@ -98,6 +98,7 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function   
+    ! real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function   
 
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
@@ -325,7 +326,7 @@ contains
         end if 
 #endif
 
-        ! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
+! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
 #ifdef MFC_POST_PROCESS
         rho_sf   (j, k, l) = rho
         gamma_sf (j, k, l) = gamma
@@ -346,8 +347,8 @@ contains
         !! @param j Cell index
         !! @param k Cell index
         !! @param l Cell index
-    subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, &
-                                                        rho, gamma, pi_inf, Re_K, G_K, G)
+    subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
+                                                      gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
 
@@ -356,6 +357,7 @@ contains
         real(kind(0d0)), intent(OUT), target :: rho
         real(kind(0d0)), intent(OUT), target :: gamma
         real(kind(0d0)), intent(OUT), target :: pi_inf
+        real(kind(0d0)), intent(OUT), target :: qv
 
         real(kind(0d0)), optional, dimension(2), intent(OUT) :: Re_K
 
@@ -386,14 +388,16 @@ contains
 
         end if
 
-        ! Calculating the density, the specific heat ratio function and the
-        ! liquid stiffness function, respectively, from the species analogs
-        rho = 0d0; gamma = 0d0; pi_inf = 0d0
+        ! Calculating the density, the specific heat ratio function, the
+        ! liquid stiffness function, and the energy reference function,
+        ! respectively, from the species analogs
+        rho = 0d0; gamma = 0d0; pi_inf = 0d0; qv = 0d0
 
         do i = 1, num_fluids
             rho = rho + alpha_rho_K(i)
             gamma = gamma + alpha_K(i)*gammas(i)
             pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
+            qv = qv + alpha_rho_K(i)*qvs(i)
         end do
 
 #ifdef MFC_SIMULATION
@@ -594,11 +598,13 @@ contains
 
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
+        @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(Gs     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i)  = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
+            qvs(i)     = fluid_pp(i)%qv
             Gs(i)      = fluid_pp(i)%G
         end do
         !$acc update device(gammas, pi_infs, Gs)
@@ -1244,7 +1250,7 @@ contains
         deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
 
-        @:DEALLOCATE(gammas, pi_infs, Gs)
+        @:DEALLOCATE(gammas, pi_infs, qvs, Gs)
         
         if (bubbles) then
             @:DEALLOCATE(bubrs)

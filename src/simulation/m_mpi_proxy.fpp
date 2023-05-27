@@ -125,9 +125,11 @@ contains
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
             & 'num_fluids','time_stepper', 'riemann_solver',      & 
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', & 
-            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
-            & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'R0_type', 'num_mono' ]
+            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'bc_x_glb%beg',  & 
+            & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &
+            & 'bc_z_glb%end', 'fd_order', 'num_probes', 'num_integrals',       &
+            & 'bubble_model', 'thermal', 'R0_type', 'num_mono', 'relax_model']
+
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -152,7 +154,7 @@ contains
 
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v','G' ]
+                & 'mu_v','k_v','G', 'cv', 'qv', 'qvp' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)

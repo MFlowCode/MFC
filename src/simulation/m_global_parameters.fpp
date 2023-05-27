@@ -117,6 +117,7 @@ module m_global_parameters
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
+    integer :: relax_model    !< Relaxation model
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
@@ -376,6 +377,7 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        relax_model      = dflt_int
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
@@ -393,6 +395,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
+            fluid_pp(i)%cv      = dflt_real
+            fluid_pp(i)%qv      = dflt_real
+            fluid_pp(i)%qvp     = dflt_real
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real

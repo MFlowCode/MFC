@@ -349,6 +349,7 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
+            fluid_pp(i)%qv      = dflt_real
             fluid_pp(i)%G = 0d0
         end do
 
