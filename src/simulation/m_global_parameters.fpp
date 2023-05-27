@@ -121,6 +121,7 @@ module m_global_parameters
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
+    integer :: relax_model    !< Relaxation model
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
