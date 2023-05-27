@@ -360,9 +360,13 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
+<<<<<<< HEAD
             fluid_pp(i)%cv      = 0d0
             fluid_pp(i)%qv      = 0d0
             fluid_pp(i)%qvp      = 0d0
+=======
+            fluid_pp(i)%qv      = dflt_real
+>>>>>>> 458685f3 (First round of changes to add phase change to the most recent MFC version)
             fluid_pp(i)%G = 0d0
         end do
 

@@ -99,8 +99,13 @@ module m_variables_conversion
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
+<<<<<<< HEAD
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
+=======
+    real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function   
+    ! real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function   
+>>>>>>> 458685f3 (First round of changes to add phase change to the most recent MFC version)
 
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
@@ -335,7 +340,11 @@ contains
         end if
 #endif
 
+<<<<<<< HEAD
 ! Post process requires rho_sf/gamma_sf/pi_inf_sf/qv_sf to also be updated
+=======
+! Post process requires rho_sf/gamma_sf/pi_inf_sf to also be updated
+>>>>>>> 458685f3 (First round of changes to add phase change to the most recent MFC version)
 #ifdef MFC_POST_PROCESS
         rho_sf(j, k, l) = rho
         gamma_sf(j, k, l) = gamma
@@ -622,8 +631,13 @@ contains
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
+<<<<<<< HEAD
             qvs(i) = fluid_pp(i)%qv
             Gs(i) = fluid_pp(i)%G
+=======
+            qvs(i)     = fluid_pp(i)%qv
+            Gs(i)      = fluid_pp(i)%G
+>>>>>>> 458685f3 (First round of changes to add phase change to the most recent MFC version)
         end do
         !$acc update device(gammas, pi_infs, qvs, Gs)
 
@@ -1276,7 +1290,11 @@ contains
 #endif
 
         @:DEALLOCATE(gammas, pi_infs, qvs, Gs)
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 458685f3 (First round of changes to add phase change to the most recent MFC version)
         if (bubbles) then
             @:DEALLOCATE(bubrs)
         end if

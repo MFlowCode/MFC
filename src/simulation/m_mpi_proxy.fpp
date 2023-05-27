@@ -129,7 +129,6 @@ contains
             & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &
             & 'bc_z_glb%end', 'fd_order', 'num_probes', 'num_integrals',       &
             & 'bubble_model', 'thermal', 'R0_type', 'num_mono', 'relax_model']
-
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
