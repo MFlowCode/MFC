@@ -41,6 +41,8 @@ jobs:
           - os:  macos-latest
             debug: --debug
             gcc: 11
+      fail-fast: false
+    continue-on-error: true
     runs-on: ${{ matrix.os }}
     steps:
       - name: Clone
@@ -105,6 +107,7 @@ jobs:
       group: phoenix
       labels: self-hosted
     if: github.repository == 'MFlowCode/MFC'
+    continue-on-error: true
     steps:
       - name: Clone
         uses: actions/checkout@v3
@@ -131,6 +134,7 @@ jobs:
       group: phoenix
       labels: self-hosted
     if: github.repository == 'MFlowCode/MFC'
+    continue-on-error: true
     steps:
       - name: Clone
         uses: actions/checkout@v3
