@@ -6,19 +6,178 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MFC | Home</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
-<!--     <link rel="icon" href="logo.png" /> -->
-    <link rel="icon" type="image/x-icon" href="/res/icon.ico">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="res/icon.ico">
     <script>
-        async function onLoad(event) {
-            const url = "https://api.github.com/repos/MFlowCode/MFC/releases/latest";
-            const r   = await fetch(url).then((r) => r.json());
-
-            document.getElementById("release-ver").innerText  = r["tag_name"];
+        async function ghapi(url) {
+            return fetch(url).then((r) => r.json());
         }
 
-        window.addEventListener("load", onLoad);
+        let htmlLoaded = false;
+        window.addEventListener("DOMContentLoaded", () => { htmlLoaded = true; });
+
+        function onHTML(func) {
+            window.addEventListener("DOMContentLoaded", func);
+
+            if (htmlLoaded) {
+                func();
+            }
+        }
+
+        ghapi("https://api.github.com/repos/MFlowCode/MFC/releases/latest").then((r) => {
+            onHTML(() => {
+                document.getElementById("release-ver").innerText = r["tag_name"];    
+            })
+        });
+
+        ghapi("https://api.github.com/repos/MFlowCode/MFC/contributors").then((r) => {
+            onHTML(() => {
+                let container = document.getElementById("ft-contrib");
+
+                for (let contrib of r) {
+                    let lnk = document.createElement("a");
+                    lnk.classList.add("w-12", "h-12", "float-left");
+                    lnk.href = contrib.html_url;
+
+                    let img = document.createElement("div");
+                    img.classList.add("w-12", "h-12", "bg-cover");
+
+                    img.style.backgroundImage = `url('${contrib.avatar_url}')`;
+
+                    lnk.appendChild(img);
+                    container.appendChild(lnk);
+                }
+            });
+        });
+
+        class FS {
+            constructor(name, image, computer, accelerators, walltime, source) {
+                this.name         = name;
+                this.image        = image;
+                this.computer     = computer;
+                this.accelerators = accelerators;
+                this.walltime     = walltime;
+                this.source       = source;
+            }
+        };
+    
+        const sims = [
+            new FS("Shedding water droplet - Vorticity", "res/simulations/a.png", "Summit", "960 V100s", "4h", "https://doi.org/10.48550/arXiv.2305.09163"),
+            new FS("Cavitating bubble cloud - Wall pressure", "res/simulations/b.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
+            new FS("Cavitating bubble cloud - Streamlines", "res/simulations/c.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
+            new FS("Kidney stone near a collapsing bubble cloud - Maximum principal stresses", "res/simulations/d.png", "Summit", "576 V100s", "30 min", "https://doi.org/10.48550/arXiv.2305.09163")
+        ];
+
+        /*
+        <div class="flex flex-col text-white rounded bg-slate-900 rounded-b-lg">
+            <div class="flex-1 grid bg-white pb-2">
+                <img class="place-self-center" src="res/simulations/a.png">
+            </div>
+            <div class="flex flex-row items-center">
+                <img class="h-10 bg-white" src="res/logo.png" />
+                <div class="flex-1 font-semibold text-center">
+                    Bubble collapse from monopole
+                </div>  
+                <a class="w-10 text-center" href="#">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>                              
+            </div>
+            <div class="grid grid-cols-3 gap-4 px-4 py-2">
+                <div class="flex flex-row items-center">
+                    <div><i class="fa-solid fa-server"></i></div>
+                    <div class="flex-1 text-center">Summit</div>
+                </div>
+                <div class="flex flex-row items-center">
+                    <div><i class="fa-solid fa-microchip"></i></div>
+                    <div class="flex-1 text-center">10k A100</div>
+                </div>
+                <div class="flex flex-row items-center">
+                    <div><i class="fa-solid fa-clock"></i></div>
+                    <div class="flex-1 text-center">10h</div>
+                </div>
+            </div>
+        </div>
+        */
+
+        onHTML(() => {
+            for (let sim of sims) {
+                let container = document.createElement("div");
+                container.classList.add("flex", "flex-col", "text-white", "rounded", "bg-slate-900", "rounded-b-lg");
+
+                let topdiv = document.createElement("div");
+                topdiv.classList.add("flex-1", "grid", "bg-white", "pb-2");
+
+                let img = document.createElement("img");
+                img.src = sim.image;
+                img.classList.add("place-self-center");
+
+                topdiv.appendChild(img);
+                container.appendChild(topdiv);
+
+                let middiv = document.createElement("div");
+                middiv.classList.add("flex", "flex-row", "items-center");
+                
+                let logoDiv = document.createElement("div");
+                logoDiv.classList.add("flex", "flex-col", "h-full", "bg-white", "justify-center");
+
+                let logo = document.createElement("img");
+                logo.src = "res/logo.png";
+                logo.classList.add("h-10");
+                
+                logoDiv.appendChild(logo);
+                middiv.appendChild(logoDiv);
+
+                let title = document.createElement("div");
+                title.classList.add("flex-1", "p-2", "font-semibold", "text-center");
+                title.innerText = sim.name;
+
+                middiv.appendChild(title);
+
+                let lnk = document.createElement("a");
+                lnk.href = sim.source;
+                lnk.classList.add("w-10", "text-center");
+
+                let icon = document.createElement("i");
+                icon.classList.add("fa-solid", "fa-arrow-up-right-from-square");
+
+                lnk.appendChild(icon);
+                middiv.appendChild(lnk);
+                container.appendChild(middiv);
+
+                let botdiv = document.createElement("div");
+                botdiv.classList.add("grid", "grid-cols-3", "gap-4", "px-4", "py-2");
+
+                const items = [
+                    ["fa-server",    sim.computer    ],
+                    ["fa-microchip", sim.accelerators],
+                    ["fa-clock",     sim.walltime    ]
+                ];
+
+                for (let r in items) {
+                    let div = document.createElement("div");
+                    div.classList.add("flex", "flex-row", "items-center");
+
+                    let iconDiv = document.createElement("div");
+                    iconDiv.classList.add("pr-2");
+
+                    let icon = document.createElement("i");
+                    icon.classList.add("fa-solid", items[r][0]);
+                    iconDiv.appendChild(icon);
+                    div.appendChild(iconDiv);
+
+                    let text = document.createElement("div");
+                    text.classList.add("flex-1", "text-center");
+                    text.innerText = items[r][1];
+
+                    div.appendChild(text);
+                    botdiv.appendChild(div);
+                }
+
+                container.appendChild(botdiv);
+
+                document.getElementById("ft-sim").appendChild(container);
+            }
+        });
     </script>
 </head>
 <body class="flex flex-col min-h-screen bg-slate-900">
@@ -54,7 +213,7 @@
                     </a>
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/md_getting-started.html">
                         <i class="pr-4 fa-solid fa-rocket"></i>
-                        <span class="flex-1">Getting Started</span>
+                        <span class="flex-1">Start</span>
                     </a>
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/index.html">
                         <i class="pr-4 fa-solid fa-book"></i>
@@ -70,101 +229,38 @@
     </div>
     <main class="px-4 md:px-0 bg-white flex-1 py-6 md:py-12 grid gap-y-4 md:gap-y-12">
         <div class="container mx-auto flex flex-col gap-8">
-            <!-- more to come! 
-
-                <div class="flex flex-col gap-4">
-                    <h1 class="flex-1 flex flex-col justify-center gap-y-4">
-                        <div class="text-xl md:text-2xl font-extrabold">
-                            Featured Simulations
-                        </div>
-                        <div class="text-sm md:text-md text-justify">
-                            A small collection of visualisations of simulations completed using MFC.
-                            Contact us if you would like to be featured!
-                        </div>
-                    </h1>
-                    <div class="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="bg-slate-900 flex flex-col text-white rounded">
-                            <img src="res/gallery_1.png">
-                            <div class="flex flex-row items-center">
-                                <img class="h-10 bg-white" src="res/logo.png" />
-                                <div class="font-semibold px-2">Bubble collapse from monopole</div>
-                            </div>
-                        </div>
-                        
+            <div class="flex flex-col gap-4">
+                <h1 class="flex-1 flex flex-col justify-center gap-y-4">
+                    <div class="text-xl md:text-2xl font-extrabold">
+                        Featured Simulations
                     </div>
-                </div>
-            -->
-            
-            <!-- more to come! 
-                
-                <div class="flex flex-col gap-4">
-                    <h1 class="flex-1 flex flex-col justify-center gap-y-4">
-                        <div class="text-xl md:text-2xl font-extrabold">
-                            Meet the Authors - Professors
-                        </div>
-                    </h1>
-                    <div class="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-
-                        <a href="https://comp-physics.group/">
-                            <div class="bg-slate-900 flex flex-row text-white rounded">
-                                <div class="w-32">
-                                    <img class="h-32 mx-auto" src="https://avatars.githubusercontent.com/u/39740593?v=4">
-                                </div>
-                                <div class="flex-1 w-full flex flex-col items-center justify-center text-center">
-                                    <div class="w-full flex-1 flex flex-col items-center justify-center">
-                                        <div class="font-semibold text-sky-300">Spencer Bryngelson</div>
-                                        <div class="text-sm text-slate-300">Georgia Institute of Technology</div>
-                                    </div>
-                                    <div class="w-full py-2 text-sm border-t-2 border-amber-400">
-                                        Computational Physics Group
-                                    </div>
-                                </div>
-                            </div>
-                        </a>
-
-                        <a href="https://vivo.brown.edu/display/mrodri97">
-                            <div class="bg-slate-900 flex flex-row text-white rounded">
-                                <div class="w-32">
-                                    <img class="h-32 mx-auto" src="https://avatars.githubusercontent.com/u/19245739?v=4">
-                                </div>
-                                <div class="flex-1 w-full flex flex-col items-center justify-center text-center">
-                                    <div class="w-full flex-1 flex flex-col items-center justify-center">
-                                        <div class="font-semibold text-sky-300">Mauro Rodriguez Jr</div>
-                                        <div class="text-sm text-slate-300">Brown University</div>
-                                    </div>
-                                    <div class="w-full py-2 text-sm border-t-2 border-amber-400">
-                                        Rodriguez Flow Research Group
-                                    </div>
-                                </div>
-                            </div>
-                        </a>
-
-                        <a href="https://colonius.caltech.edu/">
-                            <div class="bg-slate-900 flex flex-row text-white rounded">
-                                <div class="w-32">
-                                    <img class="h-32 mx-auto" src="https://caltechsites-prod.s3.amazonaws.com/colonius/images/Screen_Shot_2022-02-28_at_3.2.2e16d0ba.fill-310x412-c100.png">
-                                </div>
-                                <div class="flex-1 w-full flex flex-col items-center justify-center text-center">
-                                    <div class="w-full flex-1 flex flex-col items-center justify-center">
-                                        <div class="font-semibold text-sky-300">Tim Colonius</div>
-                                        <div class="text-sm text-slate-300">California Institute of Technology</div>
-                                    </div>
-                                    <div class="w-full py-2 text-sm border-t-2 border-amber-400">
-                                        Colonius Research Group
-                                    </div>
-                                </div>
-                            </div>
-                        </a>
-
+                  
+                    <!--
+                    <div class="text-sm md:text-md text-justify">
+                        A small collection of visualizations of simulations completed using MFC.
                     </div>
-                    <div class="font-semibold text-justify">A complete list of authors is hosted <a class="text-sky-500" href="documentation/md_authors.html">here</a>.</div>
+                    -->
+                </h1>
+                <div id="ft-sim" class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- ... -->
                 </div>
-            !-->
+            </div>
+            <div class="flex flex-col gap-4">
+                <h1 class="flex-1 flex flex-col justify-center gap-y-4">
+                    <div class="text-xl md:text-2xl font-extrabold">
+                        Contributors
+                    </div>
+                </h1>
+                    
+                <div id="ft-contrib" class="rounded">
+                    <!-- ... -->
+                </div>
+            </div>
         </div>
     </main>
     <div class="flex flex-col w-full px-4 md:px-0 text-white py-8 gap-4 container mx-auto">
         <div class="font-bold text-center text-sm md:text-md md:text-left">
-            &copy; 2022 <a href="https://comp-physics.group/">Computational Physics Group at the Georgia Institute of Technology</a>
+            &copy; 2022-2023 <a href="https://comp-physics.group/">Computational Physics Group at the Georgia Institute of Technology</a>
         </div>
         <div class="text-justify flex-1 text-xs md:text-sm text-neutral-300">
             MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF). MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit under allocation CFD154 (PI Bryngelson).
