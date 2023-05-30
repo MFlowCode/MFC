@@ -34,14 +34,12 @@ contains
     subroutine s_mpi_initialize() ! ----------------------------------------
 
 #ifndef MFC_MPI
-
         ! Serial run only has 1 processor
         num_procs = 1
         ! Local processor rank is 0
         proc_rank = 0
 
 #else
-
         ! Initializing the MPI environment
         call MPI_INIT(ierr)
 

@@ -222,6 +222,7 @@ program p_main
     finaltime = t_step_stop*dt
 
     ! Time-stepping Loop =======================================================
+    print *, proc_rank,num_procs
     do
         if (proc_rank == 0) then
             print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',                             &

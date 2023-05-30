@@ -666,7 +666,6 @@ contains
             end do
         end do
 
-
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange

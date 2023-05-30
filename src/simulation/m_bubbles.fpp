@@ -193,7 +193,7 @@ contains
                         else
                             myRho = myalpha_rho(1)
                             n_tait = gammas(1)
-                            B_tait = pi_infs(1)
+                            B_tait = pi_infs(1)/pi_fac
                         end if
                         
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
@@ -290,7 +290,7 @@ contains
         real(kind(0d0)) :: f_cpbw
 
         if (polytropic) then
-            f_cpbw = (Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
+            f_cpbw = (0.5*Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - 0.5*Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
         else
             f_cpbw = fpb - 1.d0 - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
         end if
@@ -385,7 +385,7 @@ contains
 
         if (polytropic) then
             tmp1 = (fR0/fR)**(3.d0*gam)
-            tmp1 = -3.d0*gam*(Ca + 2d0/Web/fR0)*tmp1*fV/fR
+            tmp1 = -3.d0*gam*(0.5*Ca + 2d0/Web/fR0)*tmp1*fV/fR
         else
             tmp1 = fpbdot
         end if
@@ -462,7 +462,7 @@ contains
         real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
+            f_cpbw_KM = 0.5*Ca*((fR0/fR)**(3.d0*gam)) - 0.5*Ca + 0.5*Eu
             if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
                                               (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else
@@ -492,7 +492,7 @@ contains
         real(kind(0d0)) :: f_rddot_KM
 
         if (polytropic) then
-            cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
+            cdot_star = -3d0*gam*0.5*Ca*((fR0/fR)**(3d0*gam))*fV/fR
             if (Web /= dflt_real) cdot_star = cdot_star - &
                                               3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
         else

@@ -100,6 +100,8 @@ module m_global_parameters
     logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
+    real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -254,6 +256,8 @@ contains
         perturb_sph = .false.
         perturb_sph_fluid = dflt_int
         fluid_rho = dflt_real
+
+        pi_fac = 1d0
 
         ! Initial condition parameters
         num_patches = dflt_int
@@ -451,7 +455,7 @@ contains
 
                 if (nb == 1) then
                     weight(:) = 1d0
-                    R0(:) = 1d0
+                    R0(:) = R0ref
                     V0(:) = 1d0
                 else if (nb > 1) then
                     if (R0_type == 1) then
