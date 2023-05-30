@@ -494,7 +494,7 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-        ! Set streamwise velocity to hypertangent function of y
+        ! Set streamwise velocity to hyperbolic tangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
@@ -559,7 +559,7 @@ contains
             do i = 1, nb
                 if (q_prim_vf(bub_idx%ps(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
-                    print *, 'setting to pb0'
+                    ! print *, 'setting to pb0'
                 end if
                 if (q_prim_vf(bub_idx%ms(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
@@ -742,7 +742,7 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-        ! Set streamwise velocity to hypertangent function of y
+        ! Set streamwise velocity to hyperbolic tangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
