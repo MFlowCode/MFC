@@ -184,6 +184,8 @@ Email         (-@)  {ARG("email")}
             modules = f"""\
 printf ":) Loading modules...\\n"
 
+module purge	
+module load {' '.join(common.get_loaded_modules())}	
 """
 
         return f"""\

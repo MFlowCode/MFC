@@ -169,13 +169,6 @@ def build_target(name: str, history: typing.List[str] = None):
         flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
         flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
 
-    flags.append(f"-DCMAKE_C_COMPILER='/opt/gcc/9.3.0/bin/gcc'")
-    flags.append(f"-DCMAKE_CXX_COMPILER='/opt/gcc/9.3.0/bin/g++'")
-    flags.append(f"-DCMAKE_Fortran_COMPILER='/opt/gcc/9.3.0/bin/gfortran'")
-    flags.append(f"-DMPI_C_COMPILER='/act/openmpi-2.0/gcc-9/bin/mpicc'")
-    flags.append(f"-DMPI_CXX_COMPILER='/act/openmpi-2.0/gcc-9/bin/mpic++'")
-    flags.append(f"-DMPI_Fortran_COMPILER='/act/openmpi-2.0/gcc-9/bin/mpifort'")
-
     configure = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
     build     = ["cmake", "--build",  build_dirpath,
                           "--target", name,
