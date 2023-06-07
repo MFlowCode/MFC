@@ -1,6 +1,8 @@
 #:def s_compute_speed_of_sound()
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
 
+        !$acc routine seq
+
         real(kind(0d0)), intent(IN) :: pres
         real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf
         real(kind(0d0)), intent(IN) :: H

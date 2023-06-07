@@ -89,12 +89,12 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
-        -h nomessage=296:878:1391:1069
-        -h msgs -h static -h keepfiles
+        "SHELL:-h nomessage=296:878:1391:1069"
+        "SHELL:-h msgs" "SHELL:-h static" "SHELL:-h keepfiles"
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-e D -h func_trace)
+        add_compile_options(-e D "SHELL:-h func_trace")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
@@ -185,10 +185,12 @@ macro(HANDLE_SOURCES target)
 
         add_custom_command(
             OUTPUT   ${f90}
-            COMMAND  ${FYPP_EXE} -I "${common_DIR}"
+            COMMAND  ${FYPP_EXE} -m re
+                                 -I "${common_DIR}"
                                  -I "${common_DIR}/include"
                                  -I "${${target}_DIR}/include"
                                  --line-numbering
+                                 --no-folding
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs};${common_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
@@ -260,7 +262,7 @@ function(MFC_SETUP_TARGET)
             endif()
         endif()
     elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-        target_compile_options(${ARGS_TARGET} PRIVATE -h noacc -x acc)
+        target_compile_options(${ARGS_TARGET} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
     endif()
 
     string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
