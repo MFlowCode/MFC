@@ -359,7 +359,7 @@ contains
         !! @param k Cell index
         !! @param l Cell index
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
-                                                      gamma, pi_inf, qv, Re_K, G_K, G)
+                                                      gamma, pi_inf, qv, Re_K, G_K, G )
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
 
@@ -1280,7 +1280,7 @@ contains
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
 #ifdef MFC_POST_PROCESS
-        deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
+        deallocate(rho_sf, gamma_sf, pi_inf_sf, qv_sf)
 #endif
 
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
