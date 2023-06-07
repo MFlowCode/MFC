@@ -609,20 +609,6 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-
-        !$acc parallel loop collapse(5) gang vector default(present)
-        do i = 1, sys_size
-            do l = startz, p - startz
-                do k = starty, n - starty
-                    do j = startx, m - startx
-                        do d = 1, num_dims
-                            flux_gsrc_n(d)%vf(i)%sf(j, k, l) = 0d0;
-                        end do
-                    end do
-                end do
-            end do
-        end do
-
         if (bubbles) then
             @:ALLOCATE(nbub(0:m, 0:n, 0:p))
         end if
@@ -671,84 +657,6 @@ contains
 
         ! Association/Population of Working Variables ======================
 
-        print*, "Association/Population of Working Variables"
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = iz%beg, iz%end
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
-                        q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-
-        call nvtxStartRange("RHS-MPI")
-        print*, "MPI"
-        call s_populate_conservative_variables_buffers()
-        call nvtxEndRange
-
-        
-        ! ==================================================================
-
-        ! Converting Conservative to Primitive Variables ==================
-
-        print*, "Converting Conservative to Primitive Variables"
-        if (mpp_lim .and. bubbles) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = iz%beg, iz%end
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
-                        alf_sum%sf(j, k, l) = 0d0
-                        !$acc loop seq
-                        do i = advxb, advxe - 1
-                            alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
-                        end do
-                        !$acc loop seq
-                        do i = advxb, advxe - 1
-                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1.d0 - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
-                                                          /alf_sum%sf(j, k, l)
-                        end do
-                    end do
-                end do
-            end do
-
-        end if
-
-        call nvtxStartRange("RHS-CONVERT")
-        print*, "CONVERT"
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_qp%vf, &
-            q_prim_qp%vf, &
-            gm_alpha_qp%vf, &
-            ix, iy, iz)
-        call nvtxEndRange
-
-
-        
-        if (t_step == t_step_stop) return
-        ! ==================================================================
-
-        print*, "s_mom_inv"
-        if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
-
-        call nvtxStartRange("Viscous")
-        print*, "Viscous"
-        if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                            dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                                            qL_prim, &
-                                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                            dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-                                            qR_prim, &
-                                            q_prim_qp, &
-                                            dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-                                            ix, iy, iz)
-        call nvtxEndRange()
-        
-        ! Dimensional Splitting Loop =======================================
-        print*, "Dimensional Splitting Loop"
-
         do id = 1, num_dims
 
             ! Configuring Coordinate Direction Indexes ======================
@@ -760,67 +668,6 @@ contains
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
 
-            if (all(Re_size == 0)) then
-                    iv%beg = 1; iv%end = sys_size
-                !call nvtxStartRange("RHS-WENO")
-                call nvtxStartRange("RHS-WENO")
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(1:sys_size), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-                call nvtxEndRange
-            else
-                call nvtxStartRange("RHS-WENO")
-                iv%beg = 1; iv%end = contxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                iv%beg = E_idx; iv%end = E_idx
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                iv%beg = advxb; iv%end = advxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                iv%beg = mom_idx%beg; iv%end = mom_idx%end
-                if (weno_Re_flux) then
-                    call s_reconstruct_cell_boundary_values_visc_deriv( &
-                        dq_prim_dx_qp%vf(iv%beg:iv%end), &
-                        dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
-                        dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                        id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), &
-                        ix, iy, iz)
-                    if (n > 0) then
-                        call s_reconstruct_cell_boundary_values_visc_deriv( &
-                            dq_prim_dy_qp%vf(iv%beg:iv%end), &
-                            dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
-                            dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                            id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
-                            ix, iy, iz)
-                        if (p > 0) then
-                            call s_reconstruct_cell_boundary_values_visc_deriv( &
-                                dq_prim_dz_qp%vf(iv%beg:iv%end), &
-                                dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
-                                dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                                id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
-                                ix, iy, iz)
-                        end if
-                    end if
-                end if
-                call nvtxEndRange
-            end if
-
             ! Configuring Coordinate Direction Indexes ======================
             if (id == 1) then
                 ix%beg = -1; iy%beg = 0; iz%beg = 0
@@ -831,86 +678,10 @@ contains
             end if
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
-            call nvtxStartRange("RHS-Riemann")
 
             ! Computing Riemann Solver Flux and Source Flux =================
 
-            print*, "rhs -> s_riemann_solver"
-            call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                  dqR_prim_dx_n(id)%vf, &
-                                  dqR_prim_dy_n(id)%vf, &
-                                  dqR_prim_dz_n(id)%vf, &
-                                  qR_prim(id)%vf, &
-                                  qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                  dqL_prim_dx_n(id)%vf, &
-                                  dqL_prim_dy_n(id)%vf, &
-                                  dqL_prim_dz_n(id)%vf, &
-                                  qL_prim(id)%vf, &
-                                  q_prim_qp%vf, &
-                                  flux_n(id)%vf, &
-                                  flux_src_n(id)%vf, &
-                                  flux_gsrc_n(id)%vf, &
-                                  id, ix, iy, iz)
-            call nvtxEndRange
-
-            ! ===============================================================
-
-
-            print*, "alt_soundspeed"
-            if (alt_soundspeed) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            blkmod1(j, k, l) = ((gammas(1) + 1d0)*q_prim_qp%vf(E_idx)%sf(j, k, l) + &
-                                                pi_infs(1))/gammas(1)
-                            blkmod2(j, k, l) = ((gammas(2) + 1d0)*q_prim_qp%vf(E_idx)%sf(j, k, l) + &
-                                                pi_infs(2))/gammas(2)
-                            alpha1(j, k, l) = q_cons_qp%vf(advxb)%sf(j, k, l)
-
-                            if (bubbles) then
-                                alpha2(j, k, l) = q_cons_qp%vf(alf_idx - 1)%sf(j, k, l)
-                            else
-                                alpha2(j, k, l) = q_cons_qp%vf(advxe)%sf(j, k, l)
-                            end if
-
-                            Kterm(j, k, l) = alpha1(j, k, l)*alpha2(j, k, l)*(blkmod2(j, k, l) - blkmod1(j, k, l))/ &
-                                             (alpha1(j, k, l)*blkmod2(j, k, l) + alpha2(j, k, l)*blkmod1(j, k, l))
-                        end do
-                    end do
-                end do
-            end if
-
-            call nvtxStartRange("RHS_Flux_Add")
-            print*, "RHS_Flux_Add"
-            
             if (id == 1) then
-
-                print*, "---- s_cbc"
-                if (bc_x%beg <= -5) then
-                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
-                               flux_src_n(id)%vf, id, -1, ix, iy, iz)
-                end if
-
-
-                if (bc_x%end <= -5) then
-                    call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
-                               flux_src_n(id)%vf, id, 1, ix, iy, iz)
-                end if
-
-                print*, "---- here"
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, sys_size
-                    do q = 0, p
-                        do l = 0, n
-                            do k = 0, m
-                                rhs_vf(j)%sf(k, l, q) = 1d0/dx(k)* &
-                                                        (flux_n(1)%vf(j)%sf(k - 1, l, q) &
-                                                         - flux_n(1)%vf(j)%sf(k, l, q))
-                            end do
-                        end do
-                    end do
-                end do
 
                 print*, "---- riemann_solver == 1"
                 if (riemann_solver == 1) then
@@ -1030,55 +801,6 @@ contains
                     !    end if
                     end if
                 end if    
-
-                print*, "---- monopole"
-                if (monopole) then
-                    print*, "todo"
-                !    ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                !    if (id == ndirs) then 
-                !        call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
-                !                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                !                             rhs_vf)
-                !    end if
-                end if
-
-                print*, "---- model_eqns == 3"
-                if (model_eqns == 3) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                do i = 1, num_fluids
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dx(j)* &
-                                        q_cons_qp%vf(i + advxb - 1)%sf(j, k, l)* &
-                                        q_prim_qp%vf(E_idx)%sf(j, k, l)* &
-                                        (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
-                                         flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-
-                print*, "---- any(Re_size > 0)"
-
-                if (any(Re_size > 0)) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                !$acc loop seq
-                                do i = momxb, E_idx
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
-                                        (flux_src_n(1)%vf(i)%sf(j - 1, k, l) &
-                                         - flux_src_n(1)%vf(i)%sf(j, k, l))
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
 
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
