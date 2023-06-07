@@ -1031,8 +1031,10 @@ contains
                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*vel_L(dir_idx(1))
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                            (gammas(i)*pres_L + pi_infs(i))*vel_L(dir_idx(1))
+                                            ( qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) * &
+                                            ( gammas(i)*pres_L + pi_infs(i) ) + &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1) * &
+                                            qvs(i) ) * vel_L(dir_idx(1) )
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1058,8 +1060,10 @@ contains
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*vel_R(dir_idx(1))
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
-                                            (gammas(i)*pres_R + pi_infs(i))*vel_R(dir_idx(1))
+                                            ( qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1) * &
+                                            ( gammas(i)*pres_R + pi_infs(i) ) + &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
+                                            qvs(i) ) * vel_R(dir_idx(1))
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1091,8 +1095,10 @@ contains
                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*xi_L*s_S
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                            (gammas(i)*p_K_Star + pi_infs(i))*s_S
+                                            ( qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) * &
+                                            ( gammas(i)*p_K_Star + pi_infs(i) ) + &
+                                              qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1) * &
+                                              qvs(i) ) * s_S
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1128,8 +1134,10 @@ contains
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*xi_R*s_S
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
-                                            (gammas(i)*p_K_Star + pi_infs(i))*s_S
+                                            ( qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1) * &
+                                            ( gammas(i)*p_K_Star + pi_infs(i) ) + &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
+                                            qvs(i) ) * s_S
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims

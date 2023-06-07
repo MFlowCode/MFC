@@ -255,9 +255,11 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: lit_gamma    !< specific heat ratio
         real(kind(0d0)) :: pi_inf       !< stiffness from SEOS
+        real(kind(0d0)) :: qv       !< reference energy from SEOS
         real(kind(0d0)) :: orig_rho
         real(kind(0d0)) :: orig_gamma
         real(kind(0d0)) :: orig_pi_inf
+        real(kind(0d0)) :: orig_qv
         real(kind(0d0)) :: muR, muV
 
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
@@ -298,7 +300,7 @@ contains
             q_prim_vf, j, k, l, &
             orig_rho, &
             orig_gamma, &
-            orig_pi_inf)
+            orig_pi_inf, orig_qv)
 
         ! Computing Mixture Variables of Current Patch =====================
 
@@ -333,7 +335,8 @@ contains
             q_prim_vf, j, k, l, &
             patch_icpp(patch_id)%rho, &
             patch_icpp(patch_id)%gamma, &
-            patch_icpp(patch_id)%pi_inf)
+            patch_icpp(patch_id)%pi_inf, &
+            patch_icpp(patch_id)%qv )
 
         ! ==================================================================
 
@@ -403,7 +406,8 @@ contains
             q_prim_vf, j, k, l, &
             patch_icpp(smooth_patch_id)%rho, &
             patch_icpp(smooth_patch_id)%gamma, &
-            patch_icpp(smooth_patch_id)%pi_inf)
+            patch_icpp(smooth_patch_id)%pi_inf, &
+            patch_icpp(smooth_patch_id)%qv )
 
         ! ==================================================================
 
@@ -464,7 +468,7 @@ contains
         ! Density and the specific heat ratio and liquid stiffness functions
         ! call s_convert_species_to_mixture_variables(q_prim_vf, j, k, l, &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
-                                                    rho, gamma, pi_inf)
+                                                    rho, gamma, pi_inf, qv)
 
         ! Velocity
         do i = 1, E_idx - mom_idx%beg

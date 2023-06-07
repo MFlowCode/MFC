@@ -93,7 +93,7 @@ contains
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
+        real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)) :: pres                         !< Temporary pressure
 
@@ -178,6 +178,7 @@ contains
         gamma = fluid_pp(1)%gamma
         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
         pi_inf = fluid_pp(1)%pi_inf
+        qv = fluid_pp(1)%qv
 
         if (precision == 1) then
             FMT = "(2F30.3)"
@@ -194,13 +195,13 @@ contains
 
         !1D
         if (n == 0 .and. p == 0) then
-            if (model_eqns == 2) then
+            if ( ( model_eqns == 2 ) .OR. ( model_eqns == 3 ) ) then
                 do i = 1, sys_size
                     write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_loc))
                     do j = 0, m
-                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf)
+                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv )
 
                         lit_gamma = 1d0/gamma + 1d0
 
@@ -218,7 +219,7 @@ contains
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
                                 0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
-                                pi_inf, gamma, rho, pres)
+                                pi_inf, gamma, rho, qv, pres)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 

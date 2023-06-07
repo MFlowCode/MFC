@@ -274,6 +274,16 @@ contains
         elseif (hypoelasticity .and. (riemann_solver /= 1)) then
             call s_mpi_abort( 'hypoelasticity requires riemann_solver = 1'// &
                 'Exiting ...')
+        elseif ( relax ) then
+        ! for now palpha_eps and ptgalpha_eps have different porposes. In the future,
+            ! p_infinite_relaxation might be adjusted so that these two mean the same
+            if ( ( palpha_eps < 0d0 ) .or. ( palpha_eps > 1d0 ) ) then
+                call s_mpi_abort( 'palpha_eps must be in between 0 and 1' // &
+                'Exiting ...')
+            elseif ( ptgalpha_eps < 0d0 ) then
+                call s_mpi_abort( 'ptgalpha_eps must be positive' // &
+                'Exiting ...')
+            end if
         end if
         ! END: Simulation Algorithm Parameters =============================
 
@@ -339,6 +349,12 @@ contains
                     'of values of num_fluids '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
+
+            elseif ( relax .and. fluid_pp(i)%cv < 0d0 ) then
+                    call s_mpi_abort('Unsupported value of '// &
+                    'fluid_pp('//trim(iStr)//')%'// &
+                    'cv. Make sure cv is positive. Exiting ...')
+
             end if
 
             do j = 1, 2

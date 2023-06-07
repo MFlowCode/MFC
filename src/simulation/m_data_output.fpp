@@ -227,6 +227,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
         real(kind(0d0)) :: c          !< Cell-avg. sound speed
         real(kind(0d0)) :: E          !< Cell-avg. energy
         real(kind(0d0)) :: H          !< Cell-avg. enthalpy
@@ -257,9 +258,9 @@ contains
                     end do
 
                     if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
                     end if
 
                     do i = 1, num_dims
@@ -273,7 +274,7 @@ contains
 
                     pres = q_prim_vf(E_idx)%sf(j, k, l)
 
-                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum
+                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum + qv
 
                     H = (E + pres)/rho
 
@@ -454,8 +455,8 @@ contains
         integer :: i, j, k, l, ii , r!< Generic loop iterators
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf     !< Temporary EOS params
+        real(kind(0d0)) :: nbub, nR3, vftmp             !< Temporary bubble number density
+        real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
         real(kind(0d0)) :: E_e                          !< Temp. elastic energy contrbution
@@ -546,6 +547,7 @@ contains
         gamma = fluid_pp(1)%gamma
         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
         pi_inf = fluid_pp(1)%pi_inf
+        qv =  fluid_pp(1)%qv
 
         if (precision == 1) then
             FMT = "(2F30.3)"
@@ -575,7 +577,7 @@ contains
         !1D
         if (n == 0 .and. p == 0) then
 
-            if (model_eqns == 2) then
+            if (model_eqns == 2 .OR. model_eqns == 3) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -992,6 +994,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
+        real(kind(0d0)) :: qv
         real(kind(0d0)) :: c
         real(kind(0d0)) :: M00, M10, M01, M20, M11, M02
         real(kind(0d0)) :: varR, varV
@@ -1039,6 +1042,7 @@ contains
             pres = 0d0
             gamma = 0d0
             pi_inf = 0d0
+            qv = 0d0
             c = 0d0
             accel = 0d0
             nR = 0d0; R = 0d0
@@ -1072,11 +1076,11 @@ contains
                     ! Computing/Sharing necessary state variables
                     if(hypoelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
-                                                            rho, gamma, pi_inf, &
+                                                            rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
                     else
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
-                                                            rho, gamma, pi_inf)
+                                                            rho, gamma, pi_inf, qv)
                     end if
                     do s = 1, num_dims
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
@@ -1088,7 +1092,7 @@ contains
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
                             q_cons_vf(1)%sf(j - 2, k, l), &
-                            pi_inf, gamma, rho, pres, &
+                            pi_inf, gamma, rho, qv, pres, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
@@ -1097,7 +1101,7 @@ contains
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
                             q_cons_vf(1)%sf(j - 2, k, l), &
-                            pi_inf, gamma, rho, pres)
+                            pi_inf, gamma, rho, qv, pres)
                     end if
 
                     if (model_eqns == 4) then
@@ -1176,7 +1180,7 @@ contains
 
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, & 
-                                                            rho, gamma, pi_inf, &
+                                                            rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
                         do s = 1, num_dims
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
@@ -1187,7 +1191,7 @@ contains
                             q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                             0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/ &
                             q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                            pi_inf, gamma, pres, rho, &
+                            pi_inf, gamma, rho, qv, pres, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
 
@@ -1250,14 +1254,14 @@ contains
 
                             ! Computing/Sharing necessary state variables
                             call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, &
-                                                                rho, gamma, pi_inf, &
+                                                                rho, gamma, pi_inf, qv, &
                                                                 Re, G, fluid_pp(:)%G)
                             do s = 1, num_dims
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
 
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
-                                0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, pres)
+                                0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, qv, pres)
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
@@ -1270,7 +1274,7 @@ contains
             end if
 
             if (num_procs > 1) then
-                #:for VAR in ['rho','pres','gamma','pi_inf','c','accel']
+                #:for VAR in ['rho','pres','gamma','pi_inf','qv','c','accel']
                     tmp = ${VAR}$
                     call s_mpi_allreduce_sum(tmp, ${VAR}$)
                 #:endfor
@@ -1408,7 +1412,7 @@ contains
                     end if
                 else
                     write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,'// &
+                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8)') &
                         nondim_time, &
                         rho, &
@@ -1418,6 +1422,7 @@ contains
                         pres, &
                         gamma, &
                         pi_inf, &
+                        qv, &
                         c, &
                         accel
                 end if
@@ -1440,20 +1445,24 @@ contains
                         pres = 0d0
                         gamma = 0d0
                         pi_inf = 0d0
+                        qv = 0d0
 
                         if ((integral(i)%xmin <= x_cb(j)) .and. (integral(i)%xmax >= x_cb(j))) then
                             npts = npts + 1
                             call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
-                                                                rho, gamma, pi_inf, Re)
+                                                                rho, gamma, pi_inf, qv, Re)
                             do s = 1, num_dims
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                             end do
 
+                            ! JRChreim: keep an eye on how qv was added to this pressure calculation.
+                            ! Note there is an (1-alpha) extra term in the denominator,
+                            ! typically not present for energy calculations
                             pres = ( &
                                    (q_cons_vf(E_idx)%sf(j, k, l) - &
                                     0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2.d0)/rho)/ &
                                    (1.d0 - q_cons_vf(alf_idx)%sf(j, k, l)) - &
-                                   pi_inf &
+                                   pi_inf - qv &
                                    )/gamma
                             int_pres = int_pres + (pres - 1.d0)**2.d0
                         end if
@@ -1511,20 +1520,24 @@ contains
                             pres = 0d0
                             gamma = 0d0
                             pi_inf = 0d0
+                            qv = 0d0
 
                             if (trigger) then
                                 npts = npts + 1
                                 call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
-                                                                    rho, gamma, pi_inf, Re)
+                                                                    rho, gamma, pi_inf, qv, Re)
                                 do s = 1, num_dims
                                     vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                                 end do
 
+                                ! JRChreim: keep an eye on how qv was added to this pressure calculation.
+                                ! Note there is an (1-alpha) extra term in the denominator,
+                                ! typically not present for energy calculations
                                 pres = ( &
                                        (q_cons_vf(E_idx)%sf(j, k, l) - &
                                         0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2.d0)/rho)/ &
                                        (1.d0 - q_cons_vf(alf_idx)%sf(j, k, l)) - &
-                                       pi_inf &
+                                       pi_inf - qv &
                                        )/gamma
                                 int_pres = int_pres + abs(pres - 1.d0)
                                 max_pres = max(max_pres, abs(pres - 1.d0))

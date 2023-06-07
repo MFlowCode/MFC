@@ -78,10 +78,11 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    !> @name Simulation Algorithm Parameters
-    !> @{
+    !> @name Simulation Algorithm Parameters!< Number of different fluids present in the flow
     integer :: model_eqns      !< Multicomponent flow model
     integer :: num_fluids      !< Number of different fluids present in the flow
+    logical :: relax           !< phase change
+    integer :: relax_model     !< Phase change relaxation model
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
@@ -270,6 +271,8 @@ contains
         weno_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
+        relax = .false.
+        relax_model = dflt_int
         hypoelasticity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
@@ -280,6 +283,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
+            fluid_pp(i)%cv = 0d0
+            fluid_pp(i)%qv = 0d0
+            fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%G = dflt_real
         end do
 

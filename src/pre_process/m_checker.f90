@@ -92,6 +92,11 @@ contains
                 'exiting ...')
         end if
 
+        if ( relax .and. ( ( relax_model .lt. 0 ) .and. ( relax_model .gt. 6 ) ) ) then
+            call s_mpi_abort('relax_model should be in between 1 and 6, and requires &
+            model_eqns = 2 or 3' // 'exiting ...')
+        end if
+
         ! Constraints on the use of a preexisting grid and initial condition
         if ((old_grid .neqv. .true.) .and. old_ic) then
             call s_mpi_abort('Unsupported choice of the combination of '// &

@@ -114,10 +114,13 @@ module m_global_parameters
     integer :: riemann_solver !< Riemann solver algorithm
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
+    logical :: relax          !< activate phase change
+    integer :: relax_model    !< Relaxation model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+	real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
-    integer :: relax_model    !< Relaxation model
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
@@ -318,8 +321,8 @@ module m_global_parameters
      integer :: strxb, strxe
      !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-    !$acc declare create(gammas, pi_infs)
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs, qvs
+    !$acc declare create(gammas, pi_infs, qvs)
 
 
     real(kind(0d0)) :: mytime       !< Current simulation time
@@ -377,7 +380,10 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
-        relax_model      = dflt_int
+        relax = .false.
+        relax_model = dflt_int
+        palpha_eps = 1.0d-6
+        ptgalpha_eps = 1.0d-6
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
@@ -395,9 +401,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
-            fluid_pp(i)%cv      = dflt_real
-            fluid_pp(i)%qv      = dflt_real
-            fluid_pp(i)%qvp     = dflt_real
+            fluid_pp(i)%cv      = 0d0
+            fluid_pp(i)%qv      = 0d0
+            fluid_pp(i)%qvp     = 0d0
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real

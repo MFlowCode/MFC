@@ -143,7 +143,8 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, file_per_process
+            R0_type, file_per_process, relax, relax_model, & 
+            palpha_eps, ptgalpha_eps
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -832,6 +833,7 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
+        real(kind(0d0)) :: qv
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: pres
 
@@ -841,7 +843,7 @@ contains
             do k = 0, n
                 do l = 0, p
 
-                    call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, Re)
+                    call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0d0
                     do i = mom_idx%beg, mom_idx%end
@@ -850,11 +852,12 @@ contains
                     end do
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                        dyn_pres, pi_inf, gamma, rho, pres)
+                        dyn_pres, pi_inf, gamma, rho, qv, pres )
 
                     do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
-                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf)
+                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l) * &
+                                                                            (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) + &
+                                                                            v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do

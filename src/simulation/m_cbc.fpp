@@ -597,6 +597,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: dadv_dt
         real(kind(0d0)) :: dgamma_dt
         real(kind(0d0)) :: dpi_inf_dt
+        real(kind(0d0)) :: dqv_dt
         real(kind(0d0)), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
         real(kind(0d0)), dimension(2) :: Re_cbc
         real(kind(0d0)), dimension(num_dims) :: vel, dvel_ds
@@ -610,6 +611,7 @@ contains
         real(kind(0d0)) :: H           !< Cell averaged enthalpy
         real(kind(0d0)) :: gamma       !< Cell averaged specific heat ratio
         real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
+        real(kind(0d0)) :: qv          !< Cell averaged fluid reference energy
         real(kind(0d0)) :: c
 
         real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
@@ -749,10 +751,10 @@ contains
                     end do
 
                     if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
 
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
                     end if
 
                     !$acc loop seq
@@ -878,18 +880,21 @@ contains
                         end do
                     end if
 
-                    drho_dt = 0d0; dgamma_dt = 0d0; dpi_inf_dt = 0d0
+                    drho_dt = 0d0; dgamma_dt = 0d0; dpi_inf_dt = 0d0; dqv_dt = 0d0
 
                     if (model_eqns == 1) then
                         drho_dt = dalpha_rho_dt(1)
                         dgamma_dt = dadv_dt(1)
                         dpi_inf_dt = dadv_dt(2)
+                        ! JRChreim: I might need to change this later
+                        ! dqv_dt = 0d0
                     else
                         !$acc loop seq
                         do i = 1, num_fluids
                             drho_dt = drho_dt + dalpha_rho_dt(i)
                             dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
                             dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
+                            dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
                         end do
                     end if
                     ! ============================================================
@@ -912,6 +917,7 @@ contains
                                                    + ds(0)*(pres*dgamma_dt &
                                                             + gamma*dpres_dt &
                                                             + dpi_inf_dt &
+                                                            + dqv_dt &
                                                             + rho*vel_dv_dt_sum &
                                                             + 5d-1*drho_dt*vel_K_sum)
 
