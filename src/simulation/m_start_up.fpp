@@ -855,7 +855,7 @@ contains
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
                         dyn_pres, pi_inf, gamma, rho, qv, pres )
-                   
+                                          
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
                         v_vf(i + adv_idx%beg - 1)%sf(j, k, l) * (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &

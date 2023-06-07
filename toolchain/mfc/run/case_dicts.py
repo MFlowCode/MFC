@@ -41,7 +41,6 @@ for p_id in range(1, 10+1):
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
                       "pi_inf", "r0", "v0", "p0", "m0", "hcid", "cv", "qv", "qvp" ]:
-
         PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
 
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%filepath")

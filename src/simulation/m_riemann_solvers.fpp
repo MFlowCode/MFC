@@ -1072,7 +1072,7 @@ contains
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             ( qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1) * &
                                             ( gammas(i)*pres_R + pi_infs(i) ) + &
-                                              qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
                                             qvs(i) ) * vel_R(dir_idx(1))
                                     end do
                                     !$acc loop seq
@@ -1146,7 +1146,7 @@ contains
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             ( qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1) * &
                                             ( gammas(i)*p_K_Star + pi_infs(i) ) + &
-                                              qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
                                             qvs(i) ) * s_S
                                     end do
                                     !$acc loop seq

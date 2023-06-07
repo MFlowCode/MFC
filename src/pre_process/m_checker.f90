@@ -91,7 +91,7 @@ contains
             call s_mpi_abort('hypoelasticity requires model_eqns = 2'// &
                 'exiting ...')
         end if
-
+        
         ! phase change checkers. 1st, check if it is activated
         if ( relax ) then
             ! 2nd, checking if the correct equation model is chosen
@@ -119,7 +119,6 @@ contains
         ! p_infinite_relaxation might be adjusted so that these two mean the same.
         ! palpha_eps is only used for the old phase-change modules, while the 
         ! ptgalpha_eps is the tolerance for the ptg solver of the new solvers
-
         ! Constraints on the use of a preexisting grid and initial condition
         if ((old_grid .neqv. .true.) .and. old_ic) then
             call s_mpi_abort('Unsupported choice of the combination of '// &
