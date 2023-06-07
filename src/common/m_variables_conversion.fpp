@@ -359,7 +359,7 @@ contains
         !! @param k Cell index
         !! @param l Cell index
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
-                                                      gamma, pi_inf, qv, Re_K, G_K, G)
+                                                      gamma, pi_inf, qv, Re_K, G_K, G )
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
 
