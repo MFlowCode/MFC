@@ -153,9 +153,18 @@ def handle_case(test: TestCase):
             pack.save(golden_filepath)
         else:
             if not os.path.isfile(golden_filepath):
-                raise MFCException(f"Test {test}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
+                raise MFCException(f"Test {test}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
 
-            packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
+            golden = packer.load(golden_filepath)
+
+            if ARG("add_new_variables"):
+                for pfilepath, pentry in pack.entries.items():
+                    if golden.find(pfilepath) is None:
+                        golden.set(pentry)
+
+                golden.save(golden_filepath)
+            else:
+                packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
 
         if ARG("test_all"):
             test.params.update({

@@ -1,4 +1,4 @@
-import os, re, math, dataclasses
+import os, re, math, typing, dataclasses
 
 from pathlib import Path
 
@@ -60,25 +60,41 @@ class AverageError:
         return self.get().__repr__()
 
 
+# This class maps to the data contained in one file in D/
 @dataclasses.dataclass(repr=False)
 class PackEntry:
     filepath: str
-    doubles:  list
+    doubles:  typing.List[float]
 
     def __repr__(self) -> str:
         return f"{self.filepath} {' '.join([ str(d) for d in self.doubles ])}"
 
 
-@dataclasses.dataclass
+# This class maps to the data contained in the entirety of D/: it is tush a list
+# of PackEntry classes.
 class Pack:
-    entries: list
+    entries: typing.Dict[str, PackEntry]
+
+    def __init__(self):
+        self.entries = {}
+
+    def __init__(self, entries: typing.List[PackEntry]):
+        self.entries = {}
+        for entry in entries:
+            self.set(entry)
+
+    def find(self, filepath: str) -> PackEntry:
+        return self.entries.get(filepath, None)
+
+    def set(self, entry: PackEntry):
+        self.entries[entry.filepath] = entry
 
     def save(self, filepath: str):
-        common.file_write(filepath, '\n'.join([ str(e) for e in self.entries ]))
+        common.file_write(filepath, '\n'.join([ str(e) for e in sorted(self.entries.values(), key=lambda x: x.filepath) ]))
 
 
 def load(filepath: str) -> Pack:
-    entries: list = []
+    entries: typing.List[PackEntry] = []
 
     for line in common.file_read(filepath).splitlines():
         if common.isspace(line):
@@ -103,18 +119,14 @@ def generate(case: case.TestCase) -> Pack:
     for filepath in list(Path(D_dir).rglob("*.dat")):
         short_filepath = str(filepath).replace(f'{case_dir}', '')[1:].replace("\\", "/")
 
-        data_content = common.file_read(filepath)
-
-        # 2 or more (contiguous) spaces
-        pattern = r"([ ]{2,})"
-
-        numbers_str = re.sub(pattern, " ", data_content.replace('\n', '')).strip()
-
-        doubles: list = [ float(e) for e in numbers_str.split(' ') ]
+        try:
+            doubles = [ float(e) for e in re.sub(r"[\n\t\s]+", " ", common.file_read(filepath)).strip().split(' ') ]
+        except ValueError:
+            raise MFCException(f"Test {case}: Failed to interpret the content of [magenta]{filepath}[/magenta] as a list of floating point numbers.")
 
         for double in doubles:
             if math.isnan(double):
-                raise MFCException(f"Test {case}: A NaN was found while generating a pack file.")
+                raise MFCException(f"Test {case}: A NaN was found in {filepath} while generating a pack file.")
 
         entries.append(PackEntry(short_filepath,doubles))
 
@@ -144,21 +156,19 @@ def check_tolerance(case: case.TestCase, candidate: Pack, golden: Pack, tol: flo
 
     # Compare entry-count
     if len(candidate.entries) != len(golden.entries):
-        raise MFCException(f"Test {case}: Line count didn't match.")
+        raise MFCException(f"Test {case}: Line count does not match.")
 
     # For every entry in the golden's pack
-    for gIndex, gEntry in enumerate(golden.entries):
+    for gFilepath, gEntry in golden.entries.items():
         # Find the corresponding entry in the candidate's pack
-        cIndex, cEntry = common.find(lambda i, e: e.filepath == gEntry.filepath, candidate.entries)
+        cEntry = candidate.find(gFilepath)
 
-        if cIndex == None:
-            raise MFCException(f"Test {case}: No reference of {gEntry.filepath} in the candidate's pack.")
-
-        filepath: str = gEntry.filepath
+        if cEntry == None:
+            raise MFCException(f"Test {case}: No reference of {gFilepath} in the candidate's pack.")
 
         # Compare variable-count
         if len(gEntry.doubles) != len(cEntry.doubles):
-            raise MFCException(f"Test {case}: Variable count didn't match for {filepath}.")
+            raise MFCException(f"Test {case}: Variable count didn't match for {gFilepath}.")
 
         # Check if each variable is within tolerance
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
@@ -168,7 +178,7 @@ def check_tolerance(case: case.TestCase, candidate: Pack, golden: Pack, tol: flo
 
             def raise_err(msg: str):
                 raise MFCException(f"""\
-Test {case}: Variable n°{valIndex+1} (1-indexed) in {filepath} {msg}:
+Test {case}: Variable n°{valIndex+1} (1-indexed) in {gFilepath} {msg}:
   - Description: {case.trace}
   - Candidate:   {cVal}
   - Golden:      {gVal}
