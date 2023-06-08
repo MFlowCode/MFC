@@ -20,7 +20,7 @@ started, run ./mfc.sh build -h.""",
     )
 
     parsers = parser.add_subparsers(dest="command")
-
+    
     run   = parsers.add_parser(name="run",   help="Run a case with MFC.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test  = parsers.add_parser(name="test",  help="Run MFC's test suite.",           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     build = parsers.add_parser(name="build", help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -63,7 +63,6 @@ started, run ./mfc.sh build -h.""",
 
     # === TEST ===
     add_common_arguments(test, "t")
-    test.add_argument(      "--generate",    action="store_true", help="Generate golden files.")
     test.add_argument("-l", "--list",        action="store_true", help="List all available tests.")
     test.add_argument("-f", "--from",        default=TEST_CASES[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",          default=TEST_CASES[-1].get_uuid(), type=str, help="Last test UUID to run.")
@@ -71,7 +70,12 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-b", "--binary",      choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",    action="store_true", default=False, help="Run the Post Process Tests too.")
+
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    
+    test_meg = test.add_mutually_exclusive_group()
+    test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
+    test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
 
     # === RUN ===
     engines = [ e.slug for e in ENGINES ]
