@@ -76,8 +76,11 @@ Definition of the parameters is described in the following subsections.
 | Parameter        | Type           | Description                      |
 | ---:             |    :----:      |          :---                    |
 | `run_time_info`  | Logical        | Output run-time information      |
+| `working_precision` | Integer     | Simulation working precision     |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
+- `working_precision` sets the working precision to either (1) - single precision, or
+(2) - double precision.
 
 ### 2. Computational Domain
 

@@ -49,13 +49,13 @@ program p_main
     integer :: i, j, k, l
     !> @}
 
-    real(kind(0d0)) :: total_volume !<
+    real(wp) :: total_volume !<
     !! Variable for the total volume of the second volume fraction
     !! to later on track the evolution of the radius of a bubble over time
 
-    real(kind(0d0)) :: pres
-    real(kind(0d0)) :: c
-    real(kind(0d0)) :: H 
+    real(wp) :: pres
+    real(wp) :: c
+    real(wp) :: H 
 
     ! Initialization of the MPI environment
     call s_mpi_initialize()
@@ -102,7 +102,7 @@ program p_main
     do
         if (proc_rank == 0) then
             print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")',                                &
-                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                  int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                   (t_step      - t_step_start)/t_step_save + 1,                                       &
                   (t_step_stop - t_step_start)/t_step_save + 1,                                       &
                   t_step
@@ -397,12 +397,12 @@ program p_main
 
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
 
-                        H = ((gamma_sf(i, j, k) + 1d0)*pres + &
+                        H = ((gamma_sf(i, j, k) + 1._wp)*pres + &
                         pi_inf_sf(i, j, k))/rho_sf(i, j, k)
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                             gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                            H, adv, 0d0, c)
+                            H, adv, 0._wp, c)
 
                         q_sf(i, j, k) = c
                     end do

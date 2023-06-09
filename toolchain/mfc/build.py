@@ -163,6 +163,7 @@ def build_target(name: str, history: typing.List[str] = None):
         # Location prefix to install bin/, lib/, include/, etc.
         # See: https://cmake.org/cmake/help/latest/command/install.html.
         f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
+        f"-DMFC_SINGLE_PRECISION={'ON' if ARG('single') else 'OFF'}"
     ]
 
     if not target.isDependency:

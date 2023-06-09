@@ -29,18 +29,18 @@ contains
         !!      while the transverse velocities may be nonzero.
     subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
         L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
         do i = 2, advxe
-            L(i) = 0d0
+            L(i) = 0._wp
         end do
 
         L(advxe) = L(1)
@@ -53,33 +53,33 @@ contains
         !!      outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !< Generic loop iterator
 
-        L(1) = (5d-1 - 5d-1*sign(1d0, lambda(1)))*lambda(1) &
+        L(1) = ((5._wp * (10._wp ** -(1))) - (5._wp * (10._wp ** -(1)))*sign(1._wp, lambda(1)))*lambda(1) &
             *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
         do i = 2, momxb
-            L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
+            L(i) = ((5._wp * (10._wp ** -(1))) - (5._wp * (10._wp ** -(1)))*sign(1._wp, lambda(2)))*lambda(2) &
                 *(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
+            L(i) = ((5._wp * (10._wp ** -(1))) - (5._wp * (10._wp ** -(1)))*sign(1._wp, lambda(2)))*lambda(2) &
                 *(dvel_ds(dir_idx(i - contxe)))
         end do
 
         do i = E_idx, advxe - 1
-            L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
+            L(i) = ((5._wp * (10._wp ** -(1))) - (5._wp * (10._wp ** -(1)))*sign(1._wp, lambda(2)))*lambda(2) &
                 *(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = (5d-1 - 5d-1*sign(1d0, lambda(3)))*lambda(3) &
+        L(advxe) = ((5._wp * (10._wp ** -(1))) - (5._wp * (10._wp ** -(1)))*sign(1._wp, lambda(3)))*lambda(3) &
                 *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_nonreflecting_subsonic_buffer_L ! -------------
@@ -90,18 +90,18 @@ contains
         !!      any reflections caused by outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
         L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
         do i = 2, advxe
-            L(i) = 0d0
+            L(i) = 0._wp
         end do
 
     end subroutine s_compute_nonreflecting_subsonic_inflow_L ! -------------
@@ -112,11 +112,11 @@ contains
         !!      amplitude of any reflections caused by outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -135,7 +135,7 @@ contains
         end do
 
         ! bubble index
-        L(advxe) = 0d0
+        L(advxe) = 0._wp
 
     end subroutine s_compute_nonreflecting_subsonic_outflow_L ! ------------
 
@@ -148,11 +148,11 @@ contains
         !!      velocity.
     subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -170,7 +170,7 @@ contains
             L(i) = lambda(2)*(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = L(1) + 2d0*rho*c*lambda(2)*dvel_ds(dir_idx(1))
+        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
 
     end subroutine s_compute_force_free_subsonic_outflow_L ! ---------------
 
@@ -180,11 +180,11 @@ contains
         !!      boundary in absence of any transverse effects.
     subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !> Generic loop iterator
 
@@ -213,16 +213,16 @@ contains
         !!      inflow boundary.
     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i
 
         do i = 1, advxe
-            L(i) = 0d0
+            L(i) = 0._wp
         end do
 
     end subroutine s_compute_supersonic_inflow_L ! -------------------------
@@ -233,11 +233,11 @@ contains
         !!      by the interior data.
     subroutine s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
     !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(wp), dimension(3), intent(IN) :: lambda
+        real(wp), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+        real(wp), dimension(num_dims), intent(IN) :: dvel_ds
+        real(wp), intent(IN) :: rho, c, dpres_ds
+        real(wp), dimension(sys_size), intent(INOUT) :: L
 
         integer :: i !< Generic loop iterator
 

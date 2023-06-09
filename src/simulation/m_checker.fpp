@@ -170,7 +170,7 @@ contains
         elseif (p + 1 < min(1, p)*num_stcls_min*weno_order) then
             call s_mpi_abort('Unsupported combination of values of '// &
                 'p and weno_order. Exiting ...')
-        elseif (weno_eps <= 0d0 .or. weno_eps > 1d-6) then
+        elseif (weno_eps <= 0._wp .or. weno_eps > (1._wp * (10._wp ** -(6)))) then
             call s_mpi_abort('Unsupported value of weno_eps. Exiting ...')
         elseif (weno_order == 1 .and. mapped_weno) then
             call s_mpi_abort('Unsupported combination of values of '// &
@@ -294,7 +294,7 @@ contains
             call s_int_to_str(i,iStr)
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
-                fluid_pp(i)%gamma <= 0d0) then
+                fluid_pp(i)%gamma <= 0._wp) then
                 call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &
                     'gamma. Exiting ...')
@@ -305,7 +305,7 @@ contains
                     'of values of model_eqns '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'gamma. Exiting ...')
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
+            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0._wp) &
                     .or. &
                     (i > num_fluids + bub_fac .and. fluid_pp(i)%gamma /= dflt_real)) &
                 then
@@ -315,7 +315,7 @@ contains
                     'gamma. Exiting ...')
             elseif (fluid_pp(i)%pi_inf /= dflt_real &
                     .and. &
-                    fluid_pp(i)%pi_inf < 0d0) then
+                    fluid_pp(i)%pi_inf < 0._wp) then
                 call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
@@ -326,7 +326,7 @@ contains
                     'of values of model_eqns '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
+            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0._wp) &
                     .or. &
                     (i > num_fluids + bub_fac .and. fluid_pp(i)%pi_inf /= dflt_real)) &
                 then
@@ -340,7 +340,7 @@ contains
                 call s_int_to_str(j,jStr)
                 if (fluid_pp(i)%Re(j) /= dflt_real &
                     .and. &
-                    fluid_pp(i)%Re(j) <= 0d0) then
+                    fluid_pp(i)%Re(j) <= 0._wp) then
                     call s_mpi_abort('Unsupported value of '// &
                         'fluid_pp('//trim(iStr)//')%'// &
                         'Re('//trim(jStr)//'). Exiting ...')

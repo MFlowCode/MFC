@@ -95,7 +95,7 @@ contains
         ! Define the view for each variable
         do i = 1, sys_size
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
@@ -106,12 +106,12 @@ contains
 
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
-        real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(wp), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
+        real(wp), intent(INOUT) :: time_avg
 
 #ifdef MFC_MPI
 
-        call MPI_GATHER(time_avg, 1, MPI_DOUBLE_PRECISION, proc_time(0), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        call MPI_GATHER(time_avg, 1, mpi_p, proc_time(0), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
 #endif
 
@@ -141,15 +141,15 @@ contains
                                                        ccfl_max_glb, &
                                                        Rc_min_glb)
 
-        real(kind(0d0)), intent(IN) :: icfl_max_loc
-        real(kind(0d0)), intent(IN) :: vcfl_max_loc
-        real(kind(0d0)), intent(IN) :: ccfl_max_loc
-        real(kind(0d0)), intent(IN) :: Rc_min_loc
+        real(wp), intent(IN) :: icfl_max_loc
+        real(wp), intent(IN) :: vcfl_max_loc
+        real(wp), intent(IN) :: ccfl_max_loc
+        real(wp), intent(IN) :: Rc_min_loc
 
-        real(kind(0d0)), intent(OUT) :: icfl_max_glb
-        real(kind(0d0)), intent(OUT) :: vcfl_max_glb
-        real(kind(0d0)), intent(OUT) :: ccfl_max_glb
-        real(kind(0d0)), intent(OUT) :: Rc_min_glb
+        real(wp), intent(OUT) :: icfl_max_glb
+        real(wp), intent(OUT) :: vcfl_max_glb
+        real(wp), intent(OUT) :: ccfl_max_glb
+        real(wp), intent(OUT) :: Rc_min_glb
 
 #ifdef MFC_MPI
 #ifdef MFC_SIMULATION
@@ -157,15 +157,15 @@ contains
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, &
-                        MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
+                        mpi_p, MPI_MAX, 0, &
                         MPI_COMM_WORLD, ierr)
 
         if (any(Re_size > 0)) then
             call MPI_REDUCE(vcfl_max_loc, vcfl_max_glb, 1, &
-                            MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
+                            mpi_p, MPI_MAX, 0, &
                             MPI_COMM_WORLD, ierr)
             call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, &
-                            MPI_DOUBLE_PRECISION, MPI_MIN, 0, &
+                            mpi_p, MPI_MIN, 0, &
                             MPI_COMM_WORLD, ierr)
         end if
 
@@ -184,13 +184,13 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_sum(var_loc, var_glb) ! ---------------------
 
-        real(kind(0d0)), intent(IN) :: var_loc
-        real(kind(0d0)), intent(OUT) :: var_glb
+        real(wp), intent(IN) :: var_loc
+        real(wp), intent(OUT) :: var_glb
 
 #ifdef MFC_MPI
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_SUM, MPI_COMM_WORLD, ierr)
 
 #endif
@@ -206,13 +206,13 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_min(var_loc, var_glb) ! ---------------------
 
-        real(kind(0d0)), intent(IN) :: var_loc
-        real(kind(0d0)), intent(OUT) :: var_glb
+        real(wp), intent(IN) :: var_loc
+        real(wp), intent(OUT) :: var_glb
 
 #ifdef MFC_MPI
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_MIN, MPI_COMM_WORLD, ierr)
 
 #endif
@@ -228,13 +228,13 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_max(var_loc, var_glb) ! ---------------------
 
-        real(kind(0d0)), intent(IN) :: var_loc
-        real(kind(0d0)), intent(OUT) :: var_glb
+        real(wp), intent(IN) :: var_loc
+        real(wp), intent(OUT) :: var_glb
 
 #ifdef MFC_MPI
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_MAX, MPI_COMM_WORLD, ierr)
 
 #endif
@@ -250,19 +250,19 @@ contains
         !!      the minimum value, reduced amongst all of the local values.
     subroutine s_mpi_reduce_min(var_loc) ! ---------------------------------
 
-        real(kind(0d0)), intent(INOUT) :: var_loc
+        real(wp), intent(INOUT) :: var_loc
 
 #ifdef MFC_MPI
 
         ! Temporary storage variable that holds the reduced minimum value
-        real(kind(0d0)) :: var_glb
+        real(wp) :: var_glb
 
         ! Performing reduction procedure and eventually storing its result
         ! into the variable that was initially inputted into the subroutine
-        call MPI_REDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_REDUCE(var_loc, var_glb, 1, mpi_p, &
                         MPI_MIN, 0, MPI_COMM_WORLD, ierr)
 
-        call MPI_BCAST(var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_BCAST(var_glb, 1, mpi_p, &
                        0, MPI_COMM_WORLD, ierr)
 
         var_loc = var_glb
@@ -286,11 +286,11 @@ contains
         !!  belongs.
     subroutine s_mpi_reduce_maxloc(var_loc) ! ------------------------------
 
-        real(kind(0d0)), dimension(2), intent(INOUT) :: var_loc
+        real(wp), dimension(2), intent(INOUT) :: var_loc
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), dimension(2) :: var_glb  !<
+        real(wp), dimension(2) :: var_glb  !<
             !! Temporary storage variable that holds the reduced maximum value
             !! and the rank of the processor with which the value is associated
 

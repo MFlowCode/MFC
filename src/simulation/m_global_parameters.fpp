@@ -28,7 +28,7 @@ module m_global_parameters
 
     implicit none
 
-    real(kind(0d0)) :: time = 0
+    real(wp) :: time = 0
 
     ! Logistics ================================================================
     integer :: num_procs             !< Number of processors
@@ -59,20 +59,20 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
+    real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
 
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-    real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
+    real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    real(kind(0d0)) :: dt !< Size of the time-step
+    real(wp) :: dt !< Size of the time-step
 
 !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
@@ -105,7 +105,7 @@ module m_global_parameters
         integer :: weno_order     !< Order of the WENO reconstruction
     #:endif
 
-    real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
+    real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
     logical :: mapped_weno    !< WENO with mapping of nonlinear weights
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
@@ -184,7 +184,7 @@ module m_global_parameters
     !! the dimensionally split system of equations.
     !> @{
     integer, dimension(3) :: dir_idx
-    real(kind(0d0)), dimension(3) :: dir_flg
+    real(wp), dimension(3) :: dir_flg
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
 !$acc declare create(dir_idx, dir_flg, dir_idx_tau)
@@ -228,7 +228,7 @@ module m_global_parameters
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
-    real(kind(0d0)) :: rhoref, pref
+    real(wp) :: rhoref, pref
     !> @}
 !$acc declare create(rhoref, pref)
 
@@ -240,21 +240,21 @@ module m_global_parameters
         integer :: nb       !< Number of eq. bubble sizes
     #:endif
 
-    real(kind(0d0)) :: R0ref    !< Reference bubble size
-    real(kind(0d0)) :: Ca       !< Cavitation number
-    real(kind(0d0)) :: Web      !< Weber number
-    real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
-    real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
-    real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
-    real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+    real(wp) :: R0ref    !< Reference bubble size
+    real(wp) :: Ca       !< Cavitation number
+    real(wp) :: Web      !< Weber number
+    real(wp) :: Re_inv   !< Inverse Reynolds number
+    real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
+    real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
+    real(wp), dimension(:), allocatable :: V0     !< Bubble velocities
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
-    real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
+    real(wp), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
+    real(wp) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     logical :: qbmm      !< Quadrature moment method
     integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
@@ -275,12 +275,12 @@ module m_global_parameters
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: gam
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: mul0, ss, gamma_v, mu_v
+    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: gam
     !> @}
 !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     !> @name Acoustic monopole parameters
@@ -301,12 +301,12 @@ module m_global_parameters
      integer :: strxb, strxe
      !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
+    real(wp), allocatable, dimension(:) :: gammas, pi_infs
     !$acc declare create(gammas, pi_infs)
 
 
-    real(kind(0d0)) :: mytime       !< Current simulation time
-    real(kind(0d0)) :: finaltime    !< Final simulation time
+    real(wp) :: mytime       !< Current simulation time
+    real(wp) :: finaltime    !< Final simulation time
 
     logical :: weno_flat, riemann_flat, cu_mpi
 
@@ -376,7 +376,7 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%G = 0d0
+            fluid_pp(i)%G = 0._wp
         end do
 
         ! Tait EOS
@@ -419,8 +419,8 @@ contains
             mono(j)%mag = dflt_real
             mono(j)%length = dflt_real
             mono(j)%delay = dflt_real
-            mono(j)%dir = 1.d0
-            mono(j)%npulse = 1.d0
+            mono(j)%dir = 1._wp
+            mono(j)%npulse = 1._wp
             mono(j)%pulse = 1
             mono(j)%support = 1
             mono(j)%foc_length = dflt_real
@@ -547,9 +547,9 @@ contains
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
                     if (num_fluids == 1) then
-                        gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
+                        gam = 1._wp/fluid_pp(num_fluids + 1)%gamma + 1._wp
                     else
-                        gam = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+                        gam = 1._wp/fluid_pp(num_fluids)%gamma + 1._wp
                     end if
 
                     if (qbmm) then
@@ -580,9 +580,9 @@ contains
                     end if
 
                     if (nb == 1) then
-                        weight(:) = 1d0
-                        R0(:) = 1d0
-                        V0(:) = 1d0
+                        weight(:) = 1._wp
+                        R0(:) = 1._wp
+                        V0(:) = 1._wp
                     else if (nb > 1) then
                         if (R0_type == 1) then
                             call s_simpson
@@ -590,7 +590,7 @@ contains
                             print *, 'Invalid R0 type - abort'
                             stop
                         end if
-                        V0(:) = 1d0
+                        V0(:) = 1._wp
                     else
                         stop 'Invalid value of nb'
                     end if
@@ -601,8 +601,8 @@ contains
                     if (.not. polytropic) then
                         call s_initialize_nonpoly
                     else
-                        rhoref = 1.d0
-                        pref = 1.d0
+                        rhoref = 1._wp
+                        pref = 1._wp
                     end if
                 end if
 
@@ -664,9 +664,9 @@ contains
                         end if
                     end do
                     if (nb == 1) then
-                        weight(:) = 1d0
-                        R0(:) = 1d0
-                        V0(:) = 0d0
+                        weight(:) = 1._wp
+                        R0(:) = 1._wp
+                        V0(:) = 0._wp
                     else if (nb > 1) then
                         if (R0_type == 1) then
                             call s_simpson
@@ -674,7 +674,7 @@ contains
                             print *, 'Invalid R0 type - abort'
                             stop
                         end if
-                        V0(:) = 1d0
+                        V0(:) = 1._wp
                     else
                         stop 'Invalid value of nb'
                     end if
@@ -682,8 +682,8 @@ contains
                     if (.not. polytropic) then
                         call s_initialize_nonpoly
                     else
-                        rhoref = 1.d0
-                        pref = 1.d0
+                        rhoref = 1._wp
+                        pref = 1._wp
                     end if
                 end if
             end if
@@ -819,22 +819,22 @@ contains
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
         integer :: ir
-        real(kind(0.d0)) :: rhol0
-        real(kind(0.d0)) :: pl0
-        real(kind(0.d0)) :: uu
-        real(kind(0.d0)) :: D_m
-        real(kind(0.d0)) :: temp
-        real(kind(0.d0)) :: omega_ref
-        real(kind(0.d0)), dimension(Nb) :: chi_vw0
-        real(kind(0.d0)), dimension(Nb) :: cp_m0
-        real(kind(0.d0)), dimension(Nb) :: k_m0
-        real(kind(0.d0)), dimension(Nb) :: rho_m0
-        real(kind(0.d0)), dimension(Nb) :: x_vw
+        real(wp) :: rhol0
+        real(wp) :: pl0
+        real(wp) :: uu
+        real(wp) :: D_m
+        real(wp) :: temp
+        real(wp) :: omega_ref
+        real(wp), dimension(Nb) :: chi_vw0
+        real(wp), dimension(Nb) :: cp_m0
+        real(wp), dimension(Nb) :: k_m0
+        real(wp), dimension(Nb) :: rho_m0
+        real(wp), dimension(Nb) :: x_vw
 
-        real(kind(0.d0)), parameter :: k_poly = 1.d0 !<
+        real(wp), parameter :: k_poly = 1._wp !<
             !! polytropic index used to compute isothermal natural frequency
 
-        real(kind(0.d0)), parameter :: Ru = 8314.d0 !<
+        real(wp), parameter :: Ru = 8314._wp !<
             !! universal gas constant
 
         rhol0 = rhoref
@@ -864,42 +864,42 @@ contains
         k_n(:) = fluid_pp(2)%k_v
 
         gamma_m = gamma_n
-        if (thermal == 2) gamma_m = 1.d0
+        if (thermal == 2) gamma_m = 1._wp
 
-        temp = 293.15d0
-        D_m = 0.242d-4
-        uu = DSQRT(pl0/rhol0)
+        temp = 293.15_wp
+        D_m = (0.242_wp * (10._wp ** -(4)))
+        uu = sqrt(pl0/rhol0)
 
-        omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
+        omega_ref = 3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/Web
 
             !!! thermal properties !!!
         ! gas constants
         R_n = Ru/M_n
         R_v = Ru/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
-        phi_vn = (1.d0 + DSQRT(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_v/M_n))
-        phi_nv = (1.d0 + DSQRT(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_n/M_v))
+        phi_vn = (1._wp + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_v/M_n))
+        phi_nv = (1._wp + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_n/M_v))
         ! internal bubble pressure
-        pb0 = pl0 + 2.d0*ss/(R0ref*R0)
+        pb0 = pl0 + 2._wp*ss/(R0ref*R0)
 
         ! mass fraction of vapor
-        chi_vw0 = 1.d0/(1.d0 + R_v/R_n*(pb0/pv - 1.d0))
+        chi_vw0 = 1._wp/(1._wp + R_v/R_n*(pb0/pv - 1._wp))
         ! specific heat for gas/vapor mixture
-        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1.d0) &
-                + (1.d0 - chi_vw0)*R_n*gamma_n/(gamma_n - 1.d0)
+        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1._wp) &
+                + (1._wp - chi_vw0)*R_n*gamma_n/(gamma_n - 1._wp)
         ! mole fraction of vapor
         x_vw = M_n*chi_vw0/(M_v + (M_n - M_v)*chi_vw0)
         ! thermal conductivity for gas/vapor mixture
-        k_m0 = x_vw*k_v/(x_vw + (1.d0 - x_vw)*phi_vn) &
-               + (1.d0 - x_vw)*k_n/(x_vw*phi_nv + 1.d0 - x_vw)
+        k_m0 = x_vw*k_v/(x_vw + (1._wp - x_vw)*phi_vn) &
+               + (1._wp - x_vw)*k_n/(x_vw*phi_nv + 1._wp - x_vw)
         ! mixture density
         rho_m0 = pv/(chi_vw0*R_v*temp)
 
         ! mass of gas/vapor computed using dimensional quantities
-        mass_n0 = 4.d0*(pb0 - pv)*pi/(3.d0*R_n*temp*rhol0)*R0**3
-        mass_v0 = 4.d0*pv*pi/(3.d0*R_v*temp*rhol0)*R0**3
+        mass_n0 = 4._wp*(pb0 - pv)*pi/(3._wp*R_n*temp*rhol0)*R0**3
+        mass_v0 = 4._wp*pv*pi/(3._wp*R_v*temp*rhol0)*R0**3
         ! Peclet numbers
         Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
         Pe_c = uu*R0ref/D_m
@@ -914,22 +914,22 @@ contains
 
         ! bubble wall temperature, normalized by T0, in the liquid
         ! keeps a constant (cold liquid assumption)
-        Tw = 1.d0
+        Tw = 1._wp
         ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
+        omegaN = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
 
-        pl0 = 1.d0
+        pl0 = 1._wp
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_c*R0(ir), &
                               Re_trans_c(ir), Im_trans_c(ir))
         end do
-        Im_trans_T = 0d0
-        Im_trans_c = 0d0
+        Im_trans_T = 0._wp
+        Im_trans_c = 0._wp
 
-        rhoref = 1.d0
-        pref = 1.d0
+        rhoref = 1._wp
+        pref = 1._wp
     end subroutine s_initialize_nonpoly
 
     !>  Computes transfer coefficient for non-polydisperse bubble modeling (Preston 2007)
@@ -939,19 +939,19 @@ contains
         !!  @param Im_trans Imaginary part of transfer coefficient
     subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
-        real(kind(0.d0)), intent(IN) :: omega
-        real(kind(0.d0)), intent(IN) :: peclet
-        real(kind(0.d0)), intent(OUT) :: Re_trans
-        real(kind(0.d0)), intent(OUT) :: Im_trans
+        real(wp), intent(IN) :: omega
+        real(wp), intent(IN) :: peclet
+        real(wp), intent(OUT) :: Re_trans
+        real(wp), intent(OUT) :: Im_trans
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
 
         c1 = imag*omega*peclet
         c2 = CSQRT(c1)
         c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
-        trans = ((c2/c3 - 1.d0)**(-1) - 3.d0/c1)**(-1) ! transfer function
+        trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
-        Re_trans = dble(trans)
+        Re_trans = (trans)
         Im_trans = aimag(trans)
 
     end subroutine s_transcoeff
@@ -1025,12 +1025,12 @@ contains
     subroutine s_simpson
 
         integer :: ir
-        real(kind(0.d0)) :: R0mn
-        real(kind(0.d0)) :: R0mx
-        real(kind(0.d0)) :: dphi
-        real(kind(0.d0)) :: tmp
-        real(kind(0.d0)) :: sd
-        real(kind(0.d0)), dimension(nb) :: phi
+        real(wp) :: R0mn
+        real(wp) :: R0mx
+        real(wp) :: dphi
+        real(wp) :: tmp
+        real(wp) :: sd
+        real(wp), dimension(nb) :: phi
 
         ! nondiml. min. & max. initial radii for numerical quadrature
         !sd   = 0.05D0
@@ -1046,31 +1046,31 @@ contains
         !R0mx = 150.D0
 
         sd = poly_sigma
-        R0mn = 0.8d0*DEXP(-2.8d0*sd)
-        R0mx = 0.2d0*DEXP(9.5d0*sd) + 1.d0
+        R0mn = 0.8_wp*exp(-2.8_wp*sd)
+        R0mx = 0.2_wp*exp(9.5_wp*sd) + 1._wp
 
         ! phi = ln( R0 ) & return R0
         do ir = 1, nb
-            phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(nb - 1)
-            R0(ir) = DEXP(phi(ir))
+            phi(ir) = log(R0mn) &
+                      + (ir - 1)*log(R0mx/R0mn)/(nb - 1)
+            R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)
 
         ! weights for quadrature using Simpson's rule
         do ir = 2, nb - 1
             ! Gaussian
-            tmp = DEXP(-0.5d0*(phi(ir)/sd)**2)/DSQRT(2.d0*pi)/sd
+            tmp = exp(-0.5_wp*(phi(ir)/sd)**2)/sqrt(2._wp*pi)/sd
             if (mod(ir, 2) == 0) then
-                weight(ir) = tmp*4.d0*dphi/3.d0
+                weight(ir) = tmp*4._wp*dphi/3._wp
             else
-                weight(ir) = tmp*2.d0*dphi/3.d0
+                weight(ir) = tmp*2._wp*dphi/3._wp
             end if
         end do
-        tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(1) = tmp*dphi/3.d0
-        tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(nb) = tmp*dphi/3.d0
+        tmp = exp(-0.5_wp*(phi(1)/sd)**2)/sqrt(2._wp*pi)/sd
+        weight(1) = tmp*dphi/3._wp
+        tmp = exp(-0.5_wp*(phi(nb)/sd)**2)/sqrt(2._wp*pi)/sd
+        weight(nb) = tmp*dphi/3._wp
     end subroutine s_simpson
 
 end module m_global_parameters

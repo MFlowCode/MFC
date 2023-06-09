@@ -37,8 +37,8 @@ program p_main
 
     integer :: i
     logical :: file_exists
-    real(kind(0d0)) :: start, finish, time_avg, time_final
-    real(kind(0d0)), allocatable, dimension(:) :: proc_time
+    real(wp) :: start, finish, time_avg, time_final
+    real(wp), allocatable, dimension(:) :: proc_time
 
     ! Initialization of the MPI environment
 
@@ -137,7 +137,7 @@ program p_main
     end if
 
     if (proc_rank == 0) then
-        time_final = 0d0
+        time_final = 0._wp
         if (num_procs == 1) then
             time_final = time_avg
             print *, "Final Time", time_final

@@ -231,9 +231,9 @@ contains
 
         integer :: i, j, k, l !< generic loop operators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: alpha_unadv
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: alpha_unadv
+        real(wp) :: rand_real
         call random_seed()
 
         do k = 0, p
@@ -244,8 +244,8 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
-!                        IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
-                    if ((perturb_alpha /= 0d0) .and. (perturb_alpha /= 1d0)) then
+!                        IF ((perturb_alpha >= (25._wp * (10._wp ** -(2)))) .AND. (perturb_alpha <= (75._wp * (10._wp ** -(2))))) THEN
+                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
@@ -263,8 +263,8 @@ contains
 
         integer :: i, j, k, l !<  generic loop iterators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: rand_real
         call random_seed()
 
         ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
@@ -273,18 +273,18 @@ contains
                 do i = 0, m
 
                     perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
-                    ! IF (perturb_alpha == 1d0) THEN
+                    ! IF (perturb_alpha == 1._wp) THEN
                     ! Perturb partial density
 !                            CALL RANDOM_NUMBER(rand_real)
-!                            rand_real = rand_real / 1d2 / 1d3
+!                            rand_real = rand_real / (1._wp * (10._wp ** 2)) / (1._wp * (10._wp ** 3))
 !                            q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
                     ! Perturb velocity
                     call random_number(rand_real)
-                    rand_real = rand_real*1.d-2
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    rand_real = rand_real*(1._wp * (10._wp ** -(2)))
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     if (bubbles) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
+                        q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
                     end if
                     ! END IF
                 end do
@@ -300,9 +300,9 @@ contains
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4), 
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave() ! ------------------------
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
-        real(kind(0d0)) :: tr,ti
-        real(kind(0d0)) :: Lx,Lz
+        real(wp), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
+        real(wp) :: tr,ti
+        real(wp) :: Lx,Lz
         integer :: i,j,k
         
         Lx = x_domain%end - x_domain%beg
@@ -310,32 +310,32 @@ contains
             Lz = z_domain%end - z_domain%beg
         end if
  
-        wave = 0d0
-        wave1 = 0d0
-        wave2 = 0d0
+        wave = 0._wp
+        wave1 = 0._wp
+        wave2 = 0._wp
         
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*4.0/Lx,0._wp,tr,ti,wave_tmp,0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*2.0/Lx,0._wp,tr,ti,wave_tmp,0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*1.0/Lx,0._wp,tr,ti,wave_tmp,0._wp)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*11._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*13._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*17._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Lx,-2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx,-2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*19._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx,-2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx,-2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*23._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx,-2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx,-2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*29._wp/31._wp)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -361,19 +361,19 @@ contains
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha,beta,tr,ti,wave,shift)
-        real(kind(0d0)),intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
-        real(kind(0d0)),dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
-        real(kind(0d0)),dimension(0:n,0:n) :: d !< differential operator in y dir
-        real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: ar,ai,br,bi,ci !< matrices for eigenvalue problem
-        real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: fv1,fv2,fv3 !< temporary memory
-        real(kind(0d0)) :: tr,ti !< most unstable eigenvalue
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
-        real(kind(0d0)),dimension(5,0:m,0:n,0:p) :: wave !< instability wave
-        real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)) :: gam,pi_inf,rho1,mach,c1
+        real(wp),intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(wp),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
+        real(wp),dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
+        real(wp),dimension(0:n,0:n) :: d !< differential operator in y dir
+        real(wp),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: ar,ai,br,bi,ci !< matrices for eigenvalue problem
+        real(wp),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: zr,zi !< eigenvectors
+        real(wp),dimension(0:5*(n+1)-1) :: wr,wi !< eigenvalues
+        real(wp),dimension(0:5*(n+1)-1) :: fv1,fv2,fv3 !< temporary memory
+        real(wp) :: tr,ti !< most unstable eigenvalue
+        real(wp),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
+        real(wp),dimension(5,0:m,0:n,0:p) :: wave !< instability wave
+        real(wp) :: shift !< phase shift
+        real(wp) :: gam,pi_inf,rho1,mach,c1
         integer :: ierr
         integer :: j, k, l !<  generic loop iterators
         integer :: ii, jj !< block matrix indicies
@@ -400,7 +400,7 @@ contains
         ! based on 4th order central difference (inner)
         ! and 2nd order central difference (near boundaries)
         dy = y_cc(1)-y_cc(0)
-        d=0d0
+        d=0._wp
         d(1,0)=-1/(2*dy)
         d(1,2)= 1/(2*dy)
         do j=2,n-2
@@ -427,9 +427,9 @@ contains
         ! Compute B and C, then A = B + C
         ! B includes terms without differential operator, and
         ! C includes terms with differential operator
-        br=0d0
-        bi=0d0
-        ci=0d0
+        br=0._wp
+        bi=0._wp
+        ci=0._wp
         do j=0,n
             ii = 1; jj = 1; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j); 
             ii = 1; jj = 2; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*rho_mean(j);
@@ -477,13 +477,13 @@ contains
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(nl,wr,wi,zr,zi,alpha,beta,wave,shift)
         integer nl
-        real(kind(0d0)), dimension(0:nl-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave
-        real(kind(0d0)) :: alpha,beta,ang,shift
-        real(kind(0d0)) :: norm
-        real(kind(0d0)) :: tr,ti,cr,ci !< temporary memory
+        real(wp), dimension(0:nl-1) :: wr,wi !< eigenvalues
+        real(wp), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
+        real(wp), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
+        real(wp), dimension(5,0:m,0:n,0:p) :: wave
+        real(wp) :: alpha,beta,ang,shift
+        real(wp) :: norm
+        real(wp) :: tr,ti,cr,ci !< temporary memory
         integer idx
         integer i,j,k
         
@@ -498,11 +498,11 @@ contains
         vi = zi(:,k)
 
         ! Normalize the eigenvector by its component with the largest modulus.
-        norm = 0d0
+        norm = 0._wp
         do i=0,nl-1
-            if (dsqrt(vr(i)**2+vi(i)**2) .gt. norm) then
+            if (sqrt(vr(i)**2+vi(i)**2) .gt. norm) then
                 idx = i
-                norm = dsqrt(vr(i)**2+vi(i)**2)
+                norm = sqrt(vr(i)**2+vi(i)**2)
             end if
         end do
 

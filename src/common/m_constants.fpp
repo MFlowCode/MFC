@@ -4,13 +4,28 @@
 
 module m_constants
 
+    use mpi
+
+    integer, parameter :: sp = selected_real_kind(6, 37)
+    integer, parameter :: dp = selected_real_kind(15, 307)
+
+#ifdef MFC_DOUBLE_PRECISION
+    integer, parameter :: wp = dp
+    integer, parameter :: mpi_p = MPI_DOUBLE_PRECISION
+#endif
+
+#ifdef MFC_SINGLE_PRECISION
+    integer, parameter :: wp = sp
+    integer, parameter :: mpi_p = MPI_REAL
+#endif
+
     character, parameter :: dflt_char = ' ' !< Default string value
     
-    real(kind(0d0)), parameter :: dflt_real = -1d6                !< Default real value
-    real(kind(0d0)), parameter :: sgm_eps   = 1d-16               !< Segmentation tolerance
-    real(kind(0d0)), parameter :: small_alf = 1d-7                !< Small alf tolerance
-    real(kind(0d0)), parameter :: pi        = 3.141592653589793d0 !< Pi
-    real(kind(0d0)), parameter :: verysmall = 1.d-12              !< Very small number
+    real(wp), parameter :: dflt_real = (-1._wp * (10._wp ** 6))                !< Default real value
+    real(wp), parameter :: sgm_eps   = (1._wp * (10._wp ** -(16)))               !< Segmentation tolerance
+    real(wp), parameter :: small_alf = (1._wp * (10._wp ** -(7)))                !< Small alf tolerance
+    real(wp), parameter :: pi        = 3.141592653589793_wp !< Pi
+    real(wp), parameter :: verysmall = (1._wp * (10._wp ** -(12)))              !< Very small number
     
     integer, parameter :: num_stcls_min   = 5    !< Mininum # of stencils
     integer, parameter :: path_len        = 400  !< Maximum path length

@@ -164,7 +164,13 @@ $ ./mfc.sh run examples/1D_vacuum_restart/case.py -t post_process
 $ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
 ```
 
-### Example Runs
+### Changing Working Precision
+
+MFC has the capability to run in both single and double precision. To enable single
+precision, run `./mfc.sh run ... --single`. To disable single precision run
+`./mfc.sh run ... --no-single`.
+
+## Example Runs
 
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 

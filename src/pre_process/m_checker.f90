@@ -73,7 +73,7 @@ contains
 
         if (qbmm .and. dist_type == dflt_int) then
             call s_mpi_abort('Dist type must be set if using QBMM. Exiting ...')
-        else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0d0) then
+        else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0._wp) then
             call s_mpi_abort('rhoRV cannot be used with dist_type \ne 1. Exiting ...')
         else if (polydisperse .and. R0_type == dflt_int) then
             call s_mpi_abort('R0 type must be set if using Polydisperse. Exiting ...')
@@ -145,11 +145,11 @@ contains
             ! Constraints on domain boundaries for cylindrical coordinates
             if (n == 0 &
                 .or. &
-                y_domain%beg /= 0d0 &
+                y_domain%beg /= 0._wp &
                 .or. &
                 y_domain%end == dflt_real &
                 .or. &
-                y_domain%end < 0d0 &
+                y_domain%end < 0._wp &
                 .or. &
                 y_domain%beg >= y_domain%end) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
@@ -161,9 +161,9 @@ contains
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'cyl_coord and p, z_domain%beg, or '// &
                     'z_domain%end. Exiting ...')
-            elseif (p > 0 .and. (z_domain%beg /= 0d0 &
+            elseif (p > 0 .and. (z_domain%beg /= 0._wp &
                                  .or. &
-                                 z_domain%end /= 2d0*pi)) then
+                                 z_domain%end /= 2._wp*pi)) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'cyl_coord and p, z_domain%beg, or '// &
                     'z_domain%end. Exiting ...')
@@ -267,13 +267,13 @@ contains
                     'Exiting ...')
             elseif ((a_x + log(cosh(a_x*(x_domain%beg - x_a))) &
                      + log(cosh(a_x*(x_domain%beg - x_b))) &
-                     - 2d0*log(cosh(0.5d0*a_x*(x_b - x_a))))/a_x <= 0d0) then
+                     - 2._wp*log(cosh(0.5_wp*a_x*(x_b - x_a))))/a_x <= 0._wp) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for x_domain%beg, stretch_x, a_x, '// &
                     'x_a, and x_b. Exiting ...')
             elseif ( (a_x + log(cosh(a_x*(x_domain%end - x_a))) &
                      + log(cosh(a_x*(x_domain%end - x_b))) &
-                     - 2d0*log(cosh(0.5d0*a_x*(x_b - x_a))))/a_x <= 0d0) then
+                     - 2._wp*log(cosh(0.5_wp*a_x*(x_b - x_a))))/a_x <= 0._wp) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for x_domain%end, stretch_x, a_x, '// &
                     'x_a, and x_b. Exiting ...')
@@ -304,13 +304,13 @@ contains
                     'Exiting ...')
             elseif ((a_y + log(cosh(a_y*(y_domain%beg - y_a))) &
                      + log(cosh(a_y*(y_domain%beg - y_b))) &
-                     - 2d0*log(cosh(0.5d0*a_y*(y_b - y_a))))/a_y <= 0d0) then
+                     - 2._wp*log(cosh(0.5_wp*a_y*(y_b - y_a))))/a_y <= 0._wp) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for y_domain%beg, stretch_y, a_y, '// &
                     'y_a, and y_b. Exiting ...')
             elseif ((a_y + log(cosh(a_y*(y_domain%end - y_a))) &
                      + log(cosh(a_y*(y_domain%end - y_b))) &
-                     - 2d0*log(cosh(0.5d0*a_y*(y_b - y_a))))/a_y <= 0d0) then
+                     - 2._wp*log(cosh(0.5_wp*a_y*(y_b - y_a))))/a_y <= 0._wp) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for y_domain%end, stretch_y, a_y, '// &
                     'y_a, and y_b. Exiting ...')
@@ -346,13 +346,13 @@ contains
                     'Exiting ...')
             elseif ((a_z + log(cosh(a_z*(z_domain%beg - z_a))) &
                      + log(cosh(a_z*(z_domain%beg - z_b))) &
-                     - 2d0*log(cosh(0.5d0*a_z*(z_b - z_a))))/a_z <= 0d0) then
+                     - 2._wp*log(cosh(0.5_wp*a_z*(z_b - z_a))))/a_z <= 0._wp) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for z_domain%beg, stretch_z, a_z, '// &
                     'z_a, and z_b. Exiting ...')
             elseif ((a_z + log(cosh(a_z*(z_domain%end - z_a))) &
                      + log(cosh(a_z*(z_domain%end - z_b))) &
-                     - 2d0*log(cosh(0.5d0*a_z*(z_b - z_a))))/a_z <= 0d0) then
+                     - 2._wp*log(cosh(0.5_wp*a_z*(z_b - z_a))))/a_z <= 0._wp) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for z_domain%end, stretch_z, a_z, '// &
                     'z_a, and z_b. Exiting ...')
@@ -587,7 +587,7 @@ contains
             call s_int_to_str(i, iStr)
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
-                fluid_pp(i)%gamma <= 0d0) then
+                fluid_pp(i)%gamma <= 0._wp) then
                 call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &
                     'gamma. Exiting ...')
@@ -598,7 +598,7 @@ contains
                     'of values of model_eqns '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'gamma. Exiting ...')
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
+            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0._wp) &
                     .or. &
                     (i > num_fluids + bub_fac .and. fluid_pp(i)%gamma /= dflt_real)) &
                 then
@@ -608,7 +608,7 @@ contains
                     'gamma. Exiting ...')
             elseif (fluid_pp(i)%pi_inf /= dflt_real &
                     .and. &
-                    fluid_pp(i)%pi_inf < 0d0) then
+                    fluid_pp(i)%pi_inf < 0._wp) then
                 call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
@@ -619,7 +619,7 @@ contains
                     'of values of model_eqns '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
-            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
+            elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0._wp) &
                     .or. &
                     (i > num_fluids + bub_fac .and. fluid_pp(i)%pi_inf /= dflt_real)) &
                 then

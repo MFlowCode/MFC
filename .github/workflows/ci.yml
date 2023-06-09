@@ -88,17 +88,29 @@ jobs:
           ${{ matrix.intel-command }}
           /bin/bash mfc.sh build -j $(nproc) ${{ matrix.debug }}
 
-      - name: Test Suite (Debug)
+      - name: Test Suite (Debug, Double Precision)
         if: matrix.debug == '--debug'
         run: |
           ${{ matrix.intel-command }}
           /bin/bash mfc.sh test  -j $(nproc) --debug
 
-      - name: Test Suite (No Debug)
+      - name: Test Suite (Debug, Single Precision)
+        if: matrix.debug == '--debug'
+        run: |
+          ${{ matrix.intel-command }}
+          /bin/bash mfc.sh test  -j $(nproc) --debug --single
+
+      - name: Test Suite (No Debug, Double Precision)
         if: matrix.debug == '--no-debug'
         run: |
           ${{ matrix.intel-command }}
           /bin/bash mfc.sh test -j $(nproc) -a
+
+      - name: Test Suite (No Debug, Single Precision)
+        if: matrix.debug == '--no-debug'
+        run: |
+          ${{ matrix.intel-command }}
+          /bin/bash mfc.sh test -j $(nproc) -a --single  
           
 
   self-cpu-release:

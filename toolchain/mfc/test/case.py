@@ -106,7 +106,7 @@ class TestCase(case.Case):
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
         binary_option     = f"-b {ARG('binary')}"  if ARG("binary") is not None else ""
         case_optimization =  "--case-optimization" if ARG("case_optimization")  else "--no-build"
-        
+
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
                 
         command: str = f'''\

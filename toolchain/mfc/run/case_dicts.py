@@ -7,7 +7,7 @@ COMMON = [
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse"
+    "Ca", "polydisperse", "working_precision"
 ]
 
 
@@ -137,6 +137,8 @@ for fl_id in range(1,10+1):
 
 
 CASE_OPTIMIZATION = [ "nb", "weno_order" ]
+
+PRECISION = ["working_precision"]
 
 
 def get_input_dict_keys(target_name: str) -> list:

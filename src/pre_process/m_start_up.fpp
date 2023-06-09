@@ -215,7 +215,7 @@ contains
         end if
 
         ! Computing cell-center locations
-        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
+        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
 
         ! Computing minimum cell-width
         dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
@@ -247,7 +247,7 @@ contains
             end if
 
             ! Computing cell-center locations
-            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
+            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
 
             ! Computing minimum cell-width
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
@@ -279,7 +279,7 @@ contains
                 end if
 
                 ! Computing cell-center locations
-                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
+                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
 
                 ! Computing minimum cell-width
                 dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
@@ -316,7 +316,7 @@ contains
 
         ! Cell-boundary Data Consistency Check in x-direction ==============
 
-        if (any(x_cb(0:m) - x_cb(-1:m - 1) <= 0d0)) then
+        if (any(x_cb(0:m) - x_cb(-1:m - 1) <= 0._wp)) then
             call s_mpi_abort('x_cb.dat in '//trim(t_step_dir)// &
                 ' contains non-positive cell-spacings. Exiting ...')
         end if
@@ -327,7 +327,7 @@ contains
 
         if (n > 0) then
 
-            if (any(y_cb(0:n) - y_cb(-1:n - 1) <= 0d0)) then
+            if (any(y_cb(0:n) - y_cb(-1:n - 1) <= 0._wp)) then
                 call s_mpi_abort('y_cb.dat in '//trim(t_step_dir)// &
                     ' contains non-positive cell-spacings. '// &
                     'Exiting ...')
@@ -339,7 +339,7 @@ contains
 
             if (p > 0) then
 
-                if (any(z_cb(0:p) - z_cb(-1:p - 1) <= 0d0)) then
+                if (any(z_cb(0:p) - z_cb(-1:p - 1) <= 0._wp)) then
                     call s_mpi_abort('z_cb.dat in '//trim(t_step_dir)// &
                         ' contains non-positive cell-spacings'// &
                         ' .Exiting ...')
@@ -368,7 +368,7 @@ contains
         ! Generic string used to store the address of a particular file
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !<
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
@@ -422,7 +422,7 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -441,7 +441,7 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ_ALL(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_READ_ALL(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
@@ -450,7 +450,7 @@ contains
         ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         ! Computing cell center locations
-        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2d0
+        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
         ! Computing minimum cell width
         dx = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
         if (num_procs > 1) call s_mpi_reduce_min(dx)
@@ -466,7 +466,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ_ALL(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_READ_ALL(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
@@ -475,7 +475,7 @@ contains
             ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
             ! Computing cell center locations
-            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2d0
+            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
             ! Computing minimum cell width
             dy = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
             if (num_procs > 1) call s_mpi_reduce_min(dy)
@@ -491,7 +491,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ_ALL(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_READ_ALL(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
                     call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
@@ -500,7 +500,7 @@ contains
                 ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
                 ! Computing cell center locations
-                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2d0
+                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
                 ! Computing minimum cell width
                 dz = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
                 if (num_procs > 1) call s_mpi_reduce_min(dz)
@@ -561,8 +561,8 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -573,10 +573,10 @@ contains
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
                 call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                   MPI_DOUBLE_PRECISION, status, ierr)
+                                   mpi_p, status, ierr)
             end do
 
             call s_mpi_barrier()

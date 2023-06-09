@@ -37,9 +37,9 @@ contains
         integer, intent(IN) :: q
         integer, intent(IN) :: buff_size, fd_number_in, fd_order_in
         type(int_bounds_info), optional, intent(IN) :: offset_s
-        real(kind(0d0)), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
+        real(wp), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-buff_size:q + buff_size), &
             intent(IN) :: s_cc
 
@@ -59,25 +59,25 @@ contains
         ! Computing the 1st order finite-difference coefficients
         if (fd_order_in == 1) then
             do i = lB, lE
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
+                fd_coeff_s(-1, i) = 0._wp
+                fd_coeff_s(0, i) = -1._wp/(s_cc(i + 1) - s_cc(i))
                 fd_coeff_s(1, i) = -fd_coeff_s(0, i)
             end do
 
             ! Computing the 2nd order finite-difference coefficients
         elseif (fd_order_in == 2) then
             do i = lB, lE
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
+                fd_coeff_s(-1, i) = -1._wp/(s_cc(i + 1) - s_cc(i - 1))
+                fd_coeff_s(0, i) = 0._wp
                 fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
             end do
 
             ! Computing the 4th order finite-difference coefficients
         else
             do i = lB, lE
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
+                fd_coeff_s(-2, i) = 1._wp/(s_cc(i - 2) - 8._wp*s_cc(i - 1) - s_cc(i + 2) + 8._wp*s_cc(i + 1))
+                fd_coeff_s(-1, i) = -8._wp*fd_coeff_s(-2, i)
+                fd_coeff_s(0, i) = 0._wp
                 fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
                 fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
             end do
@@ -92,27 +92,27 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-        real(kind(0.d0)), dimension(nb) :: weights
+        real(wp), intent(IN) :: vftmp
+        real(wp), dimension(nb), intent(IN) :: Rtmp
+        real(wp), intent(OUT) :: ntmp
+        real(wp) :: R3
+        real(wp), dimension(nb) :: weights
 
-        R3 = dot_product(weights, Rtmp**3.d0)
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
+        R3 = dot_product(weights, Rtmp**3._wp)
+        ntmp = (3._wp/(4._wp*pi))*vftmp/R3
 
     end subroutine s_comp_n_from_prim
 
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp  
-        real(kind(0.d0)) :: nR3
-        real(kind(0.d0)), dimension(nb) :: weights
+        real(wp), intent(IN) :: vftmp
+        real(wp), dimension(nb), intent(IN) :: nRtmp
+        real(wp), intent(OUT) :: ntmp  
+        real(wp) :: nR3
+        real(wp), dimension(nb) :: weights
 
-        nR3 = dot_product(weights, nRtmp**3.d0)
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
+        nR3 = dot_product(weights, nRtmp**3._wp)
+        ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
 

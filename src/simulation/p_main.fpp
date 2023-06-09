@@ -66,16 +66,16 @@ program p_main
     integer :: err_code, ierr
 
     integer :: t_step, i, j, k, l !< Iterator for the time-stepping loop
-    real(kind(0d0)) :: time_avg, time_final
-    real(kind(0d0)) :: io_time_avg, io_time_final
-    real(kind(0d0)), allocatable, dimension(:) :: proc_time
-    real(kind(0d0)), allocatable, dimension(:) :: io_proc_time
+    real(wp) :: time_avg, time_final
+    real(wp) :: io_time_avg, io_time_final
+    real(wp), allocatable, dimension(:) :: proc_time
+    real(wp), allocatable, dimension(:) :: io_proc_time
     logical :: file_exists
-    real(kind(0d0)) :: start, finish
+    real(wp) :: start, finish
     integer :: nt
 
 #ifdef _OPENACC
-    real(kind(0d0)) :: starttime, endtime
+    real(wp) :: starttime, endtime
     integer :: num_devices, local_size, num_nodes, ppn, my_device_num
     integer :: dev, devNum, local_rank
 #ifdef MFC_MPI
@@ -119,7 +119,6 @@ program p_main
         call s_check_input_file()
         print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
-
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
     ! carried out if the simulation is in fact not truly executed in parallel.
@@ -215,7 +214,7 @@ program p_main
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
     if (t_step == 0) then
-        mytime = 0d0
+        mytime = 0._wp
     else
         mytime = t_step*dt
     end if
@@ -225,7 +224,7 @@ program p_main
     do
         if (proc_rank == 0) then
             print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',                             &
-                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                  int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                   t_step      - t_step_start + 1,                                                     &
                   t_step_stop - t_step_start + 1,                                                     &
                   t_step
@@ -266,8 +265,8 @@ program p_main
             end if
 
             if (proc_rank == 0) then
-                time_final = 0d0
-                io_time_final = 0d0
+                time_final = 0._wp
+                io_time_final = 0._wp
                 if (num_procs == 1) then
                     time_final = time_avg
                     io_time_final = io_time_avg
@@ -374,6 +373,8 @@ program p_main
     if (any(Re_size > 0)) then
         call s_finalize_viscous_module()
     end if
+
+    if (hypoelasticity) call s_finalize_hypoelastic_module()
 
     ! Terminating MPI execution environment
     call s_mpi_finalize()
