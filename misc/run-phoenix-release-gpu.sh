@@ -4,7 +4,7 @@
 #SBATCH -N1                                     # Number of nodes and cores per node required
 #SBATCH --gres=gpu:V100:2
 #SBATCH -t 02:00:00                              # Duration of the job (Ex: 15 mins)
-#SBATCH -q inferno                               # QOS Name
+#SBATCH -q embers                               # QOS Name
 #SBATCH -otest.out                               # Combined output and error messages file
 #SBATCH -W                                      # Do not exit until the submitted job terminates.
 
