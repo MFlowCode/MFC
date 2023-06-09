@@ -232,7 +232,7 @@ contains
                             Cpinf = myP
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                             ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
+                            c_liquid = DSQRT(n_tait*(myP + B_tait)/myRho)
                             rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
