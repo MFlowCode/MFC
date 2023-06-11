@@ -176,19 +176,27 @@ elif [ "$1" == "docker" ]; then
     fi
 
     log "Running in$MAGENTA Docker$COLOR_RESET mode."
-    log "  - Fetching image..."
-    if ! docker pull henryleberre/mfc; then
-        error "Failed to fetch$MAGENTA Docker$COLOR_RESET image from$MAGENTA Docker Hub$COLOR_RESET."
+
+    if [ -t 1 ]; then
+        dockerintopts='--interactive --tty'
+    fi
+
+    __docker_run() { 
+        docker run $dockerintopts --rm --workdir /home/me/MFC            \
+                   --mount type=bind,source="$(pwd)",target=/home/me/MFC \
+                   sbryngelson/mfc:latest $@
+    }
+
+    __docker_run sudo chown -R me:me /home/me/MFC
+    if (($?)); then
+        error "Docker: Failed to set directory permissions on MFC mount.."
 
         exit 1
     fi
 
-    log "  - Starting container..."
-    docker run --interactive --tty --rm                              \
-               --mount type=bind,source="$(pwd)",target=/home/me/MFC \
-               henryleberre/mfc
+    __docker_run $@
     if (($?)); then
-        error "Failed to start Docker container."
+        error "Error running Docker container with $@."
 
         exit 1
     fi
