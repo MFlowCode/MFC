@@ -106,7 +106,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-g -O0 -traceback -debug)
+        add_compile_options(-g -Og -traceback -debug)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
@@ -122,7 +122,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
     
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -O0 -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+        add_compile_options(-C -g -Og -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
     endif()
 endif()
 
@@ -396,15 +396,17 @@ if (MFC_DOCUMENTATION)
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
-        GIT_TAG           "8a34f701d3435309a21080f44fbd4a466979aa19"
+        GIT_TAG           "df83fbf22cfff76b875c13d324baf584c74e96d0"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND     ""
         INSTALL_COMMAND   ""
     )
 
-    set(theme_dirpath "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css/src/doxygen-awesome-css/")
+    set(theme_dirpath "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css/src/doxygen-awesome-css")
 
-    set(DOXYGEN_HTML_EXTRA_STYLESHEET "\"${theme_dirpath}/doxygen-awesome.css\"")
+    set(DOXYGEN_HTML_EXTRA_STYLESHEET
+        "\"${theme_dirpath}/doxygen-awesome.css\"\
+         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"")
 
     # === === Generate Documentation
     GEN_DOCS(pre_process  "MFC: Pre-Process")
