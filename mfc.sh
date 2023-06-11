@@ -1,5 +1,7 @@
 #!/bin/bash
 
+unset u_c
+unset u_cg
 
 MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=6
@@ -22,7 +24,7 @@ if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/bui
 fi
 
 # If the user wishes to run the "load" script
-if [ "$1" == "load" ]; then
+if [ "$1" == 'load' ]; then
     shift;
 
     # Reset u_computer & u_cg to known values since this script is run with "source"
@@ -32,143 +34,70 @@ if [ "$1" == "load" ]; then
     # If there are command-line arguments, parse them:
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -c|--computer) u_computer="$2"; shift; shift;    ;;
-            -m|--mode)     u_cg="$2";       shift; shift;    ;;
+            -c|--computer) u_c="$2";  shift; shift; ;;
+            -m|--mode)     u_cg="$2"; shift; shift; ;;
             -*|--*)        echo "Unknown option $1"; return; ;;
         esac
     done
 
     # Get computer (if not supplied in command-line)
-    if [ -v $u_computer ]; then
+    if [ -v $u_c ]; then
         log   "Select a system:"
-        log   "$G""ORNL$W:    Ascent     (a), Crusher (c), Summit (s), Wombat (w)"
-        log   "$C""ACCESS$W:  Bridges2   (b), Expanse (e), Delta  (d)"
+        log   "$G""ORNL$W:    Ascent     (a) | Crusher (c) | Summit (s) | Wombat (w)"
+        log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d)"
         log   "$Y""GaTech$W:  Phoenix    (p)"
         log   "$R""CALTECH$W: Richardson (r)"
         log_n "($G""a$W/$G""c$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR): "
-        read u_computer
+        read u_c
         log
     fi
 
     # Get CPU/GPU (if not supplied in command-line)
     if [ -v $u_cg ]; then
         log   "Select configuration:"
-        log   " - CPU (c)"
-        log   " - GPU (g)"
-        log_n "(c/g): "
+        log   " - CPU (c | cpu)"
+        log   " - GPU (g | gpu)"
+        log_n "(c/cpu/g/gpu): "
         read u_cg
         log
     fi
 
     # User input to lowercase
-    u_computer=$(echo "$u_computer" | tr '[:upper:]' '[:lower:]')
+    u_c=$(echo "$u_c" | tr '[:upper:]' '[:lower:]')
     u_cg=$(echo "$u_cg" | tr '[:upper:]' '[:lower:]')
 
-    COMPUTER=""; CG=""
-    declare -a MODULES
-
-    if [ "$u_cg" == "c" ]; then # for CPU
-        CG="CPU"
-    elif [ "$u_cg" == "g" ]; then # For GPU
-        CG="GPU"
+    if [ "$u_cg" == 'c' ] || [ "$u_cg" == 'cpu' ]; then
+        CG='CPU'; cg='cpu'
+    elif [ "$u_cg" == "g" ] || [ "$u_cg" == 'gpu' ]; then
+        CG='GPU'; cg='gpu'
     fi
 
-    if [ "$u_computer" == "s" ]; then # For Summit
-        if [ "$u_cg" == "c" ]; then
-            MODULES=("gcc/12.1.0")
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.11" "cuda/nvhpc")
-        fi
+    __combine() {
+        echo -n $@ | sed 's/\[\n\r\s\]\+/\ /'
+    }
 
-        MODULES=("${MODULES[@]}" "python/3.8.10" "darshan-runtime/3.3.1-lite"
-                "hsi/5.0.2.p5" "xalt/1.2.1" "lsf-tools/2.0"
-                "cmake/3.23.2" "ninja/1.10.2" "spectrum-mpi/10.4.0.3-20210112")
-    elif [ "$u_computer" == "b" ]; then # Bridges2
-        if [ "$u_cg" == "c" ]; then
-            MODULES=("allocations/1.0" "gcc/10.2.0" "python/3.8.6"
-                     "openmpi/4.0.5-gcc10.2.0")
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("openmpi/4.0.5-nvhpc22.9" "nvhpc/22.9")
-        fi
+    __extract() {
+        __combine "$(grep -E "^$1\s+" toolchain/modules | sed "s/^$1\s\+//")"
+    }
 
-        MODULES=("${MODULES[@]}" "python/3.8.6")
-    elif [ "$u_computer" == "d" ]; then # Delta
-        if [ "$u_cg" == "c" ]; then
-            MODULES=()
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.5")
-        fi
-
-        MODULES=("${MODULES[@]}" "cmake" "openmpi")
-    elif [ "$u_computer" == "a" ]; then # For Ascent
-        if [ "$u_cg" == "c" ]; then
-            MODULES=("gcc/11.1.0" "spectrum-mpi" "cuda")
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/21.11" "spectrum-mpi" "cuda/nvhpc"
-                    "nsight-compute" "nsight-systems")
-        fi
-
-        MODULES=("${MODULES[@]}" "python" "cmake/3.22.2")
-    elif [ "$u_computer" == "r" ]; then # Richardson
-        if [ "$u_cg" == "c" ]; then
-            MODULES=("gcc/9.3.0" "openmpi-2.0/gcc-9.3.0")
-        elif [ "$u_cg" == "g" ]; then
-            error "GPU not supported on Richardson."
-
-            return
-        fi
-
-        MODULES=("${MODULES[@]}" "python/3.7")
-    elif [ "$u_computer" == "w" ]; then # For Wombat
-        if [ "$u_cg" == "c" ]; then
-            MODULES=("gcc/11.1.0" "openmpi/4.0.5_gcc")
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.11")
-        fi
-
-        MODULES=("${MODULES[@]}" "cmake/3.25.1" "python/3.10.8")
-    elif [ "$u_computer" == "e" ]; then # Expanse
-        if [ "$u_cg" == "c" ]; then
-            warn "Please set CC=icc, CXX=icx, and FC=ifort."
-            log
-
-            MODULES=("cpu/0.15.4" "gcc/9.2.0" "openmpi/4.1.1" "cmake/3.18.2")
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("gpu/0.15.4" "cuda/11.0.2" "nvhpc/22.2" "openmpi/4.0.5" "cmake/3.19.8")
-        fi
-
-        MODULES=("${MODULES[@]}" "python/3.8.5")
-    elif [ "$u_computer" == "p" ]; then # Phoenix
-        if [ "$u_cg" == "c" ]; then
-            MODULES=("gcc/10.3.0-o57x6h" "openmpi/4.1.4")
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("cuda/11.7.0-7sdye3" "nvhpc/22.11")
-        fi
-
-        MODULES=("${MODULES[@]}" "python/3.9.12-rkxvr6" "cmake/3.23.1-327dbl")
-    elif [ "$u_computer" == "c" ]; then # Crusher
-        if [ "$u_cg" == "c" ]; then
-            MODULES=()
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("rocm/5.1.0" "craype-accel-amd-gfx90a")
-        fi
-
-        MODULES=("${MODULES[@]}" "cce/15.0.1" "cmake/3.23.2" "cray-fftw/3.3.10.2" "hdf5/1.12.1" "cray-python/3.9.13.1" "ninja/1.10.2" "cray-mpich/8.1.23")
-    else
-        echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
-
+    COMPUTER="$(__extract "$u_c")"
+    
+    if [[ -z "$COMPUTER" ]]; then
+        error "Computer $M$u_cg$CR not recognized."
         return
     fi
-
-    log "Loading modules for $CG mode:"
+    
+    MODULES=($(__extract "$u_c-$cg") $(__combine $(__extract "$u_c-all")))
+    
+    log "Loading modules for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
     # Reset modules to default system configuration
-    if [ "$u_computer" != "p" ]; then
+    if [ "$u_c" != 'p' ]; then
         module reset > /dev/null 2>&1
         code="$?"
 
         # Purge if reset is not available
-        if [ "$code" -ne "0" ]; then
+        if [ "$code" -ne '0' ]; then
             module purge > /dev/null 2>&1
         fi
     else
@@ -187,22 +116,21 @@ if [ "$1" == "load" ]; then
 
     # Load modules ($MODULES)
     for module_name in ${MODULES[@]}; do
-        log_n " - Load $CYAN$module_name$COLOR_RESET "
+        log_n " - $CYAN$module_name$COLOR_RESET "
 
         # Add padding spaces
         module_length="${#module_name}"
-        delta="$((max_module_length-module_length-2))"
-        if [ "$delta" -ne "-2" ]; then
-            printf "%0.s-" $(seq 0 $delta)
-            echo -n " "
+        delta="$((max_module_length-module_length-1))"
+        if [ "$delta" -ge "0" ]; then
+            printf "%0.s " $(seq 0 $delta)
         fi
-
+    
         # Load the module
         module load "$module_name" > /dev/null 2>&1
 
         # Handle Success / Failure
         code=$?
-        if [ "$code" == "0" ]; then
+        if [ "$code" == '0' ]; then
             echo -e "[$G""SUCCESS$W]"
         else
             echo -e "[$R""FAILURE$W]"
@@ -214,7 +142,7 @@ if [ "$1" == "load" ]; then
         fi
     done
 
-    ok "All modules have been loaded."
+    ok "All modules have been loaded for $M$COMPUTER$CR on $M$CG$CR"'s.'
 
     return
 elif [ "$1" == "format" ]; then
@@ -228,7 +156,7 @@ elif [ "$1" == "format" ]; then
         --case 1 1 1 1 --strict-indent
     ret="$?"
 
-    if [ "$ret" != "0" ]; then
+    if [ "$ret" != '0' ]; then
         error "failed to execute fprettify."
         error "MFC has not been fprettify'ied."
 

@@ -13,6 +13,9 @@
 # TAG += value [value, ...]
 # Values that contain spaces should be placed between quotes (\" \").
 
+FULL_SIDEBAR           = NO
+HTML_COLORSTYLE        = LIGHT
+
 #---------------------------------------------------------------------------
 # Project related configuration options
 #---------------------------------------------------------------------------
