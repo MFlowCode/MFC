@@ -81,11 +81,11 @@ contains
 
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, &
+            t_step_start, t_step_stop, t_step_save, x_domain, y_domain, z_domain, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
-            mapped_weno, mp_weno, &
+            mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
