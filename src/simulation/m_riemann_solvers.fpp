@@ -156,9 +156,15 @@ module m_riemann_solvers
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
     !! dqK_prim_ds_vf where ds = dx, dy or dz.
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
+#endif
     !> @}
     !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
     !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
@@ -168,27 +174,51 @@ module m_riemann_solvers
     !! through the chosen Riemann problem solver by using the left and right
     !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
+#endif
     !> @}
     !$acc declare link( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
+#endif
     !$acc declare link(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
+#endif
     !$acc declare link(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
+#endif
     !$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 
     procedure(s_abstract_riemann_solver), &
@@ -206,13 +236,20 @@ module m_riemann_solvers
     type(int_bounds_info) :: is1, is2, is3
     type(int_bounds_info) :: isx, isy, isz
     !> @}
-    !$acc declare link(is1, is2, is3, isx, isy, isz)
+    !$acc declare create(is1, is2, is3, isx, isy, isz)
  
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  Gs)
+#else
     real(kind(0d0)), allocatable, dimension(:) ::  Gs
+#endif
     !$acc declare link(Gs)
 
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+#else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
+#endif
     !$acc declare link(Res)
 
 contains
@@ -2152,7 +2189,7 @@ contains
         ! the Riemann problem solution
         integer :: i, j
 
-        @:ALLOCATE(Gs(1:num_fluids))
+        @:ALLOCATE_GLOBAL(Gs(1:num_fluids))
 
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
@@ -2161,7 +2198,7 @@ contains
 
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
         end if
 
         if (any(Re_size > 0)) then
@@ -2193,24 +2230,24 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        @:ALLOCATE(flux_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_rsx_vf(is1%beg:is1%end, &
                                is2%beg:is2%end, &
                                is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_gsrc_rsx_vf(is1%beg:is1%end, &
                                     is2%beg:is2%end, &
                                     is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE(flux_src_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_src_rsx_vf(is1%beg:is1%end, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE(vel_src_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(vel_src_rsx_vf(is1%beg:is1%end, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, 1:num_dims))
         if (qbmm) then
-            @:ALLOCATE(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            @:ALLOCATE_GLOBAL(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Re_avg_rsx_vf(is1%beg:is1%end, &
+            @:ALLOCATE_GLOBAL(Re_avg_rsx_vf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end, 1:2))
         end if
@@ -2220,25 +2257,25 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
 
-        @:ALLOCATE(flux_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_rsy_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_gsrc_rsy_vf(is1%beg:is1%end, &
                                         is2%beg:is2%end, &
                                         is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE(flux_src_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_src_rsy_vf(is1%beg:is1%end, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE(vel_src_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(vel_src_rsy_vf(is1%beg:is1%end, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            @:ALLOCATE(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            @:ALLOCATE_GLOBAL(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Re_avg_rsy_vf(is1%beg:is1%end, &
+            @:ALLOCATE_GLOBAL(Re_avg_rsy_vf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end, 1:2))
         end if
@@ -2248,25 +2285,25 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
 
-        @:ALLOCATE(flux_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_rsz_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_gsrc_rsz_vf(is1%beg:is1%end, &
                                         is2%beg:is2%end, &
                                         is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE(flux_src_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(flux_src_rsz_vf(is1%beg:is1%end, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE(vel_src_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE_GLOBAL(vel_src_rsz_vf(is1%beg:is1%end, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            @:ALLOCATE(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            @:ALLOCATE_GLOBAL(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Re_avg_rsz_vf(is1%beg:is1%end, &
+            @:ALLOCATE_GLOBAL(Re_avg_rsz_vf(is1%beg:is1%end, &
                                          is2%beg:is2%end, &
                                          is3%beg:is3%end, 1:2))
         end if
@@ -4008,40 +4045,40 @@ contains
         ! s_convert_to_mixture_variables => null()
 
         if (Re_size(1) > 0) then
-            @:DEALLOCATE(Re_avg_rsx_vf)
+            @:DEALLOCATE_GLOBAL(Re_avg_rsx_vf)
         end if
-        @:DEALLOCATE(vel_src_rsx_vf)
-        @:DEALLOCATE(flux_rsx_vf)
-        @:DEALLOCATE(flux_src_rsx_vf)
-        @:DEALLOCATE(flux_gsrc_rsx_vf)
+        @:DEALLOCATE_GLOBAL(vel_src_rsx_vf)
+        @:DEALLOCATE_GLOBAL(flux_rsx_vf)
+        @:DEALLOCATE_GLOBAL(flux_src_rsx_vf)
+        @:DEALLOCATE_GLOBAL(flux_gsrc_rsx_vf)
         if (qbmm) then
-            @:DEALLOCATE(mom_sp_rsx_vf)
+            @:DEALLOCATE_GLOBAL(mom_sp_rsx_vf)
         end if
 
         if (n == 0) return
 
         if (Re_size(1) > 0) then
-            @:DEALLOCATE(Re_avg_rsy_vf)
+            @:DEALLOCATE_GLOBAL(Re_avg_rsy_vf)
         end if
-        @:DEALLOCATE(vel_src_rsy_vf)
-        @:DEALLOCATE(flux_rsy_vf)
-        @:DEALLOCATE(flux_src_rsy_vf)
-        @:DEALLOCATE(flux_gsrc_rsy_vf)
+        @:DEALLOCATE_GLOBAL(vel_src_rsy_vf)
+        @:DEALLOCATE_GLOBAL(flux_rsy_vf)
+        @:DEALLOCATE_GLOBAL(flux_src_rsy_vf)
+        @:DEALLOCATE_GLOBAL(flux_gsrc_rsy_vf)
         if (qbmm) then
-            @:DEALLOCATE(mom_sp_rsy_vf)
+            @:DEALLOCATE_GLOBAL(mom_sp_rsy_vf)
         end if
 
         if (p == 0) return
 
         if (Re_size(1) > 0) then
-            @:DEALLOCATE(Re_avg_rsz_vf)
+            @:DEALLOCATE_GLOBAL(Re_avg_rsz_vf)
         end if
-        @:DEALLOCATE(vel_src_rsz_vf)
-        @:DEALLOCATE(flux_rsz_vf)
-        @:DEALLOCATE(flux_src_rsz_vf)
-        @:DEALLOCATE(flux_gsrc_rsz_vf)
+        @:DEALLOCATE_GLOBAL(vel_src_rsz_vf)
+        @:DEALLOCATE_GLOBAL(flux_rsz_vf)
+        @:DEALLOCATE_GLOBAL(flux_src_rsz_vf)
+        @:DEALLOCATE_GLOBAL(flux_gsrc_rsz_vf)
         if (qbmm) then
-            @:DEALLOCATE(mom_sp_rsz_vf)
+            @:DEALLOCATE_GLOBAL(mom_sp_rsz_vf)
         end if
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------

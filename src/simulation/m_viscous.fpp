@@ -26,8 +26,12 @@ module m_viscous
     type(int_bounds_info) :: is1, is2, is3
  !$acc declare create(is1, is2, is3, iv)   
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+#else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
+#endif
+!$acc declare link(Res)
 
 
     contains
@@ -35,7 +39,7 @@ module m_viscous
     subroutine s_initialize_viscous_module()
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
 
         do i = 1, 2
             do j = 1, Re_size(i)
@@ -1469,7 +1473,7 @@ module m_viscous
     end subroutine s_compute_fd_gradient ! --------------------------------------
 
     subroutine s_finalize_viscous_module()
-        @:DEALLOCATE(Res)
+        @:DEALLOCATE_GLOBAL(Res)
     end subroutine s_finalize_viscous_module
 
 end module m_viscous

@@ -63,18 +63,24 @@ module m_data_output
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
-
-!$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#endif
+!$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+
 
 !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
@@ -1383,12 +1389,12 @@ contains
 
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
         
         if (any(Re_size > 0)) then
-            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
             
             vcfl_max = 0d0
             Rc_min   = 1d3
@@ -1422,9 +1428,9 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE(icfl_sf)
+        @:DEALLOCATE_GLOBAL(icfl_sf)
         if (any(Re_size > 0)) then
-            @:DEALLOCATE(vcfl_sf, Rc_sf)
+            @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
 
         ! Disassociating the pointer to the procedure that was utilized to

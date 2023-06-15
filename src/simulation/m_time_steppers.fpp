@@ -32,6 +32,22 @@ module m_time_steppers
 
     implicit none
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_cons_ts)
+    !! Cell-average conservative variables at each time-stage (TS)
+
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), q_prim_vf)
+    !! Cell-average primitive variables at the current time-stage
+
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), rhs_vf)
+    !! Cell-average RHS variables at the current time-stage
+
+    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
+    !! Cell-average primitive variables at consecutive TIMESTEPS
+
+    integer, private :: num_ts !<
+    !! Number of time stages in the time-stepping scheme
+#else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
@@ -46,8 +62,9 @@ module m_time_steppers
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
+#endif
 
-!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts)
+!$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts)
 
 contains
 
@@ -85,7 +102,7 @@ contains
         end if
 
         ! Allocating the cell-average conservative variables
-        @:ALLOCATE(q_cons_ts(1:num_ts))
+        @:ALLOCATE_GLOBAL(q_cons_ts(1:num_ts))
 
         do i = 1, num_ts
             allocate(q_cons_ts(i)%vf(1:sys_size))
@@ -103,7 +120,7 @@ contains
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
-            @:ALLOCATE(q_prim_ts(0:3))
+            @:ALLOCATE_GLOBAL(q_prim_ts(0:3))
 
             do i = 0, 3
                 allocate(q_prim_ts(i)%vf(1:sys_size))
@@ -123,7 +140,7 @@ contains
         end if
 
         ! Allocating the cell-average primitive variables
-        @:ALLOCATE(q_prim_vf(1:sys_size))
+        @:ALLOCATE_GLOBAL(q_prim_vf(1:sys_size))
         
         do i = 1, adv_idx%end
             @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
@@ -157,7 +174,7 @@ contains
         end if
 
         ! Allocating the cell-average RHS variables
-        @:ALLOCATE(rhs_vf(1:sys_size))
+        @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
         do i = 1, sys_size
             @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
@@ -497,7 +514,7 @@ contains
 
         end do
 
-        @:DEALLOCATE(q_cons_ts)
+        @:DEALLOCATE_GLOBAL(q_cons_ts)
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -507,7 +524,7 @@ contains
                 end do
                 @:DEALLOCATE(q_prim_ts(i)%vf)
             end do
-            @:DEALLOCATE(q_prim_ts)
+            @:DEALLOCATE_GLOBAL(q_prim_ts)
         end if
 
         ! Deallocating the cell-average primitive variables
@@ -533,14 +550,14 @@ contains
             end do
         end if
 
-        @:DEALLOCATE(q_prim_vf)
+        @:DEALLOCATE_GLOBAL(q_prim_vf)
 
         ! Deallocating the cell-average RHS variables
         do i = 1, sys_size
             @:DEALLOCATE(rhs_vf(i)%sf)
         end do
 
-        @:DEALLOCATE(rhs_vf)
+        @:DEALLOCATE_GLOBAL(rhs_vf)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

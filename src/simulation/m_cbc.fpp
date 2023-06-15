@@ -40,49 +40,85 @@ module m_cbc
     !! The cell-average primitive variables. They are obtained by reshaping (RS)
     !! q_prim_vf in the coordinate direction normal to the domain boundary along
     !! which the CBC is applied.
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
+#endif
     !$acc declare link(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf)
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), F_rs_vf, F_src_rs_vf)
+#else
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
+#endif
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
     !$acc declare link(F_rs_vf, F_src_rs_vf)
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsx_vf, F_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsy_vf, F_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsz_vf, F_src_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
+#endif
     !$acc declare link(F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf)
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
+#endif
     !$acc declare link(flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
 
     real(kind(0d0)) :: c           !< Cell averaged speed of sound
     real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
-    !$acc declare link(c, Re)
+    !$acc declare create(c, Re)
 
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ds)
+#else
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
-    !$acc declare link(dpres_ds, ds)
+#endif    
+    !$acc declare create(dpres_ds)
+    !$acc declare link(ds)
 
     ! CBC Coefficients =========================================================
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_z)
+#else
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
+#endif
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
     !$acc declare link(fd_coef_x, fd_coef_y, fd_coef_z)
 
     ! Bug with NVHPC when using nullified pointers in a declare create
     !    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_z)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynominal interpolant coefficients in z-dir
+#endif
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the location of the CBC.
@@ -96,7 +132,7 @@ module m_cbc
     integer :: dj
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
     integer :: cbc_dir, cbc_loc
-    !$acc declare link(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
+    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
 contains
 
@@ -132,27 +168,27 @@ contains
         end if
         is3%end = p - is3%beg
 
-        @:ALLOCATE(q_prim_rsx_vf(0:buff_size, &
+        @:ALLOCATE_GLOBAL(q_prim_rsx_vf(0:buff_size, &
                                 is2%beg:is2%end, &
                                 is3%beg:is3%end, 1:sys_size))
 
         if (weno_order > 1) then
 
-            @:ALLOCATE(F_rsx_vf(0:buff_size, &
+            @:ALLOCATE_GLOBAL(F_rsx_vf(0:buff_size, &
                                is2%beg:is2%end, &
                                is3%beg:is3%end, 1:adv_idx%end))
 
-            @:ALLOCATE(F_src_rsx_vf(0:buff_size, &
+            @:ALLOCATE_GLOBAL(F_src_rsx_vf(0:buff_size, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
         end if
 
-        @:ALLOCATE(flux_rsx_vf(-1:buff_size, &
+        @:ALLOCATE_GLOBAL(flux_rsx_vf(-1:buff_size, &
                               is2%beg:is2%end, &
                               is3%beg:is3%end, 1:adv_idx%end))
 
-        @:ALLOCATE(flux_src_rsx_vf(-1:buff_size, &
+        @:ALLOCATE_GLOBAL(flux_src_rsx_vf(-1:buff_size, &
                                   is2%beg:is2%end, &
                                   is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
@@ -175,27 +211,27 @@ contains
             end if
             is3%end = p - is3%beg
 
-            @:ALLOCATE(q_prim_rsy_vf(0:buff_size, &
+            @:ALLOCATE_GLOBAL(q_prim_rsy_vf(0:buff_size, &
                                     is2%beg:is2%end, &
                                     is3%beg:is3%end, 1:sys_size))
 
             if (weno_order > 1) then
 
-                @:ALLOCATE(F_rsy_vf(0:buff_size, &
+                @:ALLOCATE_GLOBAL(F_rsy_vf(0:buff_size, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:adv_idx%end))
 
-                @:ALLOCATE(F_src_rsy_vf(0:buff_size, &
+                @:ALLOCATE_GLOBAL(F_src_rsy_vf(0:buff_size, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
             end if
 
-            @:ALLOCATE(flux_rsy_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_rsy_vf(-1:buff_size, &
                                   is2%beg:is2%end, &
                                   is3%beg:is3%end, 1:adv_idx%end))
 
-            @:ALLOCATE(flux_src_rsy_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_src_rsy_vf(-1:buff_size, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
@@ -220,27 +256,27 @@ contains
             end if
             is3%end = m - is3%beg
 
-            @:ALLOCATE(q_prim_rsz_vf(0:buff_size, &
+            @:ALLOCATE_GLOBAL(q_prim_rsz_vf(0:buff_size, &
                                     is2%beg:is2%end, &
                                     is3%beg:is3%end, 1:sys_size))
 
             if (weno_order > 1) then
 
-                @:ALLOCATE(F_rsz_vf(0:buff_size, &
+                @:ALLOCATE_GLOBAL(F_rsz_vf(0:buff_size, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:adv_idx%end))
 
-                @:ALLOCATE(F_src_rsz_vf(0:buff_size, &
+                @:ALLOCATE_GLOBAL(F_src_rsz_vf(0:buff_size, &
                                        is2%beg:is2%end, &
                                        is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
             end if
 
-            @:ALLOCATE(flux_rsz_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_rsz_vf(-1:buff_size, &
                                   is2%beg:is2%end, &
                                   is3%beg:is3%end, 1:adv_idx%end))
 
-            @:ALLOCATE(flux_src_rsz_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_src_rsz_vf(-1:buff_size, &
                                       is2%beg:is2%end, &
                                       is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
@@ -248,16 +284,16 @@ contains
 
 
         ! Allocating the cell-width distribution in the s-direction
-        @:ALLOCATE(ds(0:buff_size))
+        @:ALLOCATE_GLOBAL(ds(0:buff_size))
 
 
         ! Allocating/Computing CBC Coefficients in x-direction =============
         if (all((/bc_x%beg, bc_x%end/) <= -5)) then
 
-            @:ALLOCATE(fd_coef_x(0:buff_size, -1:1))
+            @:ALLOCATE_GLOBAL(fd_coef_x(0:buff_size, -1:1))
 
             if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+                @:ALLOCATE_GLOBAL(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
             end if
 
             call s_compute_cbc_coefficients(1, -1)
@@ -265,20 +301,20 @@ contains
 
         elseif (bc_x%beg <= -5) then
 
-            @:ALLOCATE(fd_coef_x(0:buff_size, -1:-1))
+            @:ALLOCATE_GLOBAL(fd_coef_x(0:buff_size, -1:-1))
 
             if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                @:ALLOCATE_GLOBAL(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
             end if
 
             call s_compute_cbc_coefficients(1, -1)
 
         elseif (bc_x%end <= -5) then
 
-            @:ALLOCATE(fd_coef_x(0:buff_size, 1:1))
+            @:ALLOCATE_GLOBAL(fd_coef_x(0:buff_size, 1:1))
 
             if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                @:ALLOCATE_GLOBAL(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
             end if
 
             call s_compute_cbc_coefficients(1, 1)
@@ -291,10 +327,10 @@ contains
 
             if (all((/bc_y%beg, bc_y%end/) <= -5)) then
 
-                @:ALLOCATE(fd_coef_y(0:buff_size, -1:1))
+                @:ALLOCATE_GLOBAL(fd_coef_y(0:buff_size, -1:1))
 
                 if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+                    @:ALLOCATE_GLOBAL(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
                 end if
 
                 call s_compute_cbc_coefficients(2, -1)
@@ -302,20 +338,20 @@ contains
 
             elseif (bc_y%beg <= -5) then
 
-                @:ALLOCATE(fd_coef_y(0:buff_size, -1:-1))
+                @:ALLOCATE_GLOBAL(fd_coef_y(0:buff_size, -1:-1))
 
                 if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                    @:ALLOCATE_GLOBAL(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
                 end if
 
                 call s_compute_cbc_coefficients(2, -1)
 
             elseif (bc_y%end <= -5) then
 
-                @:ALLOCATE(fd_coef_y(0:buff_size, 1:1))
+                @:ALLOCATE_GLOBAL(fd_coef_y(0:buff_size, 1:1))
 
                 if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                    @:ALLOCATE_GLOBAL(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
                 end if
 
                 call s_compute_cbc_coefficients(2, 1)
@@ -330,10 +366,10 @@ contains
 
             if (all((/bc_z%beg, bc_z%end/) <= -5)) then
 
-                @:ALLOCATE(fd_coef_z(0:buff_size, -1:1))
+                @:ALLOCATE_GLOBAL(fd_coef_z(0:buff_size, -1:1))
 
                 if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+                    @:ALLOCATE_GLOBAL(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
                 end if
 
                 call s_compute_cbc_coefficients(3, -1)
@@ -341,20 +377,20 @@ contains
 
             elseif (bc_z%beg <= -5) then
 
-                @:ALLOCATE(fd_coef_z(0:buff_size, -1:-1))
+                @:ALLOCATE_GLOBAL(fd_coef_z(0:buff_size, -1:-1))
 
                 if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                    @:ALLOCATE_GLOBAL(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
                 end if
 
                 call s_compute_cbc_coefficients(3, -1)
 
             elseif (bc_z%end <= -5) then
 
-                @:ALLOCATE(fd_coef_z(0:buff_size, 1:1))
+                @:ALLOCATE_GLOBAL(fd_coef_z(0:buff_size, 1:1))
 
                 if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                    @:ALLOCATE_GLOBAL(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
                 end if
 
                 call s_compute_cbc_coefficients(3, 1)
@@ -1458,53 +1494,53 @@ contains
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
 
         ! Deallocating the cell-average primitive variables
-        @:DEALLOCATE(q_prim_rsx_vf)
+        @:DEALLOCATE_GLOBAL(q_prim_rsx_vf)
         if (weno_order > 1) then
-            @:DEALLOCATE(F_rsx_vf, F_src_rsx_vf)
+            @:DEALLOCATE_GLOBAL(F_rsx_vf, F_src_rsx_vf)
         end if
-        @:DEALLOCATE(flux_rsx_vf, flux_src_rsx_vf)
+        @:DEALLOCATE_GLOBAL(flux_rsx_vf, flux_src_rsx_vf)
 
         if (n > 0) then
-            @:DEALLOCATE(q_prim_rsy_vf)
+            @:DEALLOCATE_GLOBAL(q_prim_rsy_vf)
             if (weno_order > 1) then
-                @:DEALLOCATE(F_rsy_vf, F_src_rsy_vf)
+                @:DEALLOCATE_GLOBAL(F_rsy_vf, F_src_rsy_vf)
             end if
-            @:DEALLOCATE(flux_rsy_vf, flux_src_rsy_vf)
+            @:DEALLOCATE_GLOBAL(flux_rsy_vf, flux_src_rsy_vf)
         end if
         if (p > 0) then
-            @:DEALLOCATE(q_prim_rsz_vf)
+            @:DEALLOCATE_GLOBAL(q_prim_rsz_vf)
             if (weno_order > 1) then
-                @:DEALLOCATE(F_rsz_vf, F_src_rsz_vf)
+                @:DEALLOCATE_GLOBAL(F_rsz_vf, F_src_rsz_vf)
             end if
-            @:DEALLOCATE(flux_rsz_vf, flux_src_rsz_vf)
+            @:DEALLOCATE_GLOBAL(flux_rsz_vf, flux_src_rsz_vf)
         end if
 
         ! Deallocating the cell-width distribution in the s-direction
-        @:DEALLOCATE(ds)
+        @:DEALLOCATE_GLOBAL(ds)
 
         ! Deallocating CBC Coefficients in x-direction =====================
         if (any((/bc_x%beg, bc_x%end/) <= -5)) then
-            @:DEALLOCATE(fd_coef_x)
+            @:DEALLOCATE_GLOBAL(fd_coef_x)
             if (weno_order > 1) then
-                @:DEALLOCATE(pi_coef_x)
+                @:DEALLOCATE_GLOBAL(pi_coef_x)
             end if
         end if
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in y-direction =====================
         if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5)) then
-            @:DEALLOCATE(fd_coef_y)
+            @:DEALLOCATE_GLOBAL(fd_coef_y)
             if (weno_order > 1) then
-                @:DEALLOCATE(pi_coef_y)
+                @:DEALLOCATE_GLOBAL(pi_coef_y)
             end if
         end if
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in z-direction =====================
         if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5)) then
-            @:DEALLOCATE(fd_coef_z)
+            @:DEALLOCATE_GLOBAL(fd_coef_z)
             if (weno_order > 1) then
-                @:DEALLOCATE(pi_coef_z)
+                @:DEALLOCATE_GLOBAL(pi_coef_z)
             end if
         end if
         ! ==================================================================

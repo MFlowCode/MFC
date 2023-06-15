@@ -76,21 +76,32 @@ module m_variables_conversion
     end interface ! ============================================================
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
-    !$acc declare link(ixb, ixe, iyb, iye, izb, ize)
+    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
 
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, pi_infs)
+    public :: gammas, pi_infs
+#else
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, pi_infs
+#endif
     !$acc declare link(gammas, pi_infs)
 #endif
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
+    @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+#else
     real(kind(0d0)), allocatable, dimension(:)    :: Gs
     integer,         allocatable, dimension(:)    :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
+#endif
     !$acc declare link(bubrs, Gs, Res)
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-    !$acc declare link(is1b, is2b, is3b, is1e, is2e, is3e)
+    !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
@@ -509,7 +520,8 @@ contains
     subroutine s_initialize_variables_conversion_module() ! ----------------
 
         integer :: i, j
-!$acc enter data copyin(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
+! where are these from?
+!!$acc enter data copyin(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
 
 #ifdef MFC_PRE_PROCESS
         ixb = 0; iyb = 0; izb = 0;
@@ -528,23 +540,23 @@ contains
        end if
 #endif
 
-        !$acc enter data copyin(ixb, ixe, iyb, iye, izb, ize)
+        !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
-        @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+        @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
+        @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
+        @:ALLOCATE_GLOBAL(Gs     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i)  = fluid_pp(i)%gamma
             pi_infs(i) = fluid_pp(i)%pi_inf
             Gs(i)      = fluid_pp(i)%G
         end do
-        !$acc enter data copyin(gammas, pi_infs, Gs)
+        !$acc update device(gammas, pi_infs, Gs)
 
 #ifdef MFC_SIMULATION
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
             
             do i = 1, 2
                 do j = 1, Re_size(i)
@@ -557,7 +569,7 @@ contains
 #endif
 
         if (bubbles) then
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE_GLOBAL(bubrs(1:nb))
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
@@ -682,9 +694,9 @@ contains
             allocate(nRtmp(0))
         endif
 
-        !$acc parallel loop collapse(3) gang vector
-        !$acc present(qK_cons_vf, qK_prim_vf, gm_alphaK_vf, bubrs, ix, iy, iz)
-        !$acc private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
+        !$acc parallel loop collapse(3) gang vector &
+        !$acc& present(qK_cons_vf, qK_prim_vf, gm_alphaK_vf, bubrs, ix, iy, iz) &
+        !$acc& private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -1071,10 +1083,10 @@ contains
         deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
 
-        @:DEALLOCATE(gammas, pi_infs, Gs)
+        @:DEALLOCATE_GLOBAL(gammas, pi_infs, Gs)
         
         if (bubbles) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE_GLOBAL(bubrs)
         end if
 
         ! Nullifying the procedure pointer to the subroutine transfering/

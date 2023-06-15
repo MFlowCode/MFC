@@ -25,9 +25,13 @@ module m_qbmm
     implicit none
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
+!$acc declare link(momrhs)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
-
+!$acc declare create(momrhs)
+#endif
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
@@ -36,11 +40,17 @@ module m_qbmm
 
     type(int_bounds_info) :: is1, is2, is3
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
+!$acc declare link(bubrs, bubmoms)
+
+#else
     integer, allocatable, dimension(:)    :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
-
-!$acc declare create(momrhs, nterms, is1, is2, is3)
 !$acc declare create(bubrs, bubmoms)
+#endif    
+    !$acc declare create(nterms, is1, is2, is3)
 
 contains
 
@@ -62,7 +72,7 @@ contains
 
         #:endif
 
-        @:ALLOCATE(momrhs(3, 0:2, 0:2, nterms, nb))
+        @:ALLOCATE_GLOBAL(momrhs(3, 0:2, 0:2, nterms, nb))
         momrhs = 0d0
 
         ! Assigns the required RHS moments for moment transport equations
@@ -156,8 +166,8 @@ contains
 
         !$acc update device(momrhs)
 
-        @:ALLOCATE(bubrs(1:nb))
-        @:ALLOCATE(bubmoms(1:nb, 1:nmom))
+        @:ALLOCATE_GLOBAL(bubrs(1:nb))
+        @:ALLOCATE_GLOBAL(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)

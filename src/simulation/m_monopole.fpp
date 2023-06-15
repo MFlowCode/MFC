@@ -21,6 +21,19 @@ module m_monopole
     implicit none
     private; public :: s_initialize_monopole_module, s_monopole_calculations
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
+    !$acc declare link(pulse, support)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_mono)
+    !$acc declare link(loc_mono)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture)
+    !$acc declare link(foc_length, aperture)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, npulse, dir, delay)
+    !$acc declare link(mag, length, npulse, dir, delay)
+#else
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
@@ -32,14 +45,14 @@ module m_monopole
 
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
-
+#endif
 
 contains
 
     subroutine s_initialize_monopole_module()
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono))
+        @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono))
 
         do i = 1, num_mono
             mag(i) = mono(i)%mag

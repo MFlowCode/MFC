@@ -26,6 +26,12 @@ module m_mpi_proxy
 
     implicit none
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)   
+    private :: q_cons_buff_recv, q_cons_buff_send
+!$acc declare link(q_cons_buff_recv, q_cons_buff_send)
+#else
     real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
@@ -35,13 +41,12 @@ module m_mpi_proxy
     !! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
     !! average conservative variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
-
+!$acc declare create(q_cons_buff_send, q_cons_buff_recv)
+#endif
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr
     !> @}
-
-!$acc declare create(q_cons_buff_send, q_cons_buff_recv)
 
     !real :: s_time, e_time
     !real :: compress_time, mpi_time, decompress_time
@@ -62,20 +67,20 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
                                          & (m + 2*buff_size + 1)* &
                                          & (n + 2*buff_size + 1)* &
                                          & (p + 2*buff_size + 1)/ &
                                          & (min(m, n, p) + 2*buff_size + 1)))
             else
-                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
                                          & (max(m, n) + 2*buff_size + 1)))
             end if
         else
-            @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size))
+            @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size))
         end if
 
-        @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+        @:ALLOCATE_GLOBAL(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
 #endif
 
@@ -1558,7 +1563,7 @@ contains
 #ifdef MFC_MPI
 
         ! Deallocating q_cons_buff_send and q_cons_buff_recv
-        @:DEALLOCATE(q_cons_buff_send, q_cons_buff_recv)
+        @:DEALLOCATE_GLOBAL(q_cons_buff_send, q_cons_buff_recv)
 
 #endif
 
