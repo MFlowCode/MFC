@@ -179,6 +179,9 @@ contains
         elseif (weno_order /= 5 .and. mp_weno) then
             call s_mpi_abort('Unsupported combination of values of '// &
                 'weno_order and mp_weno. Exiting ...')
+        elseif (model_eqns == 1 .and. weno_avg) then
+            call s_mpi_abort('Unsupported combination of values of '// &
+                'model_eqns and weno_avg. Exiting ...')        
         elseif (riemann_solver < 1 .or. riemann_solver > 3) then
             call s_mpi_abort('Unsupported value of riemann_solver. Exiting ...')
         elseif (all(wave_speeds /= (/dflt_int, 1, 2/))) then
@@ -195,9 +198,9 @@ contains
             call s_mpi_abort('Unsupported combination of values of '// &
                 'riemann_solver and avg_state. '// &
                 'Exiting ...')
-        elseif (bc_x%beg < -12 .or. bc_x%beg > -1) then
+        elseif (bc_x%beg < -26 .or. bc_x%beg > -1) then
             call s_mpi_abort('Unsupported value of bc_x%beg. Exiting ...')
-        elseif (bc_x%end < -12 .or. bc_x%end > -1) then
+        elseif (bc_x%end < -26 .or. bc_x%end > -1) then
             call s_mpi_abort('Unsupported value of bc_x%end. Exiting ...')
         elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
                 .or. &
@@ -206,7 +209,7 @@ contains
                 'bc_x%beg and bc_x%end. Exiting ...')
         elseif (bc_y%beg /= dflt_int &
                 .and. &
-                (((cyl_coord .neqv. .true.) .and. (bc_y%beg < -12 .or. bc_y%beg > -1)) &
+                (((cyl_coord .neqv. .true.) .and. (bc_y%beg < -26 .or. bc_y%beg > -1)) &
                  .or. &
                  (cyl_coord .and. p == 0 .and. bc_y%beg /= -2) &
                  .or. &
@@ -214,7 +217,7 @@ contains
             call s_mpi_abort('Unsupported value of bc_y%beg. Exiting ...')
         elseif (bc_y%end /= dflt_int &
                 .and. &
-                (bc_y%end < -12 .or. bc_y%end > -1)) then 
+                (bc_y%end < -26 .or. bc_y%end > -1)) then 
             call s_mpi_abort('Unsupported value of bc_y%end. Exiting ...')
         elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
                 .or. &
@@ -233,11 +236,11 @@ contains
                 'bc_y%beg and bc_y%end. Exiting ...')
         elseif (bc_z%beg /= dflt_int &
                 .and. &
-                (bc_z%beg < -12 .or. bc_z%beg > -1)) then
+                (bc_z%beg < -26 .or. bc_z%beg > -1)) then
             call s_mpi_abort('Unsupported value of bc_z%beg. Exiting ...')
         elseif (bc_z%end /= dflt_int &
                 .and. &
-                (bc_z%end < -12 .or. bc_z%end > -1)) then
+                (bc_z%end < -26 .or. bc_z%end > -1)) then
             call s_mpi_abort('Unsupported value of bc_z%end. Exiting ...')
         elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
                 .or. &
@@ -363,6 +366,17 @@ contains
                         'and fluid_pp('//trim(iStr)//')%'// &
                         'Re('//trim(jStr)//'). Exiting ...')
                 end if
+
+                if (weno_order == 1 &
+                    .and. &
+                    (weno_avg .neqv. .true.)    &
+                    .and. &
+                    fluid_pp(i)%Re(j) /= dflt_real ) then
+                    call s_mpi_abort('Unsupported combination '// &
+                        'of values of weno_order, '// &
+                        'weno_avg and fluid_pp('//trim(iStr)//')%'// &
+                        'Re('//trim(jStr)//'). Exiting ...')
+                    end if
 
             end do
 

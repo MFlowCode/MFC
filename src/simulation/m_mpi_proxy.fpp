@@ -110,7 +110,7 @@ contains
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
-            & 'prim_vars_wrt']
+            & 'prim_vars_wrt', 'weno_avg']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
