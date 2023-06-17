@@ -257,6 +257,7 @@ contains
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
+        real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
         real(kind(0d0)) :: G_L, G_R
@@ -341,10 +342,12 @@ contains
                             rho_L = 0d0
                             gamma_L = 0d0
                             pi_inf_L = 0d0
+                            qv_L = 0d0
 
                             rho_R = 0d0
                             gamma_R = 0d0
                             pi_inf_R = 0d0
+                            qv_R = 0d0
 
                             alpha_L_sum = 0d0
                             alpha_R_sum = 0d0
@@ -374,10 +377,12 @@ contains
                                 rho_L = rho_L + alpha_rho_L(i)
                                 gamma_L = gamma_L + alpha_L(i)*gammas(i)
                                 pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
 
                                 rho_R = rho_R + alpha_rho_R(i)
                                 gamma_R = gamma_R + alpha_R(i)*gammas(i)
                                 pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                             end do
 
                             if (any(Re_size > 0)) then
@@ -413,8 +418,8 @@ contains
                                 end do
                             end if
 
-                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
-                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
@@ -793,6 +798,7 @@ contains
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
+        real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
 
@@ -879,10 +885,12 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
 
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
@@ -918,10 +926,12 @@ contains
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                     pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                    qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
 
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                    qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
 
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, advxb + i - 1)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, advxb + i - 1)
@@ -960,9 +970,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1062,7 +1072,7 @@ contains
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             ( qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1) * &
                                             ( gammas(i)*pres_R + pi_infs(i) ) + &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
+                                              qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
                                             qvs(i) ) * vel_R(dir_idx(1))
                                     end do
                                     !$acc loop seq
@@ -1136,7 +1146,7 @@ contains
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             ( qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1) * &
                                             ( gammas(i)*p_K_Star + pi_infs(i) ) + &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
+                                              qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1) * &
                                             qvs(i) ) * s_S
                                     end do
                                     !$acc loop seq
@@ -1218,26 +1228,30 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_L = rho_L + alpha_rho_L(i)
                                     gamma_L = gamma_L + alpha_L(i)*gammas(i)
                                     pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                    qv_L = qv_L + alpha_rho_L(i)*qvs(i)
                                 end do
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_R = rho_R + alpha_rho_R(i)
                                     gamma_R = gamma_R + alpha_R(i)*gammas(i)
                                     pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                    qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1455,6 +1469,7 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
 
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
@@ -1462,6 +1477,7 @@ contains
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                         pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                        qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     !$acc loop seq
@@ -1469,16 +1485,19 @@ contains
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                         pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                        qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                     end do
                                 else
                                     rho_L = qL_prim_rs${XYZ}$_vf(j, k, l, 1)
                                     gamma_L = gammas(1)
                                     pi_inf_L = pi_infs(1)
+                                    qv_L = qvs(1)
                                 end if
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
 
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
@@ -1486,6 +1505,7 @@ contains
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                         pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                        qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     !$acc loop seq
@@ -1493,11 +1513,13 @@ contains
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                         pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                        qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else
                                     rho_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, 1)
                                     gamma_R = gammas(1)
                                     pi_inf_R = pi_infs(1)
+                                    qv_R = qvs(1)
                                 end if
 
                                 if (any(Re_size > 0)) then
@@ -1892,10 +1914,12 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
 
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
@@ -1931,10 +1955,12 @@ contains
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                     pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                    qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
 
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                    qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                 end do
 
                                 if (any(Re_size > 0)) then
@@ -1970,9 +1996,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R

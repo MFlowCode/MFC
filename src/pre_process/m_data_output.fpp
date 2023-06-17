@@ -195,7 +195,8 @@ contains
 
         !1D
         if (n == 0 .and. p == 0) then
-            if ( ( model_eqns == 2 ) .OR. ( model_eqns == 3 ) ) then
+            ! if ( ( model_eqns == 2 ) .OR. ( model_eqns == 3 ) ) then
+            if ( ( model_eqns == 2 ) ) then
                 do i = 1, sys_size
                     write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -243,10 +244,15 @@ contains
 
             do i = 1, sys_size
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
+                ! PRINT *, 'qv', qv
+                ! PRINT *, 'pi_inf', pi_inf
 
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
                     write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                    ! if ( i == 5 ) then
+                    !     print *, 'internal energy', q_cons_vf(i)%sf(j, 0, 0)
+                    ! end if 
                 end do
                 close (2)
             end do

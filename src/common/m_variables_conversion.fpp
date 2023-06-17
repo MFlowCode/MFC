@@ -140,7 +140,7 @@ contains
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then  
             pres = (energy - dyn_p - pi_inf - qv)/gamma
         else if ((model_eqns /= 4) .and. bubbles) then
-            pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf)/gamma
+            pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv )/gamma
         else
             pres = (pref + pi_inf)* &
                 (energy/ &
@@ -166,7 +166,7 @@ contains
             pres = ( &
                    energy - &
                    0.5d0*(mom**2.d0)/rho - &
-                   pi_inf - E_e &
+                   pi_inf - qv - E_e &
                    )/gamma
 
 

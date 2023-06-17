@@ -94,7 +94,6 @@ if [ "$1" == 'load' ]; then
     # Reset modules to default system configuration
     if [ "$u_c" != 'p' ]; then
         module reset > /dev/null 2>&1
-        code="$?"
 
         # Purge if reset is not available
         if [ "$code" -ne '0' ]; then
@@ -107,6 +106,7 @@ if [ "$1" == 'load' ]; then
     # Find length of longest module_name in $MODULES for $COMPUTER
     max_module_length="0"
     for module_name in ${MODULES[@]}; do
+        echo "$module_name"
         module_length="${#module_name}"
 
         if [ "$module_length" -gt "$max_module_length" ]; then
