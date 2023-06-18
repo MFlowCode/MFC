@@ -81,7 +81,7 @@ contains
 
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, x_domain, y_domain, z_domain, &
+            t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
