@@ -66,7 +66,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    type(bounds_info) :: x_domain, y_domain, z_domain !<
+    !type(bounds_info) :: x_domain, y_domain, z_domain !<
     !! Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
@@ -362,6 +362,7 @@ contains
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.
+        weno_avg = .false.
         weno_Re_flux = .false.
         riemann_solver = dflt_int
         wave_speeds = dflt_int
