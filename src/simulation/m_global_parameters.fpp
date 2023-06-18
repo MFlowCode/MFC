@@ -381,9 +381,9 @@ contains
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
-        x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
-        y_domain%beg =  dflt_int; y_domain%end =  dflt_int;
-        z_domain%beg =  dflt_int; z_domain%end =  dflt_int;
+        ! x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
+        ! y_domain%beg =  dflt_int; y_domain%end =  dflt_int;
+        ! z_domain%beg =  dflt_int; z_domain%end =  dflt_int;
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
