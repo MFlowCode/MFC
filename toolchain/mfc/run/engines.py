@@ -57,6 +57,7 @@ class InteractiveEngine(Engine):
 
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary()
+
         # If using MPI, we don't know yet whether this engine works
         self.bKnowWorks = not ARG("mpi")
 
