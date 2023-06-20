@@ -1,4 +1,4 @@
-name: Continuous Integration
+name: 'Test Suite'
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
       - 'mfc.sh'
       - 'golden.txt'
       - 'CMakeLists.txt'
+      - 'requirements.txt'
 
   pull_request:
 
@@ -17,55 +18,42 @@ on:
 
 jobs:
   github:
-    name: (GitHub) Test Suite
+    name: Github
     strategy:
       matrix:
-        include:
-          - os:  ubuntu-latest
-            debug: --no-debug
-            intel: false
-          - os:  ubuntu-latest
-            debug: --debug
-            intel: false
-#           - os:  ubuntu-latest
-#             debug: --no-debug
-#             intel: true
-#             intel-command: source /opt/intel/oneapi/setvars.sh
-#           - os:  ubuntu-latest
-#             debug: --debug
-#             intel: true
-#             intel-command: source /opt/intel/oneapi/setvars.sh
-          - os:  macos-latest
-            debug: --no-debug
-            gcc: 11
-          - os:  macos-latest
-            debug: --debug
-            gcc: 11
+        os:    ['ubuntu', 'macos']
+        mpi:   ['mpi', 'no-mpi']
+        debug: ['debug', 'no-debug']
+        intel: [false]
       fail-fast: false
     continue-on-error: true
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Clone
         uses: actions/checkout@v3
 
       - name: Setup MacOS
-        if:   matrix.os == 'macos-latest'
+        if:   matrix.os == 'macos'
         run: |
-          echo "OMPI_FC=gfortran-${{ matrix.gcc }}" >> $GITHUB_ENV
-          echo "OMPI_CXX=g++-${{ matrix.gcc }}"     >> $GITHUB_ENV
-          echo "OMPI_MPICC=gcc-${{ matrix.gcc }}"   >> $GITHUB_ENV
-          echo "CC=gcc-${{ matrix.gcc }}"           >> $GITHUB_ENV
-          echo "CXX=g++-${{ matrix.gcc }}"          >> $GITHUB_ENV
-          echo "FC=gfortran-${{ matrix.gcc }}"      >> $GITHUB_ENV
-          brew install wget make python make cmake coreutils gcc@${{ matrix.gcc }}
-          HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-${{ matrix.gcc }} --verbose --build-from-source open-mpi
+          echo "CC=gcc-13"      >> $GITHUB_ENV
+          echo "CXX=g++-13"     >> $GITHUB_ENV
+          echo "FC=gfortran-13" >> $GITHUB_ENV
+          brew install wget make python make cmake coreutils gcc@13
+          
+      - name: (MacOS) Build OpenMPI
+        if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
+        run: |
+          echo "OMPI_FC=gfortran-13" >> $GITHUB_ENV
+          echo "OMPI_CXX=g++-13"     >> $GITHUB_ENV
+          echo "OMPI_MPICC=gcc-13"   >> $GITHUB_ENV
+          HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-13 --verbose --build-from-source open-mpi
 
       - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu-latest' && matrix.intel == false
+        if:   matrix.os == 'ubuntu' && matrix.intel == false
         run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
 
       - name: Setup Ubuntu (Intel)
-        if:   matrix.os == 'ubuntu-latest' && matrix.intel == true
+        if:   matrix.os == 'ubuntu' && matrix.intel == true
         run: |
           sudo apt install tar wget make cmake python3 python3-dev
           wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
@@ -84,211 +72,48 @@ jobs:
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
 
       - name: Build
-        run: |
-          ${{ matrix.intel-command }}
-          /bin/bash mfc.sh build -j $(nproc) ${{ matrix.debug }}
+        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
 
-      - name: Test Suite (Debug)
-        if: matrix.debug == '--debug'
-        run: |
-          ${{ matrix.intel-command }}
-          /bin/bash mfc.sh test  -j $(nproc) --debug
+      - name: Test
+        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
 
-      - name: Test Suite (No Debug)
-        if: matrix.debug == '--no-debug'
-        run: |
-          ${{ matrix.intel-command }}
-          /bin/bash mfc.sh test -j $(nproc) -a
-          
+  docker:
+    name:    Github | Docker
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone
+      uses: actions/checkout@v3
 
-  self-cpu-release:
-    name: Test CPU release - nvhpc
-    runs-on:
-      group: phoenix
-      labels: self-hosted
+    - name: Test
+      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
+
+  self:
+    name: Georgia Tech | Phoenix (NVHPC)
     if: github.repository == 'MFlowCode/MFC'
     continue-on-error: true
+    strategy:
+      matrix:
+        device: ['cpu', 'gpu']
+    runs-on:
+      group:  phoenix
+      labels: self-hosted
     steps:
       - name: Clone
         uses: actions/checkout@v3
 
       - name: Build
         run:  |
-          . ./mfc.sh load -c p -m g
-          ./mfc.sh build -j 2
+          . ./mfc.sh load -c p -m gpu
+          ./mfc.sh build -j 2 $(if [ '${{ matrix.device }}' == 'gpu' ]; then echo '--gpu'; fi)
 
       - name: Test
         run: |
-          . ./mfc.sh load -c p -m g
-          mv misc/run-phoenix-release-cpu.sh ./
-          sbatch run-phoenix-release-cpu.sh
+          . ./mfc.sh load -c p -m gpu
+          mv misc/run-phoenix-release-${{ matrix.device }}.sh ./
+          sbatch run-phoenix-release-${{ matrix.device }}.sh
 
       - name: Print
         if: always()
         run: |
           cat test.out
 
-  self-gpu-release:
-    name: Test GPU release - nvhpc
-    runs-on:
-      group: phoenix
-      labels: self-hosted
-    if: github.repository == 'MFlowCode/MFC'
-    continue-on-error: true
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
-
-      - name: Build
-        run:  |
-          . ./mfc.sh load -c p -m g
-          ./mfc.sh build -j 2 --gpu
-
-      - name: Test
-        run: |
-          . ./mfc.sh load -c p -m g
-          mv misc/run-phoenix-release-gpu.sh ./
-          sbatch run-phoenix-release-gpu.sh
-
-      - name: Print
-        if: always()
-        run: |
-          cat test.out
-
-
-  # self-cpu:
-  #   name: (Self) Test Suite - CPU
-  #   strategy:
-  #     matrix:
-  #       include:
-  #         - os: [self-hosted, wingtip]
-  #   runs-on: ${{ matrix.os }}
-  #   if: github.repository == 'MFlowCode/MFC'
-  #   steps:
-  #     - name: Clone
-  #       uses: actions/checkout@v3
-          
-  #     - name: Setup
-  #       run:  echo "test"
-        
-  #     - name: Build
-  #       run:  |
-  #         module use /opt/nvidia/hpc_sdk/modulefiles/
-  #         module load nvhpc
-  #         /bin/bash mfc.sh build -j 8 
-
-  #     - name: Test Suite
-  #       run:  |
-  #         module use /opt/nvidia/hpc_sdk/modulefiles/
-  #         module load nvhpc
-  #         /bin/bash mfc.sh test -j 8 -a 
-          
-  # self-cpu-debug:
-  #   name: (Self) Test Suite - CPU - debug
-  #   strategy:
-  #     matrix:
-  #       include:
-  #         - os: [self-hosted, wingtip]
-  #   runs-on: ${{ matrix.os }}
-  #   if: github.repository == 'MFlowCode/MFC'
-  #   steps:
-  #     - name: Clone
-  #       uses: actions/checkout@v3
-          
-  #     - name: Setup
-  #       run:  echo "test"
-        
-  #     - name: Build
-  #       run:  |
-  #         module use /opt/nvidia/hpc_sdk/modulefiles/
-  #         module load nvhpc
-  #         /bin/bash mfc.sh build -j 8 --debug
-
-  #     - name: Test Suite
-  #       run:  |
-  #         module use /opt/nvidia/hpc_sdk/modulefiles/
-  #         module load nvhpc
-  #         /bin/bash mfc.sh test -j 8 --debug
-
-  # self-gpu:
-  #   name: (Self) Test Suite - GPU
-  #   strategy:
-  #     matrix:
-  #       include:
-  #         - os: [self-hosted, wingtip]
-  #   runs-on: ${{ matrix.os }}
-  #   if: github.repository == 'MFlowCode/MFC'
-  #   steps:
-  #     - name: Clone
-  #       uses: actions/checkout@v3
-          
-  #     - name: Setup
-  #       run:  echo "test"
-        
-  #     - name: Build
-  #       run:  |
-  #         module use /opt/nvidia/hpc_sdk/modulefiles/
-  #         module load nvhpc
-  #         /bin/bash mfc.sh build -j 8 --gpu 
-
-  #     - name: Test Suite
-  #       run:  |
-  #         module use /opt/nvidia/hpc_sdk/modulefiles/
-  #         module load nvhpc
-  #         /bin/bash mfc.sh test -j 8 -b mpirun --gpu -a
-
-#   self-gpu-debug:
-#     name: (Self) Test Suite - GPU - debug
-#     strategy:
-#       matrix:
-#         include:
-#           - os: [self-hosted, wingtip]
-#     runs-on: ${{ matrix.os }}
-#     if: github.repository == 'MFlowCode/MFC'
-#     steps:
-#       - name: Clone
-#         uses: actions/checkout@v3
-          
-#       - name: Setup
-#         run:  echo "test"
-        
-#       - name: Build
-#         run:  |
-#           module use /opt/nvidia/hpc_sdk/modulefiles/
-#           module load nvhpc
-#           /bin/bash mfc.sh build -j 8 --gpu --debug
-
-#       - name: Test Suite
-#         run:  |
-#           module use /opt/nvidia/hpc_sdk/modulefiles/
-#           module load nvhpc
-#           /bin/bash mfc.sh test -j 8 -b mpirun --gpu --debug
-
-#   ice-gpu:
-#     name: (COC-ICE) Test Suite - GPU
-#     strategy:
-#       matrix:
-#         include:
-#           - os: [self-hosted, cocice]
-#     runs-on: ${{ matrix.os }}
-#     if: github.repository == 'MFlowCode/MFC'
-#     steps:
-#       - name: Clone
-#         uses: actions/checkout@v3
-          
-#       - name: Setup
-#         run:  echo "test"
-        
-#       - name: Build
-#         run:  |
-#           module purge
-#           module load nvhpc
-#           /usr/bin/bash mfc.sh build -j 4 --gpu
-
-#       - name: Test Suite
-#         run:  |
-#           qsub -I -q coc-ice-gpu -l nodes=1:ppn=8:gpus=2:teslav100
-#           module purge
-#           module load nvhpc
-#           /usr/bin/bash mfc.sh test -j 4 -b mpirun --gpu -a
-#           exit

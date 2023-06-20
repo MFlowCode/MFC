@@ -10,5 +10,5 @@
 
 cd $SLURM_SUBMIT_DIR                            # Change to working directory
 echo $(pwd)
-. ./mfc.sh load -c p -m g
-./mfc.sh test -j 1 -b mpirun -a --gpu
+. ./mfc.sh load -c p -m gpu
+./mfc.sh test -b mpirun -a --gpu
