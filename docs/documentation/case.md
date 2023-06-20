@@ -211,6 +211,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
 | `avg_state`	           | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
+| `weno_Re_flux`          | Logical | Compute velocity gradient using scaler divergence theorem	 |
+| `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 
 - \* Options that work only with `model_eqns` $=2$.
 - † Options that work only with `cyl_coord` $=$ `False`.
@@ -258,6 +260,10 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
 `wave_speeds` $=$ 1 and 2 correspond to the direct method ([Batten et al., 1997](references.md#Batten97)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md#Toro13)), respectively.
+
+- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
+
+- `weno_avg` activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 
 
 ### 6. Formatted Output
