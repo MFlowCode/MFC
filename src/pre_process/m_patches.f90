@@ -792,10 +792,25 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
 
+                ! Shu-Osher Problem
+                !if (x_cc(i) > -4d0) then
+                !    q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
+                !    q_prim_vf(momxb)%sf(i, 0, 0) = 0d0
+                !    q_prim_vf(E_idx)%sf(i, 0, 0) = 1d0
+                !end if
+        
+                ! Titarev-Torro Problem
+                !if (x_cc(i) > -4.5d0) then
+                !    q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.1*sin(20*pi*x_cc(i))
+                !    q_prim_vf(momxb)%sf(i, 0, 0) = 0d0
+                !    q_prim_vf(E_idx)%sf(i, 0, 0) = 1
+                !end if
+
+
                 !what variables to alter
                 !bump in pressure
-                q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                !q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
+                !                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
 
                 !bump in void fraction
                 !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
