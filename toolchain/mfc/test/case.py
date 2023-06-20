@@ -124,7 +124,10 @@ class TestCase(case.Case):
     def get_dirpath(self):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
-    def create_directory(self, filename: str):
+    def create_directory(self, filename: str, delete=None):
+        if delete is None:
+            delete = False
+
         dirpath = self.get_dirpath()
 
         content = f"""\
@@ -134,6 +137,11 @@ import json
 
 print(json.dumps({self.gen_json_dict_str()}))
 """
+
+        if delete:
+            common.delete_directory(os.path.join(dirpath, "D"))
+            common.delete_directory(os.path.join(dirpath, "p_all"))
+            common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
 
         common.create_directory(dirpath)
 

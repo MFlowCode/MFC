@@ -133,7 +133,7 @@ def handle_case(test: TestCase):
         else:
             tol = 1e-12
 
-        test.create_directory("case_pre_sim")
+        test.create_directory("case_pre_sim", delete=True)
         cmd = test.run("case_pre_sim", ["pre_process", "simulation"])
 
         out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
