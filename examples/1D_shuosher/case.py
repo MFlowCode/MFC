@@ -69,15 +69,40 @@ print(json.dumps({
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================================
-                                                            
-    # Patch 1 L ================================================================
-    'patch_icpp(1)%geometry'       : 15,
-    'patch_icpp(1)%x_centroid'     : 0.,
+    
+
+    # Background to cover whole domain with basic line patch
+    # Patch 1 Background  ======================================================
+    'patch_icpp(1)%geometry'       : 1,
+    'patch_icpp(1)%x_centroid'     : 0,
     'patch_icpp(1)%length_x'       : 10.,
     'patch_icpp(1)%vel(1)'         : 2.629369,
     'patch_icpp(1)%pres'           : 10.3333,
     'patch_icpp(1)%alpha_rho(1)'   : 3.957143,
     'patch_icpp(1)%alpha(1)'       : 1.,
+    # ==========================================================================
+
+
+    # One anlytic patch to take care of -4 < x < 4
+    # Patch 2 Left Analytic ====================================================
+    'patch_icpp(2)%geometry'        : 15,
+    'patch_icpp(2)%x_centroid'      : 0.,
+    'patch_icpp(2)%length_x'        : 8.,
+    'patch_icpp(2)%vel(1)'          : 0.,
+    'patch_icpp(2)%pres'            : 1.,
+    'patch_icpp(2)%alpha_rho(1)'    : '1 + 0.2*sin(5*x)',
+    'patch_icpp(2)%alpha(1)'        : 1.,
+    # ==========================================================================
+
+    # One analytic patch to take care of 4 < x < 5
+    # Patch 3 Right Analytic ===================================================
+    'patch_icpp(3)%geometry'        : 15,
+    'patch_icpp(3)%x_centroid'      : 4.5,
+    'patch_icpp(3)%length_x'        : 1.,
+    'patch_icpp(3)%vel(1)'          : 0.,
+    'patch_icpp(3)%pres'            : 1.,
+    'patch_icpp(3)%alpha_rho(1)'    : '1 + 0.2*sin(5*x)',
+    'patch_icpp(3)%alpha(1)'        : 1.,
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================

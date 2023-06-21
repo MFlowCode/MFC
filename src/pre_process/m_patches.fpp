@@ -1,3 +1,4 @@
+#:include 'initialconditions.fpp'
 !>
 !! @file m_patches.f90
 !! @brief Contains module m_patches
@@ -792,46 +793,8 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
 
-                ! Shu-Osher Problem
-                !if (x_cc(i) > -4d0) then
-                !    q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
-                !    q_prim_vf(momxb)%sf(i, 0, 0) = 0d0
-                !    q_prim_vf(E_idx)%sf(i, 0, 0) = 1d0
-                !end if
-        
-                ! Titarev-Torro Problem
-                !if (x_cc(i) > -4.5d0) then
-                !    q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.1*sin(20*pi*x_cc(i))
-                !    q_prim_vf(momxb)%sf(i, 0, 0) = 0d0
-                !    q_prim_vf(E_idx)%sf(i, 0, 0) = 1
-                !end if
-
-
-                !what variables to alter
-                !bump in pressure
-                !q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                !                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
-
-                !bump in void fraction
-                !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !bump in R(x)
-                !q_prim_vf(adv_idx%end+1)%sf(i,0,0) = q_prim_vf(adv_idx%end+1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !IF (model_eqns == 4) THEN
-                !reassign density
-                !IF (num_fluids == 1) THEN
-                ! q_prim_vf(1)%sf(i, 0, 0) = &
-                !     (((q_prim_vf(E_idx)%sf(i, 0, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                !     rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, 0, 0))
-                !END IF
-                !ELSE IF (model_eqns == 2) THEN
-                !can manually adjust density here
-                !q_prim_vf(1)%sf(i,0,0) = q_prim_vf(1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-                !END IF
+                @:analytical_1D()        
+                
             end if
         end do
 
@@ -882,33 +845,10 @@ contains
 
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
+                
+                @:bubble_pulse_1D()
 
-                !what variables to alter
-                !sinusoid in pressure
-                q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                            (1d0 + 0.1d0*sin(-1d0*(x_cb(i) - x_centroid)*2d0*pi/length_x))
-
-                !bump in void fraction
-                !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !bump in R(x)
-                !q_prim_vf(adv_idx%end+1)%sf(i,0,0) = q_prim_vf(adv_idx%end+1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !IF (model_eqns == 4) THEN
-                !reassign density
-                !IF (num_fluids == 1) THEN
-                q_prim_vf(1)%sf(i, 0, 0) = &
-                    (((q_prim_vf(E_idx)%sf(i, 0, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                    rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, 0, 0))
-                !END IF
-                !ELSE IF (model_eqns == 2) THEN
-                !can manually adjust density here
-                !q_prim_vf(1)%sf(i,0,0) = q_prim_vf(1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-                !END IF
-            end if
+             end if
         end do
 
     end subroutine s_1D_bubble_pulse ! ---------------------------------------
@@ -968,76 +908,10 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                    !what variables to alter
-                    !x-y bump in pressure
-                    !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                            !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
 
-                    !x-bump
-                    !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                    !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
+                    @:analytical_2D()
 
-                    !bump in void fraction
-                    !q_prim_vf(adv_idx%beg)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * &
-                    !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                    !bump in R(x)
-                    !q_prim_vf(adv_idx%end+1)%sf(i,j,0) = q_prim_vf(adv_idx%end+1)%sf(i,j,0) * &
-                    !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                    !reassign density
-                    !q_prim_vf(1)%sf(i, j, 0) = &
-                    !(((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                    !rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
-
-                    ! ================================================================================
-
-                    ! Sinusoidal initial condition for all flow variables =============================
-
-                    ! Cell-center values
-    !                        a = 0d0
-    !                        b = 0d0
-    !                        c = 0d0
-    !                        d = 0d0
-    !                        q_prim_vf(adv_idx%beg)%sf(i,j,0) = SIN(x_cc(i)) * SIN(y_cc(j))
-    !                        q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
-    !                        q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
-    !                        q_prim_vf(mom_idx%beg)%sf(i,j,0) = SIN(x_cc(i))
-    !                        q_prim_vf(mom_idx%end)%sf(i,j,0) = SIN(y_cc(j))
-    !                        q_prim_vf(E_idx)%sf(i,j,0) = 1d0
-
-                    ! Cell-average values
-    !                       a = x_cc(i) - 5d-1*dx ! x-beg
-    !                       b = x_cc(i) + 5d-1*dx ! x-end
-    !                       c = y_cc(j) - 5d-1*dy ! y-beg
-    !                       d = y_cc(j) + 5d-1*dy ! y-end
-    !                       q_prim_vf(adv_idx%beg)%sf(i,j,0) = 1d0/((b-a)*(d-c)) * &
-    !                               (COS(a)*COS(c) - COS(a)*COS(d) - COS(b)*COS(c) + COS(b)*COS(d))
-    !                       q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
-    !                       q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
-    !                       q_prim_vf(mom_idx%beg)%sf(i,j,0) = (COS(a) - COS(b))/(b-a)
-    !                       q_prim_vf(mom_idx%end)%sf(i,j,0) = (COS(c) - COS(d))/(d-c)
-    !                       q_prim_vf(E_idx)%sf(i,j,0) = 1d0
-                    ! ================================================================================
-                   
-                    ! Initial pressure profile smearing for bubble collapse case of Tiwari (2013) ====
-                    !IF((       (x_cc(i))**2                     &
-                    !         + (y_cc(j))**2 <= 1d0**2)) THEN
-                    !         q_prim_vf(E_idx)%sf(i,j,0) = 1d5 / 25d0
-                    !ELSE
-                    !    q_prim_vf(E_idx)%sf(i,j,0) = 1d5 + 1d0/SQRT(x_cc(i)**2+y_cc(j)**2) &
-                    !                                    * ((1d5/25d0) - 1d5)
-                    !END IF
-                    ! ================================================================================
-
-                    ! Taylor Green Vortex===============================================
-                    ! q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/l)*COS(y_cc(j)/l)
-                    ! q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/l)*SIN(y_cc(j)/l)
-                    ! q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/l + COS(2*y_cc(j))/l)* &
-                    !                                         (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
-                    ! ================================================================================
-
-                end if
+                 end if
             end do
         end do
 
@@ -1110,56 +984,10 @@ contains
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                        !gaussian ball
-                        !what variables to alter
-                        !bump in pressure
-                        q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)* &
-                                                    (1d0 + 0.2d0*exp(-1d0* &
-                                                                        ((x_cb(i) - x_centroid)**2.d0 + &
-                                                                        (y_cb(j) - y_centroid)**2.d0 + &
-                                                                        (z_cb(k) - z_centroid)**2.d0) &
-                                                                        /(2.d0*0.5d0)))
 
-                        !bump in void fraction
-                        !                       q_prim_vf(adv_idx%beg)%sf(i, j, k) = q_prim_vf(adv_idx%beg)%sf(i, j, k)* &
-                        !                                                           (1d0 + 0.2d0*exp(-1d0* &
-                        !                                                                           ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-                        !                                                                          /(2.d0*0.005d0)))
+                        @:analytical_3D()
 
-                        !bump in R(x)
-                        !       q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
-                        !                                               (1d0 + 0.2d0*exp(-1d0* &
-                        !                                                                               ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-    !                                                                                  /(2.d0*0.005d0)))
-
-                        !reassign density
-                        !         q_prim_vf(1)%sf(i, j, k) = &
-                        !             (((q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                        !            rhoref*(1d0 - q_prim_vf(E_idx + 1)%sf(i, j, k))
-
-                        ! ================================================================================
-
-                        ! Constant x-velocity in cylindrical grid ========================================
-    !                        q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-    !                        q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-    !                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-    !                        q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = COS(z_cc(k))
-    !                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = -SIN(z_cc(k))
-    !                        q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
-    !                        q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
-                        ! ================================================================================
-
-                        ! Couette flow in cylindrical grid ===============================================
-                        !q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-                        !q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-                        !q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-                        !q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = y_cc(j)*COS(z_cc(k))*SIN(z_cc(k))
-                        !q_prim_vf(mom_idx%end  )%sf(i,j,k) = -y_cc(j)*SIN(z_cc(k))**2
-                        !q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
-                        !q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
-                        ! ================================================================================
-
-                    end if
+                     end if
 
                 end do
             end do
