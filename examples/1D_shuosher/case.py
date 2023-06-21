@@ -86,6 +86,7 @@ print(json.dumps({
     # One anlytic patch to take care of -4 < x < 4
     # Patch 2 Left Analytic ====================================================
     'patch_icpp(2)%geometry'        : 15,
+    'patch_icpp(2)%alter_patch(1)'  : 'T',
     'patch_icpp(2)%x_centroid'      : 0.,
     'patch_icpp(2)%length_x'        : 8.,
     'patch_icpp(2)%vel(1)'          : 0.,
@@ -97,6 +98,7 @@ print(json.dumps({
     # One analytic patch to take care of 4 < x < 5
     # Patch 3 Right Analytic ===================================================
     'patch_icpp(3)%geometry'        : 15,
+    'patch_icpp(3)%alter_patch(1)'  : 'T',
     'patch_icpp(3)%x_centroid'      : 4.5,
     'patch_icpp(3)%length_x'        : 1.,
     'patch_icpp(3)%vel(1)'          : 0.,
