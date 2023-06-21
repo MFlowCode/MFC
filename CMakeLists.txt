@@ -1,11 +1,22 @@
+# SPDX-License-Identifier: MIT
+
+# Developer's note:
+#  CMake has extensive documentation available online. Searching "cmake <variable>"
+#  or "cmake <function_name>" will return a cmake.org page with more information
+#  than you might expect to find or need. Note that any variable or symbol
+#  prefixed by CMAKE_ is reserved by CMake and has special meaning.
+
 cmake_minimum_required(VERSION 3.20)
 
-# Note: If C is not included as a language,
-# FIND_LIBRARY_USE_LIB64_PATHS is ignored.
+
+# We include C as a language because - for some reason -
+# FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
+
 project(MFC LANGUAGES C Fortran)
 
 
-# === Options
+# Build options exposed to users and their default values.
+
 option(MFC_MPI           "Build with MPI"       ON)
 option(MFC_OpenACC       "Build with OpenACC"  OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"   OFF)
@@ -22,7 +33,8 @@ if (MFC_BUILD_ALL)
 endif()
 
 
-# === Imports
+# CMake Library Imports
+
 include(GNUInstallDirs)
 include(ExternalProject)
 include(CheckIPOSupported)
@@ -30,8 +42,10 @@ include(CMakeParseArguments)
 include(CheckFortranCompilerFlag)
 
 
-# === Check Compiler Support & Tools
-# === === Compiler Support
+# Check Compiler Support: Some compilers, especially old ones, are known not to
+# be able to compile MFC. We throw our own error early - at configure time - in
+# such cases.
+
 set(__err_msg "\
 CMake detected the ${CMAKE_Fortran_COMPILER_ID} Fortran compiler \
 v${CMAKE_Fortran_COMPILER_VERSION}. If you intended to use a different \
@@ -53,22 +67,28 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID S
     message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
 endif()
 
-# === === Find Fypp
+# Fypp is required to build MFC. We try to locate it. The path to the binary is
+# returned in FYPP_EXE upon success. This is used later.
+
 find_program(FYPP_EXE fypp REQUIRED)
 
 
-# === Miscellaneous Configuration
-# === === Enable C-Preprocessor for Fortran files
+# Miscellaneous Configuration:
+# *  Enable C-Preprocessor for Fortran files
+# *  Explicitly link to -ldl (or system equivalent)
+# *  Request that FIND_LIBRARY searches <prefix>/lib/ and <prefix>/lib64/
+# *  Let FindXXX use custom scripts from toolchain/cmake/.
+
 set(CMAKE_Fortran_PREPROCESS ON)
-# === === Explicitly link to -ldl (or system equivalent)
 link_libraries("${CMAKE_DL_LIBS}")
-# === === Request that FIND_LIBRARY searches lib/ and lib64/
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
-# === === Let FindXXX use custom scripts from cmake/
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake")
 
 
-# === Compiler Flags
+# Compiler Flags: Here, we specify our own compiler flags for both release and
+# debug builds. These include optimization and debug flags, as well as some that
+# are required for a successful build of MFC.
+
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
@@ -126,10 +146,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
 endif()
 
-
-# === Release Optimizations
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    # === === Processor tuning
+    # Processor tuning: Check if we can target the host's native CPU's ISA.
     CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
     if (SUPPORTS_MARCH_NATIVE)
         add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-march=native>)
@@ -140,8 +158,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
         endif()
     endif()
 
-
-    # === === Enable LTO/IPO if supported
+    # Enable LTO/IPO if supported
     CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
     if (SUPPORTS_IPO)
         message(STATUS "Enabled IPO / LTO")
@@ -151,16 +168,60 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
-## === DEBUG
-
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(MFC_DEBUG)
 endif()
 
-## === HANDLE_SOURCES
-# Gather F90 source files for a given target, including common/, and preprocessing .fpp -> .f90.
-# Outputs:
-#  - <target>_SRCs: List of F90 source filepaths for src/[<target>,common]/ (including .fpp -> .f90)
+
+# HANDLE_SOURCES: Given a target (herein <target>):
+#
+# *  Locate all source files for <target> of the type
+#
+#               src/[<target>,common]/[.,include]/*.[f90,fpp].
+# 
+# *  For each .fpp file found with filepath <dirpath>/<filename>.fpp, using a 
+#    custom command, instruct CMake how to generate a file with path
+#
+#                     src/<target>/autogen/<filename>.f90
+#
+#    by running Fypp on <dirpath>/<filename>.fpp. It is important to understand
+#    that this does not actually run the pre-processor. Rather, it instructs
+#    CMake what to do when it finds a src/<target>/autogen/<filename>.f90 path
+#    in the source list for a target. Thus, an association is made from an .f90
+#    file to its corresponding .fpp file (if applicable) even though the
+#    generation is of the form .fpp -> .f90.
+#
+#    This design has one limitation: If an .fpp file depends on another, for
+#    example if it '#:include's it and uses a macro defined in it, then the
+#    dependency will not be tracked. A modification to the .fpp file it depends
+#    on will not trigger a re-run of Fypp on the .fpp file that depends on it.
+#    As a compromise, both in speed and complexity, all .f90 files generated
+#    from .fpp files are re-generated not only when their corresponding .fpp
+#    file is modified, but also when any file with filepath of the form
+#
+#                     src/[<target>,common]/include/*.fpp
+#    
+#    is modified. This is a reasonable compromise as modifications to .fpp files
+#    in the include directories will be rare - by design. Other approaches would
+#    have required a more complex CMakeLists.txt file (perhaps parsing the .fpp
+#    files to determine their dependencies) or the endurment of longer
+#    compilation times (by way of re-running Fypp on all .fpp files every time
+#    one of them is modified).
+#
+#    .fpp files in src/common are treated as if they were in src/<target> (not
+#    pre-processed to src/common/autogen/) so as not to clash with other targets'
+#    .fpp files (this has caused problems in the past).
+#
+# *  Export, in the variable <target>_SRCs, a list of all source files (.f90)
+#    that would compile to produce <target>. If <target> includes .fpp files,
+#    then the list will include the paths to the corresponding .f90 files that
+#    Fypp would generate from the .fpp files.
+#
+# This design allows us to be flexible in our use of Fypp as we don't have to
+# worry about running the pre-processor on .fpp files when we create executables
+# and generate documentation. Instead, we can simply include the list of .f90
+# files that will eventually be used to compile <target>.
+
 macro(HANDLE_SOURCES target)
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
@@ -170,11 +231,11 @@ macro(HANDLE_SOURCES target)
     file(GLOB    common_F90s CONFIGURE_DEPENDS    "${common_DIR}/*.f90")
     set(${target}_SRCs ${${target}_F90s} ${common_F90s})
 
-    # src/[<DIR>,common]/*.fpp -> src/<DIR>/autogen/*.f90
+    # src/[<target>,common]/*.fpp -> src/<target>/autogen/*.f90
     file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp")
     file(GLOB    common_FPPs CONFIGURE_DEPENDS    "${common_DIR}/*.fpp")
 
-    # Locate src/[<DIR>,common]/include/*.fpp
+    # Locate src/[<target>,common]/include/*.fpp
     file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
     file(GLOB    common_incs CONFIGURE_DEPENDS    "${common_DIR}/include/*.fpp")
 
@@ -203,29 +264,63 @@ macro(HANDLE_SOURCES target)
     endforeach()
 endmacro()
 
+
 HANDLE_SOURCES(pre_process)
 HANDLE_SOURCES(simulation)
 HANDLE_SOURCES(post_process)
 
 
-## === MFC_SETUP_TARGET
-# Setup a target with the following options:
-#  - TARGET:  Target name
-#  - SOURCES: List of source files
-#  - OpenACC: Can be compiled with OpenACC
-#  - MPI:     Can be compiled with MPI
+# MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
+# executable <target> with the appropriate sources, compiler definitions, and
+# linked libraries (assuming HANDLE_SOURCES was called on <target>).
+#
+# Inputs:
+#  * TARGET   Target name (<target>)
+#  * SOURCES  List of source files (.f90)
+#  * OpenACC  (optional) Can be compiled with OpenACC.
+#  * MPI      (optional) Can be compiled with MPI.
+#  * SILO     (optional) Should be linked with SILO.
+#  * HDF5     (optional) Should be linked with HDF5.
+#  * FFTW     (optional) Should be linked with an FFTW-like library (fftw/cufftw),
+#             depending on whether OpenACC is enabled and which compiler is
+#             being used.
+
 function(MFC_SETUP_TARGET)
-    cmake_parse_arguments(ARGS "OpenACC;MPI" "TARGET" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
 
-    target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID})
+    string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
+    target_compile_definitions(
+        ${ARGS_TARGET} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID}
+                               MFC_${ARGS_TARGET_UPPER}
+    )
 
     if (MFC_MPI AND ARGS_MPI)
         find_package(MPI COMPONENTS Fortran REQUIRED)
 
         target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_MPI)
         target_link_libraries     (${ARGS_TARGET} PRIVATE MPI::MPI_Fortran)
+    endif()
+
+    if (ARGS_SILO)
+        find_package(SILO REQUIRED)
+        target_link_libraries(${ARGS_TARGET} PRIVATE SILO::SILO)
+    endif()
+
+    if (ARGS_HDF5)
+        find_package(HDF5 REQUIRED)
+        target_link_libraries(${ARGS_TARGET} PRIVATE HDF5::HDF5)
+    endif()
+
+    if (ARGS_FFTW)
+        if (MFC_OpenACC AND ARGS_OpenACC AND (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
+            find_package(CUDAToolkit REQUIRED)
+            target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::cudart CUDA::cufft)
+        else()
+            find_package(FFTW REQUIRED)
+            target_link_libraries(${ARGS_TARGET} PRIVATE FFTW::FFTW)
+        endif()
     endif()
 
     if (MFC_OpenACC AND ARGS_OpenACC)
@@ -239,6 +334,7 @@ function(MFC_SETUP_TARGET)
         target_link_libraries(${ARGS_TARGET} PRIVATE OpenACC::OpenACC_Fortran)
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+            # FIXME: This should work with other cards than gfx90a ones.
             target_compile_options(${ARGS_TARGET} PRIVATE
                 "-foffload=amdgcn-amdhsa='-march=gfx90a'"
                 "-foffload-options=-lgfortran\ -lm"
@@ -269,130 +365,89 @@ function(MFC_SETUP_TARGET)
         target_compile_options(${ARGS_TARGET} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
     endif()
 
-    string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
-
-    target_compile_definitions(${ARGS_TARGET} PRIVATE "MFC_${ARGS_TARGET_UPPER}")
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+        find_package(CUDAToolkit REQUIRED)
+        target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::nvToolsExt)
+    endif()
 
     install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
 endfunction()
 
 
 if (MFC_PRE_PROCESS)
-    MFC_SETUP_TARGET(
-        TARGET  pre_process
-        SOURCES "${pre_process_SRCs}"
-        MPI
-    )
+    MFC_SETUP_TARGET(TARGET  pre_process
+                     SOURCES "${pre_process_SRCs}"
+                     MPI)
 endif()
-
 
 if (MFC_SIMULATION)
-    MFC_SETUP_TARGET(
-        TARGET simulation
-        SOURCES "${simulation_SRCs}"
-        MPI OpenACC
-    )
-
-    if (MFC_OpenACC AND (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
-        find_package(CUDAToolkit REQUIRED)
-
-        target_link_libraries(simulation PRIVATE CUDA::cudart CUDA::cufft)
-    else()
-        find_package(FFTW REQUIRED)
-
-        target_link_libraries(simulation PRIVATE FFTW::FFTW)
-    endif()
-
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-        find_package(CUDAToolkit REQUIRED)
-        target_link_libraries(simulation PRIVATE CUDA::nvToolsExt)
-    endif()
+    MFC_SETUP_TARGET(TARGET  simulation
+                     SOURCES "${simulation_SRCs}"
+                     MPI OpenACC FFTW)
 endif()
 
-
 if (MFC_POST_PROCESS)
-    MFC_SETUP_TARGET(
-        TARGET  post_process
-        SOURCES "${post_process_SRCs}"
-        MPI
-    )
-
-    find_package(FFTW REQUIRED)
-    find_package(SILO REQUIRED)
-    find_package(HDF5 REQUIRED)
-
-    target_link_libraries(post_process PRIVATE SILO::SILO HDF5::HDF5 FFTW::FFTW)
-
+    MFC_SETUP_TARGET(TARGET  post_process
+                     SOURCES "${post_process_SRCs}"
+                     MPI SILO HDF5 FFTW)
+    
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
 endif()
 
 
-add_custom_target(documentation)
-
-macro(GEN_DOCS target name)
-    set(DOXYGEN_PROJECT_NAME "${name}")
-    set(DOXYGEN_INPUT        "${CMAKE_CURRENT_SOURCE_DIR}/src/${target}/ ${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/")
-
-    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}"
-         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
-
-    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/docs/doxygen"
-         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}")
-
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/Doxyfile"
-        @ONLY
-    )
-
-    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
-         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
-
-    file(COPY        "${CMAKE_CURRENT_SOURCE_DIR}/docs/config.js"
-         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
-
-    add_custom_command(
-        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/Doxyfile"
-                "${${target}_SRCs}"
-        COMMAND "${DOXYGEN_EXECUTABLE}"
-                "Doxyfile"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}"
-        COMMENT "${target}: Generating documentation"
-    )
-
-    add_custom_target(
-        "${target}_doxygen" ALL
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/index.html"
-    )
-
-    add_dependencies("${target}_doxygen" doxygen-awesome-css)
-    add_dependencies(documentation "${target}_doxygen")
-
-    install(
-        DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/doxygen/${target}/html/"
-        DESTINATION "docs/mfc/${target}"
-    )
-
-    install(
-        DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/doxygen/res/"
-        DESTINATION "docs/mfc/res"
-    )
-
-    install(
-        FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
-        DESTINATION "docs/mfc"
-    )
-endmacro()
-
-
-# === Documentation
 if (MFC_DOCUMENTATION)
-    # === === Find Doxygen
+    # GEN_DOCS: Given a target name (herein <target>), this macro sets up a
+    # target, <target>_docs, that generates documentation for <target> using
+    # Doxygen. It is then added as a dependency of the documentation target.
+    # Doxygen outputs HTML to the binary (build) directory. It is installed into
+    # its own directory: <prefix>/docs/mfc/<target>. We use configure_file to
+    # generate the Doxyfile for each target using paths that only apply to that
+    # target (or when relative paths are impractical), specified by CMake.
+
+    macro(GEN_DOCS target name)
+        set(DOXYGEN_PROJECT_NAME     "\"${name}\"")
+        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/src/${target}\"\
+                                     \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+        set(DOXYGEN_HTML_HEADER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/header.html\"")
+        set(DOXYGEN_HTML_FOOTER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/footer.html\"")
+        set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
+        set(DOXYGEN_MATHJAX_CODEFILE "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/config.js\"")
+        set(DOXYGEN_PROJECT_LOGO     "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res/icon.ico\"")
+
+        file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}") 
+
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile" @ONLY)
+
+        add_custom_command(
+            OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
+            DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
+                    "${${target}_SRCs}"
+            COMMAND "${DOXYGEN_EXECUTABLE}"
+                    "${target}-Doxyfile"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+            COMMENT "${target}: Generating documentation"
+        )
+
+        add_custom_target(
+            "${target}_doxygen" ALL
+            DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
+        )
+
+        install(DIRECTORY   "${CMAKE_CURRENT_BINARY_DIR}/${target}"
+                DESTINATION "docs/mfc")
+
+        add_dependencies("${target}_doxygen" doxygen-awesome-css)
+        add_dependencies(documentation "${target}_doxygen")
+    endmacro()
+
+    add_custom_target(documentation)
+    
     find_package(Doxygen REQUIRED dot REQUIRED)
 
-    # === === Fetch CSS Theme
+    # > Fetch CSS Theme
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
@@ -402,17 +457,23 @@ if (MFC_DOCUMENTATION)
         INSTALL_COMMAND   ""
     )
 
-    set(theme_dirpath "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css/src/doxygen-awesome-css")
+    set(theme_dirpath
+        "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css/src/doxygen-awesome-css")
 
     set(DOXYGEN_HTML_EXTRA_STYLESHEET
         "\"${theme_dirpath}/doxygen-awesome.css\"\
          \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"")
 
-    # === === Generate Documentation
-    GEN_DOCS(pre_process  "MFC: Pre-Process")
-    GEN_DOCS(simulation   "MFC: Simulation")
-    GEN_DOCS(post_process "MFC: Post-Process")
-
-    # === === Generate Landing Page
+    # > Generate Documentation & Landing Page
+    GEN_DOCS(pre_process   "MFC: Pre-Process")
+    GEN_DOCS(simulation    "MFC: Simulation")
+    GEN_DOCS(post_process  "MFC: Post-Process")
     GEN_DOCS(documentation "MFC")
+
+    # > Copy Resources (main landing page & assets)
+    install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
+            DESTINATION "docs/mfc")
+
+    install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
+            DESTINATION "docs/mfc")
 endif()
