@@ -3,6 +3,8 @@
 import json
 
 myv = 1.
+Mu1 = 0.01
+Mu2 = 0.01
 
 # Configuring case dictionary
 print(json.dumps({
@@ -34,7 +36,9 @@ print(json.dumps({
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.00000000000000E-16,
-    'mapped_weno'                  :'T',
+    'weno_Re_flux'                 : 'T',  
+    'weno_avg'                     : 'T',
+    'mapped_weno'                  : 'T',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
@@ -73,10 +77,10 @@ print(json.dumps({
     #'patch_icpp(1)%length_x'       : 1.00000000000000E+00,
     #'patch_icpp(1)%length_y'       : 0.50000000000000E+00,
     'patch_icpp(1)%normal(1)'      : 0.00624987793326E+00,
-    'patch_icpp(1)%normal(2)'      :-0.99998046932219E+00,
+    'patch_icpp(1)%normal(2)'      : -0.99998046932219E+00,
     #'patch_icpp(1)%smooth_patch_id': 1,
     #'patch_icpp(1)%smooth_coeff'   : 1.00000000000000E+00,
-    'patch_icpp(1)%vel(1)'         :-myv,
+    'patch_icpp(1)%vel(1)'         : -myv,
     'patch_icpp(1)%vel(2)'         : 0.00000000000000E+00,
     'patch_icpp(1)%pres'           : 1.01325000000000E+05,
     'patch_icpp(1)%alpha_rho(1)'   : 1000*1.E-12,
@@ -88,8 +92,10 @@ print(json.dumps({
     # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.0E+00/(4.4E+00-1.0E+00),
     'fluid_pp(1)%pi_inf'           : 4.4E+00*6.0E+08/(4.4E+00-1.E+00),
+    'fluid_pp(1)%Re(1)'            : 1/Mu1,
     'fluid_pp(2)%gamma'            : 1.0E+00/(4.4E+00-1.0E+00),
     'fluid_pp(2)%pi_inf'           : 4.4E+00*6.0E+08/(4.4E+00-1.E+00),
+    'fluid_pp(2)%Re(1)'            : 1/Mu2,
     # ==========================================================================
 }))
 
