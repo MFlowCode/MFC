@@ -22,9 +22,9 @@ Ly = 59.0
 Lz = 59.0
 
 # Number of grid cells
-Nx = 191
-Ny = 191
-Nz = 191
+Nx = 255
+Ny = 255
+Nz = 255
 
 # Grid spacing
 dx      = Lx/float(Nx)
@@ -43,6 +43,8 @@ Nt      = t_save*Nfiles
 t_step_start    = Ntstart
 t_step_stop     = int(Nt)
 
+# Derive dynamic viscosity (rho =1)
+Mu = u0*Lx/Re0
 # ==============================================================================
 
 
@@ -77,7 +79,8 @@ print(json.dumps({
     'time_stepper'                  : 3,
     'weno_order'                    : 5,
     'weno_eps'                      : 1.E-16,
-    'weno_Re_flux'                  : 'T',
+    'weno_Re_flux'                  : 'T', 
+    'weno_avg'                      : 'T',
     'mapped_weno'                   : 'T',
     'riemann_solver'                : 2,
     'wave_speeds'                   : 1,
@@ -128,7 +131,7 @@ print(json.dumps({
     # Surrounding liquid
     'fluid_pp(1)%gamma'             : 1./(gamma-1.),
     'fluid_pp(1)%pi_inf'            : 0.,
-    'fluid_pp(1)%Re(1)'             : Re0,
+    'fluid_pp(1)%Re(1)'             : 1/Mu,
     # =========================================================================
 }))
 
