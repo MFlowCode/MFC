@@ -43,7 +43,7 @@ print(json.dumps({
     # ==========================================================================
 
     # Simulation Algorithm Parameters ==========================================
-    'num_patches'                  : 1,
+    'num_patches'                  : 3,
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 1,
