@@ -779,7 +779,7 @@ contains
                 ! Writing the curve object associated with the local process
                 ! to the formatted database slave file
                 err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
-                                 x_cc(0:m), q_sf, precision, m + 1, &
+                                 x_cc(0:m), q_sf, DB_DOUBLE, m + 1, &
                                  DB_F77NULL, ierr)
 
                 ! Assembling the local grid and flow variable data for the
@@ -798,7 +798,7 @@ contains
                     err = DBPUTCURVE(dbroot, trim(varname), &
                                      len_trim(varname), &
                                      x_root_cc, q_root_sf, &
-                                     precision, m_root + 1, &
+                                     DB_DOUBLE, m_root + 1, &
                                      DB_F77NULL, ierr)
                 end if
 
