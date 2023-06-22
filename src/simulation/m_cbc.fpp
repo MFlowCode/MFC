@@ -628,7 +628,6 @@ contains
 
         !$acc update device(cbc_dir, cbc_loc)
 
-
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                               ix, iy, iz)
 
@@ -717,10 +716,8 @@ contains
                         end do
                     end do
                 end do
-
             end if
             ! ==================================================================
-
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
             !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)

@@ -696,6 +696,24 @@ contains
 
         end if
 
+        ! j = 0; k = 2; l = 0
+        ! write(72,*) q_cons_qp%vf(contxb)%sf(j, k, l), &
+        !             q_cons_qp%vf(momxb)%sf(j, k, l), &
+        !             q_cons_qp%vf(momxe)%sf(j, k, l), &
+        !             q_cons_qp%vf(E_idx)%sf(j, k, l), &
+        !             q_cons_qp%vf(alf_idx)%sf(j, k, l), &
+        !             q_cons_qp%vf(rs(1))%sf(j, k, l), &
+        !             q_cons_qp%vf(vs(1))%sf(j, k, l)
+
+        ! j = 0; k = 9; l = 0
+        ! write(79,*) q_cons_qp%vf(contxb)%sf(j, k, l), &
+        !             q_cons_qp%vf(momxb)%sf(j, k, l), &
+        !             q_cons_qp%vf(momxe)%sf(j, k, l), &
+        !             q_cons_qp%vf(E_idx)%sf(j, k, l), &
+        !             q_cons_qp%vf(alf_idx)%sf(j, k, l), &
+        !             q_cons_qp%vf(rs(1))%sf(j, k, l), &
+        !             q_cons_qp%vf(vs(1))%sf(j, k, l)
+
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -704,8 +722,24 @@ contains
             ix, iy, iz)
         call nvtxEndRange
 
+        ! j = 0; k = 2; l = 0
+        ! write(82,*) q_prim_qp%vf(contxb)%sf(j, k, l), &
+        !             q_prim_qp%vf(momxb)%sf(j, k, l), &
+        !             q_prim_qp%vf(momxe)%sf(j, k, l), &
+        !             q_prim_qp%vf(E_idx)%sf(j, k, l), &
+        !             q_prim_qp%vf(alf_idx)%sf(j, k, l), &
+        !             q_prim_qp%vf(rs(1))%sf(j, k, l), &
+        !             q_prim_qp%vf(vs(1))%sf(j, k, l)
 
-        
+        ! j = 0; k = 9; l = 0
+        ! write(89,*) q_prim_qp%vf(contxb)%sf(j, k, l), &
+        !             q_prim_qp%vf(momxb)%sf(j, k, l), &
+        !             q_prim_qp%vf(momxe)%sf(j, k, l), &
+        !             q_prim_qp%vf(E_idx)%sf(j, k, l), &
+        !             q_prim_qp%vf(alf_idx)%sf(j, k, l), &
+        !             q_prim_qp%vf(rs(1))%sf(j, k, l), &
+        !             q_prim_qp%vf(vs(1))%sf(j, k, l)
+                    
         if (t_step == t_step_stop) return
         ! ==================================================================
 
@@ -837,10 +871,21 @@ contains
                                   id, ix, iy, iz)
             call nvtxEndRange
 
+            ! if (id == 1) then
+            !     j = 0; k = 2; l = 0
+            !     write(52,*) id, flux_n(id)%vf(momxe)%sf(j-1, k, l),flux_n(id)%vf(momxe)%sf(j, k, l)
+            !     j = 0; k = 9; l = 0
+            !     write(59,*) id, flux_n(id)%vf(momxe)%sf(j-1, k, l),flux_n(id)%vf(momxe)%sf(j, k, l)
+            ! else 
+            !     j = 0; k = 2; l = 0
+            !     write(52,*) id, flux_n(id)%vf(momxe)%sf(j, k-1, l),flux_n(id)%vf(momxe)%sf(j, k, l)
+            !     j = 0; k = 9; l = 0
+            !     write(59,*) id, flux_n(id)%vf(momxe)%sf(j, k-1, l),flux_n(id)%vf(momxe)%sf(j, k, l)
+            ! end if
             ! ===============================================================
 
             if (alt_soundspeed) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -864,10 +909,9 @@ contains
             end if
 
             call nvtxStartRange("RHS_Flux_Add")
-
-            
-            if (id == 1) then
                 
+            if (id == 1) then
+
                 if (bc_x%beg <= -5) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
@@ -891,7 +935,7 @@ contains
                         end do
                     end do
                 end do
-
+    
                 if (riemann_solver == 1) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
@@ -986,7 +1030,7 @@ contains
                             end do
                         end do
                     else
-!$acc parallel loop collapse(3) gang vector default(present)
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -1002,7 +1046,7 @@ contains
                         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                         if (id == ndirs) then                        
                             call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                                 q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
+                                                 q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)                    
                         end if
                     end if
                 end if    
@@ -1050,16 +1094,14 @@ contains
                         end do
                     end do
                 end if
-
+    
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
-
                 if (bc_y%beg <= -5 .and. bc_y%beg /= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
-
                 if (bc_y%end <= -5) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
@@ -1079,7 +1121,7 @@ contains
                     end do
                 end do
                 ! Applying source terms to the RHS of the advection equations
-
+    
                 if (riemann_solver == 1) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
@@ -1156,7 +1198,7 @@ contains
                             end if
                         end do
                     else
-!$acc parallel loop collapse(4) gang vector default(present)
+                        !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do l = 0, p
                                 do k = 0, n
@@ -1192,10 +1234,7 @@ contains
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
-
                 end if
-
-
 
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
@@ -1371,7 +1410,7 @@ contains
                         end if
                     end if
                 end if
-
+    
             elseif (id == 3) then
                 ! RHS Contribution in z-direction ===============================
 
@@ -1582,7 +1621,6 @@ contains
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
-
                 end if
                 call nvtxEndRange()
 

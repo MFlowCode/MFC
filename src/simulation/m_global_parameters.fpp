@@ -243,7 +243,6 @@ module m_global_parameters
     real(kind(0d0)) :: R0ref    !< Reference bubble size
     real(kind(0d0)) :: Ca       !< Cavitation number
     real(kind(0d0)) :: Web      !< Weber number
-    real(kind(0d0)) :: Eu       !< Euler number
     real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
     real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
@@ -264,12 +263,14 @@ module m_global_parameters
     integer :: R0_type
 
     real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
+    real(kind(0d0)) :: uratio   !< 
+    real(kind(0d0)) :: rratio   !< 
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Eu, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -406,11 +407,12 @@ contains
 
         Ca = dflt_real
         Re_inv = dflt_real
-        Eu = dflt_real
         Web = dflt_real
         poly_sigma = dflt_real
 
         pi_fac = 1d0
+        uratio = 1d0
+        rratio = 1d0
 
         ! Monopole source
         monopole = .false.
@@ -587,7 +589,7 @@ contains
 
                     if (nb == 1) then
                         weight(:) = 1d0
-                        R0(:) = R0ref
+                        R0(:) = 1d0
                         V0(:) = 1d0
                     else if (nb > 1) then
                         if (R0_type == 1) then

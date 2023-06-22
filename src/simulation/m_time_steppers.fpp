@@ -199,6 +199,22 @@ contains
         end if
 
         if (t_step == t_step_stop) return
+        ! j = 0; k = 2; l = 0
+        ! write(62,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
+        ! j = 0; k = 9; l = 0
+        ! write(69,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -213,6 +229,37 @@ contains
             end do
         end do
 
+        ! j = 0; k = 2; l = 0
+        ! write(62,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
+        ! write(62,*) rhs_vf(contxb)%sf(j, k, l), &
+        !             rhs_vf(momxb)%sf(j, k, l), &
+        !             rhs_vf(momxe)%sf(j, k, l), &
+        !             rhs_vf(E_idx)%sf(j, k, l), &
+        !             rhs_vf(alf_idx)%sf(j, k, l), &
+        !             rhs_vf(rs(1))%sf(j, k, l), &
+        !             rhs_vf(vs(1))%sf(j, k, l)
+        ! j = 0; k = 9; l = 0
+        ! write(69,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
+        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
+        ! write(69,*) rhs_vf(contxb)%sf(j, k, l), &
+        !             rhs_vf(momxb)%sf(j, k, l), &
+        !             rhs_vf(momxe)%sf(j, k, l), &
+        !             rhs_vf(E_idx)%sf(j, k, l), &
+        !             rhs_vf(alf_idx)%sf(j, k, l), &
+        !             rhs_vf(rs(1))%sf(j, k, l), &
+        !             rhs_vf(vs(1))%sf(j, k, l)
+        ! error stop
         !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(E_idx)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)

@@ -856,8 +856,8 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-!$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1564,8 +1564,8 @@ contains
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
+                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i)/rratio, V0_L(i)/uratio, 0d0)*uratio**2
+                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i)/rratio, V0_R(i)/uratio, 0d0)*uratio**2
                                             else
                                                 pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
                                                 pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))

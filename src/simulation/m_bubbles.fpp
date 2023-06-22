@@ -129,7 +129,7 @@ contains
             do k = 0, n
                 do j = 0, m
 
-!$acc loop seq
+                    !$acc loop seq
                     do q = 1, nb
                         Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
                         Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
@@ -153,6 +153,10 @@ contains
 
                     bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
 
+                    !$acc loop seq
+                    do q = 1, nb
+                        bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
+                    end do
                 end do
             end do
         end do
@@ -163,8 +167,6 @@ contains
                 do j = 0, m
                     !$acc loop seq
                     do q = 1, nb
-
-                        bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
 
                         !$acc loop seq
                         do ii = 1, num_fluids
@@ -198,12 +200,13 @@ contains
                         
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
+                        B_tait = B_tait/uratio**2
 
-                        myRho = q_prim_vf(1)%sf(j, k, l)
-                        myP = q_prim_vf(E_idx)%sf(j, k, l)
+                        ! myRho = q_prim_vf(1)%sf(j, k, l)
+                        myP = q_prim_vf(E_idx)%sf(j, k, l)/uratio**2
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
-                        myR = q_prim_vf(rs(q))%sf(j, k, l)
-                        myV = q_prim_vf(vs(q))%sf(j, k, l)
+                        myR = q_prim_vf(rs(q))%sf(j, k, l)/rratio
+                        myV = q_prim_vf(vs(q))%sf(j, k, l)/uratio
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
@@ -232,7 +235,7 @@ contains
                             Cpinf = myP
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                             ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/myRho)
+                            c_liquid = DSQRT(n_tait*(myP + B_tait)/myRho) ! Need to confirm 
                             rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
@@ -240,7 +243,24 @@ contains
                             rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
                         end if
 
+                        rddot = rddot*uratio**2/rratio
                         bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+
+                        ! if (j==0 .and. k==1 .and. l==0) then
+                        !     write(91,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
+                        ! end if
+                        ! if (j==0 .and. k==2 .and. l==0) then
+                        !     write(92,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
+                        ! end if
+                        ! if (j==0 .and. k==3 .and. l==0) then
+                        !     write(93,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
+                        ! end if
+                        ! if (j==0 .and. k==4 .and. l==0) then
+                        !     write(94,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
+                        ! end if
+                        ! if (j==0 .and. k==9 .and. l==0) then
+                        !     write(99,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
+                        ! end if
 
                         if (alf < 1.d-11) then
                             bub_adv_src(j, k, l) = 0d0
@@ -290,7 +310,7 @@ contains
         real(kind(0d0)) :: f_cpbw
 
         if (polytropic) then
-            f_cpbw = (0.5*Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - 0.5*Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
+            f_cpbw = (Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
         else
             f_cpbw = fpb - 1.d0 - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
         end if
@@ -385,7 +405,7 @@ contains
 
         if (polytropic) then
             tmp1 = (fR0/fR)**(3.d0*gam)
-            tmp1 = -3.d0*gam*(0.5*Ca + 2d0/Web/fR0)*tmp1*fV/fR
+            tmp1 = -3.d0*gam*(Ca + 2d0/Web/fR0)*tmp1*fV/fR
         else
             tmp1 = fpbdot
         end if
@@ -462,7 +482,7 @@ contains
         real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = 0.5*Ca*((fR0/fR)**(3.d0*gam)) - 0.5*Ca + 0.5*Eu
+            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
             if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
                                               (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else
@@ -492,7 +512,7 @@ contains
         real(kind(0d0)) :: f_rddot_KM
 
         if (polytropic) then
-            cdot_star = -3d0*gam*0.5*Ca*((fR0/fR)**(3d0*gam))*fV/fR
+            cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
             if (Web /= dflt_real) cdot_star = cdot_star - &
                                               3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
         else

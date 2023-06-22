@@ -98,7 +98,7 @@ contains
 #:if not MFC_CASE_OPTIMIZATION
             nb, weno_order, &
 #:endif
-            Ca, Web, Eu, Re_inv, pi_fac, &
+            Ca, Web, Re_inv, pi_fac, uratio, rratio, &
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &

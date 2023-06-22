@@ -33,6 +33,10 @@
             if (mpp_lim .and. (num_fluids > 1)) then
                 c = (1d0/gamma + 1d0)* &
                       (pres + pi_inf/(gamma+1d0))/rho
+            elseif ((model_eqns == 2 .and. bubbles) .and. num_fluids == 1) then
+                c = &
+                    ((1d0+gammas(1))*pres+pi_infs(1))/ &
+                    ((1d0-adv(num_fluids))*gammas(1)+adv(num_fluids)*gammas(2))        
             else
                 c = &
                     (1d0/gamma + 1d0)* &    

@@ -455,7 +455,7 @@ contains
 
                 if (nb == 1) then
                     weight(:) = 1d0
-                    R0(:) = R0ref
+                    R0(:) = 1d0
                     V0(:) = 1d0
                 else if (nb > 1) then
                     if (R0_type == 1) then
