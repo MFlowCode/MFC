@@ -414,6 +414,8 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
         set(DOXYGEN_MATHJAX_CODEFILE "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/config.js\"")
         set(DOXYGEN_PROJECT_LOGO     "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res/icon.ico\"")
+        set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
+                                      \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 
         file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}") 
 
@@ -425,8 +427,9 @@ if (MFC_DOCUMENTATION)
             OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
                     "${${target}_SRCs}"
-            COMMAND "${DOXYGEN_EXECUTABLE}"
-                    "${target}-Doxyfile"
+            COMMAND  "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
+                            "${CMAKE_CURRENT_SOURCE_DIR}" && 
+                    "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             COMMENT "${target}: Generating documentation"
         )
