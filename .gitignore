@@ -16,10 +16,10 @@ __pycache__
 
 .DS_Store
 
-/tests/**/*.log
-/tests/*.txt
 /tests/*/**
-!/tests/golden.txt
+!/tests/*/golden.txt
+!/tests/*/case.py
+!/tests/*/README.md
 
 # NVIDIA Nsight Compute
 *.nsys-rep

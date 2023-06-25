@@ -17,12 +17,14 @@ To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
 
 ### Creating Tests
 
-To (re)generate *golden files*, append the `-g` (i.e `--generate`) option:
+To (re)generate *golden files*, append the `--generate` option:
 ```console
-$ ./mfc.sh test -g -j 8
+$ ./mfc.sh test --generate -j 8
 ```
 
 It is recommended that a range be specified when generating golden files for new test cases, as described in the previous section, in an effort not to regenerate the golden files of existing test cases.
+
+**Note:** If you output new variables and want to update the golden files to include these without modifying the original data, use the `--add-new-variables` option instead.
 
 Adding a new test case can be done by modifying [cases.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/case.py). The function operates on two variables:
 
