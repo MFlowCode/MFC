@@ -29,7 +29,7 @@ $ python3 my_case_file.py
 
 This is particularly useful when computations are done in Python to generate the case.
 
-## (Optional) Accepting command line arguments (from `mfc.sh run`)
+## (Optional) Accepting command line arguments
 
 Input files can accept **positional** command line arguments, forwarded by `mfc.sh run`.
 Consider this example from the 3D_weak_scaling case:
@@ -54,6 +54,18 @@ state. It contains all the runtime information you might want from the build/run
 We hide it from the help menu with `help=argparse.SUPPRESS` since it is not meant
 to be passed in by users. You can add as many additional positional arguments as
 you may need.
+
+To run such a case, use the following format:
+
+```console
+./mfc.sh run <path/to/case.py> <positional arguments> <regular mfc.sh run arguments>
+```
+
+For example, to run the 3D_weak_scaling case with `gbpp=2`:
+
+```console
+./mfc.sh run examples/3D_weak_scaling/case.py 2 -t pre_process -j 8
+```
 
 ## Parameters
 

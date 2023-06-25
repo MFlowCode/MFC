@@ -1,4 +1,4 @@
-import os, sys, json, dataclasses
+import os, json, dataclasses
 
 from ..printer import cons
 from ..        import common
@@ -25,9 +25,7 @@ class MFCInputFile:
 
                 continue
 
-            if key not in case_dicts.PRE_PROCESS  and \
-               key not in case_dicts.POST_PROCESS and \
-               key not in case_dicts.SIMULATION:
+            if key not in case_dicts.ALL:
                 raise common.MFCException(f"MFCInputFile::dump: Case parameter '{key}' is not used by any MFC code. Please check your spelling or add it as a new parameter.")
 
         contents = f"&user_inputs\n{dict_str}&end/\n"
