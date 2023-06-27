@@ -1,6 +1,6 @@
 # Titarev-Toro problem (1D)
 
-Reference: https://arxiv.org/pdf/2110.05461.pdf.
+Reference: V. A. Titarev, E. F. Toro, Finite-volume WENO schemes for three-dimensional conservation laws, Journal of Computational Physics 201 (1) (2004) 238–260.
 
 ## Initial Condition
 
