@@ -4,7 +4,7 @@ from ..      import common
 from ..state import ARG
 
 # Note: This file is now only used when running
-#       in serial mode.
+#       in -e interactive mode.
 
 @dataclasses.dataclass
 class MPIBinary:
@@ -16,6 +16,17 @@ class MPIBinary:
 
     def gen_params(self) -> typing.List[str]:
         raise common.MFCException(f"MPIBinary::gen_params <{self.name}> not implemented.")
+
+
+class NOMPIBIN(MPIBinary):
+    def __init__(self):
+        super().__init__("N/A", "N/A")
+
+    def is_present(self) -> bool:
+        return not ARG("mpi")
+
+    def gen_params(self) -> typing.List[str]:
+        return []
 
 
 class JSRUN(MPIBinary):
@@ -83,7 +94,7 @@ class MPIRUN(MPIBinary):
 
 
 # In descending order of priority (if no override present)
-BINARIES: list = [ JSRUN(), SRUN(), MPIRUN(), MPIEXEC() ]
+BINARIES: list = [ JSRUN(), SRUN(), MPIRUN(), MPIEXEC(), NOMPIBIN() ]
 
 def get_binary(exclude: typing.List[str] = None) -> MPIBinary:
     if exclude is None:

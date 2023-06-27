@@ -16,14 +16,18 @@ __pycache__
 
 .DS_Store
 
-/tests/**/*.log
-/tests/*.txt
 /tests/*/**
-!/tests/golden.txt
+!/tests/*/golden.txt
+!/tests/*/case.py
+!/tests/*/README.md
 
 # NVIDIA Nsight Compute
 *.nsys-rep
 *.sqlite
+
+docs/*/initial*
+docs/*/result*
+docs/documentation/examples.md
 
 examples/*batch/*/
 examples/*/D/*
@@ -40,4 +44,7 @@ examples/*/binary
 examples/*/fort.1
 examples/*/*.sh
 examples/*/*.err
+examples/*/viz/
+examples/*.jpg
+examples/*.png
 *.mod
