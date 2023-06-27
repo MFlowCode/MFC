@@ -153,10 +153,6 @@ contains
 
                     bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
 
-                    if (j==0 .and. k==95) then
-                        write(98,*) q_prim_vf(alf_idx)%sf(j,k,l), Rtmp(1), Vtmp(1), nbub(j,k,l), R2Vav
-                    end if
-
                     !$acc loop seq
                     do q = 1, nb
                         bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
@@ -240,11 +236,6 @@ contains
                             c_liquid = DSQRT(n_tait*(myP + B_tait)/1d0)/uratio ! Need to confirm 
                             rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
                             rddot = rddot*uratio**2/rratio
-
-                            if (j==0 .and. k==95) then
-                                write(99,*) Cpinf*uratio**2, Cpbw*uratio**2, myR, myV, c_liquid*uratio, rddot
-                            end if
-
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
