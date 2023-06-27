@@ -105,6 +105,6 @@ print(json.dumps({
     "patch_icpp(3)%vel(1)": 0.0,
     "patch_icpp(3)%vel(2)": 0.0,
     "fluid_pp(1)%Re(1)": 0.0001,
-    "weno_Re_flux": "F",
+    "weno_Re_flux": "T",
     "weno_avg": "T"
 }))
