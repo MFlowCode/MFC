@@ -25,6 +25,10 @@ __pycache__
 *.nsys-rep
 *.sqlite
 
+docs/*/initial*
+docs/*/result*
+docs/documentation/examples.md
+
 examples/*batch/*/
 examples/*/D/*
 examples/*/p*
@@ -40,4 +44,7 @@ examples/*/binary
 examples/*/fort.1
 examples/*/*.sh
 examples/*/*.err
+examples/*/viz/
+examples/*.jpg
+examples/*.png
 *.mod
