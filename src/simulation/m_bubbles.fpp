@@ -153,6 +153,10 @@ contains
 
                     bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
 
+                    if (j==0 .and. k==95) then
+                        write(98,*) q_prim_vf(alf_idx)%sf(j,k,l), Rtmp(1), Vtmp(1), nbub(j,k,l), R2Vav
+                    end if
+
                     !$acc loop seq
                     do q = 1, nb
                         bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
@@ -200,13 +204,12 @@ contains
                         
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
-                        B_tait = B_tait/uratio**2
 
                         ! myRho = q_prim_vf(1)%sf(j, k, l)
-                        myP = q_prim_vf(E_idx)%sf(j, k, l)/uratio**2
+                        myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
-                        myR = q_prim_vf(rs(q))%sf(j, k, l)/rratio
-                        myV = q_prim_vf(vs(q))%sf(j, k, l)/uratio
+                        myR = q_prim_vf(rs(q))%sf(j, k, l)
+                        myV = q_prim_vf(vs(q))%sf(j, k, l)
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
@@ -232,35 +235,23 @@ contains
                             rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
                         else if (bubble_model == 2) then
                             ! Keller-Miksis bubbles
-                            Cpinf = myP
-                            Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                            ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/myRho) ! Need to confirm 
-                            rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
+                            Cpinf = myP/uratio**2
+                            Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
+                            c_liquid = DSQRT(n_tait*(myP + B_tait)/1d0)/uratio ! Need to confirm 
+                            rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
+                            rddot = rddot*uratio**2/rratio
+
+                            if (j==0 .and. k==95) then
+                                write(99,*) Cpinf*uratio**2, Cpbw*uratio**2, myR, myV, c_liquid*uratio, rddot
+                            end if
+
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                             rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
                         end if
 
-                        rddot = rddot*uratio**2/rratio
                         bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
-
-                        ! if (j==0 .and. k==1 .and. l==0) then
-                        !     write(91,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
-                        ! end if
-                        ! if (j==0 .and. k==2 .and. l==0) then
-                        !     write(92,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
-                        ! end if
-                        ! if (j==0 .and. k==3 .and. l==0) then
-                        !     write(93,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
-                        ! end if
-                        ! if (j==0 .and. k==4 .and. l==0) then
-                        !     write(94,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
-                        ! end if
-                        ! if (j==0 .and. k==9 .and. l==0) then
-                        !     write(99,*) rddot, Cpinf, Cpbw, myRho, myR, myV, q_prim_vf(E_idx)%sf(j, k, l)
-                        ! end if
 
                         if (alf < 1.d-11) then
                             bub_adv_src(j, k, l) = 0d0
