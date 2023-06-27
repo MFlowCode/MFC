@@ -1,6 +1,9 @@
 !>
-!! @file m_patches.f90
+!! @file m_patches.fpp
 !! @brief Contains module m_patches
+
+#:include 'case.fpp'
+
 module m_patches
 
     ! Dependencies =============================================================
@@ -81,7 +84,7 @@ contains
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma
 
-        integer :: i, j  !< Generic loop operators
+        integer :: i, j, k !< Generic loop operators
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -114,12 +117,7 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                             eta, q_prim_vf, patch_id_fp)
 
-                !IF ( (q_prim_vf(1)%sf(i,0,0) < 1.e-12) .AND. (model_eqns .NE. 4)) THEN
-                !    !zero density, reassign according to Tait EOS
-                !    q_prim_vf(1)%sf(i,0,0) = &
-                !        (((q_prim_vf(E_idx)%sf(i,0,0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma)) * &
-                !        rhoref*(1d0-q_prim_vf(alf_idx)%sf(i,0,0))
-                !END IF
+                @:analytical()
             end if
         end do
 
@@ -176,6 +174,8 @@ contains
                 if ((logic_grid(i, j, 0) == 1)) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
+
+                    @:analytical()
                 end if
             end do
         end do
@@ -195,7 +195,7 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: radius
 
-        integer :: i, j !< Generic loop iterators
+        integer :: i, j, k !< Generic loop iterators
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -235,6 +235,8 @@ contains
                     then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
+                    
+                    @:analytical()
                 end if
 
             end do
@@ -254,7 +256,7 @@ contains
         real(kind(0d0)) :: radius
 
         ! Generic loop iterators
-        integer :: i, j
+        integer :: i, j, k
 
         real(kind(0d0)) :: myr, thickness
 
@@ -287,6 +289,8 @@ contains
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
+
+                    @:analytical()
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
                                                     dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
@@ -344,6 +348,8 @@ contains
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
+                            
+                        @:analytical()
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
                                                         dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
@@ -367,7 +373,7 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: a, b
 
-        integer :: i, j !< Generic loop operators
+        integer :: i, j, k !< Generic loop operators
 
         ! Transferring the elliptical patch's radii, centroid, smearing
         ! patch identity, and smearing coefficient information
@@ -408,6 +414,8 @@ contains
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
+                
+                    @:analytical()
                 end if
             end do
         end do
@@ -481,6 +489,8 @@ contains
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                      eta, q_prim_vf, patch_id_fp)
+                                    
+                        @:analytical()
                     end if
                 end do
             end do
@@ -505,7 +515,7 @@ contains
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j, k !< generic loop iterators
         
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -547,6 +557,8 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
 
+                    @:analytical()
+
                     if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                         !zero density, reassign according to Tait EOS
                         q_prim_vf(1)%sf(i, j, 0) = &
@@ -574,7 +586,7 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: a, b, c
 
-        integer :: i, j !< Generic loop operators
+        integer :: i, j, k !< Generic loop operators
 
         ! Transferring the centroid information of the line to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -613,7 +625,8 @@ contains
                     then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                       eta, q_prim_vf, patch_id_fp)
-
+                    
+                    @:analytical()
                 end if
 
             end do
@@ -635,7 +648,8 @@ contains
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         ! Generic loop iterators
-        integer :: i, j
+        integer :: i, j, k
+
         real(kind(0d0)) :: radius
 
         ! Transferring isentropic vortex patch's centroid and radius info
@@ -665,6 +679,8 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, &
                                                             i, j, 0, &
                                             eta, q_prim_vf, patch_id_fp)
+                            
+                    @:analytical()
 
                 end if
 
@@ -687,7 +703,7 @@ contains
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(kind(0d0)) :: L0, U0 !< Taylor Green Vortex parameters
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j, k !< generic loop iterators
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -731,6 +747,8 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
 
+                    @:analytical()
+
                     ! Assign Parameters =========================================================
                     q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/L0)*COS(y_cc(j)/L0)
                     q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/L0)*SIN(y_cc(j)/L0)
@@ -759,7 +777,7 @@ contains
         real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
 
         ! Generic loop iterators
-        integer :: i, j
+        integer :: i, j, k
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -792,31 +810,7 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
 
-                !what variables to alter
-                !bump in pressure
-                q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                            (1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
-
-                !bump in void fraction
-                !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !bump in R(x)
-                !q_prim_vf(adv_idx%end+1)%sf(i,0,0) = q_prim_vf(adv_idx%end+1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !IF (model_eqns == 4) THEN
-                !reassign density
-                !IF (num_fluids == 1) THEN
-                ! q_prim_vf(1)%sf(i, 0, 0) = &
-                !     (((q_prim_vf(E_idx)%sf(i, 0, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                !     rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, 0, 0))
-                !END IF
-                !ELSE IF (model_eqns == 2) THEN
-                !can manually adjust density here
-                !q_prim_vf(1)%sf(i,0,0) = q_prim_vf(1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-                !END IF
+                @:analytical()
             end if
         end do
 
@@ -835,7 +829,7 @@ contains
         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
 
         ! Generic loop iterators
-        integer :: i, j
+        integer :: i, j, k
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -868,31 +862,8 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
 
-                !what variables to alter
-                !sinusoid in pressure
-                q_prim_vf(E_idx)%sf(i, 0, 0) = q_prim_vf(E_idx)%sf(i, 0, 0)* &
-                                            (1d0 + 0.1d0*sin(-1d0*(x_cb(i) - x_centroid)*2d0*pi/length_x))
-
-                !bump in void fraction
-                !q_prim_vf(adv_idx%beg)%sf(i,0,0) = q_prim_vf(adv_idx%beg)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !bump in R(x)
-                !q_prim_vf(adv_idx%end+1)%sf(i,0,0) = q_prim_vf(adv_idx%end+1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                !IF (model_eqns == 4) THEN
-                !reassign density
-                !IF (num_fluids == 1) THEN
-                q_prim_vf(1)%sf(i, 0, 0) = &
-                    (((q_prim_vf(E_idx)%sf(i, 0, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                    rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, 0, 0))
-                !END IF
-                !ELSE IF (model_eqns == 2) THEN
-                !can manually adjust density here
-                !q_prim_vf(1)%sf(i,0,0) = q_prim_vf(1)%sf(i,0,0) * &
-                !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0)/(2.d0*0.005d0)) )
-                !END IF
+                @:analytical()
+                
             end if
         end do
 
@@ -911,7 +882,7 @@ contains
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(kind(0d0)) :: l, U0 !< Taylor Green Vortex parameters
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j, k !< generic loop iterators
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -953,75 +924,7 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                    !what variables to alter
-                    !x-y bump in pressure
-                    !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                            !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0)/(2.d0*0.005d0)))
-
-                    !x-bump
-                    !q_prim_vf(E_idx)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)* &
-                    !(1d0 + 0.2d0*dexp(-1d0*((x_cb(i) - x_centroid)**2.d0)/(2.d0*0.005d0)))
-
-                    !bump in void fraction
-                    !q_prim_vf(adv_idx%beg)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * &
-                    !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                    !bump in R(x)
-                    !q_prim_vf(adv_idx%end+1)%sf(i,j,0) = q_prim_vf(adv_idx%end+1)%sf(i,j,0) * &
-                    !    ( 1d0 + 0.2d0*exp(-1d0*((x_cb(i)-x_centroid)**2.d0 + (y_cb(j)-y_centroid)**2.d0)/(2.d0*0.005d0)) )
-
-                    !reassign density
-                    !q_prim_vf(1)%sf(i, j, 0) = &
-                    !(((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                    !rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
-
-                    ! ================================================================================
-
-                    ! Sinusoidal initial condition for all flow variables =============================
-
-                    ! Cell-center values
-    !                        a = 0d0
-    !                        b = 0d0
-    !                        c = 0d0
-    !                        d = 0d0
-    !                        q_prim_vf(adv_idx%beg)%sf(i,j,0) = SIN(x_cc(i)) * SIN(y_cc(j))
-    !                        q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
-    !                        q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
-    !                        q_prim_vf(mom_idx%beg)%sf(i,j,0) = SIN(x_cc(i))
-    !                        q_prim_vf(mom_idx%end)%sf(i,j,0) = SIN(y_cc(j))
-    !                        q_prim_vf(E_idx)%sf(i,j,0) = 1d0
-
-                    ! Cell-average values
-    !                       a = x_cc(i) - 5d-1*dx ! x-beg
-    !                       b = x_cc(i) + 5d-1*dx ! x-end
-    !                       c = y_cc(j) - 5d-1*dy ! y-beg
-    !                       d = y_cc(j) + 5d-1*dy ! y-end
-    !                       q_prim_vf(adv_idx%beg)%sf(i,j,0) = 1d0/((b-a)*(d-c)) * &
-    !                               (COS(a)*COS(c) - COS(a)*COS(d) - COS(b)*COS(c) + COS(b)*COS(d))
-    !                       q_prim_vf(1)%sf(i,j,0) = q_prim_vf(adv_idx%beg)%sf(i,j,0) * 1d0
-    !                       q_prim_vf(cont_idx%end)%sf(i,j,0) = (1d0 - q_prim_vf(adv_idx%beg)%sf(i,j,0)) * 1d0
-    !                       q_prim_vf(mom_idx%beg)%sf(i,j,0) = (COS(a) - COS(b))/(b-a)
-    !                       q_prim_vf(mom_idx%end)%sf(i,j,0) = (COS(c) - COS(d))/(d-c)
-    !                       q_prim_vf(E_idx)%sf(i,j,0) = 1d0
-                    ! ================================================================================
-                   
-                    ! Initial pressure profile smearing for bubble collapse case of Tiwari (2013) ====
-                    !IF((       (x_cc(i))**2                     &
-                    !         + (y_cc(j))**2 <= 1d0**2)) THEN
-                    !         q_prim_vf(E_idx)%sf(i,j,0) = 1d5 / 25d0
-                    !ELSE
-                    !    q_prim_vf(E_idx)%sf(i,j,0) = 1d5 + 1d0/SQRT(x_cc(i)**2+y_cc(j)**2) &
-                    !                                    * ((1d5/25d0) - 1d5)
-                    !END IF
-                    ! ================================================================================
-
-                    ! Taylor Green Vortex===============================================
-                    ! q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/l)*COS(y_cc(j)/l)
-                    ! q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/l)*SIN(y_cc(j)/l)
-                    ! q_prim_vf(E_idx        )%sf(i,j,0) = 100000d0 + (COS(2*x_cc(i))/l + COS(2*y_cc(j))/l)* &
-                    !                                         (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
-                    ! ================================================================================
-
+                    @:analytical()
                 end if
             end do
         end do
@@ -1095,54 +998,7 @@ contains
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                        !gaussian ball
-                        !what variables to alter
-                        !bump in pressure
-                        q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)* &
-                                                    (1d0 + 0.2d0*exp(-1d0* &
-                                                                        ((x_cb(i) - x_centroid)**2.d0 + &
-                                                                        (y_cb(j) - y_centroid)**2.d0 + &
-                                                                        (z_cb(k) - z_centroid)**2.d0) &
-                                                                        /(2.d0*0.5d0)))
-
-                        !bump in void fraction
-                        !                       q_prim_vf(adv_idx%beg)%sf(i, j, k) = q_prim_vf(adv_idx%beg)%sf(i, j, k)* &
-                        !                                                           (1d0 + 0.2d0*exp(-1d0* &
-                        !                                                                           ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-                        !                                                                          /(2.d0*0.005d0)))
-
-                        !bump in R(x)
-                        !       q_prim_vf(adv_idx%end + 1)%sf(i, j, k) = q_prim_vf(adv_idx%end + 1)%sf(i, j, k)* &
-                        !                                               (1d0 + 0.2d0*exp(-1d0* &
-                        !                                                                               ((x_cb(i) - x_centroid)**2.d0 + (y_cb(j) - y_centroid)**2.d0 + (z_cb(k) - z_centroid)**2.d0) &
-    !                                                                                  /(2.d0*0.005d0)))
-
-                        !reassign density
-                        !         q_prim_vf(1)%sf(i, j, k) = &
-                        !             (((q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
-                        !            rhoref*(1d0 - q_prim_vf(E_idx + 1)%sf(i, j, k))
-
-                        ! ================================================================================
-
-                        ! Constant x-velocity in cylindrical grid ========================================
-    !                        q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-    !                        q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-    !                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-    !                        q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = COS(z_cc(k))
-    !                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = -SIN(z_cc(k))
-    !                        q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
-    !                        q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
-                        ! ================================================================================
-
-                        ! Couette flow in cylindrical grid ===============================================
-                        !q_prim_vf(cont_idx%beg )%sf(i,j,k) = 1d0
-                        !q_prim_vf(cont_idx%end )%sf(i,j,k) = 0d0
-                        !q_prim_vf(mom_idx%beg  )%sf(i,j,k) = 0d0
-                        !q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = y_cc(j)*COS(z_cc(k))*SIN(z_cc(k))
-                        !q_prim_vf(mom_idx%end  )%sf(i,j,k) = -y_cc(j)*SIN(z_cc(k))**2
-                        !q_prim_vf(E_idx        )%sf(i,j,k) = 1d0
-                        !q_prim_vf(adv_idx%beg  )%sf(i,j,k) = 1d0
-                        ! ================================================================================
+                        @:analytical()
 
                     end if
 
@@ -1353,25 +1209,9 @@ contains
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
 
+                        
+                        @:analytical()
                     end if
-
-                    ! Initialization of the pressure field that corresponds to the bubble-collapse
-                    !! test case found in Tiwari et al. (2013)
-                    ! radius_pressure = SQRT(x_cc(i)**2) ! 1D
-                    ! radius_pressure = SQRT(x_cc(i)**2 + cart_y**2) ! 2D
-                    ! radius_pressure = SQRT(x_cc(i)**2 + cart_y**2 + cart_z**2) ! 3D
-                    ! pressure_bubble = 1.E+04
-                    ! pressure_inf    = 1.E+05
-                    ! q_prim_vf(E_idx)%sf(i,j,k) = pressure_inf + radius / radius_pressure * (pressure_bubble - pressure_inf)
-                    !
-                    ! IF(       ((  x_cc(i) - x_centroid)**2                    &
-                    !          + (   cart_y - y_centroid)**2                    &
-                    !          + (   cart_z - z_centroid)**2) <= radius**2)   &
-                    !                               THEN
-                    !
-                    !    q_prim_vf(E_idx)%sf(i,j,k) = pressure_bubble
-                    !
-                    ! END IF
 
                 end do
             end do
@@ -1446,6 +1286,8 @@ contains
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
+                        
+                        @:analytical()
 
                     end if
                 end do
@@ -1559,6 +1401,8 @@ contains
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
+                                        
+                        @:analytical()
 
                     end if
 
@@ -1635,6 +1479,8 @@ contains
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
+                                                
+                        @:analytical()
 
                     end if
 
