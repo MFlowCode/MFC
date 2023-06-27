@@ -13,5 +13,8 @@
 
 cd $SLURM_SUBMIT_DIR                            # Change to working directory
 echo $(pwd)
+
+nvidia-smi
+
 . ./mfc.sh load -c p -m gpu
 ./mfc.sh test -b mpirun -a --gpu
