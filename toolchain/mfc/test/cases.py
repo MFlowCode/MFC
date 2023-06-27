@@ -339,6 +339,49 @@ def generate_cases() -> typing.List[TestCase]:
                 for i in range(2):
                     stack.pop()
 
+    def alter_viscosity(dimInfo, dimParams):
+            # Viscosity & bubbles checks
+            if len(dimInfo[0]) > 0:
+                stack.push(f"Viscosity -> Bubbles", 
+                    {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T'})
+
+                stack.push(f'', {
+                    'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
+                    'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
+                    'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
+                    'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,
+                    'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05,
+                    'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)': 4e-02,
+                    'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
+                    'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
+                    'patch_icpp(3)%pres': 1.0
+                })
+
+                for polytropic in ['T', 'F']:
+                    stack.push(f"Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
+
+                    for bubble_model in [3, 2]:
+                        stack.push(f"bubble_model={bubble_model}", {'bubble_model' : bubble_model})
+
+                        if not (polytropic == 'F' and bubble_model == 3):
+                            cases.append(create_case(stack, '', {}))
+
+                        stack.pop()
+
+                    stack.pop()
+
+                stack.push('', {'polytropic': 'T', 'bubble_model': 2})
+                cases.append(create_case(stack, 'nb=1', {'nb': 1}))
+
+                stack.push(f"QBMM", {'qbmm': 'T'})
+                cases.append(create_case(stack, '', {}))
+
+                stack.push('bubble_model=3', {'bubble_model': 3})
+                cases.append(create_case(stack, '', {}))
+
+                for i in range(5):
+                    stack.pop()
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
@@ -353,6 +396,7 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_bubbles(dimInfo, dimParams)
             alter_hypoelasticity(dimInfo, dimParams)
+            alter_viscosity(dimInfo, dimParams)
             stack.pop()
             stack.pop()
         
