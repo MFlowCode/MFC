@@ -2,6 +2,7 @@
 #SBATCH -Jshb-test-jobs                         # Job name
 #SBATCH --account=gts-sbryngelson3               # charge account
 #SBATCH -N1                                     # Number of nodes and cores per node required
+#SBATCH --gres=gpu:V100:2
 #SBATCH -CV100-16GB
 #SBATCH -G2
 #SBATCH --tasks-per-node=2
