@@ -135,6 +135,7 @@ for fl_id in range(1,10+1):
     for attribute in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0"]:
         POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
 
+ALL = list(set(PRE_PROCESS + SIMULATION + POST_PROCESS))
 
 CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 

@@ -133,8 +133,10 @@ def handle_case(test: TestCase):
         else:
             tol = 1e-12
 
-        test.create_directory("case_pre_sim")
-        cmd = test.run("case_pre_sim", ["pre_process", "simulation"])
+        test.delete_output()
+        test.create_directory()
+        
+        cmd = test.run(["pre_process", "simulation"])
 
         out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
 
@@ -153,35 +155,22 @@ def handle_case(test: TestCase):
             pack.save(golden_filepath)
         else:
             if not os.path.isfile(golden_filepath):
-                raise MFCException(f"Test {test}: Golden file doesn't exist! To generate golden files, use the '-g' flag.")
+                raise MFCException(f"Test {test}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
 
-            packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
+            golden = packer.load(golden_filepath)
+
+            if ARG("add_new_variables"):
+                for pfilepath, pentry in pack.entries.items():
+                    if golden.find(pfilepath) is None:
+                        golden.set(pentry)
+
+                golden.save(golden_filepath)
+            else:
+                packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
 
         if ARG("test_all"):
-            test.params.update({
-                'parallel_io'       : 'T',
-                'cons_vars_wrt'     : 'T',
-                'prim_vars_wrt'     : 'T',
-                'alpha_rho_wrt(1)'  : 'T',
-                'rho_wrt'           : 'T',
-                'mom_wrt(1)'        : 'T',
-                'vel_wrt(1)'        : 'T',
-                'E_wrt'             : 'T',
-                'pres_wrt'          : 'T',
-                'alpha_wrt(1)'      : 'T',
-                'gamma_wrt'         : 'T',
-                'heat_ratio_wrt'    : 'T',
-                'pi_inf_wrt'        : 'T',
-                'pres_inf_wrt'      : 'T',
-                'c_wrt'             : 'T',
-            })
-            
-            if test.params['p'] != 0:
-                test.params['omega_wrt'] = 'T'
-                test.params['fd_order'] = 1            
-            
-            test.create_directory("case_post")
-            cmd = test.run("case_post", ["pre_process", "simulation", "post_process"])
+            test.delete_output()
+            cmd = test.run(["pre_process", "simulation", "post_process"])
             out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
@@ -208,6 +197,8 @@ def handle_case(test: TestCase):
 
                 if "inf," in output:
                     raise MFCException(f"""Test {test}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+
+        test.delete_output()
 
         cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
 
