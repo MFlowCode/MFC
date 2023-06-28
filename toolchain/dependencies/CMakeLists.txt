@@ -62,8 +62,8 @@ endif()
 # SILO
 if (MFC_SILO)
     ExternalProject_Add(silo
-        GIT_REPOSITORY "https://github.com/LLNL/Silo"
-        GIT_TAG        aabfbf23258f6972e1f8910722e5c938463bb47c
+        GIT_REPOSITORY "https://github.com/henryleberre/Silo"
+        GIT_TAG        964d993039b467e3d472d3a70afd03380fe2c320
         GIT_SHALLOW    ON
         GIT_PROGRESS   ON
         CMAKE_ARGS     -DSILO_ENABLE_SHARED=OFF
