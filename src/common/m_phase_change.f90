@@ -6,6 +6,8 @@
 !> equilibrium 
 module m_phase_change
 
+#ifndef MFC_POST_PROCESS
+
     ! Dependencies =============================================================
 
     use m_derived_types        !< Definitions of the derived types
@@ -30,8 +32,9 @@ module m_phase_change
                        s_infinite_p_relaxation_k,       &
                        s_infinite_pt_relaxation,        &
                        s_infinite_relaxation_k,         &
-                       s_infinite_ptg_relaxation
-
+                       s_infinite_ptg_relaxation,       &
+                       s_finalize_relaxation_solver_module
+                       
     !> @name Abstract interface for creating function pointers
     !> @{
     ABSTRACT INTERFACE
@@ -694,12 +697,6 @@ module m_phase_change
                             ! calculating Saturation temperature
                             CALL s_TSat(A, B, C, D, lp, pSSL, p_inf, TSatSL, TSSL, vp)
                             
-                            ! PRINT *, 'pT: pS', pS, 'TS', TS ,'j, k, l', j, k, l, 'palpha_eps', palpha_eps
-                            
-                            ! PRINT *, 'SL: pSSL', pSSL, 'TSSL', TSSL, 'TSatSL', TSatSL, 'j, k, l', j, k, l
-                            
-                            ! PRINT *, 'OV: pSOV', pSOV, 'TSOV', TSOV, 'TSatOV', TSatOV, 'j, k, l', j, k, l
-
                             ! Maybe I will have to change this for .GE. instead, since mass depletion can 
                             ! happen at pTg-eq. Make sure it works, first
                             IF ( TSOV .GT. TSatOV ) THEN
@@ -1048,7 +1045,6 @@ module m_phase_change
             ! Check whether I need to use both absolute and relative values
             ! for the residual, and how to do it adequately.
 
-            ! ptgalpha_eps
             DO WHILE ( ( DSQRT( R2D( 1 ) ** 2 + R2D( 2 ) ** 2 ) .GT. ptgalpha_eps ) & 
                     .OR. ( ns .EQ. 0 ) )
                             
@@ -2181,5 +2177,7 @@ module m_phase_change
            s_relaxation_solver => NULL()
 
         END SUBROUTINE
+
+#endif        
 
 END MODULE m_phase_change

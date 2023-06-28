@@ -382,8 +382,8 @@ contains
         precision = 2
         relax = .false.
         relax_model = dflt_int
-        palpha_eps = 1.0d-6
-        ptgalpha_eps = 1.0d-6
+        palpha_eps = 0.0d0
+        ptgalpha_eps = 0.0d0
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.

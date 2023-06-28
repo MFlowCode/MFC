@@ -246,8 +246,8 @@ contains
         model_eqns = dflt_int
         relax = .false.
         relax_model= dflt_int
-        palpha_eps = 1.0d-6
-        ptgalpha_eps = 1.0d-6
+        palpha_eps = 0.0d0
+        ptgalpha_eps = 0.0d0
         num_fluids = dflt_int
         adv_alphan = .false.
         weno_order = dflt_int
