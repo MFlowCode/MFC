@@ -91,7 +91,6 @@ contains
             call s_mpi_abort('hypoelasticity requires model_eqns = 2'// &
                 'exiting ...')
         end if
-        
         ! phase change checkers. 1st, check if it is activated
         if ( relax ) then
             ! 2nd, checking if the correct equation model is chosen
