@@ -7,8 +7,7 @@ COMMON = [
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse", "file_per_process", "relax", "relax_model",
-    "palpha_eps", "ptgalpha_eps"
+    "Ca", "polydisperse", "relax", "relax_model"
 ]
 
 
