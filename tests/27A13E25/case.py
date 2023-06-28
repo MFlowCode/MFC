@@ -117,6 +117,6 @@ print(json.dumps({
     "fluid_pp(1)%Re(2)": 0.0001,
     "fluid_pp(2)%Re(1)": 0.0001,
     "fluid_pp(2)%Re(2)": 0.0001,
-    "weno_Re_flux": "F",
+    "weno_Re_flux": "T",
     "weno_avg": "T"
 }))

@@ -137,7 +137,7 @@ def generate_cases() -> typing.List[TestCase]:
                 cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
                 for weno_Re_flux in ['T']:
-                    stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'F'})
+                    stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
                     cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
                     stack.pop()
 
@@ -151,7 +151,7 @@ def generate_cases() -> typing.List[TestCase]:
                 cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
                 for weno_Re_flux in ['T']:
-                    stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'F'})
+                    stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
                     cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
                     stack.pop()
 
@@ -180,7 +180,7 @@ def generate_cases() -> typing.List[TestCase]:
         cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
         cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
         for weno_Re_flux in ['T']:
-            stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'F'})
+            stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
             cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
             stack.pop()
 
@@ -219,7 +219,7 @@ def generate_cases() -> typing.List[TestCase]:
         cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
         cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
         for weno_Re_flux in ['T']:
-            stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'F'})
+            stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
             cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
             stack.pop()
 
@@ -340,7 +340,7 @@ def generate_cases() -> typing.List[TestCase]:
                     stack.pop()
 
     def alter_viscosity(dimInfo, dimParams):
-            # Viscosity & bubbles checks
+        # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
             stack.push(f"Viscosity -> Bubbles", 
                 {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T'})
