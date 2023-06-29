@@ -1,8 +1,23 @@
 #!/usr/bin/env python3
+#
+# tests/2A6136EF/case.py:
+# 1D -> 2 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg
 
 import json
+import argparse
 
-print(json.dumps({
+parser = argparse.ArgumentParser(
+    prog="tests/2A6136EF/case.py",
+    description="tests/2A6136EF/case.py: 1D -> 2 Fluid(s) -> Viscous -> weno_Re_flux -> weno_avg",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+ 
+parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
+
+ARGS = vars(parser.parse_args())
+
+ARGS["dict"] = json.loads(ARGS["dict"])
+
+case = {
     "run_time_info": "T",
     "m": 299,
     "n": 0,
@@ -86,7 +101,7 @@ print(json.dumps({
     "patch_icpp(2)%length_x": 0.7,
     "patch_icpp(3)%x_centroid": 0.9,
     "patch_icpp(3)%length_x": 0.2,
-    "patch_icpp(1)%vel(1)": 0.0,
+    "patch_icpp(1)%vel(1)": 1.0,
     "patch_icpp(2)%geometry": 1,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(3)%geometry": 1,
@@ -105,4 +120,23 @@ print(json.dumps({
     "fluid_pp(2)%Re(2)": 0.001,
     "weno_Re_flux": "T",
     "weno_avg": "T"
-}))
+}
+mods = {}
+
+if "post_process" in ARGS["dict"]["targets"]:
+    mods = {
+        'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
+        'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
+        'rho_wrt'      : 'T', 'mom_wrt(1)'      : 'T',
+        'vel_wrt(1)'   : 'T', 'E_wrt'           : 'T',
+        'pres_wrt'     : 'T', 'alpha_wrt(1)'    : 'T',
+        'gamma_wrt'    : 'T', 'heat_ratio_wrt'  : 'T',
+        'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
+        'c_wrt'        : 'T',
+    }
+        
+    if case['p'] != 0:
+        mods['fd_order']  = 1
+        mods['omega_wrt'] = 'T'
+
+print(json.dumps({**case, **mods}))

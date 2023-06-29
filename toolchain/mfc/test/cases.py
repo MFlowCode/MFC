@@ -132,7 +132,7 @@ def generate_cases() -> typing.List[TestCase]:
 
             if num_fluids == 1:
                 stack.push(f"Viscous", {
-                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11})
+                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0})
 
                 cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -146,7 +146,8 @@ def generate_cases() -> typing.List[TestCase]:
             if num_fluids == 2:
                 stack.push(f"Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
-                    'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11}) 
+                    'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
+                    'patch_icpp(1)%vel(1)': 1.0}) 
 
                 cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -167,7 +168,7 @@ def generate_cases() -> typing.List[TestCase]:
             'patch_icpp(1)%alpha(1)':     0.9,    'patch_icpp(1)%alpha_rho(2)': 0.19, 'patch_icpp(1)%alpha(2)':     0.1,
             'patch_icpp(2)%alpha_rho(1)': 0.25,   'patch_icpp(2)%alpha(1)':     0.5,  'patch_icpp(2)%alpha_rho(2)': 0.25,
             'patch_icpp(2)%alpha(2)':     0.5,    'patch_icpp(3)%alpha_rho(1)': 0.08, 'patch_icpp(3)%alpha(1)':     0.2,
-            'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8
+            'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8,  'patch_icpp(1)%vel(1)' :0.0
         })
 
         cases.append(create_case(stack, "model_eqns=2", {'model_eqns': 2}))
@@ -200,7 +201,7 @@ def generate_cases() -> typing.List[TestCase]:
             'patch_icpp(2)%length_y' : -1E+6, 'patch_icpp(2)%length_z' : -1E+6, 
             'patch_icpp(3)%geometry': 10, 'patch_icpp(3)%x_centroid' : 4.5, 'patch_icpp(3)%y_centroid' : 0.E+00,
             'patch_icpp(3)%z_centroid' : 0.E+00, 'patch_icpp(3)%radius' : 1.0, 'patch_icpp(3)%length_x' : 1.0,
-            'patch_icpp(3)%length_y' : -1E+6, 'patch_icpp(3)%length_z' : -1E+6,
+            'patch_icpp(3)%length_y' : -1E+6, 'patch_icpp(3)%length_z' : -1E+6, 'patch_icpp(1)%vel(1)' :0.0,
              'num_fluids' : 2,
             'fluid_pp(2)%gamma':          2.5,    'fluid_pp(2)%pi_inf':         0.0,  'patch_icpp(1)%alpha_rho(1)': 0.81,
             'patch_icpp(1)%alpha(1)':     0.9,    'patch_icpp(1)%alpha_rho(2)': 0.19, 'patch_icpp(1)%alpha(2)':     0.1,
@@ -214,7 +215,7 @@ def generate_cases() -> typing.List[TestCase]:
         stack.push(f"Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
             'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11
-        }) 
+            }) 
 
         cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
         cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
