@@ -101,7 +101,7 @@ case = {
     "patch_icpp(2)%length_x": 0.7,
     "patch_icpp(3)%x_centroid": 0.9,
     "patch_icpp(3)%length_x": 0.2,
-    "patch_icpp(1)%vel(1)": 0.0,
+    "patch_icpp(1)%vel(1)": 1.0,
     "patch_icpp(2)%geometry": 1,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(3)%geometry": 1,
