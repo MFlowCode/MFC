@@ -94,7 +94,8 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        #        add_compile_options(-e D "SHELL:-h func_trace")
+       add_compile_options(-gheterogeneous-dwarf -G2)
+       add_link_options(-gheterogeneous-dwarf -G2)
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
