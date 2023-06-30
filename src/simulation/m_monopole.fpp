@@ -103,7 +103,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
         real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
-
+        real(kind(0d0)), pointer :: loc_mono_ptr(:)
 
         integer :: ndirs
         
@@ -127,7 +127,7 @@ contains
             end do
 
 
-!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, loc_mono_ptr)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -187,15 +187,15 @@ contains
 
                                 angle = 0.d0
                                 angle_z = 0.d0
-
+                                loc_mono_ptr => loc_mono(:,q)
                                 s2 = f_g(the_time, sound, const_sos, q, term_index)* &
-                                        f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
-                                !s2 = 1d0
+                                        f_delta(j, k, l, loc_mono_ptr, length(q), q, angle, angle_z)
+                                
 
                                 if (support(q) == 5) then
                                     term_index = 1
                                     s1 = f_g(the_time, sound, const_sos, q, term_index)* &
-                                            f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                                            f_delta(j, k, l, loc_mono_ptr, length(q), q, angle, angle_z)
                                 end if
 
                                 mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
@@ -330,7 +330,8 @@ contains
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 !$acc routine seq
-         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
+!DIR$ INLINEALWAYS f_delta
+        real(kind(0d0)), dimension(:), pointer, intent(in) :: mono_loc
         integer, intent(IN) :: nm
         real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l
