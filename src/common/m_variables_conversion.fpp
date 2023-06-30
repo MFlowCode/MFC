@@ -76,7 +76,6 @@ module m_variables_conversion
     end interface ! ============================================================
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
-    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
 
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
@@ -540,7 +539,6 @@ contains
        end if
 #endif
 
-        !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
         @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
         @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
