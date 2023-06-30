@@ -38,7 +38,7 @@ module m_qbmm
         integer :: nterms
     #:endif
 
-    type(int_bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
 
 #ifdef _CRAYFTN
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
