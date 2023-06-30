@@ -691,7 +691,7 @@ contains
         else
             allocate(nRtmp(0))
         endif
-
+#ifndef _CRAYFTN
         !$acc parallel loop collapse(3) gang vector &
         !$acc& present(qK_cons_vf, qK_prim_vf, gm_alphaK_vf, bubrs, ix, iy, iz) &
         !$acc& private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
@@ -801,7 +801,201 @@ contains
             end do
         end do
         !$acc end parallel loop
+#else
+if (bubbles) then
+    !$acc parallel loop collapse(3) gang vector &
+    !$acc& present(qK_cons_vf, qK_prim_vf, gm_alphaK_vf, ix, iy, iz) attach(bubrs) &
+    !$acc& private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
+    do l = izb, ize
+        do k = iyb, iye
+            do j = ixb, ixe
+                dyn_pres_K = 0d0
 
+                !$acc loop seq
+                do i = 1, num_fluids
+                    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                end do
+
+                do i = 1, contxe
+                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                end do
+
+                if (model_eqns /= 4) then
+#ifdef MFC_SIMULATION
+
+                call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, &
+                                                    alpha_K, alpha_rho_K, j, k, l)
+#else
+                ! If pre-processing, use non acc mixture subroutines
+                if (hypoelasticity) then
+                    call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                            rho_K, gamma_K, pi_inf_K, Re_K, G_K, fluid_pp(:)%G)
+                else
+                    call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                            rho_K, gamma_K, pi_inf_K)
+                end if
+#endif
+                end if
+
+#ifdef MFC_SIMULATION
+                rho_K = max(rho_K, sgm_eps)
+#endif
+
+                !$acc loop seq
+                do i = momxb, momxe
+                    if (model_eqns /= 4) then
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                   /rho_K
+                        dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
+                                     *qK_prim_vf(i)%sf(j, k, l)
+                    else
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                    /qK_cons_vf(1)%sf(j, k, l)
+                    end if
+                end do
+
+                call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
+                                        qK_cons_vf(alf_idx)%sf(j, k, l), &
+                                        dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
+
+                qK_prim_vf(E_idx)%sf(j, k, l) = pres
+
+                    !$acc loop seq
+                    do i = 1, nb
+                        nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
+                    end do
+
+                    vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
+
+                    call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                    
+                    !$acc loop seq
+                    do i = bubxb, bubxe
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                    end do
+
+                if (hypoelasticity) then
+                    !$acc loop seq
+                    do i = strxb, strxe
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                    /rho_K
+                        ! subtracting elastic contribution for pressure calculation
+                        if (G_K > 1000) then !TODO: check if stable for >0
+                            qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                            ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                            ! extra terms in 2 and 3D
+                            if ((i == strxb + 1) .or. &
+                                (i == strxb + 3) .or. &
+                                (i == strxb + 4)) then
+                                qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                            end if
+                        end if
+                    end do
+                end if
+
+                do i = advxb, advxe
+                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                end do
+            end do
+        end do
+    end do
+    !$acc end parallel loop
+    else
+    !$acc parallel loop collapse(3) gang vector &
+    !$acc& present(qK_cons_vf, qK_prim_vf, gm_alphaK_vf, bubrs, ix, iy, iz) &
+    !$acc& private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
+    do l = izb, ize
+        do k = iyb, iye
+            do j = ixb, ixe
+                dyn_pres_K = 0d0
+
+                !$acc loop seq
+                do i = 1, num_fluids
+                    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                end do
+
+                do i = 1, contxe
+                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                end do
+
+                if (model_eqns /= 4) then
+#ifdef MFC_SIMULATION
+                    ! If in simulation, use acc mixture subroutines
+                    if (hypoelasticity) then
+                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, &
+                                                                        alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                    else 
+                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, &
+                                                                            alpha_K, alpha_rho_K, Re_K, j, k, l)
+                    end if
+#else
+                ! If pre-processing, use non acc mixture subroutines
+                    if (hypoelasticity) then
+                        call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                            rho_K, gamma_K, pi_inf_K, Re_K, G_K, fluid_pp(:)%G)
+                    else
+                        call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                            rho_K, gamma_K, pi_inf_K)
+                    end if
+#endif
+                end if
+
+#ifdef MFC_SIMULATION
+                rho_K = max(rho_K, sgm_eps)
+#endif
+
+                !$acc loop seq
+                do i = momxb, momxe
+                    if (model_eqns /= 4) then
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                   /rho_K
+                        dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
+                                     *qK_prim_vf(i)%sf(j, k, l)
+                    else
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                    /qK_cons_vf(1)%sf(j, k, l)
+                    end if
+                end do
+
+                call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
+                                        qK_cons_vf(alf_idx)%sf(j, k, l), &
+                                        dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
+
+                qK_prim_vf(E_idx)%sf(j, k, l) = pres
+
+
+                if (hypoelasticity) then
+                    !$acc loop seq
+                    do i = strxb, strxe
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                    /rho_K
+                        ! subtracting elastic contribution for pressure calculation
+                        if (G_K > 1000) then !TODO: check if stable for >0
+                            qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                            ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                            ! extra terms in 2 and 3D
+                            if ((i == strxb + 1) .or. &
+                                (i == strxb + 3) .or. &
+                                (i == strxb + 4)) then
+                                qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                            end if
+                        end if
+                    end do
+                end if
+
+                do i = advxb, advxe
+                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                end do
+            end do
+        end do
+    end do
+    !$acc end parallel loop
+    endif
+#endif
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
     !>  The following procedure handles the conversion between
