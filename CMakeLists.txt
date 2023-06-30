@@ -91,6 +91,8 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
         "SHELL:-h nomessage=296:878:1391:1069"
         "SHELL:-h msgs" "SHELL:-h static" "SHELL:-h keepfiles"
+        "SHELL:-h acc_model=auto_async_none"
+        "SHELL: -h acc_model=no_fast_addr"
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
