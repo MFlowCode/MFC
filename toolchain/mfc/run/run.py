@@ -45,9 +45,13 @@ Engine        (-e)  {ARG('engine')}
 
     validate_job_options()
 
-    cons.print("Generating input files...")
     for name in ARG("targets"):
+        cons.print(f"Generating input files for [magenta]{name}[/magenta]...")
+        cons.indent()
+        cons.print()
         input_file.generate(name)
+        cons.print()
+        cons.unindent()
 
     build.build_targets(targets)
 

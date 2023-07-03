@@ -490,7 +490,7 @@ contains
         is1 = is1_d
         is2 = is2_d
         is3 = is3_d
-
+        
 !$acc update device(is1, is2, is3)
 
         if (weno_order /= 1) then
@@ -539,7 +539,6 @@ contains
                 end do
 !$acc end parallel loop
             end if
-
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
@@ -706,8 +705,6 @@ contains
             #:endfor
         end if
 
-        
-
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,
@@ -754,7 +751,6 @@ contains
             end do
 !$acc end parallel loop
         end if
-
         ! ==================================================================
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction ===

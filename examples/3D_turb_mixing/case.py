@@ -22,9 +22,9 @@ Ly = 59.0
 Lz = 59.0
 
 # Number of grid cells
-Nx = 255
-Ny = 255
-Nz = 255
+Nx = 191
+Ny = 191
+Nz = 191
 
 # Grid spacing
 dx      = Lx/float(Nx)
@@ -75,7 +75,6 @@ print(json.dumps({
     'num_fluids'                    : 1,
     'adv_alphan'                    : 'T',
     'time_stepper'                  : 3,
-    'weno_vars'                     : 2,
     'weno_order'                    : 5,
     'weno_eps'                      : 1.E-16,
     'weno_Re_flux'                  : 'T',

@@ -29,7 +29,7 @@ $ python3 my_case_file.py
 
 This is particularly useful when computations are done in Python to generate the case.
 
-## (Optional) Accepting command line arguments (from `mfc.sh run`)
+## (Optional) Accepting command line arguments
 
 Input files can accept **positional** command line arguments, forwarded by `mfc.sh run`.
 Consider this example from the 3D_weak_scaling case:
@@ -54,6 +54,18 @@ state. It contains all the runtime information you might want from the build/run
 We hide it from the help menu with `help=argparse.SUPPRESS` since it is not meant
 to be passed in by users. You can add as many additional positional arguments as
 you may need.
+
+To run such a case, use the following format:
+
+```console
+./mfc.sh run <path/to/case.py> <positional arguments> <regular mfc.sh run arguments>
+```
+
+For example, to run the 3D_weak_scaling case with `gbpp=2`:
+
+```console
+./mfc.sh run examples/3D_weak_scaling/case.py 2 -t pre_process -j 8
+```
 
 ## Parameters
 
@@ -127,26 +139,65 @@ the grid stretching funciton is applied and has a default value of one.
 
 ### 3. Patches
 
-| Parameter           | Type    | Description                                                  |
-| ---:                | :----:  |          :---                                                |
-| `num_patches`       | Integer | Number of initial condition geometric patches.               |
-| `num_fluids`	      | Integer | Number of fluids/components present in the flow.             |
-| `geometry` *        | Integer | Geometry configuration of the patch.                         |
-| `alter_patch(i)` *  | Logical | Alter the $i$-th patch.                                      |
-| `x[y,z]_centroid` * | Real    | Centroid of the applied geometry in the $[x,y,z]$-direction. |
-| `length_x[y,z]` *   | Real    | Length, if applicable, in the $[x,y,z]$-direction.           |
-| `radius` *          | Real	   | Radius, if applicable, of the applied geometry.              |
-| `smoothen` *        | Logical | Smoothen the applied patch.                                  |
-| `smooth_patch_id` * | Integer | A patch with which the applied patch is smoothened.          |
-| `smooth_coeff` *    | Real    | Smoothen coefficient.                                        |
-| `alpha(i)` *        | Real    | Volume fraction of fluid $i$.                                |
-| `alpha_rho(i)` *    | Real    | Partial density of fluid $i$.                                |
-| `pres` *            | Real    | Pressure.                                                    |
-| `vel(i)` *          | Real    | Velocity in direction $i$.                                   |
+| Parameter           | Type    | Analytical Definition | Description                                                  |
+| ---:                | :----:  | :----:                | :---                                                         |
+| `num_patches`       | Integer | Not Supported         | Number of initial condition geometric patches.               |
+| `num_fluids`	      | Integer | Not Supported         | Number of fluids/components present in the flow.             |
+| `geometry` *        | Integer | Not Supported         | Geometry configuration of the patch.                         |
+| `alter_patch(i)` *  | Logical | Not Supported         | Alter the $i$-th patch.                                      |
+| `x[y,z]_centroid` * | Real    | Not Supported         | Centroid of the applied geometry in the $[x,y,z]$-direction. |
+| `length_x[y,z]` *   | Real    | Not Supported         | Length, if applicable, in the $[x,y,z]$-direction.           |
+| `radius` *          | Real    | Not Supported         | Radius, if applicable, of the applied geometry.              |
+| `smoothen` *        | Logical | Not Supported         | Smoothen the applied patch.                                  |
+| `smooth_patch_id` * | Integer | Not Supported         | A patch with which the applied patch is smoothened.          |
+| `smooth_coeff` *    | Real    | Not Supported         | Smoothen coefficient.                                        |
+| `alpha(i)` *        | Real    | Supported             | Volume fraction of fluid $i$.                                |
+| `alpha_rho(i)` *    | Real    | Supported             | Partial density of fluid $i$.                                |
+| `pres` *            | Real    | Supported             | Pressure.                                                    |
+| `vel(i)` *          | Real    | Supported             | Velocity in direction $i$.                                   |
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
 
 The Table lists the patch parameters. The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition. Note that the domain must be fully filled with patche(s). The code outputs error messages when an empty region is left in the domain.
+
+#### Analytical Definition of Primitive Variables
+
+Some parameters, as described above, can be defined by analytical functions in the input file. For example, one can define the following patch:
+
+```json
+'patch_icpp(2)%geometry'    : 15,
+'patch_icpp(2)%x_centroid'  : 0.25,
+'patch_icpp(2)%length_x'    : 9.5,
+'patch_icpp(2)%vel(1)'      : 0.,
+'patch_icpp(2)%pres'        : 1.,
+'patch_icpp(2)%alpha_rho(1)': '1 + 0.1*sin(20*x*pi)',
+'patch_icpp(2)%alpha(1)'    : 1.,
+```
+
+where `alpha_rho` is defined with the `1 + 0.1*sin(20*x*pi)` function. 
+
+The expressions are interpreted as Fortran code, in the execution context and scope of the function that defines the patch.
+Additionally, the following variables are made available as shorthand:
+
+| Shorthand | Expands To               | Shorthand | Expands To                | Shorthand | Expands To               |
+| --------- | ------------------------ | --------- | ------------------------- | --------- | ------------------------ |
+| `x`       | `x_cc(i)`                | `lx`      | The patch's `length_x`    | `xc`      | The patch's `x_centroid` |
+| `y`       | `y_cc(j)`                | `ly`      | The patch's `length_y`    | `yc`      | The patch's `y_centroid` |
+| `z`       | `z_cc(k)`                | `lz`      | The patch's `length_z`    | `zc`      | The patch's `z_centroid` |
+| `eps`     | The patch's `epsilon`    | `beta`    | The patch's `beta`        | `radii`   | The patch's `radii`      |
+| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi` and `e` | $\pi$ and $e$         |
+
+where $(i,j,k)$ are the grid-indices of the current cell in each coordinate direction.
+
+In the example above, the following code is generated:
+
+```f90
+if (patch_id == 2) then
+    q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
+end if
+```
+
+#### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain. The number has to be a positive integer.
 
@@ -358,7 +409,10 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `polytropic`   | Logical	| Polytropic gas compression |
 | `thermal` 		 | Integer	| Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
 | `R0ref` 			 | Real		  | Reference bubble radius |
+| `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0|
 | `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
+| `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
+| `R0_type` 	       | Integer 		|	Quadrature rule for probability density function of polydisperse bubble populations |
 | `Ca` 			     | Real		  | Cavitation number |
 | `Web` 			   | Real		  | Weber number |
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
@@ -369,6 +423,13 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `M_v` †     	 | Real 		| Molecular weight |
 | `mu_v` †	     | Real 		|	Viscosity |
 | `k_v` †	       | Real 		|	Thermal conductivity |
+| `qbmm` 	       | Logical 		|	Quadrature by  method of moments|
+| `dist_type` 	       | Integer 		|	Joint probability density function for bubble radius and velocity (only when qbmm is true)|
+| `sigR` 	       | Real 		|	Standard deviation for probability density function of bubble radius (only when qbmm is true) |
+| `sigV` 	       | Real 		|	Standard deviation for probability density function of bubble velocity (only when qbmm is true) |
+| `rhoRV`	       | Real 		|	Correlation coefficient for joint probability density function of bubble radius and velocity (only when qbmm is true) |
+
+
 
 These options work only for gas-liquid two component flows. Component indexes are required to be 1 for liquid and 2 for gas.
 
@@ -385,12 +446,18 @@ This table lists the ensemble-averaged bubble model parameters.
 - `polytropic` activates polytropic gas compression in the bubble.
 When `polytropic` is set `False`, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](references.md#Preston07)).
 
+- `polydisperse` activates polydispersity in the bubble model by means of a probability density function (PDF) of the equiliibrium bubble radius. 
+
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal` $=$ 1, 2, and 3 correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md#Preston07), respectively.
 
 - `R0ref` specifies the reference bubble radius.
 
-- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the bubble radius.
+- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibirum bubble radius.
+
+- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations. `R0_type` $=$ 1 corresponds to simpson's rule. 
+
+- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibirium bubble radius for polydisperse populations. 
 
 - `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
@@ -398,6 +465,16 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 `mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively. 
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
 Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
+
+- `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity. 
+
+- `dist_type` specifies the initial joint PDF of initial bubble radius and bubble velocity required in qbmm. `dist_type` $=$ 1  and 2 correspond to binormal and lognormal-normal distributions respectively. 
+
+- `sigR` specifies the standard deviation of the PDF of bubble radius required in qbmm.  
+
+- `sigV` specifies the standard deviation of the PDF of bubble velocity required in qbmm.  
+
+- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.  
 
 ### 9. Velocity Field Setup
 
