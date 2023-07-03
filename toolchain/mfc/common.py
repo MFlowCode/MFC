@@ -207,4 +207,15 @@ def get_loaded_modules() -> typing.List[str]:
     return [ l for l in subprocess.getoutput("module -t list").splitlines() if ' ' not in l ]
 
 
-
+def is_number(x: str) -> bool:
+    if x is None:
+        return False
+    
+    if isinstance(x, int) or isinstance(x, float):
+        return True
+    
+    try:
+        float(x)
+        return True
+    except ValueError:
+        return False

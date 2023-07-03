@@ -197,7 +197,7 @@ contains
                             n_tait = gammas(1)
                             B_tait = pi_infs(1)
                         end if
-
+                        
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = B_tait * (n_tait - 1d0) / n_tait
 

@@ -260,7 +260,7 @@ contains
                     end do
 
                     if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, j, k, l)
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, alpha, alpha_rho, Re, j, k, l)
                     end if
@@ -309,7 +309,7 @@ contains
                         if (any(Re_size > 0)) then
 
                             if (grid_geometry == 3) then
-                                vcfl_sf(j, k, l) = maxval(dt/Re) &
+                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
                                                    /min(dx(j), dy(k), fltr_dtheta)**2d0
 
                                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
@@ -317,7 +317,7 @@ contains
                                                      fltr_dtheta*(abs(vel(3)) + c)) &
                                                  /maxval(1d0/Re)
                             else
-                                vcfl_sf(j, k, l) = maxval(dt/Re) &
+                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
                                                    /min(dx(j), dy(k), dz(l))**2d0
 
                                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
@@ -332,10 +332,10 @@ contains
                         !2D
                         icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
                                                   dy(k)/(abs(vel(2)) + c))
-
+                        
                         if (any(Re_size > 0)) then
 
-                            vcfl_sf(j, k, l) = maxval(dt/Re)/min(dx(j), dy(k))**2d0
+                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/min(dx(j), dy(k))**2d0
 
                             Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                                  dy(k)*(abs(vel(2)) + c)) &
@@ -349,7 +349,7 @@ contains
 
                         if (any(Re_size > 0)) then
 
-                            vcfl_sf(j, k, l) = maxval(dt/Re)/dx(j)**2d0
+                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/dx(j)**2d0
 
                             Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1d0/Re)
 

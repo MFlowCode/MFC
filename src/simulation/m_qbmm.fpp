@@ -571,9 +571,7 @@ contains
                     if (bubble_model == 2) then
                         n_tait = gammas(1)
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
-                        B_tait = pi_infs(1)
                         B_tait = pi_infs(1)*(n_tait - 1) / n_tait
-
                         c = n_tait*(pres + B_tait) * (1d0 - alf) /(rho)
 
                         if (c > 0.d0) then

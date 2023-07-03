@@ -5,6 +5,7 @@
 - [Getting Started](getting-started.md)
 - [Testing MFC](testing.md)
 - [Case Files](case.md)
+- [Example Cases](examples.md)
 - [Running MFC](running.md)
 - [Flow Visualisation](visualisation.md)
 - [MFC's Authors](authors.md)
