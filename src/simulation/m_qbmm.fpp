@@ -427,7 +427,7 @@ contains
                         ! RPE
                         coeffs(1, i1, i2) = -1d0*i2*pres/rho
                         coeffs(2, i1, i2) = -3d0*i2/2d0
-                        coeffs(3, i1, i2) = i2*(pref)/rho
+                        coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
                         if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
                         if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
@@ -440,11 +440,11 @@ contains
                         coeffs(4, i1, i2) = -i2*pres/rho
                         coeffs(5, i1, i2) = -2d0*i2*pres/(c*rho)
                         coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
-                        coeffs(7, i1, i2) = i2*(pref )/rho
-                        coeffs(8, i1, i2) = 2d0*i2*(pref )/(c*rho)
-                        coeffs(9, i1, i2) = i2*(pref )/(c*c*rho)
-                        coeffs(10, i1, i2) = -3d0*i2*gam*(pref)/(c*rho)
-                        coeffs(11, i1, i2) = -3d0*i2*gam*(pref)/(c*c*rho)
+                        coeffs(7, i1, i2) = i2/rho
+                        coeffs(8, i1, i2) = 2d0*i2/(c*rho)
+                        coeffs(9, i1, i2) = i2/(c*c*rho)
+                        coeffs(10, i1, i2) = -3d0*i2*gam/(c*rho)
+                        coeffs(11, i1, i2) = -3d0*i2*gam/(c*c*rho)
                         coeffs(12, i1, i2) = i1
                         coeffs(13, i1, i2) = 0d0
                         coeffs(14, i1, i2) = 0d0
@@ -456,13 +456,13 @@ contains
                             coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
                             coeffs(21, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c*c)
-                            coeffs(22, i1, i2) = -i2*4d0*(pref )/(rho*rho*c)
-                            coeffs(23, i1, i2) = -i2*4d0*(pref )/(rho*rho*c*c)
+                            coeffs(22, i1, i2) = -i2*4d0/(rho*rho*c)
+                            coeffs(23, i1, i2) = -i2*4d0/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
                             if(Web /= dflt_real) then
                                 coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
                             end if
-                            coeffs(26, i1, i2) = -12d0*i2*gam*(pref)*Re_inv/(rho*rho*c*c)
+                            coeffs(26, i1, i2) = -12d0*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
                         coeffs(27, i1, i2) = 3d0*i2*gam*R_v*Tw / (c*rho)
                         coeffs(28, i1, i2) = 3d0*i2*gam*R_v*Tw / (c*c*rho)
@@ -494,7 +494,7 @@ contains
                         ! RPE
                         coeffs(1, i1, i2) = -1d0*i2*pres/rho
                         coeffs(2, i1, i2) = -3d0*i2/2d0
-                        coeffs(3, i1, i2) = i2*(pref - pv)/rho
+                        coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
                         if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
                         if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
@@ -507,11 +507,11 @@ contains
                         coeffs(4, i1, i2) = -i2*pres/rho
                         coeffs(5, i1, i2) = -2d0*i2*pres/(c*rho)
                         coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
-                        coeffs(7, i1, i2) = i2*(pref - pv)/rho
-                        coeffs(8, i1, i2) = 2d0*i2*(pref - pv)/(c*rho)
-                        coeffs(9, i1, i2) = i2*(pref - pv)/(c*c*rho)
-                        coeffs(10, i1, i2) = -3d0*i2*gam*(pref - pv)/(c*rho)
-                        coeffs(11, i1, i2) = -3d0*i2*gam*(pref - pv)/(c*c*rho)
+                        coeffs(7, i1, i2) = i2/rho
+                        coeffs(8, i1, i2) = 2d0*i2/(c*rho)
+                        coeffs(9, i1, i2) = i2/(c*c*rho)
+                        coeffs(10, i1, i2) = -3d0*i2*gam/(c*rho)
+                        coeffs(11, i1, i2) = -3d0*i2*gam/(c*c*rho)
                         coeffs(12, i1, i2) = i1
                         coeffs(13, i1, i2) = i2*(pv)/rho
                         coeffs(14, i1, i2) = 2d0*i2*(pv)/(c*rho)
@@ -523,13 +523,13 @@ contains
                             coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
                             coeffs(21, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c*c)
-                            coeffs(22, i1, i2) = -i2*4d0*(pref - pv)/(rho*rho*c)
-                            coeffs(23, i1, i2) = -i2*4d0*(pref - pv)/(rho*rho*c*c)
+                            coeffs(22, i1, i2) = -i2*4d0/(rho*rho*c)
+                            coeffs(23, i1, i2) = -i2*4d0/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
                             if(Web /= dflt_real) then
                                 coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
                             end if
-                            coeffs(26, i1, i2) = -12d0*i2*gam*(pref-pv)*Re_inv/(rho*rho*c*c)
+                            coeffs(26, i1, i2) = -12d0*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
                     end if
                 end if
@@ -549,8 +549,7 @@ contains
 
         real(kind(0d0)), dimension(nmom) :: moms, msum
         real(kind(0d0)), dimension(nb) :: Rvec
-        real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(nnode, nb) :: wght_pb, wght_mv, wght_ht, ht
+        real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht , ht 
         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
         real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
         real(kind(0d0)) :: start, finish
@@ -561,7 +560,7 @@ contains
         integer :: i1, i2
 
 
-!$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
+!$acc parallel loop collapse(3) gang vector default(present) private(moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht)
         do id3 = iz%beg, iz%end
             do id2 = iy%beg, iy%end
                 do id1 = ix%beg, ix%end
@@ -575,7 +574,7 @@ contains
                         B_tait = pi_infs(1)
                         B_tait = pi_infs(1)*(n_tait - 1) / n_tait
 
-                        c = n_tait*(pres + B_tait) /(rho * (1d0 - alf))
+                        c = n_tait*(pres + B_tait) * (1d0 - alf) /(rho)
 
                         if (c > 0.d0) then
                             c = DSQRT(c)
@@ -593,7 +592,6 @@ contains
 
                     ! SHB: Manually adjusted pressure here for no-coupling case
                     ! pres = 1d0/0.3d0
-
                     if (alf > small_alf) then
 
                         nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
@@ -612,17 +610,9 @@ contains
 
                             if(polytropic) then
                                  do j = 1, nnode
-                                    wght_pb(j, q) = wght(j, q) * (pb0(q) - pv) / (pref - pv)
+                                    wght_pb(j, q) = wght(j, q) * (pb0(q) - pv)
                                 end do                                
-                            end if
-
-                            if(id1 == 49) then
-                                print *, "MOMS", moms
-                                !print *, "pb", pb(id1, id2, id3, 1:4, q)
-                                !print *, "mv", mv(id1, id2, id3, 1:4, q)
-                            end if
-
-                            if(.not. polytropic) then
+                            else
                                 do j = 1, nnode
                                     chi_vw = 1.d0/(1.d0 + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1.d0))
                                     x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
@@ -637,15 +627,10 @@ contains
                                     grad_T = -Re_trans_T(q)*(T_bar - Tw)         
                                     ht(j, q) =  pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
 
-                                end do
-                            end if
-
-                            if(.not. polytropic) then
-                                 do j = 1, nnode
-                                    wght_pb(j, q) = wght(j, q) * (pb(id1, id2, id3, j, q)) / (pref)
+                                    wght_pb(j, q) = wght(j, q) * (pb(id1, id2, id3, j, q)) 
                                     wght_mv(j, q) = wght(j, q) * (rhs_mv(id1, id2, id3, j, q))
                                     wght_ht(j, q) = wght(j, q) * ht(j, q)
-                                end do
+                                end do                                
                             end if
 
                             r = 1
@@ -692,26 +677,37 @@ contains
                                 do j = 1, nnode
 
                                     drdt = msum(2)
-                                    if(j == 1 .or. j == 2) then
-                                        drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * -1d0
-                                    else
-                                        drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * 1d0
-                                    end if
-                                    drdt2 = drdt2 * (msum(3) - 2d0*moms(2) * msum(2))
 
+                                    if(moms(4) - moms(2)**2d0 > 0d0) then
+                                        if(j == 1 .or. j == 2) then
+                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * -1d0
+                                        else
+                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * 1d0
+                                        end if
+                                    else
+
+                                        if(j == 1 .or. j == 2) then
+                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * -1d0
+                                        else
+                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * 1d0
+                                        end if
+                                    end if
+
+                                    drdt2 = drdt2 * (msum(3) - 2d0*moms(2) * msum(2))                                   
                                     drdt = drdt + drdt2
 
                                     rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*drdt/ abscX(j, q)) * (pb(id1, id2, id3, j, q)) 
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q)  + (3d0 * gam / abscX(j, q)) * rhs_mv(id1, id2, id3, j, q) * R_v * Tw  
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q)  + (3d0 * gam / abscX(j, q)) * ht(j, q)
 
-                                    rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q) * (4d0 * pi * abscX(j, q) ** 2d0)                                               
+                                    rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q) * (4d0 * pi * abscX(j, q) ** 2d0)  
+                                           
                                 end do
                                         
-                            end if
-
-                            
+                            end if                            
                         end do
+
+
 
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
                         momsp(2)%sf(id1, id2, id3) = 4.d0*pi*nbub* f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0)
@@ -721,18 +717,13 @@ contains
                             momsp(4)%sf(id1, id2, id3) = 1.d0
                         else
                             if(polytropic) then
-                                momsp(4)%sf(id1, id2, id3) = (pref - pv)*f_quad(abscX, abscY, wght_pb, 3d0*(1d0 - gam), 0d0, 3d0*gam) + pv * f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0) & 
+                                momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3d0*(1d0 - gam), 0d0, 3d0*gam) + pv * f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0) & 
                                                                 - 4d0*Re_inv*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0) - (2d0 / Web) * f_quad(abscX, abscY, wght, 2d0, 0d0, 0d0)
                             else
-                                momsp(4)%sf(id1, id2, id3) = (pref)*f_quad(abscX, abscY, wght_pb, 3d0, 0d0, 0d0)  &
+                                momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3d0, 0d0, 0d0)  &
                                                                 - 4d0*Re_inv*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0) - (2d0 / Web) * f_quad(abscX, abscY, wght, 2d0, 0d0, 0d0)  
-
                             end if
                         end if
-
-
-
-
                     
                     else
                         !$acc loop seq
@@ -794,6 +785,7 @@ contains
         Vf = c11*up/c20
 
         mu2avg = c02 - sum(myrho(:)*(Vf(:)**2d0))
+
         mu2avg = maxval((/mu2avg, 0d0/))
         mu2 = mu2avg
         M3 = (/1d0, 0d0, mu2/)

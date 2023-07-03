@@ -227,12 +227,16 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G
+     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G,  pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
+    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: poly_sigma
     real(kind(0d0)) :: sigR 
-    integer :: nmom  
+    integer :: nmom 
+
+
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -314,7 +318,7 @@ contains
         cons_vars_wrt = .false.
         c_wrt = .false.
         omega_wrt = .false.
-		qm_wrt = .false.
+        qm_wrt = .false.
         schlieren_wrt = .false.
 
         schlieren_alpha = dflt_real
@@ -449,14 +453,14 @@ contains
                     R0(:) = 1d0
                     V0(:) = 0d0
                 else if (nb > 1) then
-                    call s_simpson(nb)
+                    !call s_simpson
                     V0(:) = 0d0
                 else
                     stop 'Invalid value of nb'
                 end if
 
                 if (polytropic .neqv. .true.) then
-                    call s_initialize_nonpoly
+                    !call s_initialize_nonpoly
                 else
                     rhoref = 1.d0
                     pref = 1.d0
@@ -535,14 +539,14 @@ contains
                     R0(:) = 1d0
                     V0(:) = 0d0
                 else if (nb > 1) then
-                    call s_simpson(nb)
+                    !call s_simpson
                     V0(:) = 0d0
                 else
                     stop 'Invalid value of nb'
                 end if
 
                 if (polytropic .neqv. .true.) then
-                    call s_initialize_nonpoly
+                    !call s_initialize_nonpoly
                 else
                     rhoref = 1.d0
                     pref = 1.d0
@@ -658,148 +662,6 @@ contains
 
     end subroutine s_initialize_global_parameters_module ! --------------------
 
-    !> Subroutine to initialize variable for non-polytropic gas modeling processes
-    subroutine s_initialize_nonpoly
-
-        integer :: ir
-        real(kind(0.d0)) :: rhol0
-        real(kind(0.d0)) :: pl0
-        real(kind(0.d0)) :: uu
-        real(kind(0.d0)) :: D_m
-        real(kind(0.d0)) :: temp
-        real(kind(0.d0)) :: omega_ref
-        real(kind(0.d0)), dimension(Nb) :: chi_vw0
-        real(kind(0.d0)), dimension(Nb) :: cp_m0
-        real(kind(0.d0)), dimension(Nb) :: k_m0
-        real(kind(0.d0)), dimension(Nb) :: rho_m0
-        real(kind(0.d0)), dimension(Nb) :: x_vw
-
-        ! liquid physical properties
-        real(kind(0.d0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
-
-        ! gas physical properties
-        real(kind(0.d0)) :: gamma_m, gamma_n, M_n, mu_n
-
-        ! polytropic index used to compute isothermal natural frequency
-        real(kind(0.d0)), parameter :: k_poly = 1.d0
-        ! universal gas constant
-        real(kind(0.d0)), parameter :: Ru = 8314.d0
-
-        rhol0 = rhoref
-        pl0 = pref
-
-        allocate (pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
-        allocate (k_n(nb), k_v(nb), omegaN(nb))
-        allocate (Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
-
-        pb0(:) = dflt_real
-        mass_n0(:) = dflt_real
-        mass_v0(:) = dflt_real
-        Pe_T(:) = dflt_real
-        omegaN(:) = dflt_real
-
-        mul0 = fluid_pp(1)%mul0
-        ss = fluid_pp(1)%ss
-        pv = fluid_pp(1)%pv
-        gamma_v = fluid_pp(1)%gamma_v
-        M_v = fluid_pp(1)%M_v
-        mu_v = fluid_pp(1)%mu_v
-        k_v(:) = fluid_pp(1)%k_v
-
-        gamma_n = fluid_pp(2)%gamma_v
-        M_n = fluid_pp(2)%M_v
-        mu_n = fluid_pp(2)%mu_v
-        k_n(:) = fluid_pp(2)%k_v
-
-        gamma_m = gamma_n
-        if (thermal == 2) gamma_m = 1.d0 !isothermal
-
-        temp = 293.15d0
-        D_m = 0.242d-4
-        uu = DSQRT(pl0/rhol0)
-
-        omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
-
-            !!! thermal properties !!!
-        ! gas constants
-        R_n = Ru/M_n
-        R_v = Ru/M_v
-        ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
-        phi_vn = (1.d0 + DSQRT(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_v/M_n))
-        phi_nv = (1.d0 + DSQRT(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_n/M_v))
-        ! internal bubble pressure
-        pb0 = pl0 + 2.d0*ss/(R0ref*R0)
-
-        ! mass fraction of vapor
-        chi_vw0 = 1.d0/(1.d0 + R_v/R_n*(pb0/pv - 1.d0))
-        ! specific heat for gas/vapor mixture
-        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1.d0) &
-                + (1.d0 - chi_vw0)*R_n*gamma_n/(gamma_n - 1.d0)
-        ! mole fraction of vapor
-        x_vw = M_n*chi_vw0/(M_v + (M_n - M_v)*chi_vw0)
-        ! thermal conductivity for gas/vapor mixture
-        k_m0 = x_vw*k_v/(x_vw + (1.d0 - x_vw)*phi_vn) &
-               + (1.d0 - x_vw)*k_n/(x_vw*phi_nv + 1.d0 - x_vw)
-        ! mixture density
-        rho_m0 = pv/(chi_vw0*R_v*temp)
-
-        ! mass of gas/vapor computed using dimensional quantities
-        mass_n0 = 4.d0*(pb0 - pv)*pi/(3.d0*R_n*temp*rhol0)*R0**3
-        mass_v0 = 4.d0*pv*pi/(3.d0*R_v*temp*rhol0)*R0**3
-        ! Peclet numbers
-        Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
-        Pe_c = uu*R0ref/D_m
-        ! nondimensional properties
-        R_n = rhol0*R_n*temp/pl0
-        R_v = rhol0*R_v*temp/pl0
-        k_n = k_n/k_m0
-        k_v = k_v/k_m0
-        pb0 = pb0/pl0
-        pv = pv/pl0
-
-        ! bubble wall temperature, normalized by T0, in the liquid
-        ! keeps a constant (cold liquid assumption)
-        Tw = 1.d0
-        ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
-
-        pl0 = 1.d0
-        do ir = 1, Nb
-            call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
-                              Re_trans_T(ir), Im_trans_T(ir))
-            call s_transcoeff(omegaN(ir)*R0(ir), Pe_c*R0(ir), &
-                              Re_trans_c(ir), Im_trans_c(ir))
-        end do
-        Im_trans_T = 0d0
-        Im_trans_c = 0d0
-
-        rhoref = 1.d0
-        pref = 1.d0
-    end subroutine s_initialize_nonpoly
-
-    !> Subroutine to compute the transfer coefficient for non-polytropic gas modeling
-    subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
-
-        real(kind(0.d0)), intent(IN) :: omega
-        real(kind(0.d0)), intent(IN) :: peclet
-        real(kind(0.d0)), intent(OUT) :: Re_trans
-        real(kind(0.d0)), intent(OUT) :: Im_trans
-        complex :: trans, c1, c2, c3
-        complex :: imag = (0., 1.)
-        real(kind(0.d0)) :: f_transcoeff
-
-        c1 = imag*omega*peclet
-        c2 = CSQRT(c1)
-        c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
-        trans = ((c2/c3 - 1.d0)**(-1) - 3.d0/c1)**(-1) ! transfer function
-
-        Re_trans = dble(trans)
-        Im_trans = aimag(trans)
-
-    end subroutine s_transcoeff
-
     !> Subroutine to initialize parallel infrastructure
     subroutine s_initialize_parallel_io() ! --------------------------------
 
@@ -879,52 +741,5 @@ contains
 
     end subroutine s_finalize_global_parameters_module ! -----------------
 
-    !> Computes the Simpson weights for quadrature
-        !! @param Npt is the number of bins that represent the polydisperse bubble population
-    subroutine s_simpson(Npt)
-
-        integer, intent(IN) :: Npt
-        integer :: ir
-        real(kind(0.d0)) :: R0mn
-        real(kind(0.d0)) :: R0mx
-        real(kind(0.d0)) :: dphi
-        real(kind(0.d0)) :: tmp
-        real(kind(0.d0)) :: sd
-        real(kind(0.d0)), dimension(Npt) :: phi
-
-        ! nondiml. min. & max. initial radii for numerical quadrature
-        !sd   = 0.05D0
-        !R0mn = 0.75D0
-        !R0mx = 1.3D0
-
-        sd = poly_sigma
-        R0mn = 0.8d0*DEXP(-2.8d0*sd)
-        R0mx = 0.2d0*DEXP(9.5d0*sd) + 1.d0
-
-        ! phi = ln( R0 ) & return R0
-        do ir = 1, Npt
-            phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(Npt - 1)
-            R0(ir) = DEXP(phi(ir))
-        end do
-        dphi = phi(2) - phi(1)
-
-        ! weights for quadrature using Simpson's rule
-        do ir = 2, Npt - 1
-            ! Gaussian
-            tmp = DEXP(-0.5d0*(phi(ir)/sd)**2)/DSQRT(2.d0*pi)/sd
-            if (mod(ir, 2) == 0) then
-                weight(ir) = tmp*4.d0*dphi/3.d0
-            else
-                weight(ir) = tmp*2.d0*dphi/3.d0
-            end if
-        end do
-
-        tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(1) = tmp*dphi/3.d0
-        tmp = DEXP(-0.5d0*(phi(Npt)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(Npt) = tmp*dphi/3.d0
-
-    end subroutine s_simpson
 
 end module m_global_parameters
