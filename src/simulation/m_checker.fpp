@@ -72,24 +72,36 @@ contains
         ! Simulation Algorithm Parameters ==================================
         if (all(model_eqns /= (/1, 2, 3, 4/))) then
             call s_mpi_abort('Unsupported value of model_eqns. Exiting ...')
-        elseif (model_eqns == 2 .and. bubbles .and. bubble_model == 1) then
-            call s_mpi_abort('The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)')
-        elseif (bubbles .and. nb < 1) then
-            call s_mpi_abort('The Ensemble-Averaged Bubble Model requires nb >= 1')
-        elseif (bubbles .and. bubble_model == 3 .and. (polytropic .neqv. .true.)) then
-            !call s_mpi_abort('RP bubbles require polytropic compression')
-        elseif (cyl_coord .and. bubbles) then 
-            call s_mpi_abort('Bubble models untested in cylindrical coordinates')
-        elseif (model_eqns == 3 .and. bubbles) then
-            call s_mpi_abort('Bubble models untested with 6-equation model')
-        elseif (model_eqns == 1 .and. bubbles) then
-            call s_mpi_abort('Bubble models untested with pi-gamma model')
-        elseif (model_eqns == 4 .and. num_fluids /= 1) then
-            call s_mpi_abort('The 4-equation model implementation is not a multi-component and requires num_fluids = 1')
+        end if
+
+        if (bubbles) then
+            if (model_eqns == 2 .and. bubble_model == 1) then
+                call s_mpi_abort('The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)')
+            elseif (nb < 1) then
+                call s_mpi_abort('The Ensemble-Averaged Bubble Model requires nb >= 1')
+            elseif (bubble_model == 3 .and. (polytropic .neqv. .true.)) then
+                call s_mpi_abort('RP bubbles require polytropic compression')
+            elseif (cyl_coord) then 
+                call s_mpi_abort('Bubble models untested in cylindrical coordinates')
+            elseif (model_eqns == 3) then
+                call s_mpi_abort('Bubble models untested with 6-equation model')
+            elseif (model_eqns == 1) then
+                call s_mpi_abort('Bubble models untested with pi-gamma model')
             !TODO: Comment this out when testing riemann with hll
-        elseif (bubbles .and. riemann_solver /= 2) then
-            call s_mpi_abort('Bubble modeling requires riemann_solver = 2')
-        elseif ((bubbles .neqv. .true.) .and. polydisperse) then
+            elseif (riemann_solver /= 2) then
+                call s_mpi_abort('Bubble modeling requires riemann_solver = 2')
+            elseif (avg_state == 1) then 
+                call s_mpi_abort('Unsupported combination of values of '// &
+                    'bubbles and Roe average (please use avg_state = 2). '// &
+                    'Exiting ...')
+            end if
+        end if
+
+        if (model_eqns == 4 .and. num_fluids /= 1) then
+            call s_mpi_abort('The 4-equation model implementation is not a multi-component and requires num_fluids = 1')
+        end if
+
+        if ((bubbles .neqv. .true.) .and. polydisperse) then
             call s_mpi_abort('Polydisperse bubble modeling requires the bubble switch to be activated')
         elseif (polydisperse .and. (poly_sigma == dflt_real)) then
             call s_mpi_abort('Polydisperse bubble modeling requires poly_sigma > 0')
@@ -97,31 +109,33 @@ contains
             call s_mpi_abort('QBMM requires bubbles')
         elseif (qbmm .and. (nnode /= 4)) then
             call s_mpi_abort('nnode not supported')
-        elseif (model_eqns == 3 .and. riemann_solver /= 2) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                'model_eqns (6-eq) and riemann_solver (please use riemann_solver = 2). '// &
-                'Exiting ...')
-        elseif (model_eqns == 3 .and. alt_soundspeed) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                'model_eqns (6-eq) and alt_soundspeed. '// &
-                'Exiting ...')
-        elseif (model_eqns == 3 .and. avg_state == 1) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                'model_eqns (6-eq) and Roe average (please use avg_state = 2). '// &
-                'Exiting ...')
-       elseif (bubbles .and. avg_state == 1) then 
-            call s_mpi_abort('Unsupported combination of values of '// &
-                'bubbles and Roe average (please use avg_state = 2). '// &
-                'Exiting ...')
-        elseif (model_eqns == 3 .and. wave_speeds == 2) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                'model_eqns (6-eq) and wave_speeds (please use wave_speeds = 1). '// &
-                'Exiting ...')
-        elseif (model_eqns == 3 .and. (cyl_coord .and. p /= 0)) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                'model_eqns (6-eq) and cylindrical coordinates. '// &
-                'Exiting ...')
-        elseif (num_fluids /= dflt_int &
+        end if
+
+        if (model_eqns ==3 ) then
+            if (riemann_solver /= 2) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                    'model_eqns (6-eq) and riemann_solver (please use riemann_solver = 2). '// &
+                    'Exiting ...')
+            elseif (alt_soundspeed) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                    'model_eqns (6-eq) and alt_soundspeed. '// &
+                    'Exiting ...')
+            elseif (avg_state == 1) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                    'model_eqns (6-eq) and Roe average (please use avg_state = 2). '// &
+                    'Exiting ...')
+            elseif (wave_speeds == 2) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                    'model_eqns (6-eq) and wave_speeds (please use wave_speeds = 1). '// &
+                    'Exiting ...')
+            elseif (cyl_coord .and. p /= 0) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                    'model_eqns (6-eq) and cylindrical coordinates. '// &
+                    'Exiting ...')
+            end if
+        end if
+
+        if (num_fluids /= dflt_int &
                 .and. &
                 (num_fluids < 1 .or. num_fluids > num_fluids)) then
             call s_mpi_abort('Unsupported value of num_fluids. Exiting ...')

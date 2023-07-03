@@ -27,6 +27,8 @@ module m_initial_condition
     use m_patches
 
     use m_assign_variables
+
+    use m_eigen_solver
     ! ==========================================================================
     ! ==========================================================================
 
@@ -550,7 +552,6 @@ contains
     
     end subroutine s_generate_wave
 
->>>>>>> f2bee499d15bed6bc037c806403e12c59b36fbe0
     !>  Deallocation procedures for the module
     subroutine s_finalize_initial_condition_module() ! ---------------------
 
