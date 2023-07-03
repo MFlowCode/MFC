@@ -47,13 +47,16 @@ module m_start_up
     abstract interface ! ===================================================
 
         !! @param q_cons_vf  Conservative variables
-        subroutine s_read_abstract_data_files(q_cons_vf) ! -----------
+        subroutine s_read_abstract_data_files(q_cons_vf, pb, mv) ! -----------
 
             import :: scalar_field, sys_size
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_cons_vf
+
+            real(kind(0d0)), dimension(:, :, :, 1:, 1:), intent(INOUT) :: pb 
+            real(kind(0d0)), dimension(:, :, :, 1:, 1:), intent(INOUT) :: mv            
 
         end subroutine s_read_abstract_data_files ! -----------------
 
@@ -176,9 +179,12 @@ contains
         !!              up the latter. This procedure also calculates the cell-
         !!              width distributions from the cell-boundary locations.
         !! @param q_cons_vf Cell-averaged conservative variables
-    subroutine s_read_serial_data_files(q_cons_vf) ! ------------------------------
+    subroutine s_read_serial_data_files(q_cons_vf, pb, mv) ! ------------------------------
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: mv 
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
@@ -189,7 +195,7 @@ contains
         logical :: file_exist !<
         ! Logical used to check the existence of the data files
 
-        integer :: i !< Generic loop iterator
+        integer :: i, r !< Generic loop iterator
 
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
@@ -300,17 +306,55 @@ contains
                     call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                 end if
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                do i = 1, nb
+                    do r = 1, 4
+                        write (file_path, '(A,I0,A)') &
+                            trim(t_step_dir)//'/pb', sys_size + (i-1)*4 + r, '.dat'
+                        inquire (FILE=trim(file_path), EXIST=file_exist)
+                        if (file_exist) then
+                            open (2, FILE=trim(file_path), &
+                                  FORM='unformatted', &
+                                  ACTION='read', &
+                                  STATUS='old')
+                            read (2) pb(0:m, 0:n, 0:p, r, i); close (2)
+                        else
+                            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                        end if
+                    end do
+                end do                
+                do i = 1, nb
+                    do r = 1, 4
+                        write (file_path, '(A,I0,A)') &
+                            trim(t_step_dir)//'/mv', sys_size + (i-1)*4 + r , '.dat'
+                        inquire (FILE=trim(file_path), EXIST=file_exist)
+                        if (file_exist) then
+                            open (2, FILE=trim(file_path), &
+                                  FORM='unformatted', &
+                                  ACTION='read', &
+                                  STATUS='old')
+                            read (2) mv(0:m, 0:n, 0:p, r, i); close (2)
+                        else
+                            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                        end if
+                    end do
+                end do 
+            end if
         end if
         ! ==================================================================
 
     end subroutine s_read_serial_data_files ! -------------------------------------
 
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_data_files(q_cons_vf) ! ---------------------------
+    subroutine s_read_parallel_data_files(q_cons_vf, pb, mv) ! ---------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
+
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: mv 
 
 #ifdef MFC_MPI
 
@@ -407,7 +451,12 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
             ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf)
+
+            if(qbmm .and. .not. polytropic) then
+                call s_initialize_mpi_data(q_cons_vf, pb(0:m, 0:n, 0:p, :, :), mv(0:m, 0:n, 0:p, :, :))
+            else
+                call s_initialize_mpi_data(q_cons_vf, pb, mv)
+            end if
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -434,6 +483,18 @@ contains
                     call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                        MPI_DOUBLE_PRECISION, status, ierr)
                 end do
+                if(qbmm .and. .not. polytropic) then
+                    do i = sys_size + 1, sys_size + 2*nb*4!adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
             else
                 do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)

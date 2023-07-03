@@ -62,18 +62,22 @@ contains
     end subroutine s_mpi_initialize ! --------------------------------------
 
 
-    subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
+    subroutine s_initialize_mpi_data(q_cons_vf, pb, mv) ! --------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+
+        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), optional, intent(INOUT) :: pb 
+        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), optional, intent(INOUT) :: mv 
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
 
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i
+        integer :: i, j
 
         do i = 1, sys_size
 #ifdef MPI_SIMULATION
@@ -82,6 +86,32 @@ contains
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
 #endif
         end do
+
+#ifndef MFC_POSTPROCESS
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb 
+                do j = 1, 4
+#ifdef MPI_SIMULATION
+            MPI_IO_DATA%var(sys_size + i*4 + j)%sf = pb(0:m, 0:n, 0:p, j, i)
+#else
+            MPI_IO_DATA%var(sys_size + i*4 + j)%sf = pb(0:m, 0:n, 0:p, j, i)
+#endif  
+                end do
+            end do          
+        end if
+
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb 
+                do j = 1, 4
+#ifdef MPI_SIMULATION
+            MPI_IO_DATA%var(sys_size + nb*4 + i*4 + j)%sf = mv(0:m, 0:n, 0:p, j, i)
+#else
+            MPI_IO_DATA%var(sys_size + nb*4 + i*4 + j)%sf = mv(0:m, 0:n, 0:p, j, i)
+#endif  
+                end do
+            end do          
+        end if
+#endif
 
         ! Define global(g) and local(l) sizes for flow variables
         sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
@@ -98,6 +128,15 @@ contains
                                           MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
+
+        if(qbmm .and. .not. polytropic) then
+            do i = sys_size + 1, sys_size + 2*nb*4
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+
+            end do
+        end if
 
 #endif
 

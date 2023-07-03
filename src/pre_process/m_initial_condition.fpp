@@ -40,10 +40,16 @@ module m_initial_condition
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
+    type(pres_field) :: pb
+
+    type(pres_field) :: mv
+
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
     !! patch identity may be associated with any one cell.
+
+
 
 contains
 
@@ -65,6 +71,15 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
+        if(qbmm .and. .not. polytropic) then
+            allocate(pb%sf(0:m, &
+                  0:n, &
+                  0:p, 1:4, 1:nb))
+
+            allocate(mv%sf(0:m, &
+                  0:n, &
+                  0:p, 1:4, 1:nb))
+        end if
         ! Setting default values for conservative and primitive variables so
         ! that in the case that the initial condition is wrongly laid out on
         ! the grid the simulation component will catch the problem on start-
@@ -215,6 +230,12 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                            q_cons_vf)
+
+        if(qbmm .and. .not. polytropic) then
+            call s_initialize_mv(q_cons_vf, mv%sf)
+            call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
+        end if
+
 
     end subroutine s_generate_initial_condition ! --------------------------
 

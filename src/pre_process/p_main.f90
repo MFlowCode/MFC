@@ -31,6 +31,8 @@ program p_main
     use m_patches
 
     use m_assign_variables
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -67,6 +69,12 @@ program p_main
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     call s_initialize_global_parameters_module()
+    if(bubbles .and. nb > 1) then
+        call s_simpson
+    end if
+    if(bubbles .and. .not. polytropic) then
+        call s_initialize_nonpoly()
+    end if
     call s_initialize_data_output_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
@@ -120,11 +128,11 @@ program p_main
         end if
     end if
 
-    if (old_ic) call s_read_ic_data_files(q_cons_vf)
+    if (old_ic) call s_read_ic_data_files(q_cons_vf, pb%sf, mv%sf)
 
     call s_generate_initial_condition()
 
-    call s_write_data_files(q_cons_vf)
+    call s_write_data_files(q_cons_vf, pb%sf, mv%sf)
 
     call cpu_time(finish)
 

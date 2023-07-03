@@ -82,6 +82,12 @@ program p_main
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     call s_initialize_global_parameters_module()
+    if(bubbles .and. nb > 1) then
+        call s_simpson
+    end if
+    if(bubbles .and. .not. polytropic) then
+        call s_initialize_nonpoly()
+    end if
     if (num_procs > 1) call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_data_input_module()

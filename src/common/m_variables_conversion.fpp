@@ -143,7 +143,7 @@ contains
                 )**(1/gamma + 1) - pi_inf
         end if
 
-        if (hypoelasticity .and. present(G)) then
+       if (hypoelasticity .and. present(G)) then
             ! calculate elastic contribution to Energy
             E_e = 0d0
             do s = stress_idx%beg, stress_idx%end
@@ -652,7 +652,7 @@ contains
         integer :: i, j, k, l 
         real(kind(0d0)) :: mu, sig,  nbub_sc
 
-#ifdef MFC_SIMULATION
+
         !$acc parallel loop collapse(3) gang vector default(present) private(nbub_sc, mu, sig)
         do l = izb, ize
             do k = iyb, iye
@@ -669,14 +669,11 @@ contains
                         mv(j, k, l, 2, i) = (mass_v0(i)) * (mu - sig)**(3d0) / (R0(i)**(3d0)) 
                         mv(j, k, l, 3, i) = (mass_v0(i)) * (mu + sig)**(3d0) / (R0(i)**(3d0)) 
                         mv(j, k, l, 4, i) = (mass_v0(i)) * (mu + sig)**(3d0) / (R0(i)**(3d0)) 
-
-                    end do
+                   end do
 
                 end do
             end do
         end do
-#endif
-
   
 
     end subroutine s_initialize_mv
@@ -689,7 +686,7 @@ contains
         integer :: i, j, k, l 
         real(kind(0d0)) :: mu, sig,  nbub_sc
 
-#ifdef MFC_SIMULATION
+
         !$acc parallel loop collapse(3) gang vector default(present) private( nbub_sc, mu, sig)
         do l = izb, ize
             do k = iyb, iye
@@ -697,6 +694,7 @@ contains
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
                     
+
                     
                     !$acc loop seq
                     do i = 1, nb
@@ -714,13 +712,13 @@ contains
                         !pb(j, k, l, 2, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu - sig)**(3d0*gam) 
                         !pb(j, k, l, 3, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu + sig)**(3d0*gam) 
                         !pb(j, k, l, 4, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu + sig)**(3d0*gam) 
-
                     end do
+
 
                 end do
             end do
         end do
-#endif
+
 
   
 
@@ -781,9 +779,12 @@ contains
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
 
+                    !$acc loop seq
                     do i = 1, contxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
+
+
 
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
@@ -827,14 +828,11 @@ contains
                         end if
                     end do
 
-
-
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
-
 
                     if (bubbles) then
                         !$acc loop seq
@@ -862,26 +860,16 @@ contains
                             !$acc loop seq
                             do i = bubxb, bubxe
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
-                            end do
-
-                            
-
-                        end if
-
-                        
+                            end do                        
+                        end if                   
 
                         if(qbmm) then
-
                             R3tmp = 0d0
                             do i = 1, nb
                                 R3tmp = R3tmp + weight(i)* 0.5d0 * (qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) + dsqrt(qK_prim_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) - qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) **2d0) ) ** 3d0
                                 R3tmp = R3tmp + weight(i)* 0.5d0 * (qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) - dsqrt(qK_prim_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) - qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) **2d0) ) ** 3d0
-                            end do
-                                                        
-                            !qK_cons_vf(alf_idx)%sf(j, k, l) = nbub_sc * (4d0 * pi / 3d0) * R3tmp
-                                                          
+                            end do                                                                                                                  
                         end if
-
                     end if
 
                     if (hypoelasticity) then
@@ -904,6 +892,7 @@ contains
                         end do
                     end if
 
+                    !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
@@ -983,7 +972,7 @@ contains
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                         q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
-                                                       (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
+                                                       (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)                       
                     else
                         !Tait EOS, no conserved energy variable
                         q_cons_vf(E_idx)%sf(j, k, l) = 0.

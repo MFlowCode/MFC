@@ -487,7 +487,6 @@ contains
         call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
-!        call s_compute_rhs_full(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -555,39 +554,6 @@ contains
         ! Stage 2 of 3 =====================================================
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
-!        call s_compute_rhs_full(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
-
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_temp%vf(i)%sf(j, k, l) = &
-                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2d0
-                    end do
-                end do
-            end do
-        end do
-
-        if(qbmm .and. (.not. polytropic)) then
-!$acc parallel loop collapse(5) gang vector default(present)
-            do i = 1, nb
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            do q = 1, nnode
-                                pb_temp%sf(j, k, l, q, i) = &
-                                    (pb_ts(1)%sf(j, k, l, q, i) &
-                                     +  pb_ts(2)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i))/2d0
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -642,13 +608,10 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
-
-
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
-!        call s_compute_rhs_full(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -715,35 +678,6 @@ contains
         else
             time_avg = 0d0
         end if
-
-
-
-
-        
-
-        ts_error = 0d0
-        denom = 0d0
-
-        do i = 5, sys_size
-            ts_error = ts_error + (q_cons_temp%vf(i)%sf(3, 0, 0) - q_cons_ts(1)%vf(i)%sf(3, 0, 0))**2d0
-            denom = denom + ( q_cons_ts(1)%vf(i)%sf(3, 0, 0))**2d0
-        end do
-        !if(qbmm .and. (.not. polytropic)) then
-        !    do q = 1, 4
-        !        ts_error = ts_error + (pb_temp%sf(3, 0, 0, q, 1) - pb_ts(1)%sf(3, 0, 0, q, 1))**2d0
-        !!        denom = denom + (pb_ts(1)%sf(3, 0, 0, q, 1))**2d0
-        !    end do
-        !end if
-        ts_error = ts_error / denom
-        ts_error = ts_error ** 0.5d0
-        error_fraction = (0.5 * 1d-6 / ts_error)**0.5d0
-        time_step_factor = DMAX1(error_fraction, 0.3d0)
-        time_step_factor = DMIN1(time_step_factor, 2d0)
-        !dt = time_step_factor * dt
-        !dt = DMAX1(0.9 * dt, 1d-6)
-        !dt = DMIN1(dt, 1d5)
-
-        print *, "dt", dt
 
         ! ==================================================================
 

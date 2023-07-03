@@ -59,6 +59,8 @@ program p_main
 #endif
 
     use m_nvtx
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -132,6 +134,12 @@ program p_main
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
+    if(bubbles .and. nb > 1) then
+        call s_simpson
+    end if
+    if(bubbles .and. .not. polytropic) then
+        call s_initialize_nonpoly()
+    end if
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -182,7 +190,7 @@ program p_main
     end if
 
     ! Reading in the user provided initial condition and grid data
-    call s_read_data_files(q_cons_ts(1)%vf)
+    call s_read_data_files(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
     ! Populating the buffers of the grid variables using the boundary conditions
@@ -221,11 +229,6 @@ program p_main
     end if
     finaltime = t_step_stop*dt
 
-    if(qbmm .and. (.not. polytropic)) then
-        call s_initialize_mv(q_cons_ts(1)%vf, mv_ts(1)%sf)
-        call s_initialize_pb(q_cons_ts(1)%vf, mv_ts(1)%sf, pb_ts(1)%sf)
-    end if
-
     ! Time-stepping Loop =======================================================
     do
         if (proc_rank == 0) then
@@ -260,7 +263,7 @@ program p_main
 
         ! Time-stepping loop controls
 
-        if (t_step == t_step_stop) then
+        if (t_step == t_step_stop ) then
 
             call s_mpi_barrier()
 
@@ -332,15 +335,15 @@ program p_main
                     do k = 0, n
                         do j = 0, m
                             if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p
-                                
+                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
                                 error stop "NaN(s) in timestep output."
                             end if
                         end do
                     end do
                 end do
             end do
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
+
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
             nt = int((t_step - t_step_start)/(t_step_save))
