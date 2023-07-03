@@ -838,9 +838,6 @@ contains
 
             ! ===============================================================
 
-
-
-
             if (alt_soundspeed) then
 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
@@ -1098,7 +1095,6 @@ contains
                         end do
                     end do
                 end if
-
 
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
