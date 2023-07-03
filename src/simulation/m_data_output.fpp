@@ -1001,21 +1001,35 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
-                                                        rho, gamma, pi_inf, &
-                                                        Re, G, fluid_pp(:)%G)
+                    if(hypoelasticity) then
+                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                                                            rho, gamma, pi_inf, &
+                                                            Re, G, fluid_pp(:)%G)
+                    else
+                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                                                            rho, gamma, pi_inf)
+                    end if
                     do s = 1, num_dims
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    call s_compute_pressure( &
-                        q_cons_vf(1)%sf(j - 2, k, l), &
-                        q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
-                        q_cons_vf(1)%sf(j - 2, k, l), &
-                        pi_inf, gamma, pres, rho, &
-                        q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                        q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                    if(hypoelasticity) then
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            pi_inf, gamma, rho, pres, &
+                            q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
+                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                    else
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            pi_inf, gamma, rho, pres)
+                    end if
 
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
@@ -1044,7 +1058,6 @@ contains
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
-
                         if (qbmm) then
                             M00 = q_cons_vf(bub_idx%moms(1, 1))%sf(j - 2, k, l)/nbub
                             M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
