@@ -560,12 +560,12 @@ contains
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
-            if(qbmm) then
-                q_prim_vf(bubxb)%sf = 1d0
-            end if
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
+            if(qbmm) then
+                q_prim_vf(bubxb)%sf = 1d0
+            end if
         end if
 
         !1D

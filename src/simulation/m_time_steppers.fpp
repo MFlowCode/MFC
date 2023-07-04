@@ -38,8 +38,6 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !<
     !! Cell-average primitive variables at the current time-stage
 
-    type(vector_field) :: q_cons_temp !<
-
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
 
@@ -50,9 +48,6 @@ module m_time_steppers
 
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-
-    type(pres_field) :: pb_temp
-
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
@@ -60,7 +55,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, q_cons_temp, pb_temp, mv, pb_ts, rhs_mv, rhs_pb)
+!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, mv_ts, pb_ts, rhs_mv, rhs_pb)
 
 contains
 
@@ -105,19 +100,12 @@ contains
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
         end do
 
-        @:ALLOCATE(q_cons_temp%vf(1:sys_size))
-
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
                                                 iy_t%beg:iy_t%end, &
                                                 iz_t%beg:iz_t%end))
             end do
-        end do
-        do j = 1, sys_size
-            @:ALLOCATE(q_cons_temp%vf(j)%sf(ix_t%beg:ix_t%end, &
-                                            iy_t%beg:iy_t%end, &
-                                            iz_t%beg:iz_t%end))
         end do
 
         ! Allocating the cell-average primitive ts variables
@@ -161,9 +149,6 @@ contains
                           iy_t%beg:iy_t%end, &
                           iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%end, &
-                          iy_t%beg:iy_t%end, &
-                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
-            @:ALLOCATE(pb_temp%sf(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &
                           iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%end, &
