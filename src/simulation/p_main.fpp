@@ -346,6 +346,11 @@ program p_main
                 end do
             end do
 
+            if(qbmm .and. .not. polytropic) then
+                !$acc update host(pb_ts(1)%sf)
+                !$acc update host(mv_ts(1)%sf)
+            end if
+
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1), mv_ts(1), t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
