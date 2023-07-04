@@ -75,6 +75,9 @@ program p_main
     if(bubbles .and. .not. polytropic) then
         call s_initialize_nonpoly()
     end if
+    if(qbmm .and. polytropic .and. Web /= dflt_real) then
+        pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)                              
+    end if
     call s_initialize_data_output_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
@@ -128,11 +131,11 @@ program p_main
         end if
     end if
 
-    if (old_ic) call s_read_ic_data_files(q_cons_vf, pb%sf, mv%sf)
+    if (old_ic) call s_read_ic_data_files(q_cons_vf, pb, mv)
 
     call s_generate_initial_condition()
 
-    call s_write_data_files(q_cons_vf, pb%sf, mv%sf)
+    call s_write_data_files(q_cons_vf, pb, mv)
 
     call cpu_time(finish)
 
