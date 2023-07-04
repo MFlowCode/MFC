@@ -453,12 +453,6 @@ contains
                     R0(:) = 1d0
                     V0(:) = 1d0
                 else if (nb > 1) then
-                    if (R0_type == 1) then
-                        !call s_simpson
-                    else
-                        print *, 'Invalid R0 type - abort'
-                        stop
-                    end if
                     V0(:) = 1d0
                 else
                     stop 'Invalid value of nb'
@@ -468,9 +462,7 @@ contains
                 print *, 'R0 abscissas: ', R0(:)
 
                 if(.not. qbmm) then
-                    if (.not. polytropic .and. .not. qbmm) then
-                        !call s_initialize_nonpoly
-                    else
+                    if ( polytropic ) then
                         rhoref = 1.d0
                         pref = 1.d0
                     end if
@@ -479,23 +471,16 @@ contains
                 if(qbmm) then
                     if(polytropic) then
                         allocate(pb0(nb))
-                        if(Web /= dflt_real) then
-                            do i = 1, nb
-                                !pb0(i) = pref + 2d0 * fluid_pp(1)%ss / (R0(i)*R0ref)
-                            end do
-                        else
+                        if(Web == dflt_real) then
                             do i = 1, nb
                                 pb0 = pref
                             end do
                         end if
 
-
                         pb0 = pb0 / pref
                         pref = 1d0
                         rhoref = 1d0
 
-                    else
-                        !call s_initialize_nonpoly
                     end if
                 end if
             end if
@@ -571,20 +556,12 @@ contains
                     R0(:) = 1d0
                     V0(:) = 0d0
                 else if (nb > 1) then
-                    if (R0_type == 1) then
-                        !call s_simpson
-                    else
-                        print *, 'Invalid R0 type - abort'
-                        stop
-                    end if
                     V0(:) = 1d0
                 else
                     stop 'Invalid value of nb'
                 end if
 
-                if ((.not. polytropic) .and. (.not. qbmm)) then
-                    !call s_initialize_nonpoly
-                else
+                if (polytropic) then
                     rhoref = 1.d0
                     pref = 1.d0
                 end if

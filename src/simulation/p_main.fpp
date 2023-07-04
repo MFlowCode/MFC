@@ -134,7 +134,7 @@ program p_main
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
-    if(bubbles .and. nb > 1) then
+    if(bubbles .and. nb > 1 .and. R0_type == 1) then
         call s_simpson
     end if
     if(bubbles .and. .not. polytropic) then
