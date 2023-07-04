@@ -494,6 +494,7 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+            alf_idx = 1
 
         else if (model_eqns == 4) then
             cont_idx%beg = 1 ! one continuity equation
