@@ -569,15 +569,13 @@ contains
         ! ==================================================================
 
 #ifdef MFC_MPI
-
         allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
+        allocate (MPI_IO_DATA%var(1:sys_size))                
 
         do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
-
 #endif
 
         ! Size of the ghost zone layer is non-zero only when post-processing

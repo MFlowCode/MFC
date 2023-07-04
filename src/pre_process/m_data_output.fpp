@@ -45,16 +45,13 @@ module m_data_output
         !! @param q_cons_vf The conservative variables
         subroutine s_write_abstract_data_files(q_cons_vf, pb, mv)
 
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, pres_field
 
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(IN) :: q_cons_vf
-
-
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: mv 
+            type(pres_field), intent(IN) :: pb, mv
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
@@ -76,9 +73,9 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: mv 
+            
+        type(pres_field), &
+            intent(IN) :: pb, mv
 
         logical :: file_exist !< checks if file exists
 
@@ -160,7 +157,7 @@ contains
                                //'.dat'
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
                           STATUS=status)
-                    write (1) pb(:, :, :, r, i)
+                    write (1) pb%sf(:, :, :, r, i)
                     close (1)
                 end do
             end do
@@ -172,7 +169,7 @@ contains
                                //'.dat'
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
                           STATUS=status)
-                    write (1) mv(:, :, :, r, i)
+                    write (1) mv%sf(:, :, :, r, i)
                     close (1)
                 end do
             end do
@@ -261,7 +258,7 @@ contains
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), pb(j, 0, 0, r, i)
+                            write (2, FMT) x_cb(j), pb%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -272,7 +269,7 @@ contains
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), mv(j, 0, 0, r, i)
+                            write (2, FMT) x_cb(j), mv%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -307,7 +304,7 @@ contains
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), pb(j, k, 0, r, i)
+                                write (2, FMT) x_cb(j), y_cb(k), pb%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -320,7 +317,7 @@ contains
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), mv(j, k, 0, r, i)
+                                write (2, FMT) x_cb(j), y_cb(k), mv%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -354,7 +351,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb(j, k, l, r, i)
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -369,7 +366,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv(j, k, l, r, i)
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -391,9 +388,8 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
-        
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: mv 
+        type(pres_field), &
+            intent(IN) :: pb, mv
 
 #ifdef MFC_MPI
 
@@ -413,7 +409,7 @@ contains
 
         ! Initialize MPI data I/O
         call s_initialize_mpi_data(q_cons_vf, pb, mv)
-
+        
         ! Open the file to write all flow variables
         write (file_loc, '(I0,A)') t_step_start, '.dat'
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)

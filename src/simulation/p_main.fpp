@@ -140,6 +140,9 @@ program p_main
     if(bubbles .and. .not. polytropic) then
         call s_initialize_nonpoly()
     end if
+    if(qbmm .and. polytropic .and. Web /= dflt_real) then
+        pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)                              
+    end if
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -190,7 +193,7 @@ program p_main
     end if
 
     ! Reading in the user provided initial condition and grid data
-    call s_read_data_files(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
+    call s_read_data_files(q_cons_ts(1)%vf, pb_ts(1), mv_ts(1))
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
     ! Populating the buffers of the grid variables using the boundary conditions
@@ -343,7 +346,7 @@ program p_main
                 end do
             end do
 
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, t_step)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1), mv_ts(1), t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
             nt = int((t_step - t_step_start)/(t_step_save))

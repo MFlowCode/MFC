@@ -49,14 +49,13 @@ module m_start_up
         !! @param q_cons_vf  Conservative variables
         subroutine s_read_abstract_data_files(q_cons_vf, pb, mv) ! -----------
 
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_cons_vf
 
-            real(kind(0d0)), dimension(:, :, :, 1:, 1:), intent(INOUT) :: pb 
-            real(kind(0d0)), dimension(:, :, :, 1:, 1:), intent(INOUT) :: mv            
+        type(pres_field), intent(INOUT) :: pb, mv           
 
         end subroutine s_read_abstract_data_files ! -----------------
 
@@ -183,8 +182,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: mv 
+        type(pres_field), intent(INOUT) :: pb, mv
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
@@ -318,7 +316,7 @@ contains
                                   FORM='unformatted', &
                                   ACTION='read', &
                                   STATUS='old')
-                            read (2) pb(0:m, 0:n, 0:p, r, i); close (2)
+                            read (2) pb%sf(0:m, 0:n, 0:p, r, i); close (2)
                         else
                             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                         end if
@@ -334,7 +332,7 @@ contains
                                   FORM='unformatted', &
                                   ACTION='read', &
                                   STATUS='old')
-                            read (2) mv(0:m, 0:n, 0:p, r, i); close (2)
+                            read (2) mv%sf(0:m, 0:n, 0:p, r, i); close (2)
                         else
                             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                         end if
@@ -353,8 +351,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: mv 
+        type(pres_field), intent(INOUT) :: pb, mv 
 
 #ifdef MFC_MPI
 
@@ -452,11 +449,8 @@ contains
 
             ! Initialize MPI data I/O
 
-            if(qbmm .and. .not. polytropic) then
-                call s_initialize_mpi_data(q_cons_vf, pb(0:m, 0:n, 0:p, :, :), mv(0:m, 0:n, 0:p, :, :))
-            else
-                call s_initialize_mpi_data(q_cons_vf, pb, mv)
-            end if
+
+            call s_initialize_mpi_data(q_cons_vf, pb, mv)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)

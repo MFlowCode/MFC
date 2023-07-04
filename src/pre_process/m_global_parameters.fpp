@@ -481,7 +481,7 @@ contains
                         allocate(pb0(nb))
                         if(Web /= dflt_real) then
                             do i = 1, nb
-                                pb0(i) = pref + 2d0 * fluid_pp(1)%ss / (R0(i)*R0ref)
+                                !pb0(i) = pref + 2d0 * fluid_pp(1)%ss / (R0(i)*R0ref)
                             end do
                         else
                             do i = 1, nb
@@ -610,13 +610,24 @@ contains
 
 #ifdef MFC_MPI
 
-        allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
+        if(qbmm .and. .not. polytropic) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
+            allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
+        else
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))                
+        end if
 
         do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
+        if(qbmm .and. .not. polytropic) then
+            do i = sys_size + 1, sys_size + 2*nb*4
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
 
 #endif
 

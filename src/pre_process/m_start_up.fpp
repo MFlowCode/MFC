@@ -51,16 +51,17 @@ module m_start_up
 
         subroutine s_read_abstract_ic_data_files(q_cons_vf, pb, mv) ! -----------
 
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, pres_field
 
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_cons_vf
 
+            type(pres_field), intent(INOUT) :: pb, mv
 
-            real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: pb 
-            real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: mv 
+
+
 
         end subroutine s_read_abstract_ic_data_files ! -----------------
 
@@ -368,8 +369,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: mv 
+        type(pres_field), intent(INOUT) :: pb, mv
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -423,7 +423,7 @@ contains
                     if (file_check) then
                         open (1, FILE=trim(file_loc), FORM='unformatted', &
                               STATUS='old', ACTION='read')
-                        read (1) pb(:, :, :, r, i)
+                        read (1) pb%sf(:, :, :, r, i)
                         close (1)
                     else
                         call s_mpi_abort( 'File pb'//trim(file_num)// &
@@ -447,7 +447,7 @@ contains
                     if (file_check) then
                         open (1, FILE=trim(file_loc), FORM='unformatted', &
                               STATUS='old', ACTION='read')
-                        read (1) mv(:, :, :, r, i)
+                        read (1) mv%sf(:, :, :, r, i)
                         close (1)
                     else
                         call s_mpi_abort( 'File mv'//trim(file_num)// &
@@ -586,8 +586,7 @@ contains
             intent(INOUT) :: q_cons_vf
 
 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: pb 
-        real(kind(0d0)), dimension(0:, 0:, 0:, 1:, 1:), intent(INOUT) :: mv 
+        type(pres_field), intent(INOUT) :: pb, mv
 
 #ifdef MFC_MPI
 
