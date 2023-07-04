@@ -608,13 +608,11 @@ contains
                         stop 'Invalid value of nb'
                     end if
 
-                    print *, 'R0 weights: ', weight(:)
-                    print *, 'R0 abscissas: ', R0(:)
+                    !print *, 'R0 weights: ', weight(:)
+                    !print *, 'R0 abscissas: ', R0(:)
 
                     if(.not. qbmm) then
-                        if (.not. polytropic) then
-                            !call s_initialize_nonpoly
-                        else 
+                        if (polytropic) then
                             rhoref = 1.d0
                             pref = 1.d0
                         end if
@@ -625,23 +623,15 @@ contains
                         if(polytropic) then
                             pv = fluid_pp(1)%pv 
                             @:ALLOCATE(pb0(nb))
-                            if(Web /= dflt_real) then
-                                do i = 1, nb
-                                    !pb0(i) = pref + 2d0 * fluid_pp(1)%ss / (R0(i)*R0ref)
-                                end do
-                            else
-                                do i = 1, nb
-                                    pb0 = pref
-                                end do
+                            if(Web == dflt_real) then                               
+                                pb0 = pref                                
                             end if
                             pb0 = pb0 / pref
                             pv = pv / pref
 
                             pref = 1d0
                             rhoref = 1d0
-
-                        else
-                            !call s_initialize_nonpoly
+                            
                         end if
 
                     end if
