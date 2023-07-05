@@ -709,8 +709,7 @@ contains
         real(kind(0d0)) :: mu, sig,  nbub_sc
 
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(nbub_sc, mu, sig)
-        do l = izb, ize
+       do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
                     
@@ -743,8 +742,7 @@ contains
         real(kind(0d0)) :: mu, sig,  nbub_sc
 
 
-        !$acc parallel loop collapse(3) gang vector default(present) private( nbub_sc, mu, sig)
-        do l = izb, ize
+       do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
 
