@@ -222,6 +222,9 @@ program p_main
     do i = 1, sys_size
 !$acc update device(q_cons_ts(1)%vf(i)%sf)
     end do
+    if(qbmm .and. .not. polytropic) then
+        !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
+    end if
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
