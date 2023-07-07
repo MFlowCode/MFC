@@ -221,8 +221,9 @@ class MFCInputFile:
         pass
 
     # Generate case.fpp & [target_name].inp
-    def generate(self, target_name: str) -> None:
-        self.__generate_inp(target_name)
+    def generate(self, target_name: str, bOnlyFPPs = False) -> None:
+        if not bOnlyFPPs:
+            self.__generate_inp(target_name)
         
         cons.print()
         

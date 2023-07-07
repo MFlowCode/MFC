@@ -50,7 +50,9 @@ jobs:
 
       - name: Setup Ubuntu
         if:   matrix.os == 'ubuntu' && matrix.intel == false
-        run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+        run: |
+          sudo apt update -y
+          sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
 
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true
