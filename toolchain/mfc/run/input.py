@@ -196,7 +196,7 @@ class MFCInputFile:
             bubble_model = int(self.case_dict.get("bubble_model", "-100"))
 
             if bubble_model == 2:
-                nterms = 26
+                nterms = 32
             elif bubble_model == 3:
                 nterms = 7
 

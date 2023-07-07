@@ -216,12 +216,15 @@ program p_main
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
-!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
-!$acc update device(sys_size, buff_size)
-!$acc update device(m, n, p)
+    !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
+    !$acc update device(sys_size, buff_size)
+    !$acc update device(m, n, p)
     do i = 1, sys_size
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
+    !$acc update device(q_cons_ts(1)%vf(i)%sf)
     end do
+    if(qbmm .and. .not. polytropic) then
+    !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
+    end if
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
