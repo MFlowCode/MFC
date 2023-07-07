@@ -1,8 +1,9 @@
 import os, typing, dataclasses
 
-from .state   import ARG
-from .printer import cons
-from .        import common
+from .state     import ARG
+from .printer   import cons
+from .          import common
+from .run.input import MFCInputFile
 
 
 @dataclasses.dataclass
@@ -188,6 +189,9 @@ def build_target(name: str, history: typing.List[str] = None):
 
         if common.system(configure, no_exception=True) != 0:
             raise common.MFCException(f"Failed to configure the [bold magenta]{name}[/bold magenta] target.")
+
+    if not target.isDependency and ARG("command") == "build":
+        MFCInputFile("", "", {}).generate(name, bOnlyFPPs = True)
 
     common.system(build,   exception_text=f"Failed to build the [bold magenta]{name}[/bold magenta] target.")
     common.system(install, exception_text=f"Failed to install the [bold magenta]{name}[/bold magenta] target.")
