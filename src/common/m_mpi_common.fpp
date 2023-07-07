@@ -62,14 +62,11 @@ contains
     end subroutine s_mpi_initialize ! --------------------------------------
 
 
-    subroutine s_initialize_mpi_data(q_cons_vf, pb, mv) ! --------------------------
+    subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-
-        type(pres_field), &
-            intent(IN), optional :: pb, mv
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
 
