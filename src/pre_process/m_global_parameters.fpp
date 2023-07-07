@@ -97,6 +97,9 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     integer :: precision !< Precision of output files
 
+    logical :: vel_profile !< Set hypertangent streamwise velocity profile
+    logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
+ 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -185,6 +188,8 @@ module m_global_parameters
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
+    type(pres_field) :: pb
+    type(pres_field) :: mv
 
 contains
 
@@ -248,6 +253,8 @@ contains
 
         parallel_io = .false.
         precision = 2
+        vel_profile = .false.
+        instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_sph = .false.

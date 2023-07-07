@@ -193,7 +193,7 @@ program p_main
     end if
 
     ! Reading in the user provided initial condition and grid data
-    call s_read_data_files(q_cons_ts(1)%vf, pb_ts(1), mv_ts(1))
+    call s_read_data_files(q_cons_ts(1)%vf)
     if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
 
     ! Populating the buffers of the grid variables using the boundary conditions
@@ -266,7 +266,7 @@ program p_main
 
         ! Time-stepping loop controls
 
-        if (t_step == t_step_stop ) then
+        if (t_step == t_step_stop) then
 
             call s_mpi_barrier()
 
@@ -351,7 +351,7 @@ program p_main
                 !$acc update host(mv_ts(1)%sf)
             end if
 
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1), mv_ts(1), t_step)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
             nt = int((t_step - t_step_start)/(t_step_save))

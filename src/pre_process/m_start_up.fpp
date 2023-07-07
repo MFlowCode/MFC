@@ -49,7 +49,7 @@ module m_start_up
 
         end subroutine s_read_abstract_grid_data_files ! ---------------
 
-        subroutine s_read_abstract_ic_data_files(q_cons_vf, pb, mv) ! -----------
+        subroutine s_read_abstract_ic_data_files(q_cons_vf) ! -----------
 
             import :: scalar_field, sys_size, pres_field
 
@@ -57,11 +57,6 @@ module m_start_up
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_cons_vf
-
-            type(pres_field), intent(INOUT) :: pb, mv
-
-
-
 
         end subroutine s_read_abstract_ic_data_files ! -----------------
 
@@ -103,7 +98,7 @@ contains
             adv_alphan, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
             hypoelasticity, patch_icpp, fluid_pp, &
-            precision, parallel_io, &
+            precision, parallel_io, vel_profile, instability_wave, &
             perturb_flow, perturb_flow_fluid, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
@@ -363,13 +358,11 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_serial_ic_data_files(q_cons_vf, pb, mv) ! ---------------------------
+    subroutine s_read_serial_ic_data_files(q_cons_vf) ! ---------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
-
-        type(pres_field), intent(INOUT) :: pb, mv
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -579,14 +572,11 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_ic_data_files(q_cons_vf, pb, mv) ! ------------------
+    subroutine s_read_parallel_ic_data_files(q_cons_vf) ! ------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
-
-
-        type(pres_field), intent(INOUT) :: pb, mv
 
 #ifdef MFC_MPI
 
@@ -612,7 +602,7 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
             ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf, pb, mv)
+            call s_initialize_mpi_data(q_cons_vf)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)

@@ -95,7 +95,6 @@ module m_global_parameters
     logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
-    integer :: weno_vars      !< WENO-reconstructed state variables type
     logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
@@ -311,7 +310,9 @@ module m_global_parameters
 
     logical :: weno_flat, riemann_flat, cu_mpi
 
-    real(kind(0d0)), allocatable, dimension(:) :: pb_idx
+    type(pres_field), allocatable, dimension(:) :: pb_ts
+    type(pres_field), allocatable, dimension(:) :: mv_ts
+    !$acc declare create(pb_ts, mv_ts)
     ! ======================================================================
 
 contains
@@ -345,7 +346,6 @@ contains
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
-        weno_vars = dflt_int
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.
@@ -565,15 +565,6 @@ contains
                             bub_idx%vs(i) = bub_idx%moms(i, 3)
                         end do
 
-                        if(.not. polytropic) then
-                            @:ALLOCATE(pb_idx(nb*nnode))
-                            do i = 1, nb
-                                do j = 1, nnode
-                                    pb_idx = j + (i-1)*nnode
-                                end do
-                            end do
-                        end if
-
                     else
                         do i = 1, nb
                             if (.not. polytropic) then
@@ -597,19 +588,10 @@ contains
                         R0(:) = 1d0
                         V0(:) = 1d0
                     else if (nb > 1) then
-                        if (R0_type == 1) then
-                            !call s_simpson
-                        else
-                            print *, 'Invalid R0 type - abort'
-                            stop
-                        end if
                         V0(:) = 1d0
                     else
                         stop 'Invalid value of nb'
                     end if
-
-                    !print *, 'R0 weights: ', weight(:)
-                    !print *, 'R0 abscissas: ', R0(:)
 
                     if(.not. qbmm) then
                         if (polytropic) then
@@ -700,20 +682,12 @@ contains
                         R0(:) = 1d0
                         V0(:) = 0d0
                     else if (nb > 1) then
-                        if (R0_type == 1) then
-                            !call s_simpson
-                        else
-                            print *, 'Invalid R0 type - abort'
-                            stop
-                        end if
                         V0(:) = 1d0
                     else
                         stop 'Invalid value of nb'
                     end if
 
-                    if (.not. polytropic) then
-                        !call s_initialize_nonpoly
-                    else
+                    if (polytropic) then
                         rhoref = 1.d0
                         pref = 1.d0
                     end if
