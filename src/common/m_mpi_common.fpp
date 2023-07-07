@@ -82,12 +82,23 @@ contains
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
         end do
 
-#ifndef MFC_POST_PROCESS 
+#ifdef MFC_PRE_PROCESS 
         if(qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, 4
                         MPI_IO_DATA%var(sys_size + (i-1)*4 + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i) 
                         MPI_IO_DATA%var(sys_size + (i-1)*4 + j + nb*4)%sf => mv%sf(0:m, 0:n, 0:p, j, i) 
+                end do
+            end do                  
+        end if
+#endif
+
+#ifdef MFC_SIMULATION 
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb
+                do j = 1, 4
+                        MPI_IO_DATA%var(sys_size + (i-1)*4 + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
+                        MPI_IO_DATA%var(sys_size + (i-1)*4 + j + nb*4)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
                 end do
             end do                  
         end if

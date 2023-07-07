@@ -47,7 +47,7 @@ module m_data_output
         !> Write data files
         !! @param q_cons_vf Conservative variables
         !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, pb, mv, t_step)
+        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
             import :: scalar_field, sys_size, pres_field
 
@@ -58,10 +58,6 @@ module m_data_output
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_prim_vf
-
-            type(pres_field), intent(INOUT) :: pb, mv
-
-
 
             integer, intent(IN) :: t_step
 
@@ -428,12 +424,10 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, pb, mv, t_step) ! ---------------------
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-
-        type(pres_field), intent(INOUT) :: pb, mv
 
         integer, intent(IN) :: t_step
 
@@ -522,7 +516,7 @@ contains
                           FORM='unformatted', &
                           STATUS='new')
 
-                    write (2) pb%sf(0:m, 0:n, 0:p, r, i); close (2)
+                    write (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
                 end do
             end do
 
@@ -535,7 +529,7 @@ contains
                           FORM='unformatted', &
                           STATUS='new')
 
-                    write (2) mv%sf(0:m, 0:n, 0:p, r, i); close (2)
+                    write (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
                 end do
             end do
         end if
@@ -607,7 +601,7 @@ contains
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), pb%sf(j, 0, 0, r, i)
+                            write (2, FMT) x_cb(j), pb_ts(1)%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -618,7 +612,7 @@ contains
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), mv%sf(j, 0, 0, r, i)
+                            write (2, FMT) x_cb(j), mv_ts(1)%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -654,7 +648,7 @@ contains
                         open (2, FILE=trim(file_path))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), pb%sf(j, k, 0, r, i)
+                                write (2, FMT) x_cb(j), y_cb(k), pb_ts(1)%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -667,7 +661,7 @@ contains
                         open (2, FILE=trim(file_path))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), mv%sf(j, k, 0, r, i)
+                                write (2, FMT) x_cb(j), y_cb(k), mv_ts(1)%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -731,7 +725,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb%sf(j, k, l, r, i)
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb_ts(1)%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -746,7 +740,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv%sf(j, k, l, r, i)
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv_ts(1)%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -788,13 +782,11 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, pb, mv, t_step) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step) ! --
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-
-        type(pres_field), intent(INOUT) :: pb, mv
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -819,7 +811,7 @@ contains
 
         ! Initialize MPI data I/O
 
-        call s_initialize_mpi_data(q_cons_vf, pb, mv)
+        call s_initialize_mpi_data(q_cons_vf)
 
         ! Open the file to write all flow variables
         write (file_loc, '(I0,A)') t_step, '.dat'

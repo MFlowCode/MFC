@@ -43,7 +43,7 @@ module m_data_output
 
         !>  Interface for the conservative data
         !! @param q_cons_vf The conservative variables
-        subroutine s_write_abstract_data_files(q_cons_vf, pb, mv)
+        subroutine s_write_abstract_data_files(q_cons_vf)
 
             import :: scalar_field, sys_size, pres_field
 
@@ -51,7 +51,6 @@ module m_data_output
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(IN) :: q_cons_vf
-            type(pres_field), intent(IN) :: pb, mv
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
@@ -69,13 +68,10 @@ contains
     !>  Writes grid and initial condition data files to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf The conservative variables
-    subroutine s_write_serial_data_files(q_cons_vf, pb, mv) ! -----------
+    subroutine s_write_serial_data_files(q_cons_vf) ! -----------
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-            
-        type(pres_field), &
-            intent(IN) :: pb, mv
 
         logical :: file_exist !< checks if file exists
 
@@ -381,15 +377,12 @@ contains
     !> Writes grid and initial condition data files in parallel to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf The conservative variables
-    subroutine s_write_parallel_data_files(q_cons_vf, pb, mv) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf) ! --
 
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-
-        type(pres_field), &
-            intent(IN) :: pb, mv
 
 #ifdef MFC_MPI
 
@@ -408,7 +401,7 @@ contains
         integer :: i
 
         ! Initialize MPI data I/O
-        call s_initialize_mpi_data(q_cons_vf, pb, mv)
+        call s_initialize_mpi_data(q_cons_vf)
         
         ! Open the file to write all flow variables
         write (file_loc, '(I0,A)') t_step_start, '.dat'

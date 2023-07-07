@@ -47,15 +47,13 @@ module m_start_up
     abstract interface ! ===================================================
 
         !! @param q_cons_vf  Conservative variables
-        subroutine s_read_abstract_data_files(q_cons_vf, pb, mv) ! -----------
+        subroutine s_read_abstract_data_files(q_cons_vf) ! -----------
 
             import :: scalar_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_cons_vf
-
-        type(pres_field), intent(INOUT) :: pb, mv           
 
         end subroutine s_read_abstract_data_files ! -----------------
 
@@ -85,8 +83,8 @@ contains
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
-            mpp_lim, time_stepper, weno_vars, &
-            weno_eps, weno_flat, riemann_flat, cu_mpi, cu_tensor, &
+            mpp_lim, time_stepper,  weno_eps, weno_flat, &
+            riemann_flat, cu_mpi, cu_tensor, &
             mapped_weno, mp_weno, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
@@ -178,11 +176,9 @@ contains
         !!              up the latter. This procedure also calculates the cell-
         !!              width distributions from the cell-boundary locations.
         !! @param q_cons_vf Cell-averaged conservative variables
-    subroutine s_read_serial_data_files(q_cons_vf, pb, mv) ! ------------------------------
+    subroutine s_read_serial_data_files(q_cons_vf) ! ------------------------------
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-
-        type(pres_field), intent(INOUT) :: pb, mv
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
@@ -316,7 +312,7 @@ contains
                                   FORM='unformatted', &
                                   ACTION='read', &
                                   STATUS='old')
-                            read (2) pb%sf(0:m, 0:n, 0:p, r, i); close (2)
+                            read (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
                         else
                             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                         end if
@@ -332,7 +328,7 @@ contains
                                   FORM='unformatted', &
                                   ACTION='read', &
                                   STATUS='old')
-                            read (2) mv%sf(0:m, 0:n, 0:p, r, i); close (2)
+                            read (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
                         else
                             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                         end if
@@ -345,13 +341,11 @@ contains
     end subroutine s_read_serial_data_files ! -------------------------------------
 
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_data_files(q_cons_vf, pb, mv) ! ---------------------------
+    subroutine s_read_parallel_data_files(q_cons_vf) ! ---------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
-
-        type(pres_field), intent(INOUT) :: pb, mv 
 
 #ifdef MFC_MPI
 
@@ -450,7 +444,7 @@ contains
             ! Initialize MPI data I/O
 
 
-            call s_initialize_mpi_data(q_cons_vf, pb, mv)
+            call s_initialize_mpi_data(q_cons_vf)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)

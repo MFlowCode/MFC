@@ -210,9 +210,8 @@ contains
 
     end subroutine s_assign_patch_mixture_primitive_variables ! ------------
 
-    subroutine s_perturb_primitive(patch_id, j, k, l, q_prim_vf)
+    subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
         type(scalar_field), dimension(1:sys_size), intent(INOUT) :: q_prim_vf
         integer, intent(IN) :: j, k, l
 
@@ -572,6 +571,13 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
+        ! Set streamwise velocity to hypertangent function of y
+         if (vel_profile) then
+             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
+                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
+                 + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
+         end if
+   
         ! Smoothed bubble variables
         if (bubbles) then
             do i = 1, nb
@@ -812,6 +818,13 @@ contains
                 (eta*patch_icpp(patch_id)%vel(i) &
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
+
+        ! Set streamwise velocity to hypertangent function of y
+         if (vel_profile) then
+             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
+                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
+                 + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
+         end if
 
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &

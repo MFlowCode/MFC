@@ -46,13 +46,6 @@ module m_time_steppers
     type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
-    type(pres_field), allocatable, dimension(:) :: pb_ts
-
-    type(pres_field), allocatable, dimension(:) :: mv_ts
-
-
-    type(pres_field) :: pb_temp
-
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
@@ -60,7 +53,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, q_cons_temp, pb_temp, mv, pb_ts, rhs_mv, rhs_pb)
+!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, q_cons_temp, rhs_mv, rhs_pb)
 
 contains
 
@@ -161,9 +154,6 @@ contains
                           iy_t%beg:iy_t%end, &
                           iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%end, &
-                          iy_t%beg:iy_t%end, &
-                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
-            @:ALLOCATE(pb_temp%sf(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &
                           iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%end, &

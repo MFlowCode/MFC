@@ -8,7 +8,7 @@
         real(kind(0d0)), intent(IN) :: vel_sum
         real(kind(0d0)), intent(OUT) :: c
 
-        real(kind(0d0)) :: blkmod1, blkmod2, n_tait, B_tait
+        real(kind(0d0)) :: blkmod1, blkmod2
 
         integer :: q
 
@@ -30,17 +30,14 @@
         elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles))) then
             ! Sound speed for bubble mmixture to order O(\alpha)
 
-            n_tait = (1d0/gamma + 1d0)
-            B_tait = pi_inf *(n_tait - 1) / n_tait
-
             if (mpp_lim .and. (num_fluids > 1)) then
                 c = (1d0/gamma + 1d0)* &
                       (pres + pi_inf/(gamma+1d0))/rho
             else
                 c = &
                     (1d0/gamma + 1d0)* &    
-                    (pres + B_tait) / &
-                    (rho * (1 - adv(num_fluids)))
+                    (pres + pi_inf/(gamma + 1d0)) / &
+                    (rho * (1d0 - adv(num_fluids)))
             end if
 
         else 

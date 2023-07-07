@@ -123,7 +123,7 @@ contains
 
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
-            & 'num_fluids','time_stepper', 'weno_vars', 'riemann_solver',      & 
+            & 'num_fluids','time_stepper', 'riemann_solver',      & 
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', & 
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'bc_x_glb%beg',  & 
             & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &

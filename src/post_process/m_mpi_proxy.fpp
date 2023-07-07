@@ -163,7 +163,7 @@ contains
 
         #:for VAR in [ 'cyl_coord', 'adv_alphan', 'mpp_lim', 'mixture_err',    &
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
-            & 'coarsen_silo', 'E_wrt', 'pres_wrt', 'gamma_wrt',                & 
+            & 'E_wrt', 'pres_wrt', 'gamma_wrt',                & 
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', & 
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles',   &
             & 'polytropic', 'fourier_decomp', 'polydisperse' ]

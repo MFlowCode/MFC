@@ -131,11 +131,11 @@ program p_main
         end if
     end if
 
-    if (old_ic) call s_read_ic_data_files(q_cons_vf, pb, mv)
+    if (old_ic) call s_read_ic_data_files(q_cons_vf)
 
     call s_generate_initial_condition()
 
-    call s_write_data_files(q_cons_vf, pb, mv)
+    call s_write_data_files(q_cons_vf)
 
     call cpu_time(finish)
 

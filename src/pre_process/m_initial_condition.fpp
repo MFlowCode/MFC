@@ -28,7 +28,9 @@ module m_initial_condition
 
     use m_assign_variables
 
-    use m_eigen_solver
+     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
+     ! complex general matrix
+
     ! ==========================================================================
     ! ==========================================================================
 
@@ -42,16 +44,10 @@ module m_initial_condition
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
-    type(pres_field) :: pb
-
-    type(pres_field) :: mv
-
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
     !! patch identity may be associated with any one cell.
-
-
 
 contains
 
@@ -232,6 +228,7 @@ contains
 
         if (perturb_flow) call s_perturb_surrounding_flow()
         if (perturb_sph) call s_perturb_sphere()
+        if (instability_wave) call s_superposition_instability_wave()
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &

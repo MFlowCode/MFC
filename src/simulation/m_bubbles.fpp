@@ -105,9 +105,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
         integer :: i, j, k, l, q, ii !< Loop variables
-        integer :: ndirs  !< Number of coordinate directions
-
-        
+        integer :: ndirs  !< Number of coordinate directions       
 
         !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
@@ -199,7 +197,7 @@ contains
                         end if
                         
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
-                        B_tait = B_tait * (n_tait - 1d0) / n_tait
+                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
@@ -464,7 +462,7 @@ contains
         real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = (Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0)
+            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
             if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
                                               (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else

@@ -690,6 +690,7 @@ contains
                                 end if
 
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+
                             end do
                         end do
                     end do
@@ -998,7 +999,6 @@ contains
                                                          + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
                                                       *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                            abs(vR_max - vR_rs_vf(j, k, l, i)))
-
                          ! END: Right Monotonicity Preserving Bound =========================
                     end do
                 end do
