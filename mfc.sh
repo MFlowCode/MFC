@@ -47,7 +47,8 @@ if [ "$1" == 'load' ]; then
         log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d)"
         log   "$Y""GaTech$W:  Phoenix    (p)"
         log   "$R""CALTECH$W: Richardson (r)"
-        log_n "($G""a$W/$G""c$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR): "
+        log   "$R""BROWN$W:   Oscar (o)"
+        log_n "($G""a$W/$G""c$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR/$R""o$CR): "
         read u_c
         log
     fi
