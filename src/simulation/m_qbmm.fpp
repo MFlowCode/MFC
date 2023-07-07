@@ -548,7 +548,6 @@ contains
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)), dimension(nmom) :: moms, msum
-        real(kind(0d0)), dimension(nb) :: Rvec
         real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht , ht 
         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
         real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
@@ -560,7 +559,7 @@ contains
         integer :: i1, i2
 
 
-!$acc parallel loop collapse(3) gang vector default(present) private(moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht)
+!$acc parallel loop collapse(3) gang vector default(present) private(moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T)
         do id3 = iz%beg, iz%end
             do id2 = iy%beg, iy%end
                 do id1 = ix%beg, ix%end
@@ -594,7 +593,6 @@ contains
 
                         nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
 
-
                         !$acc loop seq
                         do q = 1, nb
                             !$acc loop seq
@@ -607,10 +605,12 @@ contains
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
                             if(polytropic) then
+                                !$acc loop seq
                                  do j = 1, nnode
                                     wght_pb(j, q) = wght(j, q) * (pb0(q) - pv)
                                 end do                                
                             else
+                                !$acc loop seq
                                 do j = 1, nnode
                                     chi_vw = 1.d0/(1.d0 + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1.d0))
                                     x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
@@ -671,11 +671,9 @@ contains
                             end do
 
                             if(.not. polytropic) then
-                                                                                
+                                !$acc loop seq                                                
                                 do j = 1, nnode
-
                                     drdt = msum(2)
-
                                     if(moms(4) - moms(2)**2d0 > 0d0) then
                                         if(j == 1 .or. j == 2) then
                                             drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * -1d0
@@ -690,16 +688,13 @@ contains
                                             drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * 1d0
                                         end if
                                     end if
-
                                     drdt2 = drdt2 * (msum(3) - 2d0*moms(2) * msum(2))                                   
                                     drdt = drdt + drdt2
 
                                     rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*drdt/ abscX(j, q)) * (pb(id1, id2, id3, j, q)) 
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q)  + (3d0 * gam / abscX(j, q)) * rhs_mv(id1, id2, id3, j, q) * R_v * Tw  
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q)  + (3d0 * gam / abscX(j, q)) * ht(j, q)
-
-                                    rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q) * (4d0 * pi * abscX(j, q) ** 2d0)  
-                                           
+                                    rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q) * (4d0 * pi * abscX(j, q) ** 2d0)                                             
                                 end do
                                         
                             end if                            
@@ -832,28 +827,28 @@ contains
 
     end subroutine s_hyqmom
 
-    function f_quad(abscX, abscY, wght, q, r, s)
+    function f_quad(abscX, abscY, wght_in, q, r, s)
         !$acc routine seq
-        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
+        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght_in
         real(kind(0.d0)), intent(IN) :: q, r, s
         real(kind(0.d0)) :: f_quad_RV, f_quad
         integer :: i
 
         f_quad = 0d0
         do i = 1, nb
-            f_quad_RV = sum(wght(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
+            f_quad_RV = sum(wght_in(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
             f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
         end do
 
     end function f_quad
 
-    function f_quad2D(abscX, abscY, wght, pow)
+    function f_quad2D(abscX, abscY, wght_in, pow)
         !$acc routine seq
-        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght
+        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght_in
         real(kind(0.d0)), dimension(3), intent(IN) :: pow
         real(kind(0.d0)) :: f_quad2D
 
-        f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
+        f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
     end function f_quad2D
 
 end module m_qbmm
