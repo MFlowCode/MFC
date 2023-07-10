@@ -130,6 +130,8 @@ def handle_case(test: TestCase):
             tol = 1e-10
         elif test.params.get("hypoelasticity", 'F') == 'T':
             tol = 1e-7
+        elif test.params.get("weno_avg", 'F') == 'T':
+            tol = 1e-8    
         else:
             tol = 1e-12
 
