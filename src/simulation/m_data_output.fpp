@@ -508,9 +508,9 @@ contains
 
         if(qbmm .and. .not. polytropic) then
             do i = 1, nb
-                do r = 1, 4
+                do r = 1, nnode
                     write (file_path, '(A,I0,A)') trim(t_step_dir)//'/pb', &
-                        sys_size + (i-1)*4 + r, '.dat'
+                        sys_size + (i-1)*nnode + r, '.dat'
 
                     open (2, FILE=trim(file_path), &
                           FORM='unformatted', &
@@ -521,9 +521,9 @@ contains
             end do
 
             do i = 1, nb
-                do r = 1, 4
+                do r = 1, nnode
                     write (file_path, '(A,I0,A)') trim(t_step_dir)//'/mv', &
-                        sys_size + (i-1)*4 + r, '.dat'
+                        sys_size + (i-1)*nnode + r, '.dat'
 
                     open (2, FILE=trim(file_path), &
                           FORM='unformatted', &
@@ -596,7 +596,7 @@ contains
 
             if(qbmm .and. .not. polytropic) then
                 do i = 1, nb
-                    do r = 1, 4
+                    do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
@@ -607,7 +607,7 @@ contains
                     end do
                 end do
                 do i = 1, nb
-                    do r = 1, 4
+                    do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
@@ -642,7 +642,7 @@ contains
 
             if(qbmm .and. .not. polytropic) then
                 do i = 1, nb
-                    do r = 1, 4
+                    do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
@@ -655,7 +655,7 @@ contains
                     end do
                 end do
                 do i = 1, nb
-                    do r = 1, 4
+                    do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
@@ -718,7 +718,7 @@ contains
 
             if(qbmm .and. .not. polytropic) then
                 do i = 1, nb
-                    do r = 1, 4
+                    do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
@@ -733,7 +733,7 @@ contains
                     end do
                 end do
                 do i = 1, nb
-                    do r = 1, 4
+                    do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
@@ -848,8 +848,9 @@ contains
                 call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                         MPI_DOUBLE_PRECISION, status, ierr)
             end do
+            !Write pb and mv for non-polytropic qbmm
              if(qbmm .and. .not. polytropic) then
-                do i = sys_size + 1, sys_size + 2*nb*4! adv_idx%end
+                do i = sys_size + 1, sys_size + 2*nb*nnode
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file

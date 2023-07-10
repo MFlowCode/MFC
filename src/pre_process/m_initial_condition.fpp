@@ -70,13 +70,14 @@ contains
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         if(qbmm .and. .not. polytropic) then
+        !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
             allocate(pb%sf(0:m, &
                   0:n, &
-                  0:p, 1:4, 1:nb))
+                  0:p, 1:nnode, 1:nb))
 
             allocate(mv%sf(0:m, &
                   0:n, &
-                  0:p, 1:4, 1:nb))
+                  0:p, 1:nnode, 1:nb))
         end if
         ! Setting default values for conservative and primitive variables so
         ! that in the case that the initial condition is wrongly laid out on
@@ -235,6 +236,7 @@ contains
                                                            q_cons_vf)
 
         if(qbmm .and. .not. polytropic) then
+            !Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if

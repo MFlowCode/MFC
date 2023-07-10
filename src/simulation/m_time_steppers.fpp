@@ -139,7 +139,7 @@ contains
         end if
 
         @:ALLOCATE(pb_ts(1:2))
-
+        !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if(qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &
@@ -245,7 +245,7 @@ contains
                 end do
             end do
         end do
-
+        !Evolve pb and mv for non-polytropic qbmm
         if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
@@ -338,7 +338,7 @@ contains
                 end do
             end do
         end do
-
+        !Evolve pb and mv for non-polytropic qbmm
         if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
@@ -491,7 +491,7 @@ contains
                 end do
             end do
         end do
-
+        !Evolve pb and mv for non-polytropic qbmm
         if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb

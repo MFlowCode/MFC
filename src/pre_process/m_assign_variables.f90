@@ -210,6 +210,7 @@ contains
 
     end subroutine s_assign_patch_mixture_primitive_variables ! ------------
 
+    !Stable perturbation in pressure (Ando)
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         type(scalar_field), dimension(1:sys_size), intent(INOUT) :: q_prim_vf

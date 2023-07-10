@@ -402,12 +402,13 @@ contains
 
         end do
 
+        !Read bubble variables pb and mv for non-polytropic qbmm
         if(qbmm .and. .not. polytropic) then
             do i = 1, nb
-                do r = 1, 4
+                do r = 1, nnode
                     ! Checking whether data file associated with variable position
-                    ! of the currently manipulated conservative variable exists
-                    write (file_num, '(I0)') sys_size + r + (i-1)*4
+                    ! of the currently manipulated bubble variable exists
+                    write (file_num, '(I0)') sys_size + r + (i-1)*nnode
                     file_loc = trim(t_step_dir)//'/pb'// &
                                trim(file_num)//'.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -430,7 +431,7 @@ contains
             do i = 1, nb
                 do r = 1, 4
                     ! Checking whether data file associated with variable position
-                    ! of the currently manipulated conservative variable exists
+                    ! of the currently manipulated bubble variable exists
                     write (file_num, '(I0)') sys_size + r + (i-1)*4  
                     file_loc = trim(t_step_dir)//'/mv'// &
                                trim(file_num)//'.dat'

@@ -897,6 +897,7 @@ contains
                     end do
                 end do
 
+                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                 if(qbmm .and. (.not. polytropic) ) then
                     !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                     do i = 1, nb
@@ -1132,7 +1133,7 @@ contains
                         end do
                     end do
                 end do
-
+                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                 if(qbmm .and. (.not. polytropic) ) then
                 !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                     do i = 1, nb
@@ -1504,7 +1505,7 @@ contains
                             end do
                         end do
                     end do
-
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                     if(qbmm .and. (.not. polytropic)) then
                     !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                         do i = 1, nb
@@ -1642,7 +1643,7 @@ contains
                             end do
                         end do
                     end do
-
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                     if(qbmm .and. (.not. polytropic) ) then
                     !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                         do i = 1, nb

@@ -68,7 +68,7 @@ contains
 
         ! Assigns the required RHS moments for moment transport equations
         ! The rhs%(:,3) is only to be used for R0 quadrature, not for computing X/Y indices
-
+        ! Accounts for different governing equations in polytropic and non-polytropic models 
         if(.not. polytropic) then
             do q = 1, nb
                 do i1 = 0, 2; do i2 = 0, 2
@@ -413,6 +413,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
+!Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
         subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
 !$acc routine seq
         real(kind(0.d0)), intent(INOUT) :: pres, rho, c
@@ -480,6 +481,7 @@ contains
 
     end subroutine s_coeff_nonpoly
 
+!Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
     subroutine s_coeff(pres, rho, c, coeffs)
 !$acc routine seq
         real(kind(0.d0)), intent(INOUT) :: pres, rho, c
@@ -595,6 +597,7 @@ contains
 
                         !$acc loop seq
                         do q = 1, nb
+                            !Initialize moment set for each R0 bin
                             !$acc loop seq
                             do r = 2, nmom                                                                     
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3) 
@@ -605,11 +608,13 @@ contains
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
                             if(polytropic) then
+                                !Account for bubble pressure pb0 at each R0 bin
                                 !$acc loop seq
                                  do j = 1, nnode
                                     wght_pb(j, q) = wght(j, q) * (pb0(q) - pv)
                                 end do                                
                             else
+                                !Account for bubble pressure, mass transfer rate and heat transfer rate in wght_pb, wght_mv and wght_ht using Preston model
                                 !$acc loop seq
                                 do j = 1, nnode
                                     chi_vw = 1.d0/(1.d0 + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1.d0))
@@ -631,6 +636,7 @@ contains
                                 end do                                
                             end if
 
+                            !Compute change in moments due to bubble dynamics
                             r = 1
                             !$acc loop seq
                             do i2 = 0, 2
@@ -640,18 +646,19 @@ contains
                                         momsum = 0d0
                                         !$acc loop seq
                                         do j = 1, nterms
+                                            ! Account for term with pb in Rayleigh Plesset equation
                                             if(bubble_model == 3 .and. j == 3 ) then          
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
-                                            else if(bubble_model == 2 .and. ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23))) then
+                                            ! Account for terms with pb in Keller-Miksis equation
+                                            else if(bubble_model == 2 .and. ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 .and. j <= 11) .or. (j == 26))) then
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
-                                            else if(bubble_model == 2 .and. ((j >= 10 .and. j <= 11) .or. (j == 26))) then
-                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
-                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                            ! Account for terms with mass transfer rate in Keller-Miksis equation
                                             else if(bubble_model == 2 .and. (j >= 27 .and. j <= 29) .and. (.not. polytropic)) then
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, q), momrhs(:, i1, i2, j, q))
+                                            ! Account for terms with heat transfer rate in Keller-Miksis equation
                                             else if(bubble_model == 2 .and. (j >= 30 .and. j <= 32) .and. (.not. polytropic)) then
                                             momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
                                                             *f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, q), momrhs(:, i1, i2, j, q))
@@ -669,10 +676,11 @@ contains
                                     end if
                                 end do
                             end do
-
+                            !Compute change in pb and mv for non-polytroic model
                             if(.not. polytropic) then
                                 !$acc loop seq                                                
                                 do j = 1, nnode
+                                    !Compute Rdot (drdt) at quadrature node in the ODE for pb (note this is not the same as bubble variable Rdot)
                                     drdt = msum(2)
                                     if(moms(4) - moms(2)**2d0 > 0d0) then
                                         if(j == 1 .or. j == 2) then
@@ -681,7 +689,7 @@ contains
                                             drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * 1d0
                                         end if
                                     else
-
+                                        !Edge case where variance < 0
                                         if(j == 1 .or. j == 2) then
                                             drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * -1d0
                                         else
@@ -700,8 +708,7 @@ contains
                             end if                            
                         end do
 
-
-
+                        !Compute special high-order moments
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
                         momsp(2)%sf(id1, id2, id3) = 4.d0*pi*nbub* f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0)
                         momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 2d0, 0d0)
@@ -709,6 +716,7 @@ contains
                             ! Gam \approx 1, don't risk imaginary quadrature
                             momsp(4)%sf(id1, id2, id3) = 1.d0
                         else
+                            !Special moment with bubble pressure pb 
                             if(polytropic) then
                                 momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3d0*(1d0 - gam), 0d0, 3d0*gam) + pv * f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0) & 
                                                                 - 4d0*Re_inv*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0) - (2d0 / Web) * f_quad(abscX, abscY, wght, 2d0, 0d0, 0d0)

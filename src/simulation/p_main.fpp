@@ -134,12 +134,15 @@ program p_main
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
+    !Quadrature weights and nodes for polydisperse simulations
     if(bubbles .and. nb > 1 .and. R0_type == 1) then
         call s_simpson
     end if
+    !Initialize variables for non-polytropic (Preston) model
     if(bubbles .and. .not. polytropic) then
         call s_initialize_nonpoly()
     end if
+    !Initialize pb based on surface tension for qbmm (polytropic)
     if(qbmm .and. polytropic .and. Web /= dflt_real) then
         pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)                              
     end if
@@ -216,6 +219,7 @@ program p_main
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
+    !Update GPU DATA
     !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
     !$acc update device(sys_size, buff_size)
     !$acc update device(m, n, p)
