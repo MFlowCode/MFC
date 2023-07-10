@@ -470,8 +470,6 @@ contains
 !$acc update device(nb)
         #:endif
 
-
-
         ! Initializing the number of fluids for which viscous effects will
         ! be non-negligible, the number of distinctive material interfaces
         ! for which surface tension will be important and also, the number
@@ -601,21 +599,17 @@ contains
                     end if
 
                     if(qbmm) then
-
                         if(polytropic) then
                             pv = fluid_pp(1)%pv 
-                            @:ALLOCATE(pb0(nb))
-                            if(Web == dflt_real) then                               
-                                pb0 = pref                                
-                            end if
-                            pb0 = pb0 / pref
                             pv = pv / pref
-
-                            pref = 1d0
-                            rhoref = 1d0
-                            
+                            @:ALLOCATE(pb0(nb))
+                            if(Web == dflt_real) then                            
+                                pb0 = pref
+                                pb0 = pb0 / pref
+                                pref = 1d0                  
+                            end if
+                            rhoref = 1d0                           
                         end if
-
                     end if
 
                 end if

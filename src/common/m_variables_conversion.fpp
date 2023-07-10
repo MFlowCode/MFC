@@ -701,8 +701,8 @@ contains
 
     end subroutine s_initialize_variables_conversion_module ! --------------
 
-        subroutine s_initialize_mv(qK_cons_vf, mv)
-    
+        !Initialize mv at the quadrature nodes based on the initialized moments and sigma  
+        subroutine s_initialize_mv(qK_cons_vf, mv)      
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf 
         real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(INOUT) :: mv 
         integer :: i, j, k, l 
@@ -733,6 +733,7 @@ contains
 
     end subroutine s_initialize_mv
 
+    !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
     
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
@@ -758,15 +759,7 @@ contains
                         pb(j, k, l, 2, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 2, i)) / (mu - sig)**(3d0) / (mass_n0(i) + mass_v0(i))
                         pb(j, k, l, 3, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 3, i)) / (mu + sig)**(3d0) / (mass_n0(i) + mass_v0(i))
                         pb(j, k, l, 4, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 4, i)) / (mu + sig)**(3d0) / (mass_n0(i) + mass_v0(i))
-
-                        ! POLYTROPIC
-                        !pb(j, k, l, 1, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu - sig)**(3d0*gam) 
-                        !pb(j, k, l, 2, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu - sig)**(3d0*gam) 
-                        !pb(j, k, l, 3, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu + sig)**(3d0*gam) 
-                        !pb(j, k, l, 4, i) = (pb0(i)) * (R0(i)**(3d0*gam))  / (mu + sig)**(3d0*gam) 
                     end do
-
-
                 end do
             end do
         end do
@@ -895,13 +888,15 @@ contains
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
                         if(qbmm) then
+                            !Get nb (constant across all R0 bins)
                             nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
+                            !Convert cons to prim 
                             !$acc loop seq
                             do i = bubxb , bubxe
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
                             end do
-
+                            !Need to keep track of nb in the primitive variable list (converted back to true value before output)
 #ifdef MFC_SIMULATION                            
                             qK_prim_vf(bubxb)%sf(j, k, l) = qK_cons_vf(bubxb)%sf(j, k, l)                            
 #endif
@@ -914,14 +909,6 @@ contains
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
                             end do                        
                         end if                   
-
-                        if(qbmm) then
-                            R3tmp = 0d0
-                            do i = 1, nb
-                                R3tmp = R3tmp + weight(i)* 0.5d0 * (qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) + dsqrt(qK_prim_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) - qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) **2d0) ) ** 3d0
-                                R3tmp = R3tmp + weight(i)* 0.5d0 * (qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) - dsqrt(qK_prim_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) - qK_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) **2d0) ) ** 3d0
-                            end do                                                                                                                  
-                        end if
                     end if
 
                     if (hypoelasticity) then
@@ -1054,12 +1041,13 @@ contains
                         if(.not. qbmm) then
                             call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
                         else
+                            !Initialize R3 averaging over R0 and R directions
                             R3tmp = 0d0
                             do i = 1, nb
                                 R3tmp = R3tmp + weight(i) * 0.5d0 * (Rtmp(i) + sigR) ** 3d0
                                 R3tmp = R3tmp + weight(i) * 0.5d0 * (Rtmp(i) - sigR) ** 3d0 
                             end do
-
+                            !Initialize nb 
                             nbub = 3d0 * q_prim_vf(alf_idx)%sf(j, k, l) / (4d0 * pi * R3tmp)
                         end if
                    

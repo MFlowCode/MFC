@@ -1534,8 +1534,7 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                                 if (avg_state == 2) then
-
-!$acc loop seq
+                                    !$acc loop seq
                                     do i = 1, nb
                                         R0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, rs(i))
                                         R0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, rs(i))
@@ -1549,28 +1548,22 @@ contains
                                     end do
 
                                     if(.not. qbmm) then
-
                                         nbub_L_denom = 0d0
                                         nbub_R_denom = 0d0
-
                                         !$acc loop seq
                                         do i = 1, nb
                                             nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
                                             nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
                                         end do
-
                                         nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
                                         nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom                                        
                                     else
-
+                                        !nb stored in 0th moment of first R0 bin in variable conversion module
                                         nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, bubxb)
                                         nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, bubxb)
-
                                     end if
 
-
-
-!$acc loop seq
+                                    !$acc loop seq
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then

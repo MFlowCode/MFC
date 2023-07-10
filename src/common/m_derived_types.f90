@@ -20,6 +20,7 @@ module m_derived_types
         real(kind(0d0)), pointer, dimension(:, :, :) :: sf => null()
     end type scalar_field
 
+    !> Derived type for bubble variables pb and mv at quadrature nodes (qbmm)
     type pres_field
         real(kind(0d0)), pointer, dimension(:, :, :, :, :) :: sf => null()
     end type pres_field

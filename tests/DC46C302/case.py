@@ -64,7 +64,7 @@ case = {
     "pref": 101325.0,
     "rhoref": 1000.0,
     "bubble_model": 3,
-    "polytropic": "T",
+    "polytropic": "F",
     "polydisperse": "F",
     "thermal": 3,
     "R0ref": 1e-05,

@@ -478,16 +478,12 @@ contains
                 if(qbmm) then
                     if(polytropic) then
                         allocate(pb0(nb))
-                        if(Web == dflt_real) then
-                            do i = 1, nb
-                                pb0 = pref
-                            end do
+                        if(Web == dflt_real) then                            
+                            pb0 = pref
+                            pb0 = pb0 / pref
+                            pref = 1d0                  
                         end if
-
-                        pb0 = pb0 / pref
-                        pref = 1d0
                         rhoref = 1d0
-
                     end if
                 end if
             end if

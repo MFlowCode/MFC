@@ -268,7 +268,7 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push('bubble_model=3', {'bubble_model': 3, 'polytropic': 'T'})
             cases.append(create_case(stack, '', {}))
 
-            stack.push(f'Non-polytropic', { 'polytropic': 'T'})
+            stack.push(f'Non-polytropic', { 'polytropic': 'F'})
             cases.append(create_case(stack, '', {}))
 
             for i in range(7):
