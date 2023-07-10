@@ -106,8 +106,8 @@ module m_rhs
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaL_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaR_n)
 #else
-    type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
-    type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
+    type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
+    type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
 #endif
     !> @}
     !$acc declare link(gm_alphaL_n, gm_alphaR_n)
