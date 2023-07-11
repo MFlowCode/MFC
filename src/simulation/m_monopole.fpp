@@ -37,7 +37,7 @@ module m_monopole
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
+    real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_mono
     !$acc declare create(loc_mono)
 
     real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
@@ -330,7 +330,6 @@ contains
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 !$acc routine seq
-!DIR$ INLINEALWAYS f_delta
         real(kind(0d0)), dimension(:), pointer, intent(in) :: mono_loc
         integer, intent(IN) :: nm
         real(kind(0d0)), intent(IN) :: mono_leng
