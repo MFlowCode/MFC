@@ -587,10 +587,12 @@ contains
                         V0(:) = 1d0
                     else if (nb > 1) then
                         V0(:) = 1d0
+                        !R0 and weight initialized in s_simpson
                     else
                         stop 'Invalid value of nb'
                     end if
 
+                    !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
                     if(.not. qbmm) then
                         if (polytropic) then
                             rhoref = 1.d0
@@ -598,6 +600,7 @@ contains
                         end if
                     end if
 
+                    !Initialize pb0, pv, pref, rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
                     if(qbmm) then
                         if(polytropic) then
                             pv = fluid_pp(1)%pv 

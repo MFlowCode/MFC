@@ -50,7 +50,7 @@ module m_global_parameters
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(kind(0d0)), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
-    real(kind(0d0)), allocatable, dimension(:) :: coarse_x_cb, coarse_y_cb, coarse_z_cb
+    real(kind(0.0)), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
     !> @}
 
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
@@ -146,8 +146,6 @@ module m_global_parameters
 
     integer :: format !< Format of the database file(s)
 
-    logical :: coarsen_silo
-
     integer :: precision !< Floating point precision of the database file(s)
 
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
@@ -185,12 +183,6 @@ module m_global_parameters
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
     logical :: schlieren_wrt
-    !> @}
-
-    !> @name Options for Fourier decomposition in the azimuthal direction if 3D
-    !! cylindrical coordinates are used
-    !> @{
-    logical :: fourier_decomp
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -298,8 +290,6 @@ contains
 
         precision = dflt_int
 
-        coarsen_silo = .false.
-
         alpha_rho_wrt = .false.
         rho_wrt = .false.
         mom_wrt = .false.
@@ -322,8 +312,6 @@ contains
         schlieren_wrt = .false.
 
         schlieren_alpha = dflt_real
-
-        fourier_decomp = .false.
 
         fd_order = dflt_int
 
@@ -494,7 +482,7 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
-            alf_idx = 1
+            alf_idx = 1 ! dummy, cannot actually have a void fraction
 
         else if (model_eqns == 4) then
             cont_idx%beg = 1 ! one continuity equation
@@ -540,15 +528,12 @@ contains
                     R0(:) = 1d0
                     V0(:) = 0d0
                 else if (nb > 1) then
-                    !call s_simpson
                     V0(:) = 0d0
                 else
                     stop 'Invalid value of nb'
                 end if
 
-                if (polytropic .neqv. .true.) then
-                    !call s_initialize_nonpoly
-                else
+                if (polytropic ) then
                     rhoref = 1.d0
                     pref = 1.d0
                 end if
@@ -614,6 +599,17 @@ contains
             buff_size = buff_size + fd_number
         end if
 
+        ! Allocating single precision grid variables if needed
+         if (precision == 1) then
+             allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
+             if (n > 0) then 
+                 allocate (y_cb_s(-1 - offset_x%beg:n + offset_x%end))
+                 if (p > 0) then
+                     allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end)) 
+                 end if
+             end if
+         end if
+
         ! Allocating the grid variables in the x-coordinate direction
         allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
         allocate (x_cc(-buff_size:m + buff_size))
@@ -639,14 +635,6 @@ contains
             allocate (x_root_cb(-1:m_root))
             allocate (x_root_cc(0:m_root))
 
-        end if
-
-        if (coarsen_silo) then
-            allocate (coarse_x_cb(-1 - offset_x%beg:(m/2) + offset_x%end))
-            if (n > 0) then
-                allocate (coarse_y_cb(-1 - offset_y%beg:(n/2) + offset_y%end))
-                if (p > 0) allocate (coarse_z_cb(-1 - offset_z%beg:(p/2) + offset_z%end))
-            end if
         end if
 
         allocate (adv(num_fluids))
@@ -710,14 +698,6 @@ contains
 
             deallocate (x_root_cb, x_root_cc)
 
-        end if
-
-        if (coarsen_silo) then
-            deallocate (coarse_x_cb)
-            if (n > 0) then
-                deallocate (coarse_y_cb)
-                if (p > 0) deallocate (coarse_z_cb)
-            end if
         end if
 
         deallocate (proc_coords)
