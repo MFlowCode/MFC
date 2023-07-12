@@ -411,8 +411,8 @@ contains
             if (icfl_max_glb /= icfl_max_glb) then
                 call s_mpi_abort('ICFL is NaN. Exiting ...')
             elseif (icfl_max_glb > 1d0) then
-                !call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
                 print *, 'icfl', icfl_max_glb
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')           
             end if
         end if
 
@@ -557,6 +557,7 @@ contains
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
+            ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1d0)
             if(qbmm) then
                 q_prim_vf(bubxb)%sf = 1d0
             end if

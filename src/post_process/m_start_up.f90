@@ -53,9 +53,8 @@ contains
             omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
-            parallel_io, coarsen_silo, fourier_decomp, &
-            rhoref, pref, bubbles, qbmm, sigR, R0ref, nb, &
-            polytropic, thermal, Ca, Web, Re_inv, &
+            parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
+            R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma
 
         ! Inquiring the status of the post_process.inp file
