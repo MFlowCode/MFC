@@ -14,8 +14,6 @@ module m_monopole
 
     use m_bubbles              !< Bubble dynamic routines
 
-    use m_qbmm                 !< Moment inversion
-
     use m_variables_conversion !< State variables type conversion procedures
     ! ==========================================================================
     implicit none

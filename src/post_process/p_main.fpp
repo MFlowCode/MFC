@@ -82,6 +82,12 @@ program p_main
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     call s_initialize_global_parameters_module()
+    if(bubbles .and. nb > 1) then
+        call s_simpson
+    end if
+    if(bubbles .and. .not. polytropic) then
+        call s_initialize_nonpoly()
+    end if
     if (num_procs > 1) call s_initialize_mpi_proxy_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_data_input_module()
@@ -506,7 +512,7 @@ program p_main
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
             end do
-            if (polytropic .neqv. .true.) then
+            if ((polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 !nP
                 do i = 1, nb
                     q_sf = q_cons_vf(bub_idx%ps(i))%sf( &
