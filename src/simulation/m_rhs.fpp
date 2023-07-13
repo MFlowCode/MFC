@@ -696,24 +696,6 @@ contains
 
         end if
 
-        ! j = 0; k = 2; l = 0
-        ! write(72,*) q_cons_qp%vf(contxb)%sf(j, k, l), &
-        !             q_cons_qp%vf(momxb)%sf(j, k, l), &
-        !             q_cons_qp%vf(momxe)%sf(j, k, l), &
-        !             q_cons_qp%vf(E_idx)%sf(j, k, l), &
-        !             q_cons_qp%vf(alf_idx)%sf(j, k, l), &
-        !             q_cons_qp%vf(rs(1))%sf(j, k, l), &
-        !             q_cons_qp%vf(vs(1))%sf(j, k, l)
-
-        ! j = 0; k = 9; l = 0
-        ! write(79,*) q_cons_qp%vf(contxb)%sf(j, k, l), &
-        !             q_cons_qp%vf(momxb)%sf(j, k, l), &
-        !             q_cons_qp%vf(momxe)%sf(j, k, l), &
-        !             q_cons_qp%vf(E_idx)%sf(j, k, l), &
-        !             q_cons_qp%vf(alf_idx)%sf(j, k, l), &
-        !             q_cons_qp%vf(rs(1))%sf(j, k, l), &
-        !             q_cons_qp%vf(vs(1))%sf(j, k, l)
-
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -721,24 +703,6 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-
-        ! j = 0; k = 2; l = 0
-        ! write(82,*) q_prim_qp%vf(contxb)%sf(j, k, l), &
-        !             q_prim_qp%vf(momxb)%sf(j, k, l), &
-        !             q_prim_qp%vf(momxe)%sf(j, k, l), &
-        !             q_prim_qp%vf(E_idx)%sf(j, k, l), &
-        !             q_prim_qp%vf(alf_idx)%sf(j, k, l), &
-        !             q_prim_qp%vf(rs(1))%sf(j, k, l), &
-        !             q_prim_qp%vf(vs(1))%sf(j, k, l)
-
-        ! j = 0; k = 9; l = 0
-        ! write(89,*) q_prim_qp%vf(contxb)%sf(j, k, l), &
-        !             q_prim_qp%vf(momxb)%sf(j, k, l), &
-        !             q_prim_qp%vf(momxe)%sf(j, k, l), &
-        !             q_prim_qp%vf(E_idx)%sf(j, k, l), &
-        !             q_prim_qp%vf(alf_idx)%sf(j, k, l), &
-        !             q_prim_qp%vf(rs(1))%sf(j, k, l), &
-        !             q_prim_qp%vf(vs(1))%sf(j, k, l)
                     
         if (t_step == t_step_stop) return
         ! ==================================================================
@@ -871,17 +835,19 @@ contains
                                   id, ix, iy, iz)
             call nvtxEndRange
 
-            ! if (id == 1) then
-            !     j = 0; k = 2; l = 0
-            !     write(52,*) id, flux_n(id)%vf(momxe)%sf(j-1, k, l),flux_n(id)%vf(momxe)%sf(j, k, l)
-            !     j = 0; k = 9; l = 0
-            !     write(59,*) id, flux_n(id)%vf(momxe)%sf(j-1, k, l),flux_n(id)%vf(momxe)%sf(j, k, l)
-            ! else 
-            !     j = 0; k = 2; l = 0
-            !     write(52,*) id, flux_n(id)%vf(momxe)%sf(j, k-1, l),flux_n(id)%vf(momxe)%sf(j, k, l)
-            !     j = 0; k = 9; l = 0
-            !     write(59,*) id, flux_n(id)%vf(momxe)%sf(j, k-1, l),flux_n(id)%vf(momxe)%sf(j, k, l)
-            ! end if
+            do j = 1, sys_size
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            if (isnan(flux_n(id)%vf(j)%sf(k,l,q))) then
+                                write(*,*) 'after riemann',id,j,k,l,q,flux_n(id)%vf(j)%sf(k,l,q)
+                                error stop
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
             ! ===============================================================
 
             if (alt_soundspeed) then

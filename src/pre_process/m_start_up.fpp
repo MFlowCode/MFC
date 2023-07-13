@@ -99,6 +99,7 @@ contains
             weno_order, bc_x, bc_y, bc_z, num_patches, &
             hypoelasticity, patch_icpp, fluid_pp, &
             precision, parallel_io, vel_profile, instability_wave, pi_fac, &
+            uratio, rratio, &
             perturb_flow, perturb_flow_fluid, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &

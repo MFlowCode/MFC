@@ -309,16 +309,16 @@ contains
         if (bubbles) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0 ! = R0(i)
-                muV = patch_icpp(patch_id)%v0 ! = 0
+                muV = V0(i)*patch_icpp(patch_id)%v0 ! = 0
 
                 if (qbmm) then
                     if (dist_type == 1) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*rratio)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*rratio)*(sigV*uratio)
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*uratio)**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
@@ -396,9 +396,9 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*rratio)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*rratio)*(sigV*uratio)
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*uratio)**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR
@@ -512,9 +512,9 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*rratio)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*rratio)*(sigV*uratio)
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*uratio)**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1d0
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2d0)*muR

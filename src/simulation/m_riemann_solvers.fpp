@@ -1621,6 +1621,7 @@ contains
                                     end if
 
                                     if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
+                                        call s_mpi_abort('ptilde is NaN')
                                     end if
 
                                     rho_avg = 5d-1*(rho_L + rho_R)

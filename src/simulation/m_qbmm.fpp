@@ -162,19 +162,19 @@ contains
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
         end do
-!$acc update device(bubrs)
+        !$acc update device(bubrs)
 
         do j = 1, nmom
             do i = 1, nb
                 bubmoms(i, j) = bub_idx%moms(i, j)
             end do
         end do
-!$acc update device(bubmoms)
+        !$acc update device(bubmoms)
 
     end subroutine s_initialize_qbmm_module
 
     subroutine s_coeff(pres, rho, c, coeffs)
-!$acc routine seq
+        !$acc routine seq
         real(kind(0.d0)), intent(IN) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
         integer :: i1, i2
@@ -235,20 +235,20 @@ contains
         !$acc update device(is1, is2, is3)
 
 
-!$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
+        !$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
         do id3 = is3%beg, is3%end
             do id2 = is2%beg, is2%end
                 do id1 = is1%beg, is1%end
 
                     alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
-                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
+                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)/uratio**2
                     rho = q_prim_vf(contxb)%sf(id1, id2, id3)
                     if (bubble_model == 2) then
                         n_tait = gammas(1)
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = pi_infs(1)
                         B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
-                        c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
+                        c = n_tait*(pres + B_tait)*(1.d0 - alf)/(rho)
                         if (c > 0.d0) then
                             c = DSQRT(c)
                         else
@@ -275,14 +275,20 @@ contains
                         !$acc loop seq
                         do q = 1, nb
                             !$acc loop seq
-                            do r = 1, nmom
+                            do r = 2, nmom
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
+                            moms(1) = 1d0
+                            moms(2) = moms(2)/rratio
+                            moms(3) = moms(3)/uratio
+                            moms(4) = moms(4)/rratio**2
+                            moms(5) = moms(5)/rratio/uratio
+                            moms(6) = moms(6)/uratio**2
 
-                           
+                            ! write(*,*) moms
+                            ! error stop
 
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
-
 
                             !$acc loop seq
                             do i2 = 0, 2
@@ -301,7 +307,6 @@ contains
                                 end do
                             end do
 
-                            
                         end do
 
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
@@ -314,7 +319,28 @@ contains
                             momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
                         end if
 
-                    
+                        ! write(*,*)  moms3d(0, 0, nb)%sf(id1, id2, id3), &
+                        !             moms3d(1, 0, nb)%sf(id1, id2, id3), &
+                        !             moms3d(0, 1, nb)%sf(id1, id2, id3), &
+                        !             moms3d(2, 0, nb)%sf(id1, id2, id3), &
+                        !             moms3d(1, 1, nb)%sf(id1, id2, id3), &
+                        !             moms3d(0, 2, nb)%sf(id1, id2, id3)
+                        ! write(*,*) (momsp(q)%sf(id1, id2, id3), q=1,4)
+                        ! call s_mpi_abort()
+
+                        !$acc loop seq
+                        do q = 1, nb
+                            moms3d(1, 0, q)%sf(id1, id2, id3) = moms3d(1, 0, q)%sf(id1, id2, id3)*rratio
+                            moms3d(0, 1, q)%sf(id1, id2, id3) = moms3d(0, 1, q)%sf(id1, id2, id3)*uratio
+                            moms3d(2, 0, q)%sf(id1, id2, id3) = moms3d(2, 0, q)%sf(id1, id2, id3)*rratio**2
+                            moms3d(1, 1, q)%sf(id1, id2, id3) = moms3d(1, 1, q)%sf(id1, id2, id3)*rratio*uratio
+                            moms3d(0, 2, q)%sf(id1, id2, id3) = moms3d(0, 2, q)%sf(id1, id2, id3)*uratio**2
+                        end do
+                        momsp(1)%sf(id1, id2, id3) = momsp(1)%sf(id1, id2, id3)*rratio**3
+                        momsp(2)%sf(id1, id2, id3) = momsp(2)%sf(id1, id2, id3)*rratio**2*uratio
+                        momsp(3)%sf(id1, id2, id3) = momsp(3)%sf(id1, id2, id3)*rratio**3*uratio**2
+                        momsp(4)%sf(id1, id2, id3) = momsp(4)%sf(id1, id2, id3)*rratio**3
+
                     else
                         !$acc loop seq
                         do q = 1, nb
@@ -342,7 +368,7 @@ contains
     end subroutine s_mom_inv
 
     subroutine s_chyqmom(momin, wght, abscX, abscY)
-!$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
         real(kind(0d0)), dimension(nmom), intent(IN) :: momin
 

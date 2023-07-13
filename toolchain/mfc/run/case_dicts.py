@@ -15,7 +15,7 @@ PRE_PROCESS = COMMON + [
     'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', 'pi_fac'
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', 'pi_fac', 'uratio', 'rratio'
 ]
 
 for cmp in ["x", "y", "z"]:
