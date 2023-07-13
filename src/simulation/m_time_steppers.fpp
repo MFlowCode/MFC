@@ -150,6 +150,16 @@ contains
             @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &
                           iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+        else if(qbmm .and. polytropic) then
+            @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%beg + 1, &
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+            @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%beg + 1, &
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+            @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%beg + 1, &
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
         @:ALLOCATE(mv_ts(1:2))
@@ -164,6 +174,16 @@ contains
             @:ALLOCATE(rhs_mv(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &
                           iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+        else if(qbmm .and. polytropic) then
+            @:ALLOCATE(mv_ts(1)%sf(ix_t%beg:ix_t%beg + 1, &
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+            @:ALLOCATE(mv_ts(2)%sf(ix_t%beg:ix_t%beg + 1, &
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+            @:ALLOCATE(rhs_mv(ix_t%beg:ix_t%beg + 1, &
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
         if (hypoelasticity) then
