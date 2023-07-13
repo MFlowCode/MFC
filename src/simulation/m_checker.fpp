@@ -79,7 +79,7 @@ contains
                 call s_mpi_abort('The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)')
             elseif (nb < 1) then
                 call s_mpi_abort('The Ensemble-Averaged Bubble Model requires nb >= 1')
-            elseif (bubble_model == 3 .and. (polytropic .neqv. .true.)) then
+            elseif (bubble_model == 3 .and. (polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 call s_mpi_abort('RP bubbles require polytropic compression')
             elseif (cyl_coord) then 
                 call s_mpi_abort('Bubble models untested in cylindrical coordinates')

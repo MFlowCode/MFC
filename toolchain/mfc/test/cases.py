@@ -276,10 +276,19 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push(f"QBMM", {'qbmm': 'T'})
             cases.append(create_case(stack, '', {}))
 
-            stack.push('bubble_model=3', {'bubble_model': 3})
+
+            stack.push(f"Non-polytropic", {'polytropic': 'F'})
             cases.append(create_case(stack, '', {}))
 
-            for i in range(6):
+            stack.pop()
+
+            stack.push('bubble_model=3', {'bubble_model': 3, 'polytropic': 'T'})
+            cases.append(create_case(stack, '', {}))
+
+            stack.push(f'Non-polytropic', { 'polytropic': 'F'})
+            cases.append(create_case(stack, '', {}))
+
+            for i in range(7):
                 stack.pop()
 
             if len(dimInfo[0]) >= 2:

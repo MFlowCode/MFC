@@ -49,7 +49,7 @@ module m_start_up
         !! @param q_cons_vf  Conservative variables
         subroutine s_read_abstract_data_files(q_cons_vf) ! -----------
 
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
@@ -83,7 +83,7 @@ contains
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
-            mpp_lim, time_stepper, weno_eps, weno_flat, &
+            mpp_lim, time_stepper,  weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
             mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
@@ -189,7 +189,7 @@ contains
         logical :: file_exist !<
         ! Logical used to check the existence of the data files
 
-        integer :: i !< Generic loop iterator
+        integer :: i, r !< Generic loop iterator
 
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
@@ -300,6 +300,41 @@ contains
                     call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                 end if
             end do
+            !Read pb and mv for non-polytropic qbmm
+            if(qbmm .and. .not. polytropic) then
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A)') &
+                            trim(t_step_dir)//'/pb', sys_size + (i-1)*nnode + r, '.dat'
+                        inquire (FILE=trim(file_path), EXIST=file_exist)
+                        if (file_exist) then
+                            open (2, FILE=trim(file_path), &
+                                  FORM='unformatted', &
+                                  ACTION='read', &
+                                  STATUS='old')
+                            read (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                        else
+                            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                        end if
+                    end do
+                end do                
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A)') &
+                            trim(t_step_dir)//'/mv', sys_size + (i-1)*nnode + r , '.dat'
+                        inquire (FILE=trim(file_path), EXIST=file_exist)
+                        if (file_exist) then
+                            open (2, FILE=trim(file_path), &
+                                  FORM='unformatted', &
+                                  ACTION='read', &
+                                  STATUS='old')
+                            read (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                        else
+                            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                        end if
+                    end do
+                end do 
+            end if
         end if
         ! ==================================================================
 
@@ -407,6 +442,8 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
             ! Initialize MPI data I/O
+
+
             call s_initialize_mpi_data(q_cons_vf)
 
             ! Size of local arrays
@@ -434,6 +471,19 @@ contains
                     call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                        MPI_DOUBLE_PRECISION, status, ierr)
                 end do
+                !Read pb and mv for non-polytropic qbmm
+                if(qbmm .and. .not. polytropic) then
+                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
             else
                 do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)

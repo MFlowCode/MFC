@@ -24,6 +24,8 @@ module m_variables_conversion
     implicit none
 
     private; public :: s_initialize_variables_conversion_module, &
+ s_initialize_pb, &
+ s_initialize_mv, &
  s_convert_to_mixture_variables, &
  s_convert_mixture_to_mixture_variables, &
  s_convert_species_to_mixture_variables_bubbles, &
@@ -141,7 +143,7 @@ contains
                 )**(1/gamma + 1) - pi_inf
         end if
 
-        if (hypoelasticity .and. present(G)) then
+       if (hypoelasticity .and. present(G)) then
             ! calculate elastic contribution to Energy
             E_e = 0d0
             do s = stress_idx%beg, stress_idx%end
@@ -161,6 +163,10 @@ contains
                    0.5d0*(mom**2.d0)/rho - &
                    pi_inf - E_e &
                    )/gamma
+
+
+
+
         end if
 
     end subroutine s_compute_pressure
@@ -695,6 +701,74 @@ contains
 
     end subroutine s_initialize_variables_conversion_module ! --------------
 
+        !Initialize mv at the quadrature nodes based on the initialized moments and sigma  
+        subroutine s_initialize_mv(qK_cons_vf, mv)      
+        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf 
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(INOUT) :: mv 
+        integer :: i, j, k, l 
+        real(kind(0d0)) :: mu, sig,  nbub_sc
+
+
+       do l = izb, ize
+            do k = iyb, iye
+                do j = ixb, ixe
+                    
+                    nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+                    
+                    !$acc loop seq
+                    do i = 1, nb
+                        mu = qK_cons_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)/nbub_sc
+                        sig = (qK_cons_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) / nbub_sc  -  mu**2)**0.5
+
+                        mv(j, k, l, 1, i) = (mass_v0(i)) * (mu - sig)**(3d0) / (R0(i)**(3d0)) 
+                        mv(j, k, l, 2, i) = (mass_v0(i)) * (mu - sig)**(3d0) / (R0(i)**(3d0)) 
+                        mv(j, k, l, 3, i) = (mass_v0(i)) * (mu + sig)**(3d0) / (R0(i)**(3d0)) 
+                        mv(j, k, l, 4, i) = (mass_v0(i)) * (mu + sig)**(3d0) / (R0(i)**(3d0)) 
+                   end do
+
+                end do
+            end do
+        end do
+  
+
+    end subroutine s_initialize_mv
+
+    !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
+    subroutine s_initialize_pb(qK_cons_vf, mv, pb)
+    
+        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(IN) :: mv 
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(INOUT) :: pb
+        integer :: i, j, k, l 
+        real(kind(0d0)) :: mu, sig,  nbub_sc
+
+
+       do l = izb, ize
+            do k = iyb, iye
+                do j = ixb, ixe
+
+                    nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+                    
+                    !$acc loop seq
+                    do i = 1, nb
+                        mu = qK_cons_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)/nbub_sc
+                        sig = (qK_cons_vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l) / nbub_sc  -  mu**2)**0.5
+
+                        !PRESTON (ISOTHERMAL)
+                        pb(j, k, l, 1, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 1, i)) / (mu - sig)**(3d0) / (mass_n0(i) + mass_v0(i))
+                        pb(j, k, l, 2, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 2, i)) / (mu - sig)**(3d0) / (mass_n0(i) + mass_v0(i))
+                        pb(j, k, l, 3, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 3, i)) / (mu + sig)**(3d0) / (mass_n0(i) + mass_v0(i))
+                        pb(j, k, l, 4, i) = (pb0(i)) * (R0(i)**(3d0)) * (mass_n0(i) + mv(j, k, l, 4, i)) / (mu + sig)**(3d0) / (mass_n0(i) + mass_v0(i))
+                    end do
+                end do
+            end do
+        end do
+
+
+  
+
+    end subroutine s_initialize_pb
+
     !> The following procedure handles the conversion between
         !!      the conservative variables and the primitive variables.
         !! @param qK_cons_vf Conservative variables
@@ -722,7 +796,7 @@ contains
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
 
         real(kind(0d0)), dimension(:), allocatable :: nRtmp
-        real(kind(0d0)) :: vftmp, nR3, nbub_sc
+        real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
 
         real(kind(0d0)) :: G_K
 
@@ -738,7 +812,7 @@ contains
             allocate(nRtmp(0))
         endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K, R3tmp)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -750,9 +824,12 @@ contains
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
 
+                    !$acc loop seq
                     do i = 1, contxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
+
+
 
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
@@ -810,12 +887,28 @@ contains
 
                         vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
 
-                        call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
-                        
-                        !$acc loop seq
-                        do i = bubxb, bubxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
-                        end do
+                        if(qbmm) then
+                            !Get nb (constant across all R0 bins)
+                            nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+
+                            !Convert cons to prim 
+                            !$acc loop seq
+                            do i = bubxb , bubxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                            end do
+                            !Need to keep track of nb in the primitive variable list (converted back to true value before output)
+#ifdef MFC_SIMULATION                            
+                            qK_prim_vf(bubxb)%sf(j, k, l) = qK_cons_vf(bubxb)%sf(j, k, l)                            
+#endif
+
+                         else
+                            call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+
+                            !$acc loop seq
+                            do i = bubxb, bubxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                            end do                        
+                        end if                   
                     end if
 
                     if (hypoelasticity) then
@@ -838,6 +931,7 @@ contains
                         end do
                     end if
 
+                    !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
@@ -874,7 +968,7 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: nbub, R3, vftmp
+        real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
 
         real(kind(0d0)) :: G
@@ -917,7 +1011,7 @@ contains
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                         q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
-                                                       (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
+                                                       (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)                       
                     else
                         !Tait EOS, no conserved energy variable
                         q_cons_vf(E_idx)%sf(j, k, l) = 0.
@@ -943,7 +1037,21 @@ contains
                         do i = 1, nb
                             Rtmp(i) = q_prim_vf(bub_idx%rs(i))%sf(j, k, l)
                         end do
-                        call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+
+                        if(.not. qbmm) then
+                            call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                        else
+                            !Initialize R3 averaging over R0 and R directions
+                            R3tmp = 0d0
+                            do i = 1, nb
+                                R3tmp = R3tmp + weight(i) * 0.5d0 * (Rtmp(i) + sigR) ** 3d0
+                                R3tmp = R3tmp + weight(i) * 0.5d0 * (Rtmp(i) - sigR) ** 3d0 
+                            end do
+                            !Initialize nb 
+                            nbub = 3d0 * q_prim_vf(alf_idx)%sf(j, k, l) / (4d0 * pi * R3tmp)
+                        end if
+                   
+                        
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
