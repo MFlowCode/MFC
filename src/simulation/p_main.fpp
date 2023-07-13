@@ -144,7 +144,9 @@ program p_main
     end if
     !Initialize pb based on surface tension for qbmm (polytropic)
     if(qbmm .and. polytropic .and. Web /= dflt_real) then
-        pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)                              
+        pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)
+        pb0 = pb0 / pref
+        pref = 1d0                              
     end if
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
