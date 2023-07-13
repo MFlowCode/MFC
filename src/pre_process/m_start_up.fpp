@@ -51,7 +51,7 @@ module m_start_up
 
         subroutine s_read_abstract_ic_data_files(q_cons_vf) ! -----------
 
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, pres_field
 
             ! Conservative variables
             type(scalar_field), &
@@ -376,7 +376,7 @@ contains
             !! Generic logical used for the purpose of asserting whether a file
             !! is or is not present in the designated location
 
-        integer :: i !< Generic loop iterator
+        integer :: i, r !< Generic loop iterator
 
         ! Reading the Conservative Variables Data Files ====================
         do i = 1, sys_size
@@ -401,6 +401,57 @@ contains
             end if
 
         end do
+
+        !Read bubble variables pb and mv for non-polytropic qbmm
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb
+                do r = 1, nnode
+                    ! Checking whether data file associated with variable position
+                    ! of the currently manipulated bubble variable exists
+                    write (file_num, '(I0)') sys_size + r + (i-1)*nnode
+                    file_loc = trim(t_step_dir)//'/pb'// &
+                               trim(file_num)//'.dat'
+                    inquire (FILE=trim(file_loc), EXIST=file_check)
+
+                    ! If it exists, the data file is read
+                    if (file_check) then
+                        open (1, FILE=trim(file_loc), FORM='unformatted', &
+                              STATUS='old', ACTION='read')
+                        read (1) pb%sf(:, :, :, r, i)
+                        close (1)
+                    else
+                        call s_mpi_abort( 'File pb'//trim(file_num)// &
+                            '.dat is missing in '//trim(t_step_dir)// &
+                            '. Exiting ...')
+                    end if
+                end do
+
+            end do
+
+            do i = 1, nb
+                do r = 1, 4
+                    ! Checking whether data file associated with variable position
+                    ! of the currently manipulated bubble variable exists
+                    write (file_num, '(I0)') sys_size + r + (i-1)*4  
+                    file_loc = trim(t_step_dir)//'/mv'// &
+                               trim(file_num)//'.dat'
+                    inquire (FILE=trim(file_loc), EXIST=file_check)
+
+                    ! If it exists, the data file is read
+                    if (file_check) then
+                        open (1, FILE=trim(file_loc), FORM='unformatted', &
+                              STATUS='old', ACTION='read')
+                        read (1) mv%sf(:, :, :, r, i)
+                        close (1)
+                    else
+                        call s_mpi_abort( 'File mv'//trim(file_num)// &
+                            '.dat is missing in '//trim(t_step_dir)// &
+                            '. Exiting ...')
+                    end if
+                end do
+
+            end do
+        end if
 
         ! ==================================================================
 
@@ -578,6 +629,21 @@ contains
                 call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                    MPI_DOUBLE_PRECISION, status, ierr)
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                do i = sys_size + 1, sys_size + 2*nb*4
+                    var_MOK = int(i, MPI_OFFSET_KIND)
+
+                    ! Initial displacement to skip at beginning of file
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                           'native', mpi_info_int, ierr)
+                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                       MPI_DOUBLE_PRECISION, status, ierr)
+                end do
+            end if
+
 
             call s_mpi_barrier()
 

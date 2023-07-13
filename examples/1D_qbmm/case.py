@@ -39,16 +39,14 @@ pa      = 0.1 * 1.E+06 / 101325.
 #Characteristic velocity
 uu = math.sqrt( p0/rho0 )
 #Cavitation number
-# Ca = (p0 - pv)/(rho0*(uu**2.))
-Ca = 1.
+Ca = (p0 - pv)/(rho0*(uu**2.))
 #Weber number
-# We = rho0*(uu**2.)*R0ref/ss
-We = p0*R0ref/ss
+We = rho0*(uu**2.)*R0ref/ss
 #Inv. bubble Reynolds number
 Re_inv = mul0/(rho0*uu*R0ref)
 
 #IC setup
-vf0     = 4.E-5
+vf0     = 0.04
 n0      = vf0/(math.pi*4.E+00/3.E+00)
 
 cact    = 1475.
@@ -89,11 +87,11 @@ print(json.dumps({
     'm'                            : Nx,
     'n'                            : 0,
     'p'                            : 0,
-    'dt'                           : 0.002,
+    'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : 8000,
+    't_step_stop'                  : 800,
     # 't_step_stop'                  : 4,
-    't_step_save'                  : 8000,
+    't_step_save'                  : 80,
     # 't_step_save'                  : 1,
     # ==========================================================
 
@@ -124,7 +122,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'F',
+    'parallel_io'                  :'T',
     'fd_order'                     : 1,
     #'schlieren_wrt'                :'T',
     'probe_wrt'                    :'T',
@@ -188,17 +186,16 @@ print(json.dumps({
     # Bubbles ==================================================
     'bubbles'               : 'T',
     'bubble_model'          : 2,
-    'polytropic'            : 'T',
+    'polytropic'            : 'F',
     'polydisperse'          : 'T',
     'R0_type'               : 1,
     'poly_sigma'            : 0.3,
     'thermal'               : 3,
     'R0ref'                 : myr0,
-    # 'nb'                    : 3,
     'nb'                    : 3,
     'Ca'                    : Ca,
-    # 'Web'                   : We,
-    # 'Re_inv'                : Re_inv,
+    'Web'                   : We,
+    'Re_inv'                : Re_inv,
     'qbmm'               : 'T',
     'dist_type'          : 2,
     'sigR'               : 0.1,
@@ -206,16 +203,6 @@ print(json.dumps({
     'rhoRV'              : 0.0,
     # ==========================================================
 
-    # Acoustic source ==========================================
-    'Monopole'                  : 'T',
-    'num_mono'                  : 1,
-    'Mono(1)%loc(1)'            : -5.E-03/x0,
-    'Mono(1)%npulse'            : 1,
-    'Mono(1)%dir'               : 1.,
-    'Mono(1)%pulse'             : 1,
-    'Mono(1)%mag'               : 1*pa,
-    'Mono(1)%length'            : (1./(300000.))*cact/x0,
-    # ==========================================================
 }))
 
 # ==============================================================================

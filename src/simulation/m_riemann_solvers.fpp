@@ -1534,33 +1534,36 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                                 if (avg_state == 2) then
-
-!$acc loop seq
+                                    !$acc loop seq
                                     do i = 1, nb
                                         R0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, rs(i))
                                         R0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, rs(i))
 
                                         V0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, vs(i))
                                         V0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, vs(i))
-                                        if (.not. polytropic) then
+                                        if (.not. polytropic .and. .not. qbmm) then
                                             P0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, ps(i))
                                             P0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, ps(i))
                                         end if
                                     end do
 
-                                    nbub_L_denom = 0d0
-                                    nbub_R_denom = 0d0
+                                    if(.not. qbmm) then
+                                        nbub_L_denom = 0d0
+                                        nbub_R_denom = 0d0
+                                        !$acc loop seq
+                                        do i = 1, nb
+                                            nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
+                                            nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
+                                        end do
+                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
+                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom                                        
+                                    else
+                                        !nb stored in 0th moment of first R0 bin in variable conversion module
+                                        nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, bubxb)
+                                        nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, bubxb)
+                                    end if
 
                                     !$acc loop seq
-                                    do i = 1, nb
-                                        nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
-                                        nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
-                                    end do
-
-                                    nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                    nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
-
-!$acc loop seq
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
@@ -1612,6 +1615,8 @@ contains
                                         ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
                                                                                                            rho_L*R3V2Lbar/R3Lbar)
                                     end if
+
+
 
                                      if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
                                         ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
@@ -1718,6 +1723,7 @@ contains
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
 
                                 ! Include p_tilde
+
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -1749,6 +1755,7 @@ contains
                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
                                                         (s_R - vel_R(dir_idx(1))))) - E_R))
 
+                                   
                                 ! Volume fraction flux
 
                                 !$acc loop seq
@@ -1778,13 +1785,21 @@ contains
 
                                 ! Add advection flux for bubble variables
                                 !$acc loop seq
-                                do i = bubxb, bubxe
+                                do i = bubxb , bubxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
                                         + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
+
+                                if(qbmm) then
+                                    flux_rs${XYZ}$_vf(j, k, l, bubxb) = &
+                                            xi_M*nbub_L &
+                                            *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                            + xi_P*nbub_R &
+                                            *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                end if
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
@@ -2063,6 +2078,8 @@ contains
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
                                                         (s_R - vel_R(idx1)))) - E_R))
+
+
 
                                 ! Volume fraction flux
                                 !$acc loop seq

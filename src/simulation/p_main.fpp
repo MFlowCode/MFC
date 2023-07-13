@@ -59,6 +59,8 @@ program p_main
 #endif
 
     use m_nvtx
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -132,6 +134,18 @@ program p_main
     ! and/or the execution of any other tasks needed to properly configure the
     ! modules. The preparations below DO NOT DEPEND on the grid being complete.
     call s_initialize_global_parameters_module()
+    !Quadrature weights and nodes for polydisperse simulations
+    if(bubbles .and. nb > 1 .and. R0_type == 1) then
+        call s_simpson
+    end if
+    !Initialize variables for non-polytropic (Preston) model
+    if(bubbles .and. .not. polytropic) then
+        call s_initialize_nonpoly()
+    end if
+    !Initialize pb based on surface tension for qbmm (polytropic)
+    if(qbmm .and. polytropic .and. Web /= dflt_real) then
+        pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)                              
+    end if
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -205,12 +219,16 @@ program p_main
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
-!$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
-!$acc update device(sys_size, buff_size)
-!$acc update device(m, n, p)
+    !Update GPU DATA
+    !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
+    !$acc update device(sys_size, buff_size)
+    !$acc update device(m, n, p)
     do i = 1, sys_size
-!$acc update device(q_cons_ts(1)%vf(i)%sf)
+    !$acc update device(q_cons_ts(1)%vf(i)%sf)
     end do
+    if(qbmm .and. .not. polytropic) then
+    !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
+    end if
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
@@ -327,14 +345,19 @@ program p_main
                     do k = 0, n
                         do j = 0, m
                             if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, proc_rank, t_step, m, n, p
-                                
+                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
                                 error stop "NaN(s) in timestep output."
                             end if
                         end do
                     end do
                 end do
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                !$acc update host(pb_ts(1)%sf)
+                !$acc update host(mv_ts(1)%sf)
+            end if
+
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
