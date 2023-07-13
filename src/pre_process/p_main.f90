@@ -31,6 +31,8 @@ program p_main
     use m_patches
 
     use m_assign_variables
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -67,6 +69,20 @@ program p_main
     ! Computation of parameters, allocation procedures, and/or any other tasks
     ! needed to properly setup the modules
     call s_initialize_global_parameters_module()
+    !Quadrature weights and nodes for polydisperse simulations
+    if(bubbles .and. nb > 1) then
+        call s_simpson
+    end if
+    !Initialize variables for non-polytropic (Preston) model
+    if(bubbles .and. .not. polytropic) then
+        call s_initialize_nonpoly()
+    end if
+    !Initialize pb based on surface tension for qbmm (polytropic)
+    if(qbmm .and. polytropic .and. Web /= dflt_real) then
+        pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref) 
+        pb0 = pb0 / pref
+        pref = 1d0                             
+    end if
     call s_initialize_data_output_module()
     call s_initialize_variables_conversion_module()
     call s_initialize_start_up_module()
