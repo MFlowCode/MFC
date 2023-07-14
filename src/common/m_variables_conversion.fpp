@@ -132,7 +132,7 @@ contains
         ! Depending on model_eqns and bubbles, the appropriate procedure
         ! for computing pressure is targeted by the procedure pointer
 
-        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then   
+        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then  
             pres = (energy - dyn_p - pi_inf)/gamma
         else if ((model_eqns /= 4) .and. bubbles) then
             pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf)/gamma

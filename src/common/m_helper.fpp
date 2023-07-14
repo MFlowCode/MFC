@@ -2,6 +2,7 @@
 !>
 !! @file m_helper.f90
 !! @brief Contains module m_helper
+
 module m_helper
 
     ! Dependencies =============================================================
@@ -20,7 +21,14 @@ module m_helper
         s_initialize_nonpoly, &
         s_simpson, &
         s_transcoeff, &
-        s_int_to_str
+        s_int_to_str, &
+        s_transform_vec, &
+        s_transform_triangle, &
+        s_transform_model, &
+        s_swap, &
+        f_cross, &
+        f_create_transform_matrix, &
+        f_create_bbox
 
 contains
 
@@ -148,15 +156,9 @@ contains
         rhol0 = rhoref
         pl0 = pref
 
-#ifdef MFC_SIMULATION
         @:ALLOCATE(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
         @:ALLOCATE(k_n(nb), k_v(nb), omegaN(nb))
         @:ALLOCATE(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
-#else
-        allocate(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
-        allocate(k_n(nb), k_v(nb), omegaN(nb))
-        allocate(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
-#endif
 
         pb0(:) = dflt_real
         mass_n0(:) = dflt_real
@@ -331,5 +333,150 @@ contains
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
     end subroutine s_simpson
+    
+    !> This procedure computes the cross product of two vectors.
+    !! @param a First vector.
+    !! @param b Second vector.
+    !! @return The cross product of the two vectors.
+    function f_cross(a, b) result(c)
+        real(kind(0d0)), dimension(3), intent(in) :: a, b
+        real(kind(0d0)), dimension(3)             :: c
+
+        c(1) = a(2) * b(3) - a(3) * b(2)
+        c(2) = a(3) * b(1) - a(1) * b(3)
+        c(3) = a(1) * b(2) - a(2) * b(1)
+    end function f_cross
+
+    !> This procedure swaps two real numbers.
+    !! @param lhs Left-hand side.
+    !! @param rhs Right-hand side.
+    subroutine s_swap(lhs, rhs)
+        real(kind(0d0)), intent(inout) :: lhs, rhs
+        real(kind(0d0))                :: ltemp
+
+        ltemp = lhs
+        lhs   = rhs
+        rhs   = ltemp
+    end subroutine s_swap
+
+    !> This procedure creates a transformation matrix.
+    !! @param  p Parameters for the transformation.
+    !! @return Transformation matrix.
+    function f_create_transform_matrix(p) result(out_matrix)
+
+        type(ic_model_parameters) :: p
+
+        t_mat4x4 :: sc, rz, rx, ry, tr, out_matrix
+
+        sc = transpose(reshape([ &
+            p%scale(1), 0d0,        0d0,        0d0, &
+            0d0,        p%scale(2), 0d0,        0d0, &
+            0d0,        0d0,        p%scale(3), 0d0, &
+            0d0,        0d0,        0d0,        1d0  ], shape(sc)))
+
+        rz = transpose(reshape([ &
+            cos(p%rotate(3)), -sin(p%rotate(3)), 0d0, 0d0, &
+            sin(p%rotate(3)),  cos(p%rotate(3)), 0d0, 0d0, &
+            0d0,               0d0,              1d0, 0d0, &
+            0d0,               0d0,              0d0, 1d0  ], shape(rz)))
+
+        rx = transpose(reshape([ &
+            1d0, 0d0,               0d0,              0d0, &
+            0d0, cos(p%rotate(1)), -sin(p%rotate(1)), 0d0, &
+            0d0, sin(p%rotate(1)),  cos(p%rotate(1)), 0d0, &
+            0d0, 0d0,               0d0,              1d0  ], shape(rx)))
+
+        ry = transpose(reshape([ &
+            cos(p%rotate(2)),  0d0, sin(p%rotate(2)), 0d0, &
+            0d0,               1d0, 0d0,              0d0, &
+            -sin(p%rotate(2)), 0d0, cos(p%rotate(2)), 0d0, &
+            0d0,               0d0, 0d0,              1d0  ], shape(ry)))
+
+        tr = transpose(reshape([ &
+            1d0, 0d0, 0d0, p%translate(1), &
+            0d0, 1d0, 0d0, p%translate(2), &
+            0d0, 0d0, 1d0, p%translate(3), &
+            0d0, 0d0, 0d0, 1d0 ], shape(tr)))
+
+        out_matrix = matmul(tr, matmul(ry, matmul(rx, matmul(rz, sc))))
+
+    end function f_create_transform_matrix
+
+    !> This procedure transforms a vector by a matrix.
+    !! @param vec Vector to transform.
+    !! @param matrix Transformation matrix.
+    subroutine s_transform_vec(vec, matrix)
+
+        t_vec3,   intent(inout) :: vec
+        t_mat4x4, intent(in)    :: matrix
+
+        real(kind(0d0)), dimension(1:4) :: tmp
+
+        tmp = matmul(matrix, [ vec(1), vec(2), vec(3), 1d0 ])
+        vec = tmp(1:3)
+
+    end subroutine s_transform_vec
+
+    !> This procedure transforms a triangle by a matrix, one vertex at a time.
+    !! @param triangle Triangle to transform.
+    !! @param matrix   Transformation matrix.
+    subroutine s_transform_triangle(triangle, matrix)
+
+        type(t_triangle), intent(inout) :: triangle
+        t_mat4x4, intent(in) :: matrix
+
+        integer :: i
+
+        real(kind(0d0)), dimension(1:4) :: tmp
+
+        do i = 1, 3
+            call s_transform_vec(triangle%v(i,:), matrix)
+        end do
+
+    end subroutine s_transform_triangle
+
+    !> This procedure transforms a model by a matrix, one triangle at a time.
+    !! @param model  Model to transform.
+    !! @param matrix Transformation matrix.
+    subroutine s_transform_model(model, matrix)
+
+        type(t_model), intent(inout) :: model
+        t_mat4x4,      intent(in)    :: matrix
+
+        integer :: i
+
+        do i = 1, size(model%trs)
+            call s_transform_triangle(model%trs(i), matrix)
+        end do
+
+    end subroutine s_transform_model
+
+    !> This procedure creates a bounding box for a model.
+    !! @param model Model to create bounding box for.
+    !! @return Bounding box.
+    function f_create_bbox(model) result(bbox)
+
+        type(t_model), intent(in) :: model
+        type(t_bbox)              :: bbox
+
+        integer :: i, j
+
+        if (size(model%trs) == 0) then
+            bbox%min = 0d0
+            bbox%max = 0d0
+            return
+        end if
+
+        bbox%min = model%trs(1)%v(1,:)
+        bbox%max = model%trs(1)%v(1,:)
+
+        do i = 1, size(model%trs)
+            do j = 1, 3
+                bbox%min = min(bbox%min, model%trs(i)%v(j,:))
+                bbox%max = max(bbox%max, model%trs(i)%v(j,:))
+            end do
+        end do
+
+    end function f_create_bbox
 
 end module m_helper

@@ -429,4 +429,112 @@ contains
         
     end subroutine s_skip_ignored_lines
 
+    !> This procedure, recursively, finds whether a point is inside an octree.
+    !! @param model    Model to search in.
+    !! @param point    Point to test.
+    !! @param spacing  Space around the point to search in (grid spacing).
+    !! @param spc      Number of samples per cell.
+    !! @return True if the point is inside the octree, false otherwise.
+    function f_model_is_inside(model, point, spacing, spc) result(fraction)
+
+        type(t_model), intent(in) :: model
+        t_vec3,        intent(in) :: point
+        t_vec3,        intent(in) :: spacing
+        integer,       intent(in) :: spc
+
+        real(kind(0d0)) :: fraction
+
+        type(t_ray) :: ray
+        integer     :: i, j, nInOrOut, nHits
+
+        real(kind(0d0)), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
+        
+        do i = 1, spc
+            call random_number(ray_origins(i,:))
+            ray_origins(i,:) = point + (ray_origins(i,:) - 0.5) * spacing(:)
+
+            call random_number(ray_dirs(i,:))
+            ray_dirs(i,:) = ray_dirs(i,:) - 0.5
+            ray_dirs(i,:) = ray_dirs(i,:) / sqrt(sum(ray_dirs(i,:) * ray_dirs(i,:)))
+        end do
+
+        nInOrOut = 0
+        do i = 1, spc
+            ray%o = ray_origins(i,:)
+            ray%d = ray_dirs(i,:)
+
+            nHits = 0
+            do j = 1, model%ntrs
+                if (f_intersects_triangle(ray, model%trs(j))) then
+                    nHits = nHits + 1
+                end if
+            end do
+
+            nInOrOut = nInOrOut + mod(nHits, 2)
+        end do
+
+        fraction = real(nInOrOut) / real(spc)
+
+    end function f_model_is_inside
+
+    ! From https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
+    !> This procedure checks if a ray intersects a triangle.
+    !! @param ray      Ray.
+    !! @param triangle Triangle.
+    !! @return         True if the ray intersects the triangle, false otherwise.
+    function f_intersects_triangle(ray, triangle) result(intersects)
+
+        type(t_ray),      intent(in) :: ray
+        type(t_triangle), intent(in) :: triangle
+
+        logical :: intersects
+
+        real(kind(0d0)) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
+        real(kind(0d0)) :: area2, d, t, NdotRayDirection
+
+        intersects = .false.
+
+        N     = triangle%n
+        area2 = sqrt(sum(N(:) * N(:)))
+        
+        NdotRayDirection = sum(N(:) * ray%d(:))
+
+        if (abs(NdotRayDirection) .lt. 0.0000001) then
+            return
+        end if
+
+        d = - sum(N(:) * triangle%v(1,:))
+        t = - (sum(N(:) * ray%o(:)) + d) / NdotRayDirection
+    
+        if (t .lt. 0) then
+            return
+        end if
+
+        P = ray%o + t * ray%d
+
+        edge = triangle%v(2,:) - triangle%v(1,:)
+        vp   = P - triangle%v(1,:)
+        C = f_cross(edge, vp)
+        if (sum(N(:) * C(:)) .lt. 0) then
+            return
+        end if
+
+        edge = triangle%v(3,:) - triangle%v(2,:)
+        vp   = P - triangle%v(2,:)
+        C = f_cross(edge, vp)
+        if (sum(N(:) * C(:)) .lt. 0) then
+            return
+        end if
+
+        edge = triangle%v(1,:) - triangle%v(3,:)
+        vp   = P - triangle%v(3,:)
+        C = f_cross(edge, vp)
+        if (sum(N(:) * C(:)) .lt. 0) then
+            return
+        end if
+
+        intersects = .true.
+        
+    end function f_intersects_triangle
+
 end module m_model
