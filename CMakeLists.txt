@@ -290,6 +290,12 @@ function(MFC_SETUP_TARGET)
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
 
+    target_include_directories(${ARGS_TARGET} PRIVATE 
+        "${CMAKE_SOURCE_DIR}/src/common"
+        "${CMAKE_SOURCE_DIR}/src/common/include"
+        "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}"
+        "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
+
     string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
     target_compile_definitions(
         ${ARGS_TARGET} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID}
