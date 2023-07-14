@@ -36,9 +36,10 @@
             else
                 c = &
                     (1d0/gamma + 1d0)* &    
-                    (pres + pi_inf/(gamma+1d0))/ &
-                    (rho*(1d0 - adv(num_fluids)))
+                    (pres + pi_inf/(gamma + 1d0)) / &
+                    (rho * (1d0 - adv(num_fluids)))
             end if
+
         else 
             c = ((H - 5d-1*vel_sum)/gamma) 
         end if 

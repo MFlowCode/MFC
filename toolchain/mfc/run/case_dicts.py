@@ -115,7 +115,7 @@ POST_PROCESS = COMMON + [
     'fourier_modes%beg', 'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
-    'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
+    'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
     'qm_wrt'
 ]
 
@@ -135,6 +135,7 @@ for fl_id in range(1,10+1):
     for attribute in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0"]:
         POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
 
+ALL = list(set(PRE_PROCESS + SIMULATION + POST_PROCESS))
 
 CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 

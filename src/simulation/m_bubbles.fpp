@@ -105,7 +105,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
         integer :: i, j, k, l, q, ii !< Loop variables
-        integer :: ndirs  !< Number of coordinate directions
+        integer :: ndirs  !< Number of coordinate directions       
 
         !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
