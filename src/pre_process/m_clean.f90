@@ -34,7 +34,7 @@ module m_clean
     implicit none
 
     private; public :: s_initialize_modules, s_initialize_mpi_domain, s_finalize_modules, &
-                        s_apply_initial_condition, s_save_data
+                        s_apply_initial_condition, s_save_data, s_read_grid
 
 contains
 
@@ -80,6 +80,10 @@ contains
 	        s_write_data_files => s_write_parallel_data_files
 		end if
 
+    end subroutine s_initialize_modules
+
+    subroutine s_read_grid()
+
 	    if (old_grid) then
 	        call s_read_grid_data_files()
 	        call s_check_grid_data_files()
@@ -93,7 +97,8 @@ contains
 	            call s_check_grid_data_files()
 	        end if
 	    end if
-    end subroutine s_initialize_modules
+
+    end subroutine s_read_grid
 
     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
 
