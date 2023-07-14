@@ -23,24 +23,24 @@ jobs:
       matrix:
         include:
           - os:  ubuntu-latest
-            debug: --no-debug
+            debug: no-debug
             intel: false
           - os:  ubuntu-latest
-            debug: --debug
+            debug: debug
             intel: false
           - os:  ubuntu-latest
-            debug: --no-debug
+            debug: no-debug
             intel: true
             intel-command: source /opt/intel/oneapi/setvars.sh
           - os:  ubuntu-latest
-            debug: --debug
+            debug: debug
             intel: true
             intel-command: source /opt/intel/oneapi/setvars.sh
           - os:  macos-latest
-            debug: --no-debug
+            debug: no-debug
             gcc: 11
           - os:  macos-latest
-            debug: --debug
+            debug: debug
             gcc: 11
     runs-on: ${{ matrix.os }}
     steps:
