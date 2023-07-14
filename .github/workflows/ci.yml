@@ -25,31 +25,31 @@ jobs:
           - os:  ubuntu-latest
             debug: no-debug
             intel: false
-            mpi: true
+            mpi: mpi
           - os:  ubuntu-latest
             debug: debug
             intel: false
-            mpi: true
+            mpi: mpi
           - os:  ubuntu-latest
             debug: no-debug
             intel: true
             intel-command: source /opt/intel/oneapi/setvars.sh
-            mpi: true
+            mpi: mpi
           - os:  ubuntu-latest
             debug: debug
             intel: true
             intel-command: source /opt/intel/oneapi/setvars.sh
-            mpi: true
+            mpi: mpi
           - os:  macos-latest
             debug: no-debug
             gcc: 11
             intel: false
-            mpi: true
+            mpi: mpi
           - os:  macos-latest
             debug: debug
             gcc: 11
             intel: false
-            mpi: true
+            mpi: mpi
     runs-on: ${{ matrix.os }}
     steps:
       - name: Clone
