@@ -142,7 +142,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
     
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -Og -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+        add_compile_options(-C -g -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
     endif()
 endif()
 
