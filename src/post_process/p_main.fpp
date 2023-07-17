@@ -15,7 +15,7 @@ program p_main
     ! Dependencies =============================================================
     use m_global_parameters     !< Global parameters for the code
 
-    use m_clean
+    use m_start_up
     ! ==========================================================================
 
     implicit none
