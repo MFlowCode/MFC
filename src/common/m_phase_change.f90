@@ -25,16 +25,16 @@ module m_phase_change
     IMPLICIT NONE
 
     PRIVATE; PUBLIC :: s_initialize_phasechange_module, &
-                       s_relaxation_solver,             & 
-                       s_relaxation_finite_solver,      & 
-                       s_finite_ptg_relaxation,         &
-                       s_infinite_p_relaxation,         &
-                       s_infinite_p_relaxation_k,       &
-                       s_infinite_pt_relaxation,        &
-                       s_infinite_relaxation_k,         &
-                       s_infinite_ptg_relaxation,       &
-                       s_finalize_relaxation_solver_module
-                       
+                        s_relaxation_solver,             & 
+                        s_relaxation_finite_solver,      & 
+                        s_finite_ptg_relaxation,         &
+                        s_infinite_p_relaxation,         &
+                        s_infinite_p_relaxation_k,       &
+                        s_infinite_pt_relaxation,        &
+                        s_infinite_relaxation_k,         &
+                        s_infinite_ptg_relaxation,       &
+                        s_finalize_relaxation_solver_module
+                        
     !> @name Abstract interface for creating function pointers
     !> @{
     ABSTRACT INTERFACE
@@ -94,14 +94,14 @@ module m_phase_change
             n2    = 1.d0/fluid_pp(2)%gamma + 1.d0
             pinf2 = fluid_pp(2)%pi_inf/(1.d0 + fluid_pp(2)%gamma)
             gibbsA = (n1*fluid_pp(1)%cv - n2*fluid_pp(2)%cv +  & 
-                     fluid_pp(2)%qvp - fluid_pp(1)%qvp) / &
-                     (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
+                        fluid_pp(2)%qvp - fluid_pp(1)%qvp) / &
+                        (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
             gibbsB = (fluid_pp(1)%qv - fluid_pp(2)%qv) / &
-                     (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
+                        (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
             gibbsC = (n2*fluid_pp(2)%cv - n1*fluid_pp(1)%cv) / &
-                     (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
+                        (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
             gibbsD = (n1*fluid_pp(1)%cv - fluid_pp(1)%cv) / & 
-                     (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
+                        (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
 
             ! Associating procedural pointer to the subroutine that will be
             ! utilized to calculate the solution of a given Riemann problem
@@ -158,86 +158,86 @@ module m_phase_change
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
-                       ! Numerical correction of the volume fractions
-                       IF (mpp_lim) THEN
-                       END IF
+                        ! Numerical correction of the volume fractions
+                        IF (mpp_lim) THEN
+                        END IF
 
-                       IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps .OR. &
-                           q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) THEN
-       
-                       ! computing n_k, pinf_k, p_k, T_k, and g_k for finite relaxation
-                       phi = 0.d0; psi = 0.d0; f1 = 0.d0; f2 = 0.d0; f3 = 0.d0; f4 = 0.d0;
-                       !rhoe = 0.d0;
+                        IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps .OR. &
+                            q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) THEN
+        
+                        ! computing n_k, pinf_k, p_k, T_k, and g_k for finite relaxation
+                        phi = 0.d0; psi = 0.d0; f1 = 0.d0; f2 = 0.d0; f3 = 0.d0; f4 = 0.d0;
+                        !rhoe = 0.d0;
 
-                       DO i = 1, num_fluids
-                          n_k    = 1.d0/fluid_pp(i)%gamma + 1.d0
-                          pinf_k = fluid_pp(i)%pi_inf/(1.d0 + fluid_pp(i)%gamma)
-                          rho_k  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) &
-                                  /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
-                          rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                              -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                              /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                          !rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)
-                          e_k = q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) &
-                               /q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
+                        DO i = 1, num_fluids
+                            n_k    = 1.d0/fluid_pp(i)%gamma + 1.d0
+                            pinf_k = fluid_pp(i)%pi_inf/(1.d0 + fluid_pp(i)%gamma)
+                            rho_k  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) &
+                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
+                            rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                            !rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)
+                            e_k = q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) &
+                                /q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
 
-                          p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
-                          T_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf/(1.d0+fluid_pp(i)%gamma)) &
-                              /(rho_k*fluid_pp(i)%cv)
-                          g_k(i) = (n_k*fluid_pp(i)%cv-fluid_pp(i)%qvp)*T_k(i) &
-                              -fluid_pp(i)%cv*T_k(i)*log(T_k(i)**(n_k) &
-                              /((p_k(i)+pinf_k)**(n_k-1.d0)))+fluid_pp(i)%qv
-                          Z_k(i) = n_k*(p_k(i)+pinf_k);
+                            p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                            T_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf/(1.d0+fluid_pp(i)%gamma)) &
+                                /(rho_k*fluid_pp(i)%cv)
+                            g_k(i) = (n_k*fluid_pp(i)%cv-fluid_pp(i)%qvp)*T_k(i) &
+                                -fluid_pp(i)%cv*T_k(i)*log(T_k(i)**(n_k) &
+                                /((p_k(i)+pinf_k)**(n_k-1.d0)))+fluid_pp(i)%qv
+                            Z_k(i) = n_k*(p_k(i)+pinf_k);
 
-                          phi = phi + 1.d0/(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv)
-                          psi = psi + 1.d0/(fluid_pp(i)%gamma*q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l))
+                            phi = phi + 1.d0/(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv)
+                            psi = psi + 1.d0/(fluid_pp(i)%gamma*q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l))
 
-                          f1 = f1 + (p_k(i)+n_k*pinf_k)/q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
-                          f2 = f2 + pinf_k/(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv)
-                          f3 = f3 + fluid_pp(i)%qv/(fluid_pp(i)%gamma & 
+                            f1 = f1 + (p_k(i)+n_k*pinf_k)/q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
+                            f2 = f2 + pinf_k/(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv)
+                            f3 = f3 + fluid_pp(i)%qv/(fluid_pp(i)%gamma & 
                                     *q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l))
-                          f4 = f4 + (e_k-pinf_k/rho_k) &
+                            f4 = f4 + (e_k-pinf_k/rho_k) &
                                     /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv)
-                       END DO
-                       !TODO IMPROVE THIS APPROACH
-                       Tsat = f_Tsat(p_k(1))
-                       !PRINT *,'prelax =',p_k(1),'Trelax = ',T_k(1),', Tsat = ',Tsat
+                        END DO
+                        !TODO IMPROVE THIS APPROACH
+                        Tsat = f_Tsat(p_k(1))
+                        !PRINT *,'prelax =',p_k(1),'Trelax = ',T_k(1),', Tsat = ',Tsat
 
-                       IF ( ieee_is_nan(p_k(1)) .OR. p_k(1) < 0.d0 ) THEN 
-                           PRINT *, 'code crashed' 
-                           CALL s_mpi_abort()
-                       END IF
+                        IF ( ieee_is_nan(p_k(1)) .OR. p_k(1) < 0.d0 ) THEN 
+                            PRINT *, 'code crashed' 
+                            CALL s_mpi_abort()
+                        END IF
 
-                       kappa = f1/psi
-                       rho_I = (phi*f1-psi*f2)/(psi*f4-phi*f3)
-                       p_I = (Z_k(2)*p_k(1)+Z_k(1)*p_k(2))/(Z_k(1)+Z_k(2));
-                       e_I = f4/phi + f2/(rho_I*phi)
+                        kappa = f1/psi
+                        rho_I = (phi*f1-psi*f2)/(psi*f4-phi*f3)
+                        p_I = (Z_k(2)*p_k(1)+Z_k(1)*p_k(2))/(Z_k(1)+Z_k(2));
+                        e_I = f4/phi + f2/(rho_I*phi)
 
-                       !mu = 1.d8
-                       mu = 0.d0;
-                       theta = 1.d8 
-                       nu = 0.d0
-                       IF (T_k(1) .GT. Tsat) nu = 1d-3
-  
-                       deltap = mu*(p_k(1)-p_k(2))
-                       Q = theta*(T_k(2)-T_k(1))
-                       mdot = nu*(g_k(2)-g_k(1))
-                       mdotalpha = mdot/rho_I
-                       mdotrhoe = mdot*e_I
+                        !mu = 1.d8
+                        mu = 0.d0;
+                        theta = 1.d8 
+                        nu = 0.d0
+                        IF (T_k(1) .GT. Tsat) nu = 1d-3
+    
+                        deltap = mu*(p_k(1)-p_k(2))
+                        Q = theta*(T_k(2)-T_k(1))
+                        mdot = nu*(g_k(2)-g_k(1))
+                        mdotalpha = mdot/rho_I
+                        mdotrhoe = mdot*e_I
 
-                       rhs_vf(1+adv_idx%beg-1)%sf(j,k,l) = & 
-                              rhs_vf(1+adv_idx%beg-1)%sf(j,k,l) + deltap + Q/kappa + mdotalpha
-                       rhs_vf(2+adv_idx%beg-1)%sf(j,k,l) = & 
-                              rhs_vf(2+adv_idx%beg-1)%sf(j,k,l) - deltap - Q/kappa - mdotalpha
-                       rhs_vf(1+cont_idx%beg-1)%sf(j,k,l) = & 
-                              rhs_vf(1+cont_idx%beg-1)%sf(j,k,l) + mdot
-                       rhs_vf(2+cont_idx%beg-1)%sf(j,k,l) = & 
-                              rhs_vf(2+cont_idx%beg-1)%sf(j,k,l) - mdot
-                       rhs_vf(1+internalEnergies_idx%beg-1)%sf(j,k,l) = &
-                              rhs_vf(1+internalEnergies_idx%beg-1)%sf(j,k,l) - p_I*deltap + Q + mdotrhoe
-                       rhs_vf(2+internalEnergies_idx%beg-1)%sf(j,k,l) = &
-                              rhs_vf(2+internalEnergies_idx%beg-1)%sf(j,k,l) + p_I*deltap - Q - mdotrhoe
-                       END IF
+                        rhs_vf(1+adv_idx%beg-1)%sf(j,k,l) = & 
+                                rhs_vf(1+adv_idx%beg-1)%sf(j,k,l) + deltap + Q/kappa + mdotalpha
+                        rhs_vf(2+adv_idx%beg-1)%sf(j,k,l) = & 
+                                rhs_vf(2+adv_idx%beg-1)%sf(j,k,l) - deltap - Q/kappa - mdotalpha
+                        rhs_vf(1+cont_idx%beg-1)%sf(j,k,l) = & 
+                                rhs_vf(1+cont_idx%beg-1)%sf(j,k,l) + mdot
+                        rhs_vf(2+cont_idx%beg-1)%sf(j,k,l) = & 
+                                rhs_vf(2+cont_idx%beg-1)%sf(j,k,l) - mdot
+                        rhs_vf(1+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                rhs_vf(1+internalEnergies_idx%beg-1)%sf(j,k,l) - p_I*deltap + Q + mdotrhoe
+                        rhs_vf(2+internalEnergies_idx%beg-1)%sf(j,k,l) = &
+                                rhs_vf(2+internalEnergies_idx%beg-1)%sf(j,k,l) + p_I*deltap - Q - mdotrhoe
+                        END IF
                     END DO
                 END DO
             END DO
@@ -273,14 +273,14 @@ module m_phase_change
                             CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         END IF
                         IF ( (q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps ) .AND. &
-                              q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
+                                q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
                         IF (relax) THEN
                             DO i = 1, num_fluids
-                                 alpha_k(i) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                                 rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                          -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                          /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                                 p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                                    alpha_k(i) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                                    rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                            -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                            /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                                    p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
                             END DO
                             a1 = f_alpha1_prelax(p_k,alpha_k)
                             ! Cell update of the volume fraction
@@ -333,11 +333,11 @@ module m_phase_change
                         IF (relax) THEN
                             ! Calculating the initial pressure
                             DO i = 1, num_fluids
-                              pres_K_init(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                 -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                 /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
-                                 -fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
-                              IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) & 
+                                pres_K_init(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                    -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
+                                    -fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                                IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) & 
                                     pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-0
                             END DO
                             CALL s_compute_p_relax_k(rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
@@ -386,14 +386,14 @@ module m_phase_change
                             CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         END IF
                         IF ( (q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps ) .AND. &
-                              q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
+                                q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
                         IF (relax) THEN
                             DO i = 1, num_fluids
-                                 alpha_k(i) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                                 rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                          -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                          /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                                 p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                                    alpha_k(i) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                                    rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                            -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                            /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                                    p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
                             END DO
                             a1 = f_alpha1_prelax(p_k,alpha_k)
                             ! Cell update of the volume fraction
@@ -409,7 +409,7 @@ module m_phase_change
                             CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         END IF
                         IF ( (q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps ) .AND. &
-                              q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
+                                q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
                         IF (relax) THEN
                             rhoalpha1 = q_cons_vf(cont_idx%beg)%sf(j,k,l)
                             rhoalpha2 = q_cons_vf(1+cont_idx%beg)%sf(j,k,l)
@@ -467,14 +467,14 @@ module m_phase_change
                                                             gamma, pi_inf, qv )
 
                         IF ( (q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps ) .AND. &
-                              q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
+                                q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
                         IF (relax) THEN
                             DO i = 1, num_fluids
-                                 alpha_k(i) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                                 rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                          -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                          /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
-                                 p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                                    alpha_k(i) = q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                                    rhoeq_k = (q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                            -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                            /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) 
+                                    p_k(i) = (rhoeq_k-fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
                             END DO
                             a1 = f_alpha1_prelax(p_k,alpha_k)
                             ! Cell update of the volume fraction
@@ -491,7 +491,7 @@ module m_phase_change
                         CALL s_convert_to_mixture_variables( q_cons_vf, j, k, l, rho, &
                                                             gamma, pi_inf, qv )
                         IF ( (q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps ) .AND. &
-                              q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
+                                q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps ) relax = .TRUE.
                         IF (relax) THEN
                             rhoalpha1 = q_cons_vf(cont_idx%beg)%sf(j,k,l)
                             rhoalpha2 = q_cons_vf(1+cont_idx%beg)%sf(j,k,l)
@@ -511,35 +511,35 @@ module m_phase_change
                             CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         END IF
                         CALL s_convert_to_mixture_variables( q_cons_vf, j, k, l, rho, &
-                                                             gamma, pi_inf, qv )
+                                                                gamma, pi_inf, qv )
                         IF ((q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .GT. ptgalpha_eps ) .AND. &
-                             q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps ) relax = .TRUE.
+                                q_cons_vf(1+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps ) relax = .TRUE.
                         IF (relax) THEN
-                           DO i = 1, num_fluids
-                               rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) 
-                           END DO                   
-                           pres_relax = (rhoe - pi_inf)/gamma
-                           Tsat = f_Tsat(pres_relax)
-                           DO i = 1, num_fluids
-                             Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                            DO i = 1, num_fluids
+                                rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) 
+                            END DO                   
+                            pres_relax = (rhoe - pi_inf)/gamma
+                            Tsat = f_Tsat(pres_relax)
+                            DO i = 1, num_fluids
+                                Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
                                     -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
                                     /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
                                     -fluid_pp(i)%pi_inf & 
                                     /(1.d0+fluid_pp(i)%gamma)) &
                                     /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
                                     /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)) 
-                           END DO
-                           IF (Tk(1) .LT. Tsat) relax = .FALSE.
+                            END DO
+                            IF (Tk(1) .LT. Tsat) relax = .FALSE.
                         END IF
                         ! PTG RELAXATION PROCEDURE ===========================
                         IF (relax) THEN
                             CALL s_compute_ptg_pTrelax(pres_relax,Trelax,rho,rhoe)
                             p_infk = fluid_pp(1)%pi_inf/(1.d0+fluid_pp(1)%gamma)
                             rho1 = (pres_relax + p_infk)*fluid_pp(1)%gamma /& 
-                                   (fluid_pp(1)%cv*Trelax)
+                                    (fluid_pp(1)%cv*Trelax)
                             p_infk = fluid_pp(2)%pi_inf/(1.d0+fluid_pp(2)%gamma)
                             rho2 = (pres_relax + p_infk)*fluid_pp(2)%gamma /& 
-                                   (fluid_pp(2)%cv*Trelax)
+                                    (fluid_pp(2)%cv*Trelax)
                             ! Calculate vapor and liquid volume fractions
                             a1 = (rho-rho2)/(rho1-rho2)
                             a2 = 1.d0 - a1
@@ -559,8 +559,8 @@ module m_phase_change
         ! model, with changes such that mass depletion is taken into consideration
         SUBROUTINE s_infinite_relaxation_k(q_cons_vf) ! ----------------
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT)  :: q_cons_vf 
-            REAL(KIND(0.0D0)), DIMENSION(num_fluids)                :: g_min, p_inf, p_infA, pDumb
-            REAL(KIND(0.0D0)), DIMENSION(num_fluids)                :: pk, Tk, sk, hk, gk
+            REAL(KIND(0.0D0)), DIMENSION(num_fluids)                :: g_min, p_inf, p_infA, pDumb, cv, qv, qvp
+            REAL(KIND(0.0D0)), DIMENSION(num_fluids)                :: pk, sk, hk, gk
             REAL(KIND(0.0D0)), DIMENSION(num_fluids)                :: ek, rhok
             REAL(KIND(0.0D0))                                       :: A, B, C, D
             REAL(KIND(0.0D0))                                       :: pS, pSOV, pSSL
@@ -578,27 +578,31 @@ module m_phase_change
             lp = 1 
             vp = 2
 
-            ! gamma min for the SG EoS
+            ! renaming fluid properties JUST FOR EASINESS
+            cv( 1 : num_fluids ) = fluid_pp( 1 : num_fluids )%cv
+            qv( 1 : num_fluids ) = fluid_pp( 1 : num_fluids )%qv
+            qvp( 1 : num_fluids ) = fluid_pp( 1 : num_fluids )%qvp
+            
+            ! gamma_min
             g_min( 1 : num_fluids ) = 1.0D0 / fluid_pp( 1 : num_fluids )%gamma + 1.0D0
-
-            ! p_infty for the SG EoS
+            
+            ! p_inf
             p_inf( 1 : num_fluids )  = fluid_pp( 1 : num_fluids )%pi_inf &
             / ( 1.0D0 + fluid_pp( 1 : num_fluids )%gamma )
             
             ! variables used in the calculation of the saturation curves for fluids 1 and 2
-            A = ( g_min( lp ) * fluid_pp( lp )%cv  - g_min( vp ) * fluid_pp( vp )%cv &
-            + fluid_pp( vp )%qvp - fluid_pp( lp )%qvp ) &
-            / ( ( g_min( vp ) - 1.0D0 ) * fluid_pp( vp )%cv )
+            A = ( g_min( lp ) * cv( lp )  - g_min( vp ) * cv( vp ) &
+            + qv( vp ) - qv( lp ) ) / ( ( g_min( vp ) - 1.0D0 ) * cv( vp ) )
             
-            B = ( fluid_pp( lp )%qv - fluid_pp( vp )%qv ) &
-            / ( ( g_min( vp ) - 1.0D0 ) * fluid_pp( vp )%cv )
+            B = ( qv( lp ) - qv( vp ) ) / ( ( g_min( vp ) - 1.0D0 ) * cv( vp ) )
             
-            C = ( g_min( vp ) * fluid_pp( vp )%cv - g_min( lp ) * fluid_pp( lp )%cv ) & 
-            / ( ( g_min( vp ) - 1.0D0 ) * fluid_pp( vp )%cv )
+            C = ( g_min( vp ) * cv( vp ) - g_min( lp ) * cv( lp ) ) & 
+            / ( ( g_min( vp ) - 1.0D0 ) * cv( vp ) )
             
-            D = ( ( g_min( lp ) - 1.0D0 ) * fluid_pp( lp )%cv ) &
-            / ( ( g_min( vp ) - 1.0D0 ) * fluid_pp( vp )%cv )
+            D = ( ( g_min( lp ) - 1.0D0 ) * cv( lp ) ) &
+            / ( ( g_min( vp ) - 1.0D0 ) * cv( vp ) )
 
+            ! threshold for 'mixture cell'. If Y < mixM, the cell is not considered a mixture for pTg purposes
             mixM = 1.0D-08
 
             ! starting equilibrium solver
@@ -612,10 +616,11 @@ module m_phase_change
                         DO i = 1, num_fluids
                         
                             ! pressure that comes from the homogeneous solver at that cell
-                            pk( i ) = ( ( q_cons_vf( i + internalEnergies_idx%beg - 1 )%sf( j, k, l ) & 
-                                    - q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%qv ) &
-                                    / q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) &
-                                    - fluid_pp( i )%pi_inf ) / fluid_pp( i )%gamma	
+                            pk( i ) =   ( g_min( i ) - 1 ) &
+                            * ( q_cons_vf( i + internalEnergies_idx%beg - 1 )%sf( j, k, l ) & 
+                            -   q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * qv( i ) ) &
+                            /   q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l )              &
+                            - g_min( i ) * p_inf ( i )
                             
                             ! Mixture density
                             rho = rho + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
@@ -657,16 +662,16 @@ module m_phase_change
                         rhoe = q_cons_vf( E_idx )%sf( j, k, l ) - dynE
                         
                         ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
-                        CALL s_infinite_pt_relaxation_k(j, k, l, g_min, 'pT', pk, pS, p_inf &
-                        , p_infA, q_cons_vf, rho, rhoe, TS )
+                        CALL s_infinite_pt_relaxation_k(cv, j, k, l, g_min, 'pT', pk, pS, p_inf &
+                        , p_infA, qv, q_cons_vf, rho, rhoe, TS )
                         
                         ! check if pTg-equilibrium is required
                         ! NOTE that NOTHING else needs to be updated OTHER than the individual partial densities
                         ! given the outputs from the pT- and pTg-equilibrium solvers are just p, T (byproduct)
                         ! , and the partial masses (pTg- case)
                         IF ( ( relax_model .EQ. 6 ) .AND. ( ( q_cons_vf( lp + cont_idx%beg - 1  )%sf( j, k, l ) &
-                        .GT. MCT / 2.0D0 * rM ) .OR. ( q_cons_vf( vp + cont_idx%beg - 1  )%sf( j, k, l )        &
-                        .GT. MCT / 2.0D0 * rM ) ) .AND. ( pS .LT. pres_crit ) .AND. ( TS .LT. T_crit ) ) THEN
+                        .GT. MixM * rM ) .OR. ( q_cons_vf( vp + cont_idx%beg - 1  )%sf( j, k, l )        &
+                        .GT. MixM * rM ) ) .AND. ( pS .LT. pres_crit ) .AND. ( TS .LT. T_crit ) ) THEN
 
                             ! Checking if phase change can happen.
                             ! overheated vapor
@@ -677,12 +682,12 @@ module m_phase_change
                             q_cons_vf( vp + cont_idx%beg - 1  )%sf( j, k, l ) = ( 1.0D0 - mixM ) * rM
 
                             ! calling pT-equilibrium for overheated vapor
-                            CALL s_infinite_pt_relaxation_k(j, k, l, g_min, 'OV', pk, pSOV, p_inf &
-                            , pDumb, q_cons_vf, rho, rhoe, TSOV )
+                            CALL s_infinite_pt_relaxation_k(cv, j, k, l, g_min, 'OV', pk, pSOV, p_inf &
+                            , pDumb, qv, q_cons_vf, rho, rhoe, TSOV )
 
                             ! calculating Saturation temperature
-                            CALL s_TSat(A, B, C, D, lp, pSOV, p_inf, TSatOV, TSOV, vp)
-
+                            CALL s_TSat(A, B, C, cv, D, g_min, lp, pSOV, p_inf, qv, qvp, TSatOV, TSOV, vp)
+                                 
                             ! subcooled liquid
                             ! correcting the liquid partial density
                             q_cons_vf( lp + cont_idx%beg - 1  )%sf( j, k, l ) = ( 1.0D0 - mixM ) * rM
@@ -691,11 +696,11 @@ module m_phase_change
                             q_cons_vf( vp + cont_idx%beg - 1  )%sf( j, k, l ) = mixM * rM
 
                             ! calling pT-equilibrium for subcooled liquid
-                            CALL s_infinite_pt_relaxation_k(j, k, l, g_min, 'SL', pk, pSSL, p_inf &
-                            , pDumb, q_cons_vf, rho, rhoe, TSSL )
+                            CALL s_infinite_pt_relaxation_k(cv, j, k, l, g_min, 'SL', pk, pSSL, p_inf &
+                            , pDumb, qv, q_cons_vf, rho, rhoe, TSSL )
                             
                             ! calculating Saturation temperature
-                            CALL s_TSat(A, B, C, D, lp, pSSL, p_inf, TSatSL, TSSL, vp)
+                            CALL s_TSat(A, B, C, cv, D, g_min, lp, pSSL, p_inf, qv, qvp, TSatSL, TSSL, vp)
                             
                             ! Maybe I will have to change this for .GE. instead, since mass depletion can 
                             ! happen at pTg-eq. Make sure it works, first
@@ -737,11 +742,11 @@ module m_phase_change
                                 q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l ) = m2
 
                                 ! calling the pTg-equilibrium solver
-                                CALL s_infinite_ptg_relaxation_k( A, B, C, D, g_min, j, k, l, lp, pS &
-                                , p_inf, p_infA, rhoe, q_cons_vf, TS, vp )
- 
+                                CALL s_infinite_ptg_relaxation_k( A, B, C, cv, D, g_min, j, k, l, lp, pS &
+                                , p_inf, p_infA, rhoe, qv, qvp, q_cons_vf, TS, vp )
+
                             END IF
-    
+                            
                         END IF
                         
                         ! Calculations AFTER the solvers
@@ -751,25 +756,25 @@ module m_phase_change
                         ! to update alpha, and alpha*rho*e. So, in the end I update alpha, e, and then alpha*rho*e
                         ! entropy
                         sk( 1 : num_fluids ) = &
-                        fluid_pp( 1 : num_fluids )%cv * DLOG( ( TS ** g_min( 1 : num_fluids ) ) &
+                        cv( 1 : num_fluids ) * DLOG( ( TS ** g_min( 1 : num_fluids ) ) &
                         / ( ( pS + p_inf( 1 : num_fluids ) ) ** ( g_min( 1 : num_fluids ) - 1.0D0 ) ) ) & 
-                        + fluid_pp( 1 : num_fluids )%qvp
+                        + qvp( 1 : num_fluids )
 
                         ! enthalpy
-                        hk( 1 : num_fluids ) = g_min( 1 : num_fluids ) * fluid_pp( 1 : num_fluids )%cv * TS &
-                        + fluid_pp( 1 : num_fluids )%qvp
+                        hk( 1 : num_fluids ) = g_min( 1 : num_fluids ) * cv( 1 : num_fluids ) * TS &
+                        + qv( 1 : num_fluids )
 
                         ! GIBBS-FREE ENERGY
                         gk( 1 : num_fluids ) = hk( 1 : num_fluids ) - TS * sk( 1 : num_fluids )
 
                         ! densities
                         rhok( 1 : num_fluids ) = ( pS + p_inf( 1 : num_fluids ) ) &
-                        / ( ( g_min( 1 : num_fluids ) - 1 ) * fluid_pp( 1 : num_fluids )%cv * TS )
+                        / ( ( g_min( 1 : num_fluids ) - 1 ) * cv( 1 : num_fluids ) * TS )
 
                         ! internal energy
                         ek( 1 : num_fluids ) = ( pS + g_min( 1 : num_fluids ) & 
                         * p_inf( 1 : num_fluids ) ) / ( pS + p_inf( 1 : num_fluids ) ) & 
-                        * fluid_pp( 1 : num_fluids )%cv * TS + fluid_pp( 1 : num_fluids )%qv
+                        * cv( 1 : num_fluids ) * TS + qv( 1 : num_fluids )
 
                         DO i = 1, num_fluids
                                                     
@@ -783,40 +788,47 @@ module m_phase_change
 
                         END DO
                         
-                        ! TEST FOR THE TOTAL VOLUME FRACTION
+                        ! calculating the TOTAL VOLUME FRACTION, reacting mass, and TOTAL MASS, after the PC
                         TvFT = 0.0D0
+                        rhoT = 0.0D0
                         DO i = 1, num_fluids
+                            
                             ! Total volume Fraction Test
                             TvFT = TvFT + q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l )
-                        END DO
-
-                        ! total volume fractions test
-                        ! IF( DABS( TvF - TvFT ) .GT. 1.0D-2 ) THEN
                             
-                        !     PRINT *, 'constraint on total volume fractions not satisfied'
+                            ! Total Mass
+                            rhoT = rhoT + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
 
-                        !     PRINT *, 'j, k, l ', j, k, l
-
-                        !     PRINT *, 'old', TvF
-
-                        !     PRINT *, 'new', TvFT
-
-                        ! END IF
+                        END DO
 
                         rMT = q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l ) & 
                         + q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l )
-                        
-                        rhoT = rMT + q_cons_vf( num_fluids + cont_idx%beg - 1 )%sf( j, k, l )
 
-                        IF ( DABS( rM - rMT ) .GT. 1.0D-8 ) THEN
+                        ! testing the total volume fraction
+                        IF( DABS( TvF - TvFT ) .GT. 1.0D-2 ) THEN
+                            
+                            PRINT *, 'D total volume fractions AFTER PC: ', TvF - TvFT &
+                            , 'j, k, l ', j, k, l
 
-                            PRINT *, 'D rM AFTER PC: ', rM - rMT, 'j,k,l', j, k, l
+                            PRINT *, 'old', TvF
+
+                            PRINT *, 'new', TvFT
 
                         END IF
 
+                        ! testing the reacting mass
+                        IF ( DABS( rM - rMT ) .GT. 1.0D-8 ) THEN
+
+                            PRINT *, 'D Reacting Mass AFTER PC: ', rM - rMT &
+                            , 'j, k, l ', j, k, l
+
+                        END IF
+
+                        ! testing the total mass
                         IF ( DABS( rho - rhoT ) .GT. 1.0D-6 ) THEN
 
-                            PRINT *, 'D TM AFTER PC: ', rho - rhoT, 'j,k,l', j, k, l
+                            PRINT *, 'D Total Mass AFTER PC: ', rho - rhoT &
+                            , 'j, k, l ', j, k, l
 
                         END IF
 
@@ -830,10 +842,10 @@ module m_phase_change
         !!!!!!!!!!!!!!! SUBROUTINES SUBROUTINES SUBROUTINES !!!!!!!!!!!!!!!
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        SUBROUTINE s_infinite_pt_relaxation_k(j, k, l, g_min, MDF, pk, pS, p_inf, p_infA, q_cons_vf, rho, rhoe, TS )
+        SUBROUTINE s_infinite_pt_relaxation_k(cv, j, k, l, g_min, MDF, pk, pS, p_inf, p_infA, qv, q_cons_vf, rho, rhoe, TS )
             ! initializing variables
             TYPE( scalar_field ),  DIMENSION( sys_size ), INTENT( IN )    :: q_cons_vf         
-            REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( IN )  :: g_min, p_inf, pk
+            REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( IN )  :: g_min, p_inf, pk, cv, qv
             REAL( KIND( 0.0D0 ) ), INTENT( OUT )                          :: pS, TS
             REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( OUT ) :: p_infA
             REAL( KIND( 0.0D0 ) ), INTENT( IN )                           :: rho, rhoe
@@ -861,14 +873,12 @@ module m_phase_change
                 ! check if all alpha(i)*rho(i) are nonnegative. If so, abort
                 IF ( q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) .LT. 0.0D0 ) THEN
                     
-                    PRINT *, 'Solver for the pT-relaxation solver failed (m_phase_change, s_infinite_pt_relaxation_k) &
-                    . Please, check partial densities. Aborting!'
-                    
                     CALL s_tattletale( (/ 0.0D0, 0.0D0 /), RESHAPE( (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), (/ 2, 2 /) ) &
-                    , j, (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), k, l, mQ, p_inf, pS, (/ DABS( pS - pO ), DABS( pS - pO ) /) &
+                    , j, (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), k, l, mQ, p_inf, pS, qv, (/ DABS( pS - pO ), DABS( pS - pO ) /) &
                     , rhoe, q_cons_vf, TS )
         
-                    CALL s_mpi_abort()
+                    CALL s_mpi_abort('Solver for the pT-relaxation solver failed (m_phase_change, s_infinite_pt_relaxation_k) &
+                    . Please, check partial densities. Aborting!')
                 
                 ! check which indices I will ignore (no need to abort the solver in this case). Adjust this sgm_eps value for mixture cells
                 ! ELSE IF ( ( q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) .GE. 0.0D0 ) &
@@ -884,10 +894,10 @@ module m_phase_change
                 
                 ! sum of the total alpha*rho*cp of the system
                 mCP = mCP + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) &
-                * fluid_pp( i )%cv * g_min( i )
+                * cv( i ) * g_min( i )
         
                 ! sum of the total alpha*rho*q of the system
-                mQ = mQ + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%qv
+                mQ = mQ + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * qv( i )
         
             END DO
         
@@ -910,17 +920,15 @@ module m_phase_change
                     RETURN
 
                 ELSE
-
-                    PRINT *, 'Solver for the pT-relaxation solver failed (m_phase_change, s_infinite_pt_relaxation_k) &
-                    . Please, check energy constraint. Aborting!'
             
                     PRINT *, 'MDF', MDF
 
                     CALL s_tattletale( (/ 0.0D0, 0.0D0 /), RESHAPE( (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), (/ 2, 2 /) ) &
-                    , j, (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), k, l, mQ, p_inf, pS, (/ DABS( pS - pO ), DABS( pS - pO ) /) &
+                    , j, (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), k, l, mQ, p_inf, pS, qv, (/ DABS( pS - pO ), DABS( pS - pO ) /) &
                     , rhoe, q_cons_vf, TS )
 
-                    CALL s_mpi_abort()
+                    CALL s_mpi_abort('Solver for the pT-relaxation solver failed (m_phase_change, s_infinite_pt_relaxation_k) &
+                    . Please, check energy constraint. Aborting!')
 
                 END IF
         
@@ -936,8 +944,9 @@ module m_phase_change
         
             ! Newton Solver for the pT-equilibrium
             ns = 0
-            DO WHILE ( ( DABS( pS - pO ) .GT. palpha_eps ) .AND. ( DABS( ( pS - pO ) / pO ) .GT. palpha_eps ) )
-        
+            DO WHILE ( ( DABS( pS - pO ) .GT. palpha_eps ) .AND. ( DABS( ( pS - pO ) / pO ) .GT. palpha_eps ) &
+                        .OR. ( ns .EQ. 0 ) )
+
                 ! increasing counter
                 ns = ns + 1
         
@@ -956,11 +965,11 @@ module m_phase_change
                     IF ( i .NE. ig( i ) ) THEN
 
                         gp =   gp + ( g_min( i ) - 1.0D0 ) & 
-                        * q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%cv &
+                        * q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * cv( i ) &
                         * ( rhoe + pS - mQ ) / ( mCP * ( pS + p_infA( i ) ) )
             
                         gpp = gpp + ( g_min( i ) - 1.0D0 ) & 
-                        * q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%cv &
+                        * q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * cv( i ) &
                         * ( p_infA( i ) - rhoe + mQ ) / ( mCP * ( pS + p_infA( i ) ) ** 2 )
 
                     END IF
@@ -973,19 +982,29 @@ module m_phase_change
                 pS = pO + ( ( 1.0D0 - gp ) / gpp ) / ( 1.0D0 - ( 1.0D0 - gp + DABS( 1.0D0 - gp ) ) &
                 / ( 2.0D0 * gpp ) * hp )
         
-                IF ( ( ns .GT. 1E4 ) .OR. ( pS .LE. -1.0D0 * MINVAL( p_infA ) ) ) THEN
-        
-                    PRINT *, 'Solver for the pT-relaxation solver failed (m_phase_change, s_infinite_pt_relaxation_k) &
-                    . Please, check the pressure value. Aborting!'
-
-                    PRINT *, 'ns', ns
+                ! check if solution is out of bounds (which I believe it won`t happen given the solver is gloabally convergent.
+                ! I am not an expert in numerical methods though)
+                IF ( pS .LE. -1.0D0 * MINVAL( p_infA ) ) THEN
 
                     CALL s_tattletale( (/ 0.0D0, 0.0D0 /), RESHAPE( (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), (/ 2, 2 /) ) &
-                    , j, (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), k, l, mQ, p_infA, pS, (/ pS - pO, pS + pO /) &
+                    , j, (/ 0.0D0, 0.0D0, 0.0D0, 0.0D0 /), k, l, mQ, p_infA, pS, qv, (/ pS - pO, pS + pO /) &
                     , rhoe, q_cons_vf, TS )
     
-                    CALL s_mpi_abort()
+                    CALL s_mpi_abort('Solver for the pT-relaxation solver failed (m_phase_change, s_infinite_pt_relaxation_k) &
+                    . Please, check the pressure value. Aborting!')
+                
+                ELSEIF ( ISNAN( pS ) ) THEN
+
+                    CALL s_mpi_abort( 'Solver for the pT-relaxation returned NaN values     &
+                    (m_phase_change, s_infinite_pt_relaxation_k). Please, check the error.  &
+                    Aborting!' )
+
+                ! cheching is the maximum number of iterations was reached
+                ELSEIF ( ns .GT. 1E4 ) THEN
         
+                    CALL s_mpi_abort('Maximum number of iterations for the pT-relaxation solver reached &
+                    (m_phase_change, s_infinite_pt_relaxation_k). Please, check the pressure value. Aborting!')
+
                 END IF
         
             END DO
@@ -995,11 +1014,11 @@ module m_phase_change
         
         END SUBROUTINE s_infinite_pt_relaxation_k ! -----------------------
 
-        SUBROUTINE s_infinite_ptg_relaxation_k( A, B, C, D, g_min, j, k, l, lp, pS, p_inf, p_infpT, rhoe, q_cons_vf, TS, vp )
+        SUBROUTINE s_infinite_ptg_relaxation_k( A, B, C, cv, D, g_min, j, k, l, lp, pS, p_inf, p_infpT, rhoe, qv, qvp, q_cons_vf, TS, vp )
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT)        :: q_cons_vf 
             REAL( KIND( 0.0D0 ) ), INTENT( INOUT )                        :: pS, TS
-            REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( IN )  :: g_min, p_inf, p_infpT
+            REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( IN )  :: g_min, p_inf, p_infpT, cv, qv, qvp
             REAL( KIND( 0.0D0 ) ), INTENT( IN )                           :: A, B, C, D, rhoe
             INTEGER, INTENT(IN)                                           :: j, k, l, lp, vp
             
@@ -1018,7 +1037,7 @@ module m_phase_change
             ns = 0
         
             ! Relaxation factor
-            Om = 1.0D-3
+            Om = 1.0D-4
         
             ! Dummy guess to start the pTg-equilibrium problem.
             ! improve this initial condition
@@ -1032,7 +1051,7 @@ module m_phase_change
 
             IF ( ( ( pS .LT. 0.0D0 ) .AND. ( ( q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l ) &
             + q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l ) ) .GT. ( ( rhoe                  & 
-            - g_min( lp ) * p_inf( lp ) / ( g_min( lp ) - 1  ) ) / fluid_pp( i )%qv ) ) ) .OR.  &
+            - g_min( lp ) * p_inf( lp ) / ( g_min( lp ) - 1  ) ) / qv( i ) ) ) ) .OR.  &
             ( ( pS .GE. 0.0D0 ) .AND. ( pS .LT. 1.0D-1 ) ) ) THEN
 
                 ! improve this initial condition
@@ -1040,14 +1059,13 @@ module m_phase_change
 
             END IF
 
-            ! Checking if pTg-equilibrium is needed. If not, pT-equilibrium was performed and
-            ! the solver finishes
+            ! Loop until the solution for F(X) is satisfied
             ! Check whether I need to use both absolute and relative values
             ! for the residual, and how to do it adequately.
-
-            DO WHILE ( ( DSQRT( R2D( 1 ) ** 2 + R2D( 2 ) ** 2 ) .GT. ptgalpha_eps ) & 
-                    .OR. ( ns .EQ. 0 ) )
-                            
+            DO WHILE ( ( ( DSQRT( R2D( 1 ) ** 2 + R2D( 2 ) ** 2 ) .GT. ptgalpha_eps )                       &
+                .AND.  ( ( DSQRT( R2D( 1 ) ** 2 + R2D( 2 ) ** 2 ) / rhoe ) .GT. ( ptgalpha_eps / 1E4 ) ) )  &
+                .OR. ( ns .EQ. 0 ) )
+                
                 ! Updating counter for the iterative procedure
                 ns = ns + 1
 
@@ -1065,25 +1083,25 @@ module m_phase_change
         
                     ! sum of the total alpha*rho*cp of the system
                     mCP = mCP + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) &
-                    * fluid_pp( i )%cv * g_min( i )
-        
+                    * cv( i ) * g_min( i )
+
                     ! sum of the total alpha*rho*q of the system
-                    mQ = mQ + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%qv
+                    mQ = mQ + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * qv( i )
         
                     ! These auxiliary variables now need to be updated, as the partial densities now 
                     ! vary at every iteration
                     IF ( ( i .NE. lp ) .AND. ( i .NE. vp ) ) THEN
         
                         mCVGP = mCVGP + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) &
-                        * fluid_pp( i )%cv * ( g_min( i ) - 1 ) / ( pS + p_inf( i ) )
+                        * cv( i ) * ( g_min( i ) - 1 ) / ( pS + p_inf( i ) )
         
                         mCVGP2 = mCVGP2 + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) &
-                        * fluid_pp( i )%cv * ( g_min( i ) - 1 ) / ( ( pS + p_inf( i ) ) ** 2 )
+                        * cv( i ) * ( g_min( i ) - 1 ) / ( ( pS + p_inf( i ) ) ** 2 )
         
-                        mQD = mQD + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%qv
+                        mQD = mQD + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * qv( i )
         
                         ! sum of the total alpha*rho*cp of the system
-                        mCPD = mCPD + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%cv &
+                        mCPD = mCPD + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * cv( i ) &
                         * g_min( i )
         
                     END IF
@@ -1100,38 +1118,36 @@ module m_phase_change
         
                 END DO
 
-                ! Checking criteria for the solver to find a solution
-                ! constrain on pressure
-                IF ( ( ns .GT. 1E5 ) .OR. ( pS .LE. -1.0D0 * MINVAL( p_inf ) ) &
-                .OR. ( ( rhoe - mQ - MINVAL( p_inf ) ) .LT. 0.0D0 ) & 
-                .OR. ( ( ISNAN( R2D( 1 ) ) ) .OR. ( ISNAN( R2D( 2 ) ) ) ) ) THEN
-        
-                    PRINT *, 'Solver for the pTg-relaxation failed &
-                    (m_phase_change, s_infinite_ptg_relaxation_k). Please, check the error. &
-                    Aborting!'
+                ! Checking pressure and energy criteria for the (pT) solver to find a solution
+                IF ( ( pS .LE. -1.0D0 * MINVAL( p_inf ) ) &
+                .OR. ( ( rhoe - mQ - MINVAL( p_inf ) ) .LT. 0.0D0 ) ) THEN
                     
-                    PRINT *, 'ns', ns
-
-                    PRINT *, 'ptgalpha_eps', ptgalpha_eps
-
-                    PRINT *, 'palpha_eps', palpha_eps
-
-                    PRINT *, 'relax model', relax_model
-
-                    CALL s_tattletale(DeltamP, InvJac, j, Jac, k, l, mQ, p_inf, pS &
+                    CALL s_tattletale(DeltamP, InvJac, j, Jac, k, l, mQ, p_inf, pS, qv &
                                     , R2D, rhoe, q_cons_vf, TS )
         
-                    CALL s_mpi_abort()
+                    CALL s_mpi_abort( 'Solver for the pTg-relaxation failed &
+                    (m_phase_change, s_infinite_ptg_relaxation_k). Either pS is out of bounds. &
+                    or the energy constraint has been violated. Aborting!' )
         
                 END IF
                         
                 ! calculating the (2D) Jacobian Matrix used in the solution of the pTg-quilibrium model
-                CALL s_compute_jacobian_matrix( B, C, D, rhoe, g_min, InvJac, j, Jac, k, l, &
-                lp, mCPD, mCVGP, mCVGP2, mQD, p_inf, pS, q_cons_vf, TJac, vp )
+                CALL s_compute_jacobian_matrix( B, C, cv, D, rhoe, g_min, InvJac, j, Jac, k, l, &
+                lp, mCPD, mCVGP, mCVGP2, mQD, p_inf, pS, qv, qvp, q_cons_vf, TJac, vp )
         
                 ! calculating correction array for Newton's method
                 DeltamP = - 1.0D0 * MATMUL( InvJac, R2D )
-        
+
+                ! checking if the correction in the mass/pressure will lead to negative values for those quantities
+                ! If so, adjust the underrelaxation parameter Om
+                IF ( q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l ) - Om * DeltamP( 1 ) .LT. 0 ) THEN
+                    CALL s_mpi_abort('crapV')
+                END IF
+
+                IF ( q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l ) + Om * DeltamP( 1 ) .LT. 0 ) THEN
+                    CALL s_mpi_abort('crapL')
+                END IF
+
                 ! updating two reacting 'masses'. Recall that the other 'masses' do not change during the phase change
                 ! liquid
                 q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l ) = &
@@ -1146,14 +1162,29 @@ module m_phase_change
         
                 ! calculating residuals, which are (i) the difference between the Gibbs Free energy of the gas and the liquid
                 ! and (ii) the energy before and after the phase-change process.
-                CALL s_compute_pTg_residue(A, B, C, D, g_min, j, k, l, lp, mCPD, mCVGP, mQD &
-                , p_inf, q_cons_vf, pS, rhoe, R2D, vp)
+                CALL s_compute_pTg_residue(A, B, C, cv, D, g_min, j, k, l, lp, mCPD, mCVGP, mQD &
+                , p_inf, qv, qvp, q_cons_vf, pS, rhoe, R2D, vp)
+
+                ! checking if the residue returned any NaN values
+                IF ( ( ISNAN( R2D( 1 ) ) ) .OR. ( ISNAN( R2D( 2 ) ) ) ) THEN
+
+                    CALL s_mpi_abort( 'Solver for the pTg-relaxation returned NaN values &
+                    (m_phase_change, s_infinite_ptg_relaxation_k). Please, check the error. &
+                    Aborting!' )
+
+                ! checking if maximum number of iterations was reached
+                ELSEIF ( ( ns .GT. 1E6 ) ) THEN
+
+                    CALL s_mpi_abort( 'Maximum number of iterations reached for the (m_phase_change &
+                    , s_infinite_ptg_relaxation_k). Aborting!' )
+
+                END IF
 
             END DO
-        
+
             ! common temperature
             TS = ( rhoe + pS - mQ ) / mCP
-        
+
         END SUBROUTINE s_infinite_ptg_relaxation_k ! -----------------------
 
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
@@ -1176,19 +1207,7 @@ module m_phase_change
                 ! I changed this line to .LE. so the phase cannot 'disappear'.
                 ! Think of more appropriate conditions, later on
                 IF ( ( q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) .LT. sgm_eps ) .OR. &
-                     ( q_cons_vf( i + adv_idx%beg  - 1 )%sf( j, k, l ) .LT. sgm_eps ) ) THEN
-
-                        ! IF ( ( j .EQ. 49 ) .AND. ( k .EQ. 1. ) .AND. ( l .EQ. 0 ) ) THEN
-
-                        !     PRINT *, 'i'
-        
-                        !     PRINT *, 'm', q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
-        
-                        !     PRINT *, 'alp', q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l )
-                        
-                        !     PRINT *, 'e',q_cons_vf( i + internalEnergies_idx%beg - 1 )%sf(j,k,l)
-                            
-                        ! END IF
+                        ( q_cons_vf( i + adv_idx%beg  - 1 )%sf( j, k, l ) .LT. sgm_eps ) ) THEN
 
                     q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) = sgm_eps
                     
@@ -1200,32 +1219,20 @@ module m_phase_change
 
                 IF ( q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) .GT. 1.0D0 ) THEN 
                 
-                    ! IF ( ( j .EQ. 49 ) .AND. ( k .EQ. 1. ) .AND. ( l .EQ. 0 ) ) THEN
-
-                    !     PRINT *, 'i'
-    
-                    !     PRINT *, 'm', q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
-    
-                    !     PRINT *, 'alp', q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l )
-                    
-                    !     PRINT *, 'e', q_cons_vf( i + internalEnergies_idx%beg - 1 )%sf(j,k,l)
-                        
-                    ! END IF
-
                     q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = 1.0D0
 
                 END IF
                 
                 sum_alpha = sum_alpha + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
 
-             END DO
+                END DO
 
-             DO i = 1, num_fluids
-                   
+                DO i = 1, num_fluids
+                    
                 q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = &                 
                 q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) / sum_alpha
 
-             END DO
+                END DO
 
         END SUBROUTINE s_mixture_volume_fraction_correction
 
@@ -1241,11 +1248,7 @@ module m_phase_change
             INTEGER :: i, AR           !< Generic loop iterators
 
             IF ( rM .LT. 0.0D0 ) THEN
-                
-                PRINT *, 'crap'
-
-                PRINT *, 'rM', rM
-
+                CALL s_mpi_abort( 'total reacting mass is negative on "s_correct_partial_densities". Aborting!')
             END IF
 
             ! Defining the correction in terms of an absolute value might not be the best practice.
@@ -1281,105 +1284,6 @@ module m_phase_change
 
         END SUBROUTINE s_correct_partial_densities
 
-        ! SUBROUTINE s_correct_mixture_properties(g_min, pS, p_inf, q_cons_vf, rhoe, j, k, l )
-        !     TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT)      :: q_cons_vf 
-        !     REAL( KIND( 0.0D0 ) ), INTENT(IN)                           :: rhoe
-        !     REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)    :: pS, g_min, p_inf
-        !     INTEGER, INTENT(IN)                                         :: j, k, l
-        !     REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids)                :: rho
-        !     REAL( KIND( 0.0D0 ) )                                       :: TVF, mCP, mQ
-        !     !> @}
-        !     INTEGER :: i, AR           !< Generic loop iterators
-
-        !     ! correction flag for alpha_rho correction
-        !     AR = 0
-        !     mCP = 0.0D0
-        !     mQ = 0.0D0
-        !     TVF = 0.0D0         
-
-        !     ! correcting partial densities if needed
-        !     DO i = 1, num_fluids
-
-        !         ! calculating density to be used afterwards, based on the internal energies
-        !         rho( i ) = ( pS( i ) + g_min( i ) * p_inf( i ) ) / ( ( g_min( i ) - 1 ) &
-        !         * ( q_cons_vf( i + internalEnergies_idx%beg - 1 )%sf(j,k,l)             &
-        !         / q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) - fluid_pp( i )%qv  ) )
-
-        !         IF ( q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) .LT. sgm_eps ) THEN
-                    
-        !             q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) = sgm_eps
-
-        !             q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = &
-        !             q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) / rho( i )
-
-        !             ! q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = ( g_min( i ) - 1 ) / g_min( i )    &
-        !             ! * q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%cv * g_min( i )   &
-        !             ! / mCP * ( rhoe + pS - mQ ) / ( pS + p_inf( i ) )
-                    
-        !         ELSE IF ( q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) .LT. sgm_eps ) THEN
-
-        !             AR = 1
-
-        !             q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = sgm_eps
-
-        !             ! PRINT *, 'AR', AR
-
-        !         ELSE IF ( q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) .GT. 1.0D0 ) THEN 
-
-        !             AR = 1
-
-        !             q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = 1.0D0
-
-        !             ! PRINT *, 'AR', AR
-
-        !         END IF
-
-        !         ! sum of the total alpha*rho*cp of the system
-        !         mCP = mCP + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) &
-        !         * fluid_pp( i )%cv * g_min( i )
-        
-        !         ! sum of the total alpha*rho*q of the system
-        !         mQ = mQ + q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) * fluid_pp( i )%qv
-
-        !         ! normalizing volume fraction
-        !         TVF = TVF + q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l )
-
-        !     END DO
-                
-        !     ! normalizing volume fraction
-        !     DO i = 1, num_fluids
-                
-        !         q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) = &     
-        !         q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) / TVF
-
-        !         ! correcting alpha*rho if that is necessary
-        !         IF ( AR .EQ. 1 ) THEN
-
-        !             ! PRINT *, 'i', i
-                    
-        !             ! PRINT *, 'rho', rho( i )
-                    
-        !             ! PRINT *, 'pres', pS( i )
-
-        !             q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) = &
-        !             q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) * rho( i )
-
-        !             ! PRINT *, 'ar', q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
-
-        !             ! maybe I will use this later on
-        !             ! q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) = g_min( i ) / ( g_min( i ) - 1 )           &
-        !             ! * q_cons_vf( i + adv_idx%beg - 1 )%sf( j, k, l ) * mCP / ( fluid_pp( i )%cv * g_min( i ) )  &
-        !             ! * ( pS + p_inf( i ) ) / ( rhoe + pS - mQ )
-
-        !         END IF
-
-        !     END DO
-
-        !     ! correctiong of internal energies are not necessary at this point, as for the pT and pTg algorthims,
-        !     ! the total energy is used in place of the individual energies
-
-        ! END SUBROUTINE s_correct_mixture_properties
-
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
         !! derivative df(p), isentropic partial density, sum of volume fractions,
         !! mixture density, dynamic pressure, surface energy, specific heat ratio
@@ -1403,7 +1307,7 @@ module m_phase_change
             !> @}
             INTEGER :: i     !< Generic loop iterators
             CALL s_convert_to_mixture_variables( q_cons_vf, j, k, l, rho, &
-                                                 gamma, pi_inf, qv )
+                                                    gamma, pi_inf, qv )
             dyn_pres = 0.d0
             DO i = mom_idx%beg, mom_idx%end
                 ! PRINT *, 'i from s_mixture_tec', i
@@ -1487,18 +1391,18 @@ module m_phase_change
             ! Calculating coefficients, Eq. C.6, Pelanti 2014
             ap = rhoalpha1*cv1 + rhoalpha2*cv2
             bp = q1*cv1*(n1-1.d0)*rhoalpha1*rhoalpha1 + q2*cv2*(n2-1.d0)*rhoalpha2*rhoalpha2 + &
-                 rhoalpha1*cv1*(n1*pinf1+pinf2) + rhoalpha2*cv2*(n2*pinf2+pinf1) + &
-                 rhoalpha1*rhoalpha2*(q1*cv2*(n2-1.d0)+q2*cv1*(n1-1.d0)) - &
-                 E0*(cv1*(n1-1.d0)*rhoalpha1 + cv2*(n2-1.d0)*rhoalpha2)
+                    rhoalpha1*cv1*(n1*pinf1+pinf2) + rhoalpha2*cv2*(n2*pinf2+pinf1) + &
+                    rhoalpha1*rhoalpha2*(q1*cv2*(n2-1.d0)+q2*cv1*(n1-1.d0)) - &
+                    E0*(cv1*(n1-1.d0)*rhoalpha1 + cv2*(n2-1.d0)*rhoalpha2)
             dp = q1*cv1*(n1-1.d0)*pinf2*rhoalpha1*rhoalpha1 + q2*cv2*(n2-1.d0)*pinf1*rhoalpha2*rhoalpha2 + &
-                 pinf1*pinf2*(rhoalpha1*cv1*n1 + rhoalpha2*cv2*n2) + & 
-                 rhoalpha1*rhoalpha2*(q1*cv2*(n2-1.d0)*pinf1 + q2*cv1*(n1-1.d0)*pinf2) - &
-                 E0*(cv1*(n1-1.d0)*pinf2*rhoalpha1 + cv2*(n2-1.d0)*pinf1*rhoalpha2)
+                    pinf1*pinf2*(rhoalpha1*cv1*n1 + rhoalpha2*cv2*n2) + & 
+                    rhoalpha1*rhoalpha2*(q1*cv2*(n2-1.d0)*pinf1 + q2*cv1*(n1-1.d0)*pinf2) - &
+                    E0*(cv1*(n1-1.d0)*pinf2*rhoalpha1 + cv2*(n2-1.d0)*pinf1*rhoalpha2)
             ! Calculating the Tstar temperature, Eq. C.7, Pelanti 2014
             pstar = (-bp + DSQRT(bp*bp - 4.d0*ap*dp))/(2.d0*ap)
             f_alpha1_ptrelax = (cv1*(n1-1.d0)*(pstar+pinf2)*rhoalpha1)/&
-                     (cv1*(n1-1.d0)*(pstar+pinf2)*rhoalpha1 + &
-                      cv2*(n2-1.d0)*(pstar+pinf1)*rhoalpha2)
+                        (cv1*(n1-1.d0)*(pstar+pinf2)*rhoalpha1 + &
+                        cv2*(n2-1.d0)*(pstar+pinf1)*rhoalpha2)
 
         END FUNCTION f_alpha1_ptrelax
 
@@ -1515,7 +1419,7 @@ module m_phase_change
             REAL(KIND(0d0)), INTENT(OUT)        :: fp, dfdp
             REAL(KIND(0d0)), INTENT(IN)         :: pstar, Tstar
             fp = gibbsA + gibbsB/Tstar + gibbsC*DLOG(Tstar) - & 
-                 DLOG((pstar+pinf2)/(pstar+pinf1)**gibbsD)
+                    DLOG((pstar+pinf2)/(pstar+pinf1)**gibbsD)
             dfdp = -gibbsB/(Tstar*Tstar) + gibbsC/Tstar
 
         END SUBROUTINE s_compute_fdfTsat !-------------------------------
@@ -1537,25 +1441,25 @@ module m_phase_change
             CALL s_compute_fdfTsat(fB,dfdp,pressure,TstarB)
             !PRINT *, 'fA :: ',fA,', fB :: ',fB
             DO WHILE ( fA*fB .GT. 0.d0 )
-                  IF (TstarA .GT. TsatHv) THEN
-                         PRINT *, 'Tsat bracketing failed to find lower bound'
-                         PRINT *, 'TstarA :: ',TstarA,', pressure :: ',pressure
-                         PRINT *, 'fA :: ',fA,', fB :: ',fB
-                         CALL s_mpi_abort()
-                  END IF
-                  fA = fB
-                  TstarA = TstarB
-                  TstarB = TstarA+factor
-                  CALL s_compute_fdfTsat(fB,dfdp,pressure,TstarB)
-                  !PRINT *, 'fB :: ',fB,', TstarB :: ',TstarB,', p :: ',pressure
-                  !PRINT *,'fB :: ',fB,', TstarB :: ',TstarB
-                  IF( ieee_is_nan(fB) ) THEN
+                    IF (TstarA .GT. TsatHv) THEN
+                            PRINT *, 'Tsat bracketing failed to find lower bound'
+                            PRINT *, 'TstarA :: ',TstarA,', pressure :: ',pressure
+                            PRINT *, 'fA :: ',fA,', fB :: ',fB
+                            CALL s_mpi_abort()
+                    END IF
+                    fA = fB
+                    TstarA = TstarB
+                    TstarB = TstarA+factor
+                    CALL s_compute_fdfTsat(fB,dfdp,pressure,TstarB)
+                    !PRINT *, 'fB :: ',fB,', TstarB :: ',TstarB,', p :: ',pressure
+                    !PRINT *,'fB :: ',fB,', TstarB :: ',TstarB
+                    IF( ieee_is_nan(fB) ) THEN
                         fB = fA
                         TstarB = TstarA
                         factor = factor-10.d0
-                  ELSE 
+                    ELSE 
                         factor = 20.d0
-                  END IF
+                    END IF
             END DO
         END SUBROUTINE s_compute_Tsat_bracket
 
@@ -1591,22 +1495,22 @@ module m_phase_change
             DO iter = 0, newton_iter
                 IF ((((Tstar-TstarH)*dfdp-fp)*((Tstar-TstarL)*dfdp-fp) > 0.d0) & ! Bisect if Newton out of range,
                         .OR. (DABS(2.0*fp) > DABS(delta_old*dfdp))) THEN         ! or not decreasing fast enough.
-                   delta_old = delta
-                   delta = 0.5d0*(TstarH-TstarL)
-                   Tstar = TstarL + delta
-                   IF (delta .EQ. 0.d0) EXIT
+                    delta_old = delta
+                    delta = 0.5d0*(TstarH-TstarL)
+                    Tstar = TstarL + delta
+                    IF (delta .EQ. 0.d0) EXIT
                 ELSE                    ! Newton step acceptable, take it
-                   delta_old = delta
-                   delta = fp/dfdp
-                   Tstar = Tstar - delta
-                   IF (delta .EQ. 0.d0) EXIT
+                    delta_old = delta
+                    delta = fp/dfdp
+                    Tstar = Tstar - delta
+                    IF (delta .EQ. 0.d0) EXIT
                 END IF
                 IF (DABS(delta/Tstar) < pTsatnewton_eps) EXIT
                 CALL s_compute_fdfTsat(fp,dfdp,pressure,Tstar)           
                 IF (fp < 0.d0) THEN     !Maintain the bracket on the root
-                   TstarL = Tstar
+                    TstarL = Tstar
                 ELSE
-                   TstarH = Tstar
+                    TstarH = Tstar
                 END IF
                 IF (iter .EQ. newton_iter) THEN
                     PRINT *, 'Tsat : ',Tstar,', iter : ',iter
@@ -1641,8 +1545,8 @@ module m_phase_change
             ! Calculating coefficients, Eq. C.6, Pelanti 2014
             ap = rho0*cv1*cv2*((n2-1.d0)*(pstar+n1*pinf1)-(n1-1.d0)*(pstar+n2*pinf2))
             bp = E0*((n1-1.d0)*cv1*(pstar+pinf2) - (n2-1.d0)*cv2*(pstar+pinf1)) + &
-                 rho0*((n2-1.d0)*cv2*q1*(pstar+pinf1) - (n1-1.d0)*cv1*q2*(pstar+pinf2)) + &
-                 cv2*(pstar+pinf1)*(pstar+n2*pinf2) - cv1*(pstar+pinf2)*(pstar+n1*pinf1)
+                    rho0*((n2-1.d0)*cv2*q1*(pstar+pinf1) - (n1-1.d0)*cv1*q2*(pstar+pinf2)) + &
+                    cv2*(pstar+pinf1)*(pstar+n2*pinf2) - cv1*(pstar+pinf2)*(pstar+n1*pinf1)
             dp = (q2-q1)*(pstar+pinf1)*(pstar+pinf2)
             ! Calculating the Tstar temperature, Eq. C.7, Pelanti 2014
             Tstar = (-bp + DSQRT(bp*bp - 4.d0*ap*dp))/(2.d0*ap)
@@ -1653,17 +1557,17 @@ module m_phase_change
             ! Calculating the derivatives wrt pressure of the coefficients
             dadp = rho0*cv1*cv2*((n2-1.d0)-(n1-1.d0))
             dbdp = E0*((n1-1.d0)*cv1 - (n2-1.d0)*cv2) + &
-                   rho0*((n2-1.d0)*cv2*q1 - (n1-1.d0)*cv1*q2) + &
-                   cv2*((pstar+pinf1)+(pstar+n2*pinf2)) - & 
-                   cv1*((pstar+pinf2)+(pstar+n1*pinf1))
+                    rho0*((n2-1.d0)*cv2*q1 - (n1-1.d0)*cv1*q2) + &
+                    cv2*((pstar+pinf1)+(pstar+n2*pinf2)) - & 
+                    cv1*((pstar+pinf2)+(pstar+n1*pinf1))
             dddp = (q2-q1)*((pstar+pinf1)+(pstar+pinf2))
             ! Derivative of the temperature wrt to pressure, needed for dfdp
             dTdp = (-dbdp + (0.5d0/DSQRT(bp*bp-4.d0*ap*dp))*(2.d0*bp*dbdp-&
-                   4.d0*(ap*dddp+dp*dadp)))/(2.d0*ap) - (dadp/ap)*Tstar
+                    4.d0*(ap*dddp+dp*dadp)))/(2.d0*ap) - (dadp/ap)*Tstar
             fp   = gibbsA + gibbsB/Tstar + gibbsC*DLOG(Tstar) + & 
-                   gibbsD*DLOG(pstar+pinf1) - DLOG(pstar+pinf2)
+                    gibbsD*DLOG(pstar+pinf1) - DLOG(pstar+pinf2)
             dfdp = -gibbsB/(Tstar*Tstar)*dTdp + gibbsC/Tstar*dTdp + & 
-                   gibbsD/(pstar+pinf1) - 1.d0/(pstar+pinf2)
+                    gibbsD/(pstar+pinf1) - 1.d0/(pstar+pinf2)
 
             ! PRINT *, Tstar
             ! PRINT *, dadp, dbdp, dddp, dTdp, fp, dfdp
@@ -1693,22 +1597,22 @@ module m_phase_change
             DO WHILE ( fA*fB .GT. 0.d0 )
                 ! PRINT *, 'fA', fA
                 ! PRINT *, 'fB', fb
-                  IF (pstarA .GT. 1.d13) THEN
-                         PRINT *, 'ptg bracketing failed to find lower bound'
-                         PRINT *, 'pstarA :: ',pstarA
-                         CALL s_mpi_abort()
-                  END IF
-                  fA = fB
-                  pstarA = pstarB
-                  pstarB = pstarA*factor
-                  CALL s_compute_ptg_fdf(fB,dfdp,pstarB,Tstar,rho0,E0)
-                  IF( ieee_is_nan(fB) ) THEN
+                    IF (pstarA .GT. 1.d13) THEN
+                            PRINT *, 'ptg bracketing failed to find lower bound'
+                            PRINT *, 'pstarA :: ',pstarA
+                            CALL s_mpi_abort()
+                    END IF
+                    fA = fB
+                    pstarA = pstarB
+                    pstarB = pstarA*factor
+                    CALL s_compute_ptg_fdf(fB,dfdp,pstarB,Tstar,rho0,E0)
+                    IF( ieee_is_nan(fB) ) THEN
                         fB = fA
                         pstarB = pstarA
                         factor = factor*0.95d0
-                  ELSE 
+                    ELSE 
                         factor = 1.05d0
-                  END IF
+                    END IF
             END DO
 
         END SUBROUTINE s_compute_ptg_bracket
@@ -1751,23 +1655,23 @@ module m_phase_change
             DO iter = 0, newton_iter
                 IF ((((pstar-pstarH)*dfdp-fp)*((pstar-pstarL)*dfdp-fp) > 0.d0) & ! Bisect if Newton out of range,
                         .OR. (DABS(2.0*fp) > DABS(delta_old*dfdp))) THEN         ! or not decreasing fast enough.
-                   delta_old = delta
-                   delta = 0.5d0*(pstarH-pstarL)
-                   pstar = pstarL + delta
-                   IF (delta .EQ. 0.d0) EXIT                    ! Change in root is negligible
+                    delta_old = delta
+                    delta = 0.5d0*(pstarH-pstarL)
+                    pstar = pstarL + delta
+                    IF (delta .EQ. 0.d0) EXIT                    ! Change in root is negligible
                 ELSE                                              ! Newton step acceptable, take it
-                   delta_old = delta
-                   delta = fp/dfdp
-                   pstar = pstar - delta
-                   IF (delta .EQ. 0.d0) EXIT
+                    delta_old = delta
+                    delta = fp/dfdp
+                    pstar = pstar - delta
+                    IF (delta .EQ. 0.d0) EXIT
                 END IF
                 IF (DABS(delta/pstar) < ptgnewton_eps) EXIT           ! Stopping criteria
                 ! Updating to next iteration
                 CALL s_compute_ptg_fdf(fp,dfdp,pstar,Tstar,rho0,E0)
                 IF (fp < 0.d0) THEN !Maintain the bracket on the root
-                   pstarL = pstar
+                    pstarL = pstar
                 ELSE
-                   pstarH = pstar
+                    pstarH = pstar
                 END IF
             END DO
         END SUBROUTINE s_compute_ptg_pTrelax !-------------------------------
@@ -1796,16 +1700,16 @@ module m_phase_change
             INTEGER                                              :: i
             fp = -1.d0; dfdp = 0.d0;
             DO i = 1, num_fluids
-                  numerator   = gamma_min(i)*(pstar+pres_inf(i))
-                  denominator = numerator + pres_K_init(i)-pstar
-                  rho_K_s(i)  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)/&
-                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps)*numerator/denominator
-                  drhodp      = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / & 
-                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) * & 
-                     gamma_min(i)*(pres_K_init(i)+pres_inf(i)) / (denominator*denominator)
-                  fp          = fp  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
-                  dfdp        = dfdp - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) * & 
-                     drhodp / (rho_K_s(i)*rho_K_s(i))
+                    numerator   = gamma_min(i)*(pstar+pres_inf(i))
+                    denominator = numerator + pres_K_init(i)-pstar
+                    rho_K_s(i)  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)/&
+                        MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps)*numerator/denominator
+                    drhodp      = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / & 
+                        MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) * & 
+                        gamma_min(i)*(pres_K_init(i)+pres_inf(i)) / (denominator*denominator)
+                    fp          = fp  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
+                    dfdp        = dfdp - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) * & 
+                        drhodp / (rho_K_s(i)*rho_K_s(i))
             END DO
 
         END SUBROUTINE s_compute_pk_fdf !------------------------
@@ -1833,24 +1737,24 @@ module m_phase_change
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
             factor = 10.d0
             DO WHILE ( fA*fB .GT. 0.d0 )
-                  IF (pstarA .GT. 1.d13) THEN
-                         PRINT *, 'P-K bracketing failed to find lower bound'
-                         PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
-                         PRINT *, 'alpha1 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
-                         PRINT *, 'alpha2 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
-                         CALL s_mpi_abort()
-                  END IF
-                  fA = fB
-                  pstarA = pstarB
-                  pstarB = pstarA*factor
-                  CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
-                  IF( ieee_is_nan(fB) ) THEN
+                    IF (pstarA .GT. 1.d13) THEN
+                            PRINT *, 'P-K bracketing failed to find lower bound'
+                            PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
+                            PRINT *, 'alpha1 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
+                            PRINT *, 'alpha2 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
+                            CALL s_mpi_abort()
+                    END IF
+                    fA = fB
+                    pstarA = pstarB
+                    pstarB = pstarA*factor
+                    CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                    IF( ieee_is_nan(fB) ) THEN
                         fB = fA
                         pstarB = pstarA
                         factor = factor*0.5d0
-                  ELSE 
+                    ELSE 
                         factor = 10.d0
-                  END IF
+                    END IF
             END DO
         END SUBROUTINE s_compute_pk_bracket
 
@@ -1890,39 +1794,39 @@ module m_phase_change
             DO iter = 0, newton_iter
                 IF ((((pstar-pstarH)*dfdp-fp)*((pstar-pstarL)*dfdp-fp) > 0.d0) & ! Bisect if Newton out of range,
                         .OR. (DABS(2.0*fp) > DABS(delta_old*dfdp))) THEN         ! or not decreasing fast enough.
-                   delta_old = delta
-                   delta = 0.5d0*(pstarH-pstarL)
-                   pstar = pstarL + delta
-                   IF (delta .EQ. 0.d0) EXIT                    ! Change in root is negligible
+                    delta_old = delta
+                    delta = 0.5d0*(pstarH-pstarL)
+                    pstar = pstarL + delta
+                    IF (delta .EQ. 0.d0) EXIT                    ! Change in root is negligible
                 ELSE                                              ! Newton step acceptable, take it
-                   delta_old = delta
-                   delta = fp/dfdp
-                   pstar = pstar - delta
-                   IF (delta .EQ. 0.d0) EXIT
+                    delta_old = delta
+                    delta = fp/dfdp
+                    pstar = pstar - delta
+                    IF (delta .EQ. 0.d0) EXIT
                 END IF
                 IF (DABS(delta/pstar) < pknewton_eps) EXIT           ! Stopping criteria
                 ! Updating to next iteration
                 CALL s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
                 IF (fp < 0.d0) THEN !Maintain the bracket on the root
-                   pstarL = pstar
+                    pstarL = pstar
                 ELSE
-                   pstarH = pstar
+                    pstarH = pstar
                 END IF
             END DO
         END SUBROUTINE s_compute_p_relax_k !-------------------------------
 
         ! This SUBROUTINE IS USED TO CALCULATE THE 2X2 JACOBIAN AND ITS INVERSE FOR THE PROPOSED
         ! pTg-Equilibrium procedure
-        SUBROUTINE s_compute_jacobian_matrix( B, C, D, rhoe, g_min, InvJac, j, Jac, k, l, lp, mCPD, &
-                                                mCVGP, mCVGP2, mQD, p_inf, pS, q_cons_vf, TJac, vp )
+        SUBROUTINE s_compute_jacobian_matrix( B, C, cv, D, rhoe, g_min, InvJac, j, Jac, k, l, lp, mCPD, &
+                                                mCVGP, mCVGP2, mQD, p_inf, pS, qv, qvp, q_cons_vf, TJac, vp )
         
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN)        :: q_cons_vf
             REAL( KIND( 0.0D0 ) ), INTENT(IN)                          :: B, C, D
             REAL( KIND( 0.0D0 ) ), INTENT(IN)                          :: pS, rhoe, mCPD, mCVGP, mCVGP2, mQD
-            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)   :: g_min, p_inf
+            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)   :: g_min, p_inf, cv, qv, qvp
             REAL( KIND( 0.0D0 ) ), DIMENSION(2,2), INTENT(OUT)         :: Jac, InvJac, TJac
             INTEGER, INTENT(IN)                                        :: j, k, l, lp, vp
-            REAL( KIND( 0.0D0 ) )                                      :: ml, mT
+            REAL( KIND( 0.0D0 ) )                                      :: ml, mT, TS, dFdT, dTdm, dTdp
             INTEGER                                                    :: i
             
             ! mass of the reactant liquid
@@ -1932,50 +1836,58 @@ module m_phase_change
             mT = q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l ) &
             + q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l )         
 
+            TS =  1 / ( mT *   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )    &
+            +           ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )    &
+            -                  cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )  &
+            +       mCVGP )
+
+            dFdT =                                                              &
+            - ( cv( lp ) * g_min( lp ) - cv( vp ) * g_min( vp ) ) * DLOG( TS )  &
+            - ( qvp( lp ) - qvp( vp ) )                                         &
+            + cv( lp ) * ( g_min( lp ) - 1 ) * DLOG( pS + p_inf( lp ) )         &
+            - cv( vp ) * ( g_min( vp ) - 1 ) * DLOG( pS + p_inf( vp ) )
+
+            dTdm = - ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )  &
+            -          cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) ) * TS ** 2
+
+            dTdp =   ( mT *   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) ** 2      &
+            +          ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) ) ** 2      &
+            -                 cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) ** 2 )    &
+            +        mCVGP2 ) * TS ** 2
+
             ! F = (F1,F2) is the fuction whose roots we are looking for
             ! x = (m1, p) are the independent variables. m1 = mass of the first participant fluid, p = pressure
             ! F1 = 0 is the gibbs free energy quality
-            ! F2 = 0 is the enforcement of the thermodynamic (total - kinectic) energy
-
+            ! F2 = 0 is the enforcement of the thermodynamic (total - kinectic) energy           
             ! dF1dm
-            Jac(1,1) = ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )            &
-            -            fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )          &
-            * ( B - C / ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )    & 
-                               - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )  & 
-            + mT * fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) )
+            Jac(1,1) = dFdT * dTdm
 
-            ! dF1dp
-            Jac(1,2) = ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) ) ** 2            &
-                            - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )   ** 2 )          &
-            +            mT * fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )   ** 2 + mCVGP2 ) &
-            * ( - B + C / ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )              &
-                                 - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )            &
-            + mT * fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) )                  &
-            + D / ( pS + p_inf( lp ) ) - 1 / ( pS + p_inf( vp ) )
+            Jac(1,2) = dFdT * dTdp + TS &
+            * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) ) &
+            -   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )
 
             ! dF2dm
-            Jac(2,1) = ( fluid_pp( vp )%qv - fluid_pp( lp )%qv                                              &
-            + ( fluid_pp( vp )%cv * g_min( vp ) - fluid_pp( lp )%cv * g_min( lp ) )                         &
-            / ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                       &
-                     - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                     & 
-              + mT *   fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP )             &
-            - ( ml * ( fluid_pp( vp )%cv * g_min( vp ) - fluid_pp( lp )%cv * g_min( lp ) )                  &
-            -   mT * fluid_pp( vp )%cv * g_min( vp ) - mCPD )                                               &
-            * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                              &
-            -   fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                            &
-            / ( ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                     &
-            -            fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                   &
-            +     mT *   fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) ** 2 ) ) / rhoe
+            Jac(2,1) = ( qv( vp ) - qv( lp )                                                        &
+            + ( cv( vp ) * g_min( vp ) - cv( lp ) * g_min( lp ) )                                   &
+            / ( ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                        &
+                        - cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                      & 
+                + mT *   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP )              &
+            - ( ml * ( cv( vp ) * g_min( vp ) - cv( lp ) * g_min( lp ) )                            &
+            -   mT * cv( vp ) * g_min( vp ) - mCPD )                                                &
+            * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                               &
+            -   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                             &
+            / ( ( ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                      &
+            -            cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                    &
+            +     mT *   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) ** 2 ) ) / 1
             
-            ! dF2dp
-            Jac(2,2) = ( 1 + ( ml * ( fluid_pp( vp )%cv * g_min( vp ) - fluid_pp( lp )%cv * g_min( lp ) )   &
-            -                mT *   fluid_pp( vp )%cv * g_min( vp ) - mCPD )                                & 
-            * ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )  ** 2                 & 
-                     - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )  ** 2 )               &
-            +   mT *   fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )  ** 2 + mCVGP2 )      &
-            / ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                       &   
-                     - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                     &
-            +   mT *   fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) ** 2 ) / rhoe
+            Jac(2,2) = ( 1 + ( ml * ( cv( vp ) * g_min( vp ) - cv( lp ) * g_min( lp ) )             &
+            -                mT *   cv( vp ) * g_min( vp ) - mCPD )                                 & 
+            * ( ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )  ** 2                  & 
+                        - cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )  ** 2 )                &
+            +   mT *   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )  ** 2 + mCVGP2 )       &
+            / ( ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                        &   
+                        - cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )                      &
+            +   mT *   cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) ** 2 ) / 1
 
             ! elements of J^{-1}
             InvJac(1,1) =  Jac(2,2)
@@ -1994,23 +1906,17 @@ module m_phase_change
 
         END SUBROUTINE s_compute_jacobian_matrix
 
-        SUBROUTINE s_compute_pTg_residue(A, B, C, D, g_min, j, k, l, lp, mCPD, mCVGP, mQD &
-                                            , p_inf, q_cons_vf, pS, rhoe, R2D, vp)
+        SUBROUTINE s_compute_pTg_residue(A, B, C, cv, D, g_min, j, k, l, lp, mCPD, mCVGP, mQD &
+                                            , p_inf, qv, qvp, q_cons_vf, pS, rhoe, R2D, vp)
             
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN)         :: q_cons_vf
             REAL( KIND( 0.0D0 ) ), INTENT(IN)                           :: A, B, C, D
             REAL( KIND( 0.0D0 ) ), INTENT(IN)                           :: pS, rhoe, mCPD, mCVGP, mQD
-            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)    :: g_min, p_inf
+            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)    :: g_min, p_inf, cv, qv, qvp
             REAL( KIND( 0.0D0 ) ), DIMENSION(2), INTENT(OUT)            :: R2D
             INTEGER, INTENT(IN)                                         :: j, k, l, lp, vp
-            REAL( KIND( 0.0D0 ) )                                       :: ml, mT, p0, T0
-            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids)                :: s0
+            REAL( KIND( 0.0D0 ) )                                       :: ml, mT, TS
             INTEGER                                                     :: i
-            
-            p0 = 3166
-            T0 = 298 
-            s0( lp ) = - 2.648323441929081D+04
-            s0( lp ) = - 1.853134222104357D+04
             
             ! mass of the reactant liquid
             ml = q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l )
@@ -2019,35 +1925,35 @@ module m_phase_change
             mT = q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l ) &
             + q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l )            
 
-            ! Gibbs Free Energy Equality condition (DG/T)
-            R2D( 1 ) = A &
-                + B * ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )   &
-                             - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) ) &
-                        + mT * fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )   & 
-                        + mCVGP )                                                               &
-            - C * DLOG( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )   &
-                             - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) ) &
-                        + mT * fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )   &
-                        + mCVGP )                                                               &
-            + D * DLOG( pS + p_inf( lp ) ) - DLOG( pS + p_inf( vp ) )
-            
+            TS =  1 / ( mT * cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) )      &
+            +           ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )    &
+            -                  cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )  &
+            +       mCVGP )
+
+            ! Gibbs Free Energy Equality condition (DG)
+            R2D( 1 ) = TS * ( ( cv( lp ) * g_min( lp ) - cv( vp ) * g_min( vp ) )   &
+            * ( 1 - DLOG( TS ) ) - ( qvp( lp ) - qvp( vp ) )                        &
+            + cv( lp ) * ( g_min( lp ) - 1 ) * DLOG( pS + p_inf( lp ) )             &
+            - cv( vp ) * ( g_min( vp ) - 1 ) * DLOG( pS + p_inf( vp ) ) )           &
+            + qv( lp ) - qv( vp )
+
             ! Constant Energy Process condition (DE)
             R2D( 2 ) = ( rhoe + pS                                                          &
-            + ml * ( fluid_pp( vp )%qv - fluid_pp( lp )%qv ) - mT * fluid_pp( vp )%qv - mQD &
-            + ( ml * ( g_min( vp ) * fluid_pp( vp )%cv - g_min( lp ) * fluid_pp( lp )%cv )  &
-            - mT * g_min( vp ) * fluid_pp( vp )%cv - mCPD )                                 &
-            / ( ml * ( fluid_pp( lp )%cv * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )       &
-                     - fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )     &
-            + mT * fluid_pp( vp )%cv * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) ) / rhoe
-            
+            + ml * ( qv( vp ) - qv( lp ) ) - mT * qv( vp ) - mQD                            &
+            + ( ml * ( g_min( vp ) * cv( vp ) - g_min( lp ) * cv( lp ) )                    &
+            - mT * g_min( vp ) * cv( vp ) - mCPD )                                          &
+            / ( ml * ( cv( lp ) * ( g_min( lp ) - 1 ) / ( pS + p_inf( lp ) )                &
+                        - cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) )           &
+            + mT * cv( vp ) * ( g_min( vp ) - 1 ) / ( pS + p_inf( vp ) ) + mCVGP ) ) / 1
+
         END SUBROUTINE s_compute_pTg_residue
 
         ! SUBROUTINE CREATED TO TELL ME WHERE THE ERROR IN THE PT- AND PTG-EQUILIBRIUM SOLVERS IS
-        SUBROUTINE s_tattletale(DeltamP, InvJac, j, Jac, k, l, mQ, p_inf, pS, R2D, rhoe, q_cons_vf, TS ) ! ----------------
+        SUBROUTINE s_tattletale(DeltamP, InvJac, j, Jac, k, l, mQ, p_inf, pS, qv, R2D, rhoe, q_cons_vf, TS ) ! ----------------
 
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN)         :: q_cons_vf 
             REAL( KIND( 0.0D0 ) ), DIMENSION(2,2), INTENT(IN)           :: Jac, InvJac
-            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)    :: p_inf
+            REAL( KIND( 0.0D0 ) ), DIMENSION(num_fluids), INTENT(IN)    :: p_inf, qv
             REAL( KIND( 0.0D0 ) ), DIMENSION(2), INTENT(IN)             :: R2D, DeltamP
             REAL( KIND( 0.0D0 ) ), INTENT(IN)                           :: pS, TS
             REAL( KIND( 0.0D0 ) ), INTENT(IN)                           :: rhoe, mQ
@@ -2093,7 +1999,7 @@ module m_phase_change
                 PRINT *, 'alpha_rho_i', q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
 
                 PRINT *, 'mq_i', q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l ) &
-                                        * fluid_pp( i )%qv
+                                        * qv( i )
 
                 PRINT *, 'rho', rho
 
@@ -2108,13 +2014,13 @@ module m_phase_change
         END SUBROUTINE s_tattletale
 
         ! Newton Solver for the finding the Saturation temperature TSat for a given saturation pressure
-        SUBROUTINE s_TSat(A, B, C, D, lp, pSat, p_inf, TSat, TSIn, vp)
+        SUBROUTINE s_TSat(A, B, C, cv, D, g_min, lp, pSat, p_inf, qv, qvp, TSat, TSIn, vp)
 
             REAL( KIND( 0.0D0 ) ), INTENT( OUT )                         :: TSat
-            REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( IN ) :: p_inf
-            REAL( KIND( 0.0D0 ) ), INTENT( IN )                          :: pSat, TSIn
+            REAL( KIND( 0.0D0 ) ), DIMENSION( num_fluids ), INTENT( IN ) :: cv, g_min, p_inf, qv, qvp
+            REAL( KIND( 0.0D0 ) ), INTENT( IN )                          :: pSat, TSIn, A, B, C, D
             INTEGER, INTENT( IN )                                        :: lp, vp
-            REAL( KIND( 0.0D0 ) )                                        :: A, B, C, D, dFdT, FT, TSat_eps
+            REAL( KIND( 0.0D0 ) )                                        :: dFdT, FT
 
             ! Generic loop iterators
             INTEGER :: ns    
@@ -2129,41 +2035,50 @@ module m_phase_change
                 ! calculating initial estimate for temperature in the TSat procedure. I will also use this variable to 
                 ! iterate over the Newton's solver
                 TSat = TSIn
-
-                ! tolerance
-                TSat_eps = 1.0D-8
                 
                 ! iteration counter
                 ns = 0
 
-                DO WHILE ( ( DABS( FT ) .GT.  TSat_eps .AND. DABS( FT / TSat ) .GT. TSat_eps ) & 
+                ! DO WHILE ( ( DABS( FT ) .GT. ptgalpha_eps .AND. DABS( FT / TSat ) .GT. ptgalpha_eps ) & 
+                DO WHILE ( ( DABS( FT ) .GT. ptgalpha_eps ) & 
                         .OR. ( ns .EQ. 0 ) )
                     
                     ! increasing counter
                     ns = ns + 1
 
                     ! calculating residual
-                    FT = A + B / TSat + C * DLOG( TSat ) & 
-                    + D * DLOG( ( pSat + p_inf( lp ) ) ) - DLOG( pSat + p_inf( vp ) )
+                    ! FT = A + B / TSat + C * DLOG( TSat ) & 
+                    ! + D * DLOG( ( pSat + p_inf( lp ) ) ) - DLOG( pSat + p_inf( vp ) )
+
+                    FT = TSat * ( ( cv( lp ) * g_min( lp ) - cv( vp ) * g_min( vp ) )   &
+                    * ( 1 - DLOG( TSat ) ) - ( qvp( lp ) - qvp( vp ) )                  &
+                    + cv( lp ) * ( g_min( lp ) - 1 ) * DLOG( pSat + p_inf( lp ) )       &
+                    - cv( vp ) * ( g_min( vp ) - 1 ) * DLOG( pSat + p_inf( vp ) ) )     &
+                    + qv( lp ) - qv( vp )
 
                     ! calculating the jacobian
-                    dFdT = - B / ( TSat ** 2) + C / TSat
+                    ! dFdT = - B / ( TSat ** 2) + C / TSat
+
+                    dFdT =                                                                  &
+                    - ( cv( lp ) * g_min( lp ) - cv( vp ) * g_min( vp ) ) * DLOG( TSat )    &
+                    - ( qvp( lp ) - qvp( vp ) )                                             &
+                    + cv( lp ) * ( g_min( lp ) - 1 ) * DLOG( pSat + p_inf( lp ) )           &
+                    - cv( vp ) * ( g_min( vp ) - 1 ) * DLOG( pSat + p_inf( vp ) )
 
                     ! updating saturation temperature
                     TSat = TSat - FT / dFdT
 
-                    ! checking exit flag
-                    IF ( ns .GT. 1E4 ) THEN
+                    ! Checking if TSat returns a NaN
+                    IF ( ISNAN( TSat ) ) THEN
+
+                        CALL s_mpi_abort('TSat returned NaN values, when it should not (by assumption &
+                        of first order transition - m_phase_change, s_TSat). Aborting!')
+        
+                    ! checking if the maximum number of iterations has been reached
+                    ELSEIF ( ns .GT. 1E4 ) THEN
             
-                        PRINT *, 'Solver for the TSat failed (m_phase_change, s_TSat). &
-                        Please, check the error. Aborting!'
-        
-                        PRINT *, DABS( FT )
-
-                        PRINT *, DABS( FT / TSat )
-
-                        CALL s_mpi_abort()
-        
+                            CALL s_mpi_abort('Maximum number of iterations reached for TSat &
+                            (m_phase_change, s_TSat). Aborting!')
                     END IF
 
                 END DO
@@ -2174,7 +2089,7 @@ module m_phase_change
 
         SUBROUTINE s_finalize_relaxation_solver_module()
 
-           s_relaxation_solver => NULL()
+            s_relaxation_solver => NULL()
 
         END SUBROUTINE
 

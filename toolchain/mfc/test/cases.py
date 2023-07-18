@@ -349,6 +349,55 @@ def generate_cases() -> typing.List[TestCase]:
                 for i in range(2):
                     stack.pop()
 
+    def alter_phasechange(dimInfo, dimParams):
+        # Phase Change checks
+        for relax_model in [5,6]:
+            for num_fluids in [2, 3]:
+                stack.push(f"Phase Change model {relax_model} -> {num_fluids} Fluid(s)", {
+                    "relax": 'T',
+                    "relax_model": relax_model,
+                    'model_eqns': 3,
+                    'palpha_eps': 1E-02,
+                    'ptgalpha_eps': 1E-02,                    
+                    "num_fluids": num_fluids,
+                    'riemann_solver':           2,
+                    'fluid_pp(1)%gamma':        0.7409,       'fluid_pp(1)%pi_inf':   1.7409E+09,
+                    'fluid_pp(1)%cv':           1816,         'fluid_pp(1)%qv':   -1167000,
+                    'fluid_pp(1)%qvp':          0.0,
+                    'fluid_pp(2)%gamma':        2.3266,       'fluid_pp(2)%pi_inf':   0.0E+00,
+                    'fluid_pp(2)%cv':           1040,         'fluid_pp(2)%qv':   2030000,
+                    'fluid_pp(2)%qvp':          -23400,
+                    'patch_icpp(1)%pres':       4.3755E+05,
+                    'patch_icpp(1)%alpha(1)':   8.7149E-06,    'patch_icpp(1)%alpha_rho(1)': 9.6457E+02 * 8.7149E-06,
+                    'patch_icpp(1)%alpha(2)':   1-8.7149E-06,  'patch_icpp(1)%alpha_rho(2)': 2.3132 * ( 1 - 8.7149E-06 ),
+                    'patch_icpp(2)%pres':       9.6602E+04,
+                    'patch_icpp(2)%alpha(1)':   3.6749E-05,   'patch_icpp(2)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
+                    'patch_icpp(2)%alpha(2)':   1-3.6749E-05, 'patch_icpp(2)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 ),
+                    'patch_icpp(3)%pres':       9.6602E+04,
+                    'patch_icpp(3)%alpha(1)':   3.6749E-05,   'patch_icpp(3)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
+                    'patch_icpp(3)%alpha(2)':   1-3.6749E-05, 'patch_icpp(3)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 )
+                })
+
+                if num_fluids == 3:
+                    stack.push("", {
+                        'fluid_pp(3)%gamma':        2.4870,        'fluid_pp(3)%pi_inf':   0.0E+00,
+                        'fluid_pp(3)%cv':           717.5,         'fluid_pp(3)%qv':   0.0E+00,
+                        'fluid_pp(3)%qvp':          0.0,
+                        'patch_icpp(1)%alpha(2)':   2.5893E-02,                 'patch_icpp(1)%alpha_rho(2)':   2.3132 * 2.5893E-02,
+                        'patch_icpp(2)%alpha(2)':   2.8728E-02,                 'patch_icpp(2)%alpha_rho(2)':   0.5803 * 2.8728E-02,
+                        'patch_icpp(3)%alpha(2)':   2.8728E-02,                 'patch_icpp(3)%alpha_rho(2)':   0.5803 * 2.8728E-02,
+                        'patch_icpp(1)%alpha(3)':   1-8.7149E-06-2.5893E-02,    'patch_icpp(1)%alpha_rho(3)':   3.5840 * ( 1-8.7149E-06-2.5893E-02 ),
+                        'patch_icpp(2)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(2)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 ),
+                        'patch_icpp(3)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(3)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 )
+                    })
+
+                cases.append(create_case(stack, '', {}))
+
+                stack.pop()
+
+                if num_fluids == 3:
+                    stack.pop()
+
     def alter_viscosity(dimInfo, dimParams):
         # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
@@ -406,6 +455,7 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_bubbles(dimInfo, dimParams)
             alter_hypoelasticity(dimInfo, dimParams)
+            alter_phasechange(dimInfo, dimParams)
             alter_viscosity(dimInfo, dimParams)
             stack.pop()
             stack.pop()
