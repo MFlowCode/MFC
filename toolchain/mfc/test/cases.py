@@ -71,7 +71,7 @@ def generate_cases() -> typing.List[TestCase]:
     stack, cases = CaseGeneratorStack(), []
 
     def alter_bcs(dimInfo, dimParams):
-        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3 ]:
+        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -14, -15 ]:
             cases.append(create_case(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_weno(dimInfo, dimParams):
