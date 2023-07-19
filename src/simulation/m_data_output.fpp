@@ -24,7 +24,6 @@ module m_data_output
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compile_specific
-
     use m_helper
 
     use m_delay_file_access
