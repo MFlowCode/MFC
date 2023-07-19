@@ -768,7 +768,7 @@ contains
         call s_generate_initial_condition()
 
         if (relax) then
-            ! this print statement is not necessary, just to let the end user know
+            ! this print statement is not necessary, just if it feels necessary for the end user to have this warning.
             PRINT *, 'initial condition might have been altered due to enforcement of &
             pTg-equilirium (relax = "T" activated)'
 
