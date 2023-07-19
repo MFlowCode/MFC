@@ -1064,6 +1064,15 @@ contains
 
                     ! Computing the internal energies from the pressure and continuities
                     if (model_eqns == 3) then
+                        ! uncomment this DO LOOP to satisfy the failing tests. Note, however, that 
+                        ! this expression for the internal energy is incorrect. The expression below 
+                        ! this one should be the correct one
+                        ! do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                        !     q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i - adv_idx%end)%sf(j, k, l)* &
+                        !                                fluid_pp(i - adv_idx%end)%gamma* &
+                        !                                q_prim_vf(E_idx)%sf(j, k, l) + &
+                        !                                fluid_pp(i - adv_idx%end)%pi_inf
+                        
                         do i = 1, num_fluids
                             ! internal energy calculation for each of the fluids
                             q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
