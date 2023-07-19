@@ -31,6 +31,8 @@ module m_start_up
 
     use m_assign_variables
 
+    use m_phase_change          !< Phase-change module
+
     use m_helper
 
 #ifdef MFC_MPI
@@ -704,6 +706,7 @@ contains
         call s_initialize_grid_module()
         call s_initialize_initial_condition_module()
         call s_initialize_assign_variables_module()
+        if (relax) call s_initialize_phasechange_module()
 
         ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
@@ -763,6 +766,14 @@ contains
         if (old_ic) call s_read_ic_data_files(q_cons_vf)
 
         call s_generate_initial_condition()
+
+        if (relax) then
+            ! this print statement is not necessary, just if it feels necessary for the end user to have this warning.
+            PRINT *, 'initial condition might have been altered due to enforcement of &
+            pTg-equilirium (relax = "T" activated)'
+
+            call s_relaxation_solver(q_cons_vf)
+        end if
 
         call s_write_data_files(q_cons_vf)
 
@@ -841,6 +852,7 @@ contains
         call s_finalize_data_output_module()
         call s_finalize_global_parameters_module()
         call s_finialize_assign_variables_module()
+        if (relax) call s_finalize_relaxation_solver_module()
 
         ! Finalization of the MPI environment
         call s_mpi_finalize()

@@ -49,6 +49,8 @@ module m_start_up
 
     use m_hypoelastic
 
+    use m_phase_change          !< Phase-change module
+
     use m_viscous
 
     use m_bubbles
@@ -853,11 +855,11 @@ contains
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
                         dyn_pres, pi_inf, gamma, rho, qv, pres )
-
+                   
                     do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l) * &
-                                                                            (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) + &
-                                                                            v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
+                        v_vf(i + adv_idx%beg - 1)%sf(j, k, l) * (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
+                        + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do
@@ -907,6 +909,8 @@ contains
         elseif (time_stepper == 3) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
+
+        if ( relax ) CALL s_relaxation_solver(q_cons_ts(1)%vf)
 
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime 
@@ -1059,6 +1063,7 @@ contains
 #endif
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
+        if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
@@ -1191,6 +1196,7 @@ contains
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
+        if (relax) call s_finalize_relaxation_solver_module()      
 
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
