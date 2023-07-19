@@ -1020,7 +1020,6 @@ contains
         real(kind(0d0)), dimension(nb) :: Rtmp
         real(kind(0d0)) :: G
         real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)), dimension(nb) :: Rtmp
         ! real(kind(0d0)), dimension(num_fluids) :: G_T
 
         integer :: i, j, k, l, q !< Generic loop iterators
