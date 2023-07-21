@@ -4,7 +4,7 @@ import math
 import json
 
 # Numerical setup
-Nx = 399
+Nx = 200
 dx = 1./(1.*(Nx+1))
 
 Tend, Nt = 0.14, 1000
