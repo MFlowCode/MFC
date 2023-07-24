@@ -2,6 +2,8 @@
 !! @file m_derived_types.f90
 !! @brief Contains module m_derived_types
 
+#:include "macros.fpp"
+
 !> @brief This file contains the definitions of all of the custom-defined
 !!              types used in the pre-process code.
 module m_derived_types
@@ -59,6 +61,45 @@ module m_derived_types
         integer, dimension(:, :, :), allocatable :: fullmom !< Moment indices for qbmm
     end type bub_bounds_info
 
+    !> Defines parameters for a Model Patch
+    type :: ic_model_parameters
+        character(LEN=pathlen_max) :: filepath !<
+        !! Path the STL file relative to case_dir.
+
+        t_vec3 :: translate !<
+        !! Translation of the STL object.
+
+        t_vec3 :: scale !<
+        !! Scale factor for the STL object.
+
+        t_vec3 :: rotate !<
+        !! Angle to rotate the STL object along each cartesian coordinate axis,
+        !! in radians.
+
+        integer :: spc !<
+        !! Number of samples per cell to use when discretizing the STL object.
+    end type ic_model_parameters
+
+    type :: t_triangle
+        real(kind(0d0)), dimension(1:3, 1:3) :: v ! Vertices of the triangle
+        t_vec3 :: n ! Normal vector
+    end type t_triangle
+
+    type :: t_ray
+        t_vec3 :: o ! Origin
+        t_vec3 :: d ! Direction
+    end type t_ray
+
+    type :: t_bbox
+        t_vec3 :: min ! Minimum coordinates
+        t_vec3 :: max ! Maximum coordinates
+    end type t_bbox
+
+    type :: t_model
+        integer                       :: ntrs   ! Number of triangles
+        type(t_triangle), allocatable :: trs(:) ! Triangles
+    end type t_model
+
     !> Derived type adding initial condition (ic) patch parameters as attributes
     !! NOTE: The requirements for the specification of the above parameters
     !! are strongly dependent on both the choice of the multicomponent flow
@@ -78,6 +119,8 @@ module m_derived_types
         !! Vector indicating the various radii for the elliptical and ellipsoidal
         !! patch geometries. It is specified through its x-, y-, and z-components
         !! respectively.
+
+        type(ic_model_parameters) :: model !< Model parameters
 
         real(kind(0d0)) :: epsilon, beta !<
         !! The isentropic vortex parameters administrating, respectively, both
