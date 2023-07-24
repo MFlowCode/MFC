@@ -1,9 +1,9 @@
-import re, argparse, dataclasses
+import re, os.path, argparse, dataclasses
 
 from .build     import get_mfc_target_names, get_target_names, get_dependencies_names
 from .common    import format_list_to_string
 from .test.test import CASES as TEST_CASES
-
+from .packer    import packer
 
 def parse(config):
     from .run.engines  import ENGINES
@@ -19,14 +19,25 @@ started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parsers = parser.add_subparsers(dest="command")
+    parsers = parser.add_subparsers(dest="command")    
+    run     = parsers.add_parser(name="run",    help="Run a case with MFC.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    test    = parsers.add_parser(name="test",   help="Run MFC's test suite.",           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    build   = parsers.add_parser(name="build",  help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean   = parsers.add_parser(name="clean",  help="Clean build artifacts.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench   = parsers.add_parser(name="bench",  help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count   = parsers.add_parser(name="count",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    packer  = parsers.add_parser(name="packer", help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        
+    packers = packer.add_subparsers(dest="packer")
+    pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    pack.add_argument("input", metavar="INPUT", type=str, default="", help="Input file of case to pack.")
+    pack.add_argument("-o", "--output", metavar="OUTPUT", type=str, default=None, help="Base name of output file.")
     
-    run   = parsers.add_parser(name="run",   help="Run a case with MFC.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    test  = parsers.add_parser(name="test",  help="Run MFC's test suite.",           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    build = parsers.add_parser(name="build", help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean = parsers.add_parser(name="clean", help="Clean build artifacts.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench = parsers.add_parser(name="bench", help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count = parsers.add_parser(name="count", help="Count LOC in MFC.",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    compare = packers.add_parser(name="compare", help="Compare two cases.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    compare.add_argument("input1", metavar="INPUT1", type=str, default=None, help="First pack file.")
+    compare.add_argument("input2", metavar="INPUT2", type=str, default=None, help="Second pack file.")
+    compare.add_argument("-rel", "--reltol", metavar="RELTOL", type=float, default=1e-12, help="Relative tolerance.")
+    compare.add_argument("-abs", "--abstol", metavar="ABSTOL", type=float, default=1e-12, help="Absolute tolerance.")
 
     def add_common_arguments(p, mask = None):
         if mask is None:
@@ -117,8 +128,8 @@ started, run ./mfc.sh build -h.""",
                 if not key in args:
                     args[key] = val
 
-    for a, b in [("run",   run  ), ("test",  test ), ("build", build),
-                 ("clean", clean), ("bench", bench), ("count", count)]:
+    for a, b in [("run",    run  ), ("test",  test ), ("build", build),
+                 ("clean",  clean), ("bench", bench), ("count", count)]:
         append_defaults_to_data(a, b)
 
     if args["command"] is None:
@@ -127,5 +138,12 @@ started, run ./mfc.sh build -h.""",
 
     # "Slugify" the name of the job
     args["name"] = re.sub(r'[\W_]+', '-', args["name"])
+
+    for e in ["input", "input1", "input2"]:
+        if e not in args:
+            continue
+        
+        if args[e] is not None:
+            args[e] = os.path.abspath(args[e])
 
     return args

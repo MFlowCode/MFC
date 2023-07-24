@@ -79,7 +79,9 @@ contains
                 elseif (patch_icpp(i)%geometry == 19) then
                     print *, '3d var circle'
                 elseif (patch_icpp(i)%geometry == 20) then
-                    call s_check_2D_TaylorGreen_vortex_patch_geometry(i)    
+                    call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
+                elseif (patch_icpp(i)%geometry == 21) then
+                    call s_check_model_geometry(i)
                 else
                     call s_mpi_abort('Unsupported choice of the '// &
                             'geometry of active patch '//trim(iStr)//&
@@ -850,5 +852,24 @@ contains
         end if
 
     end subroutine s_check_inactive_patch_primitive_variables ! ------------
+
+    subroutine s_check_model_geometry(patch_id) ! ------------------------------
+
+        integer, intent(IN) :: patch_id
+
+        logical :: file_exists
+
+        inquire(file=patch_icpp(patch_id)%model%filepath, exist=file_exists)
+
+        if (.not. file_exists) then
+
+            print '(A,I0,A)', 'Model file '//trim(patch_icpp(patch_id)%model%filepath)//&
+                ' requested by patch ', patch_id,' does not exist. Exiting ...'
+
+            call s_mpi_abort()
+
+        end if
+
+    end subroutine s_check_model_geometry ! -----------------------------------
 
 end module m_check_patches

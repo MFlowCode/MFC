@@ -379,6 +379,8 @@ if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
     fi
 
     ok "Created a$MAGENTA Python$COLOR_RESET virtual environment (venv)."
+
+    rm "$(pwd)/build/requirements.txt" > /dev/null 2>&1 || true
 fi
 
 
