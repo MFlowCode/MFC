@@ -40,7 +40,7 @@ for name, cfg in VARS.items():
     print(f"  * Reading data files...")
 
     dfs = {}
-    for f in glob.glob(os.path.join(DIRPATH, 'D', f'{cfg[0]}.*.*.dat')):     
+    for f in glob.glob(os.path.join(DIRPATH, 'D', f'{cfg[0]}.*.*.dat')):
         proc, t_step = int(f.split('.')[-3]), int(f.split('.')[-2])
         
         if t_step != dfs:
