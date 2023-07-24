@@ -119,6 +119,10 @@ contains
 
             do i = 1, num_patches
 
+                if (proc_rank == 0) then
+                    print*, 'Processing patch', i
+                end if
+
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
                     call s_sphere(i, patch_id_fp, q_prim_vf)
@@ -151,6 +155,10 @@ contains
                 elseif (patch_icpp(i)%geometry == 19) then
                     call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
 
+                    ! 3D STL patch
+                elseif (patch_icpp(i)%geometry == 21) then
+                    call s_model(i, patch_id_fp, q_prim_vf)
+ 
                 end if
 
             end do
@@ -161,6 +169,10 @@ contains
         elseif (n > 0) then
 
             do i = 1, num_patches
+
+                if (proc_rank == 0) then
+                    print*, 'Processing patch', i
+                end if
 
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
@@ -196,8 +208,12 @@ contains
 
                     ! TaylorGreen vortex patch
                 elseif (patch_icpp(i)%geometry == 20) then
-                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)    
+                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
 
+                    ! STL patch
+                elseif (patch_icpp(i)%geometry == 21) then
+                    call s_model(i, patch_id_fp, q_prim_vf)
+ 
                 end if
 
             end do
@@ -208,6 +224,10 @@ contains
         else
 
             do i = 1, num_patches
+
+                if (proc_rank == 0) then
+                    print*, 'Processing patch', i
+                end if
 
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == 1) then
