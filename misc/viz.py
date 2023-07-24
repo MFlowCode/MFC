@@ -40,7 +40,7 @@ for name, cfg in VARS.items():
     print(f"  * Reading data files...")
 
     dfs = {}
-    for f in glob.glob(os.path.join(DIRPATH, 'D', f'{cfg[0]}.*.*.dat')):     
+    for f in glob.glob(os.path.join(DIRPATH, 'D', f'{cfg[0]}.*.*.dat')):
         proc, t_step = int(f.split('.')[-3]), int(f.split('.')[-2])
         
         if t_step != dfs:
@@ -114,7 +114,7 @@ for t_step, df in sorted(DATA.items(), key=lambda x: x[0]):
 
     fig, axes = plt.subplots(rows, cols, figsize=PLOT_DIMS)
 
-    for i, name in enumerate(df.keys()[1:]):
+    for i, name in enumerate(VARS.keys()):
         print(f" * Plotting {name}...")
         plot(name, t_step, axes[i % rows, i // rows])
 

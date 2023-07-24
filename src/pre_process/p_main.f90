@@ -21,7 +21,11 @@ program p_main
     real(kind(0d0)) :: start, finish, time_avg, time_final
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
 
+    call random_seed()
+    
     call s_initialize_mpi_domain()
+
+    ! Initialization of the MPI environment
 
     call s_initialize_modules()
 
