@@ -139,22 +139,27 @@ the grid stretching funciton is applied and has a default value of one.
 
 ### 3. Patches
 
-| Parameter           | Type    | Analytical Definition | Description                                                  |
-| ---:                | :----:  | :----:                | :---                                                         |
-| `num_patches`       | Integer | Not Supported         | Number of initial condition geometric patches.               |
-| `num_fluids`	      | Integer | Not Supported         | Number of fluids/components present in the flow.             |
-| `geometry` *        | Integer | Not Supported         | Geometry configuration of the patch.                         |
-| `alter_patch(i)` *  | Logical | Not Supported         | Alter the $i$-th patch.                                      |
-| `x[y,z]_centroid` * | Real    | Not Supported         | Centroid of the applied geometry in the $[x,y,z]$-direction. |
-| `length_x[y,z]` *   | Real    | Not Supported         | Length, if applicable, in the $[x,y,z]$-direction.           |
-| `radius` *          | Real    | Not Supported         | Radius, if applicable, of the applied geometry.              |
-| `smoothen` *        | Logical | Not Supported         | Smoothen the applied patch.                                  |
-| `smooth_patch_id` * | Integer | Not Supported         | A patch with which the applied patch is smoothened.          |
-| `smooth_coeff` *    | Real    | Not Supported         | Smoothen coefficient.                                        |
-| `alpha(i)` *        | Real    | Supported             | Volume fraction of fluid $i$.                                |
-| `alpha_rho(i)` *    | Real    | Supported             | Partial density of fluid $i$.                                |
-| `pres` *            | Real    | Supported             | Pressure.                                                    |
-| `vel(i)` *          | Real    | Supported             | Velocity in direction $i$.                                   |
+| Parameter            | Type    | Analytical Definition | Description                                                  |
+| ---:                 | :----:  | :----:                | :---                                                         |
+| `num_patches`        | Integer | Not Supported         | Number of initial condition geometric patches.               |
+| `num_fluids`	       | Integer | Not Supported         | Number of fluids/components present in the flow.             |
+| `geometry` *         | Integer | Not Supported         | Geometry configuration of the patch.                         |
+| `alter_patch(i)` *   | Logical | Not Supported         | Alter the $i$-th patch.                                      |
+| `x[y,z]_centroid` *  | Real    | Not Supported         | Centroid of the applied geometry in the $[x,y,z]$-direction. |
+| `length_x[y,z]` *    | Real    | Not Supported         | Length, if applicable, in the $[x,y,z]$-direction.           |
+| `radius` *           | Real    | Not Supported         | Radius, if applicable, of the applied geometry.              |
+| `smoothen` *         | Logical | Not Supported         | Smoothen the applied patch.                                  |
+| `smooth_patch_id` *  | Integer | Not Supported         | A patch with which the applied patch is smoothened.          |
+| `smooth_coeff` *     | Real    | Not Supported         | Smoothen coefficient.                                        |
+| `alpha(i)` *         | Real    | Supported             | Volume fraction of fluid $i$.                                |
+| `alpha_rho(i)` *     | Real    | Supported             | Partial density of fluid $i$.                                |
+| `pres` *             | Real    | Supported             | Pressure.                                                    |
+| `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
+| `model%filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
+| `model%scale(i)`     | Real    | Not Supported         | Model's (applied) scaling factor for component $i$.          |
+| `model%rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
+| `model%translate(i)` | Real    | Not Supported         | Model's $i$-th component of (applied) translation.           |
+| `model%spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
 
@@ -220,6 +225,9 @@ Optimal choice of the value of `smooth_coeff` is case-dependent and left to the 
 
 - `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `texttt{patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction. These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-algorithm).
+
+- 'model%scale', 'model%rotate` and `model%translate` define how the model should be transformed to domain-space by first
+scaling by `model%scale`, then rotating about the Z, X, and Y axes (using `model%rotate`), and finally translating by `model%translate`.
 
 ### 4. Fluid Material’s
 
@@ -339,7 +347,7 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
 | `num_probes`         | Integer | Number of probes	|
-| `probe(i)%[x,y,z]`   | Real	   | Coordinates of probe $i$	|
+| `probe(i)%[x,y,z]`   | Real	 | Coordinates of probe $i$	|
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -364,17 +372,17 @@ Parallel I/O enables the use of different number of processors in each of the pr
 
 ### 7. Acoustic Source
 
-| Parameter         | Type    | Description                                    |
-| ---:              | :----:  |          :---                                  |
-| `Monopole` 		    | Logical	| Acoustic source |
-| `num_mono` 	      | Integer	| Number of acoustic sources |
-| `Mono(i)%pulse`   | Integer	| Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
-| `Mono(i)%npulse`  | Integer	| Number of pulse cycles |
-| `Mono(i)%support` | Integer	| Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
-| `Mono(i)%loc(j)`  | Real		| $j$-th coordinate of the point that consists of $i$-th source plane |
-| `Mono(i)%dir` 	  | Real		| Direction of acoustic propagation	|
-| `Mono(i)%mag`     | Real		| Pulse magnitude	|
-| `Mono(i)%length`  | Real		| Spatial pulse length |
+| Parameter         | Type    | Description |
+| ---:              | :----:  | :--- |
+| `Monopole`        | Logical | Acoustic source |
+| `num_mono`        | Integer | Number of acoustic sources |
+| `Mono(i)%pulse`   | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
+| `Mono(i)%npulse`  | Integer | Number of pulse cycles |
+| `Mono(i)%support` | Integer | Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
+| `Mono(i)%loc(j)`  | Real    | $j$-th coordinate of the point that consists of $i$-th source plane |
+| `Mono(i)%dir`     | Real    | Direction of acoustic propagation	|
+| `Mono(i)%mag`     | Real    | Pulse magnitude	|
+| `Mono(i)%length`  | Real    | Spatial pulse length |
 
 The table lists acoustic source parameters. The parameters are optionally used to define a source plane in the domain that generates an acoustic wave that propagates in a specified direction normal to the source plane (one-way acoustic source). Details of the acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
 
@@ -429,8 +437,6 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `sigV` 	       | Real 		|	Standard deviation for probability density function of bubble velocity (only when qbmm is true) |
 | `rhoRV`	       | Real 		|	Correlation coefficient for joint probability density function of bubble radius and velocity (only when qbmm is true) |
 
-
-
 These options work only for gas-liquid two component flows. Component indexes are required to be 1 for liquid and 2 for gas.
 
 - \* These parameters should be pretended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
@@ -478,13 +484,13 @@ Implementation of the parameterse into the model follow [Ando (2010)](references
 
 ### 9. Velocity Field Setup
 
-| Parameter      | Type    | Description                                    |
-| ---:           | :----:  |          :---                                  |
-| `perturb_flow` | Logical | Perturb the initlal velocity field by random noise |
-| `perturb_sph`  | Logical | Perturb the initial partial density by random noise |
-| `perturb_sph_fluid`  | Integer | Fluid component whose partial density to be perturbed |
-| `vel_profile`  | Logical  | Set the mean streamwise velocity to hyperbolic tangent profile |
-| `instability_wave` | Logical  | Perturb the initial velocity field by instability waves |
+| Parameter           | Type    | Description |
+| ---:                | :----:  | :--- |
+| `perturb_flow`      | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_sph`       | Logical | Perturb the initial partial density by random noise |
+| `perturb_sph_fluid` | Integer | Fluid component whose partial density to be perturbed |
+| `vel_profile`       | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
+| `instability_wave`  | Logical | Perturb the initial velocity field by instability waves |
 
 The table lists velocity field parameters. The parameters are optionally used to define initial velocity profiles and perturbations.
 
@@ -517,34 +523,35 @@ The table lists velocity field parameters. The parameters are optionally used to
 |  -10 | Characteristic | Constant pressure subsonic outflow |
 |  -11 | Characteristic | Supersonic inflow |
 |  -12 | Characteristic | Supersonic outflow |
-	
+    
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions). Their number (`#`)
 corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90).
 
 ### Patch types
 
-| #    | Name           | Dim.  | Smooth | Description |
-| ---: | :----:         | :---: |  :---: | :--- |
-| 1    | Line segment 	| 1     | N      | Requires `x_centroid` and `x_length`. |
+| #    | Name               | Dim.  | Smooth | Description |
+| ---: | :----:             | :---: |  :---: | :--- |
+| 1    | Line segment 	    | 1     | N      | Requires `x_centroid` and `x_length`. |
 | 2    | Circle 		    | 2     | Y      | Requires `[x,y]_centroid` and `radius`. |
-| 3    | Rectangle 	    | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `[x,y]_length`. |
+| 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `[x,y]_length`. |
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
 | 6    | Vortex 		    | 2     | N      | Isentropic flow disturbance. Requires `[x,y]_centroid` and `radius`. |
-| 7    | 2D analytical 	| 2     | N      | Assigns the primitive variables as analytical functions. |
+| 7    | 2D analytical 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `[x,y,z]_length`. |
-| 10   | Cylinder 		  | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `[x,y,z]_length`. |
-| 11   | Sweep plane 	  | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
-| 12   | Ellipsoid 		  | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | 3D analytical 	| 3     | N      | Assigns the primitive variables as analytical functions |
-| 14   | Spherical Harmonic | 3 |  N     | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |   
-| 15   | 1D analytical  | 1     |  N     | Assigns the primitive variables as analytical functions  |
-| 16   | 1D bubble pulse | 1    |  N     | Requires `x_centroid`, `length_x` |
-| 17   | Spiral          | 2    |  N     | Requires `[x,y]_centroid` |
-| 18   | 2D Varcircle    | 2    |  Y     | Requires `[x,y]_centroid`, `radius`, and `thickness` |
-| 19   | 3D Varcircle    | 3    |  Y     | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
+| 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `[x,y,z]_length`. |
+| 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
+| 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
+| 13   | 3D analytical 	    | 3     | N      | Assigns the primitive variables as analytical functions |
+| 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |   
+| 15   | 1D analytical      | 1     | N      | Assigns the primitive variables as analytical functions  |
+| 16   | 1D bubble pulse    | 1     | N      | Requires `x_centroid`, `length_x` |
+| 17   | Spiral             | 2     | N      | Requires `[x,y]_centroid` |
+| 18   | 2D Varcircle       | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
+| 19   | 3D Varcircle       | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
+| 21   | Model              | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model%filepath`. | |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types). This includes
 types exclusive to one-, two-, and three-dimensional problems. The patch type number (`#`)
@@ -555,13 +562,13 @@ also listed in this table.
 ### Monopole supports
 
 | #    | Description |
-| --- | ----       |
-|    1 | 1D normal to x-axis      |
-|    2 | 2D semi-infinite source plane         |
-|    3 | 3D semi-infinite source plane along some lines       |
-|    4 | 3D semi-infinite source plane    |
-|    5 | Transducer      |
-|    6 | Cyl_coord along axial-dir|
+| ---- | ----        |
+|    1 | 1D normal to x-axis |
+|    2 | 2D semi-infinite source plane |
+|    3 | 3D semi-infinite source plane along some lines |
+|    4 | 3D semi-infinite source plane |
+|    5 | Transducer |
+|    6 | Cyl_coord along axial-dir |
 
 The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
 types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
@@ -569,27 +576,27 @@ $i$ is the monopole source index.
 
 ### Conservative Variables Ordering
 
-| 5-eqn | 6-eqn |
-| ----  |  ---- |
+| 5-eqn                           | 6-eqn |
+| ----                            |  ---- |
 | num_fluids continuity variables | num_fluids continuity variables        |
-| num_dims momentum variables   | num_dims momentum variables          |
-| 1 energy variable                     | 1 energy variable                            |
-| num_fluids advection variables       | num_fluids advection variables              |
-| N/A                                             | num_fluids internal energy variables |
+| num_dims momentum variables     | num_dims momentum variables          |
+| 1 energy variable               | 1 energy variable                            |
+| num_fluids advection variables  | num_fluids advection variables              |
+| N/A                             | num_fluids internal energy variables |
 
 The above variables are used for all simulations.
 
-| 5-eqn | 6-eqn |
-| ----  |  ---- |
-| sub-grid bubble variables | N/A |
-| hypoelastic variables     | N/A |
+| 5-eqn                     | 6-eqn |
+| ----                      |  ---- |
+| sub-grid bubble variables | N/A   |
+| hypoelastic variables     | N/A   |
 
 The above variables correspond to optional physics.
 
 ### Primitive Variables Ordering
 
-| 5-eqn | 6-eqn |
-| ---- | ---- |
+| 5-eqn                         | 6-eqn |
+| -----                         | ----  |
 | num_fluids densities          | num_fluids densities          |
 | num_dims velocities           | num_dims velocities           |
 | 1 pressure                    | 1 pressure                    |
