@@ -79,6 +79,68 @@ jobs:
       - name: Test
         run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
 
+  github:
+    name: Github | Intel
+    strategy:
+      matrix:
+        os:    ['ubuntu']
+        mpi:   ['mpi']
+        debug: ['debug', 'no-debug']
+        intel: [true]
+      fail-fast: false
+    continue-on-error: true
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v3
+
+      - name: Setup MacOS
+        if:   matrix.os == 'macos'
+        run: |
+          echo "CC=gcc-13"      >> $GITHUB_ENV
+          echo "CXX=g++-13"     >> $GITHUB_ENV
+          echo "FC=gfortran-13" >> $GITHUB_ENV
+          brew install wget make python make cmake coreutils gcc@13
+          
+      - name: (MacOS) Build OpenMPI
+        if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
+        run: |
+          echo "OMPI_FC=gfortran-13" >> $GITHUB_ENV
+          echo "OMPI_CXX=g++-13"     >> $GITHUB_ENV
+          echo "OMPI_MPICC=gcc-13"   >> $GITHUB_ENV
+          HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-13 --verbose --build-from-source open-mpi
+
+      - name: Setup Ubuntu
+        if:   matrix.os == 'ubuntu' && matrix.intel == false
+        run: |
+          sudo apt update -y
+          sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+
+      - name: Setup Ubuntu (Intel)
+        if:   matrix.os == 'ubuntu' && matrix.intel == true
+        run: |
+          sudo apt install tar wget make cmake python3 python3-dev
+          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt-get update
+          sudo apt-get install -y intel-oneapi-common-vars intel-oneapi-compiler-fortran-2022.1.0 intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0 intel-oneapi-mkl-2021.4.0 intel-oneapi-mpi-2021.7.1 intel-oneapi-mpi-devel-2021.7.1
+          source /opt/intel/oneapi/setvars.sh
+          echo "CXX=$(which icpc)"          >> $GITHUB_ENV
+          echo "CC=$(which icc)"            >> $GITHUB_ENV
+          echo "FC=$(which ifort)"          >> $GITHUB_ENV
+          echo "OMPI_FC=$(which ifort)"     >> $GITHUB_ENV
+          echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
+          echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
+          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
+
+      - name: Build
+        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
+
+      - name: Test
+        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
+
   docker:
     name:    Github | Docker
     runs-on: ubuntu-latest
