@@ -25,6 +25,7 @@ jobs:
         mpi:   ['mpi']
         debug: ['debug', 'no-debug']
         intel: [true]
+        intel-command: source /opt/intel/oneapi/setvars.sh
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
@@ -74,10 +75,10 @@ jobs:
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
 
       - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
+        run:  ${{ matrix.intel-command }} /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
 
       - name: Test
-        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
+        run:  ${{ matrix.intel-command }} /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
 
   docker:
     name:    Github | Docker
