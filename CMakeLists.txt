@@ -74,12 +74,10 @@ find_program(FYPP_EXE fypp REQUIRED)
 
 
 # Miscellaneous Configuration:
-# *  Enable C-Preprocessor for Fortran files
 # *  Explicitly link to -ldl (or system equivalent)
 # *  Request that FIND_LIBRARY searches <prefix>/lib/ and <prefix>/lib64/
 # *  Let FindXXX use custom scripts from toolchain/cmake/.
 
-set(CMAKE_Fortran_PREPROCESS ON)
 link_libraries("${CMAKE_DL_LIBS}")
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake")
@@ -289,6 +287,8 @@ function(MFC_SETUP_TARGET)
     cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+
+    set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
 
     target_include_directories(${ARGS_TARGET} PRIVATE 
         "${CMAKE_SOURCE_DIR}/src/common"
