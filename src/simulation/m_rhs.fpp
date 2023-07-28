@@ -663,8 +663,6 @@ contains
 
         !$acc update device(ix, iy, iz)
 
-        print *, "HERE1"
-
         ! Association/Population of Working Variables ======================
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -677,13 +675,9 @@ contains
             end do
         end do
 
-        print *, "HERE2"
-
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers(pb, mv)
         call nvtxEndRange
-
-        print *, "HERE3"
         
         ! ==================================================================
 
@@ -717,8 +711,6 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-
-        print *, "HERE4"
         
         if (t_step == t_step_stop) return
         ! ==================================================================
@@ -822,8 +814,6 @@ contains
                 call nvtxEndRange
             end if
 
-            print *, "HERE5"
-
             ! Configuring Coordinate Direction Indexes ======================
             if (id == 1) then
                 ix%beg = -1; iy%beg = 0; iz%beg = 0
@@ -856,8 +846,6 @@ contains
             call nvtxEndRange
 
             ! ===============================================================
-
-            print *, "HERE6"
 
             if (alt_soundspeed) then
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -896,8 +884,6 @@ contains
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
 
-                print *, "HERE7"
-
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do q = 0, p
@@ -910,8 +896,6 @@ contains
                         end do
                     end do
                 end do
-
-                print *, "HERE8"
 
                 !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                 if(qbmm .and. (.not. polytropic) ) then
@@ -1025,8 +1009,6 @@ contains
                     end if
                 end if
 
-                print *, "HERE9"
-
                 if (bubbles) then
                     if (qbmm) then
 
@@ -1123,8 +1105,6 @@ contains
                         end do
                     end do
                 end if
-
-                print *, "HERE10"
 
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
@@ -1891,8 +1871,6 @@ contains
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 
-            print *, "HERE11"
-
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do l = iz%beg, iz%end
@@ -1903,8 +1881,6 @@ contains
                     end do
                 end do
             end do
-
-            print *, "HERE12"
 
         end if
 
