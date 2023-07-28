@@ -1,6 +1,6 @@
-#:def 3dHardcoded()
+#:def Hardcoded3D()
 
-    if (patch_icpp%hcid == 300) then
+    if (patch_icpp(patch_id)%hcid == 300) then
 
     end if
 

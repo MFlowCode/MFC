@@ -1,6 +1,6 @@
-#:def 1dHardcoded()
+#:def Hardcoded1D()
 
-    if (patch_icpp%hcid == 100) then
+    if (patch_icpp(patch_id)%hcid == 100) then
 
     end if
 

@@ -816,7 +816,7 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
 
-                @:1dHardcoded()
+                @:Hardcoded1D()
             end if
         end do
 
@@ -930,7 +930,7 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                    @:2dHardcoded()
+                    @:Hardcoded2D()
                 end if
             end do
         end do
@@ -1004,7 +1004,7 @@ contains
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                        @:3dHardcoded()
+                        @:Hardcoded3D()
 
                     end if
 
