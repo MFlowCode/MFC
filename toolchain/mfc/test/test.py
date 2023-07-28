@@ -8,7 +8,9 @@ from .cases    import generate_cases
 from ..        import sched
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
 from ..build   import build_targets, get_install_dirpath
-from .         import pack as packer
+
+from ..packer import tol as packtol
+from ..packer import packer
 
 import rich, rich.table
 
@@ -144,10 +146,14 @@ def handle_case(test: TestCase):
 
         if cmd.returncode != 0:
             cons.print(cmd.stdout)
-            raise MFCException(f"""Test {test}: Failed to execute MFC. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+            raise MFCException(f"Test {test}: Failed to execute MFC.")
 
-        pack = packer.generate(test)
-        pack.save(os.path.join(test.get_dirpath(), "pack.txt"))
+        pack, err = packer.pack(test.get_dirpath())
+        if err is not None:
+            raise MFCException(f"Test {test}: {err}")
+
+        if pack.hash_NaNs():
+            raise MFCException(f"Test {test}: NaNs detected in the case.")
 
         golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
         if ARG("generate"):
@@ -166,7 +172,9 @@ def handle_case(test: TestCase):
 
                 golden.save(golden_filepath)
             else:
-                packer.check_tolerance(test, pack, packer.load(golden_filepath), tol)
+                err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
+                if msg is not None:
+                    raise MFCException(f"Test {test}: {msg}")
 
         if ARG("test_all"):
             test.delete_output()
