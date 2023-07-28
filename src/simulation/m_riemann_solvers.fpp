@@ -2272,6 +2272,8 @@ contains
                                          is3%beg:is3%end, 1:2))
         end if
 
+        print *, "DONE Riem"
+
         if (n == 0) return
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
@@ -2328,7 +2330,6 @@ contains
                                          is3%beg:is3%end, 1:2))
         end if
 
-        print *, "DONE Riem"
 
     end subroutine s_initialize_riemann_solvers_module ! -------------------
 

@@ -188,6 +188,8 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
+        print *, "ST RHS"
+
 !$acc update device(ix, iy, iz)
 
         if (any(Re_size > 0) .and. cyl_coord) then
@@ -230,6 +232,8 @@ contains
                 q_cons_qp%vf(l)%sf
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
+
+                print *, "ST RHS 2"
 
         ! ==================================================================
 
@@ -308,6 +312,8 @@ contains
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
+
+                print *, "ST RHS 3"
 
         ! Allocation of dq_prim_ds_qp ======================================
 
@@ -449,6 +455,7 @@ contains
             end if
         end if
 
+                print *, "ST RHS 4"
         ! ==================================================================
 
         ! Allocation of gm_alphaK_n =====================================
