@@ -181,7 +181,7 @@ if "post_process" in ARGS["dict"]["targets"]:
         
     if case['p'] != 0:
         mods['fd_order']  = 1
-        mods['omega_wrt'] = 'T'
+        mods['omega_wrt'] = 'F'
 
 print(json.dumps({{**case, **mods}}))
 """)
