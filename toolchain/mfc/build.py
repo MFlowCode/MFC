@@ -24,17 +24,19 @@ class MFCTarget:
     flags:        typing.List[str]
     isDependency: bool
     isDefault:    bool
+    isRequired:   bool
     requires:     Dependencies
 
 
 TARGETS: typing.List[MFCTarget] = [
-    MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, MFCTarget.Dependencies([], [], [])),
-    MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, MFCTarget.Dependencies([], [], [])),
-    MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, MFCTarget.Dependencies(["hdf5"], [], [])),
-    MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  MFCTarget.Dependencies([], [], [])),
-    MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  MFCTarget.Dependencies([], ["fftw"], [])),
-    MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  MFCTarget.Dependencies(['fftw', 'silo'], [], [])),
-    MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, MFCTarget.Dependencies([], [], []))
+    MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], [])),
+    MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], [])),
+    MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies(["hdf5"], [], [])),
+    MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], [])),
+    MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], ["fftw"], [])),
+    MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies(['fftw', 'silo'], [], [])),
+    MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], [])),
+    MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []))
 ]
 
 
@@ -44,6 +46,10 @@ def get_mfc_target_names() -> typing.List[str]:
 
 def get_dependencies_names() -> typing.List[str]:
     return [ target.name for target in TARGETS if target.isDependency ]
+
+
+def get_required_target_names() -> typing.List[str]:
+    return [ target.name for target in TARGETS if target.isRequired ]
 
 
 def get_target_names() -> typing.List[str]:
@@ -201,7 +207,7 @@ def build_target(name: str, history: typing.List[str] = None):
 
 
 def build_targets(targets):
-    for target in targets:
+    for target in set(targets).union(set(get_required_target_names())):
         build_target(target)
 
 

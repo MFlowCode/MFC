@@ -36,7 +36,7 @@ def system(command: typing.List[str], no_exception: bool = False, exception_text
 
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
-    
+
     cons.print(f"$ {' '.join(cmd)}")
     
     if stdout != subprocess.DEVNULL:
