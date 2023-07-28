@@ -21,10 +21,10 @@ jobs:
     name: Github
     strategy:
       matrix:
-        os:    ['ubuntu', 'macos']
+        os:    ['ubuntu']
         mpi:   ['mpi', 'no-mpi']
         debug: ['debug', 'no-debug']
-        intel: [false]
+        intel: [true]
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
@@ -54,27 +54,6 @@ jobs:
            sudo apt update -y
            sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
      
-      - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
-
-      - name: Test
-        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
-
-  github:
-    name: Github-Intel
-    strategy:
-      matrix:
-        os:    ['ubuntu']
-        mpi:   ['no-mpi', 'mpi']
-        debug: ['no-debug', 'debug']
-        intel: [true]
-      fail-fast: false
-    continue-on-error: true
-    runs-on: ${{ matrix.os }}-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
-
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true
         run: |
@@ -93,6 +72,12 @@ jobs:
           echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
           echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
+
+      - name: Build
+        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
+
+      - name: Test
+        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
 
       - name: Build
         run:  |
