@@ -82,7 +82,7 @@ jobs:
       - name: Test
         run:  |
           source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh run tests/6FC6A809/case.py -j $(nproc) 
+          /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi) -f 6FC6A809 
 
   docker:
     name:    Github | Docker
