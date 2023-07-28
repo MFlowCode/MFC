@@ -1,3 +1,9 @@
+#:def Hardcoded1DVariables()
+    ! Place any declaration of intermediate variables here
+    
+
+#:enddef
+
 #:def Hardcoded1D()
 
     if (patch_icpp(patch_id)%hcid == 100) then

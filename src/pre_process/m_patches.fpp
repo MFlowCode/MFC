@@ -785,6 +785,8 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
 
+        @:Hardcoded1DVariables()
+
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1d0 + gamma)/gamma
@@ -890,6 +892,8 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
+        @:Hardcoded2DVariables()
+
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1d0 + gamma)/gamma
@@ -948,6 +952,8 @@ contains
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
 
         integer :: i, j, k !< generic loop iterators
+
+        @:Hardcoded3DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
