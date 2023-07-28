@@ -10,7 +10,7 @@ program p_main
 
     use m_global_parameters     !< Global parameters for the code
 
-    use m_clean
+    use m_start_up
 
     ! ==========================================================================
 
