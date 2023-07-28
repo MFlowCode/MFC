@@ -488,6 +488,8 @@ contains
         @:ALLOCATE(flux_src_n(1:num_dims))
         @:ALLOCATE(flux_gsrc_n(1:num_dims))
 
+        print *, "ST RHS 5"
+
         do i = 1, num_dims
 
             @:ALLOCATE(flux_n(i)%vf(1:sys_size))
@@ -555,6 +557,8 @@ contains
             end if
         end do
 
+        print *, "ST RHS 6"
+
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         if (alt_soundspeed) then
@@ -582,6 +586,7 @@ contains
 !$acc update device(Res, Re_idx, Re_size)
         end if
 
+        print *, "ST RHS 7"
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -604,6 +609,8 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
+        print *, "ST RHS 8"
+
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = startz, p - startz
@@ -622,6 +629,8 @@ contains
                 end do
             end do
         end do
+
+        print *, "ST RHS 9"
 
         if (bubbles) then
             @:ALLOCATE(nbub(0:m, 0:n, 0:p))
