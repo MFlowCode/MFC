@@ -15,7 +15,7 @@ on:
   pull_request:
 
   workflow_dispatch:
-6FC6A809
+    
 jobs:
   github:
     name: Github
