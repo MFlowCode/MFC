@@ -620,6 +620,8 @@ contains
             @:ALLOCATE(nbub(0:m, 0:n, 0:p))
         end if
 
+        print *, "DONE RHS"
+
     end subroutine s_initialize_rhs_module ! -------------------------------
 
     subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------

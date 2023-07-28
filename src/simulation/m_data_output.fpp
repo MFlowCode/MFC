@@ -1562,6 +1562,8 @@ contains
             s_write_data_files => s_write_parallel_data_files
         end if
 
+        print *, "DONE DATA"
+
     end subroutine s_initialize_data_output_module ! -----------------------
 
     !> Module deallocation and/or disassociation procedures

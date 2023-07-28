@@ -81,5 +81,5 @@ jobs:
       - name: Test
         run:  |
           source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh test -j $(nproc) --relentless 
+          /bin/bash mfc.sh test -j $(nproc) 
 

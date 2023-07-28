@@ -829,6 +829,8 @@ contains
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
 
+        print *, "DONE GLOB"
+
     end subroutine s_initialize_global_parameters_module ! -----------------
 
     !> Initializes parallel infrastructure

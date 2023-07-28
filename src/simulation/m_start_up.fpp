@@ -721,6 +721,8 @@ contains
 
         ! END: Population of Buffers in z-direction ========================
 
+        print *, "DONE GRID VAR"
+
     end subroutine s_populate_grid_variables_buffers ! ---------------------
 
     !> The purpose of this procedure is to initialize the

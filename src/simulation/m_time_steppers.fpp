@@ -215,6 +215,8 @@ contains
             call s_open_run_time_information_file()
         end if
 
+        print *, "DONE TS"
+
     end subroutine s_initialize_time_steppers_module ! ---------------------
 
     !> 1st order TVD RK time-stepping algorithm
