@@ -3,12 +3,14 @@
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 module m_patches
 
     ! Dependencies =============================================================
-    
-    use m_derived_types        !< Definitions of the derived types
+    use m_model                 ! Subroutine(s) related to STL files
+
+    use m_derived_types         ! Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
 
@@ -38,7 +40,8 @@ module m_patches
         s_sphere, &
         s_cuboid, &
         s_cylinder, &
-        s_sweep_plane
+        s_sweep_plane, &
+        s_model
 
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
@@ -1490,8 +1493,106 @@ contains
 
     end subroutine s_sweep_plane ! -----------------------------------------
 
+    !> The STL patch is a 2/3D geometry that is imported from an STL file.
+    !! @param patch_id is the patch identifier
+    subroutine s_model(patch_id, patch_id_fp, q_prim_vf) ! ---------------------
+
+        integer, intent(IN)                              :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field),     dimension(1:sys_size)    :: q_prim_vf
+
+        integer :: i, j, k !< Generic loop iterators
+
+        type(t_bbox) :: bbox
+        type(t_model) :: model
+        type(ic_model_parameters) :: params
+
+        t_vec3 :: point
+
+        real(kind(0d0)) :: grid_mm(1:3, 1:2)
+
+        integer :: cell_num
+        integer :: ncells
+
+        t_mat4x4 :: transform
+
+        if (proc_rank == 0) then
+            print*, " * Reading model: " // trim(patch_icpp(patch_id)%model%filepath)
+        end if
+        model = f_model_read(patch_icpp(patch_id)%model%filepath)
+
+        if (proc_rank == 0) then
+            print*, " * Transforming model..."
+        end if
+        transform = f_create_transform_matrix(patch_icpp(patch_id)%model)
+        call s_transform_model(model, transform)
+
+        bbox = f_create_bbox(model)
+
+        if (proc_rank == 0) then
+            write (*,"(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
+            write (*,"(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2d0
+            write (*,"(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
+
+            !call s_model_write("__out__.stl", model)
+            !call s_model_write("__out__.obj", model)
+
+            grid_mm(1,:) = (/ minval(x_cc) - 0d5 * dx, maxval(x_cc) + 0d5 * dx /)
+            grid_mm(2,:) = (/ minval(y_cc) - 0d5 * dy, maxval(y_cc) + 0d5 * dy /)
+    
+            if (p .gt. 0) then
+                grid_mm(3,:) = (/ minval(z_cc) - 0d5 * dz, maxval(z_cc) + 0d5 * dz /)
+            else
+                grid_mm(3,:) = (/ 0d0, 0d0 /)
+            end if
+
+            write (*,"(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
+            write (*,"(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2d0
+            write (*,"(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
+        end if
+
+        ncells = (m+1)*(n+1)*(p+1)
+        do i = 0, m; do j = 0, n; do k = 0, p
+
+            cell_num = i*(n+1)*(p+1) + j*(p+1) + (k+1)
+            if (proc_rank == 0 .and. mod(cell_num, ncells / 100) == 0) then
+                write (*,"(A, I3, A)", advance="no") &
+                    CHAR(13) // "  * Generating grid: ", &
+                    NINT(100 * real(cell_num) / ncells), "%"
+            end if
+
+            point = (/ x_cc(i), y_cc(j), 0d0 /)
+            if (p .gt. 0) then
+                point(3) = z_cc(k)
+            end if
+
+            if (grid_geometry == 3) then
+                point = f_convert_cyl_to_cart(point)
+            end if
+
+            eta = f_model_is_inside(model, point, (/ dx, dy, dz /), patch_icpp(patch_id)%model%spc)
+            
+            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                eta, q_prim_vf, patch_id_fp)
+
+            ! Note: Should probably use *eta* to compute primitive variables
+            ! if defining them analytically.
+            @:analytical()
+
+        end do; end do; end do
+
+        if (proc_rank == 0) then
+            print*, ""
+            print*, " * Cleaning up..."
+        end if
+
+        call s_model_free(model)
+
+    end subroutine s_model ! ---------------------------------------------------
+
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         !$acc routine seq
+
         real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
@@ -1499,8 +1600,22 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
 
+    function f_convert_cyl_to_cart(cyl) result(cart)
+
+        !$acc routine seq
+
+        t_vec3, intent(in)  :: cyl
+        t_vec3 :: cart
+
+        cart = (/ cyl(1), &
+                  cyl(2)*sin(cyl(3)), &
+                  cyl(2)*cos(cyl(3)) /)
+
+    end function f_convert_cyl_to_cart
+
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
         !$acc routine seq
+
         real(kind(0d0)), intent(IN) :: cyl_x, cyl_y
 
         sph_phi = atan(cyl_y/cyl_x)
