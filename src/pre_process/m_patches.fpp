@@ -3,6 +3,9 @@
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
+#:include '1dHardcodedIC.fpp'
+#:include '2dHardcodedIC.fpp'
+#:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
 module m_patches
@@ -813,7 +816,7 @@ contains
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                 eta, q_prim_vf, patch_id_fp)
 
-                @:analytical()
+                @:Hardcoded1D()
             end if
         end do
 
@@ -927,7 +930,7 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                    @:analytical()
+                    @:Hardcoded2D()
                 end if
             end do
         end do
@@ -1001,7 +1004,7 @@ contains
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                     eta, q_prim_vf, patch_id_fp)
 
-                        @:analytical()
+                        @:Hardcoded3D()
 
                     end if
 
