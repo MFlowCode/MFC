@@ -74,8 +74,12 @@ jobs:
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
 
       - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
+        run:  |
+          source /opt/intel/oneapi/setvars.sh
+          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
 
       - name: Test
-        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
+        run:  |
+          source /opt/intel/oneapi/setvars.sh
+          /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
 
