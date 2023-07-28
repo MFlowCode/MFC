@@ -178,7 +178,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_rhs_module() ! ---------------------------------
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, id !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -187,8 +187,6 @@ contains
 
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
-
-        print *, "ST RHS"
 
 !$acc update device(ix, iy, iz)
 
@@ -232,8 +230,6 @@ contains
                 q_cons_qp%vf(l)%sf
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
-
-                print *, "ST RHS 2"
 
         ! ==================================================================
 
@@ -312,8 +308,6 @@ contains
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
-
-                print *, "ST RHS 3"
 
         ! Allocation of dq_prim_ds_qp ======================================
 
@@ -455,7 +449,6 @@ contains
             end if
         end if
 
-                print *, "ST RHS 4"
         ! ==================================================================
 
         ! Allocation of gm_alphaK_n =====================================
@@ -487,8 +480,6 @@ contains
         @:ALLOCATE(flux_n(1:num_dims))
         @:ALLOCATE(flux_src_n(1:num_dims))
         @:ALLOCATE(flux_gsrc_n(1:num_dims))
-
-        print *, "ST RHS 5"
 
         do i = 1, num_dims
 
@@ -557,8 +548,6 @@ contains
             end if
         end do
 
-        print *, "ST RHS 6"
-
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         if (alt_soundspeed) then
@@ -586,7 +575,6 @@ contains
 !$acc update device(Res, Re_idx, Re_size)
         end if
 
-        print *, "ST RHS 7"
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -609,28 +597,20 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-        print *, "ST RHS 8"
+
 
 !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = startz, p - startz
-                do k = starty, n - starty
-                    do j = startx, m - startx
-                        flux_gsrc_n(1)%vf(i)%sf(j, k, l) = 0d0
-
-                        if (n > 0) then
-                            flux_gsrc_n(2)%vf(i)%sf(j, k, l) = 0d0
-                        end if
-
-                        if (p > 0) then
-                            flux_gsrc_n(3)%vf(i)%sf(j, k, l) = 0d0
-                        end if
+        do id = 1, num_dims
+            do i = 1, sys_size
+                do l = startz, p - startz
+                    do k = starty, n - starty
+                        do j = startx, m - startx
+                            flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0d0
+                        end do
                     end do
                 end do
             end do
         end do
-
-        print *, "ST RHS 9"
 
         if (bubbles) then
             @:ALLOCATE(nbub(0:m, 0:n, 0:p))
