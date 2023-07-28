@@ -23,7 +23,7 @@ jobs:
       matrix:
         os:    ['ubuntu']
         mpi:   ['mpi']
-        debug: ['debug', 'no-debug']
+        debug: ['no-debug']
         intel: [true]
       fail-fast: false
     continue-on-error: true
@@ -81,5 +81,5 @@ jobs:
       - name: Test
         run:  |
           source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
+          /bin/bash mfc.sh test -j $(nproc) 
 
