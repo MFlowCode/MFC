@@ -71,10 +71,12 @@ contains
         #:endfor
 
         do i = 1, num_patches_max
-            #:for VAR in [ 'geometry', 'smooth_patch_id', 'smoothen',          &
-                           'alter_patch' ]
+            #:for VAR in [ 'geometry', 'smooth_patch_id']
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+            
+            call MPI_BCAST(patch_icpp(i)%smoothen, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%alter_patch(0), num_patches_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &

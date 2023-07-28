@@ -155,6 +155,7 @@ the grid stretching funciton is applied and has a default value of one.
 | `alpha_rho(i)` *     | Real    | Supported             | Partial density of fluid $i$.                                |
 | `pres` *             | Real    | Supported             | Pressure.                                                    |
 | `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
+| `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `model%filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
 | `model%scale(i)`     | Real    | Not Supported         | Model's (applied) scaling factor for component $i$.          |
 | `model%rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
@@ -201,6 +202,18 @@ if (patch_id == 2) then
     q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
 end if
 ```
+
+#### Hard Coded Patches
+
+Some patch configurations are not adequatley handeled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 201, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+
+```f90
+    if (patch_icpp%hcid == 201) then
+        ! Primitive variables assignment
+    end if
+```
+
+and use `patch_icpp(i)%geometry = y` and `patch_icpp(i)%hcid = 201` in the input file. As a convention, any hard coded patches that are part of the MFC master branch should be identied as 1[2,3]xx where the first digit indiates the number of dimensions.
 
 #### Parameter Descriptions
 
