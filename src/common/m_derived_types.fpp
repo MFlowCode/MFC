@@ -168,6 +168,9 @@ module m_derived_types
         real(kind(0d0)) :: p0 !< Bubble size
         real(kind(0d0)) :: m0 !< Bubble velocity
 
+        integer :: hcid
+        !! id for hard coded initial condition
+
     end type ic_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These

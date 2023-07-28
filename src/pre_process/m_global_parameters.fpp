@@ -300,6 +300,8 @@ contains
 
             patch_icpp(i)%p0 = dflt_real
             patch_icpp(i)%m0 = dflt_real
+
+            patch_icpp(i)%hcid = dflt_int
         end do
 
         ! Tait EOS
