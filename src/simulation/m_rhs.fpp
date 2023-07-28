@@ -276,7 +276,7 @@ contains
         if (mpp_lim .and. bubbles) then
             @:ALLOCATE(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end if
-        ! END: Allocation/Association of qK_cons_n and qK_prim_n =====
+        ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
 
         @:ALLOCATE(qL_rsx_vf(ix%beg:ix%end, &
                                  iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
