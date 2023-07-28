@@ -42,10 +42,14 @@ program p_main
     !Initialize Modules
     call s_initialize_modules()
 
+    print *, "DONE"
+
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
     call s_initialize_gpu_vars()
+
+    print *, "DONE"
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start
@@ -62,6 +66,7 @@ program p_main
             exit 
         end if
 
+        print *, "DONE 2"
         call s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, &
          proc_time, io_proc_time, file_exists, start, finish, nt)
 
