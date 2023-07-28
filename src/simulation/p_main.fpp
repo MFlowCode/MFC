@@ -37,19 +37,13 @@ program p_main
     !Initialize MPI
     call s_initialize_mpi_domain()
 
-    print *, "DONE"
-
     !Initialize Modules
     call s_initialize_modules()
-
-    print *, "DONE"
 
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
     call s_initialize_gpu_vars()
-
-    print *, "DONE"
 
     ! Setting the time-step iterator to the first time-step
     t_step = t_step_start

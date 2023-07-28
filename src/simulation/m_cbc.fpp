@@ -384,8 +384,6 @@ contains
             !$acc update device(bczb, bcze)
         end if
 
-        print *, "DONE CBC"
-
     end subroutine s_initialize_cbc_module ! -------------------------------
 
 
