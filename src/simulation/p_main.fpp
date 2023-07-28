@@ -18,7 +18,7 @@ program p_main
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_clean
+    use m_start_up
     ! ==========================================================================
 
     implicit none
