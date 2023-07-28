@@ -63,7 +63,7 @@ jobs:
           rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
           sudo apt-get update
-          sudo apt-get install -y intel-oneapi-common-vars intel-oneapi-compiler-fortran-2022.1.0 intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0 intel-oneapi-mkl-2021.4.0 intel-oneapi-mpi-2021.7.1 intel-oneapi-mpi-devel-2021.7.1
+          sudo apt-get install -y intel-oneapi-common-vars intel-oneapi-compiler-fortran-2022.1.0 intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0 intel-oneapi-mkl-2021.4.0 intel-oneapi-mpi-2021.6.0 intel-oneapi-mpi-devel-2021.6.0
           source /opt/intel/oneapi/setvars.sh
           echo "CXX=$(which icpc)"          >> $GITHUB_ENV
           echo "CC=$(which icc)"            >> $GITHUB_ENV
@@ -71,7 +71,7 @@ jobs:
           echo "OMPI_FC=$(which ifort)"     >> $GITHUB_ENV
           echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
           echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
-          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
+          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.6.0/"    >> $GITHUB_ENV
 
       - name: Build
         run:  |
