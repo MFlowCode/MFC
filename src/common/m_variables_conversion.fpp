@@ -690,7 +690,6 @@ contains
             s_convert_to_mixture_variables => &
                 s_convert_species_to_mixture_variables
         end if
-print *, "DONE VARS"
     end subroutine s_initialize_variables_conversion_module ! --------------
 
         !Initialize mv at the quadrature nodes based on the initialized moments and sigma  
