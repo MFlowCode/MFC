@@ -37,6 +37,8 @@ program p_main
     !Initialize MPI
     call s_initialize_mpi_domain()
 
+    print *, "DONE"
+
     !Initialize Modules
     call s_initialize_modules()
 
