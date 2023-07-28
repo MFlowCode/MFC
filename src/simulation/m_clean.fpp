@@ -335,11 +335,8 @@ contains
         ! carried out if the simulation is in fact not truly executed in parallel.
 
         call s_mpi_bcast_user_inputs()
-        print *, "MPI ENT"
         call s_initialize_parallel_io()
-        print *, "MPI ENT"
         call s_mpi_decompose_computational_domain()
-        print *, "MPI EXIT"
 
     end subroutine s_initialize_mpi_domain
 
