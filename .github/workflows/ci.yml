@@ -76,10 +76,10 @@ jobs:
       - name: Build
         run:  |
           source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
+          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} -t pre_process simulation
 
       - name: Test
         run:  |
           source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh test -j $(nproc) 
+          /bin/bash mfc.sh test -j $(nproc) --relentless 
 
