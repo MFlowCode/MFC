@@ -780,8 +780,6 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
 
-        print *, "DONE STUP"
-
     end subroutine s_initialize_start_up_module ! --------------------------
 
     subroutine s_finalize_start_up_module() ! ------------------------------
