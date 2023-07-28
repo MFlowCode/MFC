@@ -81,6 +81,8 @@ contains
             end if
         end if
 
+        print *, "DONE DV"
+
     end subroutine s_initialize_derived_variables_module ! --------------------
 
     !> Allocate and open derived variables. Computing FD coefficients.
@@ -107,6 +109,8 @@ contains
             end if
 
         end if
+
+        print *, "DONE DV 2"
 
     end subroutine s_initialize_derived_variables ! -----------------------------
 

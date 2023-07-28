@@ -218,6 +218,8 @@ contains
         @:ALLOCATE(v_rs_ws_z(is3%beg:is3%end, &
                                  is2%beg:is2%end, is1%beg:is1%end, 1:sys_size))
 
+        print *, "DONE WENO"
+
         ! ==================================================================
 
     end subroutine s_initialize_weno_module ! ------------------------------

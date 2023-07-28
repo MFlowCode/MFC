@@ -180,6 +180,7 @@ contains
         
 #endif
 
+    print *, "DONE MPI"
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------
 
     !>  The purpose of this procedure is to optimally decompose
