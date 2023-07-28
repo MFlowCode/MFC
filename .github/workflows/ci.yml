@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         os:    ['ubuntu']
-        mpi:   ['mpi']
+        mpi:   ['no-mpi']
         debug: ['no-debug']
         intel: [true]
       fail-fast: false
