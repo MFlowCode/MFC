@@ -35,7 +35,7 @@ def __print_greeting():
         lhs = a.ljust(max_logo_line_length)
         rhs = b if b is not None else ''
         cons.print(
-            f"[bold blue] {lhs} [/bold blue]  {rhs}",
+            f"[bold] {lhs} [/bold]  {rhs}",
             highlight=False
         )
 
