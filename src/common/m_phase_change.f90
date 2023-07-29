@@ -1048,7 +1048,7 @@ contains
 
         if (((pS < 0.0d0) .and. ((q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) &
                                   + q_cons_vf(vp + cont_idx%beg - 1)%sf(j, k, l)) > ((rhoe &
-                                                                              - g_min(lp)*p_inf(lp)/(g_min(lp) - 1))/qv(i)))) .or. &
+                                                                              - g_min(lp)*p_inf(lp)/(g_min(lp) - 1))/qv(lp)))) .or. &
             ((pS >= 0.0d0) .and. (pS < 1.0d-1))) then
 
             ! improve this initial condition
