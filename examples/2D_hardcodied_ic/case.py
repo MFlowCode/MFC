@@ -26,10 +26,10 @@ print(json.dumps({
     'm'                            : 199,
     'n'                            : 199,
     'p'                            : 0,
-    'dt'                           : 5.E-07,
+    'dt'                           : 5.E-06,
     't_step_start'                 : 0,
-    't_step_stop'                  : 100000,
-    't_step_save'                  : 1000,
+    't_step_stop'                  : 2000,
+    't_step_save'                  : 200,
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -50,9 +50,9 @@ print(json.dumps({
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
     'bc_x%beg'                     : -2,
-    'bc_x%end'                     : -2,
-    'bc_y%beg'                     : -6,
-    'bc_y%end'                     : -6,
+    'bc_x%end'                     : -7,
+    'bc_y%beg'                     : -2,
+    'bc_y%end'                     : -7,
     # ==========================================================
 
     # Formatted Database Files Structure Parameters ============
@@ -71,7 +71,7 @@ print(json.dumps({
     'patch_icpp(1)%length_y'       : 8.,
     'patch_icpp(1)%vel(1)'         : 0.,
     'patch_icpp(1)%vel(2)'         : 0.,
-    'patch_icpp(1)%pres'           : 100,
+    'patch_icpp(1)%pres'           : 10,
     'patch_icpp(1)%alpha_rho(1)'   : (1-eps)*1000,
     'patch_icpp(1)%alpha_rho(2)'   : eps*1,
     'patch_icpp(1)%alpha(1)'       : 1-eps,

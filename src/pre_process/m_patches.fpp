@@ -20,6 +20,8 @@ module m_patches
     use m_helper
 
     use m_assign_variables
+
+    use m_mpi_common
     ! ==========================================================================
 
     implicit none
@@ -73,6 +75,8 @@ module m_patches
     !! a particular patch to yield the locations of the patch boundaries in the
     !! x-, y- and z-coordinate directions. They are used as a means to concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
+
+    character(len=5) :: istr ! string to store int to string result for error checking
 
 contains
     !>          The line segment patch is a 1D geometry that may be used,
