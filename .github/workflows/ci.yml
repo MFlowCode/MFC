@@ -28,9 +28,9 @@ jobs:
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
+    if: matrix.os == 'ubuntu' || (matrix.os == 'macos' && matrix.intel == false)
     steps:
       - name: Clone
-        if: matrix.os == 'ubuntu' || (matrix.os == 'macos' && matrix.intel == false)
         uses: actions/checkout@v3
 
       - name: Setup MacOS
