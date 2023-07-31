@@ -21,14 +21,14 @@ jobs:
     name: Github
     strategy:
       matrix:
-        os:    ['ubuntu']
+        os:    ['ubuntu', 'macos']
         mpi:   ['mpi', 'no-mpi']
         debug: ['debug', 'no-debug']
-        intel: [true]
+        intel: [true, false]
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
-    if:  ${{matrix.os == 'macos' && matrix.intel == true}} == false
+    if: ! (matrix.os == 'macos' && matrix.intel == true)
       steps:
         - name: Clone
           uses: actions/checkout@v3
