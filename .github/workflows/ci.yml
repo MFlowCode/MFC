@@ -26,8 +26,8 @@ jobs:
         debug: ['debug', 'no-debug']
         intel: [true, false]
       fail-fast: false
-    continue-on-error: true
     if: matrix.os == 'ubuntu' && matrix.intel == true
+    continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Clone
