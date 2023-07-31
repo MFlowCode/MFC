@@ -21,12 +21,11 @@ jobs:
     name: Github
     strategy:
       matrix:
-        os:    ['ubuntu', 'macos']
+        os:    ['ubuntu']
         mpi:   ['mpi', 'no-mpi']
         debug: ['debug', 'no-debug']
         intel: [true, false]
       fail-fast: false
-    if: matrix.os == 'ubuntu' && matrix.intel == true
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -75,15 +74,25 @@ jobs:
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
           echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
 
-      - name: Build
-        run:  |
-          source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
+      if: matrix.intel == true
+        - name: Build
+          run:  |
+            source /opt/intel/oneapi/setvars.sh
+            /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
 
-      - name: Test
-        run:  |
-          source /opt/intel/oneapi/setvars.sh
-          /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi) 
+        - name: Test
+          run:  |
+            source /opt/intel/oneapi/setvars.sh
+            /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi) 
+
+      if: matrix.intel == false
+        - name: Build
+          run:  |
+            /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
+
+        - name: Test
+          run:  |
+            /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi) 
 
   docker:
     name:    Github | Docker
