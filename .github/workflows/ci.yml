@@ -92,7 +92,7 @@ jobs:
           source /opt/intel/oneapi/setvars.sh
           /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
 
-      - name: Test-intel
+      - name: Test
         if:   matrix.intel == false
         run:  |
           /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
