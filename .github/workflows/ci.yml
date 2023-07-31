@@ -28,8 +28,8 @@ jobs:
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
-    if: matrix.os == 'ubuntu' || (matrix.os == 'macos' && matrix.intel == false)
     steps:
+    if:   matrix.os == 'ubuntu' || (matrix.os == 'macos' && matrix.intel == false)
       - name: Clone
         uses: actions/checkout@v3
 
