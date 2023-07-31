@@ -27,8 +27,8 @@ jobs:
         intel: [true, false]
       fail-fast: false
     continue-on-error: true
-    runs-on: ${{ matrix.os }}-latest
     if: matrix.os == 'ubuntu' && matrix.intel == true
+      runs-on: ${{ matrix.os }}-latest
       steps:
         - name: Clone
           uses: actions/checkout@v3
