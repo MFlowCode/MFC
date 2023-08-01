@@ -127,7 +127,7 @@ contains
 
     end subroutine s_check_input_file ! ------------------------------------
 
-        subroutine s_perform_time_step(t_step)
+    subroutine s_perform_time_step(t_step)
     
         integer, intent(INOUT) :: t_step 
         if (proc_rank == 0) then

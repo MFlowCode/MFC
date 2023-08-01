@@ -17,3 +17,4 @@ We try to maintain a list of current and past developers:
 + M. Rodriguez 
 + K. Schmidmayer 
 + J. Spratt 
++ B. Wilfong    
