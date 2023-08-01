@@ -333,9 +333,9 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
 `wave_speeds` $=$ 1 and 2 correspond to the direct method ([Batten et al., 1997](references.md#Batten97)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md#Toro13)), respectively.
 
-- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
+- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values. If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
 
-- `weno_avg` activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
+- `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values. This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
 
 ### 6. Formatted Output
