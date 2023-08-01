@@ -178,7 +178,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_rhs_module() ! ---------------------------------
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, id !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -276,7 +276,7 @@ contains
         if (mpp_lim .and. bubbles) then
             @:ALLOCATE(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end if
-        ! END: Allocation/Association of qK_cons_n and qK_prim_n =====
+        ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
 
         @:ALLOCATE(qL_rsx_vf(ix%beg:ix%end, &
                                  iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
@@ -597,20 +597,16 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
+
+
 !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = startz, p - startz
-                do k = starty, n - starty
-                    do j = startx, m - startx
-                        flux_gsrc_n(1)%vf(i)%sf(j, k, l) = 0d0
-
-                        if (n > 0) then
-                            flux_gsrc_n(2)%vf(i)%sf(j, k, l) = 0d0
-                        end if
-
-                        if (p > 0) then
-                            flux_gsrc_n(3)%vf(i)%sf(j, k, l) = 0d0
-                        end if
+        do id = 1, num_dims
+            do i = 1, sys_size
+                do l = startz, p - startz
+                    do k = starty, n - starty
+                        do j = startx, m - startx
+                            flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0d0
+                        end do
                     end do
                 end do
             end do
