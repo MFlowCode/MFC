@@ -205,15 +205,14 @@ end if
 
 #### Hard Coded Patches
 
-Some patch configurations are not adequatley handeled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 201, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+Some patch configurations are not adequatley handeled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
-    if (patch_icpp%hcid == 201) then
+    case(200)
         ! Primitive variables assignment
-    end if
 ```
 
-and use `patch_icpp(i)%geometry = y` and `patch_icpp(i)%hcid = 201` in the input file. As a convention, any hard coded patches that are part of the MFC master branch should be identied as 1[2,3]xx where the first digit indiates the number of dimensions.
+and use `patch_icpp(i)%geometry = 7` and `patch_icpp(i)%hcid = 200` in the input file. Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`. As a convention, any hard coded patches that are part of the MFC master branch should be identied as 1[2,3]xx where the first digit indiates the number of dimensions.
 
 #### Parameter Descriptions
 
