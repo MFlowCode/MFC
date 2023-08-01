@@ -82,6 +82,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",    action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-g", "--gpus",        type=str, default="0", help="(GPU) Comma separated list of GPU #s to use.")
+    test.add_argument("-%", "--percent",     type=int, default=100, help="Percentage of tests to run.")
 
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     

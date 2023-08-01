@@ -1,5 +1,6 @@
 import os, math, shutil
 
+from random    import sample
 from ..printer import cons
 from ..        import common
 from ..state   import ARG
@@ -54,6 +55,11 @@ def __filter():
         for case in CASES[:]:
             if case.ppn > 1:
                 CASES.remove(case)
+
+    if ARG("percent") == 100:
+        return
+
+    CASES = sample(CASES, k=int(len(CASES)*ARG("percent")/100.0))
 
 
 def test():
