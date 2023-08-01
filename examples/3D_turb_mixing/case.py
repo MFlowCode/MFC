@@ -42,9 +42,6 @@ t_save  = int(math.ceil((Ntfinal-0)/float(Nfiles)))
 Nt      = t_save*Nfiles
 t_step_start    = Ntstart
 t_step_stop     = int(Nt)
-
-# Derive dynamic viscosity (rho =1)
-Mu = u0*Lx/Re0
 # ==============================================================================
 
 
@@ -131,7 +128,7 @@ print(json.dumps({
     # Surrounding liquid
     'fluid_pp(1)%gamma'             : 1./(gamma-1.),
     'fluid_pp(1)%pi_inf'            : 0.,
-    'fluid_pp(1)%Re(1)'             : 1/Mu,
+    'fluid_pp(1)%Re(1)'             : Re0,
     # =========================================================================
 }))
 
