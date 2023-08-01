@@ -22,9 +22,9 @@ Ly = 59.0
 Lz = 59.0
 
 # Number of grid cells
-Nx = 255
-Ny = 255
-Nz = 255
+Nx = 191
+Ny = 191
+Nz = 191
 
 # Grid spacing
 dx      = Lx/float(Nx)
@@ -42,6 +42,7 @@ t_save  = int(math.ceil((Ntfinal-0)/float(Nfiles)))
 Nt      = t_save*Nfiles
 t_step_start    = Ntstart
 t_step_stop     = int(Nt)
+
 # ==============================================================================
 
 
