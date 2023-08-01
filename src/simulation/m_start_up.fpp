@@ -895,7 +895,7 @@ contains
 
             
         else
-            if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+            if ((mytime + dt) >= finaltime) dt = finaltime - mytime 
             t_step = t_step + 1
         end if
     end subroutine s_perform_time_step
