@@ -81,6 +81,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-b", "--binary",      choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",    action="store_true", default=False, help="Run the Post Process Tests too.")
+    test.add_argument("-g", "--gpus",        type=str, default="0", help="(GPU) Comma separated list of GPU #s to use.")
 
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     
@@ -145,5 +146,9 @@ started, run ./mfc.sh build -h.""",
         
         if args[e] is not None:
             args[e] = os.path.abspath(args[e])
+
+    # Turn GPU ID list into a comma separated string
+    if "gpus" in args:
+        args["gpus"] = [int(g) for g in args["gpus"].split(",")]
 
     return args

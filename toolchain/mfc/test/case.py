@@ -100,7 +100,8 @@ class TestCase(case.Case):
         self.ppn   = ppn if ppn is not None else 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self, targets: typing.List[str]) -> subprocess.CompletedProcess:
+    def run(self, targets: typing.List[str], gpu: int) -> subprocess.CompletedProcess:
+        gpu_select        = f"CUDA_VISIBLE_DEVICES={gpu}"
         filepath          = f'"{self.get_dirpath()}/case.py"'
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
@@ -110,7 +111,7 @@ class TestCase(case.Case):
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
         
         command: str = f'''\
-            {mfc_script} run {filepath} {tasks} {binary_option} \
+            {gpu_select} {mfc_script} run {filepath} {tasks} {binary_option} \
             {case_optimization} {jobs} -t {' '.join(targets)} 2>&1\
             '''
 
