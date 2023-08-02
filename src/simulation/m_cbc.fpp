@@ -104,20 +104,11 @@ contains
     subroutine s_initialize_cbc_module() ! ---------------------------------
 
         integer :: i
+        logical :: is_cbc
 
-        ! Return on low numer non-characteristic BCs
-        if (all((/bc_x%beg, bc_x%end/) > -5) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+        call s_any_cbc_boundaries(is_cbc)
 
-        ! Return on high number non-characteristic BCs
-        if (all((/bc_x%beg, bc_x%end/) < -13) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) < -13)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) < -13))) return
+        if (is_cbc .eqv. .false.) return
 
         if (n == 0) then
             is2%beg = 0
@@ -256,7 +247,7 @@ contains
 
 
         ! Allocating/Computing CBC Coefficients in x-direction =============
-        if (all((/bc_x%beg, bc_x%end/) <= -5)) then
+        if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
 
             allocate (fd_coef_x(0:buff_size, -1:1))
 
@@ -267,7 +258,7 @@ contains
             call s_compute_cbc_coefficients(1, -1)
             call s_compute_cbc_coefficients(1, 1)
 
-        elseif (bc_x%beg <= -5) then
+        elseif (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
 
             allocate (fd_coef_x(0:buff_size, -1:-1))
 
@@ -277,7 +268,7 @@ contains
 
             call s_compute_cbc_coefficients(1, -1)
 
-        elseif (bc_x%end <= -5) then
+        elseif (bc_x%end <= -5 .and. bc_x%end >= -13) then
 
             allocate (fd_coef_x(0:buff_size, 1:1))
 
@@ -293,7 +284,7 @@ contains
         ! Allocating/Computing CBC Coefficients in y-direction =============
         if (n > 0) then
 
-            if (all((/bc_y%beg, bc_y%end/) <= -5)) then
+            if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, bc_y%end/) >= -13)) then
 
                 allocate (fd_coef_y(0:buff_size, -1:1))
 
@@ -304,7 +295,7 @@ contains
                 call s_compute_cbc_coefficients(2, -1)
                 call s_compute_cbc_coefficients(2, 1)
 
-            elseif (bc_y%beg <= -5) then
+            elseif (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
 
                 allocate (fd_coef_y(0:buff_size, -1:-1))
 
@@ -314,7 +305,7 @@ contains
 
                 call s_compute_cbc_coefficients(2, -1)
 
-            elseif (bc_y%end <= -5) then
+            elseif (bc_y%end <= -5 .and. bc_y%end >= -13) then
 
                 allocate (fd_coef_y(0:buff_size, 1:1))
 
@@ -332,7 +323,7 @@ contains
         ! Allocating/Computing CBC Coefficients in z-direction =============
         if (p > 0) then
 
-            if (all((/bc_z%beg, bc_z%end/) <= -5)) then
+            if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, bc_z%end/) >= -13)) then
 
                 allocate (fd_coef_z(0:buff_size, -1:1))
 
@@ -343,7 +334,7 @@ contains
                 call s_compute_cbc_coefficients(3, -1)
                 call s_compute_cbc_coefficients(3, 1)
 
-            elseif (bc_z%beg <= -5) then
+            elseif (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
 
                 allocate (fd_coef_z(0:buff_size, -1:-1))
 
@@ -353,7 +344,7 @@ contains
 
                 call s_compute_cbc_coefficients(3, -1)
 
-            elseif (bc_z%end <= -5) then
+            elseif (bc_z%end <= -5 .and. bc_z%end >= -13) then
 
                 allocate (fd_coef_z(0:buff_size, 1:1))
 
@@ -1450,22 +1441,27 @@ contains
 
     end subroutine s_finalize_cbc ! ----------------------------------------
 
+    ! Detext if the problem has any characteristic boundary conditions
+    subroutine s_any_cbc_boundaries(toggle)
+
+        logical :: toggle
+
+        #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
+        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
+            toggle = .true.
+        end if
+        #:endfor
+
+    end subroutine
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_cbc_module() ! -----------------------------------
 
-        ! Return on low number non-charactistic BCs
-        if (all((/bc_x%beg, bc_x%end/) > -5) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+        logical :: is_cbc
 
-        ! Return on high number non-characteristic BCs
-        if (all((/bc_x%beg, bc_x%end/) < -13) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) < -13)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) < -13))) return
+        call s_any_cbc_boundaries(is_cbc)
+
+        if (is_cbc .eqv. .false.) return
 
         ! Deallocating the cell-average primitive variables
         deallocate (q_prim_rsx_vf)
@@ -1493,19 +1489,19 @@ contains
         deallocate (ds)
 
         ! Deallocating CBC Coefficients in x-direction =====================
-        if (any((/bc_x%beg, bc_x%end/) <= -5)) then
+        if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
             deallocate (fd_coef_x); if (weno_order > 1) deallocate (pi_coef_x)
         end if
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in y-direction =====================
-        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5)) then
+        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. any((/bc_y%beg, bc_y%end/) >= -13)) then
             deallocate (fd_coef_y); if (weno_order > 1) deallocate (pi_coef_y)
         end if
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in z-direction =====================
-        if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5)) then
+        if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
             deallocate (fd_coef_z); if (weno_order > 1) deallocate (pi_coef_z)
         end if
         ! ==================================================================

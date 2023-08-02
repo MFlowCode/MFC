@@ -541,15 +541,13 @@ The table lists velocity field parameters. The parameters are optionally used to
 |  -10 | Characteristic | Constant pressure subsonic outflow |
 |  -11 | Characteristic | Supersonic inflow |
 |  -12 | Characteristic | Supersonic outflow |
+|  -13 | Normal         | Axis (for `cyl_coord = 'T'`) |
 |  -14 | Normal         | Slip wall |
 |  -15 | Normal         | No-slip wall |
-|  -16 | Normal         | Assigned Velocity *|
 	
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions). Their number (`#`)
 corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90).
-
-* Requires velocity in any combination of the `x[y,z]` directions at the beginning and end of the domain to be set by adding `bc_x[y,z]%vel1[2,3]b` and `bc_x[y,z]%vel1[2,3]e` respectively. A ghost cell extrapolation is applied to any `vel1[2,3]b[e]` that is not specified.
 
 ### Patch types
 

@@ -1107,7 +1107,7 @@ contains
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
 
-                if (bc_y%beg <= -5 .and. bc_y%beg /= -13 .and. bc_y%beg >= -13) then
+                if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
@@ -1359,7 +1359,7 @@ contains
                 end if
 
                 if (any(Re_size > 0)) then
-                    if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
+                    if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
                                                                  dq_prim_dx_qp%vf(mom_idx%beg:mom_idx%end), &
@@ -1422,7 +1422,7 @@ contains
                     ! Applying the geometrical viscous Riemann source fluxes calculated as average
                     ! of values at cell boundaries
                     if (cyl_coord) then
-                        if ((bc_y%beg == -2) .or. (bc_y%beg == -13)) then
+                        if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
 
                             !$acc parallel loop collapse(3) gang vector default(present)
                             do l = 0, p

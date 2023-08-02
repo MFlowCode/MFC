@@ -622,11 +622,11 @@ contains
         ! and processor boundary conditions.
         if (n == 0) then
             return
-        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
             do i = 1, buff_size
                 dy(-i) = dy(0)
             end do
-        elseif (bc_y%beg == -2 .or. bc_y%beg == -13) then
+        elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
             do i = 1, buff_size
                 dy(-i) = dy(i - 1)
             end do
