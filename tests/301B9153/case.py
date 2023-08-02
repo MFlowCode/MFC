@@ -98,7 +98,7 @@ case = {
     "z_domain%end": 6.283185307179586,
     "bc_x%beg": -3,
     "bc_x%end": -3,
-    "bc_y%beg": -13,
+    "bc_y%beg": -14,
     "bc_y%end": -3,
     "bc_z%beg": -1,
     "bc_z%end": -1,
