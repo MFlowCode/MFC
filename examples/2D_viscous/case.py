@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+#!/usr/bin/env python3
 # Dependencies and Logistics ===================================================
 # Command to navigate between directories
 
@@ -24,13 +26,13 @@ print(json.dumps({
     'y_domain%beg'                 : -0.5,
     'y_domain%end'                 : 0.5,
     'cyl_coord'                    : 'F',
-    'm'                            : 50,
-    'n'                            : 50,
+    'm'                            : 99,
+    'n'                            : 99,
     'p'                            : 0,
     'dt'                           : 5.E-10,
     't_step_start'                 : 0,
-    't_step_stop'                  : 10,
-    't_step_save'                  : 1,
+    't_step_stop'                  : 2000,
+    't_step_save'                  : 20,
     # ==========================================================================
 
     # Simulation Algorithm Parameters ==========================================
@@ -48,6 +50,7 @@ print(json.dumps({
     'null_weights'                 : 'F',
     'mp_weno'                      : 'F',
     'weno_Re_flux'                 : 'T',
+    'weno_avg'                     : 'T',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,

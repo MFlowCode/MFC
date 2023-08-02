@@ -66,12 +66,13 @@ module m_global_parameters
     !> @{
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-
+    !type(bounds_info) :: x_domain, y_domain, z_domain !<
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
     real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
-
+  
     real(kind(0d0)) :: dt !< Size of the time-step
 
 !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
@@ -108,6 +109,7 @@ module m_global_parameters
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
     logical :: mapped_weno    !< WENO with mapping of nonlinear weights
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
+    logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
     integer :: riemann_solver !< Riemann solver algorithm
     integer :: wave_speeds    !< Wave speeds estimation method
@@ -174,9 +176,21 @@ module m_global_parameters
     !> @{
     integer, dimension(2) :: Re_size
     integer, allocatable, dimension(:, :) :: Re_idx
-    !> @}
+    !> @{
+
 !$acc declare create(Re_size, Re_idx)
 
+    ! The WENO average (WA) flag regulates whether the calculation of any cell-
+    ! average spatial derivatives is carried out in each cell by utilizing the
+    ! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
+    ! values or simply, the unaltered left and right, WENO-reconstructed, cell-
+    ! boundary values.
+    !> @{
+    REAL(KIND(0d0)) :: wa_flg
+    !> @{
+
+!$acc declare create(wa_flg)
+    
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
     !! and that will be used to isolate the contributions, in that direction, in
@@ -186,6 +200,7 @@ module m_global_parameters
     real(kind(0d0)), dimension(3) :: dir_flg
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
+
 !$acc declare create(dir_idx, dir_flg, dir_idx_tau)
 
     integer :: buff_size !<
@@ -194,6 +209,7 @@ module m_global_parameters
     !! to the next time-step.
 
     integer :: startx, starty, startz
+
 
 !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, stress_idx)
 
@@ -290,7 +306,7 @@ module m_global_parameters
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 
-
+    
 
      integer :: momxb, momxe
      integer :: advxb, advxe
@@ -348,6 +364,7 @@ contains
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.
+        weno_avg = .false.
         weno_Re_flux = .false.
         riemann_solver = dflt_int
         wave_speeds = dflt_int
@@ -373,6 +390,10 @@ contains
                 bc_${DIR}$%${PARAM}$ = dflt_real
             #:endfor
         #:endfor
+
+        ! x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
+        ! y_domain%beg =  dflt_int; y_domain%end =  dflt_int;
+        ! z_domain%beg =  dflt_int; z_domain%end =  dflt_int;
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -749,6 +770,13 @@ contains
             end do
         end if
 
+
+        ! Configuring the WENO average flag that will be used to regulate
+            ! whether any spatial derivatives are to computed in each cell by
+            ! using the arithmetic mean of left and right, WENO-reconstructed,
+            ! cell-boundary values or otherwise, the unaltered left and right,
+            ! WENO-reconstructed, cell-boundary values
+        wa_flg = 0d0; IF(weno_avg) wa_flg = 1d0
 
 !$acc update device(Re_size)
         ! Determining the number of cells that are needed in order to store

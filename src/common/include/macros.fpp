@@ -24,3 +24,6 @@
     deallocate(${', '.join(args)}$)
     !$acc exit data delete(${', '.join(args)}$)
 #:enddef DEALLOCATE
+
+#define t_vec3   real(kind(0d0)), dimension(1:3)
+#define t_mat4x4 real(kind(0d0)), dimension(1:4,1:4)
