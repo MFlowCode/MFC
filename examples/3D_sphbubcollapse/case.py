@@ -66,6 +66,8 @@ print(json.dumps({
     # Use WENO5
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
+    'weno_Re_flux'                 : 'F',  
+    'weno_avg'                     : 'F',
     'avg_state'                    : 2,
     # Use the mapped WENO weights to maintain monotinicity
     'mapped_weno'                  : 'T',

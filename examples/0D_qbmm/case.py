@@ -85,6 +85,8 @@ print(json.dumps({
     'time_stepper'                 : 1,
     'weno_order'                   : 3,
     'weno_eps'                     : 1.E-16,
+    'weno_Re_flux'                 : 'F',  
+    'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
     'mp_weno'                      : 'F',
