@@ -132,7 +132,7 @@ contains
         ! Depending on model_eqns and bubbles, the appropriate procedure
         ! for computing pressure is targeted by the procedure pointer
 
-        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then   
+        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then  
             pres = (energy - dyn_p - pi_inf)/gamma
         else if ((model_eqns /= 4) .and. bubbles) then
             pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf)/gamma
@@ -690,7 +690,6 @@ contains
             s_convert_to_mixture_variables => &
                 s_convert_species_to_mixture_variables
         end if
-
     end subroutine s_initialize_variables_conversion_module ! --------------
 
         !Initialize mv at the quadrature nodes based on the initialized moments and sigma  

@@ -179,6 +179,9 @@ contains
         elseif (weno_order /= 5 .and. mp_weno) then
             call s_mpi_abort('Unsupported combination of values of '// &
                 'weno_order and mp_weno. Exiting ...')
+        elseif (model_eqns == 1 .and. weno_avg) then
+            call s_mpi_abort('Unsupported combination of values of '// &
+                'model_eqns and weno_avg. Exiting ...')        
         elseif (riemann_solver < 1 .or. riemann_solver > 3) then
             call s_mpi_abort('Unsupported value of riemann_solver. Exiting ...')
         elseif (all(wave_speeds /= (/dflt_int, 1, 2/))) then
@@ -363,6 +366,17 @@ contains
                         'and fluid_pp('//trim(iStr)//')%'// &
                         'Re('//trim(jStr)//'). Exiting ...')
                 end if
+
+                if (weno_order == 1 &
+                    .and. &
+                    (weno_avg .neqv. .true.)    &
+                    .and. &
+                    fluid_pp(i)%Re(j) /= dflt_real ) then
+                    call s_mpi_abort('Unsupported combination '// &
+                        'of values of weno_order, '// &
+                        'weno_avg and fluid_pp('//trim(iStr)//')%'// &
+                        'Re('//trim(jStr)//'). Exiting ...')
+                    end if
 
             end do
 

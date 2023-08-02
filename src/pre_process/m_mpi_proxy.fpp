@@ -71,9 +71,10 @@ contains
         #:endfor
 
         do i = 1, num_patches_max
-            call MPI_BCAST(patch_icpp(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%smooth_patch_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
+            #:for VAR in [ 'geometry', 'smooth_patch_id']
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            
             call MPI_BCAST(patch_icpp(i)%smoothen, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alter_patch(0), num_patches_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
@@ -83,12 +84,15 @@ contains
                 & 'pres', 'gamma', 'pi_inf', 'hcid' ]
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            call MPI_BCAST(patch_icpp(i)%normal(1), 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%radii(1), 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%vel(1), 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%tau_e(1), 6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%alpha_rho(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%alpha(1), num_fluids_max - 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+            call MPI_BCAST(patch_icpp(i)%model%filepath, len(patch_icpp(i)%model%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+
+            #:for VAR in [ 'model%translate', 'model%scale', 'model%rotate', &
+                           'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha' ]
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            call MPI_BCAST(patch_icpp(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! Fluids physical parameters

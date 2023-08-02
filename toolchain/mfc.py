@@ -6,9 +6,9 @@ from mfc         import args, lock, build, bench, state, count
 from mfc.state   import ARG
 from mfc.run     import run
 from mfc.test    import test
+from mfc.packer  import packer
 from mfc.common  import MFC_LOGO, MFCException, quit, format_list_to_string, does_command_exist
 from mfc.printer import cons
-
 
 def __print_greeting():
     MFC_LOGO_LINES       = MFC_LOGO.splitlines()
@@ -16,7 +16,7 @@ def __print_greeting():
 
     host_line    = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
     targets_line = f"[bold]--targets {format_list_to_string(ARG('targets'), 'magenta', 'None')}[/bold]"
-    help_line    = "$ ./mfc.sh \[build, run, test, clean, count] --help"
+    help_line    = "$ ./mfc.sh \[build, run, test, clean, count, packer] --help"
 
     MFC_SIDEBAR_LINES = [
         "",
@@ -48,8 +48,9 @@ def __checks():
 
 
 def __run():    
-    {"test":  test.test,   "run":   run.run,    "build": build.build,
-     "clean": build.clean, "bench": bench.bench, "count": count.count
+    {"test":   test.test,   "run":   run.run,    "build": build.build,
+     "clean":  build.clean, "bench": bench.bench, "count": count.count,
+     "packer": packer.packer
     }[ARG("command")]()
 
 
