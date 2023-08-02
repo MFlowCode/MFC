@@ -14,6 +14,8 @@ module m_patches
 
     use m_helper
 
+    use m_mpi_common
+
     use m_assign_variables
     ! ==========================================================================
 
@@ -913,6 +915,7 @@ contains
         ! permission to write to that cell. If both queries check out,
         ! the primitive variables of the current patch are assigned
         ! to this cell.
+
         do j = 0, n
             do i = 0, m
                 if (x_boundary%beg <= x_cc(i) .and. &
