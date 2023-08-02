@@ -107,7 +107,7 @@ module m_global_parameters
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
-    type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(bc_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
 
     logical :: parallel_io    !< Format of the data files
@@ -271,12 +271,17 @@ contains
         alt_soundspeed = .false.
         hypoelasticity = .false.
 
-        bc_x%beg = dflt_int
-        bc_x%end = dflt_int
-        bc_y%beg = dflt_int
-        bc_y%end = dflt_int
-        bc_z%beg = dflt_int
-        bc_z%end = dflt_int
+        #:for DIR in ['x', 'y', 'z']
+            #:for PARAM in ['beg', 'end']
+                bc_${DIR}$%${PARAM}$ = dflt_int
+            #:endfor
+        #:endfor
+
+        #:for DIR in ['x', 'y', 'z']
+            #:for PARAM in ['vel1b', 'vel2b', 'vel3b', 'vel1e', 'vel2e', 'vel3e']
+                bc_${DIR}$%${PARAM}$ = dflt_real
+            #:endfor
+        #:endfor
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max

@@ -41,6 +41,17 @@ module m_derived_types
         integer :: end
     end type int_bounds_info
 
+    type bc_bounds_info
+        integer :: beg
+        integer :: end
+        real(kind(0d0)) :: vel1b
+        real(kind(0d0)) :: vel2b
+        real(kind(0d0)) :: vel3b
+        real(kind(0d0)) :: vel1e
+        real(kind(0d0)) :: vel2e
+        real(kind(0d0)) :: vel3e
+    end type bc_bounds_info
+
     !> Derived type adding beginning (beg) and end bounds info as attributes
     type bounds_info
         real(kind(0d0)) :: beg

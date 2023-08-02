@@ -160,14 +160,6 @@ contains
 
             close (1)
 
-            ! Store BC information into global BC
-            bc_x_glb%beg = bc_x%beg
-            bc_x_glb%end = bc_x%end
-            bc_y_glb%beg = bc_y%beg
-            bc_y_glb%end = bc_y%end
-            bc_z_glb%beg = bc_z%beg
-            bc_z_glb%end = bc_z%end
-
             ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n

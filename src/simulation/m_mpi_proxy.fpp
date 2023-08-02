@@ -125,10 +125,9 @@ contains
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
             & 'num_fluids','time_stepper', 'riemann_solver',      & 
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', & 
-            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'bc_x_glb%beg',  & 
-            & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &
-            & 'bc_z_glb%end', 'fd_order', 'num_probes', 'num_integrals',       &
-            & 'bubble_model', 'thermal', 'R0_type', 'num_mono' ]
+            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
+            & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
+            & 'R0_type', 'num_mono' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -142,7 +141,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
-            & 'Re_inv','poly_sigma' ]
+            & 'Re_inv','poly_sigma', 'bc_x%vel1b', 'bc_x%vel2b', 'bc_x%vel3b' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
