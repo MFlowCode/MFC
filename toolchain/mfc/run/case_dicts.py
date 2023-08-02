@@ -28,6 +28,9 @@ for cmp in ["x", "y", "z"]:
     PRE_PROCESS.append(f"bc_{cmp}%beg")
     PRE_PROCESS.append(f"bc_{cmp}%end")
 
+    for var in ["vel1b", "vel2b", "vel3b", "vel1e", "vel2e", "vel3e"]:
+        PRE_PROCESS.append(f"bc_{cmp}%{var}")
+
 for f_id in range(1, 10+1):
     PRE_PROCESS.append(f'fluid_rho({f_id})')
 
@@ -79,6 +82,9 @@ for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')
     SIMULATION.append(f'bc_{cmp}%end')
 
+    for var in ["vel1b", "vel2b", "vel3b", "vel1e", "vel2e", "vel3e"]:
+        SIMULATION.append(f"bc_{cmp}%{var}")
+
 for wrt_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
@@ -124,6 +130,9 @@ for cmp_id in range(1,3+1):
 
     POST_PROCESS.append(f'bc_{cmp}%beg')
     POST_PROCESS.append(f'bc_{cmp}%end')
+
+    for var in ["vel1b", "vel2b", "vel3b", "vel1e", "vel2e", "vel3e"]:
+        POST_PROCESS.append(f"bc_{cmp}%{var}")
 
     for attribute in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
         POST_PROCESS.append(f'{attribute}({cmp_id})')

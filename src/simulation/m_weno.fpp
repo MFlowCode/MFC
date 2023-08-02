@@ -238,7 +238,7 @@ contains
         real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
             !! Cell-boundary locations in the s-direction
 
-        type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
+        type(bc_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
 
         integer :: i !< Generic loop iterator
 
