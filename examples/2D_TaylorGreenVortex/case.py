@@ -4,7 +4,7 @@ import math
 import json
 
 gam_a = 1.4
-
+Mu = 10000 # Define the fluid's dynamic viscosity
 # Dimension of the Vortex
 l = 1.0
 L = math.pi*l
@@ -46,6 +46,7 @@ print(json.dumps({
     'null_weights'                 : 'F',
     'mp_weno'                      : 'F',
     'weno_Re_flux'                 : 'T',
+    'weno_avg'                     : 'T',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
@@ -71,7 +72,7 @@ print(json.dumps({
     'patch_icpp(1)%length_x'       : 2.0*L, 
     'patch_icpp(1)%length_y'       : 2.0*L,  
     'patch_icpp(1)%vel(1)'         : 1.E-01, # Define the characteristic velocity of the vortex
-    'patch_icpp(1)%vel(2)'         : 1.E+00, # Define the characteristic length of the vortex
+    'patch_icpp(1)%vel(2)'         : l, # Define the characteristic length of the vortex
     'patch_icpp(1)%pres'           : 1.E+05,
     'patch_icpp(1)%alpha_rho(1)'   : 1.22,
     'patch_icpp(1)%alpha(1)'       : 1.,
@@ -82,7 +83,7 @@ print(json.dumps({
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
     # Shear viscosity of STD air
-    'fluid_pp(1)%Re(1)'            : 0.0001,
+    'fluid_pp(1)%Re(1)'            : 1/Mu,
     # ==========================================================
 }))
 # ==============================================================================
