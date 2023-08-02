@@ -402,11 +402,11 @@ contains
                 'values for num_procs, m, n, p and '// &
                 'weno_order. Exiting ...')
 
-            ! Constraints on the boundary conditions in the x-direction
-        elseif (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -13) then
+        ! Constraints on the boundary conditions in the x-direction
+        elseif (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -14) then
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'bc_x%beg. Exiting ...')
-        elseif (bc_x%end < -16 .or. bc_x%end > -1 .or. bc_x%beg == -13) then
+        elseif (bc_x%end < -16 .or. bc_x%end > -1 .or. bc_x%beg == -14) then
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'bc_x%end. Exiting ...')
         elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
@@ -422,14 +422,14 @@ contains
             ! Constraints on the boundary conditions in the r-direction
             if (bc_y%beg /= dflt_int &
                 .and. &
-                ((p > 0 .and. bc_y%beg /= -13) &
+                ((p > 0 .and. bc_y%beg /= -14) &
                  .or. &
                  (p == 0 .and. bc_y%beg /= -2))) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                     'bc_y%beg. Exiting ...')
             elseif (bc_y%end /= dflt_int &
                     .and. &
-                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -13)) then
+                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                     'bc_y%end. Exiting ...')
             elseif ((n > 0 .and. bc_y%beg == dflt_int)) then
@@ -475,12 +475,12 @@ contains
             ! Constraints on the boundary conditions in the y-direction
             if (bc_y%beg /= dflt_int &
                 .and. &
-                (bc_y%beg < -16 .or. bc_y%beg > -1 .or. bc_y%beg == -13)) then
+                (bc_y%beg < -16 .or. bc_y%beg > -1 .or. bc_y%beg == -14)) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                     'bc_y%beg. Exiting ...')
             elseif (bc_y%end /= dflt_int &
                     .and. &
-                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -13)) then
+                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                     'bc_y%end. Exiting ...')
             elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
@@ -505,12 +505,12 @@ contains
             ! Constraints on the boundary conditions in the z-direction
             elseif (bc_z%beg /= dflt_int &
                     .and. &
-                    (bc_z%beg < -16 .or. bc_z%beg > -1 .or. bc_z%beg == -13)) then
+                    (bc_z%beg < -16 .or. bc_z%beg > -1 .or. bc_z%beg == -14)) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                     'bc_z%beg. Exiting ...')
             elseif (bc_z%end /= dflt_int &
                     .and. &
-                    (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -13)) then
+                    (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -14)) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                 'bc_z%end. Exiting ...')
             elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
