@@ -541,9 +541,10 @@ The table lists velocity field parameters. The parameters are optionally used to
 |  -10 | Characteristic | Constant pressure subsonic outflow |
 |  -11 | Characteristic | Supersonic inflow |
 |  -12 | Characteristic | Supersonic outflow |
-|  -13 | Normal         | Axis (for `cyl_coord = 'T'`) |
-|  -14 | Normal         | Slip wall |
-|  -15 | Normal         | No-slip wall |
+|  -13 | Characteristic | No-slip wall |
+|  -14 | Normal         | Axis (for `cyl_coord = 'T'`) |
+|  -15 | Normal         | Slip wall |
+|  -16 | Normal         | No-slip wall |
 	
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions). Their number (`#`)
 corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
