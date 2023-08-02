@@ -218,12 +218,15 @@ class MFCInputFile:
             self.__generate_inp(target_name)
         
         cons.print()
-        
+       
+        def _default():
+            cons.print(f"No additional input file generation needed for [bold magenta]{target_name}[/bold magenta].")
+
         {
             "pre_process"  : self.__generate_pre_fpp,
             "simulation"   : self.__generate_sim_fpp,
-            "post_process" : self.__generate_post_fpp
-        }[target_name]()
+            "post_process" : self.__generate_post_fpp,
+        }.get(target_name, _default)()
         
 
 # Load the input file
