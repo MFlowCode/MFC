@@ -8,6 +8,9 @@ from .. import common,  build
 
 
 def validate_job_options() -> None:
+    if not ARG("mpi") and any({ARG("nodes") > 1, ARG("tasks_per_node") > 1}):
+        raise common.MFCException("RUN: Cannot run on more than one rank with --no-mpi.")
+
     if ARG("nodes") <= 0:
         raise common.MFCException("RUN: At least one node must be requested.")
 

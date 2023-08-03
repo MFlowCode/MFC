@@ -55,7 +55,7 @@ module m_start_up
 
     use ieee_arithmetic
 
-#ifdef _OPENACC
+#ifdef MFC_OpenACC
     use openacc
 #endif
 
@@ -949,7 +949,7 @@ contains
             pref = 1d0                              
         end if
 
-#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
 
@@ -962,7 +962,7 @@ contains
 
         if (qbmm) call s_initialize_qbmm_module()
 
-#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
 
@@ -974,7 +974,7 @@ contains
         end if
         call s_initialize_rhs_module()
 
-#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
 
@@ -983,7 +983,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
 
@@ -1008,7 +1008,7 @@ contains
         ! the modules. The preparations below DO DEPEND on the grid being complete.
         call s_initialize_weno_module()
 
-#if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
+#if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
         call acc_present_dump()
 #endif
@@ -1021,7 +1021,7 @@ contains
 
     subroutine s_initialize_mpi_domain()
         integer :: ierr
-#ifdef _OPENACC
+#ifdef MFC_OpenACC
         real(kind(0d0)) :: starttime, endtime
         integer :: num_devices, local_size, num_nodes, ppn, my_device_num
         integer :: dev, devNum, local_rank
@@ -1036,7 +1036,7 @@ contains
         call s_mpi_initialize()
 
     ! Bind GPUs if OpenACC is enabled
-#ifdef _OPENACC
+#ifdef MFC_OpenACC
 #ifndef MFC_MPI
         local_size = 1
         local_rank = 0

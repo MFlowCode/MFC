@@ -1,5 +1,6 @@
 import os, math, shutil
 
+from random    import sample
 from ..printer import cons
 from ..        import common
 from ..state   import ARG
@@ -55,6 +56,11 @@ def __filter():
             if case.ppn > 1:
                 CASES.remove(case)
 
+    if ARG("percent") == 100:
+        return
+
+    CASES = sample(CASES, k=int(len(CASES)*ARG("percent")/100.0))
+
 
 def test():
     global CASES, nFAIL
@@ -99,6 +105,9 @@ def test():
     cons.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
     cons.print()
     
+    # Initialize GPU_LOAD to 0 for each GPU
+    handle_case.GPU_LOAD = { id: 0 for id in ARG("gpus") }
+
     # Select the correct number of threads to use to launch test CASES
     # We can't use ARG("jobs") when the --case-optimization option is set
     # because running a test case may cause it to rebuild, and thus
@@ -124,7 +133,7 @@ def test():
 
 def handle_case(test: TestCase):
     global nFAIL
-    
+ 
     try:
         if test.params.get("qbmm", 'F') == 'T':
             tol = 1e-10
@@ -137,8 +146,12 @@ def handle_case(test: TestCase):
 
         test.delete_output()
         test.create_directory()
-        
-        cmd = test.run(["pre_process", "simulation"])
+
+        load = test.get_cell_count()
+        gpu_id = min(handle_case.GPU_LOAD.items(), key=lambda x: x[1])[0]
+        handle_case.GPU_LOAD[gpu_id] += load
+       
+        cmd = test.run(["pre_process", "simulation"], gpu=gpu_id)
 
         out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
 
@@ -178,7 +191,7 @@ def handle_case(test: TestCase):
 
         if ARG("test_all"):
             test.delete_output()
-            cmd = test.run(["pre_process", "simulation", "post_process"])
+            cmd = test.run(["pre_process", "simulation", "post_process"], gpu=gpu_id)
             out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
@@ -210,6 +223,7 @@ def handle_case(test: TestCase):
 
         cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
 
+        handle_case.GPU_LOAD[gpu_id] -= load
     except Exception as exc:
         nFAIL = nFAIL + 1
 
@@ -218,3 +232,5 @@ def handle_case(test: TestCase):
 
         cons.print(f"[bold red]Failed test {test}.[/bold red]")
         cons.print(f"{exc}")
+
+handle_case.GPU_LOAD = {}
