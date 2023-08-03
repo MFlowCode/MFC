@@ -32,17 +32,6 @@ module m_bubbles
 
 contains
 
-    !>  The purpose of this procedure is to compute the source terms
-        !!      that are needed for the bubble modeling
-        !!  @param idir Dimension splitting index
-        !!  @param q_prim_vf Primitive variables
-        !!  @param q_cons_vf Conservative variables
-        !!  @param mydivu Divergence of velocity
-        !!  @param bub_adv_src Advection equation source due to bubble compression/expansion
-        !!  @param bub_r_src   Bubble radius equation source
-        !!  @param bub_v_src   Bubble velocity equation source
-        !!  @param bub_p_src   Bubble pressure equation source
-        !!  @param bub_m_src   Bubble mass equation source
     subroutine s_initialize_bubbles_module() 
 
         integer :: i, j, k, l, q
@@ -70,7 +59,16 @@ contains
 
     end subroutine   
 
-
+    !>  The purpose of this procedure is to compute the source terms
+        !!      that are needed for the bubble modeling
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_cons_vf Conservative variables
+        !!  @param divu Divergence of velocity
+        !!  @param bub_adv_src Advection equation source due to bubble compression/expansion
+        !!  @param bub_r_src   Bubble radius equation source
+        !!  @param bub_v_src   Bubble velocity equation source
+        !!  @param bub_p_src   Bubble pressure equation source
+        !!  @param bub_m_src   Bubble mass equation source
     subroutine s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                              q_cons_vf, q_prim_vf, t_step, id, rhs_vf)
 
