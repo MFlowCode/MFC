@@ -1495,7 +1495,8 @@ contains
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in y-direction =====================
-        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. any((/bc_y%beg, bc_y%end/) >= -13)) then
+        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. & 
+            any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             deallocate (fd_coef_y); if (weno_order > 1) deallocate (pi_coef_y)
         end if
         ! ==================================================================
