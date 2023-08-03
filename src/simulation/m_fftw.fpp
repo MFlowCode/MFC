@@ -16,7 +16,7 @@ module m_fftw
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
     use cufft
 #endif
     ! ==========================================================================
@@ -27,7 +27,7 @@ module m_fftw
  s_apply_fourier_filter, &
  s_finalize_fftw_module
 
-#if !(defined(_OPENACC) && defined(__PGI))
+#if !(defined(MFC_OpenACC) && defined(__PGI))
     include 'fftw3.f03'
 #endif
 
@@ -43,7 +43,7 @@ module m_fftw
     complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
     !$acc declare create(real_size, cmplx_size, x_size, batch_size)
 
     real(kind(0d0)),    allocatable :: data_real_gpu(:)
@@ -65,7 +65,7 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_initialize_fftw_module() ! ----------------------------------
 
-#if defined(_OPENACC) && !defined(__PGI)
+#if defined(MFC_OpenACC) && !defined(__PGI)
 
         print *, "The FFTW module is not supported when using OpenACC with a compiler other than NVHPC/PGI."
         stop 1
@@ -81,7 +81,7 @@ contains
 
         batch_size = x_size*sys_size
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
         rank = 1; istride = 1; ostride = 1
 
         allocate(cufft_size(1:rank), iembed(1:rank), oembed(1:rank))
@@ -106,7 +106,7 @@ contains
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
         @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
         @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -132,7 +132,7 @@ contains
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
 
 !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
@@ -270,7 +270,7 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_finalize_fftw_module() ! ------------------------------------
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)

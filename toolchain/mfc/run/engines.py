@@ -48,8 +48,11 @@ class Engine:
 
 
 def _interactive_working_worker(cmd, q):
-	q.put(common.system(cmd, no_exception=True, stdout=subprocess.DEVNULL,
-                                                stderr=subprocess.DEVNULL) == 0)
+    cmd = [ str(_) for _ in cmd ]
+    cons.print(f"$ {' '.join(cmd)}")
+    result = subprocess.run(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    q.put(result)
 
 class InteractiveEngine(Engine):
     def __init__(self) -> None:
@@ -88,16 +91,15 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
             work_timeout = 30
 
-            cons.print(f"Ensuring the [bold magenta]Interactive Engine[/bold magenta] works ({work_timeout}s timeout):")
+            cons.print(f"Ensuring the [bold magenta]Interactive Engine[/bold magenta] works ({work_timeout}s timeout) via [bold magenta]syscheck[/bold magenta]:")
+            cons.print()
+            cons.indent()
 
             q = multiprocessing.Queue()
-
-            test_cmd = ["cmd", "/c", "ver"] if os.name == "nt" else ["hostname"]
-
             p = multiprocessing.Process(
                 target=_interactive_working_worker,
                 args=(
-                    [self.mpibin.bin] + self.mpibin.gen_params() + test_cmd,
+                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([build.get_install_dirpath(), "bin", "syscheck"])],
                     q,
                 ))
 
@@ -105,19 +107,34 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p.join(work_timeout)
 
             try:
-                self.bKnowWorks = q.get(block=False)
+                result = q.get(block=False)
+                self.bKnowWorks = result.returncode == 0
             except queue.Empty as e:
                 self.bKnowWorks = False
 
             if p.is_alive() or not self.bKnowWorks:
-                raise common.MFCException(
-                      "The [bold magenta]Interactive Engine[/bold magenta] appears to hang or exit with a non-zero status code. "
-                    + "This may indicate that the wrong MPI binary is being used to launch parallel jobs. You can specify the correct one for your system "
-                    + "using the <-b,--binary> option. For example:\n"
-                    + " - ./mfc.sh run <myfile.py> -b mpirun\n"
-                    + " - ./mfc.sh run <myfile.py> -b srun\n"
-                    + f"[bold magenta]Reason[/bold magenta]: {'Time limit.' if p.is_alive() else 'Exit code.'}"
-                )
+                if p.is_alive():
+                    raise common.MFCException("""\
+The [bold magenta]Interactive Engine[/bold magenta] appears to hang.
+This may indicate that the wrong MPI binary is being used to launch parallel jobs. You can specify the correct one for your system
+using the <-b,--binary> option. For example:
+ * ./mfc.sh run <myfile.py> -b mpirun
+ * ./mfc.sh run <myfile.py> -b srun
+""")
+                else:
+                    raise common.MFCException(f"""\
+MFC's [bold magenta]syscheck[/bold magenta] (system check) failed to run successfully.
+Please review the output bellow and ensure that your system is configured correctly:
+
+STDOUT:
+{result.stdout}
+
+STDERR:
+{result.stderr}
+""")
+
+            cons.print()
+            cons.unindent()
 
         for name in names:
             cons.print(f"[bold]Running [magenta]{name}[/magenta][/bold]:")
@@ -212,8 +229,6 @@ printf "$TABLE_FOOTER\\n"
 
 cd "{self.input.case_dirpath}"
 
-echo -e ":) Running MFC..."
-
 t_start=$(date +%s)
 """
 
@@ -246,7 +261,7 @@ exit $code
             ("{MFC::PROLOGUE}", self.__generate_prologue(system, names)),
             ("{MFC::PROFILER}", ' '.join(profiler_prepend())),
             ("{MFC::EPILOGUE}", self.__generate_epilogue()),
-            ("{MFC::BINARIES}", ' '.join([f"'{self.get_binpath(x)}'" for x in names]))
+            ("{MFC::BINARIES}", ' '.join([f"'{self.get_binpath(x)}'" for x in ["syscheck"] + names])),
         ]
 
         for (key, value) in replace_list:

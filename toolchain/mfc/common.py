@@ -12,18 +12,16 @@ MFC_DEV_FILEPATH  = abspath(f"{MFC_ROOTDIR}/toolchain/mfc.dev.yaml")
 MFC_USER_FILEPATH = abspath(f"{MFC_ROOTDIR}/defaults.yaml")
 MFC_LOCK_FILEPATH = abspath(f"{MFC_SUBDIR}/lock.yaml")
 
-MFC_LOGO = f"""\
-     ___            ___          ___
-    /__/\          /  /\        /  /\\
-   |  |::\        /  /:/_      /  /:/
-   |  |:|:\      /  /:/ /\    /  /:/
- __|__|:|\:\    /  /:/ /:/   /  /:/  ___
-/__/::::| \:\  /__/:/ /:/   /__/:/  /  /\\
-\  \:\~~\__\/  \  \:\/:/    \  \:\ /  /:/
- \  \:\         \  \::/      \  \:\  /:/
-  \  \:\         \  \:\       \  \:\/:/
-   \  \:\         \  \:\       \  \::/
-    \__\/          \__\/        \__\/
+MFC_LOGO = f"""
+     .=++*:          -+*+=.
+    :+   -*-        ==   =* .
+  :*+      ==      ++    .+-
+ :*##-.....:*+   .#%+++=--+=:::.
+ -=-++-======#=--**+++==+*++=::-:.
+.:++=----------====+*= ==..:%.....
+ .:-=++++===--==+=-+=   +.  :=
+ +#=::::::::=%=. -+:    =+   *:
+.*=-=*=..    :=+*+:      -...--
 """
 
 
@@ -36,7 +34,7 @@ def system(command: typing.List[str], no_exception: bool = False, exception_text
 
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
-    
+
     cons.print(f"$ {' '.join(cmd)}")
     
     if stdout != subprocess.DEVNULL:
