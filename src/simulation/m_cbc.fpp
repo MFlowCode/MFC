@@ -1444,7 +1444,9 @@ contains
     ! Detext if the problem has any characteristic boundary conditions
     subroutine s_any_cbc_boundaries(toggle)
 
-        logical :: toggle
+        logical, intent(inout) :: toggle
+
+        toggle = .false.
 
         #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
         if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
