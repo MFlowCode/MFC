@@ -1444,7 +1444,9 @@ contains
     ! Detext if the problem has any characteristic boundary conditions
     subroutine s_any_cbc_boundaries(toggle)
 
-        logical :: toggle
+        logical, intent(inout) :: toggle
+
+        toggle = .false.
 
         #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
         if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
@@ -1495,7 +1497,8 @@ contains
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in y-direction =====================
-        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. any((/bc_y%beg, bc_y%end/) >= -13)) then
+        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. & 
+            any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             deallocate (fd_coef_y); if (weno_order > 1) deallocate (pi_coef_y)
         end if
         ! ==================================================================
