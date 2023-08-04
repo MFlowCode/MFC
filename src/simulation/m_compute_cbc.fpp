@@ -19,7 +19,8 @@ module m_compute_cbc
         s_compute_force_free_subsonic_outflow_L, &
         s_compute_constant_pressure_subsonic_outflow_L, &
         s_compute_supersonic_inflow_L, &
-        s_compute_supersonic_outflow_L
+        s_compute_supersonic_outflow_L, &
+        s_compute_noslip_wall_L
 
 contains
 
@@ -258,5 +259,32 @@ contains
         L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_supersonic_outflow_L ! ------------------------
+
+    !>  The L variables for the No-slip wall CBC, see pg. 451 of
+        !!      Thompson (1990). At the No-slip wall (frictional wall),
+        !!      the normal/transverse component of velocity is zero at all times.
+    subroutine s_compute_noslip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dpres_dtrv1, dpres_dtrv2) ! --------------
+        !$acc routine seq
+                real(kind(0d0)), dimension(3), intent(IN) :: lambda
+                real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
+                real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
+                real(kind(0d0)), intent(IN) :: rho, c, dpres_ds, dpres_dtrv1, dpres_dtrv2
+                real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        
+                integer :: i
+    
+                L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+                
+                do i = 2, momxb
+                    L(i) = 0d0
+                end do
+
+                L(momxb+1) = -(dpres_dtrv1/rho)
+        
+                L(E_idx) = -(dpres_dtrv2/rho)
+        
+                L(advxe) = L(1)
+        
+        end subroutine s_compute_noslip_wall_L ! ---------------------------------
 
 end module m_compute_cbc
