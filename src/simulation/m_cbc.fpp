@@ -428,10 +428,12 @@ contains
                 ! Finite difference coefficient for transverse directions
                 if (cbc_dir_in == 1) then
                     ! Trv1
-                    fd_coef_${XYZ}$(:, 2, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$(0, 2, cbc_loc_in) = -1d0/(dy(0) + dy(1))
-                    fd_coef_${XYZ}$(1, 2, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$(2, 2, cbc_loc_in) = -fd_coef_${XYZ}$(0, 2, cbc_loc_in)
+                    if (m*n > 0) then
+                        fd_coef_${XYZ}$(:, 2, cbc_loc_in) = 0d0
+                        fd_coef_${XYZ}$(0, 2, cbc_loc_in) = -1d0/(dy(0) + dy(1))
+                        fd_coef_${XYZ}$(1, 2, cbc_loc_in) = 0d0
+                        fd_coef_${XYZ}$(2, 2, cbc_loc_in) = -fd_coef_${XYZ}$(0, 2, cbc_loc_in)
+                    end if
 
                     if (m*n*p > 0) then
                     ! Trv2
@@ -483,10 +485,12 @@ contains
 
                 if (cbc_dir_in == 1) then
                     ! Trv1
-                    fd_coef_${XYZ}$(:, 2, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$(0, 2, cbc_loc_in) = -1d0/(dy(0) + dy(1))
-                    fd_coef_${XYZ}$(1, 2, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$(2, 2, cbc_loc_in) = -fd_coef_${XYZ}$(0, 2, cbc_loc_in)
+                    if (m*n > 0) then
+                        fd_coef_${XYZ}$(:, 2, cbc_loc_in) = 0d0
+                        fd_coef_${XYZ}$(0, 2, cbc_loc_in) = -1d0/(dy(0) + dy(1))
+                        fd_coef_${XYZ}$(1, 2, cbc_loc_in) = 0d0
+                        fd_coef_${XYZ}$(2, 2, cbc_loc_in) = -fd_coef_${XYZ}$(0, 2, cbc_loc_in)
+                    end if
 
                     if (m*n*p > 0) then
                     ! Trv2
@@ -545,11 +549,12 @@ contains
 
                 if (cbc_dir_in == 1) then
                     ! Trv1
-                    fd_coef_${XYZ}$(:, 2, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$(0, 2, cbc_loc_in) = -1d0/(dy(0) + dy(1))
-                    fd_coef_${XYZ}$(1, 2, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$(2, 2, cbc_loc_in) = -fd_coef_${XYZ}$(0, 2, cbc_loc_in)
-
+                    if (m*n > 0) then
+                        fd_coef_${XYZ}$(:, 2, cbc_loc_in) = 0d0
+                        fd_coef_${XYZ}$(0, 2, cbc_loc_in) = -1d0/(dy(0) + dy(1))
+                        fd_coef_${XYZ}$(1, 2, cbc_loc_in) = 0d0
+                        fd_coef_${XYZ}$(2, 2, cbc_loc_in) = -fd_coef_${XYZ}$(0, 2, cbc_loc_in)
+                    end if
                     if (m*n*p > 0) then
                     ! Trv2
                         fd_coef_${XYZ}$(:, 3, cbc_loc_in) = 0d0
@@ -1283,8 +1288,8 @@ contains
 
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do r = is3%beg -1, is3%end +1
-                    do k = is2%beg -1, is2%end +1
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
                         do j = 0, buff_size
                             q_prim_rsx_vf(j, k, r, i) = &
                                 q_prim_vf(i)%sf(dj*(m - 2*j) + j, k, r)
@@ -1361,8 +1366,8 @@ contains
 
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do r = is3%beg -1, is3%end +1
-                    do k = is2%beg -1, is2%end +1
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
                         do j = 0, buff_size
                             q_prim_rsy_vf(j, k, r, i) = &
                                 q_prim_vf(i)%sf(k, dj*(n - 2*j) + j, r)
@@ -1438,8 +1443,8 @@ contains
 
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do r = is3%beg -1, is3%end +1
-                    do k = is2%beg -1, is2%end +1
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
                         do j = 0, buff_size
                             q_prim_rsz_vf(j, k, r, i) = &
                                 q_prim_vf(i)%sf(r, k, dj*(p - 2*j) + j)
