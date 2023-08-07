@@ -957,126 +957,129 @@ contains
                     ! ============================================================
 
                     ! Spatial Derivatives on the Trv-direction
+                    if ((cbc_loc == -1 .and. bc${XYZ}$b == -13) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -13)) then
                     ! =0 means pcb; =1 means domainb
-                    proc_trv1_bcb = 0
-                    proc_trv1_bce = 0
-                    proc_trv2_bcb = 0
-                    proc_trv2_bce = 0
+                        proc_trv1_bcb = 0
+                        proc_trv1_bce = 0
+                        proc_trv2_bcb = 0
+                        proc_trv2_bce = 0
 
-                    if (cbc_dir == 1) then
-                        if (MINVAL(y_cb) <= y_domain%beg .AND. MAXVAL(y_cb) >= y_domain%end) then
-                           proc_trv1_bcb = 1
-                           proc_trv1_bce = 1
-                        elseif (MINVAL(y_cb) <= y_domain%beg) then
-                           proc_trv1_bcb = 1
-                        elseif (MAXVAL(y_cb) >= y_domain%end) then
-                           proc_trv1_bce = 1
-                        end if
-
-                        if (n*m*p > 0)then
-                            if (MINVAL(z_cb) <= z_domain%beg .AND. MAXVAL(z_cb) >= z_domain%end) then
-                               proc_trv2_bcb = 1
-                               proc_trv2_bce = 1
-                            elseif (MINVAL(z_cb) <= z_domain%beg) then
-                               proc_trv2_bcb = 1
-                            elseif (MAXVAL(z_cb) >= z_domain%end) then
-                               proc_trv2_bce = 1
+                        if (cbc_dir == 1) then
+                            if (MINVAL(y_cb) <= y_domain%beg .AND. MAXVAL(y_cb) >= y_domain%end) then
+                            proc_trv1_bcb = 1
+                            proc_trv1_bce = 1
+                            elseif (MINVAL(y_cb) <= y_domain%beg) then
+                            proc_trv1_bcb = 1
+                            elseif (MAXVAL(y_cb) >= y_domain%end) then
+                            proc_trv1_bce = 1
                             end if
-                        end if
 
-                    elseif (cbc_dir == 2) then
-                        if (MINVAL(x_cb) <= x_domain%beg .AND. MAXVAL(x_cb) >= x_domain%end) then
-                           proc_trv1_bcb = 1
-                           proc_trv1_bce = 1
-                        elseif (MINVAL(x_cb) <= x_domain%beg) then
-                           proc_trv1_bcb = 1
-                        elseif (MAXVAL(x_cb) >= x_domain%end) then
-                           proc_trv1_bce = 1
-                        end if
-
-                        if (n*m*p > 0)then
-                            if (MINVAL(z_cb) <= z_domain%beg .AND. MAXVAL(z_cb) >= z_domain%end) then
-                               proc_trv2_bcb = 1
-                               proc_trv2_bce = 1
-                            elseif (MINVAL(z_cb) <= z_domain%beg) then
-                               proc_trv2_bcb = 1
-                            elseif (MAXVAL(z_cb) >= z_domain%end) then
-                               proc_trv2_bce = 1
+                            if (n*m*p > 0)then
+                                if (MINVAL(z_cb) <= z_domain%beg .AND. MAXVAL(z_cb) >= z_domain%end) then
+                                proc_trv2_bcb = 1
+                                proc_trv2_bce = 1
+                                elseif (MINVAL(z_cb) <= z_domain%beg) then
+                                proc_trv2_bcb = 1
+                                elseif (MAXVAL(z_cb) >= z_domain%end) then
+                                proc_trv2_bce = 1
+                                end if
                             end if
-                        end if
 
-                    elseif (cbc_dir == 3) then
-                        if (MINVAL(y_cb) <= y_domain%beg .AND. MAXVAL(y_cb) >= y_domain%end) then
-                           proc_trv1_bcb = 1
-                           proc_trv1_bce = 1
-                        elseif (MINVAL(y_cb) <= y_domain%beg) then
-                           proc_trv1_bcb = 1
-                        elseif (MAXVAL(y_cb) >= y_domain%end) then
-                           proc_trv1_bce = 1
-                        end if
-
-                        if (n*m*p > 0) then
+                        elseif (cbc_dir == 2) then
                             if (MINVAL(x_cb) <= x_domain%beg .AND. MAXVAL(x_cb) >= x_domain%end) then
-                               proc_trv2_bcb = 1
-                               proc_trv2_bce = 1
+                            proc_trv1_bcb = 1
+                            proc_trv1_bce = 1
                             elseif (MINVAL(x_cb) <= x_domain%beg) then
-                               proc_trv2_bcb = 1
+                            proc_trv1_bcb = 1
                             elseif (MAXVAL(x_cb) >= x_domain%end) then
-                               proc_trv2_bce = 1
+                            proc_trv1_bce = 1
+                            end if
+
+                            if (n*m*p > 0)then
+                                if (MINVAL(z_cb) <= z_domain%beg .AND. MAXVAL(z_cb) >= z_domain%end) then
+                                proc_trv2_bcb = 1
+                                proc_trv2_bce = 1
+                                elseif (MINVAL(z_cb) <= z_domain%beg) then
+                                proc_trv2_bcb = 1
+                                elseif (MAXVAL(z_cb) >= z_domain%end) then
+                                proc_trv2_bce = 1
+                                end if
+                            end if
+
+                        elseif (cbc_dir == 3) then
+                            if (MINVAL(y_cb) <= y_domain%beg .AND. MAXVAL(y_cb) >= y_domain%end) then
+                            proc_trv1_bcb = 1
+                            proc_trv1_bce = 1
+                            elseif (MINVAL(y_cb) <= y_domain%beg) then
+                            proc_trv1_bcb = 1
+                            elseif (MAXVAL(y_cb) >= y_domain%end) then
+                            proc_trv1_bce = 1
+                            end if
+
+                            if (n*m*p > 0) then
+                                if (MINVAL(x_cb) <= x_domain%beg .AND. MAXVAL(x_cb) >= x_domain%end) then
+                                proc_trv2_bcb = 1
+                                proc_trv2_bce = 1
+                                elseif (MINVAL(x_cb) <= x_domain%beg) then
+                                proc_trv2_bcb = 1
+                                elseif (MAXVAL(x_cb) >= x_domain%end) then
+                                proc_trv2_bce = 1
+                                end if
                             end if
                         end if
-                    end if
-
-                    ! Trv1
-                    dpres_dtrv1 = 0d0
-                    dpres_dtrv2 = 0d0
-
-                    !$acc loop seq                   
-                    do kk = k - 1, k + 1
-                        dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, kk, r, E_idx)* &
-                                fd_coef_${XYZ}$(kk-k + 1, 2, cbc_loc) + &
-                                dpres_dtrv1      
-                    end do
-        
-                    ! Trv2
-                    !$acc loop seq
-                    do rr = r - 1, r + 1
-                    dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, rr, E_idx)* &
-                                fd_coef_${XYZ}$(rr-r + 1, 3, cbc_loc) + &
-                                dpres_dtrv2     
-                    end do
                     
-                    !Treat the corner with upwind scheme
-                    if (k == 0 .AND. proc_trv1_bcb == 1) then
-                        dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, 1, r, E_idx)* &
-                                      fd_coef_${XYZ}$(0, 1, cbc_loc) + &
-                                      q_prim_rs${XYZ}$_vf(0, 0, r, E_idx)* &
-                                      fd_coef_${XYZ}$(1, 1, cbc_loc)
-                        !dpres_dtrv1 = 0d0              
-                    end if
+                        ! Trv1
+                        dpres_dtrv1 = 0d0
+                        dpres_dtrv2 = 0d0
 
-                    if (k == is2%end .AND. proc_trv1_bce == 1) then
-                        dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, k-1, r, E_idx)* &
-                                      fd_coef_${XYZ}$(0, 1, cbc_loc) + &
-                                      q_prim_rs${XYZ}$_vf(0, k, r, E_idx)* &
-                                      fd_coef_${XYZ}$(1, 1, cbc_loc)
-                        !dpres_dtrv1 = 0d0              
-                    end if
+                        !$acc loop seq                   
+                        do kk = k - 1, k + 1
+                            dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, kk, r, E_idx)* &
+                                    fd_coef_${XYZ}$(kk-k + 1, 2, cbc_loc) + &
+                                    dpres_dtrv1      
+                        end do
+            
+                        ! Trv2
+                        !$acc loop seq
+                        do rr = r - 1, r + 1
+                            dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, rr, E_idx)* &
+                                    fd_coef_${XYZ}$(rr-r + 1, 3, cbc_loc) + &
+                                    dpres_dtrv2     
+                        end do
+                        
+                        !Treat the corner with upwind scheme
+                        if (k == 0 .AND. proc_trv1_bcb == 1) then
+                            dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, 1, r, E_idx)* &
+                                        fd_coef_${XYZ}$(0, 1, cbc_loc) + &
+                                        q_prim_rs${XYZ}$_vf(0, 0, r, E_idx)* &
+                                        fd_coef_${XYZ}$(1, 1, cbc_loc)
+                            dpres_dtrv1 = 0d0              
+                        end if
 
-                    if (r == 0 .AND. proc_trv2_bcb == 1) then
-                        dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, 1, E_idx)* &
-                                      fd_coef_${XYZ}$(0, 1, cbc_loc) + &
-                                      q_prim_rs${XYZ}$_vf(0, k, 0, E_idx)* &
-                                      fd_coef_${XYZ}$(1, 1, cbc_loc)
-                    end if
+                        if (k == is2%end .AND. proc_trv1_bce == 1) then
+                            dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, k-1, r, E_idx)* &
+                                        fd_coef_${XYZ}$(0, 1, cbc_loc) + &
+                                        q_prim_rs${XYZ}$_vf(0, k, r, E_idx)* &
+                                        fd_coef_${XYZ}$(1, 1, cbc_loc)
+                            dpres_dtrv1 = 0d0              
+                        end if
 
-                    if (r == is2%end .AND. proc_trv2_bce == 1) then
-                        dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, r-1, E_idx)* &
-                                      fd_coef_${XYZ}$(0, 1, cbc_loc) + &
-                                      q_prim_rs${XYZ}$_vf(0, k, r, E_idx)* &
-                                      fd_coef_${XYZ}$(1, 1, cbc_loc)
-                    end if
+                        if (r == 0 .AND. proc_trv2_bcb == 1) then
+                            dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, 1, E_idx)* &
+                                        fd_coef_${XYZ}$(0, 1, cbc_loc) + &
+                                        q_prim_rs${XYZ}$_vf(0, k, 0, E_idx)* &
+                                        fd_coef_${XYZ}$(1, 1, cbc_loc)
+                            dpres_dtrv2 = 0d0 
+                        end if
 
+                        if (r == is2%end .AND. proc_trv2_bce == 1) then
+                            dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, r-1, E_idx)* &
+                                        fd_coef_${XYZ}$(0, 1, cbc_loc) + &
+                                        q_prim_rs${XYZ}$_vf(0, k, r, E_idx)* &
+                                        fd_coef_${XYZ}$(1, 1, cbc_loc)
+                            dpres_dtrv2 = 0d0            
+                        end if
+                    end if
                     ! First-Order Temporal Derivatives of Primitive Variables ====
                     lambda(1) = vel(dir_idx(1)) - c
                     lambda(2) = vel(dir_idx(1))
@@ -1280,8 +1283,8 @@ contains
 
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do r = is3%beg - 1, is3%end + 1
-                    do k = is2%beg - 1, is2%end + 1
+                do r = is3%beg -1, is3%end +1
+                    do k = is2%beg -1, is2%end +1
                         do j = 0, buff_size
                             q_prim_rsx_vf(j, k, r, i) = &
                                 q_prim_vf(i)%sf(dj*(m - 2*j) + j, k, r)
@@ -1358,8 +1361,8 @@ contains
 
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do r = is3%beg - 1, is3%end + 1
-                    do k = is2%beg - 1, is2%end + 1
+                do r = is3%beg -1, is3%end +1
+                    do k = is2%beg -1, is2%end +1
                         do j = 0, buff_size
                             q_prim_rsy_vf(j, k, r, i) = &
                                 q_prim_vf(i)%sf(k, dj*(n - 2*j) + j, r)
@@ -1435,8 +1438,8 @@ contains
 
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
-                do r = is3%beg - 1, is3%end + 1
-                    do k = is2%beg - 1, is2%end + 1
+                do r = is3%beg -1, is3%end +1
+                    do k = is2%beg -1, is2%end +1
                         do j = 0, buff_size
                             q_prim_rsz_vf(j, k, r, i) = &
                                 q_prim_vf(i)%sf(r, k, dj*(p - 2*j) + j)
