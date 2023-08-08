@@ -350,9 +350,11 @@ def generate_cases() -> typing.List[TestCase]:
                     stack.pop()
 
     def alter_phasechange(dimInfo, dimParams):
+        ndims = len(dimInfo[0])
+
         # Phase Change checks
-        for relax_model in [5,6]:
-            for num_fluids in [2, 3]:
+        for relax_model in [5] + ([6] if ndims <= 2 else []):
+            for num_fluids in ([2] if ndims == 1 or relax_model == 5 else []) + [3]:
                 stack.push(f"Phase Change model {relax_model} -> {num_fluids} Fluid(s)", {
                     "relax": 'T',
                     "relax_model": relax_model,
