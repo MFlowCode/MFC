@@ -156,16 +156,6 @@ class TestCase(case.Case):
     def create_directory(self):
         dirpath = self.get_dirpath()
 
-        if delete:
-            common.delete_directory(os.path.join(dirpath, "D"))
-            common.delete_directory(os.path.join(dirpath, "p_all"))
-            common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
-
-        if delete:
-            common.delete_directory(os.path.join(dirpath, "D"))
-            common.delete_directory(os.path.join(dirpath, "p_all"))
-            common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
-
         common.create_directory(dirpath)
 
         common.file_write(f"{dirpath}/case.py", f"""\
