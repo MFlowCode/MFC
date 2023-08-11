@@ -1036,22 +1036,26 @@ contains
                         dpres_dtrv1 = 0d0
                         dpres_dtrv2 = 0d0
                         
-                        ! Trv1
-                        !$acc loop seq                   
-                        do kk = k - 1, k + 1
-                            dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, kk, r, E_idx)* &
-                                    fd_coef_${XYZ}$(kk-k + 1, 2, cbc_loc) + &
-                                    dpres_dtrv1      
-                        end do
-            
-                        ! Trv2
-                        !$acc loop seq
-                        do rr = r - 1, r + 1
-                            dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, rr, E_idx)* &
-                                    fd_coef_${XYZ}$(rr-r + 1, 3, cbc_loc) + &
-                                    dpres_dtrv2     
-                        end do
+                        if (k > 0 .and. k < is2%end ) then
+                            ! Trv1
+                            !$acc loop seq                   
+                            do kk = k - 1, k + 1
+                                dpres_dtrv1 = q_prim_rs${XYZ}$_vf(0, kk, r, E_idx)* &
+                                        fd_coef_${XYZ}$(kk-k + 1, 2, cbc_loc) + &
+                                        dpres_dtrv1      
+                            end do
+                        end if
                         
+                        if (r > 0 .and. r < is3%end ) then
+                            ! Trv2
+                            !$acc loop seq
+                            do rr = r - 1, r + 1
+                                dpres_dtrv2 = q_prim_rs${XYZ}$_vf(0, k, rr, E_idx)* &
+                                        fd_coef_${XYZ}$(rr-r + 1, 3, cbc_loc) + &
+                                        dpres_dtrv2     
+                            end do
+                        end if
+
                         ! Trv1 Around the corner/proc interface
                         if (m*n > 0) then
                             if (cbc_dir == 1 .and. cbc_loc == -1 .and. k ==0) then
