@@ -30,7 +30,6 @@ c = 600
 C = 0.3
 mydt = C * dx / c
 Nt = 100
-Tend = 1
 
 # Configuring case dictionary
 print(json.dumps({
