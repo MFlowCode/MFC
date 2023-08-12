@@ -122,9 +122,7 @@ module m_derived_types
 
         type(ic_model_parameters) :: model !< Model parameters
 
-        real(kind(0d0)) :: epsilon, beta !<
-        !! The isentropic vortex parameters administrating, respectively, both
-        !! the amplitude of the disturbance as well as its domain of influence.
+        real(kind(0d0)) :: epsilon, beta
 
         real(kind(0d0)), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified

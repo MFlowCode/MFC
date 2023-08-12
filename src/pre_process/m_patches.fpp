@@ -35,7 +35,6 @@ module m_patches
         s_ellipsoid, &
         s_rectangle, &
         s_sweep_line, &
-        s_isentropic_vortex, &
         s_2D_TaylorGreen_vortex, &
         s_1D_analytical, &
         s_1d_bubble_pulse, &
@@ -644,61 +643,6 @@ contains
 
     end subroutine s_sweep_line ! ------------------------------------------
 
-    !> The isentropic vortex is a 2D geometry that may be used,
-        !!              for example, to generate an isentropic flow disturbance.
-        !!              Geometry of the patch is well-defined when its centroid
-        !!              and radius are provided. Notice that the patch DOES NOT
-        !!              allow for the smoothing of its boundary.
-        !! @param patch_id is the patch identifier
-    subroutine s_isentropic_vortex(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
-
-        ! Patch identifier
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-
-        ! Generic loop iterators
-        integer :: i, j, k
-
-        real(kind(0d0)) :: radius
-
-        ! Transferring isentropic vortex patch's centroid and radius info
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        radius = patch_icpp(patch_id)%radius
-
-        ! Since the isentropic vortex patch does not allow for its boundary
-        ! to get smoothed, the pseudo volume fraction is set to 1 to ensure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1d0
-
-        ! Verifying whether the isentropic vortex includes a particular cell
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries work out the primitive variables of the
-        ! the current patch are assigned to this cell.
-        do j = 0, n
-            do i = 0, m
-
-                if ((x_cc(i) - x_centroid)**2 &
-                    + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                    .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                    then
-
-                    call s_assign_patch_primitive_variables(patch_id, &
-                                                            i, j, 0, &
-                                            eta, q_prim_vf, patch_id_fp)
-                            
-                    @:analytical()
-
-                end if
-
-            end do
-        end do
-
-    end subroutine s_isentropic_vortex ! -----------------------------------
-    
     !> The Taylor Green vortex is 2D decaying vortex that may be used,
         !!              for example, to verify the effects of viscous attenuation.
         !!              Geometry of the patch is well-defined when its centroid
