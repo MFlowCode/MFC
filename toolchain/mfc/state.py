@@ -15,6 +15,15 @@ class MFCConfig:
 
         return r
 
+    def items(self) -> typing.List[typing.Tuple[str, bool]]:
+        return { field.name: getattr(self, field.name) for field in dataclasses.fields(self) }.items()
+
+    def make_options(self) -> typing.List[str]:
+        return [ f"--{'no-' if not v else ''}{k}" for k, v in self.items() ]
+
+    def make_slug(self) -> str:
+        return '_'.join([ f"{'no-' if not v else ''}{k}" for k, v in sorted(self.items(), key=lambda x: x[0]) ])
+
     def __eq__(self, other) -> bool:
         for field in dataclasses.fields(self):
             if getattr(self, field.name) != getattr(other, field.name):

@@ -8,7 +8,7 @@ from .case     import TestCase
 from .cases    import generate_cases
 from ..        import sched
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build_targets, get_install_dirpath
+from ..build   import build_targets, get_install_dirpath, HDF5
 
 from ..packer import tol as packtol
 from ..packer import packer
@@ -200,8 +200,8 @@ def handle_case(test: TestCase):
                 if not os.path.exists(silo_filepath):
                     silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
         
-                h5dump = f"{get_install_dirpath()}/bin/h5dump"
-            
+                h5dump = f"{get_install_dirpath(HDF5)}/bin/h5dump"
+
                 if ARG("no_hdf5"):
                     if not does_command_exist("h5dump"):
                         raise MFCException("--no-hdf5 was specified and h5dump couldn't be found.")

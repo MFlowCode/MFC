@@ -44,7 +44,7 @@ class Engine:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
     def get_binpath(self, target: str) -> str:
-        return os.sep.join([build.get_install_dirpath(), "bin", target])
+        return os.sep.join([build.get_install_dirpath(build.get_target(target)), "bin", target])
 
 
 def _interactive_working_worker(cmd, q):
@@ -99,7 +99,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p = multiprocessing.Process(
                 target=_interactive_working_worker,
                 args=(
-                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([build.get_install_dirpath(), "bin", "syscheck"])],
+                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([build.get_install_dirpath(build.SYSCHECK), "bin", "syscheck"])],
                     q,
                 ))
 

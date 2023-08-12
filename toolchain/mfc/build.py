@@ -1,6 +1,6 @@
 import os, typing, dataclasses
 
-from .state     import ARG
+from .state     import ARG, CFG
 from .printer   import cons
 from .          import common
 from .run.input import MFCInputFile
@@ -28,17 +28,16 @@ class MFCTarget:
     requires:     Dependencies
 
 
-TARGETS: typing.List[MFCTarget] = [
-    MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], [])),
-    MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], [])),
-    MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies(["hdf5"], [], [])),
-    MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], [])),
-    MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], ["fftw"], [])),
-    MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies(['fftw', 'silo'], [], [])),
-    MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], [])),
-    MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []))
-]
+FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []))
+HDF5          = MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []))
+SILO          = MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies(["hdf5"], [], []))
+PRE_PROCESS   = MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], []))
+SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], ["fftw"], []))
+POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies(['fftw', 'silo'], [], []))
+SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], []))
+DOCUMENTATION = MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []))
 
+TARGETS: typing.List[MFCTarget] = [ FFTW, HDF5, SILO, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION ]
 
 def get_mfc_target_names() -> typing.List[str]:
     return [ target.name for target in TARGETS if target.isDefault ]
@@ -66,23 +65,43 @@ def get_target(name: str) -> MFCTarget:
 
 # Get path to directory that will store the build files
 def get_build_dirpath(target: MFCTarget) -> str:
-    return os.sep.join([os.getcwd(), "build", target.name])
+    return os.sep.join([
+        os.getcwd(),
+        "build",
+        [CFG().make_slug(), 'dependencies'][int(target.isDependency)],
+        target.name
+    ])
 
 
 # Get the directory that contains the target's CMakeLists.txt
 def get_cmake_dirpath(target: MFCTarget) -> str:
-    subdir = ["", os.sep.join(["toolchain", "dependencies"])][int(target.isDependency)]
+    return os.sep.join([
+        os.getcwd(),
+        ["", os.sep.join(["toolchain", "dependencies"])][int(target.isDependency)]
+    ])
 
-    return os.sep.join([os.getcwd(), subdir])
+
+def get_install_dirpath(target: MFCTarget) -> str:
+    return os.sep.join([
+        os.getcwd(),
+        "build",
+        "install",
+        [CFG().make_slug(), 'dependencies'][int(target.isDependency)]
+    ])
 
 
-def get_install_dirpath() -> str:
-    return os.sep.join([os.getcwd(), "build", "install"])
+def get_dependency_install_dirpath() -> str:
+    for target in TARGETS:
+        if target.isDependency:
+            return get_install_dirpath(target)
+
+    raise common.MFCException("No dependency target found.")
 
 
 def is_target_configured(target: MFCTarget) -> bool:
-    cmake_cachepath = os.sep.join([get_build_dirpath(target), "CMakeCache.txt"])
-    return os.path.isfile(cmake_cachepath)
+    return os.path.isfile(
+        os.sep.join([get_build_dirpath(target), "CMakeCache.txt"])
+    )
 
 
 def clean_target(name: str):
@@ -146,7 +165,9 @@ def build_target(name: str, history: typing.List[str] = None):
 
     build_dirpath   = get_build_dirpath(target)
     cmake_dirpath   = get_cmake_dirpath(target)
-    install_dirpath = get_install_dirpath()
+    install_dirpath = get_install_dirpath(target)
+    
+    install_prefixes = ';'.join([install_dirpath, get_dependency_install_dirpath()])
 
     flags: list = target.flags.copy() + [
         # Disable CMake warnings intended for developers (us).
@@ -163,10 +184,10 @@ def build_target(name: str, history: typing.List[str] = None):
         # second heighest level of priority, still letting users manually
         # specify <PackageName>_ROOT, which has precedence over CMAKE_PREFIX_PATH.
         # See: https://cmake.org/cmake/help/latest/command/find_package.html.
-        f"-DCMAKE_PREFIX_PATH={install_dirpath}",
+        f"-DCMAKE_PREFIX_PATH={install_prefixes}",
         # First directory that FIND_LIBRARY searches.
         # See: https://cmake.org/cmake/help/latest/command/find_library.html.
-        f"-DCMAKE_FIND_ROOT_PATH={install_dirpath}",
+        f"-DCMAKE_FIND_ROOT_PATH={install_prefixes}",
         # Location prefix to install bin/, lib/, include/, etc.
         # See: https://cmake.org/cmake/help/latest/command/install.html.
         f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
