@@ -196,13 +196,8 @@ contains
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_ellipse(i, patch_id_fp, q_prim_vf)
 
-                    ! Unimplemented patch
-                elseif (patch_icpp(i)%geometry == 6) then
-                    call s_int_to_str(i, iStr)
-
-                    call s_mpi_abort('Unimplemented choice of geometry 6'// &
-                        ' (formerly "Vortex") of active patch '//trim(iStr)// &
-                        ' detected. Exiting ...')
+                    ! Unimplemented patch (formerly isentropic vortex)
+                ! elseif (patch_icpp(i)%geometry == 6) then
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
