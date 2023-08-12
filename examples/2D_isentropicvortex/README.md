@@ -22,3 +22,7 @@ between the exact and numerical solutions is due to numerical diffusion." (Coral
 ## Pressure
 
 ![Pressure](pres.png)
+
+## Vorticity
+
+![Vorticity](omega_wrt3.png)
