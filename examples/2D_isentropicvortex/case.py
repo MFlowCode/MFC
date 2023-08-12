@@ -29,7 +29,7 @@ dx = 1./(1.*(Nx+1))
 c = 600
 C = 0.3
 mydt = C * dx / c
-Nt = 100
+Nt = 1
 
 # Configuring case dictionary
 print(json.dumps({
@@ -78,7 +78,9 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'F',
+    'parallel_io'                  :'T',
+    'omega_wrt(3)'                 :'T',
+    'fd_order'                     : 2,
     # ==========================================================================
 
     # Patch 1 ==================================================================
