@@ -7,14 +7,6 @@ References:
 "Note that since the isentropic vortex is stationary, the exact solution at the given output time is simply the initial condition to the problem and any discrepancy
 between the exact and numerical solutions is due to numerical diffusion." (Coralic and Colonius)
 
-## Velocity (x)
-
-![Velocity (x)](vel1.png)
-
-## Velocity (y)
-
-![Velocity (y)](vel2.png)
-
 ## Density
 
 ![Density](alpha_rho1.png)
