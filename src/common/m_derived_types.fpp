@@ -122,7 +122,7 @@ module m_derived_types
 
         type(ic_model_parameters) :: model !< Model parameters
 
-        real(kind(0d0)) :: epsilon, beta
+        real(kind(0d0)) :: epsilon, beta !<
         !! The spherical harmonics eccentricity parameters.
 
         real(kind(0d0)), dimension(3) :: normal !<
