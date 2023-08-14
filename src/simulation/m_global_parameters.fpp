@@ -72,7 +72,10 @@ module m_global_parameters
     !> @{
     real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
-  
+    
+    type(bounds_info) :: x_domain, y_domain, z_domain !<
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+
     real(kind(0d0)) :: dt !< Size of the time-step
 
 !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
@@ -354,6 +357,13 @@ contains
         t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
+
+        x_domain%beg = dflt_real
+        x_domain%end = dflt_real
+        y_domain%beg = dflt_real
+        y_domain%end = dflt_real
+        z_domain%beg = dflt_real
+        z_domain%end = dflt_real
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
