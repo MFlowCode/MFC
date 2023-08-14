@@ -4,7 +4,7 @@ import json
 # Parameters
 epsilon = '5d0'
 alpha = '1d0'
-gamma = 'fluid_pp(1)%gamma'
+gamma = '1.4'
 
 # Initial conditions
 vel1_i = '0d0'
