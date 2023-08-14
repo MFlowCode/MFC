@@ -3,8 +3,8 @@ import json
 
 # Parameters
 epsilon = '5d0'
-beta = '0.5'
-gamma = '1.4'
+alpha = '1d0'
+gamma = 'fluid_pp(1)%gamma'
 
 # Initial conditions
 vel1_i = '0d0'
@@ -15,10 +15,11 @@ alpha_rho1_i = '1d0'
 
 # Perturbations
 vel1 = f'{vel1_i} + (y - yc)*({epsilon}/(2d0*pi))*' + \
-    f'exp({beta}*(1d0 - (x - xc)**2d0 - (y - yc)**2))'
+    f'exp({alpha}*(1d0 - (x - xc)**2d0 - (y - yc)**2))'
 vel2 = f'{vel2_i} - (x - xc)*({epsilon}/(2d0*pi))*' + \
-    f'exp({beta}*(1d0 - (x - xc)**2d0 - (y - yc)**2))'
-T = f'{T_i} - (({gamma} - 1d0) * {beta}**2)/(8d0 * {gamma} * pi**2) * exp(1d0 - (x - xc)**2 - (y - yc)**2)'
+    f'exp({alpha}*(1d0 - (x - xc)**2d0 - (y - yc)**2))'
+T = f'{T_i} - (({gamma} - 1d0))/(16d0*{alpha}*{gamma}*pi**2)*' + \
+    f'exp(2*{alpha}*(1d0 - (x - xc)**2 - (y - yc)**2))'
 alpha_rho1 = f'{T}**(1d0/({gamma} - 1d0))'
 pres = f'{alpha_rho1} ** {gamma}'
 
@@ -26,7 +27,7 @@ pres = f'{alpha_rho1} ** {gamma}'
 Nx = 399
 dx = 1./(1.*(Nx+1))
 
-c = 600
+c = 1.4**2
 C = 0.3
 mydt = C * dx / c
 Nt = 1
@@ -48,7 +49,7 @@ print(json.dumps({
     'dt'                           : mydt,
     't_step_start'                 : 0,
     't_step_stop'                  : int(Nt),
-    't_step_save'                  : math.ceil(Nt/100.),
+    't_step_save'                  : int(Nt),
     # ==========================================================================
 
     # Simulation Algorithm Parameters ==========================================
@@ -87,7 +88,6 @@ print(json.dumps({
     'patch_icpp(1)%geometry'       : 3,
     'patch_icpp(1)%x_centroid'     : 0,
     'patch_icpp(1)%y_centroid'     : 0,
-    'patch_icpp(1)%radius'         : 5,
     'patch_icpp(1)%length_x'       : 10.,
     'patch_icpp(1)%length_y'       : 10.,
     'patch_icpp(1)%vel(1)'         : vel1,
@@ -99,7 +99,7 @@ print(json.dumps({
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================
-    'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
+    'fluid_pp(1)%gamma'            : 1.4,
     'fluid_pp(1)%pi_inf'           : 0.0,
     # ==========================================================================
 }))
