@@ -39,7 +39,7 @@ module m_phase_change
     !> @{
     abstract interface
 
-        !> @name Abstract subroutine for the finite relaxation solver
+        !> @name Abstract subroutine for the infinite relaxation solver
         !> @{
         subroutine s_abstract_relaxation_solver(q_cons_vf) ! -------
             import :: scalar_field, sys_size
@@ -80,6 +80,8 @@ module m_phase_change
 
     procedure(s_abstract_relaxation_finite_solver), &
         pointer :: s_relaxation_finite_solver => null()
+
+    !$acc declare create(newton_iter,pknewton_eps,pTsatnewton_eps,ptgnewton_eps,pres_crit,T_crit,TsatHv,TsatLv,lp,vp,A,B,C,D,g_minI, p_infI, cvI, qvI, qvpI)
 
 contains
 
@@ -136,8 +138,7 @@ contains
         elseif ((relax_model == 5) .or. (relax_model == 6)) then
             s_relaxation_solver => s_infinite_relaxation_k
         else
-            print '(A)', 'relaxation solver was not set!'
-            call s_mpi_abort()
+            call s_mpi_abort('relaxation solver was not set!')
         end if
 
         !IF (relax_model == 1) THEN
@@ -605,6 +606,7 @@ contains
         mixM = 1.0d-08
 
         ! starting equilibrium solver
+!$acc parallel loop collapse(3) gang vector default(present)
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -641,18 +643,14 @@ contains
                     rM = m1 + m2
 
                     ! correcting negative volume and mass fraction values in case they happen
-                    ! IF ( mpp_lim ) THEN
-
                     call s_correct_partial_densities(g_min, MCT, mixM, pK, p_inf, q_cons_vf, 0.0d0, rM, j, k, l)
 
-                    ! END IF
-
                     ! kinetic energy so as to calculate the total internal energy as the total energy minus the
-                    ! kinetic energy.rMT
+                    ! kinetic energy.
                     dynE = 0.0d0
                     do i = mom_idx%beg, mom_idx%end
 
-                        dynE = dynE + 5.0d-1*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
+                        dynE = dynE + 5.0d-1*q_cons_vf(i)%sf(j, k, l)**2/rho
 
                     end do
 
@@ -787,8 +785,7 @@ contains
                     end do
 
                     ! calculating the TOTAL VOLUME FRACTION, reacting mass, and TOTAL MASS, after the PC
-                    TvFT = 0.0d0
-                    rhoT = 0.0d0
+                    TvFT = 0.0d0; rhoT = 0.0d0
                     do i = 1, num_fluids
 
                         ! Total volume Fraction Test
@@ -808,9 +805,7 @@ contains
                         print *, 'D total volume fractions AFTER PC: ', TvF - TvFT &
                             , 'j, k, l ', j, k, l
 
-                        print *, 'old', TvF
-
-                        print *, 'new', TvFT
+                        print *, 'old', TvF, 'new', TvFT
 
                     end if
 
@@ -820,6 +815,8 @@ contains
                         print *, 'D Reacting Mass AFTER PC: ', rM - rMT &
                             , 'j, k, l ', j, k, l
 
+                        print *, 'old', rM, 'new', rMT
+
                     end if
 
                     ! testing the total mass
@@ -827,6 +824,8 @@ contains
 
                         print *, 'D Total Mass AFTER PC: ', rho - rhoT &
                             , 'j, k, l ', j, k, l
+
+                        print *, 'old', rho, 'new', rhoT
 
                     end if
 
@@ -841,6 +840,8 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     subroutine s_infinite_pt_relaxation_k(cv, j, k, l, g_min, MDF, pk, pS, p_inf, p_infA, qv, q_cons_vf, rho, rhoe, TS)
+!$acc routine seq
+
         ! initializing variables
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: g_min, p_inf, pk, cv, qv
@@ -855,18 +856,12 @@ contains
         integer :: i, ns
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0d0
-        mQ = 0.0d0
-        p_infA = p_inf
+        mCP = 0.0d0; mQ = 0.0d0; p_infA = p_inf
 
         ig = 0
 
         ! Performing tests before initializing the pT-equilibrium
         do i = 1, num_fluids
-
-            ! PRINT *, 'i', i
-
-            ! PRINT *, q_cons_vf( i + cont_idx%beg - 1 )%sf( j, k, l )
 
             ! check if all alpha(i)*rho(i) are nonnegative. If so, abort
             if (q_cons_vf(i + cont_idx%beg - 1)%sf(j, k, l) < 0.0d0) then
@@ -1013,6 +1008,7 @@ contains
     end subroutine s_infinite_pt_relaxation_k ! -----------------------
 
     subroutine s_infinite_ptg_relaxation_k(cv, g_min, j, k, l, pS, p_inf, p_infpT, rhoe, qv, qvp, q_cons_vf, TS)
+!$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         real(kind(0.0d0)), intent(INOUT) :: pS, TS
@@ -1038,10 +1034,8 @@ contains
 
         ! Dummy guess to start the pTg-equilibrium problem.
         ! improve this initial condition
-        R2D(1) = 0.0d0
-        R2D(2) = 0.0d0
-        DeltamP(1) = 0.0d0
-        DeltamP(2) = 0.0d0
+        R2D(1) = 0.0d0; R2D(2) = 0.0d0
+        DeltamP(1) = 0.0d0; DeltamP(2) = 0.0d0
         mQ = 0.0d0
 
         p_infA = p_infpT
@@ -1066,13 +1060,8 @@ contains
             ! Updating counter for the iterative procedure
             ns = ns + 1
 
-            ! Auxiliary variable to help in the calculation of the residue
-            mCP = 0.0d0
-            mCPD = 0.0d0
-            mCVGP = 0.0d0
-            mCVGP2 = 0.0d0
-            mQ = 0.0d0
-            mQD = 0.0d0
+            ! Auxiliary variables to help in the calculation of the residue
+            mCP = 0.0d0; mCPD = 0.0d0; mCVGP = 0.0d0; mCVGP2 = 0.0d0; mQ = 0.0d0; mQD = 0.0d0
 
             ! Those must be updated through the iterations, as they either depend on
             ! the partial masses for all fluids, or on the equilibrium pressure
@@ -1137,15 +1126,14 @@ contains
 
             ! checking if the correction in the mass/pressure will lead to negative values for those quantities
             ! If so, adjust the underrelaxation parameter Om
-            if (q_cons_vf(vp + cont_idx%beg - 1)%sf(j, k, l) - Om*DeltamP(1) < 0) then
-                call s_mpi_abort('crapV')
-            end if
 
             if (q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) + Om*DeltamP(1) < 0) then
-                call s_mpi_abort('crapL')
+                call s_mpi_abort('Liquid phase will become negative. Aborting (for the moment).')
+            else if (q_cons_vf(vp + cont_idx%beg - 1)%sf(j, k, l) - Om*DeltamP(1) < 0) then
+                call s_mpi_abort('Vapor phase will become negative. Aborting (for the moment).')
             end if
 
-            ! updating two reacting 'masses'. Recall that the other 'masses' do not change during the phase change
+            ! updating two reacting 'masses'. Recall that inert 'masses' do not change during the phase change
             ! liquid
             q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) = &
                 q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) + Om*DeltamP(1)
@@ -1233,6 +1221,8 @@ contains
     end subroutine s_mixture_volume_fraction_correction
 
     subroutine s_correct_partial_densities(g_min, MCT, mixM, pS, p_inf, q_cons_vf, rhoe, rM, j, k, l)
+!$acc routine seq
+
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         real(kind(0.0d0)), intent(OUT) :: MCT
         real(kind(0.0d0)), intent(IN) :: mixM, rhoe, rM
@@ -1254,23 +1244,11 @@ contains
         ! correcting the partial densities of the reacting fluids. What to do for the nonreacting ones?
         if (q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) < 0.0d0) then
 
-            ! PRINT *, 'lp deficient'
-
-            ! PRINT *, q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l )
-
-            ! PRINT *, q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l )
-
             q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) = MCT*rM
 
             q_cons_vf(vp + cont_idx%beg - 1)%sf(j, k, l) = (1.0d0 - MCT)*rM
 
         else if (q_cons_vf(vp + cont_idx%beg - 1)%sf(j, k, l) < 0.0d0) then
-
-            ! PRINT *, 'vp deficient'
-
-            ! PRINT *, q_cons_vf( lp + cont_idx%beg - 1 )%sf( j, k, l )
-
-            ! PRINT *, q_cons_vf( vp + cont_idx%beg - 1 )%sf( j, k, l )
 
             q_cons_vf(lp + cont_idx%beg - 1)%sf(j, k, l) = (1.0d0 - MCT)*rM
 
@@ -1320,16 +1298,13 @@ contains
 
         pRT = (rhoeT - pi_inf)/gamma
 
-        ! PRINT *, 'P_RELAX', pres_relax
-        ! PRINT *, 'pRT', pRT
         do i = 1, num_fluids
-            ! PRINT *, i
-            ! PRINT *, q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)
+
             q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
                 q_cons_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
                 (fluid_pp(i)%gamma*pres_relax + fluid_pp(i)%pi_inf) + &
                 q_cons_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
-            ! PRINT *, q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)
+
         end do
         ! ==================================================================
     end subroutine s_mixture_total_energy_correction
@@ -1815,7 +1790,8 @@ contains
     ! pTg-Equilibrium procedure
     subroutine s_compute_jacobian_matrix(cv, rhoe, g_min, InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2 &
         , mQD, p_inf, pS, qv, qvp, q_cons_vf, TJac)
-
+!$acc routine seq
+        
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0.0d0)), intent(IN) :: pS, rhoe, mCPD, mCVGP, mCVGP2, mQD
         real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: g_min, p_inf, cv, qv, qvp
@@ -1943,6 +1919,7 @@ contains
 
     ! SUBROUTINE CREATED TO TELL ME WHERE THE ERROR IN THE PT- AND PTG-EQUILIBRIUM SOLVERS IS
     subroutine s_tattletale(DeltamP, InvJac, j, Jac, k, l, mQ, p_inf, pS, qv, R2D, rhoe, q_cons_vf, TS) ! ----------------
+!$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0.0d0)), dimension(2, 2), intent(IN) :: Jac, InvJac
@@ -2008,6 +1985,7 @@ contains
 
     ! Newton Solver for the finding the Saturation temperature TSat for a given saturation pressure
     subroutine s_TSat(cv, g_min, pSat, p_inf, qv, qvp, TSat, TSIn)
+!$acc routine seq
 
         real(kind(0.0d0)), intent(OUT) :: TSat
         real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: cv, g_min, p_inf, qv, qvp
