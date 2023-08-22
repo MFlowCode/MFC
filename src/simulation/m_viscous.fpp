@@ -23,11 +23,15 @@ module m_viscous
     s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
-    type(int_bounds_info) :: is1, is2, is3
- !$acc declare create(is1, is2, is3, iv)   
+    type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
+ !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)   
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
+#else
+    real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
+#endif
+!$acc declare link(Res_viscous)
 
 
     contains
@@ -35,14 +39,14 @@ module m_viscous
     subroutine s_initialize_viscous_module()
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE_GLOBAL(Res_viscous(1:2, 1:maxval(Re_size)))
 
         do i = 1, 2
             do j = 1, Re_size(i)
-                Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
             end do
         end do
-!$acc update device(Res, Re_idx, Re_size)
+!$acc update device(Res_viscous, Re_idx, Re_size)
 
 
     end subroutine s_initialize_viscous_module
@@ -162,7 +166,7 @@ module m_viscous
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
     !$acc loop seq
                                     do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                     + Re_visc(i)
                                     end do
 
@@ -269,7 +273,7 @@ module m_viscous
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
     !$acc loop seq
                                     do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                     + Re_visc(i)
                                     end do
 
@@ -373,7 +377,7 @@ module m_viscous
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
     !$acc loop seq
                                     do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                     + Re_visc(i)
                                     end do
 
@@ -481,7 +485,7 @@ module m_viscous
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
     !$acc loop seq
                                     do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
+                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                     + Re_visc(i)
                                     end do
 
@@ -981,23 +985,23 @@ module m_viscous
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+            weno_dir = 1; is1_viscous%beg = is1_viscous%beg + weno_polyn
+            is1_viscous%end = is1_viscous%end - weno_polyn
 
         elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            weno_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
+            weno_dir = 2; is1_viscous%beg = is1_viscous%beg + weno_polyn
+            is1_viscous%end = is1_viscous%end - weno_polyn
 
         else
-            is1 = iz; is2 = iy; is3 = ix
-            weno_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
+            weno_dir = 3; is1_viscous%beg = is1_viscous%beg + weno_polyn
+            is1_viscous%end = is1_viscous%end - weno_polyn
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1005,19 +1009,19 @@ module m_viscous
                 call s_weno(v_vf(iv%beg:iv%end), &
                     vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                                 norm_dir, weno_dir, &
-                                is1, is2, is3)
+                                is1_viscous, is2_viscous, is3_viscous)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                     vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                                 norm_dir, weno_dir, &
-                                is1, is2, is3)
+                                is1_viscous, is2_viscous, is3_viscous)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
-                            is1, is2, is3)
+                            is1_viscous, is2_viscous, is3_viscous)
         end if
 
         if (any(Re_size > 0)) then
@@ -1025,9 +1029,9 @@ module m_viscous
                 if (norm_dir == 2) then
 !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do j = is1%beg, is1%end
-                                do k = is2%beg, is2%end
+                        do l = is3_viscous%beg, is3_viscous%end
+                            do j = is1_viscous%beg, is1_viscous%end
+                                do k = is2_viscous%beg, is2_viscous%end
                                     vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
                                     vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
                                 end do
@@ -1037,9 +1041,9 @@ module m_viscous
                 elseif (norm_dir == 3) then
 !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                do l = is3%beg, is3%end
+                        do j = is1_viscous%beg, is1_viscous%end
+                            do k = is2_viscous%beg, is2_viscous%end
+                                do l = is3_viscous%beg, is3_viscous%end
                                     vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
                                     vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
                                 end do
@@ -1049,9 +1053,9 @@ module m_viscous
                 elseif (norm_dir == 1) then
 !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
+                        do l = is3_viscous%beg, is3_viscous%end
+                            do k = is2_viscous%beg, is2_viscous%end
+                                do j = is1_viscous%beg, is1_viscous%end
                                     vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
                                     vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
                                 end do
@@ -1084,23 +1088,23 @@ module m_viscous
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+            weno_dir = 1; is1_viscous%beg = is1_viscous%beg + weno_polyn
+            is1_viscous%end = is1_viscous%end - weno_polyn
 
         elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            weno_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
+            weno_dir = 2; is1_viscous%beg = is1_viscous%beg + weno_polyn
+            is1_viscous%end = is1_viscous%end - weno_polyn
 
         else
-            is1 = iz; is2 = iy; is3 = ix
-            weno_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
+            weno_dir = 3; is1_viscous%beg = is1_viscous%beg + weno_polyn
+            is1_viscous%end = is1_viscous%end - weno_polyn
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
 
         if (n > 0) then
             if (p > 0) then
@@ -1108,29 +1112,31 @@ module m_viscous
                 call s_weno(v_vf(iv%beg:iv%end), &
                     vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                                 norm_dir, weno_dir, &
-                                is1, is2, is3)
+                                is1_viscous, is2_viscous, is3_viscous)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                     vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                                 norm_dir, weno_dir, &
-                                is1, is2, is3)
+                                is1_viscous, is2_viscous, is3_viscous)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
-                            is1, is2, is3)
+                            is1_viscous, is2_viscous, is3_viscous)
         end if
+
+        print*, "after"
 
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do j = is1%beg, is1%end
-                                do k = is2%beg, is2%end
+                        do l = is3_viscous%beg, is3_viscous%end
+                            do j = is1_viscous%beg, is1_viscous%end
+                                do k = is2_viscous%beg, is2_viscous%end
                                     vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
                                     vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
                                 end do
@@ -1138,11 +1144,11 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 3) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                do l = is3%beg, is3%end
+                        do j = is1_viscous%beg, is1_viscous%end
+                            do k = is2_viscous%beg, is2_viscous%end
+                                do l = is3_viscous%beg, is3_viscous%end
                                     vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
                                     vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
                                 end do
@@ -1150,11 +1156,11 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
+                        do l = is3_viscous%beg, is3_viscous%end
+                            do k = is2_viscous%beg, is2_viscous%end
+                                do j = is1_viscous%beg, is1_viscous%end
                                     vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
                                     vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
                                 end do
@@ -1483,7 +1489,7 @@ module m_viscous
     end subroutine s_compute_fd_gradient ! --------------------------------------
 
     subroutine s_finalize_viscous_module()
-        @:DEALLOCATE(Res)
+        @:DEALLOCATE_GLOBAL(Res_viscous)
     end subroutine s_finalize_viscous_module
 
 end module m_viscous
