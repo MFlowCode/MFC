@@ -25,22 +25,32 @@ module m_qbmm
     implicit none
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff
-
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
+!$acc declare link(momrhs)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
-
+!$acc declare create(momrhs)
+#endif
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
         integer :: nterms
     #:endif
 
-    type(int_bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
+!$acc declare link(bubrs, bubmoms)
+
+#else
     integer, allocatable, dimension(:)    :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
-
-!$acc declare create(momrhs, nterms, is1, is2, is3)
 !$acc declare create(bubrs, bubmoms)
+#endif    
+    !$acc declare create(nterms, is1_qbmm, is2_qbmm, is3_qbmm)
 
 contains
 
@@ -62,7 +72,7 @@ contains
 
         #:endif
 
-        @:ALLOCATE(momrhs(3, 0:2, 0:2, nterms, nb))
+        @:ALLOCATE_GLOBAL(momrhs(3, 0:2, 0:2, nterms, nb))
         momrhs = 0d0
 
         ! Assigns the required RHS moments for moment transport equations
@@ -156,8 +166,8 @@ contains
 
         !$acc update device(momrhs)
 
-        @:ALLOCATE(bubrs(1:nb))
-        @:ALLOCATE(bubmoms(1:nb, 1:nmom))
+        @:ALLOCATE_GLOBAL(bubrs(1:nb))
+        @:ALLOCATE_GLOBAL(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
@@ -212,7 +222,6 @@ contains
     end subroutine s_coeff
 
     subroutine s_mom_inv(q_prim_vf, momsp, moms3d, ix, iy, iz)
-
         type(scalar_field), dimension(:), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(:), intent(INOUT) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
@@ -230,15 +239,15 @@ contains
         integer :: id1, id2, id3
         integer :: i1, i2
 
-        is1 = ix; is2 = iy; is3 = iz
+        is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
 
-        !$acc update device(is1, is2, is3)
+        !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
 
 
 !$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
-        do id3 = is3%beg, is3%end
-            do id2 = is2%beg, is2%end
-                do id1 = is1%beg, is1%end
+        do id3 = is3_qbmm%beg, is3_qbmm%end
+            do id2 = is2_qbmm%beg, is2_qbmm%end
+                do id1 = is1_qbmm%beg, is1_qbmm%end
 
                     alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
                     pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
@@ -284,8 +293,10 @@ contains
                             call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
 
 
+                            !DIR$ UNROLL
                             !$acc loop seq
                             do i2 = 0, 2
+                                !DIR$ UNROLL
                                 !$acc loop seq
                                 do i1 = 0, 2
                                     if ((i1 + i2) <= 2) then

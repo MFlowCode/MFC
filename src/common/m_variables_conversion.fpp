@@ -76,21 +76,32 @@ module m_variables_conversion
     end interface ! ============================================================
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
-    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
 
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, pi_infs)
+    public :: gammas, pi_infs
+    !$acc declare link(gammas, pi_infs)
+#else
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, pi_infs
     !$acc declare create(gammas, pi_infs)
 #endif
 
+#endif
+
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
+    @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+    !$acc declare link(bubrs, Gs, Res)
+#else
     real(kind(0d0)), allocatable, dimension(:)    :: Gs
     integer,         allocatable, dimension(:)    :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(bubrs, Gs, Res)
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-    !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
@@ -565,7 +576,8 @@ contains
     subroutine s_initialize_variables_conversion_module() ! ----------------
 
         integer :: i, j
-!$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
+! where are these from?
+!!$acc enter data copyin(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
 
 #ifdef MFC_PRE_PROCESS
         ixb = 0; iyb = 0; izb = 0;
@@ -583,12 +595,12 @@ contains
             end if
        end if
 #endif
-
+#ifndef _CRAYFTN
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
-
-        @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+#endif
+        @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
+        @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
+        @:ALLOCATE_GLOBAL(Gs     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i)  = fluid_pp(i)%gamma
@@ -600,7 +612,7 @@ contains
 #ifdef MFC_SIMULATION
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
             
             do i = 1, 2
                 do j = 1, Re_size(i)
@@ -613,7 +625,7 @@ contains
 #endif
 
         if (bubbles) then
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE_GLOBAL(bubrs(1:nb))
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
@@ -622,12 +634,12 @@ contains
             !$acc update device(bubrs)
         end if
 
-!$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
-!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc enter data copyin(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+!$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
-!$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+!$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
-!$acc update device(monopole, num_mono)
+!$acc enter data copyin(monopole, num_mono)
 
 #ifdef MFC_POST_PROCESS
         ! Allocating the density, the specific heat ratio function and the
@@ -1025,7 +1037,7 @@ contains
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
-        !$acc update device(is1b, is2b, is3b, is1e, is2e, is3e)
+        !!$acc enter data copyin(is1b, is2b, is3b, is1e, is2e, is3e)
 
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
@@ -1125,10 +1137,10 @@ contains
         deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
 
-        @:DEALLOCATE(gammas, pi_infs, Gs)
+        @:DEALLOCATE_GLOBAL(gammas, pi_infs, Gs)
         
         if (bubbles) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE_GLOBAL(bubrs)
         end if
 
         ! Nullifying the procedure pointer to the subroutine transfering/

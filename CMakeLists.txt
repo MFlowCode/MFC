@@ -90,11 +90,19 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
         "SHELL:-h nomessage=296:878:1391:1069"
-        "SHELL:-h msgs" "SHELL:-h static" "SHELL:-h keepfiles"
+        "SHELL:-h static" "SHELL:-h keepfiles"
+        "SHELL:-h acc_model=auto_async_none"
+        "SHELL: -h acc_model=no_fast_addr"
     )
-
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-e D "SHELL:-h func_trace")
+        add_compile_options(
+                "SHELL:-h acc_model=auto_async_none"
+                "SHELL: -h acc_model=no_fast_addr"
+                "SHELL: -K trap=fp" "SHELL: -G2"
+
+        )
+        add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
+
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
@@ -120,7 +128,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             $<$<COMPILE_LANGUAGE:Fortran:-minline>
         )
     endif()
-    
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-C -g -O0 -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
     endif()

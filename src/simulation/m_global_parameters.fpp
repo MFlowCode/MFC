@@ -59,22 +59,39 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), x_cb, y_cb, z_cb)
+#else
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+#endif
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), x_cc, y_cc, z_cc)
+#else
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
+#endif
     !> @}
 
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), dx, dy, dz)
+#else
     real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
+#endif
     !> @}
 
     real(kind(0d0)) :: dt !< Size of the time-step
 
+#ifdef _CRAYFTN
+!$acc declare link(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz)
+!$acc declare create(m, n, p, dt)
+#else
 !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+#endif
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -174,9 +191,18 @@ module m_global_parameters
     !! numbers, will be non-negligible.
     !> @{
     integer, dimension(2) :: Re_size
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), Re_idx)
+#else
     integer, allocatable, dimension(:, :) :: Re_idx
+#endif
     !> @}
+#ifdef _CRAYFTN
+!$acc declare create(Re_size)
+!$acc declare link(Re_idx)
+#else
 !$acc declare create(Re_size, Re_idx)
+#endif
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
@@ -244,16 +270,26 @@ module m_global_parameters
     real(kind(0d0)) :: Ca       !< Cavitation number
     real(kind(0d0)) :: Web      !< Weber number
     real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), weight)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), R0)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), V0)
+#else
     real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
     real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+#endif
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ptil)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
+#endif
     real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
     logical :: qbmm      !< Quadrature moment method
@@ -266,23 +302,36 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc declare link(weight, R0, V0, ptil)
+!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma)
 
+#if _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:, :, :), mom_3d)
+#else
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
+#endif
     !> @}
-!$acc declare create(mom_sp, mom_3d)
+!$acc declare link(mom_sp, mom_3d)
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+#if _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+#else
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+#endif
     real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
-!$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+!$acc declare link(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+!$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+    
     !> @name Acoustic monopole parameters
     !> @{
     logical :: monopole !< Monopole switch
@@ -290,6 +339,7 @@ module m_global_parameters
     integer :: num_mono !< Number of monopoles
     !> @}
 !$acc declare create(monopole, mono, num_mono)
+
 
 
 
@@ -301,8 +351,12 @@ module m_global_parameters
      integer :: strxb, strxe
      !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, pi_infs)
+#else
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-    !$acc declare create(gammas, pi_infs)
+#endif
+    !$acc declare link(gammas, pi_infs)
 
 
     real(kind(0d0)) :: mytime       !< Current simulation time
@@ -463,8 +517,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-!$acc update device(weno_polyn)
-!$acc update device(nb)
+!$acc enter data copyin(weno_polyn,nb)
         #:endif
 
 
@@ -542,7 +595,7 @@ contains
                     ! print*, 'alf idx', alf_idx
                     ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
-                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE_GLOBAL(weight(nb), R0(nb), V0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
@@ -646,7 +699,7 @@ contains
 
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
-                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE_GLOBAL(weight(nb), R0(nb), V0(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -699,7 +752,7 @@ contains
             ! fluids whose interface will support effects of surface tension
             if (any(Re_size > 0)) then
 
-                @:ALLOCATE(Re_idx(1:2, 1:maxval(Re_size)))
+                @:ALLOCATE_GLOBAL(Re_idx(1:2, 1:maxval(Re_size)))
 
                 k = 0
                 do i = 1, num_fluids
@@ -728,7 +781,7 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
-!$acc update device(Re_size)
+!$acc enter data copyin(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
@@ -753,7 +806,7 @@ contains
 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
 
-            @:ALLOCATE(ptil(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE_GLOBAL(ptil(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end if
 
         if (probe_wrt) then
@@ -771,7 +824,7 @@ contains
             startz = -buff_size
         end if
 
-!$acc update device(startx, starty, startz)
+!$acc enter data copyin(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -794,25 +847,30 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-
-!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+!$acc enter data copyin(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
         ! Allocating grid variables for the x-, y- and z-directions
-        @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
-        @:ALLOCATE(x_cc(-buff_size:m + buff_size))
-        @:ALLOCATE(dx(-buff_size:m + buff_size))
+        @:ALLOCATE_GLOBAL(x_cb(-1 - buff_size:m + buff_size))
+        @:ALLOCATE_GLOBAL(x_cc(-buff_size:m + buff_size))
+        @:ALLOCATE_GLOBAL(dx(-buff_size:m + buff_size))
+
+        !!$acc enter data copyin(dx, x_cc, x_cb)
 
         if (n == 0) return;
         
-        @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
-        @:ALLOCATE(y_cc(-buff_size:n + buff_size))
-        @:ALLOCATE(dy(-buff_size:n + buff_size))
+        @:ALLOCATE_GLOBAL(y_cb(-1 - buff_size:n + buff_size))
+        @:ALLOCATE_GLOBAL(y_cc(-buff_size:n + buff_size))
+        @:ALLOCATE_GLOBAL(dy(-buff_size:n + buff_size))
+
+        !!$acc enter data copyin(dy, y_cc, y_cb)
 
         if (p == 0) return;
         
-        @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
-        @:ALLOCATE(z_cc(-buff_size:p + buff_size))
-        @:ALLOCATE(dz(-buff_size:p + buff_size))
+        @:ALLOCATE_GLOBAL(z_cb(-1 - buff_size:p + buff_size))
+        @:ALLOCATE_GLOBAL(z_cc(-buff_size:p + buff_size))
+        @:ALLOCATE_GLOBAL(dz(-buff_size:p + buff_size))
+
+        !!$acc enter data copyin(dz, z_cc, z_cb)
 
     end subroutine s_initialize_global_parameters_module ! -----------------
 
@@ -840,9 +898,9 @@ contains
         rhol0 = rhoref
         pl0 = pref
 
-        @:ALLOCATE(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
-        @:ALLOCATE(k_n(nb), k_v(nb), omegaN(nb))
-        @:ALLOCATE(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
+        @:ALLOCATE_GLOBAL(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
+        @:ALLOCATE_GLOBAL(k_n(nb), k_v(nb), omegaN(nb))
+        @:ALLOCATE_GLOBAL(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
 
         pb0(:) = dflt_real
         mass_n0(:) = dflt_real
@@ -996,17 +1054,17 @@ contains
         ! fluids and any pairs of fluids whose interfaces supported effects
         ! of surface tension
         if (any(Re_size > 0)) then
-            @:DEALLOCATE(Re_idx)
+            @:DEALLOCATE_GLOBAL(Re_idx)
         end if
 
         ! Deallocating grid variables for the x-, y- and z-directions
-        @:DEALLOCATE(x_cb, x_cc, dx)
+        @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
         
         if (n == 0) return;
-        @:DEALLOCATE(y_cb, y_cc, dy)
+        @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
 
         if (p == 0) return;
-        @:DEALLOCATE(z_cb, z_cc, dz)
+        @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
 
         deallocate (proc_coords)
         if (parallel_io) then

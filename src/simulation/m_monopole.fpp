@@ -21,10 +21,23 @@ module m_monopole
     implicit none
     private; public :: s_initialize_monopole_module, s_monopole_calculations
 
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
+    !$acc declare link(pulse, support)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_mono)
+    !$acc declare link(loc_mono)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture)
+    !$acc declare link(foc_length, aperture)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, npulse, dir, delay)
+    !$acc declare link(mag, length, npulse, dir, delay)
+#else
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
+    real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_mono
     !$acc declare create(loc_mono)
 
     real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
@@ -32,14 +45,14 @@ module m_monopole
 
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
-
+#endif
 
 contains
 
     subroutine s_initialize_monopole_module()
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono))
+        @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono))
 
         do i = 1, num_mono
             mag(i) = mono(i)%mag
@@ -90,7 +103,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
         real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
-
+        real(kind(0d0)), pointer :: loc_mono_ptr(:)
 
         integer :: ndirs
         
@@ -114,7 +127,7 @@ contains
             end do
 
 
-!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, loc_mono_ptr)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -174,15 +187,15 @@ contains
 
                                 angle = 0.d0
                                 angle_z = 0.d0
-
+                                loc_mono_ptr => loc_mono(:,q)
                                 s2 = f_g(the_time, sound, const_sos, q, term_index)* &
-                                        f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
-                                !s2 = 1d0
+                                        f_delta(j, k, l, loc_mono_ptr, length(q), q, angle, angle_z)
+                                
 
                                 if (support(q) == 5) then
                                     term_index = 1
                                     s1 = f_g(the_time, sound, const_sos, q, term_index)* &
-                                            f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                                            f_delta(j, k, l, loc_mono_ptr, length(q), q, angle, angle_z)
                                 end if
 
                                 mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
@@ -317,7 +330,7 @@ contains
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 !$acc routine seq
-         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
+        real(kind(0d0)), dimension(:), pointer, intent(in) :: mono_loc
         integer, intent(IN) :: nm
         real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l

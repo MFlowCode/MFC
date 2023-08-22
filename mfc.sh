@@ -92,14 +92,6 @@ if [ "$1" == "load" ]; then
         fi
 
         MODULES=("${MODULES[@]}" "python/3.8.6")
-    elif [ "$u_computer" == "d" ]; then # Delta
-        if [ "$u_cg" == "c" ]; then
-            MODULES=()
-        elif [ "$u_cg" == "g" ]; then
-            MODULES=("nvhpc/22.5")
-        fi
-
-        MODULES=("${MODULES[@]}" "cmake" "openmpi")
     elif [ "$u_computer" == "a" ]; then # For Ascent
         if [ "$u_cg" == "c" ]; then
             MODULES=("gcc/11.1.0" "spectrum-mpi" "cuda")
@@ -138,6 +130,14 @@ if [ "$1" == "load" ]; then
         fi
 
         MODULES=("${MODULES[@]}" "python/3.8.5")
+    elif [ "$u_computer" == "d" ]; then # Delta
+        if [ "$u_cg" == "c" ]; then
+            MODULES=()
+        elif [ "$u_cg" == "g" ]; then
+            MODULES=("nvhpc/22.5")
+        fi
+
+        MODULES=("${MODULES[@]}" "cmake" "openmpi")
     elif [ "$u_computer" == "p" ]; then # Phoenix
         if [ "$u_cg" == "c" ]; then
             MODULES=("gcc/10.3.0-o57x6h" "openmpi/4.1.4")
@@ -150,10 +150,10 @@ if [ "$1" == "load" ]; then
         if [ "$u_cg" == "c" ]; then
             MODULES=()
         elif [ "$u_cg" == "g" ]; then
-            MODULES=("rocm/5.1.0" "craype-accel-amd-gfx90a")
+            MODULES=("rocm/5.5.1" "craype-accel-amd-gfx90a")
         fi
 
-        MODULES=("${MODULES[@]}" "cce/15.0.1" "cmake/3.23.2" "cray-fftw/3.3.10.2" "hdf5/1.12.1" "cray-python/3.9.13.1" "ninja/1.10.2" "cray-mpich/8.1.23")
+        MODULES=("${MODULES[@]}" "cce/16.0.0" "cray-fftw/3.3.10.2" "cray-hdf5/1.12.2.3" "cray-python/3.9.13.1" "cray-mpich/8.1.26")
     else
         echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
 

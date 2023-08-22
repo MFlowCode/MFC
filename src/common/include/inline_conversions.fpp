@@ -1,19 +1,18 @@
 #:def s_compute_speed_of_sound()
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
-
         !$acc routine seq
 
         real(kind(0d0)), intent(IN) :: pres
         real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf
         real(kind(0d0)), intent(IN) :: H
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
+        real(kind(0d0)), dimension(2), intent(IN) :: adv
         real(kind(0d0)), intent(IN) :: vel_sum
         real(kind(0d0)), intent(OUT) :: c
 
         real(kind(0d0)) :: blkmod1, blkmod2
 
         integer :: q
-
+#ifndef _CRAYFTN
         if (alt_soundspeed) then 
             blkmod1 = ((gammas(1) + 1d0)*pres + & 
                         pi_infs(1))/gammas(1)
@@ -42,15 +41,18 @@
                     (rho*(1d0 - adv(num_fluids)))
             end if
         else 
+#endif
             c = ((H - 5d-1*vel_sum)/gamma) 
+#ifndef _CRAYFTN
         end if 
-
         if (mixture_err .and. c < 0d0) then
             c = 100.d0*sgm_eps
         else
+#endif
             c = sqrt(c)
+#ifndef _CRAYFTN
         end if
-
+#endif
     end subroutine s_compute_speed_of_sound
 #:enddef
 

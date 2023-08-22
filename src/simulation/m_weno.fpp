@@ -40,11 +40,13 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
+#ifdef _CRAYFTN
+        @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
+    !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
+#else
         real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
+#endif
     !> @}
-
-
-
 
     ! WENO Coefficients ========================================================
 
@@ -54,6 +56,18 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_z)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_z)
+    !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
+    !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
+    !$acc declare link(poly_coef_L, poly_coef_R)
+#else
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
@@ -61,17 +75,30 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
+#endif
     real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L
     real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R
-!    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
-!    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
+
+    !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
+    !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
+
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
     !! left and the right quadrature points, in x-, y- and z-directions. Note
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_z)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_z)
+    !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z, d_L, d_R)
+#else
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_z
@@ -79,7 +106,7 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
-
+#endif
     real(kind(0d0)), pointer, dimension(:, :) :: d_L
     real(kind(0d0)), pointer, dimension(:, :) :: d_R
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
@@ -91,10 +118,16 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
+#ifdef _CRAYFTN
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_z)
+    !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z, beta_coef)
+#else
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_z
-
+#endif
     real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
@@ -102,21 +135,24 @@ module m_weno
     ! END: WENO Coefficients ===================================================
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-
+#ifdef _CRAYFTN
+    !$acc declare create(v_size)
+#endif
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
-    type(int_bounds_info) :: is1, is2, is3
+    type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
     !> @}
-
-    real(kind(0d0)) :: test
-
+#ifdef _CRAYFTN
+    !$acc declare create(is1_weno, is2_weno, is3_weno)
+#endif
+#ifndef _CRAYFTN
 !$acc declare create( &
 !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
 !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
 !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
 !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
 !$acc                v_size, is1, is2, is3, test)
-
+#endif
 contains
 
     !>  The computation of parameters, the allocation of memory,
@@ -128,95 +164,95 @@ contains
         if (weno_order == 1) return
 
         ! Allocating/Computing WENO Coefficients in x-direction ============
-        is1%beg = -buff_size; is1%end = m - is1%beg
+        is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
         if (n == 0) then
-            is2%beg = 0
+            is2_weno%beg = 0
         else
-            is2%beg = -buff_size; 
+            is2_weno%beg = -buff_size; 
         end if
 
-        is2%end = n - is2%beg
+        is2_weno%end = n - is2_weno%beg
 
         if (p == 0) then
-            is3%beg = 0
+            is3_weno%beg = 0
         else
-            is3%beg = -buff_size
+            is3_weno%beg = -buff_size
         end if
 
-        is3%end = p - is3%beg
+        is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE(poly_coef_cbL_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(poly_coef_cbL_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
-        @:ALLOCATE(poly_coef_cbR_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(poly_coef_cbR_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        @:ALLOCATE(d_cbL_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
-        @:ALLOCATE(d_cbR_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
+        @:ALLOCATE_GLOBAL(d_cbL_x(0:weno_polyn, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
+        @:ALLOCATE_GLOBAL(d_cbR_x(0:weno_polyn, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
                               0:2*(weno_polyn - 1)))
 
-        call s_compute_weno_coefficients(1, is1)
+        call s_compute_weno_coefficients(1, is1_weno)
 
-        @:ALLOCATE(v_rs_ws_x(is1%beg:is1%end, &
-                                 is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+        @:ALLOCATE_GLOBAL(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
+                                 is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
         ! ==================================================================
 
         ! Allocating/Computing WENO Coefficients in y-direction ============
         if (n == 0) return
 
-        is2%beg = -buff_size; is2%end = n - is2%beg
-        is1%beg = -buff_size; is1%end = m - is1%beg
+        is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
+        is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
 
         if (p == 0) then
-            is3%beg = 0
+            is3_weno%beg = 0
         else
-            is3%beg = -buff_size
+            is3_weno%beg = -buff_size
         end if
 
-        is3%end = p - is3%beg
+        is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE(poly_coef_cbL_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(poly_coef_cbL_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
-        @:ALLOCATE(poly_coef_cbR_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(poly_coef_cbR_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        @:ALLOCATE(d_cbL_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
-        @:ALLOCATE(d_cbR_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
+        @:ALLOCATE_GLOBAL(d_cbL_y(0:weno_polyn, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
+        @:ALLOCATE_GLOBAL(d_cbR_y(0:weno_polyn, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
                               0:2*(weno_polyn - 1)))
 
-        call s_compute_weno_coefficients(2, is2)
+        call s_compute_weno_coefficients(2, is2_weno)
 
-        @:ALLOCATE(v_rs_ws_y(is2%beg:is2%end, &
-                                 is1%beg:is1%end, is3%beg:is3%end, 1:sys_size))
+        @:ALLOCATE_GLOBAL(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
+                                 is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
         ! ==================================================================
 
         ! Allocating/Computing WENO Coefficients in z-direction ============
         if (p == 0) return
 
-        is2%beg = -buff_size; is2%end = n - is2%beg
-        is1%beg = -buff_size; is1%end = m - is1%beg
-        is3%beg = -buff_size; is3%end = p - is3%beg
+        is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
+        is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
+        is3_weno%beg = -buff_size; is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE(poly_coef_cbL_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(poly_coef_cbL_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
-        @:ALLOCATE(poly_coef_cbR_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(poly_coef_cbR_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
                                   0:weno_polyn - 1))
 
-        @:ALLOCATE(d_cbL_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
-        @:ALLOCATE(d_cbR_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
+        @:ALLOCATE_GLOBAL(d_cbL_z(0:weno_polyn, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
+        @:ALLOCATE_GLOBAL(d_cbR_z(0:weno_polyn, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE_GLOBAL(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
                               0:2*(weno_polyn - 1)))
 
-        call s_compute_weno_coefficients(3, is3)
+        call s_compute_weno_coefficients(3, is3_weno)
 
-        @:ALLOCATE(v_rs_ws_z(is3%beg:is3%end, &
-                                 is2%beg:is2%end, is1%beg:is1%end, 1:sys_size))
+        @:ALLOCATE_GLOBAL(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
+                                 is2_weno%beg:is2_weno%end, is1_weno%beg:is1_weno%end, 1:sys_size))
 
         ! ==================================================================
 
@@ -468,13 +504,13 @@ contains
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
                           norm_dir, weno_dir, &
-                          is1_d, is2_d, is3_d)
+                          is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(IN) :: v_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) ::  vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
-        type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
+        type(int_bounds_info), intent(IN) :: is1_weno_d, is2_weno_d, is3_weno_d
 
         real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd
         real(kind(0d0)), dimension(0:weno_polyn) :: poly
@@ -491,61 +527,63 @@ contains
         is2 = is2_d
         is3 = is3_d
         
-!$acc update device(is1, is2, is3)
+        !$acc enter data copyin(is1_weno, is2_weno, is3_weno)
 
+        print*, "weno_init"
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
                                    norm_dir, weno_dir)
         end if
+        print*, "weno_body"
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                    do l = is3_weno%beg, is3_weno%end
+                        do k = is2_weno%beg, is2_weno%end
+                            do j = is1_weno%beg, is1_weno%end
                                 vL_rs_vf_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                                 vR_rs_vf_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                    do l = is3_weno%beg, is3_weno%end
+                        do k = is2_weno%beg, is2_weno%end
+                            do j = is1_weno%beg, is1_weno%end
                                 vL_rs_vf_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
                                 vR_rs_vf_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
                             end do
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                    do l = is3_weno%beg, is3_weno%end
+                        do k = is2_weno%beg, is2_weno%end
+                            do j = is1_weno%beg, is1_weno%end
                                 vL_rs_vf_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
                                 vR_rs_vf_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
                             end do
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
+                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
+                    do l = is3_weno%beg, is3_weno%end
+                        do k = is2_weno%beg, is2_weno%end
+                            do j = is1_weno%beg, is1_weno%end
                                 do i = 1, v_size
                                     ! reconstruct from left side
 
@@ -605,16 +643,16 @@ contains
                             end do
                         end do
                     end do
-!$acc end parallel loop
+                    !$acc end parallel loop
             end if
             #:endfor
         else
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-!$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
+                !$acc parallel loop gang vector collapse(3) default(present) private(dvd, poly, beta, alpha, omega)
+                do l = is3_weno%beg, is3_weno%end
+                    do k = is2_weno%beg, is2_weno%end
+                        do j = is1_weno%beg, is1_weno%end
 !$acc loop seq
                             do i = 1, v_size
 
@@ -695,7 +733,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
 
                 if (mp_weno) then
                     call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
@@ -717,9 +755,9 @@ contains
         !! @param vR_vf Right WENO reconstructed cell-boundary values
         !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
-        !! @param is1 Index bounds in first coordinate direction
-        !! @param is2 Index bounds in second coordinate direction
-        !! @param is3 Index bounds in third coordinate direction
+        !! @param is1_weno Index bounds in first coordinate direction
+        !! @param is2_weno Index bounds in second coordinate direction
+        !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, & ! ---------
                                  norm_dir, weno_dir)
 
@@ -736,21 +774,20 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-
-        !$acc update device(v_size)
+        !$acc enter data copyin(v_size)
 
         if (weno_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do j = 1, v_size
-                do q = is3%beg, is3%end
-                    do l = is2%beg, is2%end
-                        do k = is1%beg - weno_polyn, is1%end + weno_polyn
+                do q = is3_weno%beg, is3_weno%end
+                    do l = is2_weno%beg, is2_weno%end
+                        do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
                             v_rs_ws_x(k, l, q, j) = v_vf(j)%sf(k, l, q)
                         end do
                     end do
                 end do
             end do
-!$acc end parallel loop
+            !$acc end parallel loop
         end if
         ! ==================================================================
 
@@ -779,17 +816,17 @@ contains
                 end if
             else
 #endif
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, v_size
-                    do q = is3%beg, is3%end
-                        do l = is2%beg, is2%end
-                            do k = is1%beg - weno_polyn, is1%end + weno_polyn
+                    do q = is3_weno%beg, is3_weno%end
+                        do l = is2_weno%beg, is2_weno%end
+                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
                                 v_rs_ws_y(k, l, q, j) = v_vf(j)%sf(l, k, q)
                             end do
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
 #if MFC_cuTENSOR
             end if
 #endif
@@ -811,17 +848,17 @@ contains
                 end block
             else
 #endif
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, v_size
-                    do q = is3%beg, is3%end
-                        do l = is2%beg, is2%end
-                            do k = is1%beg - weno_polyn, is1%end + weno_polyn
+                    do q = is3_weno%beg, is3_weno%end
+                        do l = is2_weno%beg, is2_weno%end
+                            do k = is1_weno%beg - weno_polyn, is1_weno%end + weno_polyn
                                 v_rs_ws_z(k, l, q, j) = v_vf(j)%sf(q, l, k)
                             end do
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
 #if MFC_cuTENSOR
             end if
 #endif
@@ -880,9 +917,9 @@ contains
         real(kind(0d0)), parameter :: beta_mp  = 4d0/3d0
 
  !$acc parallel loop gang vector collapse (4)  default(present) private(d)
-        do l = is3%beg, is3%end
-            do k = is2%beg, is2%end
-                do j = is1%beg, is1%end
+        do l = is3_weno%beg, is3_weno%end
+            do k = is2_weno%beg, is2_weno%end
+                do j = is1_weno%beg, is1_weno%end
                     do i = 1, v_size
                         d(-1) = v_rs_ws(j, k, l, i) &
                                 + v_rs_ws(j - 2, k, l, i) &
@@ -1018,34 +1055,34 @@ contains
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
         !deallocate(vL_rs_vf_x, vR_rs_vf_x)
-        @:DEALLOCATE(v_rs_ws_x)
+        @:DEALLOCATE_GLOBAL(v_rs_ws_x)
 
         ! Deallocating WENO coefficients in x-direction ====================
-        @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
-        @:DEALLOCATE(d_cbL_x, d_cbR_x)
-        @:DEALLOCATE(beta_coef_x)
+        @:DEALLOCATE_GLOBAL(poly_coef_cbL_x, poly_coef_cbR_x)
+        @:DEALLOCATE_GLOBAL(d_cbL_x, d_cbR_x)
+        @:DEALLOCATE_GLOBAL(beta_coef_x)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in y-direction ====================
         if (n == 0) return
 
         !deallocate(vL_rs_vf_y, vR_rs_vf_y)
-        @:DEALLOCATE(v_rs_ws_y)
+        @:DEALLOCATE_GLOBAL(v_rs_ws_y)
 
-        @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
-        @:DEALLOCATE(d_cbL_y, d_cbR_y)
-        @:DEALLOCATE(beta_coef_y)
+        @:DEALLOCATE_GLOBAL(poly_coef_cbL_y, poly_coef_cbR_y)
+        @:DEALLOCATE_GLOBAL(d_cbL_y, d_cbR_y)
+        @:DEALLOCATE_GLOBAL(beta_coef_y)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in z-direction ====================
         if (p == 0) return
 
         !deallocate(vL_rs_vf_z, vR_rs_vf_z)
-        @:DEALLOCATE(v_rs_ws_z)
+        @:DEALLOCATE_GLOBAL(v_rs_ws_z)
 
-        @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)
-        @:DEALLOCATE(d_cbL_z, d_cbR_z)
-        @:DEALLOCATE(beta_coef_z)
+        @:DEALLOCATE_GLOBAL(poly_coef_cbL_z, poly_coef_cbR_z)
+        @:DEALLOCATE_GLOBAL(d_cbL_z, d_cbR_z)
+        @:DEALLOCATE_GLOBAL(beta_coef_z)
         ! ==================================================================
 
     end subroutine s_finalize_weno_module ! --------------------------------
