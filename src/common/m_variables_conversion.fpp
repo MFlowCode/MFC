@@ -100,7 +100,7 @@ module m_variables_conversion
     integer,         allocatable, dimension(:)    :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(bubrs, Gs, Res)
-
+#endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function

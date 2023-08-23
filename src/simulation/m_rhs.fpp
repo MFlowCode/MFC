@@ -180,7 +180,7 @@ module m_rhs
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: bub_mom_src
     !$acc declare link(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, bub_mom_src)
-    #endif
+#endif
     type(scalar_field) :: divu !< matrix for div(u)
     !> @}
 #ifdef _CRAYFTN
@@ -192,7 +192,7 @@ module m_rhs
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mono_mass_src, mono_e_src)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mono_mom_src)
 !$acc declare link(mono_mass_src, mono_e_src, mono_mom_src)
-    #else
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
 #endif
@@ -229,14 +229,14 @@ module m_rhs
 #ifdef _CRAYFTN
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
     !$acc declare link(Res)
-    #else
+#else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 #endif
 
 #ifdef _CRAYFTN
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), nbub)
     !$acc declare link(nbub)
-    #else
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
 #endif

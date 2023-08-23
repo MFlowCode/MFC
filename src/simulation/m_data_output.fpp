@@ -75,7 +75,7 @@ module m_data_output
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
-    #endif
+#endif
 
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids

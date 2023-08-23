@@ -50,10 +50,11 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
 #endif
+
 #ifdef _CRAYFTN
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), F_rs_vf, F_src_rs_vf)
     !$acc declare link(F_rs_vf, F_src_rs_vf)
-    #else
+#else
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
 #endif
     !! Cell-average fluxes (src - source). These are directly determined from the
