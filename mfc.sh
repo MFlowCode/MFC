@@ -153,7 +153,10 @@ if [ "$1" == "load" ]; then
             MODULES=("rocm/5.5.1" "craype-accel-amd-gfx90a")
         fi
 
-        MODULES=("${MODULES[@]}" "cce/16.0.0" "cray-fftw/3.3.10.2" "cray-hdf5/1.12.2.3" "cray-python/3.9.13.1" "cray-mpich/8.1.26")
+        # This will load necessary modules, then set them to their versions
+        # included with the 23.05 CPE release.
+        # This is the safest way to get a fully consistent CPE environment.
+        MODULES=("${MODULES[@]}" "cray-fftw" "cray-hdf5" "cray-python" "cray-mpich" "cpe/23.05")
     else
         echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
 
