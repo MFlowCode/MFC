@@ -8,23 +8,30 @@ class MFCConfig:
     debug: bool = False
 
     def from_dict(d: dict):
+        """ Create a MFCConfig object from a dictionary with the same keys
+            as the fields of MFCConfig """
         r = MFCConfig()
 
-        for key in d:
-            setattr(r, key, d[key])
+        for field in dataclasses.fields(MFCConfig):
+            setattr(r, field.name, d[field.name])
 
         return r
 
     def items(self) -> typing.List[typing.Tuple[str, bool]]:
-        return { field.name: getattr(self, field.name) for field in dataclasses.fields(self) }.items()
+        return dataclasses.asdict(self).items()
 
     def make_options(self) -> typing.List[str]:
+        """ Returns a list of options that could be passed to mfc.sh again.
+            Example: --no-debug --mpi --no-gpu """
         return [ f"--{'no-' if not v else ''}{k}" for k, v in self.items() ]
 
     def make_slug(self) -> str:
+        """ Sort the items by key, then join them with underscores. This uniquely 
+            identifies the configuration. Example: no-debug_no-gpu_mpi """
         return '_'.join([ f"{'no-' if not v else ''}{k}" for k, v in sorted(self.items(), key=lambda x: x[0]) ])
 
     def __eq__(self, other) -> bool:
+        """ Check if two MFCConfig objects are equal, field by field. """
         for field in dataclasses.fields(self):
             if getattr(self, field.name) != getattr(other, field.name):
                 return False
@@ -32,10 +39,9 @@ class MFCConfig:
         return True
 
     def __str__(self) -> str:
-        m = { False: "No", True: "Yes" }
-        r = ' & '.join([ f"{field.name}={m[getattr(self, field.name)]}" for field in dataclasses.fields(self) ])
-
-        return r
+        """ Returns a string like "mpi=No & gpu=No & debug=No" """
+        
+        return ' & '.join([ f"{k}={'Yes' if v else 'No'}" for k, v in self.items() ])
 
 
 gCFG: MFCConfig = MFCConfig()

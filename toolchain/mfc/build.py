@@ -20,12 +20,12 @@ class MFCTarget:
 
             return r
 
-    name:         str
-    flags:        typing.List[str]
-    isDependency: bool
-    isDefault:    bool
-    isRequired:   bool
-    requires:     Dependencies
+    name:         str              # Name of the target
+    flags:        typing.List[str] # Extra flags to pass to CMake
+    isDependency: bool             # Is it a dependency of an MFC target?
+    isDefault:    bool             # Should it be built by default? (unspecified -t | --targets)
+    isRequired:   bool             # Should it always be built? (no matter what -t | --targets is)
+    requires:     Dependencies     # Build dependencies of the target
 
 
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []))
@@ -75,22 +75,30 @@ def get_build_dirpath(target: MFCTarget) -> str:
 
 # Get the directory that contains the target's CMakeLists.txt
 def get_cmake_dirpath(target: MFCTarget) -> str:
+    # The CMakeLists.txt file is located:
+    #  * Regular:    <root>/CMakelists.txt
+    #  * Dependency: <root>/toolchain/dependencies/CMakelists.txt
     return os.sep.join([
         os.getcwd(),
-        ["", os.sep.join(["toolchain", "dependencies"])][int(target.isDependency)]
+        os.sep.join(["toolchain", "dependencies"]) if target.isDependency else "",
     ])
 
 
 def get_install_dirpath(target: MFCTarget) -> str:
+    # The install directory is located:
+    # Regular:    <root>/build/install/<configuration_slug>
+    # Dependency: <root>/build/install/dependencies (shared)
     return os.sep.join([
         os.getcwd(),
         "build",
         "install",
-        [CFG().make_slug(), 'dependencies'][int(target.isDependency)]
+        'dependencies' if target.isDependency else CFG().make_slug()
     ])
 
 
 def get_dependency_install_dirpath() -> str:
+    # Since dependencies share the same install directory, we can just return
+    # the install directory of the first dependency we find.
     for target in TARGETS:
         if target.isDependency:
             return get_install_dirpath(target)
@@ -99,6 +107,8 @@ def get_dependency_install_dirpath() -> str:
 
 
 def is_target_configured(target: MFCTarget) -> bool:
+    # We assume that if the CMakeCache.txt file exists, then the target is
+    # configured. (this isn't perfect, but it's good enough for now)
     return os.path.isfile(
         os.sep.join([get_build_dirpath(target), "CMakeCache.txt"])
     )
