@@ -44,10 +44,13 @@ class Engine:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
     def get_binpath(self, target: str) -> str:
-        return os.sep.join([build.get_install_dirpath(build.get_target(target)), "bin", target])
+        # <root>/install/<slug>/bin/<target>
+        prefix = build.get_install_dirpath(build.get_target(target))
+        return os.sep.join([prefix, "bin", target])
 
 
-def _interactive_working_worker(cmd, q):
+def _interactive_working_worker(cmd: typing.List[str], q: multiprocessing.Queue):
+    """ Runs a command and puts the result in a queue. """
     cmd = [ str(_) for _ in cmd ]
     cons.print(f"$ {' '.join(cmd)}")
     result = subprocess.run(
