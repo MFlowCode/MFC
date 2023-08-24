@@ -106,7 +106,7 @@ def test():
     cons.print()
     
     # Initialize GPU_LOAD to 0 for each GPU
-    handle_case.GPU_LOAD = { id: 0 for id in ARG("gpus") }
+    _handle_case.GPU_LOAD = { id: 0 for id in ARG("gpus") }
 
     # Select the correct number of threads to use to launch test CASES
     # We can't use ARG("jobs") when the --case-optimization option is set
@@ -131,106 +131,121 @@ def test():
     cons.unindent()
 
 
-def handle_case(test: TestCase):
-    global nFAIL
- 
-    try:
-        if test.params.get("qbmm", 'F') == 'T':
-            tol = 1e-10
-        elif test.params.get("bubbles", 'F') == 'T':
-            tol = 1e-10
-        elif test.params.get("hypoelasticity", 'F') == 'T':
-            tol = 1e-7 
+def _handle_case(test: TestCase):
+    if test.params.get("qbmm", 'F') == 'T':
+        tol = 1e-10
+    elif test.params.get("bubbles", 'F') == 'T':
+        tol = 1e-10
+    elif test.params.get("hypoelasticity", 'F') == 'T':
+        tol = 1e-7 
+    else:
+        tol = 1e-12
+
+    test.delete_output()
+    test.create_directory()
+
+    load = test.get_cell_count()
+    gpu_id = min(_handle_case.GPU_LOAD.items(), key=lambda x: x[1])[0]
+    _handle_case.GPU_LOAD[gpu_id] += load
+    
+    cmd = test.run(["pre_process", "simulation"], gpu=gpu_id)
+
+    out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
+
+    common.file_write(out_filepath, cmd.stdout)
+
+    if cmd.returncode != 0:
+        cons.print(cmd.stdout)
+        raise MFCException(f"Test {test}: Failed to execute MFC.")
+
+    pack, err = packer.pack(test.get_dirpath())
+    if err is not None:
+        raise MFCException(f"Test {test}: {err}")
+
+    if pack.hash_NaNs():
+        raise MFCException(f"Test {test}: NaNs detected in the case.")
+
+    golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
+    if ARG("generate"):
+        common.delete_file(golden_filepath)
+        pack.save(golden_filepath)
+    else:
+        if not os.path.isfile(golden_filepath):
+            raise MFCException(f"Test {test}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
+
+        golden = packer.load(golden_filepath)
+
+        if ARG("add_new_variables"):
+            for pfilepath, pentry in pack.entries.items():
+                if golden.find(pfilepath) is None:
+                    golden.set(pentry)
+
+            golden.save(golden_filepath)
         else:
-            tol = 1e-12
+            err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
+            if msg is not None:
+                raise MFCException(f"Test {test}: {msg}")
 
+    if ARG("test_all"):
         test.delete_output()
-        test.create_directory()
-
-        load = test.get_cell_count()
-        gpu_id = min(handle_case.GPU_LOAD.items(), key=lambda x: x[1])[0]
-        handle_case.GPU_LOAD[gpu_id] += load
-       
-        cmd = test.run(["pre_process", "simulation"], gpu=gpu_id)
-
-        out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
-
+        cmd = test.run(["pre_process", "simulation", "post_process"], gpu=gpu_id)
+        out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
 
-        if cmd.returncode != 0:
-            cons.print(cmd.stdout)
-            raise MFCException(f"Test {test}: Failed to execute MFC.")
+        for t_step in [ i*test["t_step_save"] for i in range(0, math.floor(test["t_step_stop"] / test["t_step_save"]) + 1) ]:
+            silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
+            if not os.path.exists(silo_filepath):
+                silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
+    
+            h5dump = f"{get_install_dirpath(HDF5)}/bin/h5dump"
 
-        pack, err = packer.pack(test.get_dirpath())
-        if err is not None:
-            raise MFCException(f"Test {test}: {err}")
+            if ARG("no_hdf5"):
+                if not does_command_exist("h5dump"):
+                    raise MFCException("--no-hdf5 was specified and h5dump couldn't be found.")
+                
+                h5dump = shutil.which("h5dump")
 
-        if pack.hash_NaNs():
-            raise MFCException(f"Test {test}: NaNs detected in the case.")
+            output, err = get_program_output([h5dump, silo_filepath])
 
-        golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
-        if ARG("generate"):
-            common.delete_file(golden_filepath)
-            pack.save(golden_filepath)
-        else:
-            if not os.path.isfile(golden_filepath):
-                raise MFCException(f"Test {test}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
+            if err != 0:
+                raise MFCException(f"""Test {test}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
 
-            golden = packer.load(golden_filepath)
+            if "nan," in output:
+                raise MFCException(f"""Test {test}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
 
-            if ARG("add_new_variables"):
-                for pfilepath, pentry in pack.entries.items():
-                    if golden.find(pfilepath) is None:
-                        golden.set(pentry)
+            if "inf," in output:
+                raise MFCException(f"""Test {test}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
 
-                golden.save(golden_filepath)
+    test.delete_output()
+
+    cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+
+    _handle_case.GPU_LOAD[gpu_id] -= load
+
+_handle_case.GPU_LOAD = {}
+
+def handle_case(test: TestCase):
+    global nFAIL
+    
+    nAttempts = 0
+
+    while True:
+        nAttempts += 1
+
+        try:
+            _handle_case(test)
+        except Exception as exc:
+            if nAttempts < ARG("max_attempts"):
+                cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {test.get_uuid()}. Retrying...[/bold yellow]")
+                continue
+
+            nFAIL += 1
+
+            cons.print(f"[bold red]Failed test {test} after {nAttempts} attempt(s).[/bold red]")
+
+            if ARG("relentless"):
+                cons.print(f"{exc}")
             else:
-                err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
-                if msg is not None:
-                    raise MFCException(f"Test {test}: {msg}")
+                raise exc
 
-        if ARG("test_all"):
-            test.delete_output()
-            cmd = test.run(["pre_process", "simulation", "post_process"], gpu=gpu_id)
-            out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
-            common.file_write(out_filepath, cmd.stdout)
-
-            for t_step in [ i*test["t_step_save"] for i in range(0, math.floor(test["t_step_stop"] / test["t_step_save"]) + 1) ]:
-                silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
-                if not os.path.exists(silo_filepath):
-                    silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
-        
-                h5dump = f"{get_install_dirpath(HDF5)}/bin/h5dump"
-
-                if ARG("no_hdf5"):
-                    if not does_command_exist("h5dump"):
-                        raise MFCException("--no-hdf5 was specified and h5dump couldn't be found.")
-                    
-                    h5dump = shutil.which("h5dump")
-
-                output, err = get_program_output([h5dump, silo_filepath])
-
-                if err != 0:
-                    raise MFCException(f"""Test {test}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
-
-                if "nan," in output:
-                    raise MFCException(f"""Test {test}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
-
-                if "inf," in output:
-                    raise MFCException(f"""Test {test}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
-
-        test.delete_output()
-
-        cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
-
-        handle_case.GPU_LOAD[gpu_id] -= load
-    except Exception as exc:
-        nFAIL = nFAIL + 1
-
-        if not ARG("relentless"):
-            raise exc
-
-        cons.print(f"[bold red]Failed test {test}.[/bold red]")
-        cons.print(f"{exc}")
-
-handle_case.GPU_LOAD = {}
+        return
