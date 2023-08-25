@@ -13,7 +13,7 @@ mydt     = Tend/(1.*Nt)
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
-    'run_time_info'                : 'T',
+    'run_time_info'                : 'F',
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
