@@ -200,15 +200,15 @@ program p_main
 #endif
 
     call s_initialize_cbc_module()
-
+    
     call s_initialize_derived_variables()
 
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
-!$acc enter data copyin(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
-!$acc enter data copyin(sys_size, buff_size)
-!$acc enter data copyin(m, n, p)
+!$acc enter data copyin(dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
+!$acc update device(sys_size, buff_size)
+!$acc update device(m, n, p)
     do i = 1, sys_size
 !$acc update device(q_cons_ts(1)%vf(i)%sf)
     end do

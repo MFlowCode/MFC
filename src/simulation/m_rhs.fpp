@@ -1146,7 +1146,7 @@ contains
                         end do
                     end do
                 end if
-
+#if 0
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
@@ -1749,7 +1749,7 @@ contains
                         end do
                     end if
                 end if
-
+#endif
             end if  ! id loop
             call nvtxEndRange
 
@@ -1763,7 +1763,7 @@ contains
 
             end if
             call nvtxEndRange
-
+            
         end do
         ! END: Dimensional Splitting Loop =================================
 

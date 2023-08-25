@@ -243,6 +243,8 @@ module m_riemann_solvers
     type(int_bounds_info) :: is1, is2, is3
     type(int_bounds_info) :: isx, isy, isz
     !> @}
+
+    !$acc declare create(is1, is2, is3, isx, isy, isz)
  
 #ifdef _CRAYFTN
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  Gs)
@@ -897,7 +899,7 @@ contains
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
 
-        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+        #:for NORM_DIR, XYZ in [(1, 'x')]
 
             if (norm_dir == ${NORM_DIR}$) then
                 if (model_eqns == 3) then
@@ -2081,7 +2083,7 @@ contains
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
+                                    idxi = 1
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                         xi_M*(rho_L*(vel_L(idx1)* &
                                                      vel_L(idxi) + &
@@ -2123,7 +2125,7 @@ contains
                                 ! Source for volume fraction advection equation
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
+                                    idxi = 1
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
                                         xi_M*(vel_L(idxi) + &
                                               dir_flg(idxi)* &
@@ -2187,6 +2189,7 @@ contains
 
                                     end if
                                 #:endif
+
                             end do
                         end do
                     end do
@@ -2412,14 +2415,16 @@ contains
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
-            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
+            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)        
         elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
             dir_idx = (/2, 1, 3/); dir_flg = (/0d0, 1d0, 0d0/)
         else
             is1 = iz; is2 = iy; is3 = ix
-            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
+            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)      
         end if
+
+        !$acc enter data copyin(is1, is2, is3)
 
         if (hypoelasticity) then
             if (norm_dir == 1) then
@@ -2432,8 +2437,8 @@ contains
         end if
 
         isx = ix; isy = iy; isz = iz
-
-        !$acc enter data copyin(dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
+        !$acc enter data copyin(isx, isy, isz)
+        !$acc update device(dir_idx, dir_flg,  dir_idx_tau)
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then

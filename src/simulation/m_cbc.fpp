@@ -158,9 +158,9 @@ contains
 
         if (all((/bc_x%beg, bc_x%end/) > -5) &
             .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
+            ((n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) .or. (n == 0)) &
             .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+            ((p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5)) .or. (p == 0))) return
 
         if (n == 0) then
             is2%beg = 0
@@ -1499,9 +1499,9 @@ contains
 
         if (all((/bc_x%beg, bc_x%end/) > -5) &
             .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
+            ((n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) .or. (n == 0)) &
             .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+            ((p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5)) .or. (p == 0))) return
 
         ! Deallocating the cell-average primitive variables
         @:DEALLOCATE_GLOBAL(q_prim_rsx_vf)

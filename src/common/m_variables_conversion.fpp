@@ -77,6 +77,8 @@ module m_variables_conversion
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
 
+    real(kind(0d0)) :: temp
+
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
 #ifdef _CRAYFTN
@@ -634,12 +636,19 @@ contains
             !$acc update device(bubrs)
         end if
 
-!$acc enter data copyin(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
-!$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
+#ifdef MFC_SIMULATION
+print *, "vars CPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps
 
-!$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+!$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
-!$acc enter data copyin(monopole, num_mono)
+!$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
+!$acc update device(monopole, num_mono)
+
+!$acc update host(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps
+#endif
 
 #ifdef MFC_POST_PROCESS
         ! Allocating the density, the specific heat ratio function and the
@@ -740,7 +749,7 @@ contains
 
         real(kind(0d0)) :: pres
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, q !< Generic loop iterators
         
         real(kind(0.d0)) :: ntmp
         
@@ -750,12 +759,33 @@ contains
             allocate(nRtmp(0))
         endif
 
+        print *, "NUM FLUIDS CPU", num_fluids
+        print *, "GAMMAS CPU", gammas
+        !$acc enter data copyin(num_fluids, gammas)
+        !$acc update host(num_fluids, gammas)
+        print *, "NUM FLUIDS GPU", num_fluids
+        print *, "GAMMAS GPU", gammas
+
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
                     dyn_pres_K = 0d0
-                    
+
+                    if(j == 1) then
+                        print *, "NUM_FLUIDS"
+                        print *, num_fluids
+                        print *, "GAMMAS"
+                        print *, gammas(1)
+                        print *, "ADVXB"
+                        print *, advxb
+                        print *, "QK_CONS_VF"
+                        print *, qK_cons_vf(1)%sf(1, 0, 0)
+                        print *, qK_cons_vf(2)%sf(1, 0, 0)
+                        print *, qK_cons_vf(3)%sf(1, 0, 0)
+                        print *, qK_cons_vf(4)%sf(1, 0, 0)
+                    end if
+                   
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
@@ -766,19 +796,45 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if (model_eqns /= 4) then
+                    if(j == 1) then
+                        print *, "PRIM"
+                        print *, alpha_K(1)
+                        print *, alpha_rho_K(1)
+                        print *, qK_prim_vf(1)%sf(1, 0, 0)
+                    end if
+
+#ifdef MFC_SIMULATION
+                    rho_K = 0d0
+                    gamma_K = 0d0
+                    pi_inf_K = 0d0
+
+                    do i = 1, num_fluids
+                        rho_K = rho_K + alpha_rho_K(i)
+                        gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                        pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+                    end do
+
+                    if(j == 1) then
+                        print *, "MIXTURE"
+                        print *, gamma_K
+                        print *, pi_inf_K
+                        print *, rho_K
+                    end if
+#endif
+
+                    !if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        if (hypoelasticity) then
-                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, &
-                                                                            alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                        else if (bubbles) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, &
-                                                                                alpha_K, alpha_rho_K, Re_K, j, k, l)
-                        else 
-                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, &
-                                                                                alpha_K, alpha_rho_K, Re_K, j, k, l)
-                        end if
+                        !if (hypoelasticity) then
+!                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, &
+!                                                                            alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+!                        else if (bubbles) then
+!                            call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, &
+!                                                                                alpha_K, alpha_rho_K, Re_K, j, k, l)
+!                        else 
+                            !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, &
+                            !                                                    alpha_K, alpha_rho_K, Re_K, j, k, l)
+!                        end if
 #else
                     ! If pre-processing, use non acc mixture subroutines
                         if (hypoelasticity) then
@@ -789,7 +845,8 @@ contains
                                                                 rho_K, gamma_K, pi_inf_K)
                         end if
 #endif
-                    end if
+                    !end if
+
 
 #ifdef MFC_SIMULATION
                     rho_K = max(rho_K, sgm_eps)
@@ -811,6 +868,14 @@ contains
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
+
+                    if(j == 1) then
+                        print *, "gam, pi_inf"
+                        print *, gamma_K
+                        print *, pi_inf_K
+                        print *, rho_K
+                        print *, pres
+                    end if
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
@@ -853,6 +918,7 @@ contains
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
+
                 end do
             end do
         end do

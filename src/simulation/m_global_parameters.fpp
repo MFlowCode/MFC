@@ -318,6 +318,7 @@ module m_global_parameters
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+    !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
 #if _CRAYFTN
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
@@ -329,7 +330,7 @@ module m_global_parameters
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
-!$acc declare link(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+!$acc declare link( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 !$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     
     !> @name Acoustic monopole parameters
@@ -651,12 +652,16 @@ contains
                     print *, 'R0 weights: ', weight(:)
                     print *, 'R0 abscissas: ', R0(:)
 
+                    !$acc enter data copyin(weight, R0, V0)
+
                     if (.not. polytropic) then
                         call s_initialize_nonpoly
+                        !$acc enter data copyin(k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
                     else
                         rhoref = 1.d0
                         pref = 1.d0
                     end if
+                    
                 end if
 
                 if (hypoelasticity) then
