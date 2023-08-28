@@ -1,6 +1,6 @@
 import re, os.path, argparse, dataclasses
 
-from .build     import get_mfc_target_names, get_target_names, get_dependencies_names
+from .build     import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
 from .common    import format_list_to_string
 from .test.test import CASES as TEST_CASES
 from .packer    import packer
@@ -44,8 +44,9 @@ started, run ./mfc.sh build -h.""",
             mask = ""
 
         if "t" not in mask:
-            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=get_target_names(),
-                           default=get_mfc_target_names(), help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string(get_target_names())}.")
+            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=[ _.name for _ in TARGETS ],
+                           default=[ _.name for _ in DEFAULT_TARGETS ],
+                           help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string([ _.name for _ in TARGETS ])}.")
 
         if "m" not in mask:
             for f in dataclasses.fields(config):
@@ -61,8 +62,8 @@ started, run ./mfc.sh build -h.""",
             p.add_argument("-v", "--verbose", action="store_true", help="Enables verbose compiler & linker output.")
 
         if "n" not in mask:
-            for name in get_dependencies_names():
-                p.add_argument(f"--no-{name}", action="store_true", help=f"Do not build the {name} dependency. Use the system's instead.")
+            for target in DEPENDENCY_TARGETS:
+                p.add_argument(f"--no-{target.name}", action="store_true", help=f"Do not build the {target.name} dependency. Use the system's instead.")
 
     # === BUILD ===
     add_common_arguments(build)

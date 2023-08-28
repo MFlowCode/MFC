@@ -4,12 +4,12 @@ import rich.table
 
 from .printer import cons
 from .state   import ARG
-from .build   import build_targets
+from .build   import PRE_PROCESS, SIMULATION, build_targets
 from .common  import system, MFC_SUBDIR
 from .        import sched
 
 def bench():
-    build_targets(["pre_process", "simulation"])
+    build_targets([PRE_PROCESS, SIMULATION])
     
     cons.print("[bold]Benchmarking [magenta]simulation[/magenta]:[/bold]")
     cons.indent()
@@ -21,7 +21,7 @@ def bench():
     table.add_column("Case")
     table.add_column("(Simulation) Runtime (s)")
     
-    def __worker(case: str):
+    def __worker(case: str, devices: typing.Set[int]):
         nonlocal RESULTS
         
         system(["./mfc.sh", "run", f"examples/{case}/case.py", "--no-build", "-t", "pre_process"], stdout=subprocess.DEVNULL)
@@ -39,11 +39,15 @@ def bench():
         table.add_row(case, str(runtime))
     
     tasks: typing.List[sched.Task] = [
-        sched.Task(1, __worker, [ case ]) for case in CASES
+        sched.Task(1, __worker, [ case ], 1) for case in CASES
     ]
     
     cons.print()
-    sched.sched(tasks, 1 if ARG('case_optimization') else ARG('jobs'))
+    nThreads = min(ARG('jobs'), len(ARG('gpus'))) if ARG("gpu") else ARG('jobs')
+    if ARG('case_optimization'):
+        nThreads = 1
+
+    sched.sched(tasks, nThreads, ARG("gpus"))
     cons.print()
     cons.unindent()
     cons.print("[bold]Benchmark Results:[/bold]")
