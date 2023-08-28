@@ -29,8 +29,11 @@ class MFCException(Exception):
     pass
 
 
-def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None) -> int:
+def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None, env: dict = None) -> int:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
+
+    if env is None:
+        env = os.environ.copy()
 
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
@@ -40,7 +43,7 @@ def system(command: typing.List[str], no_exception: bool = False, exception_text
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
 
-    r = subprocess.run(cmd, cwd=cwd, stdout=stdout, stderr=stderr)
+    r = subprocess.run(cmd, cwd=cwd, stdout=stdout, stderr=stderr, env=env)
 
     if r.returncode != 0:
         on_error()
