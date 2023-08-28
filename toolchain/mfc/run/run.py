@@ -67,3 +67,12 @@ def run_target(target: MFCTarget):
 
 def run() -> None:
     run_targets([ get_target(_) for _ in ARG("targets")])
+
+
+def run_targets_with(targets: typing.List[MFCTarget]):
+    pass
+
+
+def run_target_with(target: MFCTarget):
+    run_targets_with([target])
+

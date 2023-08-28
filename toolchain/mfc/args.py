@@ -65,11 +65,14 @@ started, run ./mfc.sh build -h.""",
             for target in DEPENDENCY_TARGETS:
                 p.add_argument(f"--no-{target.name}", action="store_true", help=f"Do not build the {target.name} dependency. Use the system's instead.")
 
+        if "g" not in mask:
+            p.add_argument("-g", "--gpus", nargs="+", type=int, default=[0], help="(GPU) List of GPU #s to use.")
+
     # === BUILD ===
-    add_common_arguments(build)
+    add_common_arguments(build, "g")
 
     # === CLEAN ===
-    add_common_arguments(clean, "j")
+    add_common_arguments(clean, "jg")
 
     binaries = [ b.bin for b in BINARIES ]
 
@@ -82,7 +85,6 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-b", "--binary",       choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
-    test.add_argument("-g", "--gpus",         type=str, default="0", help="(GPU) Comma separated list of GPU #s to use.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
     test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
 
@@ -120,7 +122,7 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(bench, "t")
 
     # === COUNT ===
-    add_common_arguments(count)
+    add_common_arguments(count, "g")
 
     args: dict = vars(parser.parse_args())
 
@@ -149,9 +151,5 @@ started, run ./mfc.sh build -h.""",
         
         if args[e] is not None:
             args[e] = os.path.abspath(args[e])
-
-    # Turn GPU ID list into a comma separated string
-    if "gpus" in args:
-        args["gpus"] = [int(g) for g in args["gpus"].split(",")]
 
     return args

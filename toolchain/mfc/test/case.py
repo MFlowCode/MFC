@@ -78,7 +78,6 @@ BASE_CFG = {
     'sigV'                          : 0.1,
     'rhoRV'                         : 0.0,
 
-
     'Monopole'                      : 'F',
     'num_mono'                      : 1,
     'Mono(1)%loc(1)'                : 0.5,

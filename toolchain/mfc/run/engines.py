@@ -74,7 +74,6 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
     def get_exec_cmd(self, target: MFCTarget) -> typing.List[str]:
         cmd = []
-
         if ARG("mpi"):
             cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
 
@@ -148,7 +147,13 @@ STDERR:
 
             if not ARG("dry_run"):
                 start_time = time.monotonic()
-                system(self.get_exec_cmd(target), cwd=self.input.case_dirpath)
+                system(
+                    self.get_exec_cmd(target), cwd=self.input.case_dirpath, 
+                    env={
+                        **os.environ.copy(),
+                        'CUDA_VISIBLE_DEVICES': ','.join([str(_) for _ in ARG('gpus')])
+                    }
+                )
                 end_time   = time.monotonic()
                 cons.print(no_indent=True)
 
