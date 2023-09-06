@@ -85,8 +85,8 @@ module m_variables_conversion
 
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
-    real(kind(0d0)), allocatable, public, dimension(:) :: gammas, pi_infs, qvs
-    !$acc declare create(gammas, pi_infs, qvs)
+    real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
     real(kind(0d0)), allocatable, dimension(:) :: Gs
@@ -615,17 +615,25 @@ contains
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
         @:ALLOCATE(gammas (1:num_fluids))
+        @:ALLOCATE(gs_min (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
+        @:ALLOCATE(ps_inf(1:num_fluids))
+        @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
+        @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
+            gs_min(i) = 1.0d0/gammas(i) + 1.0d0
             pi_infs(i) = fluid_pp(i)%pi_inf
+            ps_inf(i) = pi_infs(i)/(1.0d0 + gammas(i))
+            cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
+            qvps(i) = fluid_pp(i)%qvp
             Gs(i) = fluid_pp(i)%G
         end do
-        !$acc update device(gammas, pi_infs, qvs, Gs)
+        !$acc update device(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
 
 #ifdef MFC_SIMULATION
 
@@ -1275,7 +1283,7 @@ contains
         deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
 #endif
 
-        @:DEALLOCATE(gammas, pi_infs, qvs, Gs)
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
         if (bubbles) then
             @:DEALLOCATE(bubrs)
         end if
