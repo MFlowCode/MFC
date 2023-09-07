@@ -2,6 +2,8 @@
 !! @file m_phase_change.f90
 !! @brief Contains module m_phasechange
 
+#:include 'macros.fpp'
+
 !> @brief This module is used to relax pressure, temperature, and/or gibbs free energies of the species towards
 !> equilibrium
 module m_phase_change
@@ -25,9 +27,9 @@ module m_phase_change
     implicit none
 
     private; public :: s_initialize_phasechange_module, &
- s_relaxation_solver, &
- s_infinite_relaxation_k, &
- s_finalize_relaxation_solver_module
+            s_relaxation_solver, &
+            s_infinite_relaxation_k, &
+            s_finalize_relaxation_solver_module
 
     !> @name Abstract interface for creating function pointers
     !> @{
@@ -44,7 +46,7 @@ module m_phase_change
 
     !> @name Parameters for the first order transition phase change
     !> @{
-    integer, parameter :: newton_iter = 50        !< p_relaxk \alpha iter,                set to 25
+    integer, parameter :: max_iter = 1e6        !< p_relaxk \alpha iter,                set to 25
     real(kind(0d0)), parameter :: pres_crit = 22.09d6   !< Critical water pressure              set to 22.06d6
     real(kind(0d0)), parameter :: T_crit = 647.29d0  !< Critical water temperature           set to 648
     integer, parameter         :: lp = 1    ! index for the liquid phase of the reacting fluid
@@ -56,7 +58,7 @@ module m_phase_change
     real(kind(0d0)) :: A, B, C, D
     !> @}
 
-    !$acc declare create(newton_iter,pres_crit,T_crit,lp,vp,A,B,C,D)
+    !$acc declare create(max_iter,pres_crit,T_crit,lp,vp,A,B,C,D)
 
     real(kind(0d0)), allocatable, dimension(:) :: p_infA, pk, sk, hk, gk, ek, rhok
 
@@ -67,7 +69,7 @@ module m_phase_change
 
 contains
 
-    !>     The purpose of this subroutine is to determine the saturation
+        !>  The purpose of this subroutine is to determine the saturation
         !!         temperature by using a Newton-Raphson method from the provided
         !!         equilibrium pressure and EoS of the binary phase system.
         !!     @param q_cons_vf Cell-average conservative variables
@@ -86,12 +88,11 @@ contains
         D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
             /((gs_min(vp) - 1.0d0)*cvs(vp))
 
-        allocate (p_infA(1:num_fluids), pk(1:num_fluids), sk(1:num_fluids), &
+        @:ALLOCATE(p_infA(1:num_fluids), pk(1:num_fluids), sk(1:num_fluids), &
         hk(1:num_fluids), gk(1:num_fluids), ek(1:num_fluids), rhok(1:num_fluids))
 
         ! Associating procedural pointer to the subroutine that will be
-        ! utilized to calculate the solution of a given Riemann problem
-        ! Opening and writing the header of the run-time information file
+        ! utilized to calculate the solution to the selected relaxation system
         if ((relax_model == 5) .or. (relax_model == 6)) then
             s_relaxation_solver => s_infinite_relaxation_k
         else
@@ -104,34 +105,26 @@ contains
     ! model, with changes such that mass depletion is taken into consideration
     subroutine s_infinite_relaxation_k(q_cons_vf) ! ----------------
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        ! real(kind(0.0d0)), dimension(num_fluids) :: p_infA
-        ! real(kind(0.0d0)), dimension(num_fluids) :: pk, sk, hk, gk
-        ! real(kind(0.0d0)), dimension(num_fluids) :: ek, rhok
         real(kind(0.0d0)) :: pS, pSOV, pSSL
         real(kind(0.0d0)) :: TS, TSOV, TSatOV, TSatSL, TSSL
-        real(kind(0.0d0)) :: rhoe, mCP, mQ, TvF
+        real(kind(0.0d0)) :: rhoe, dynE, rhos
         real(kind(0.0d0)) :: rho, rM, m1, m2, MCT, mixM, rhoT, rMT
-        real(kind(0.0d0)) :: TvFT, rhos
-        real(kind(0.0d0)) :: dynE, VFT
-
+        real(kind(0.0d0)) :: TvF, TvFT
+        
         !< Generic loop iterators
-        integer :: i, j, k, l
-        integer :: ns
+        integer :: i, j, k, l, ns
 
         ! threshold for 'mixture cell'. If Y < mixM, the cell is not considered a mixture for pTg purposes
         mixM = 1.0d-08
 
-!        !$acc declare create(p_infA, pk, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, mCP, mQ, TvF, rho, rM, m1, m2, MCT, mixM, rhoT, rMT, TvFT, rhos, dynE, VFT)
-
         ! starting equilibrium solver
-! !$acc parallel loop collapse(3) gang vector default(present)
-        ! copy(p_infA, pk, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, mCP, mQ, TvF, rho, rM, m1, m2, MCT, mixM, rhoT, rMT, TvFT, rhos, dynE, VFT)
-        !$acc kernels
+        !$acc parallel loop collapse(3) gang vector default(present)
         do j = 0, m
             do k = 0, n
                 do l = 0, p
 
                     rho = 0.0d0; TvF = 0.0d0
+!$acc loop seq
                     do i = 1, num_fluids
 
                         ! pressure that comes from the homogeneous solver at that cell
@@ -156,12 +149,12 @@ contains
 
                     rM = m1 + m2
 
-                    ! correcting negative volume and mass fraction values in case they happen
+                    ! correcting negative (recating) mass fraction values in case they happen
                     call s_correct_partial_densities(MCT, mixM, q_cons_vf, rM, j, k, l)
 
-                    ! kinetic energy so as to calculate the total internal energy as the total energy minus the
-                    ! kinetic energy.
+                    ! kinetic energy as an auxiliary variable to the calculation of the total internal energy
                     dynE = 0.0d0
+!$acc loop seq                    
                     do i = momxb, momxe
 
                         dynE = dynE + 5.0d-1*q_cons_vf(i)%sf(j, k, l)**2/rho
@@ -169,53 +162,51 @@ contains
                     end do
 
                     ! calculating the total energy that MUST be preserved throughout the pT- and pTg-relaxation procedures
-                    ! at each of the cells. Note I calculate UE as TE - KE due to numerical reasons (stability at the dicontinuities)
+                    ! at each of the cells. Note I calculate UE as TE - KE due to nonconservation at the dicontinuities
                     rhoe = q_cons_vf(E_idx)%sf(j, k, l) - dynE
 
                     ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
-                    ! for this case, MFL cannot be either 0 or 1
-                    call s_infinite_pt_relaxation_k(j, k, l, 2, pk, pS &
-                                                    , p_infA, q_cons_vf, rho, rhoe, TS)
+                    ! for this case, MFL cannot be either 0 or 1, so I chose it to be 2
+                    call s_infinite_pt_relaxation_k(j, k, l, 2, pk, pS, p_infA, q_cons_vf, rhoe, TS)
 
                     ! check if pTg-equilibrium is required
                     ! NOTE that NOTHING else needs to be updated OTHER than the individual partial densities
-                    ! given the outputs from the pT- and pTg-equilibrium solvers are just p, T (byproduct)
-                    ! , and the partial masses (pTg- case)
+                    ! given the outputs from the pT- and pTg-equilibrium solvers are just p and one of the partial masses
+                    ! (pTg- case)
                     if ((relax_model == 6) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
                                                    > MixM*rM) .or. (q_cons_vf(vp + contxb - 1)%sf(j, k, l) &
                                                                     > MixM*rM)) .and. (pS < pres_crit) .and. (TS < T_crit)) then
 
-                        ! Checking if phase change can happen.
-                        ! overheated vapor
-                        ! correcting the liquid partial density
+                        ! Checking if phase change is needed, by checking whther the final solution is either subcoooled
+                        ! liquid or overheated vapor.
+
+                        ! overheated vapor case
+                        ! depleting the mass of liquid
                         q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
 
-                        ! correcting the vapor partial density
+                        ! tranferring the total mass to vapor
                         q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0d0 - mixM)*rM
 
                         ! calling pT-equilibrium for overheated vapor, which is MFL = 0
-                        call s_infinite_pt_relaxation_k(j, k, l, 0, pk, pSOV &
-                                                        , p_infA, q_cons_vf, rho, rhoe, TSOV)
+                        call s_infinite_pt_relaxation_k(j, k, l, 0, pk, pSOV, p_infA, q_cons_vf, rhoe, TSOV)
 
                         ! calculating Saturation temperature
                         call s_TSat(pSOV, TSatOV, TSOV)
 
-                        ! subcooled liquid
-                        ! correcting the liquid partial density
+                        ! subcooled liquid case
+                        ! tranferring the total mass to liquid
                         q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0d0 - mixM)*rM
 
-                        ! correcting the vapor partial density
+                        ! depleting the mass of vapor
                         q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
 
                         ! calling pT-equilibrium for subcooled liquid, which is MFL = 1
-                        call s_infinite_pt_relaxation_k(j, k, l, 1, pk, pSSL &
-                                                        , p_infA, q_cons_vf, rho, rhoe, TSSL)
+                        call s_infinite_pt_relaxation_k(j, k, l, 1, pk, pSSL, p_infA, q_cons_vf, rhoe, TSSL)
 
                         ! calculating Saturation temperature
                         call s_TSat(pSSL, TSatSL, TSSL)
 
-                        ! Maybe I will have to change this for .GE. instead, since mass depletion can
-                        ! happen at pTg-eq. Make sure it works, first
+                        ! checking the conditions for overheated vapor and subcooled liquide
                         if (TSOV > TSatOV) then
 
                             ! Assigning pressure
@@ -265,6 +256,7 @@ contains
                     ! alpha*rho remains constant in the pT-quilibrium, or the reacting masses have already been updated
                     ! in the pTg-equilibrium, (the remaining) alpha*rho does not need to be updated. I do need, however
                     ! to update alpha, and alpha*rho*e. So, in the end I update alpha, e, and then alpha*rho*e
+                    
                     ! entropy
                     sk(1:num_fluids) = cvs(1:num_fluids)*DLOG((TS**gs_min(1:num_fluids)) &
                         /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0d0))) + qvps(1:num_fluids)
@@ -273,7 +265,7 @@ contains
                     hk(1:num_fluids) = gs_min(1:num_fluids)*cvs(1:num_fluids)*TS &
                                        + qvs(1:num_fluids)
 
-                    ! GIBBS-FREE ENERGY
+                    ! Gibbs-free energy
                     gk(1:num_fluids) = hk(1:num_fluids) - TS*sk(1:num_fluids)
 
                     ! densities
@@ -287,6 +279,7 @@ contains
 
                     ! calculating the TOTAL VOLUME FRACTION, reacting mass, and TOTAL MASS, after the PC
                     TvFT = 0.0d0; rhoT = 0.0d0; rhos = 0.0d0
+!$acc loop seq                    
                     do i = 1, num_fluids
 
                         ! volume fractions
@@ -341,11 +334,10 @@ contains
                 end do
             end do
         end do
-        !$acc end kernels
 
     end subroutine s_infinite_relaxation_k ! ----------------
 
-    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pk, pS, p_infA, q_cons_vf, rho, rhoe, TS)
+    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pk, pS, p_infA, q_cons_vf, rhoe, TS)
 !$acc routine seq
 
         ! initializing variables
@@ -353,7 +345,7 @@ contains
         real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: pk 
         real(kind(0.0d0)), intent(OUT) :: pS, TS
         real(kind(0.0d0)), dimension(num_fluids), intent(OUT) :: p_infA
-        real(kind(0.0d0)), intent(IN) :: rho, rhoe
+        real(kind(0.0d0)), intent(IN) :: rhoe
         integer, intent(IN) :: j, k, l, MFL
         integer, dimension(num_fluids) :: ig
 
@@ -366,6 +358,7 @@ contains
         ig = 0
 
         ! Performing tests before initializing the pT-equilibrium
+!$acc loop seq
         do i = 1, num_fluids
 
             ! check if all alpha(i)*rho(i) are nonnegative. If so, abort
@@ -392,8 +385,7 @@ contains
             end if
 #endif
             ! sum of the total alpha*rho*cp of the system
-            mCP = mCP + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                  *cvs(i)*gs_min(i)
+            mCP = mCP + q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
 
             ! sum of the total alpha*rho*q of the system
             mQ = mQ + q_cons_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
@@ -442,7 +434,7 @@ contains
         ns = 0
         do while ((DABS(pS - pO) > palpha_eps) .and. (DABS((pS - pO)/pO) > palpha_eps) &
                   .or. (ns == 0))
-
+      
             ! increasing counter
             ns = ns + 1
 
@@ -450,10 +442,8 @@ contains
             pO = pS
 
             ! updating functions used in the Newton's solver
-            gpp = 0.0d0
-            gp = 0.0d0
-            hp = 0.0d0
-
+            gpp = 0.0d0; gp = 0.0d0; hp = 0.0d0
+!$acc loop seq
             do i = 1, num_fluids
 
                 ! given pS always change, I need ig( i ) and gp to be in here, as it dynamically updates.
@@ -496,14 +486,13 @@ contains
 &                    Aborting!')
 
             ! cheching is the maximum number of iterations was reached
-            elseif (ns > 1e4) then
+            elseif (ns > max_iter) then
 
                 call s_mpi_abort('Maximum number of iterations for the pT-relaxation solver reached &
 &                    (m_phase_change, s_infinite_pt_relaxation_k). Please, check the pressure value. Aborting!')
 
             end if
 #endif
-
         end do
 
         ! common temperature
@@ -515,15 +504,15 @@ contains
 !$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0.0d0)), intent(INOUT) :: pS, TS
         real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: p_infpT
+        real(kind(0.0d0)), intent(INOUT) :: pS, TS
         real(kind(0.0d0)), intent(IN) :: rhoe
         integer, intent(IN) :: j, k, l
         real(kind(0.0d0)), dimension(num_fluids) :: p_infA
         real(kind(0.0d0)), dimension(2, 2) :: Jac, InvJac, TJac
         real(kind(0.0d0)), dimension(2) :: R2D, DeltamP
         real(kind(0.0d0)) :: Om
-        real(kind(0.0d0)) :: mCP, mCPD, mQ, mQD, mCVGP, mCVGP2
+        real(kind(0.0d0)) :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD
 
         !< Generic loop iterators
         integer :: i, ns
@@ -569,6 +558,7 @@ contains
 
             ! Those must be updated through the iterations, as they either depend on
             ! the partial masses for all fluids, or on the equilibrium pressure
+!$acc loop seq            
             do i = 1, num_fluids
 
                 ! sum of the total alpha*rho*cp of the system
@@ -623,8 +613,7 @@ contains
             end if
 #endif
             ! calculating the (2D) Jacobian Matrix used in the solution of the pTg-quilibrium model
-            call s_compute_jacobian_matrix(rhoe, InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2 &
-            , mQD, pS, q_cons_vf, TJac)
+            call s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
 
             ! calculating correction array for Newton's method
             DeltamP = -1.0d0*matmul(InvJac, R2D)
@@ -664,7 +653,7 @@ contains
 &                    Aborting!')
 
                 ! checking if maximum number of iterations was reached
-            elseif ((ns > 1e6)) then
+            elseif (ns > max_iter) then
 
                 call s_mpi_abort('Maximum number of iterations reached for the (m_phase_change &
 &                    , s_infinite_ptg_relaxation_k). Aborting!')
@@ -686,10 +675,7 @@ contains
         real(kind(0.0d0)), intent(OUT) :: MCT
         real(kind(0.0d0)), intent(IN) :: mixM, rM
         integer, intent(IN) :: j, k, l
-        real(kind(0.0d0)), dimension(num_fluids) :: rho
-        real(kind(0.0d0)) :: TVF, mCP, mQ
         !> @}
-        integer :: i, AR           !< Generic loop iterators
 
 #ifndef MFC_OpenACC        
         if (rM < 0.0d0) then
@@ -719,16 +705,14 @@ contains
 
     ! This SUBROUTINE IS USED TO CALCULATE THE 2X2 JACOBIAN AND ITS INVERSE FOR THE PROPOSED
     ! pTg-Equilibrium procedure
-    subroutine s_compute_jacobian_matrix(rhoe, InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2 &
-        , mQD, pS, q_cons_vf, TJac)
+    subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
 !$acc routine seq
         
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0.0d0)), intent(IN) :: pS, rhoe, mCPD, mCVGP, mCVGP2, mQD
-        real(kind(0.0d0)), dimension(2, 2), intent(OUT) :: Jac, InvJac, TJac
+        real(kind(0.0d0)), intent(IN) :: pS, mCPD, mCVGP, mCVGP2
         integer, intent(IN) :: j, k, l
+        real(kind(0.0d0)), dimension(2, 2), intent(OUT) :: Jac, InvJac, TJac
         real(kind(0.0d0)) :: ml, mT, TS, dFdT, dTdm, dTdp
-        integer :: i
 
         ! mass of the reactant liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
@@ -812,10 +796,9 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0.0d0)), intent(IN) :: pS, rhoe, mCPD, mCVGP, mQD
-        real(kind(0.0d0)), dimension(2), intent(OUT) :: R2D
         integer, intent(IN) :: j, k, l
+        real(kind(0.0d0)), dimension(2), intent(OUT) :: R2D
         real(kind(0.0d0)) :: ml, mT, TS
-        integer :: i
 
         ! mass of the reactant liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
@@ -936,9 +919,7 @@ contains
             ns = 0
 
             ! DO WHILE ( ( DABS( FT ) .GT. ptgalpha_eps .AND. DABS( FT / TSat ) .GT. ptgalpha_eps ) &
-            do while ((DABS(FT) > ptgalpha_eps) &
-                      .or. (ns == 0))
-
+            do while ((DABS(FT) > ptgalpha_eps) .or. (ns == 0))
                 ! increasing counter
                 ns = ns + 1
 
@@ -972,12 +953,11 @@ contains
 &                        of first order transition - m_phase_change, s_TSat). Aborting!')
 
                     ! checking if the maximum number of iterations has been reached
-                elseif (ns > 1e4) then
+                elseif (ns > max_iter) then
 
                     call s_mpi_abort('Maximum number of iterations reached for TSat &
 &                            (m_phase_change, s_TSat). Aborting!')
                 end if
-
 #endif
             end do
 
@@ -989,7 +969,7 @@ contains
 
         s_relaxation_solver => null()
 
-        deallocate (p_infA, pk, sk, hk, gk, ek, rhok)
+        @:DEALLOCATE(p_infA, pk, sk, hk, gk, ek, rhok)
         
     end subroutine
 
