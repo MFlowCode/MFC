@@ -206,7 +206,7 @@ program p_main
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
-!$acc enter data copyin(dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
+!$acc update device(dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
 !$acc update device(sys_size, buff_size)
 !$acc update device(m, n, p)
     do i = 1, sys_size

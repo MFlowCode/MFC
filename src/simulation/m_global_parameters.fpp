@@ -518,7 +518,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-!$acc enter data copyin(weno_polyn,nb)
+!$acc update device(weno_polyn,nb)
         #:endif
 
 
@@ -652,11 +652,11 @@ contains
                     print *, 'R0 weights: ', weight(:)
                     print *, 'R0 abscissas: ', R0(:)
 
-                    !$acc enter data copyin(weight, R0, V0)
+                    !$acc update device(weight, R0, V0)
 
                     if (.not. polytropic) then
                         call s_initialize_nonpoly
-                        !$acc enter data copyin(k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+                        !$acc update device(k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
                     else
                         rhoref = 1.d0
                         pref = 1.d0
@@ -786,7 +786,7 @@ contains
             MPI_IO_DATA%var(i)%sf => null()
         end do
 
-!$acc enter data copyin(Re_size)
+!$acc update device(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
@@ -829,7 +829,7 @@ contains
             startz = -buff_size
         end if
 
-!$acc enter data copyin(startx, starty, startz)
+!$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -852,7 +852,7 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-!$acc enter data copyin(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE_GLOBAL(x_cb(-1 - buff_size:m + buff_size))

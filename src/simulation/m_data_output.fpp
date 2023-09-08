@@ -368,18 +368,21 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
-        !$acc kernels
-        icfl_max_loc = maxval(icfl_sf)
-        !$acc end kernels
+        !$acc update host(icfl_sf)
 
-        if (any(Re_size > 0)) then
-            !$acc kernels
-            vcfl_max_loc = maxval(vcfl_sf)
-            Rc_min_loc = minval(Rc_sf)
-            !$acc end kernels
+        if(any(Re_size > 0)) then
+            !$acc update host(vcfl_sf, Rc_sf)
         end if
 
-        !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
+        icfl_max_loc = maxval(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+        end if
+
+
+        
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then

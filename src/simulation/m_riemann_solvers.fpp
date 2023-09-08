@@ -2083,7 +2083,7 @@ contains
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = 1
+                                    !idxi = 1
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                         xi_M*(rho_L*(vel_L(idx1)* &
                                                      vel_L(idxi) + &
@@ -2125,7 +2125,7 @@ contains
                                 ! Source for volume fraction advection equation
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = 1
+                                    !idxi = 1
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
                                         xi_M*(vel_L(idxi) + &
                                               dir_flg(idxi)* &

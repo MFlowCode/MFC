@@ -439,8 +439,8 @@ contains
                                                           gamma_K, pi_inf_K, &
                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
                                                           G_K, G)
-!$acc routine seq
-
+!DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
+!!$acc routine seq
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K
 
         real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_rho_K, alpha_K !<
@@ -493,17 +493,17 @@ contains
         end if
 
         if (any(Re_size > 0)) then
-
+            
             do i = 1, 2
                 Re_K(i) = dflt_real
-
+        
                 if (Re_size(i) > 0) Re_K(i) = 0d0
-
-                do j = 1, Re_size(i)
+        
+               do j = 1, Re_size(i)
                     Re_K(i) = alpha_K(Re_idx(i, j))/Res(i, j) &
                               + Re_K(i)
                 end do
-
+        
                 Re_K(i) = 1d0/max(Re_K(i), sgm_eps)
 
             end do
@@ -515,7 +515,9 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, &
                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
-!$acc routine seq
+
+!DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
+!!$acc routine seq
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K
 
@@ -578,8 +580,6 @@ contains
     subroutine s_initialize_variables_conversion_module() ! ----------------
 
         integer :: i, j
-! where are these from?
-!!$acc enter data copyin(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
 
 #ifdef MFC_PRE_PROCESS
         ixb = 0; iyb = 0; izb = 0;
@@ -637,17 +637,10 @@ contains
         end if
 
 #ifdef MFC_SIMULATION
-print *, "vars CPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps
-
 !$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
 !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
-
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
-
 !$acc update device(monopole, num_mono)
-
-!$acc update host(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
-print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps
 #endif
 
 #ifdef MFC_POST_PROCESS
@@ -758,33 +751,12 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
         else
             allocate(nRtmp(0))
         endif
-
-        print *, "NUM FLUIDS CPU", num_fluids
-        print *, "GAMMAS CPU", gammas
-        !$acc enter data copyin(num_fluids, gammas)
-        !$acc update host(num_fluids, gammas)
-        print *, "NUM FLUIDS GPU", num_fluids
-        print *, "GAMMAS GPU", gammas
-
+        
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
                     dyn_pres_K = 0d0
-
-                    if(j == 1) then
-                        print *, "NUM_FLUIDS"
-                        print *, num_fluids
-                        print *, "GAMMAS"
-                        print *, gammas(1)
-                        print *, "ADVXB"
-                        print *, advxb
-                        print *, "QK_CONS_VF"
-                        print *, qK_cons_vf(1)%sf(1, 0, 0)
-                        print *, qK_cons_vf(2)%sf(1, 0, 0)
-                        print *, qK_cons_vf(3)%sf(1, 0, 0)
-                        print *, qK_cons_vf(4)%sf(1, 0, 0)
-                    end if
                    
                     !$acc loop seq
                     do i = 1, num_fluids
@@ -796,45 +768,19 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if(j == 1) then
-                        print *, "PRIM"
-                        print *, alpha_K(1)
-                        print *, alpha_rho_K(1)
-                        print *, qK_prim_vf(1)%sf(1, 0, 0)
-                    end if
-
-#ifdef MFC_SIMULATION
-                    rho_K = 0d0
-                    gamma_K = 0d0
-                    pi_inf_K = 0d0
-
-                    do i = 1, num_fluids
-                        rho_K = rho_K + alpha_rho_K(i)
-                        gamma_K = gamma_K + alpha_K(i)*gammas(i)
-                        pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-                    end do
-
-                    if(j == 1) then
-                        print *, "MIXTURE"
-                        print *, gamma_K
-                        print *, pi_inf_K
-                        print *, rho_K
-                    end if
-#endif
-
-                    !if (model_eqns /= 4) then
+                    if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        !if (hypoelasticity) then
-!                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, &
-!                                                                            alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-!                        else if (bubbles) then
-!                            call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, &
-!                                                                                alpha_K, alpha_rho_K, Re_K, j, k, l)
-!                        else 
-                            !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, &
-                            !                                                    alpha_K, alpha_rho_K, Re_K, j, k, l)
-!                        end if
+                        if (hypoelasticity) then
+                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, alpha_K, &
+                                                                            alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                        else if (bubbles) then
+                            call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, &
+                                                                                alpha_K, alpha_rho_K, Re_K, j, k, l)
+                        else 
+                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, &
+                                                                                alpha_K, alpha_rho_K, Re_K, j, k, l)
+                        end if
 #else
                     ! If pre-processing, use non acc mixture subroutines
                         if (hypoelasticity) then
@@ -845,7 +791,7 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
                                                                 rho_K, gamma_K, pi_inf_K)
                         end if
 #endif
-                    !end if
+                    end if
 
 
 #ifdef MFC_SIMULATION
@@ -868,14 +814,6 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
-
-                    if(j == 1) then
-                        print *, "gam, pi_inf"
-                        print *, gamma_K
-                        print *, pi_inf_K
-                        print *, rho_K
-                        print *, pres
-                    end if
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
@@ -1103,7 +1041,7 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
-        !!$acc enter data copyin(is1b, is2b, is3b, is1e, is2e, is3e)
+        !$acc enter data copyin(is1b, is2b, is3b, is1e, is2e, is3e)
 
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
@@ -1156,6 +1094,7 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
                         FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx(1))
                     end do
 
+
 !$acc loop seq
                     do i = 1, num_dims
                         FK_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -1163,6 +1102,8 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
                             *vel_K(dir_idx(i)) &
                             + pres_K*dir_flg(dir_idx(i))
                     end do
+
+
 
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
@@ -1188,6 +1129,7 @@ print *, "vars GPU INIT", dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_i
                         end do
 
                     end if
+
                 end do
             end do
         end do

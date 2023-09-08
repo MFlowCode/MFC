@@ -523,11 +523,11 @@ contains
 
         integer :: t1, t2, c_rate, c_max
 
-        is1 = is1_d
-        is2 = is2_d
-        is3 = is3_d
+        is1_weno = is1_weno_d
+        is2_weno = is2_weno_d
+        is3_weno = is3_weno_d
         
-        !$acc enter data copyin(is1_weno, is2_weno, is3_weno)
+        !$acc update device(is1_weno, is2_weno, is3_weno)
 
         print*, "weno_init"
         if (weno_order /= 1) then
@@ -704,6 +704,11 @@ contains
 
                                 vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
 
+                                if(j == 1) then
+                                        print *, "WENO OUTPUT"
+                                        print *, vL_rs_vf_x(j, k, l, i)
+                                        print *, vR_rs_vf_x(j, k, l, i)
+                                 end if
                                 poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
@@ -728,8 +733,12 @@ contains
                                 end if
 
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-
-                            end do
+                                if(j == 1) then
+                                        print *, "WENO OUTPUT"
+                                        print *, vL_rs_vf_x(j, k, l, i)
+                                        print *, vR_rs_vf_x(j, k, l, i)
+                                 end if
+                             end do
                         end do
                     end do
                 end do
@@ -743,6 +752,7 @@ contains
             end if
             #:endfor
         end if
+
 
     end subroutine s_weno
 
@@ -774,7 +784,7 @@ contains
         ! as to reshape the inputted data in the coordinate direction of
         ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
-        !$acc enter data copyin(v_size)
+        !$acc update device(v_size)
 
         if (weno_dir == 1) then
             !$acc parallel loop collapse(4) gang vector default(present)

@@ -132,6 +132,9 @@ module m_cbc
     ! ==========================================================================
 
     type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
+#ifdef _CRAYFTN
+    !$acc declare create(is1, is2, is3)
+#endif
 
     integer :: dj
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
@@ -677,13 +680,14 @@ contains
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
 
-        !$acc enter data copyin(cbc_dir, cbc_loc)
+        !$acc update device(cbc_dir, cbc_loc)
 
 
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                               ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
+
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
         if (cbc_dir == ${CBC_DIR}$) then
@@ -724,10 +728,12 @@ contains
 
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
             elseif (weno_order == 5) then
+
                 call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                            F_rs${XYZ}$_vf, &
                                                            F_src_rs${XYZ}$_vf, &
                                                            is1, is2, is3, starty, startz)
+
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, advxe
@@ -768,7 +774,6 @@ contains
                         end do
                     end do
                 end do
-
             end if
             ! ==================================================================
 
@@ -802,6 +807,7 @@ contains
                         adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
                     end do
 
+                    
                     if (bubbles) then
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, adv, alpha_rho, Re_cbc, 0, k, r)
 
@@ -1000,7 +1006,7 @@ contains
                         end do
 
                     end if
-                    ! END: flux_rs_vf and flux_src_rs_vf at j = -1/2 =============
+                    ! END: flux_rs_vf and flux_src_rs_vf at j = -1/2 =============                    
 
                 end do
             end do
@@ -1013,10 +1019,8 @@ contains
         ! The reshaping of outputted data and disssociation of the FD and PI
         ! coefficients, or CBC coefficients, respectively, based on selected
         ! CBC coordinate direction.
-
         call s_finalize_cbc(flux_vf, flux_src_vf, &
                             ix, iy, iz)
-
     end subroutine s_cbc ! -------------------------------------------------
 
     !>  The computation of parameters, the allocation of memory,
@@ -1062,8 +1066,8 @@ contains
         end if
 
         dj = max(0, cbc_loc)
-
-        !$acc enter data copyin(is1, is2, is3, dir_idx, dir_flg, dj)
+        !$acc enter data copyin(is1, is2, is3, dj)
+        !$acc update device( dir_idx, dir_flg)
 
         ! Reshaping Inputted Data in x-direction ===========================
         if (cbc_dir == 1) then
@@ -1090,7 +1094,6 @@ contains
                     end do
                 end do
             end do
-
 !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, advxe
                 do r = is3%beg, is3%end
@@ -1138,7 +1141,6 @@ contains
                     end do
                 end do
             end if
-
 
             ! END: Reshaping Inputted Data in x-direction ======================
 

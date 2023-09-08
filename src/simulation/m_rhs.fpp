@@ -1031,7 +1031,6 @@ contains
                             end if
                         end do
                     else
-                        print*, "here"
                         !$acc parallel loop collapse(4) gang vector default(present) &
                         !$acc& attach(rhs_vf(j)%sf)
                         do j = advxb, advxe
