@@ -60,12 +60,7 @@ module m_phase_change
 
     !$acc declare create(max_iter,pres_crit,T_crit,lp,vp,A,B,C,D)
 
-    real(kind(0d0)), allocatable, dimension(:) :: p_infA, pk, sk, hk, gk, ek, rhok
-
-    !$acc declare create(p_infA, pk, sk, hk, gk, ek, rhok)
-
-    procedure(s_abstract_relaxation_solver), &
-        pointer :: s_relaxation_solver => null()
+    procedure(s_abstract_relaxation_solver), pointer :: s_relaxation_solver => null()
 
 contains
 
@@ -88,9 +83,6 @@ contains
         D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
             /((gs_min(vp) - 1.0d0)*cvs(vp))
 
-        @:ALLOCATE(p_infA(1:num_fluids), pk(1:num_fluids), sk(1:num_fluids), &
-        hk(1:num_fluids), gk(1:num_fluids), ek(1:num_fluids), rhok(1:num_fluids))
-
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution to the selected relaxation system
         if ((relax_model == 5) .or. (relax_model == 6)) then
@@ -111,14 +103,18 @@ contains
         real(kind(0.0d0)) :: rho, rM, m1, m2, MCT, mixM, rhoT, rMT
         real(kind(0.0d0)) :: TvF, TvFT
         
+        real(kind(0d0)), dimension(num_fluids) :: p_infA, pk, sk, hk, gk, ek, rhok
+
         !< Generic loop iterators
-        integer :: i, j, k, l, ns
+        integer :: i, j, k, l
+
+        !$acc declare create(p_infA, pk, sk, hk, gk, ek, rhok)
 
         ! threshold for 'mixture cell'. If Y < mixM, the cell is not considered a mixture for pTg purposes
         mixM = 1.0d-08
 
         ! starting equilibrium solver
-        !$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present) private(p_infA, pk, sk, hk, gk, ek, rhok)
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -128,10 +124,8 @@ contains
                     do i = 1, num_fluids
 
                         ! pressure that comes from the homogeneous solver at that cell
-                        pk(i) = (gs_min(i) - 1)*(q_cons_vf(i + intxb - 1)%sf(j, k, l) &
-                                  - q_cons_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)) &
-                                /q_cons_vf(i + advxb - 1)%sf(j, k, l) &
-                                - gs_min(i)*ps_inf(i)
+                        pk(i) = (gs_min(i) - 1)*(q_cons_vf(i + intxb - 1)%sf(j, k, l) - q_cons_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)) &
+                                / q_cons_vf(i + advxb - 1)%sf(j, k, l) - gs_min(i)*ps_inf(i)
 
                         ! Mixture density
                         rho = rho + q_cons_vf(i + contxb - 1)%sf(j, k, l)
@@ -832,7 +826,7 @@ contains
 
     ! SUBROUTINE CREATED TO TELL ME WHERE THE ERROR IN THE PT- AND PTG-EQUILIBRIUM SOLVERS IS
     subroutine s_tattletale(DeltamP, InvJac, j, Jac, k, l, mQ, p_infA, pS, R2D, rhoe, q_cons_vf, TS) ! ----------------
-        
+
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0.0d0)), dimension(2, 2), intent(IN) :: Jac, InvJac
         real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: p_infA
@@ -968,8 +962,6 @@ contains
     subroutine s_finalize_relaxation_solver_module()
 
         s_relaxation_solver => null()
-
-        @:DEALLOCATE(p_infA, pk, sk, hk, gk, ek, rhok)
         
     end subroutine
 
