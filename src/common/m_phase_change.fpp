@@ -103,6 +103,8 @@ contains
         real(kind(0.0d0)) :: rho, rM, m1, m2, MCT, mixM, rhoT, rMT
         real(kind(0.0d0)) :: TvF, TvFT
         
+        !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, mixM, rhoT, rMT, TvF, TvFT)
+
         real(kind(0d0)), dimension(num_fluids) :: p_infA, pk, sk, hk, gk, ek, rhok
 
         !< Generic loop iterators
@@ -114,7 +116,7 @@ contains
         mixM = 1.0d-08
 
         ! starting equilibrium solver
-        !$acc parallel loop collapse(3) gang vector default(present) private(p_infA, pk, sk, hk, gk, ek, rhok)
+        !$acc parallel loop collapse(3) gang vector default(present) private(p_infA, pk, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, mixM, rhoT, rMT, TvF, TvFT)
         do j = 0, m
             do k = 0, n
                 do l = 0, p
